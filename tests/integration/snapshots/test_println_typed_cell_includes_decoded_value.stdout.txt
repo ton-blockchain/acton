@@ -1,0 +1,12 @@
+  Installing standard library [ACTON_VERSION]
+Boxed {
+    child: Cell<Child> 8 bits, 0 refs, hash: 0x2730af09... {
+        decoded: Child {
+            value: 42,
+        },
+        bits: 8,
+        refs: 0,
+        hash: 0x2730af090faf7a9d925c11622e4b1b6cb8a8d4c45cdb7d3b6c10f409c10c1c81,
+        raw: cell{[BOC_HEX]},
+    },
+}

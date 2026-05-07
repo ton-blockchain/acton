@@ -9,7 +9,7 @@
 
  > tests/test.test.tolk (1 test)
   ✗ foo [TIME]
-    └─ Cannot execute unknown get method currentCounter999 (112466)
+    └─ Cannot execute unknown get method currentCounter999 (112466), did you mean 'currentCounter'
 
  ✗ 1 failed in 1 file
 

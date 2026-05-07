@@ -21,7 +21,7 @@
                        ownerOrFriend: [WALLET_ADDRESS_BASE] (friend)
                        anyInternal: [WALLET_ADDRESS_BASE] (sender)
                        anyExternal: :beef0001
-                       anyNone: null
+                       anyNone: "none"
                    }
                    values: {
                        tiny: 7
@@ -32,7 +32,7 @@
                        nibble: 0xABC0 (12 bits)
                        bytesTag: 0xCAFEBABE
                        rawCell: [BOC_HEX]
-                       mode: { value: 2 }
+                       mode: 2
                    }
                }
                tuples: {

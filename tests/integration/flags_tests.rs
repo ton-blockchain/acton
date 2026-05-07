@@ -1,6 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::compilation::extract_compiled_contracts;
-use crate::support::project::ProjectBuilder;
+use crate::support::project::{Project, ProjectBuilder, TestConfig};
 use acton_config::color::ColorMode;
 use std::fs;
 
@@ -101,6 +101,41 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const PROFILED_TEST_WITH_FAILURE: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test-profiled-transaction`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployer = testing.treasury("deployer");
+    val deployMessage = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    val deployResult = net.send(deployer.address, deployMessage);
+    expect(deployResult.size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    });
+    val pingResult = net.send(deployer.address, ping);
+    expect(pingResult.size()).toEqual(2);
+}
+"#;
+
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build"
 import "../../lib/testing/expect"
@@ -125,6 +160,56 @@ get fun `{test_name}`() {{
 }}
 "#
     )
+}
+
+fn append_acton_toml(project: &Project, content: &str) {
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("should read generated Acton.toml");
+    acton_toml.push_str(content);
+    fs::write(&acton_toml_path, acton_toml).expect("should update generated Acton.toml");
+}
+
+fn fail_fast_project(project_name: &str, configured_fail_fast: Option<bool>) -> ProjectBuilder {
+    let builder = ProjectBuilder::new(project_name)
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test first pass`() {
+                expect(1).toEqual(1);
+            }
+
+            get fun `test second fail`() {
+                expect(1).toEqual(2);
+            }
+
+            get fun `test third pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+
+            get fun `test fourth pass`() {
+                expect(1).toEqual(1);
+            }
+        "#,
+        );
+
+    if let Some(fail_fast) = configured_fail_fast {
+        builder.with_test_config(TestConfig {
+            fail_fast: Some(fail_fast),
+            ..TestConfig::default()
+        })
+    } else {
+        builder
+    }
 }
 
 fn body_printing_test_project(project_name: &str) -> ProjectBuilder {
@@ -436,37 +521,7 @@ fn test_exclude_flag_filters_test_files() {
 
 #[test]
 fn test_fail_fast() {
-    let project = ProjectBuilder::new("fail-fast")
-        .contract("simple", SIMPLE_CONTRACT)
-        .test_file(
-            "test1",
-            r#"
-            import "../../lib/testing/expect"
-
-            get fun `test first pass`() {
-                expect(1).toEqual(1);
-            }
-
-            get fun `test second fail`() {
-                expect(1).toEqual(2);
-            }
-
-            get fun `test third pass`() {
-                expect(1).toEqual(1);
-            }
-        "#,
-        )
-        .test_file(
-            "test2",
-            r#"
-            import "../../lib/testing/expect"
-
-            get fun `test fourth pass`() {
-                expect(1).toEqual(1);
-            }
-        "#,
-        )
-        .build();
+    let project = fail_fast_project("fail-fast", None).build();
 
     // Without fail-fast: should fail but run all tests
     project
@@ -496,6 +551,68 @@ fn test_fail_fast() {
         .assert_not_contains("third pass")
         .assert_not_contains("fourth pass")
         .assert_snapshot_matches("integration/snapshots/flags/test_with_fail_fast.stdout.txt");
+}
+
+#[test]
+fn test_fail_fast_config_stops_after_first_failure() {
+    let project = fail_fast_project("fail-fast-config", Some(true)).build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_passed(1)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_config_stops_after_first_failure.stdout.txt",
+        );
+}
+
+#[test]
+fn test_fail_fast_flag_overrides_false_config() {
+    let project = fail_fast_project("fail-fast-cli-overrides-config", Some(false)).build();
+
+    project
+        .acton()
+        .test()
+        .fail_fast()
+        .run()
+        .failure()
+        .assert_passed(1)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_not_contains("third pass")
+        .assert_not_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_flag_overrides_false_config.stdout.txt",
+        );
+}
+
+#[test]
+fn test_fail_fast_false_flag_overrides_true_config() {
+    let project = fail_fast_project("fail-fast-false-cli-overrides-config", Some(true)).build();
+
+    project
+        .acton()
+        .test()
+        .arg("--fail-fast=false")
+        .run()
+        .failure()
+        .assert_passed(3)
+        .assert_failed(1)
+        .assert_contains("first pass")
+        .assert_contains("second fail")
+        .assert_contains("third pass")
+        .assert_contains("fourth pass")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_fail_fast_false_flag_overrides_true_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -550,6 +667,48 @@ fn test_junit_path_flag_writes_report_to_custom_directory() {
 }
 
 #[test]
+fn test_junit_path_flag_overrides_configured_path() {
+    let project = ProjectBuilder::new("test-junit-path-overrides-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            &passing_test_file(ROOT_TEST_IMPORT, "test junit custom path", 1),
+        )
+        .with_test_config(TestConfig {
+            reporters: Some(vec!["junit".to_owned()]),
+            junit_path: Some("configured-reports".to_owned()),
+            ..TestConfig::default()
+        })
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .arg("--junit-path")
+        .arg("cli-reports")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_junit_path_flag_overrides_configured_path.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "cli-reports/TEST-test.test.tolk.xml",
+            "integration/snapshots/flags/test_junit_path_flag_overrides_configured_path.xml.gen",
+        );
+
+    let configured_report = project
+        .path()
+        .join("configured-reports/TEST-test.test.tolk.xml");
+    assert!(
+        !configured_report.exists(),
+        "configured junit report should not be written when --junit-path is set: {}",
+        configured_report.display()
+    );
+}
+
+#[test]
 fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
     let project = ProjectBuilder::new("test-clear-cache-flag")
         .contract("simple", SIMPLE_CONTRACT)
@@ -557,6 +716,10 @@ fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
             "test",
             &passing_test_file(ROOT_TEST_IMPORT, "test-clear-cache", 1),
         )
+        .with_test_config(TestConfig {
+            reporters: Some(vec!["console".to_owned()]),
+            ..TestConfig::default()
+        })
         .build();
 
     let first_run = project.acton().test().run().success();
@@ -586,6 +749,34 @@ fn test_clear_cache_flag_recompiles_contracts_before_running_tests() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/flags/test_clear_cache_flag_recompiles_contracts_before_running_tests.stdout.txt",
+        );
+}
+
+#[test]
+fn test_invalid_test_fork_net_config_reports_error() {
+    let project = ProjectBuilder::new("test-invalid-fork-net-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test",
+            &passing_test_file(ROOT_TEST_IMPORT, "test invalid fork net config", 1),
+        )
+        .build();
+
+    append_acton_toml(
+        &project,
+        r#"
+[test]
+fork-net = "bogus"
+"#,
+    );
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_invalid_test_fork_net_config_reports_error.stderr.txt",
         );
 }
 
@@ -1248,6 +1439,30 @@ fn test_fail_on_diff_succeeds_when_profile_matches_baseline() {
 }
 
 #[test]
+fn test_profiling_tables_are_hidden_when_tests_fail() {
+    let project = ProjectBuilder::new("profiling-hidden-on-test-failure")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", PROFILED_TEST_WITH_FAILURE)
+        .build();
+    project.acton().init().run().success();
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .test()
+        .arg("--baseline-snapshot")
+        .arg("missing-baseline.json")
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/flags/test_profiling_tables_are_hidden_when_tests_fail.stderr.txt",
+        );
+}
+
+#[test]
 fn test_baseline_missing_without_fail_on_diff_warns_and_succeeds() {
     let project = ProjectBuilder::new("profiling-baseline-missing-non-strict")
         .contract("simple", SIMPLE_CONTRACT)
@@ -1375,6 +1590,7 @@ fn test_up_rejects_conflicting_flag_combinations() {
         (&["--force", "--list"], &["--force", "--list"]),
         (&["--force", "--check"], &["--force", "--check"]),
         (&["--list", "--check"], &["--list", "--check"]),
+        (&["--yes", "--list", "--check"], &["--list", "--check"]),
     ];
 
     for (args, expected_needles) in cases {

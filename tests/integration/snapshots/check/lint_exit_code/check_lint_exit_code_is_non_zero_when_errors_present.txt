@@ -1,4 +1,4 @@
-warning[E002]: variable is unused
+warning[E001]: variable is unused
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val x =

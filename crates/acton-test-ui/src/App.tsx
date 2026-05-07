@@ -1,6 +1,6 @@
 import * as React from "react"
 import {useCallback, useEffect, useRef, useState} from "react"
-import {FiChevronRight} from "react-icons/fi"
+import {FiChevronRight, FiWifiOff} from "react-icons/fi"
 
 import type {TestReport, Trace} from "@acton/shared-ui"
 
@@ -8,6 +8,8 @@ import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
+
+const RUNNER_HEALTH_POLL_INTERVAL_MS = 1500
 
 export const App: React.FC = () => {
   const [reports, setReports] = useState<TestReport[]>([])
@@ -23,6 +25,7 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [coverageLcov, setCoverageLcov] = useState<string | undefined>()
   const [coverageLoaded, setCoverageLoaded] = useState(false)
+  const [connectionLost, setConnectionLost] = useState(false)
   const [activeView, setActiveView] = useState<"tests" | "coverage">(() => {
     const saved = localStorage.getItem("activeMainView")
     return saved === "coverage" ? "coverage" : "tests"
@@ -50,6 +53,12 @@ export const App: React.FC = () => {
   const [isHoveredResizer, setIsHoveredResizer] = useState(false)
   const isResizing = useRef(false)
   const lastWidth = useRef(sidebarWidth)
+  const hasConnectedToRunner = useRef(false)
+
+  const markRunnerConnected = useCallback(() => {
+    hasConnectedToRunner.current = true
+    setConnectionLost(false)
+  }, [])
 
   const handleSelectTest = useCallback((test: TestReport) => {
     setSelectedTest(test)
@@ -110,6 +119,7 @@ export const App: React.FC = () => {
     void fetch("/api/config", {signal: configController.signal})
       .then(async res => (await res.json()) as {project_root: string})
       .then(data => {
+        markRunnerConnected()
         setProjectRoot(data.project_root)
       })
       .catch(error => {
@@ -123,6 +133,7 @@ export const App: React.FC = () => {
     void fetch("/api/reports", {signal: reportsController.signal})
       .then(async res => (await res.json()) as TestReport[])
       .then(data => {
+        markRunnerConnected()
         setReports(data)
         setLoading(false)
       })
@@ -138,6 +149,7 @@ export const App: React.FC = () => {
     void fetch("/api/coverage.lcov", {signal: coverageController.signal})
       .then(async response => {
         if (response.status === 204) {
+          markRunnerConnected()
           setCoverageLcov(undefined)
           setCoverageLoaded(true)
           return
@@ -148,6 +160,7 @@ export const App: React.FC = () => {
         }
 
         const lcov = await response.text()
+        markRunnerConnected()
         setCoverageLcov(lcov)
         setCoverageLoaded(true)
       })
@@ -166,7 +179,46 @@ export const App: React.FC = () => {
       reportsController.abort()
       configController.abort()
     }
-  }, [])
+  }, [markRunnerConnected])
+
+  useEffect(() => {
+    const checkRunnerConnection = () => {
+      const controller = new AbortController()
+
+      void fetch("/api/health", {
+        cache: "no-store",
+        signal: controller.signal,
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Runner health check failed: ${response.status}`)
+          }
+
+          markRunnerConnected()
+        })
+        .catch(error => {
+          if (error instanceof Error && error.name === "AbortError") {
+            return
+          }
+
+          if (hasConnectedToRunner.current) {
+            setConnectionLost(true)
+          }
+        })
+
+      return controller
+    }
+
+    const currentController = checkRunnerConnection()
+    const intervalId = globalThis.setInterval(() => {
+      void checkRunnerConnection()
+    }, RUNNER_HEALTH_POLL_INTERVAL_MS)
+
+    return () => {
+      currentController.abort()
+      globalThis.clearInterval(intervalId)
+    }
+  }, [markRunnerConnected])
 
   useEffect(() => {
     if (reports.length === 0) {
@@ -198,6 +250,29 @@ export const App: React.FC = () => {
 
   return (
     <div className={styles.app}>
+      {connectionLost && (
+        <div className={styles.connectionOverlay}>
+          <div
+            className={styles.connectionDialog}
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="connection-lost-title"
+            aria-describedby="connection-lost-description"
+          >
+            <div className={styles.connectionIcon} aria-hidden="true">
+              <FiWifiOff />
+            </div>
+            <h1 id="connection-lost-title" className={styles.connectionTitle}>
+              Connection lost
+            </h1>
+            <p id="connection-lost-description" className={styles.connectionMessage}>
+              The connection to the test runner was lost. Restart the runner to continue using the
+              test UI.
+            </p>
+          </div>
+        </div>
+      )}
+
       {!isSidebarCollapsed && (
         <Sidebar
           reports={reports}

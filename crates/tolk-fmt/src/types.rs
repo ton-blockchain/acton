@@ -8,6 +8,10 @@ use tolk_syntax::{
 #[must_use]
 pub fn print_type<'a>(ctx: &Context<'_>, typ: &Type) -> Option<RcDoc<'a>> {
     let node = typ.syntax();
+    if !common::should_format_node(ctx, &node) {
+        return Some(common::print_original_node_text_inline(ctx, &node));
+    }
+
     let comments = ctx.comments.get(&node);
 
     if comments.is_none() {
@@ -223,7 +227,7 @@ pub fn print_type_instantiated_ts<'a>(
     Some(RcDoc::concat([name_doc, types_doc]))
 }
 
-fn single_type_argument_should_stay_inline(typ: &Type) -> bool {
+pub(crate) fn single_type_argument_should_stay_inline(typ: &Type) -> bool {
     !matches!(
         typ,
         Type::TypeInstantiatedTs(inst)

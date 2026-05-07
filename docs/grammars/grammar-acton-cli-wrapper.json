@@ -1,0 +1,27 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-cli-wrapper",
+  "scopeName": "source.acton-cli-wrapper",
+  "patterns": [
+    {
+      "include": "#wrapperStages"
+    },
+    {
+      "include": "source.acton-cli"
+    }
+  ],
+  "repository": {
+    "wrapperStages": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(Generated)(\\b.*)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli-wrapper"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

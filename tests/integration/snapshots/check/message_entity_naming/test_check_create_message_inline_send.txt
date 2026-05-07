@@ -1,4 +1,4 @@
-warning[E012]: create named message before send
+warning[S006]: create named message before send
   --> [ROOT]/contracts/main[LINE]
   |  
 3 | /                 createMessage({
@@ -12,4 +12,4 @@ warning[E012]: create named message before send
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E012
+For example: acton check --explain S006

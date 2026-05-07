@@ -25,10 +25,16 @@ If `Acton.toml` does not exist, the command scans `.tolk` files in the current
 directory tree and auto-registers files that define `onInternalMessage` as
 contract entry files.
 
-With `--create-app`, `acton init` switches to app-only mode. In that mode,
+With `--create-dapp`, `acton init` switches to app-only mode. In that mode,
 Acton does not create or patch `Acton.toml`, `.gitignore`, `.acton/`,
 or overlay symlinks. It only creates a Vite-based TypeScript app scaffold in
 `./app` by default, or in the provided path.
+
+With `--stdlib-only`, `acton init` switches to standard-library-only mode. In
+that mode, Acton does not read, create, or patch `Acton.toml`, does not patch
+`.gitignore`, and does not create overlay symlinks. It re-extracts the bundled
+standard library into `.acton/` even when `Acton.toml` is missing or the stored
+stdlib version already matches the current Acton version.
 
 ## Idempotency
 
@@ -41,19 +47,29 @@ or overlay symlinks. It only creates a Vite-based TypeScript app scaffold in
 - it refreshes `.acton/tolk-stdlib`
 - it re-attempts global wallet and library symlinks on each run
 
-The `--create-app` mode is not idempotent: it fails if the target app
+The `--create-dapp` mode is not idempotent: it fails if the target app
 directory already exists.
+
+The `--stdlib-only` mode is safe to run repeatedly, but it always re-extracts
+the bundled standard library instead of relying on the stored version marker.
 
 ## Init Options
 
 {{#options}}
 
-{{#option "`--create-app` [_path_]" }}
+{{#option "`--create-dapp` [_path_]" }}
 Create a Vite-based TypeScript app scaffold instead of performing project
 initialization.
 
 If `_path_` is omitted, Acton uses `app`. The target directory must not already
 exist.
+{{/option}}
+
+{{#option "`--stdlib-only`" }}
+Update the bundled standard library without touching `Acton.toml`.
+
+This mode always re-extracts the standard library into `.acton/`, even outside
+an initialized Acton project.
 {{/option}}
 
 {{/options}}
@@ -75,8 +91,10 @@ The default `acton init` flow can create or update:
 - `.acton/`
 - local symlinks for `global.wallets.toml` and `global.libraries.toml`
 
-With `--create-app`, `acton init` only creates `app/` or the provided app
+With `--create-dapp`, `acton init` only creates `app/` or the provided app
 directory.
+
+With `--stdlib-only`, `acton init` only creates or updates `.acton/`.
 
 When `Acton.toml` is created from scratch, it starts from Acton's default
 project config and may include:
@@ -114,6 +132,9 @@ When generating a new `Acton.toml`, contract discovery:
 `acton init` ensures that the bundled Tolk standard library is installed into
 `.acton/tolk-stdlib`.
 
+With `--stdlib-only`, Acton refreshes the bundled standard library
+unconditionally and does not require `Acton.toml` to exist.
+
 If global wallet or library overlay files already exist, `acton init` also
 tries to create local symlinks for them. Existing local files and non-dangling
 symlinks are left in place; Acton only creates the link when the local path
@@ -133,8 +154,15 @@ When it patches an existing `Acton.toml`, it rewrites the parsed manifest and
 may drop TOML comments or unknown keys; `.gitignore` patching remains
 append-only.
 
-With `--create-app`, `acton init` writes only inside the new app directory and
+The default flow normally refreshes the bundled standard library under
+`.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic refresh.
+This does not affect `--stdlib-only`, which always refreshes `.acton/`
+explicitly.
+
+With `--create-dapp`, `acton init` writes only inside the new app directory and
 does not touch Acton project files.
+
+With `--stdlib-only`, `acton init` writes only inside `.acton/`.
 
 ## Exit Status
 
@@ -142,6 +170,8 @@ does not touch Acton project files.
 - `1`: Manifest parsing, stdlib installation, writing or patching project
   files, or another hard filesystem operation failed. Contract discovery skips
   unreadable/unparseable `.tolk` files, and overlay symlink failures only warn.
+  In `--stdlib-only` mode, manifest parsing and overlay symlink operations are
+  skipped.
 
 ## Examples
 
@@ -160,19 +190,25 @@ does not touch Acton project files.
 3. Create only the default app scaffold:
 
    ```bash
-   acton init --create-app
+   acton init --create-dapp
    ```
 
 4. Create only the app scaffold in `frontend/`:
 
    ```bash
-   acton init --create-app frontend
+   acton init --create-dapp frontend
    ```
 
 5. Re-run safely after adding more contracts:
 
    ```bash
    acton init
+   ```
+
+6. Refresh only the bundled standard library:
+
+   ```bash
+   acton init --stdlib-only
    ```
 
 ## See Also

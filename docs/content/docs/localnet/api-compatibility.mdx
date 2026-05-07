@@ -15,6 +15,7 @@ This page tracks TonCenter v2 and v3 API coverage in Acton local development nod
 | `GET`  | `/api/v2/unpackAddress`                 | ✅                       | Unpack address                   |
 | `GET`  | `/api/v2/getAddressInformation`         | ✅                       | Get Address Information          |
 | `GET`  | `/api/v2/getExtendedAddressInformation` | ✅                       | Get Extended Address Information |
+| `GET`  | `/api/v2/getShardAccountCell`           | ✅                       | Get Shard Account Cell           |
 | `GET`  | `/api/v2/getWalletInformation`          | ❌                       | Get Wallet Information           |
 | `GET`  | `/api/v2/getAddressBalance`             | ✅                       | Get Address Balance              |
 | `GET`  | `/api/v2/getAddressState`               | ✅                       | Get Address State                |
@@ -37,6 +38,11 @@ This page tracks TonCenter v2 and v3 API coverage in Acton local development nod
 | `GET`  | `/api/v2/getConfigParam`                | ✅                       | Get Config Parameter             |
 | `GET`  | `/api/v2/getConfigAll`                  | ✅                       | Get All Config                   |
 | `GET`  | `/api/v2/getLibraries`                  | ✅                       | Get Libraries                    |
+
+`/api/v2/getShardAccountCell` accepts `address` and optional `seqno`, and returns
+a TonCenter `tvm.cell` object with base64-encoded BOC bytes. The same method is
+also available through the v2 JSON-RPC entrypoints: `POST /api/v2` and
+`POST /api/v2/jsonRPC`.
 
 ## TonCenter v3 Coverage Matrix
 

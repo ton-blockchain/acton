@@ -2,7 +2,11 @@ use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
-use crate::server::models::*;
+use crate::server::models::{
+    AddressRequest, DetectHashRequest, GetAddressInformationRequest, GetBlockRequest,
+    GetConfigAllRequest, GetConfigParamRequest, GetLibrariesRequest, GetTransactionsRequest,
+    JsonRpcRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest, TryLocateTxRequest,
+};
 use crate::types::Hash256;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
@@ -110,6 +114,12 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
             node.get_address_information(req.address, req.seqno)
                 .await
                 .map(|r| v2::map_account_state(&r))?
+        }
+        "getShardAccountCell" => {
+            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            node.get_shard_account_cell(req.address, req.seqno)
+                .await
+                .map(|r| v2::map_shard_account_cell(&r))?
         }
         "getAddressBalance" => {
             let req: GetAddressInformationRequest = parse_params(params, method)?;

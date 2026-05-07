@@ -15,7 +15,7 @@ use tolk_syntax::{GlobalVar, HasName};
 /// ### Example
 /// ```tolk twoslash
 /// global counter: int
-/// //     ^^^^^^^ E028: global variable declarations are not allowed
+/// //     ^^^^^^^ E022: global variable declarations are not allowed
 /// ```
 ///
 /// Use instead:

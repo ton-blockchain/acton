@@ -135,7 +135,7 @@ What this does:
 ## Building from source
 
 Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
-`i582/ton` fork branch `pmakhnev/acton`.
+upstream `ton-blockchain/ton` repository branch `pmakhnev/acton`.
 
 ### Artifact ownership and verification
 
@@ -190,7 +190,7 @@ just build-dev
 Clone the TON repository from the Acton repo root:
 
 ```bash
-git clone --branch pmakhnev/acton https://github.com/i582/ton.git ton-repo --recurse-submodules
+git clone --branch pmakhnev/acton https://github.com/ton-blockchain/ton.git ton-repo --recurse-submodules
 ```
 
 Build the static artifacts with the script for your platform.

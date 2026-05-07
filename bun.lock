@@ -30,7 +30,7 @@
         "@ton/core": "0.62.0",
         "@types/react-router-dom": "^5.3.3",
         "buffer": "^6.0.3",
-        "gen-typescript-from-tolk-dev": "^0.2.0",
+        "gen-typescript-from-tolk-dev": "^0.3.4",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
@@ -57,7 +57,7 @@
         "@ton/core": "0.62.0",
         "buffer": "^6.0.3",
         "clsx": "^2.1.1",
-        "gen-typescript-from-tolk-dev": "^0.2.0",
+        "gen-typescript-from-tolk-dev": "^0.3.4",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
@@ -81,7 +81,7 @@
         "bignumber.js": "^9.3.1",
         "buffer": "^6.0.3",
         "d3-hierarchy": "^1.1.9",
-        "gen-typescript-from-tolk-dev": "^0.2.0",
+        "gen-typescript-from-tolk-dev": "^0.3.4",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
         "shiki": "^3.22.0",
@@ -731,7 +731,7 @@
 
     "functions-have-names": ["functions-have-names@1.2.3", "", {}, "sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ=="],
 
-    "gen-typescript-from-tolk-dev": ["gen-typescript-from-tolk-dev@0.2.0", "", { "dependencies": { "@ton/core": "0.62.0" }, "bin": { "gen-typescript-from-tolk-dev": "bin/generator.js" } }, "sha512-laz8jorqwfj8nWQzGdhzEip4daYV+Rgtz9REqYsOEeIhUsmkX7HmtBfaxnCKgBWVflnOZvjk3bMmZYIhBn8EeA=="],
+    "gen-typescript-from-tolk-dev": ["gen-typescript-from-tolk-dev@0.3.4", "", { "bin": { "gen-typescript-from-tolk": "dist/cli.js" } }, "sha512-Sl2XjlzYPzKfUSWi61LZ2euj6dBX9NOgVpYaY9b6dr3/wfXj0eyyphxYzHgd69qDlqZf/vvyX+wRiv1NxBsbKQ=="],
 
     "generator-function": ["generator-function@2.0.1", "", {}, "sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g=="],
 

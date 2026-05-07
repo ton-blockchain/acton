@@ -1,0 +1,1 @@
+Error: --tonconnect supports only --net mainnet and --net testnet; use configured local wallets for localnet

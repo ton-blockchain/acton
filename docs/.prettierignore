@@ -1,0 +1,9 @@
+*
+!*/
+node_modules/
+.next/
+out/
+build/
+.source/
+!*.ts
+!*.tsx

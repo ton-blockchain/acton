@@ -17,7 +17,7 @@ use tolk_syntax::{FuncBody, FunctionLike, HasName, TopLevel};
 /// ### Example
 /// ```tolk twoslash
 /// fun lowLevelLoad(x: slice): int asm "32 LDI";
-/// //                              ^^^ E015: asm function requires safety comment
+/// //                              ^^^ E011: asm function requires safety comment
 /// ```
 ///
 /// Use instead:

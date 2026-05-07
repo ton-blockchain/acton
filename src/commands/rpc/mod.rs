@@ -7,17 +7,20 @@ use clap::Subcommand;
 use log::warn;
 use num_bigint::{BigInt, Sign};
 use std::fs;
+use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
-use tolk_compiler::abi::ContractABI as CompilerContractABI;
-use ton_abi::abi_serde::Data as CompilerAbiData;
-use ton_abi::{ContractAbi, compiler_abi_serde, contract_abi};
+use tolk_compiler::SourceMap;
+use tolk_compiler::abi::ContractABI;
+use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::models::{
     Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
 };
+
+mod trace;
 
 #[derive(Subcommand, Clone)]
 pub enum RpcCommand {
@@ -31,11 +34,67 @@ pub enum RpcCommand {
         )]
         net: Option<String>,
     },
+    #[command(about = "Print the latest masterchain block info returned by TonCenter")]
+    Block {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Print the latest masterchain block number for a network")]
+    BlockNumber {
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+    },
+    #[command(about = "Render a TonCenter v3 trace as a decoded transaction tree")]
+    Trace {
+        #[arg(help = "Root transaction hash to query through TonCenter v3 /traces")]
+        hash: String,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            conflicts_with_all = ["tree", "verbose"],
+            help = "Print only the trace summary"
+        )]
+        summary: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "verbose"],
+            help = "Print the trace summary and transaction tree (default)"
+        )]
+        tree: bool,
+        #[arg(
+            long,
+            conflicts_with_all = ["summary", "tree"],
+            help = "Print the summary, tree, and stable per-transaction fields"
+        )]
+        verbose: bool,
+        #[arg(long, help = "Print decoded message bodies in the transaction tree")]
+        show_bodies: bool,
+    },
 }
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
+        RpcCommand::Block { net } => rpc_block_cmd(net),
+        RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
+        RpcCommand::Trace {
+            hash,
+            net,
+            summary,
+            tree: _,
+            verbose,
+            show_bodies,
+        } => trace::rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
 }
 
@@ -44,12 +103,7 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
         .map_err(|_| anyhow!("Invalid address"))
         .with_context(|| error_fmt::invalid_address(address))?;
 
-    let network = net
-        .as_deref()
-        .map(Network::from_str)
-        .transpose()?
-        .unwrap_or(Network::Testnet);
-
+    let network = resolve_rpc_network(net)?;
     let config = load_rpc_config()?;
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
@@ -69,7 +123,7 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
 
     let decoded_storage = match (&data, matched_contract.as_ref()) {
         (Some(data), Some(contract)) => contract
-            .compiler_abi
+            .abi
             .as_ref()
             .map(|abi| decode_storage_json(data, abi, &network))
             .transpose()?,
@@ -118,9 +172,6 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
                     .green()
                     .to_string(),
             );
-            if let Some(abi) = &contract.abi {
-                print_kv("ABI", abi.name.as_str().green().to_string());
-            }
         } else {
             print_kv("Contract", "<none>".dimmed().to_string());
         }
@@ -145,6 +196,39 @@ fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
+fn rpc_block_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let block = client
+        .get_masterchain_info()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{}", serde_json::to_string_pretty(&block)?);
+
+    Ok(())
+}
+
+fn rpc_block_number_cmd(net: Option<String>) -> anyhow::Result<()> {
+    let network = resolve_rpc_network(net)?;
+    let config = load_rpc_config()?;
+    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
+
+    let seqno = client
+        .get_last_block_seqno()
+        .with_context(|| format!("Failed to fetch latest block from {network}"))?;
+    println!("{seqno}");
+
+    Ok(())
+}
+
+fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
+    net.as_deref()
+        .map(Network::from_str)
+        .transpose()
+        .map(|network| network.unwrap_or(Network::Testnet))
+}
+
 fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     let manifest_path = acton_config::config::manifest_path();
     match ActonConfig::load() {
@@ -163,23 +247,39 @@ fn load_rpc_config() -> anyhow::Result<ActonConfig> {
 struct LocalContractMatch {
     contract_id: String,
     contract_name: String,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
 }
 
 fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
 ) -> anyhow::Result<Option<LocalContractMatch>> {
+    for candidate in load_local_contract_candidates(config)? {
+        if &candidate.code_hash == code_hash {
+            return Ok(Some(LocalContractMatch {
+                contract_id: candidate.contract_id,
+                contract_name: candidate.contract_name,
+                abi: candidate.abi,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+fn load_local_contract_candidates(
+    config: &ActonConfig,
+) -> anyhow::Result<Vec<LocalContractCandidate>> {
     let manifest_path = acton_config::config::manifest_path();
     if !manifest_path.exists() {
-        return Ok(None);
+        return Ok(Vec::new());
     }
 
     let Some(contracts) = config.contracts() else {
-        return Ok(None);
+        return Ok(Vec::new());
     };
     let mut file_cache = FileBuildCache::new(None).ok();
+    let mut candidates = Vec::new();
 
     for (contract_id, contract) in contracts {
         let candidate =
@@ -191,25 +291,20 @@ fn find_local_contract_match(
                     continue;
                 }
             };
-        if &candidate.code_hash == code_hash {
-            return Ok(Some(LocalContractMatch {
-                contract_id: candidate.contract_id,
-                contract_name: candidate.contract_name,
-                abi: candidate.abi,
-                compiler_abi: candidate.compiler_abi,
-            }));
-        }
+        candidates.push(candidate);
     }
 
-    Ok(None)
+    Ok(candidates)
 }
 
 struct LocalContractCandidate {
+    contract_path: PathBuf,
     contract_id: String,
     contract_name: String,
+    code_boc64: String,
     code_hash: HashBytes,
-    abi: Option<Arc<ContractAbi>>,
-    compiler_abi: Option<Arc<CompilerContractABI>>,
+    abi: Option<Arc<ContractABI>>,
+    source_map: Option<Arc<SourceMap>>,
 }
 
 fn load_local_contract_candidate(
@@ -224,12 +319,15 @@ fn load_local_contract_candidate(
             .with_context(|| format!("Failed to read {}", contract_path.display()))?;
         let code = Boc::decode(boc)
             .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
+        let code_boc64 = Boc::encode_base64(&code);
         return Ok(LocalContractCandidate {
+            contract_path,
             contract_id: contract_id.to_owned(),
             contract_name: contract.display_name(contract_id).to_owned(),
+            code_boc64,
             code_hash: *code.repr_hash(),
             abi: None,
-            compiler_abi: None,
+            source_map: None,
         });
     }
 
@@ -237,8 +335,12 @@ fn load_local_contract_candidate(
     let cached = file_cache
         .as_mut()
         .and_then(|cache| cache.get(&contract_path_key, false, false, 2, "1.3"));
-    let (code_boc64, compiler_abi) = if let Some(cached) = cached {
-        (cached.code_boc64, cached.abi.map(Arc::new))
+    let (code_boc64, abi, source_map) = if let Some(cached) = cached {
+        (
+            cached.code_boc64,
+            cached.abi.map(Arc::new),
+            cached.source_map.map(Arc::new),
+        )
     } else {
         let compiler = tolk_compiler::Compiler::new(2).with_mappings(&config.mappings());
         match compiler.compile(&contract_path, false) {
@@ -246,7 +348,11 @@ fn load_local_contract_candidate(
                 if let Some(cache) = file_cache.as_mut() {
                     let _ = cache.put(&contract_path_key, &result, false, false, 2, "1.3");
                 }
-                (result.code_boc64, result.abi.map(Arc::new))
+                (
+                    result.code_boc64,
+                    result.abi.map(Arc::new),
+                    result.source_map.map(Arc::new),
+                )
             }
             tolk_compiler::CompilerResult::Error(err) => {
                 return Err(anyhow!(err.message)
@@ -257,37 +363,34 @@ fn load_local_contract_candidate(
 
     let code = Boc::decode_base64(&code_boc64)
         .with_context(|| format!("Failed to decode code for {}", contract_path.display()))?;
-    let content = fs::read_to_string(&contract_path)
-        .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-    let path = contract_path.to_string_lossy();
-    let abi = Arc::new(contract_abi(content.into(), &path, &config.mappings()));
 
     Ok(LocalContractCandidate {
+        contract_path,
         contract_id: contract_id.to_owned(),
         contract_name: contract.display_name(contract_id).to_owned(),
+        code_boc64,
         code_hash: *code.repr_hash(),
-        abi: Some(abi),
-        compiler_abi,
+        abi,
+        source_map,
     })
 }
 
 fn decode_storage_json(
     data: &Cell,
-    abi: &CompilerContractABI,
+    abi: &ContractABI,
     network: &Network,
 ) -> anyhow::Result<serde_json::Value> {
-    let storage_ty = abi
+    let storage_ty_idx = abi
         .storage
-        .storage_at_deployment_ty
-        .as_ref()
-        .or(abi.storage.storage_ty.as_ref())
+        .storage_at_deployment_ty_idx
+        .or(abi.storage.storage_ty_idx)
         .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
     let mut parser = data.as_slice_allow_exotic();
-    let decoded = compiler_abi_serde::decode(&mut parser, abi, storage_ty)
+    let decoded = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, storage_ty_idx)
         .context("Failed to decode storage with compiler ABI")?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         anyhow::bail!(
-            "Storage cell has {} extra bits and {} extra refs after ABI decode",
+            "Storage cell has {} extra bits and {} extra refs after type decode",
             parser.size_bits(),
             parser.size_refs()
         );
@@ -295,37 +398,35 @@ fn decode_storage_json(
     Ok(compiler_data_to_json(&decoded, network))
 }
 
-fn compiler_data_to_json(data: &CompilerAbiData, network: &Network) -> serde_json::Value {
+fn compiler_data_to_json(data: &UnpackedValue, network: &Network) -> serde_json::Value {
     match data {
-        CompilerAbiData::Null => serde_json::Value::Null,
-        CompilerAbiData::Number(value) => serde_json::Value::String(value.to_string()),
-        CompilerAbiData::Bool(value) => serde_json::Value::Bool(*value),
-        CompilerAbiData::String(value) | CompilerAbiData::Symbol(value) => {
-            serde_json::Value::String(value.clone())
-        }
-        CompilerAbiData::Address(value) => {
+        UnpackedValue::Null | UnpackedValue::Void => serde_json::Value::Null,
+        UnpackedValue::Number(value) => serde_json::Value::String(value.to_string()),
+        UnpackedValue::Bool(value) => serde_json::Value::Bool(*value),
+        UnpackedValue::String(value) => serde_json::Value::String(value.clone()),
+        UnpackedValue::Address(value) => {
             serde_json::Value::String(format_int_address(value, network))
         }
-        CompilerAbiData::ExtAddress(value) => serde_json::json!({
+        UnpackedValue::ExtAddress(value) => serde_json::json!({
             "bits": value.data_bit_len,
             "hex": hex::encode(&value.data),
         }),
-        CompilerAbiData::Cell(value) | CompilerAbiData::RemainingBitsAndRefs(value) => {
+        UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
             serde_json::json!({
                 "boc64": Boc::encode_base64(value.clone()),
             })
         }
-        CompilerAbiData::Bits((bytes, bit_len)) => serde_json::json!({
+        UnpackedValue::Bits((bytes, bit_len)) => serde_json::json!({
             "bits": bit_len,
             "hex": hex::encode(bytes),
         }),
-        CompilerAbiData::Array(values) => serde_json::Value::Array(
+        UnpackedValue::Array(values) => serde_json::Value::Array(
             values
                 .iter()
                 .map(|value| compiler_data_to_json(value, network))
                 .collect(),
         ),
-        CompilerAbiData::Map(values) => serde_json::Value::Array(
+        UnpackedValue::Map(values) => serde_json::Value::Array(
             values
                 .iter()
                 .map(|(key, value)| {
@@ -336,13 +437,10 @@ fn compiler_data_to_json(data: &CompilerAbiData, network: &Network) -> serde_jso
                 })
                 .collect(),
         ),
-        CompilerAbiData::Object(object) => {
+        UnpackedValue::Object { fields, .. } => {
             let mut result = serde_json::Map::new();
-            for field in &object.fields {
-                result.insert(
-                    field.name.clone(),
-                    compiler_data_to_json(&field.value, network),
-                );
+            for (name, value) in fields {
+                result.insert(name.clone(), compiler_data_to_json(value, network));
             }
             serde_json::Value::Object(result)
         }

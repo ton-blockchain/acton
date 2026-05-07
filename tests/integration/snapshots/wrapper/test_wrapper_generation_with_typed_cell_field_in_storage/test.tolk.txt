@@ -7,7 +7,7 @@ import "../wrappers/MyContract.gen"
 
 /// Example test case demonstrating the basic flow
 get fun `test basic flow`() {
-    val (contract, deployer, not_deployer) = setupTest();
+    val (contract, deployer, notDeployer) = setupTest();
     // TODO: Implement your test logic here
     // Example:
     // val res = contract.sendMsg(deployer.address, ...);
@@ -15,17 +15,17 @@ get fun `test basic flow`() {
 }
 
 /// Initializes the test environment, creating a fresh instance of the contract.
-/// Returns the contract wrapper and two treasury accounts (`deployer` and `not_deployer`).
+/// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).
 fun setupTest(): (MyContract, Treasury, Treasury) {
     // Create a treasury account for deployment (typically the owner)
     val deployer = testing.treasury("deployer");
     // Create another treasury account for testing interactions from other users
-    val not_deployer = testing.treasury("not_deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
     // Initialize and deploy the contract with default values
     val contract = MyContract.fromStorage({ id: 0, counter: 0.toCell() });
     val res = contract.deploy(deployer.address, { value: ton("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
-    return (contract, deployer, not_deployer);
+    return (contract, deployer, notDeployer);
 }

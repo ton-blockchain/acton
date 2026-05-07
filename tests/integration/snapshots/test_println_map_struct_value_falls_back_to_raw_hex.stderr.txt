@@ -1,4 +1,7 @@
   Installing standard library [ACTON_VERSION]
 map<int32, Payload> {
-    1: [BOC_HEX],
+    1: Payload {
+        a: 7,
+        b: true,
+    },
 }

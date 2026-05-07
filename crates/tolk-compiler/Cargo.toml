@@ -21,6 +21,10 @@ rustc-hash = { workspace = true }
 dunce = { workspace = true }
 anyhow = { workspace = true }
 tycho-types = { workspace = true }
+num-bigint = { workspace = true }
+
+[dev-dependencies]
+expect-test = { workspace = true }
 
 [lints]
 workspace = true

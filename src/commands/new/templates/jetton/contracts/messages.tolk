@@ -1,5 +1,13 @@
 type ForwardPayloadRemainder = RemainingBitsAndRefs
 
+struct (0b0) PayloadInline {
+    value: RemainingBitsAndRefs
+}
+
+struct (0b1) PayloadInRef {
+    value: Cell<RemainingBitsAndRefs>
+}
+
 struct (0x0f8a7ea5) AskToTransfer {
     queryId: uint64
     jettonAmount: coins
@@ -7,6 +15,7 @@ struct (0x0f8a7ea5) AskToTransfer {
     sendExcessesTo: address?
     customPayload: cell?
     forwardTonAmount: coins
+    @abi.clientType(PayloadInline | PayloadInRef)
     forwardPayload: ForwardPayloadRemainder
 }
 
@@ -14,6 +23,7 @@ struct (0x7362d09c) TransferNotificationForRecipient {
     queryId: uint64
     jettonAmount: coins
     transferInitiator: address?
+    @abi.clientType(PayloadInline | PayloadInRef)
     forwardPayload: ForwardPayloadRemainder
 }
 
@@ -23,6 +33,7 @@ struct (0x178d4519) InternalTransferStep {
     transferInitiator: address?
     sendExcessesTo: address?
     forwardTonAmount: coins
+    @abi.clientType(PayloadInline | PayloadInRef)
     forwardPayload: ForwardPayloadRemainder
 }
 

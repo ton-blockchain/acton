@@ -15,7 +15,7 @@
        N/A -> deployer A
        └── empty 0.2 TON -> main B                                                     gas=1754
            ├── account created
-           └── empty 0.1 TON -> EQDrJl..owkrPN C                                       gas=353
+           └── empty 0.1 TON -> lib C                                                  gas=353
                └── account created
 
  ✓ 1 passed in 1 file

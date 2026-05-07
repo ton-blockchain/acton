@@ -380,7 +380,7 @@ fn coalesce_errors(errors: Vec<ParseError>) -> Vec<ParseError> {
         map.entry(key)
             .and_modify(|acc| {
                 if d.message.len() > acc.message.len() {
-                    acc.message = d.message.clone();
+                    acc.message.clone_from(&d.message);
                 }
                 let mut exp = acc.expected.clone();
                 exp.extend(d.expected.clone());

@@ -1,3 +1,4 @@
+import "@stdlib/strings"
 import "@acton/build"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
@@ -14,7 +15,7 @@ import "@wrappers/utils"
 
 fun buildTestMetadata(uri: string): cell {
     var metadata: OnchainMetadataReply = { contentDict: [] };
-    metadata.contentDict.set("uri".sha256(), SnakeDataReply { string: uri }.toCell());
+    metadata.contentDict.set("uri".sha256(), uri.prefixWith00());
     return metadata.toCell();
 }
 
@@ -205,9 +206,9 @@ fun hasSetCodeAction(res: SendResultList, account: address): bool {
 
 fun setupTest(initialSupply: int = 0): (JettonMinter, Treasury, Treasury) {
     val deployer = testing.treasury("deployer");
-    val notDeployer = testing.treasury("not-deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
-    val minter = JettonMinter.fromStorage(MinterStorage {
+    val minter = JettonMinter.fromStorage({
         totalSupply: initialSupply,
         adminAddress: deployer.address,
         metadata: buildTestMetadata("link"),

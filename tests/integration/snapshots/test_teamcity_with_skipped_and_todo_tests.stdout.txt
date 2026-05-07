@@ -1,0 +1,27 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+##teamcity[testingStarted]
+ > tests/skip_todo.test.tolk (3 tests)
+##teamcity[testSuiteStarted name='skip_todo.test.tolk' nodeId='suite_skip_todo.test.tolk' parentNodeId='0' nodeType='file' locationHint='file://[ROOT]/tests/skip_todo.test.tolk']
+##teamcity[testStarted name='test teamcity skipped' nodeId='test_test teamcity skipped' parentNodeId='suite_skip_todo.test.tolk' locationHint='tolk_qn://[ROOT]/tests/skip_todo.test.tolk:test teamcity skipped']
+  ○ teamcity skipped [skip | ' []]
+##teamcity[testIgnored name='test teamcity skipped' nodeId='test_test teamcity skipped' [DURATION] message='skip || |' |[|]']
+##teamcity[testFinished name='test teamcity skipped' nodeId='test_test teamcity skipped' [DURATION] parentNodeId='suite_skip_todo.test.tolk']
+##teamcity[testStarted name='test teamcity todo' nodeId='test_test teamcity todo' parentNodeId='suite_skip_todo.test.tolk' locationHint='tolk_qn://[ROOT]/tests/skip_todo.test.tolk:test teamcity todo']
+  □ teamcity todo [todo | ' []]
+##teamcity[testIgnored name='test teamcity todo' nodeId='test_test teamcity todo' [DURATION] message='todo || |' |[|]']
+##teamcity[testFinished name='test teamcity todo' nodeId='test_test teamcity todo' [DURATION] parentNodeId='suite_skip_todo.test.tolk']
+##teamcity[testStarted name='test teamcity passes' nodeId='test_test teamcity passes' parentNodeId='suite_skip_todo.test.tolk' locationHint='tolk_qn://[ROOT]/tests/skip_todo.test.tolk:test teamcity passes']
+  ✓ teamcity passes [TIME]
+##teamcity[testFinished name='test teamcity passes' nodeId='test_test teamcity passes' [DURATION] parentNodeId='suite_skip_todo.test.tolk']
+##teamcity[testSuiteFinished name='skip_todo.test.tolk' nodeId='suite_skip_todo.test.tolk']
+
+ ✓ 1 passed, ○ 1 skipped, □ 1 todo in 1 file
+##teamcity[testingFinished]

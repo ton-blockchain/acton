@@ -87,7 +87,9 @@ fn assert_fail_wallet_not_found_direct_call_with_loaded_wallets_lists_available_
         .failure();
 
     output
-        .assert_stderr_contains("Wallet el_missing_wallet not found in Acton.toml")
+        .assert_stderr_contains(
+            "Wallet el_missing_wallet not found in wallets.toml or global.wallets.toml",
+        )
         .assert_stderr_contains("Available wallets:")
         .assert_stderr_contains("deployer")
         .assert_contains("at scripts/el_assert_fail_wallet_not_found.tolk:5:5");

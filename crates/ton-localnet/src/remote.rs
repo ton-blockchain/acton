@@ -31,6 +31,15 @@ pub fn fetch_remote_shard_account(
     let custom_networks = config.custom_networks();
     let api_client = TonApiClient::new(provider.network.clone(), custom_networks)?;
 
+    if let Ok(cell) =
+        api_client.get_shard_account_cell(provider.fork_block_number, &addr.to_string())
+    {
+        let shard_account = cell.parse::<ShardAccount>()?;
+        let boc = Boc::encode(cell);
+        let meta = account_meta_from_shard_account(&shard_account, &boc, cas)?;
+        return Ok((boc.into(), meta));
+    }
+
     let info = api_client.get_account_info(provider.fork_block_number, &addr.to_string())?;
 
     let code = if info.code.is_empty() {
@@ -52,6 +61,7 @@ pub fn fetch_remote_shard_account(
     };
 
     let last_trans_lt = info.last_transaction_id.lt.parse::<u64>().unwrap_or(0);
+    let storage_last_trans_lt = last_trans_lt.saturating_add(1);
     let last_trans_hash = Hash256::from_base64(&info.last_transaction_id.hash).ok();
 
     let status = match info.state.as_str() {
@@ -93,7 +103,7 @@ pub fn fetch_remote_shard_account(
             other: ExtraCurrencyCollection::new(),
         },
         state: account_state,
-        last_trans_lt,
+        last_trans_lt: storage_last_trans_lt,
         storage_stat: StorageInfo::default(),
     };
 
@@ -128,4 +138,61 @@ fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     let cell = Boc::decode(boc)?;
     let hash = cell.repr_hash();
     Ok(Hash256(*hash.as_array()))
+}
+
+fn account_meta_from_shard_account(
+    shard_account: &ShardAccount,
+    shard_account_boc: &[u8],
+    cas: &mut CellStore,
+) -> anyhow::Result<AccountMeta> {
+    let account_hash = compute_boc_hash(shard_account_boc)?;
+    cas.put(shard_account_boc.to_vec().into(), account_hash);
+
+    let optional_account = shard_account.account.load()?;
+    let Some(account) = optional_account.0 else {
+        return Ok(AccountMeta {
+            account_hash,
+            status: AccountStatus::Nonexist,
+            cached_balance: Some(0),
+            last_trans_lt: Some(shard_account.last_trans_lt),
+            last_trans_hash: Some(Hash256(*shard_account.last_trans_hash.as_array())),
+            code_hash: None,
+            data_hash: None,
+            frozen_hash: None,
+        });
+    };
+
+    let balance = account.balance.tokens.into();
+    let mut code_hash = None;
+    let mut data_hash = None;
+    let mut frozen_hash = None;
+    let status = match account.state {
+        AccountState::Active(state) => {
+            code_hash = state.code.map(|cell| put_cell(cas, cell));
+            data_hash = state.data.map(|cell| put_cell(cas, cell));
+            AccountStatus::Active
+        }
+        AccountState::Uninit => AccountStatus::Uninit,
+        AccountState::Frozen(hash) => {
+            frozen_hash = Some(Hash256(*hash.as_array()));
+            AccountStatus::Frozen
+        }
+    };
+
+    Ok(AccountMeta {
+        account_hash,
+        status,
+        cached_balance: Some(balance),
+        last_trans_lt: Some(shard_account.last_trans_lt),
+        last_trans_hash: Some(Hash256(*shard_account.last_trans_hash.as_array())),
+        code_hash,
+        data_hash,
+        frozen_hash,
+    })
+}
+
+fn put_cell(cas: &mut CellStore, cell: Cell) -> Hash256 {
+    let hash = Hash256(*cell.repr_hash().as_array());
+    cas.put(Boc::encode(cell).into(), hash);
+    hash
 }

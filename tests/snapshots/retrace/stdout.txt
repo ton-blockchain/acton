@@ -1,4 +1,4 @@
-Retrace a transaction by its hash
+Replay a transaction trace by hash
 
 Usage: acton[EXE] retrace [OPTIONS] <HASH>
 

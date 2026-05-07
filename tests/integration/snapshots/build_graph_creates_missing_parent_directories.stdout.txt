@@ -1,0 +1,8 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Generated dependency graph: graphs/deps.dot
+   Compiling parent
+    Finished in [TIME]
+   Compiling child
+    Finished in [TIME]
+    Finished in [TIME]

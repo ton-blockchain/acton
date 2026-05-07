@@ -89,14 +89,24 @@ fn build_coverage_scope_project(name: &str) -> Project {
             }
         "#,
         )
+        .file(
+            "tests/support_helpers",
+            r"
+            @noinline
+            fun valueFromTestsHelper(): int {
+                return 5;
+            }
+        ",
+        )
         .test_file(
             "test",
             r#"
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
+            import "./support_helpers.tolk"
 
             get fun `test coverage scope`() {
-                expect(callThroughWrapper(5)).toEqual(6);
+                expect(callThroughWrapper(valueFromTestsHelper())).toEqual(6);
             }
         "#,
         )
@@ -130,6 +140,98 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
             }
         "#,
         )
+}
+
+#[test]
+fn test_coverage_matches_contract_deployed_as_library_reference() {
+    let project = ProjectBuilder::new("coverage-library-reference")
+        .contract(
+            "library_ref_target",
+            r"
+            fun onInternalMessage(_: InMessage) {
+                return;
+            }
+        ",
+        )
+        .file(
+            "wrappers/LibraryRefTarget",
+            r#"
+            import "@stdlib/exotic-cells"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+
+            struct LibraryRefTarget {
+                address: address
+                stateInit: ContractState
+            }
+
+            fun LibraryRefTarget.fromLibraryCode(): LibraryRefTarget {
+                val realCode = build("library_ref_target");
+                testing.registerLibrary(realCode);
+                val stateInit = ContractState {
+                    code: realCode.toLibraryReference(),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit }.calculateAddress();
+                return LibraryRefTarget { address, stateInit };
+            }
+
+            fun LibraryRefTarget.deploy(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: false,
+                    value: ton("0.05"),
+                    dest: { stateInit: self.stateInit },
+                }));
+            }
+
+            fun LibraryRefTarget.sendEmpty(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: true,
+                    value: ton("0.05"),
+                    dest: self.address,
+                    body: createEmptyCell(),
+                }));
+            }
+        "#,
+        )
+        .test_file(
+            "library_ref",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../wrappers/LibraryRefTarget"
+
+            get fun `test coverage sees library-ref contract source`() {
+                val sender = testing.treasury("sender");
+                val target = LibraryRefTarget.fromLibraryCode();
+
+                expect(target.deploy(sender.address)).toHaveSuccessfulDeploy({ to: target.address });
+                expect(target.sendEmpty(sender.address)).toHaveSuccessfulTx({
+                    from: sender.address,
+                    to: target.address,
+                });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("library-ref-coverage.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("library_ref_target.tolk")
+        .assert_snapshot_matches("integration/snapshots/test_coverage_library_reference.stdout.txt")
+        .assert_file_snapshot_matches(
+            "library-ref-coverage.txt",
+            "integration/snapshots/test_coverage_library_reference.txt",
+        );
 }
 
 #[test]
@@ -931,9 +1033,16 @@ fn test_coverage_empty_no_tests() {
         .acton()
         .test()
         .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("empty-coverage.txt")
         .run()
-        .success()
-        .assert_passed(0);
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_coverage_empty_no_tests.stdout.txt");
+
+    assert!(
+        !project.path().join("empty-coverage.txt").exists(),
+        "coverage report should not be generated when no tests are selected"
+    );
 }
 
 #[test]
@@ -1133,6 +1242,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
             "integration/snapshots/test_coverage_scope_with_tests.txt",
         )
         .assert_file_contains("with-tests.txt", "tests/test.test.tolk")
+        .assert_file_contains("with-tests.txt", "tests/support_helpers.tolk")
         .assert_file_contains("with-tests.txt", "test coverage scope");
 }
 
@@ -1158,14 +1268,24 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             }
         "#,
         )
+        .file(
+            "tests/config_support_helpers",
+            r"
+            @noinline
+            fun configValueFromTestsHelper(): int {
+                return 5;
+            }
+        ",
+        )
         .test_file(
             "test",
             r#"
             import "../../lib/testing/expect"
             import "@wrappers/TestWrapper"
+            import "./config_support_helpers.tolk"
 
             get fun `test config coverage scope`() {
-                expect(callThroughWrapper(5)).toEqual(6);
+                expect(callThroughWrapper(configValueFromTestsHelper())).toEqual(6);
             }
         "#,
         )
@@ -1192,7 +1312,8 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
             "integration/snapshots/test_coverage_scope_from_config.txt",
         )
         .assert_file_contains("from-config.txt", "generated/abi/TestWrapper.tolk")
-        .assert_file_contains("from-config.txt", "tests/test.test.tolk");
+        .assert_file_contains("from-config.txt", "tests/test.test.tolk")
+        .assert_file_contains("from-config.txt", "tests/config_support_helpers.tolk");
 }
 
 #[test]

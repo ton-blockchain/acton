@@ -58,7 +58,7 @@ fn parse_stack_content(input: &str) -> Vec<VmStackValue> {
             Ok(value) => {
                 values.push(value);
             }
-            Err(_) => {
+            Err(()) => {
                 break;
             }
         }
@@ -455,7 +455,7 @@ pub fn parse_lines(input: &str) -> impl Iterator<Item = Result<VmLine<'_>, Strin
     })
 }
 
-fn parse_line<'a>(line: &'a str) -> Result<VmLine<'a>, &'static str> {
+fn parse_line(line: &str) -> Result<VmLine<'_>, &'static str> {
     if let Some(raw_stack) = line.strip_prefix("stack: ") {
         return Ok(VmLine::VmStack {
             stack: VmStack::new(raw_stack.trim()),

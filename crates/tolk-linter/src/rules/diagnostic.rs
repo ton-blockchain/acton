@@ -58,7 +58,7 @@ impl Diagnostic {
 
     pub fn help_for<V: Violation>(file_id: FileId, violation: V, message: &str) -> Self {
         let mut d = Self::for_violation(file_id, Severity::Help, violation);
-        d.message = message.to_owned();
+        message.clone_into(&mut d.message);
         d
     }
 

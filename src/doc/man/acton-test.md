@@ -52,6 +52,8 @@ May be passed multiple times.
 
 {{#option "`--fail-fast`" }}
 Stop after the first failing test.
+
+Defaults to `[test].fail-fast`, or `false` when it is not configured.
 {{/option}}
 
 {{#option "`--fuzz-seed` _seed_" }}
@@ -169,6 +171,8 @@ Show decoded message bodies in printed transaction trees when ABI is known.
 
 {{#option "`--junit-path` _path_" }}
 Output directory for JUnit XML reports.
+
+Defaults to `[test].junit-path`, or `test-results` when it is not configured.
 {{/option}}
 
 {{#option "`--junit-merge`" }}
@@ -181,6 +185,8 @@ Open test results in a browser UI.
 
 {{#option "`--ui-port` _port_" }}
 Port for the browser UI server.
+
+Defaults to `[test].ui-port`, or `12344` when it is not configured.
 {{/option}}
 
 {{/options}}
@@ -191,6 +197,8 @@ Port for the browser UI server.
 
 {{#option "`--clear-cache`" }}
 Clear the compilation cache before running tests.
+
+Defaults to `false`.
 {{/option}}
 
 {{/options}}
@@ -347,8 +355,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
 - `--ui` adds the browser UI in addition to text reporters
 - `--coverage --ui` adds a `Coverage` tab to the browser UI for browsing
   coverage summaries, files, and annotated source
-- `--junit-path` matters when the JUnit reporter is enabled; the default output
-  directory is `test-results`
+- `--junit-path` matters when the JUnit reporter is enabled; it defaults to
+  `[test].junit-path`, or `test-results` when it is not configured
 - executor debug logs are hidden by default; re-run with `--verbose` when you need
   level-1 executor output such as `debug.dumpStack()`
 - `--verbose` is only low-level executor logging; `--coverage` also collects
@@ -361,7 +369,8 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   observed for a file
 - `--coverage-minimum-percent` checks the final blended `Score` shown in the
   summary, not just `% Lines`
-- coverage excludes `.test.tolk` files and `@wrappers` sources by default;
+- coverage excludes files under `tests/`, `.test.tolk` files, and `@wrappers`
+  sources by default;
   use `--coverage-include-tests` or `--coverage-include-wrappers` to opt in
 - `--save-test-trace` without a value writes traces to `build/traces`
 - each executed test produces its own `<test-name>_trace.json` artifact

@@ -26,7 +26,7 @@ import {useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {V3Transaction} from "../api/types"
-import {addressKey, buildMessageNamesByOpcodeNumber} from "../api/compilerAbi"
+import {addressKey} from "../api/compilerAbi"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {hashToHex, normalizeAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
@@ -164,14 +164,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
             }
           }
 
-          const abiByCodeHash = new Map<
-            string,
-            {
-              readonly compilerAbi: ContractData["compilerAbi"]
-              readonly incoming: ReadonlyMap<number, string>
-              readonly outgoing: ReadonlyMap<number, string>
-            }
-          >()
+          const abiByCodeHash = new Map<string, ContractData["abi"]>()
           const codeHashes = [...new Set(addressToCodeHash.values())]
           const fetchedAbis = await Promise.all(
             codeHashes.map(async codeHash => {
@@ -182,12 +175,8 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               }
             }),
           )
-          for (const [codeHash, compilerAbi] of fetchedAbis) {
-            abiByCodeHash.set(codeHash, {
-              compilerAbi: (compilerAbi as ContractData["compilerAbi"] | undefined) ?? undefined,
-              incoming: buildMessageNamesByOpcodeNumber(compilerAbi, "incoming_messages"),
-              outgoing: buildMessageNamesByOpcodeNumber(compilerAbi, "outgoing_messages"),
-            })
+          for (const [codeHash, abi] of fetchedAbis) {
+            abiByCodeHash.set(codeHash, abi)
           }
 
           let nextLetterCode = 65
@@ -196,14 +185,12 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               const letter = String.fromCodePoint(nextLetterCode++)
               const displayAddr = normalizeAddress(addr)
               const customName = await fetchName(addr)
-              const contractAbi = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
+              const abi = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
               contractsMap.set(addr, {
                 displayName: customName || fmt.formatAddress(displayAddr),
                 address: Address.parse(addr),
                 letter,
-                compilerAbi: contractAbi?.compilerAbi,
-                incomingMessageNamesByOpcode: contractAbi?.incoming,
-                outgoingMessageNamesByOpcode: contractAbi?.outgoing,
+                abi,
               })
             }),
           )

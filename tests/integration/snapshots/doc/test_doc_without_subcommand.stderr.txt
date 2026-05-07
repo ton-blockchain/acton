@@ -1,4 +1,4 @@
-Lookup reference documentation
+Look up TVM reference documentation
 
 Usage: acton[EXE] doc [OPTIONS] <COMMAND>
 

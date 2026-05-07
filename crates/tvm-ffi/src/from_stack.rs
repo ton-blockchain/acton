@@ -130,14 +130,10 @@ fn decode_big_array_items(tuple: Tuple) -> Result<Vec<TupleItem>, ArgError> {
 }
 
 fn decode_vec_like_items(item: TupleItem) -> Result<Vec<TupleItem>, ArgError> {
-    let tuple = match item {
-        TupleItem::Tuple(tuple) => tuple,
-        TupleItem::TypedTuple { inner, .. } => inner,
-        _ => {
-            return Err(ArgError::TypeMismatch {
-                expected: "Tuple(Array<T> | BigArray<T>)",
-            });
-        }
+    let TupleItem::Tuple(tuple) = item else {
+        return Err(ArgError::TypeMismatch {
+            expected: "Tuple(Array<T> | BigArray<T>)",
+        });
     };
 
     let looks_like_big_array = tuple.len() == 2

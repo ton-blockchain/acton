@@ -1,0 +1,22 @@
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/profile.test.tolk (1 test)
+  ✗ profiled-transaction [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            1,
+            2
+        )
+      └─ at tests/profile.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
+
+Note: Gas profiling snapshot and comparison tables were skipped because tests failed.

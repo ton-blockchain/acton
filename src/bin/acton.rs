@@ -1,8 +1,7 @@
 use acton::commands;
-use acton::commands::build::build_cmd;
+use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
-use acton::commands::create_app::DEFAULT_APP_DIR;
 use acton::commands::disasm::disasm_cmd;
 use acton::commands::doc::doc_tvm_cmd;
 use acton::commands::docgen::docgen_cmd;
@@ -11,7 +10,7 @@ use acton::commands::fmt::fmt_cmd;
 use acton::commands::func2tolk::{default_func2tolk_version, func2tolk_cmd};
 use acton::commands::help::print_command_manual;
 use acton::commands::hooks::{HooksCommand, hooks_cmd};
-use acton::commands::init::init_cmd;
+use acton::commands::init::{DEFAULT_APP_DIR, init_cmd};
 use acton::commands::internal::internal_register_contract;
 use acton::commands::library::{fetch_cmd, info_cmd, publish_cmd};
 use acton::commands::ls::ls_cmd;
@@ -31,12 +30,14 @@ use acton_config::color::OwoColorize;
 use acton_config::color::{ColorMode, init_color_mode};
 use acton_config::config::{
     ActonConfig, CheckOutputFormat, Explorer, LocalnetSettings, Network, ResolutionSource,
-    WalletsFile, global_wallets_path, init_manifest_path_with_source,
-    init_project_root_with_source, project_root as configured_project_root,
+    TestSettings, WalletsFile, global_wallets_path, init_manifest_path_with_source,
+    init_project_root_with_source, manifest_path as configured_manifest_path,
+    project_root as configured_project_root,
 };
 use acton_config::test::{
     BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
 };
+use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
 use clap::builder::{StyledStr, Styles};
 use clap::{ColorChoice, CommandFactory, FromArgMatches};
@@ -48,12 +49,13 @@ use clap_complete::engine::{
 use commands::common::error_fmt;
 use dotenvy::dotenv;
 use human_panic::{Metadata, setup_panic};
+use std::fmt::Write as _;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
-use tolk_compiler::TolkSourceMap;
+use tolk_compiler::SourceMap;
 
 #[derive(Parser)]
 #[command(
@@ -93,22 +95,28 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     #[command(
-        about = "Initialize Acton support in the current directory",
-        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-app, Acton skips project initialization and only scaffolds a TypeScript app.",
+        about = "Add Acton support to current directory",
+        long_about = "Initialize Acton support in the current directory. This is useful for adding Acton support to an existing project. With --create-dapp, Acton skips project initialization and only scaffolds a TypeScript app. With --stdlib-only, Acton only refreshes the bundled standard library.",
         after_help = detailed_help_pointer("init")
     )]
     Init {
         #[arg(
-            long,
+            long = "create-dapp",
             value_name = "PATH",
             num_args = 0..=1,
             default_missing_value = DEFAULT_APP_DIR,
+            conflicts_with = "stdlib_only",
             help = "Create a TypeScript app scaffold in PATH (default: app)"
         )]
-        create_app: Option<PathBuf>,
+        create_dapp: Option<PathBuf>,
+        #[arg(
+            long,
+            help = "Update the bundled standard library without touching Acton.toml"
+        )]
+        stdlib_only: bool,
     },
     #[command(
-        about = "Create a new project in a specified directory",
+        about = "Create a new project from a template",
         long_about = "Create a new project in a specified directory. This will create a new directory with a basic project template.",
         after_help = detailed_help_pointer("new")
     )]
@@ -153,7 +161,7 @@ enum Commands {
         templates: bool,
     },
     #[command(
-        about = "Print this message or the help of a given top-level command",
+        about = "Show top-level or command-specific help",
         after_help = detailed_help_pointer("help")
     )]
     Help {
@@ -161,7 +169,7 @@ enum Commands {
         command: Option<String>,
     },
     #[command(
-        about = "Manage wallets",
+        about = "Manage project and global wallets",
         after_help = detailed_help_pointer("wallet")
     )]
     Wallet {
@@ -169,7 +177,7 @@ enum Commands {
         command: WalletCommand,
     },
     #[command(
-        about = "Manage git hooks for the current project",
+        about = "Install and manage project Git hooks",
         after_help = detailed_help_pointer("hooks")
     )]
     Hooks {
@@ -177,7 +185,7 @@ enum Commands {
         command: HooksCommand,
     },
     #[command(
-        about = "Inspect remote account and contract state",
+        about = "Inspect remote accounts and contracts",
         after_help = detailed_help_pointer("rpc")
     )]
     Rpc {
@@ -185,7 +193,7 @@ enum Commands {
         command: RpcCommand,
     },
     #[command(
-        about = "Execute tests in file or directory",
+        about = "Run tests from a file or directory",
         after_help = detailed_help_pointer("test")
     )]
     Test {
@@ -215,10 +223,13 @@ enum Commands {
         // Execution
         #[arg(
             long,
-            help = "Stop executing tests after the first failure",
-            help_heading = "Execution"
+            help = "Stop executing tests after the first failure (default: [test].fail-fast or false)",
+            help_heading = "Execution",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        fail_fast: bool,
+        fail_fast: Option<bool>,
         #[arg(
             long,
             value_name = "SEED",
@@ -228,7 +239,7 @@ enum Commands {
         fuzz_seed: Option<u64>,
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Execution"
         )]
@@ -273,7 +284,7 @@ enum Commands {
         coverage_include_wrappers: bool,
         #[arg(
             long,
-            help = "Include .test.tolk files in coverage reports",
+            help = "Include files under tests/ and .test.tolk files in coverage reports",
             help_heading = "Coverage"
         )]
         coverage_include_tests: bool,
@@ -315,8 +326,7 @@ enum Commands {
         show_bodies: bool,
         #[arg(
             long,
-            default_value = "test-results",
-            help = "JUnit XML output directory",
+            help = "JUnit XML output directory (default: [test].junit-path or test-results)",
             help_heading = "Reporting"
         )]
         junit_path: Option<String>,
@@ -330,10 +340,13 @@ enum Commands {
         // Cache
         #[arg(
             long,
-            help = "Clear compilation cache before running",
-            help_heading = "Cache"
+            help = "Clear compilation cache before running (default: false)",
+            help_heading = "Cache",
+            num_args = 0..=1,
+            default_missing_value = "true",
+            require_equals = true
         )]
-        clear_cache: bool,
+        clear_cache: Option<bool>,
 
         // Remote
         #[arg(
@@ -460,20 +473,31 @@ enum Commands {
         ui: bool,
         #[arg(
             long,
-            help = "UI server port",
-            default_value = "12344",
+            help = "UI server port (default: [test].ui-port or 12344)",
             help_heading = "Reporting",
             value_name = "PORT"
         )]
-        ui_port: u16,
+        ui_port: Option<u16>,
     },
     #[command(
-        about = "Generate wrappers and optionally a stub test file for a contract",
+        about = "Generate contract wrappers and test stubs",
         after_help = detailed_help_pointer("wrapper")
     )]
     Wrapper {
-        #[arg(help = "Contract name to generate wrappers for", value_name = "CONTRACT_NAME", add = ArgValueCompleter::new(complete_contracts))]
-        contract_id: String,
+        #[arg(
+            help = "Contract name to generate wrappers for",
+            value_name = "CONTRACT_NAME",
+            required_unless_present = "all",
+            conflicts_with = "all",
+            add = ArgValueCompleter::new(complete_contracts)
+        )]
+        contract_id: Option<String>,
+        #[arg(
+            long,
+            help = "Generate wrappers for every contract defined in Acton.toml",
+            conflicts_with_all = ["output", "test_output"],
+        )]
+        all: bool,
         #[arg(
             long,
             short,
@@ -522,19 +546,23 @@ enum Commands {
         ts: bool,
     },
     #[command(
-        about = "Execute a Tolk script file",
+        about = "Run a standalone Tolk script file",
         after_help = detailed_help_pointer("script")
     )]
     Script {
         #[arg(help = "Script file to execute", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
 
-        #[arg(help = "Arguments to pass to the script")]
+        #[arg(
+            help = "Arguments to pass to the script",
+            trailing_var_arg = true,
+            allow_hyphen_values = true
+        )]
         args: Vec<String>,
 
         #[arg(
             long,
-            action = clap::ArgAction::Count,
+            action = ArgAction::Count,
             help = "Increase executor log verbosity (currently supports only level 1)",
             help_heading = "Script"
         )]
@@ -583,6 +611,19 @@ enum Commands {
             help_heading = "Broadcasting"
         )]
         net: Option<String>,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for broadcast messages",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
 
         #[arg(
             value_enum,
@@ -600,7 +641,7 @@ enum Commands {
         show_bodies: bool,
     },
     #[command(
-        about = "Build the specified contract or all contracts",
+        about = "Build one contract or every contract",
         after_help = detailed_help_pointer("build")
     )]
     Build {
@@ -625,6 +666,12 @@ enum Commands {
         #[arg(
             long,
             value_name = "DIR",
+            help = "Directory to save contract ABI JSON files (default: build/abi/)"
+        )]
+        output_abi: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
             help = "Directory to save compiled Fift files"
         )]
         output_fift: Option<String>,
@@ -632,11 +679,11 @@ enum Commands {
         info: bool,
     },
     #[command(
-        about = "Run a script defined in Acton.toml",
+        about = "Run a named script from Acton.toml",
         after_help = detailed_help_pointer("run")
     )]
     Run {
-        #[arg(help = "Name of the script to run", add = ArgValueCompleter::new(complete_scripts))]
+        #[arg(help = "Name of the command script to run", add = ArgValueCompleter::new(complete_scripts))]
         script: String,
         #[arg(
             help = "Arguments to pass to the script",
@@ -646,15 +693,15 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Compile a Tolk file",
+        about = "Compile one Tolk source into TVM code",
         after_help = detailed_help_pointer("compile")
     )]
     Compile {
         #[arg(help = "Tolk file to compile", add = ArgValueCompleter::new(PathCompleter::file()))]
         path: String,
-        #[arg(long, help = "Output result as JSON")]
+        #[arg(long, help = "Output result as JSON", conflicts_with = "base64_only")]
         json: bool,
-        #[arg(long, help = "Output only base64 code")]
+        #[arg(long, help = "Output only base64 code", conflicts_with = "json")]
         base64_only: bool,
         #[arg(long, help = "Output code to binary BoC file")]
         boc: Option<String>,
@@ -673,15 +720,21 @@ enum Commands {
         clear_cache: bool,
     },
     #[command(
-        about = "Disassemble TVM bitcode to human-readable TASM",
+        about = "Disassemble TVM code into TASM",
         after_help = detailed_help_pointer("disasm")
     )]
     Disasm {
         #[arg(
-            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)"
+            help = "BoC file to disassemble, either binary or text with hex/base64 data (use -s for inline data)",
+            conflicts_with_all = ["string", "address"]
         )]
         boc_file: Option<String>,
-        #[arg(short, long, help = "BoC string in hex or base64 format")]
+        #[arg(
+            short,
+            long,
+            help = "BoC string in hex or base64 format",
+            conflicts_with_all = ["boc_file", "address"]
+        )]
         string: Option<String>,
         #[arg(
             short,
@@ -693,11 +746,14 @@ enum Commands {
         show_hashes: bool,
         #[arg(long, help = "Show instruction offsets in left column")]
         show_offsets: bool,
+        #[arg(long, help = "Print machine-readable disassembly JSON to stdout")]
+        json: bool,
         #[arg(long, help = "Source map JSON from `acton compile --source-map`")]
         source_map: Option<String>,
         #[arg(
             long,
-            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)"
+            help = "Contract address to fetch from blockchain (e.g., UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM)",
+            conflicts_with_all = ["boc_file", "string"]
         )]
         address: Option<String>,
         #[arg(long, help = "Network for `--address` and library lookups")]
@@ -709,7 +765,7 @@ enum Commands {
         follow_libraries: bool,
     },
     #[command(
-        about = "Verify contract source code on verifier.ton.org",
+        about = "Verify contract source on TON Verifier",
         after_help = detailed_help_pointer("verify")
     )]
     Verify {
@@ -729,9 +785,23 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the verification transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
     },
     #[command(
-        about = "Check Tolk files in the project for errors",
+        about = "Check project Tolk sources for errors",
         after_help = detailed_help_pointer("check")
     )]
     Check {
@@ -756,7 +826,7 @@ enum Commands {
             long = "enable-only",
             value_delimiter = ',',
             value_name = "CODE[,CODE...]",
-            help = "Enable only selected lint rules by code (e.g. E001,S001)"
+            help = "Enable only selected lint rules by code (e.g. S003,S001)"
         )]
         enable_only: Option<Vec<String>>,
         #[arg(long, help = "Explain a rule")]
@@ -774,7 +844,7 @@ enum Commands {
         args: Vec<String>,
     },
     #[command(
-        about = "Retrace a transaction by its hash",
+        about = "Replay a transaction trace by hash",
         after_help = detailed_help_pointer("retrace")
     )]
     Retrace {
@@ -802,7 +872,7 @@ enum Commands {
         debug_port: Option<u16>,
     },
     #[command(
-        about = "Manage TON libraries",
+        about = "Publish and manage on-chain libraries",
         after_help = detailed_help_pointer("library")
     )]
     Library {
@@ -818,7 +888,7 @@ enum Commands {
         command: LocalnetCommand,
     },
     #[command(
-        about = "Format Tolk source files",
+        about = "Format project Tolk source files",
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
@@ -826,9 +896,15 @@ enum Commands {
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
+        #[arg(
+            long,
+            value_name = "startLine:startChar-endLine:endChar",
+            help = "Format only the specified zero-based source range using UTF-8 byte columns"
+        )]
+        range: Option<String>,
     },
     #[command(
-        about = "Lookup reference documentation",
+        about = "Look up TVM reference documentation",
         after_help = detailed_help_pointer("doc")
     )]
     Doc {
@@ -850,7 +926,7 @@ enum Commands {
         no_log: bool,
     },
     #[command(
-        about = "Manage Acton versions",
+        about = "Install or update Acton CLI releases",
         after_help = detailed_help_pointer("up")
     )]
     Up {
@@ -881,10 +957,12 @@ enum Commands {
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
+        #[arg(long, hide = true)]
+        yes: bool,
     },
     #[command(
         name = "func2tolk",
-        about = "Convert FunC files to Tolk via @ton/convert-func-to-tolk",
+        about = "Convert FunC sources into Tolk code",
         after_help = detailed_help_pointer("func2tolk")
     )]
     Func2Tolk {
@@ -907,12 +985,12 @@ enum Commands {
         version: String,
     },
     #[command(
-        about = "Inspect resolved project environment",
+        about = "Inspect the resolved project setup",
         after_help = detailed_help_pointer("doctor")
     )]
     Doctor,
     #[command(
-        about = "Generate shell completions for selected shell",
+        about = "Generate shell completion scripts",
         after_help = detailed_help_pointer("completions")
     )]
     Completions {
@@ -997,7 +1075,13 @@ pub enum LocalnetCommand {
     Airdrop {
         #[arg(help = "Address to receive TON")]
         address: String,
-        #[arg(long, short, help = "Amount of TON to request", default_value = "100")]
+        #[arg(
+            long,
+            short,
+            help = "Amount of TON to request",
+            default_value = "100",
+            value_parser = parse_positive_ton_amount
+        )]
         amount: f64,
         #[arg(
             long,
@@ -1029,9 +1113,17 @@ pub enum LibraryCommand {
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
-        #[arg(long, help = "Save library info to local libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to local libraries.toml",
+            conflicts_with = "global"
+        )]
         local: bool,
-        #[arg(long, help = "Save library info to global.libraries.toml")]
+        #[arg(
+            long,
+            help = "Save library info to global.libraries.toml",
+            conflicts_with = "local"
+        )]
         global: bool,
     },
     #[command(about = "Fetch a library from the blockchain")]
@@ -1210,13 +1302,30 @@ fn detailed_help_pointer(command: &str) -> StyledStr {
     use std::fmt::Write as _;
 
     let mut writer = StyledStr::new();
-    let styles = Styles::styled();
+    let styles = acton_help_styles();
     let literal = styles.get_literal();
     let _ = write!(
         writer,
         "Run '{literal}acton help {command}{literal:#}' for more detailed information."
     );
     writer
+}
+
+const fn acton_help_styles() -> Styles {
+    let header = Style::new().bold();
+    let usage = Style::new().bold();
+    let literal = Style::new()
+        .fg_color(Some(Color::Ansi(AnsiColor::Cyan)))
+        .bold();
+    let placeholder = Style::new().dimmed();
+
+    Styles::styled()
+        .header(header)
+        .usage(usage)
+        .literal(literal)
+        .placeholder(placeholder)
+        .context(placeholder)
+        .context_value(placeholder)
 }
 
 fn root_help(show_global_options: bool) -> StyledStr {
@@ -1256,7 +1365,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("rpc", "<COMMAND>"),
         ("verify", "[CONTRACT_NAME]"),
         ("library", "<COMMAND>"),
-        ("localnet", "<COMMAND>"),
+        // ("localnet", "<COMMAND>"),
         ("retrace", "<TX_HASH>"),
     ];
     let tooling_commands = vec![
@@ -1267,7 +1376,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         ("doc", "tvm <QUERY...>"),
     ];
     let support_commands = vec![
-        ("ls", ""),
+        // ("ls", ""),
         ("up", ""),
         ("help", "[COMMAND]"),
         ("hooks", "<COMMAND>"),
@@ -1417,14 +1526,17 @@ fn root_help(show_global_options: bool) -> StyledStr {
 }
 
 fn base_cli_command() -> clap::Command {
-    Cli::command().disable_version_flag(true).arg(
-        clap::Arg::new("version")
-            .short('v')
-            .short_alias('V')
-            .long("version")
-            .action(clap::ArgAction::Version)
-            .help("Print version"),
-    )
+    Cli::command()
+        .styles(acton_help_styles())
+        .disable_version_flag(true)
+        .arg(
+            clap::Arg::new("version")
+                .short('v')
+                .short_alias('V')
+                .long("version")
+                .action(ArgAction::Version)
+                .help("Print version"),
+        )
 }
 
 fn cli_command(show_global_options: bool) -> clap::Command {
@@ -1470,9 +1582,10 @@ fn render_help_command(command: Option<String>) -> anyhow::Result<()> {
                 .filter(|(_, score)| *score >= 0.80)
                 .max_by(|left, right| left.1.total_cmp(&right.1))
             {
-                message.push_str(&format!(
+                let _ = write!(
+                    message,
                     "\n\nhelp: a command with a similar name exists: `{suggestion}`"
-                ));
+                );
             }
             message.push_str("\n\nhelp: view all commands with `acton --help`");
 
@@ -1626,39 +1739,40 @@ fn main() {
     };
     init_color_mode(color);
 
-    if !matches!(
-        command,
-        Commands::Init { .. }
-            | Commands::New { .. }
-            | Commands::Help { .. }
-            | Commands::Rpc { .. }
-            | Commands::Meta { .. }
-            | Commands::Lint { .. }
-    ) && let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone())
-    {
-        eprintln!("{} {}", "Error:".red(), err);
-        process::exit(1);
+    if command_configures_project_roots(&command) {
+        if let Err(err) = configure_project_roots(manifest_path.clone(), project_root.clone()) {
+            eprintln!("{} {}", "Error:".red(), err);
+            process::exit(1);
+        }
+
+        if command_checks_toolchain_version(&command)
+            && let Err(err) = validate_project_toolchain_version()
+        {
+            print_error(&err);
+            process::exit(1);
+        }
     }
 
     if !matches!(
         command,
         Commands::Ls { .. } | Commands::Help { .. } | Commands::Meta { .. } | Commands::Lint { .. }
-    ) && let Err(err) = setup_logging()
+    ) && let Err(_) = setup_logging()
     {
-        eprintln!(
-            "{} failed to initialize debug logging ({err}). Continuing without file logging.\nHint: set ACTON_LOG_DIR to a writable directory.",
-            "Warning:".yellow()
-        );
+        // previously we print error here, but it is too annoying for LLM agents
+        // we need some better way
     }
 
     let result = match command {
-        Commands::Init { create_app } => init_cmd(create_app.as_deref()),
+        Commands::Init {
+            create_dapp,
+            stdlib_only,
+        } => init_cmd(create_dapp.as_deref(), stdlib_only),
         Commands::Help { command } => render_help_command(command),
         Commands::Wallet { command } => wallet_cmd(command),
         Commands::Rpc { command } => {
             if manifest_path.is_some() || project_root.is_some() {
                 match configure_project_roots(manifest_path, project_root) {
-                    Ok(()) => rpc_cmd(command),
+                    Ok(()) => validate_project_toolchain_version().and_then(|()| rpc_cmd(command)),
                     Err(err) => Err(err),
                 }
             } else {
@@ -1733,7 +1847,7 @@ fn main() {
             commands::common::validate_cli_verbosity(verbose),
         ) {
             (Ok(fork_net), Ok(verbose)) => {
-                let config = create_test_config(
+                match create_test_config(
                     filter,
                     show_bodies,
                     verbose,
@@ -1777,15 +1891,18 @@ fn main() {
                     mutation_minimum_percent,
                     mutation_disable_rules,
                     fuzz_seed,
-                    Some(fail_fast),
+                    fail_fast,
                     ui,
                     ui_port,
-                );
-
-                if mutate {
-                    mutation::test_mutate_cmd(&path, &config)
-                } else {
-                    test_cmd(path, &config)
+                ) {
+                    Ok(config) => {
+                        if mutate {
+                            mutation::test_mutate_cmd(path.as_deref(), &config)
+                        } else {
+                            test_cmd(path, &config)
+                        }
+                    }
+                    Err(err) => Err(err),
                 }
             }
             (Err(err), _) | (_, Err(err)) => Err(err),
@@ -1802,6 +1919,7 @@ fn main() {
         } => retrace_cmd(hash, net, verbose, logs_dir, contract, debug, debug_port),
         Commands::Wrapper {
             contract_id,
+            all,
             output: wrapper_output,
             output_dir: wrapper_output_dir,
             test_output,
@@ -1809,7 +1927,8 @@ fn main() {
             test,
             ts,
         } => wrapper_cmd(
-            &contract_id,
+            contract_id.as_deref(),
+            all,
             wrapper_output,
             wrapper_output_dir,
             test_output,
@@ -1828,6 +1947,8 @@ fn main() {
             fork_net,
             fork_block_number,
             net,
+            tonconnect,
+            tonconnect_port,
             explorer,
             show_bodies,
         } => match commands::common::validate_cli_verbosity(verbose) {
@@ -1844,6 +1965,8 @@ fn main() {
                 net,
                 explorer,
                 show_bodies,
+                tonconnect,
+                tonconnect_port,
             ),
             Err(err) => Err(err),
         },
@@ -1853,17 +1976,19 @@ fn main() {
             graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
             info,
-        } => build_cmd(
+        } => build_cmd(BuildCommandOptions {
             contract_id,
             clear_cache,
-            graph,
+            graph_output: graph,
             out_dir,
             gen_dir,
+            output_abi,
             output_fift,
-            info,
-        ),
+            show_info: info,
+        }),
         Commands::Compile {
             path,
             json,
@@ -1896,6 +2021,7 @@ fn main() {
                         }))
                         .expect("JSON serialization should not fail")
                     );
+                    process::exit(1);
                 }
                 return;
             }
@@ -1907,26 +2033,35 @@ fn main() {
             output,
             show_hashes,
             show_offsets,
+            json,
             source_map,
             address,
             net,
             follow_libraries,
-        } => match read_source_map(source_map) {
-            Ok(source_map) => disasm_cmd(
-                boc_file,
-                string,
-                output,
-                FormatOptions {
-                    show_hashes,
-                    show_offsets,
-                    source_map,
-                },
-                address,
-                net,
-                follow_libraries,
-            ),
-            Err(err) => Err(err),
-        },
+        } => {
+            let result = match read_source_map(source_map) {
+                Ok(source_map) => disasm_cmd(
+                    boc_file,
+                    string,
+                    output,
+                    FormatOptions {
+                        show_hashes,
+                        show_offsets,
+                        source_map,
+                    },
+                    address,
+                    net,
+                    follow_libraries,
+                    json,
+                ),
+                Err(err) => Err(err),
+            };
+            if json {
+                report_error_as_json(result);
+                return;
+            }
+            result
+        }
         Commands::Verify {
             contract_id,
             address,
@@ -1934,7 +2069,18 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
-        } => verify_cmd(contract_id, address, net, wallet, compiler_version, dry_run),
+            tonconnect,
+            tonconnect_port,
+        } => verify_cmd(
+            contract_id,
+            address,
+            net,
+            wallet,
+            compiler_version,
+            dry_run,
+            tonconnect,
+            tonconnect_port,
+        ),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
                 contract_id,
@@ -2005,6 +2151,7 @@ fn main() {
             force,
             list,
             check,
+            yes: _,
         } => {
             let result = up_cmd(version, trunk, stable, force, list, check);
             if check {
@@ -2013,7 +2160,11 @@ fn main() {
             }
             result
         }
-        Commands::Fmt { paths, check } => fmt_cmd(paths, check),
+        Commands::Fmt {
+            paths,
+            check,
+            range,
+        } => fmt_cmd(paths, check, range),
         Commands::Doc { command } => match command {
             DocCommand::Tvm {
                 instruction,
@@ -2127,6 +2278,61 @@ fn main() {
     }
 }
 
+const fn command_configures_project_roots(command: &Commands) -> bool {
+    !matches!(
+        command,
+        Commands::Init { .. }
+            | Commands::New { .. }
+            | Commands::Help { .. }
+            | Commands::Rpc { .. }
+            | Commands::Meta { .. }
+            | Commands::Lint { .. }
+    )
+}
+
+const fn command_checks_toolchain_version(command: &Commands) -> bool {
+    command_configures_project_roots(command)
+        && !matches!(
+            command,
+            Commands::Up { .. } | Commands::Completions { .. } | Commands::Doctor
+        )
+}
+
+fn validate_project_toolchain_version() -> anyhow::Result<()> {
+    if !configured_manifest_path().exists() {
+        return Ok(());
+    }
+
+    let config = ActonConfig::load_manifest()?;
+    let Some(expected) = config
+        .toolchain
+        .as_ref()
+        .and_then(|toolchain| toolchain.acton.as_deref())
+    else {
+        return Ok(());
+    };
+
+    let expected = expected.trim();
+    if expected.is_empty() {
+        anyhow::bail!(
+            "Acton.toml has empty [toolchain].acton.\n\nSet it to the required Acton CLI version, for example:\n\n[toolchain]\nacton = \"{}\"",
+            acton::build_info::PACKAGE_VERSION
+        );
+    }
+
+    let installed = acton::build_info::SHORT_VERSION;
+    if expected == installed {
+        return Ok(());
+    }
+    if acton::build_info::is_trunk_build() && expected == acton::build_info::PACKAGE_VERSION {
+        return Ok(());
+    }
+
+    anyhow::bail!(
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update [toolchain].acton if this project supports acton {installed}."
+    );
+}
+
 fn print_error(err: &anyhow::Error) {
     eprintln!("{} {}", "Error:".red(), err);
 
@@ -2196,7 +2402,23 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<TolkSourceMap>>> {
+fn parse_positive_ton_amount(value: &str) -> Result<f64, String> {
+    let amount = value
+        .parse::<f64>()
+        .map_err(|err| format!("invalid TON amount '{value}': {err}"))?;
+
+    if !amount.is_finite() {
+        return Err(format!("TON amount must be finite, got '{value}'"));
+    }
+
+    if amount <= 0.0 {
+        return Err(format!("TON amount must be greater than 0, got '{value}'"));
+    }
+
+    Ok(amount)
+}
+
+fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<SourceMap>>> {
     let source_map_data = if let Some(path) = source_map {
         if !fs::exists(&path).unwrap_or(false) {
             anyhow::bail!(error_fmt::file_not_found(&path));
@@ -2209,7 +2431,7 @@ fn read_source_map(source_map: Option<String>) -> anyhow::Result<Option<Box<Tolk
 
         let content = fs::read_to_string(&path)
             .map_err(|err| anyhow::anyhow!("Cannot access {}: {err}", path.yellow()))?;
-        let result = serde_json::from_str::<TolkSourceMap>(content.as_str()).map_err(|err| {
+        let result = serde_json::from_str::<SourceMap>(content.as_str()).map_err(|err| {
             anyhow::anyhow!("Failed to parse source map {}: {err}", path.yellow())
         })?;
         Some(Box::new(result))
@@ -2303,7 +2525,7 @@ fn create_test_config(
     coverage_include_tests: bool,
     exclude: Vec<String>,
     include: Vec<String>,
-    clear_cache: bool,
+    clear_cache: Option<bool>,
     report_formats: Vec<ReportFormat>,
     junit_path: Option<String>,
     junit_merge: bool,
@@ -2328,13 +2550,15 @@ fn create_test_config(
     fuzz_seed: Option<u64>,
     fail_fast: Option<bool>,
     ui: bool,
-    ui_port: u16,
-) -> TestConfig {
+    ui_port: Option<u16>,
+) -> anyhow::Result<TestConfig> {
     let acton_config = ActonConfig::load();
 
-    if let Ok(acton_config) = acton_config
+    if let Ok(acton_config) = &acton_config
         && let Some(test_settings) = &acton_config.test
     {
+        validate_test_settings(test_settings)?;
+
         let mut config = test_settings.to_test_config(
             filter,
             report_formats,
@@ -2366,7 +2590,7 @@ fn create_test_config(
             } else {
                 Some(include)
             },
-            None,
+            clear_cache,
             junit_path,
             junit_merge,
             snapshot,
@@ -2386,7 +2610,7 @@ fn create_test_config(
             if fail_on_diff { Some(true) } else { None },
             fail_fast,
             ui,
-            Some(ui_port),
+            ui_port,
         );
         config.verbosity = verbosity;
         config.mutation_ids = mutation_ids;
@@ -2395,10 +2619,11 @@ fn create_test_config(
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
-        return config;
+        validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
+        return Ok(config);
     }
 
-    TestConfig {
+    let config = TestConfig {
         show_bodies,
         verbosity,
         debug,
@@ -2413,7 +2638,7 @@ fn create_test_config(
         coverage_file,
         exclude_patterns: exclude,
         include_patterns: include,
-        clear_cache,
+        clear_cache: clear_cache.unwrap_or(false),
         report_formats,
         junit_path,
         junit_merge,
@@ -2439,9 +2664,79 @@ fn create_test_config(
         fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
         ui,
-        ui_port,
+        ui_port: ui_port.unwrap_or(12344),
         fork_net,
+    };
+
+    validate_merged_test_fork_network(acton_config.as_ref().ok(), config.fork_net.as_ref())?;
+
+    Ok(config)
+}
+
+fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
+    if let Some(fork_net) = test_settings.fork_net.as_deref() {
+        Network::from_str(fork_net)
+            .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
     }
+
+    Ok(())
+}
+
+fn validate_merged_test_fork_network(
+    acton_config: Option<&ActonConfig>,
+    fork_net: Option<&Network>,
+) -> anyhow::Result<()> {
+    let Some(fork_net) = fork_net else {
+        return Ok(());
+    };
+
+    let Some(acton_config) = acton_config else {
+        if let Network::Custom(name) = fork_net {
+            anyhow::bail!(
+                "Custom test fork network 'custom:{name}' requires Acton.toml with [networks.{name}.api].v2"
+            );
+        }
+        return Ok(());
+    };
+
+    if let Network::Custom(name) = fork_net {
+        validate_custom_test_network(acton_config, name)?;
+    }
+
+    let custom_networks = acton_config.custom_networks();
+    let v2_url = fork_net
+        .toncenter_v2_url(&custom_networks)
+        .map_err(|err| anyhow::anyhow!("Invalid test fork network '{fork_net}': {err}"))?;
+    reqwest::Url::parse(&v2_url).map_err(|err| {
+        anyhow::anyhow!("Invalid TonCenter v2 URL for test fork network '{fork_net}': {err}")
+    })?;
+
+    Ok(())
+}
+
+fn validate_custom_test_network(acton_config: &ActonConfig, name: &str) -> anyhow::Result<()> {
+    let network = acton_config
+        .networks
+        .as_ref()
+        .and_then(|networks| networks.get(name))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "Unknown custom test fork network 'custom:{name}'. Define [networks.{name}.api].v2 in Acton.toml."
+            )
+        })?;
+
+    let has_v2 = network
+        .api
+        .as_ref()
+        .and_then(|api| api.v2.as_deref())
+        .is_some_and(|url| !url.trim().is_empty());
+    if !has_v2 {
+        anyhow::bail!(
+            "Custom test fork network 'custom:{name}' must define [networks.{name}.api].v2 in Acton.toml."
+        );
+    }
+
+    Ok(())
 }
 
 fn parse_coverage_percent(raw: &str) -> Result<f64, String> {

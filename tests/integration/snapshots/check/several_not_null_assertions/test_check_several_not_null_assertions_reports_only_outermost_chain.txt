@@ -1,4 +1,4 @@
-warning[E019]: several not-null assertions in a row
+warning[E014]: several not-null assertions in a row
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val b = a!!!;
@@ -16,4 +16,4 @@ help: keep a single not-null assertion
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E019
+For example: acton check --explain E014

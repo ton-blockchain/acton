@@ -1,0 +1,10 @@
+SETCP 0
+DICTPUSHCONST 19 [
+    0 => {
+        DROP
+        INMSG_BOUNCED
+        IFRET
+    }
+]
+DICTIGETJMPZ
+THROWARG 11

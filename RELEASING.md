@@ -85,8 +85,7 @@ cargo xtask retag --version 0.22.0
 ## After the push
 
 After the tag is pushed, the GitHub `Release` workflow builds release
-artifacts, creates the GitHub release, and only then publishes the Docker image
-and mirrored release to `i582/acton-public`.
+artifacts, creates the GitHub release, and only then publishes the Docker image.
 
 The retag workflow creates an empty commit on top of `master`, deletes the
 existing tag in `origin`, recreates the tag on that retry commit, and pushes

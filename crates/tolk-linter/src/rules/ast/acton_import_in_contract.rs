@@ -14,7 +14,7 @@ use tolk_resolver::file_index::{FileId, Span};
 /// ### Example
 /// ```tolk twoslash
 /// import "@acton/tlb/maybe";
-/// //      ^^^^^^^^^^^^^^^^ E014: contracts cannot import files from Acton standard library
+/// //      ^^^^^^^^^^^^^^^^ E010: contracts cannot import files from Acton standard library
 /// ```
 ///
 /// Use instead:

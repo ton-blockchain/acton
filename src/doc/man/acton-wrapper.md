@@ -8,10 +8,15 @@ acton-wrapper --- Generate Tolk or TypeScript wrappers for a contract
 
 `acton wrapper` [_options_] _contract-name_
 
+`acton wrapper` [_options_] `--all`
+
 ## Description
 
 Generate a wrapper for the contract identified by `_contract-name_` from
 `Acton.toml`.
+
+Use `--all` to generate wrappers for every contract defined in `Acton.toml`
+without picking a single one.
 
 Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
 contract header is the source of truth for typed storage accessors, incoming
@@ -30,13 +35,21 @@ run is not required.
 {{#options}}
 
 {{#option "_contract-name_" }}
-Contract name from `Acton.toml` to generate the wrapper for.
+Contract name from `Acton.toml` to generate the wrapper for. Required unless
+`--all` is given.
+{{/option}}
+
+{{#option "`--all`" }}
+Generate wrappers for every contract defined in `Acton.toml`.
+
+Conflicts with _contract-name_, `--output`, and `--test-output` (which
+designate a single output file).
 {{/option}}
 
 {{#option "`-o`, `--output` _path_" }}
 Write the generated wrapper to an exact path.
 
-Conflicts with `--output-dir`.
+Conflicts with `--output-dir` and `--all`.
 {{/option}}
 
 {{#option "`--output-dir` _dir_" }}
@@ -58,7 +71,7 @@ Generate a stub test file together with the wrapper.
 {{#option "`--test-output` _path_" }}
 Write the generated test file to an exact path.
 
-Requires `--test`.
+Requires `--test`. Conflicts with `--all`.
 {{/option}}
 
 {{#option "`--test-output-dir` _dir_" }}
@@ -164,6 +177,14 @@ CLI flags override config values for the current invocation.
 
    ```bash
    acton wrapper Counter --ts --output-dir app/src/wrappers-ts
+   ```
+
+6. Generate wrappers for every contract in `Acton.toml`:
+
+   ```bash
+   acton wrapper --all
+   acton wrapper --all --ts
+   acton wrapper --all --output-dir wrappers/generated
    ```
 
 ## See Also

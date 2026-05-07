@@ -17,28 +17,19 @@ const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE";
 const TEST_CURRENT_EXE_ENV: &str = "ACTON_TEST_UP_CURRENT_EXE";
 
 #[test]
-// Verifies that `acton up --list` merges versions from both release repositories without duplicates.
-fn test_up_list_aggregates_unique_versions_across_repositories() {
+// Verifies that `acton up --list` lists versions from the Acton release repository.
+fn test_up_list_lists_versions_from_release_repository() {
     let project = ProjectBuilder::new("up-list-versions").build();
     let mock = GitHubMockServer::spawn_with(|_| {
-        vec![
-            expected_json_response(
-                "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
-                json!([
-                    { "tag_name": "v0.4.0", "assets": [] },
-                    { "tag_name": "v0.3.0", "assets": [] }
-                ])
-                .to_string(),
-            ),
-            expected_json_response(
-                "/repos/i582/acton-public/releases?per_page=100&page=1",
-                json!([
-                    { "tag_name": "v0.3.0", "assets": [] },
-                    { "tag_name": "trunk", "assets": [] }
-                ])
-                .to_string(),
-            ),
-        ]
+        vec![expected_json_response(
+            "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+            json!([
+                { "tag_name": "v0.4.0", "assets": [] },
+                { "tag_name": "v0.3.0", "assets": [] },
+                { "tag_name": "trunk", "assets": [] }
+            ])
+            .to_string(),
+        )]
     });
 
     let output = up_command(&project)
@@ -48,7 +39,39 @@ fn test_up_list_aggregates_unique_versions_across_repositories() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/up/test_up_list_aggregates_unique_versions_across_repositories.stdout.txt",
+        "integration/snapshots/up/test_up_list_lists_versions_from_release_repository.stdout.txt",
+    );
+}
+
+#[test]
+// Verifies that `acton up` remains available when [toolchain].acton does not match.
+fn test_up_list_ignores_project_toolchain_acton_mismatch() {
+    let project = ProjectBuilder::new("up-list-toolchain-mismatch").build();
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "0.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![expected_json_response(
+            "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+            json!([{ "tag_name": "v0.4.0", "assets": [] }]).to_string(),
+        )]
+    });
+
+    let output = up_command(&project)
+        .arg("--list")
+        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/up/test_up_list_ignores_project_toolchain_acton_mismatch.stdout.txt",
     );
 }
 
@@ -106,82 +129,25 @@ fn test_up_check_reports_no_update_when_latest_matches_current() {
 }
 
 #[test]
-// Verifies that malformed JSON from the primary repository falls back to the secondary repository.
-fn test_up_check_falls_back_when_primary_repo_returns_malformed_json() {
-    let project = ProjectBuilder::new("up-check-fallback-json").build();
-    let mock = GitHubMockServer::spawn_with(|base_url| {
-        let release = release_response(
-            "v1.2.3",
-            &mock_assets(base_url, "1.2.3", supported_archive_name(), 1, 1),
-        );
-        vec![
-            ExpectedHttpRequest::json(200, "/repos/ton-blockchain/acton/releases/latest", "{"),
-            expected_json_response("/repos/i582/acton-public/releases/latest", release),
-        ]
+// Verifies that invalid release metadata from the release repository fails without fallback.
+fn test_up_update_fails_when_release_json_is_malformed() {
+    let project = ProjectBuilder::new("up-update-malformed-json").build();
+    let mock = GitHubMockServer::spawn_with(|_| {
+        vec![ExpectedHttpRequest::json(
+            200,
+            "/repos/ton-blockchain/acton/releases/latest",
+            "{",
+        )]
     });
 
     let output = up_command(&project)
-        .arg("--check")
         .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
         .run()
-        .success();
+        .failure();
 
-    output.assert_snapshot_matches(
-        "integration/snapshots/up/test_up_check_falls_back_when_primary_repo_returns_malformed_json.stdout.txt",
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/up/test_up_update_fails_when_release_json_is_malformed.stderr.txt",
     );
-}
-
-#[test]
-// Verifies that a normal update can install from the fallback repository when the primary one has no release.
-fn test_up_installs_latest_release_from_fallback_repository() -> Result<()> {
-    let (project, fake_binary) = setup_up_project("up-install-fallback")?;
-    let bundle = release_bundle("binary-data-9.9.9")?;
-    let archive_name = supported_archive_name();
-    let mock = GitHubMockServer::spawn_with(|base_url| {
-        let release = release_response(
-            "v9.9.9",
-            &mock_assets(
-                base_url,
-                "9.9.9",
-                &archive_name,
-                bundle.archive_len(),
-                bundle.checksum_len(),
-            ),
-        );
-        vec![
-            ExpectedHttpRequest::empty(404, "/repos/ton-blockchain/acton/releases/latest"),
-            expected_json_response("/repos/i582/acton-public/releases/latest", release),
-            expected_binary_response(
-                &format!("/download/9.9.9/{archive_name}"),
-                bundle.archive_bytes.clone(),
-            ),
-            expected_binary_response(
-                &format!("/download/9.9.9/{archive_name}.sha256"),
-                bundle.checksum_bytes.clone(),
-            ),
-        ]
-    });
-
-    let output = up_command(&project)
-        .env(TEST_GITHUB_API_BASE_ENV, mock.base_url())
-        .env(TEST_CURRENT_EXE_ENV, &fake_binary.to_string_lossy())
-        .run()
-        .success();
-
-    output
-        .assert_snapshot_matches(
-            "integration/snapshots/up/test_up_installs_latest_release_from_fallback_repository.stdout.txt",
-        )
-        .assert_file_snapshot_matches(
-            ".fake-bin/acton",
-            "integration/snapshots/up/test_up_installs_latest_release_from_fallback_repository.binary.txt",
-        )
-        .assert_file_snapshot_matches(
-            &backup_file_name(),
-            "integration/snapshots/up/test_up_installs_latest_release_from_fallback_repository.backup.txt",
-        );
-
-    Ok(())
 }
 
 #[test]
@@ -351,14 +317,9 @@ fn test_up_unknown_version_lists_available_versions() {
     let mock = GitHubMockServer::spawn_with(|_| {
         vec![
             ExpectedHttpRequest::empty(404, "/repos/ton-blockchain/acton/releases/tags/v0.0.1"),
-            ExpectedHttpRequest::empty(404, "/repos/i582/acton-public/releases/tags/v0.0.1"),
             expected_json_response(
                 "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
                 json!([{ "tag_name": "v0.4.0", "assets": [] }]).to_string(),
-            ),
-            expected_json_response(
-                "/repos/i582/acton-public/releases?per_page=100&page=1",
-                json!([{ "tag_name": "trunk", "assets": [] }]).to_string(),
             ),
         ]
     });
@@ -553,7 +514,7 @@ fn test_up_fails_when_asset_download_returns_http_error() -> Result<()> {
 }
 
 #[test]
-// Verifies that `--list` reports a GitHub fetch failure when both repositories are unreachable offline.
+// Verifies that `--list` reports a GitHub fetch failure when the release repository is unreachable.
 fn test_up_list_fails_when_offline() {
     let project = ProjectBuilder::new("up-list-offline").build();
     let offline_url = unused_local_url();
@@ -570,20 +531,14 @@ fn test_up_list_fails_when_offline() {
 }
 
 #[test]
-// Verifies that `--list` surfaces GitHub API server errors when both repositories return HTTP 500.
+// Verifies that `--list` surfaces GitHub API server errors from the release repository.
 fn test_up_list_fails_when_github_returns_server_errors() {
     let project = ProjectBuilder::new("up-list-server-errors").build();
     let mock = GitHubMockServer::spawn_with(|_| {
-        vec![
-            ExpectedHttpRequest::empty(
-                500,
-                "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
-            ),
-            ExpectedHttpRequest::empty(
-                500,
-                "/repos/i582/acton-public/releases?per_page=100&page=1",
-            ),
-        ]
+        vec![ExpectedHttpRequest::empty(
+            500,
+            "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
+        )]
     });
 
     let output = up_command(&project)
@@ -614,14 +569,14 @@ fn test_up_update_fails_when_offline() {
 }
 
 #[test]
-// Verifies that a normal update surfaces GitHub API server errors when both repositories return HTTP 500.
+// Verifies that a normal update surfaces GitHub API server errors from the release repository.
 fn test_up_update_fails_when_github_returns_server_errors() {
     let project = ProjectBuilder::new("up-update-server-errors").build();
     let mock = GitHubMockServer::spawn_with(|_| {
-        vec![
-            ExpectedHttpRequest::empty(500, "/repos/ton-blockchain/acton/releases/latest"),
-            ExpectedHttpRequest::empty(500, "/repos/i582/acton-public/releases/latest"),
-        ]
+        vec![ExpectedHttpRequest::empty(
+            500,
+            "/repos/ton-blockchain/acton/releases/latest",
+        )]
     });
 
     let output = up_command(&project)
@@ -635,20 +590,15 @@ fn test_up_update_fails_when_github_returns_server_errors() {
 }
 
 #[test]
-// Verifies that an unknown version still fails clearly when fetching the fallback versions list also fails.
+// Verifies that an unknown version still fails clearly when fetching the versions list also fails.
 fn test_up_unknown_version_when_available_versions_list_fails() {
     let project = ProjectBuilder::new("up-unknown-version-list-failure").build();
     let mock = GitHubMockServer::spawn_with(|_| {
         vec![
             ExpectedHttpRequest::empty(404, "/repos/ton-blockchain/acton/releases/tags/v0.0.1"),
-            ExpectedHttpRequest::empty(404, "/repos/i582/acton-public/releases/tags/v0.0.1"),
             ExpectedHttpRequest::empty(
                 500,
                 "/repos/ton-blockchain/acton/releases?per_page=100&page=1",
-            ),
-            ExpectedHttpRequest::empty(
-                500,
-                "/repos/i582/acton-public/releases?per_page=100&page=1",
             ),
         ]
     });

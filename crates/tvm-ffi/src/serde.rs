@@ -98,9 +98,6 @@ pub fn serialize_tuple_item(builder: &mut CellBuilder, src: &TupleItem) -> anyho
                 builder.store_reference(t.clone())?;
             }
         }
-        TupleItem::TypedTuple { inner: items, .. } => {
-            serialize_tuple_item(builder, &TupleItem::Tuple(items.clone()))?;
-        }
     }
     Ok(())
 }

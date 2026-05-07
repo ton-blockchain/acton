@@ -1,4 +1,4 @@
-warning[E024]: random generator must be initialized before `random.uint256`/`random.range` call
+warning[E018]: random generator must be initialized before `random.uint256`/`random.range` call
   --> [ROOT]/contracts/main[LINE]
   |
 3 |                 val _value = random.range(10);
@@ -8,4 +8,4 @@ warning[E024]: random generator must be initialized before `random.uint256`/`ran
 
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain E024
+For example: acton check --explain E018

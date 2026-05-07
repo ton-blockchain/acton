@@ -17,6 +17,19 @@ pub use comments::{Comment, CommentKind, collect_comments};
 pub struct FormatOptions {
     pub width: usize,
     pub separate_import_groups: bool,
+    pub range: Option<FormatRange>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FormatRange {
+    pub start: FormatPosition,
+    pub end: FormatPosition,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct FormatPosition {
+    pub line: usize,
+    pub character: usize,
 }
 
 impl Default for FormatOptions {
@@ -24,6 +37,7 @@ impl Default for FormatOptions {
         Self {
             width: 100,
             separate_import_groups: false,
+            range: None,
         }
     }
 }

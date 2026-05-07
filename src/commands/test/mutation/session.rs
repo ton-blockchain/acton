@@ -148,9 +148,10 @@ pub(crate) fn load_or_create_mutation_session(
     selected_ids: &BTreeSet<usize>,
     requested_session_id: Option<&str>,
 ) -> anyhow::Result<MutationSessionState> {
-    let session_id = requested_session_id.map(str::to_owned).unwrap_or_else(|| {
-        generate_mutation_session_id(project_root, mutate_contract, source_path)
-    });
+    let session_id = requested_session_id.map_or_else(
+        || generate_mutation_session_id(project_root, mutate_contract, source_path),
+        str::to_owned,
+    );
     let progress_path = mutation_session_progress_path(project_root, &session_id);
     let selected_ids_sorted = selected_ids.iter().copied().collect::<Vec<_>>();
 

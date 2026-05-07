@@ -523,6 +523,11 @@ impl_ast_node!(StructField, "struct_field_declaration");
 
 impl<'tree> StructField<'tree> {
     #[must_use]
+    pub fn annotations(&self) -> Option<AnnotationList<'tree>> {
+        self.0.field("annotations")
+    }
+
+    #[must_use]
     pub fn modifiers(&self) -> Option<StructFieldModifiers<'tree>> {
         self.0.field("modifiers")
     }
@@ -543,6 +548,12 @@ impl<'tree> HasName<'tree> for StructField<'tree> {
 
     fn name(&self) -> Option<Ident<'tree>> {
         self.0.field("name")
+    }
+}
+
+impl<'tree> HasAnnotations<'tree> for StructField<'tree> {
+    fn annotations(&self) -> Option<AnnotationList<'tree>> {
+        StructField::annotations(self)
     }
 }
 
@@ -967,6 +978,11 @@ pub struct AnnotationArgs<'tree>(pub Node<'tree>);
 impl_ast_node!(AnnotationArgs, "annotation_arguments");
 
 impl<'tree> AnnotationArgs<'tree> {
+    #[must_use]
+    pub fn typ(&self) -> Option<Type<'tree>> {
+        self.0.field("type")
+    }
+
     #[must_use]
     pub fn args(&self) -> AstChildren<'tree, Expr<'tree>> {
         AstChildren::new(self.0)

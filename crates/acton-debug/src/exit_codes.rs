@@ -8,6 +8,29 @@ pub struct ExitCodeInfo {
     pub phase: &'static str,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExitCodePhase {
+    Compute,
+    Action,
+}
+
+impl ExitCodePhase {
+    #[must_use]
+    pub const fn display_name(self) -> &'static str {
+        match self {
+            Self::Compute => "Compute phase",
+            Self::Action => "Action phase",
+        }
+    }
+}
+
+impl ExitCodeInfo {
+    #[must_use]
+    pub fn matches_phase(&self, phase: ExitCodePhase) -> bool {
+        self.phase == phase.display_name() || self.phase == "Compute and action phases"
+    }
+}
+
 pub static EXIT_CODE_DESCRIPTIONS: LazyLock<HashMap<i32, ExitCodeInfo>> = LazyLock::new(|| {
     let mut map = HashMap::new();
 
@@ -296,4 +319,28 @@ pub static EXIT_CODE_DESCRIPTIONS: LazyLock<HashMap<i32, ExitCodeInfo>> = LazyLo
 #[must_use]
 pub fn find(code: i32) -> Option<&'static ExitCodeInfo> {
     EXIT_CODE_DESCRIPTIONS.get(&code)
+}
+
+#[must_use]
+pub fn find_for_phase(code: i32, phase: ExitCodePhase) -> Option<&'static ExitCodeInfo> {
+    find(code).filter(|info| info.matches_phase(phase))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ExitCodePhase, find_for_phase};
+
+    #[test]
+    fn action_phase_code_is_not_returned_for_compute_phase() {
+        assert!(find_for_phase(32, ExitCodePhase::Compute).is_none());
+
+        let info = find_for_phase(32, ExitCodePhase::Action).expect("action exit code 32");
+        assert_eq!(info.description, "Action list is invalid");
+    }
+
+    #[test]
+    fn shared_success_code_is_returned_for_both_phases() {
+        assert!(find_for_phase(0, ExitCodePhase::Compute).is_some());
+        assert!(find_for_phase(0, ExitCodePhase::Action).is_some());
+    }
 }

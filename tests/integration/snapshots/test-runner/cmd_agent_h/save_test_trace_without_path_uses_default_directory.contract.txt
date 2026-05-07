@@ -1,26 +1,9 @@
 {
   "abi": {
-    "entryPoint": {
-      "pos": {
-        "column": 4,
-        "row": 1,
-        "uri": "[ROOT]/contracts/simple.tolk"
-      }
-    },
-    "exitCodes": [],
-    "externalEntryPoint": null,
-    "getMethods": [],
-    "messages": [],
-    "name": "simple",
-    "storage": null,
-    "types": []
-  },
-  "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
-  "compiler_abi": {
     "abi_schema_version": "1.0",
+    "alias_instantiations": [],
     "compiler_name": "tolk",
-    "compiler_version": "1.3.0",
-    "constants": [],
+    "compiler_version": "1.4.0",
     "contract_name": "",
     "declarations": [],
     "emitted_events": [],
@@ -29,93 +12,155 @@
     "incoming_messages": [],
     "outgoing_messages": [],
     "storage": {},
-    "thrown_errors": []
+    "struct_instantiations": [],
+    "thrown_errors": [],
+    "unique_types": [
+      {
+        "kind": "void"
+      },
+      {
+        "kind": "int"
+      },
+      {
+        "kind": "slice"
+      },
+      {
+        "kind": "cell"
+      },
+      {
+        "kind": "builder"
+      },
+      {
+        "kind": "bool"
+      },
+      {
+        "kind": "coins"
+      },
+      {
+        "kind": "address"
+      },
+      {
+        "kind": "intN",
+        "n": 32
+      },
+      {
+        "kind": "uintN",
+        "n": 32
+      },
+      {
+        "kind": "intN",
+        "n": 64
+      },
+      {
+        "kind": "uintN",
+        "n": 64
+      }
+    ]
   },
+  "code_boc64": "te6ccgEBAgEAFAABFP8A9KQT9LzyyAsBAArTMPiR3A==",
   "name": "simple",
   "source_map": {
-    "source_map": {
-      "debug_marks": [],
-      "declarations": [],
-      "files": [],
-      "functions": [],
-      "unique_ty": [
-        {
-          "ty": {
-            "kind": "void"
-          },
-          "ty_idx": 0
-        },
-        {
-          "ty": {
-            "kind": "int"
-          },
-          "ty_idx": 1
-        },
-        {
-          "ty": {
-            "kind": "slice"
-          },
-          "ty_idx": 2
-        },
-        {
-          "ty": {
-            "kind": "cell"
-          },
-          "ty_idx": 3
-        },
-        {
-          "ty": {
-            "kind": "builder"
-          },
-          "ty_idx": 4
-        },
-        {
-          "ty": {
-            "kind": "bool"
-          },
-          "ty_idx": 5
-        },
-        {
-          "ty": {
-            "kind": "coins"
-          },
-          "ty_idx": 6
-        },
-        {
-          "ty": {
-            "kind": "address"
-          },
-          "ty_idx": 7
-        },
-        {
-          "ty": {
-            "kind": "intN",
-            "n": 32
-          },
-          "ty_idx": 8
-        },
-        {
-          "ty": {
-            "kind": "uintN",
-            "n": 32
-          },
-          "ty_idx": 9
-        },
-        {
-          "ty": {
-            "kind": "intN",
-            "n": 64
-          },
-          "ty_idx": 10
-        },
-        {
-          "ty": {
-            "kind": "uintN",
-            "n": 64
-          },
-          "ty_idx": 11
-        }
-      ]
-    }
+    "alias_instantiations": [],
+    "debug_marks": [],
+    "declarations": [],
+    "files": [
+      {
+        "file_id": 0,
+        "file_name": "@stdlib/common.tolk",
+        "imports": [],
+        "size_chars": 75175
+      },
+      {
+        "file_id": 1,
+        "file_name": "[ROOT]/contracts/simple.tolk",
+        "imports": [],
+        "size_chars": 86
+      }
+    ],
+    "functions": [
+      {
+        "end_loc": [
+          1,
+          2,
+          39,
+          2,
+          40
+        ],
+        "f_idx": 0,
+        "ident_loc": [
+          1,
+          2,
+          5,
+          2,
+          22
+        ],
+        "name": "onInternalMessage",
+        "num_params": 1,
+        "return_ty_idx": 0
+      },
+      {
+        "end_loc": [
+          1,
+          3,
+          44,
+          3,
+          45
+        ],
+        "f_idx": 1,
+        "ident_loc": [
+          1,
+          3,
+          5,
+          3,
+          21
+        ],
+        "name": "onBouncedMessage",
+        "num_params": 1,
+        "return_ty_idx": 0
+      }
+    ],
+    "struct_instantiations": [],
+    "unique_types": [
+      {
+        "kind": "void"
+      },
+      {
+        "kind": "int"
+      },
+      {
+        "kind": "slice"
+      },
+      {
+        "kind": "cell"
+      },
+      {
+        "kind": "builder"
+      },
+      {
+        "kind": "bool"
+      },
+      {
+        "kind": "coins"
+      },
+      {
+        "kind": "address"
+      },
+      {
+        "kind": "intN",
+        "n": 32
+      },
+      {
+        "kind": "uintN",
+        "n": 32
+      },
+      {
+        "kind": "intN",
+        "n": 64
+      },
+      {
+        "kind": "uintN",
+        "n": 64
+      }
+    ]
   }
 }

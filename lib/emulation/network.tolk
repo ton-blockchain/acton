@@ -164,7 +164,19 @@ fun SendResult.allOutActions(self): OutActionList {
 
 /// Represents a list of send results obtained from [net.send] method.
 ///
-/// This list represent all transactions produced by a [net.send] call.
+/// This list represents all transactions produced by a [net.send] call.
+///
+/// You can print the whole list with [println] to inspect the transaction tree produced by
+/// the send call.
+///
+/// Example output:
+/// ```acton-trace
+/// N/A -> sender A
+/// └── AskToTransfer 0.3 TON -> JettonWallet B                                  gas=5158
+///     └── InternalTransferStep 0.19 TON -> JettonWallet C                      gas=6974
+///         ├── TransferNotificationForRecipient 0.05 TON -> receiver D          gas=1234
+///         └── ReturnExcessesBack 0.13 TON -> sender A                          gas=4321
+/// ```
 ///
 /// To get a single send result, use [SendResultList.at] method.
 type SendResultList = BigArray<SendResult>
@@ -543,6 +555,8 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///
 /// In broadcast mode (with `--net`), sending to the real network is attempted only when `from`
 /// matches one of the wallets opened at script startup.
+/// With `--tonconnect`, `scripts.wallet("name")` resolves to the connected TON Connect wallet
+/// and matching sends are approved in that wallet instead of signed by local keys.
 /// If `from` is not an opened wallet address, this method falls back to normal
 /// emulator execution, even when [net.isBroadcasting] is `true`.
 ///
@@ -790,7 +804,6 @@ fun net.runGetMethod<Ret>(addr: address, idOrName: int | string, args: array<unk
         code,
         methodId,
         methodName,
-        reflect.typeNameOf<Ret>(),
         args,
     );
     if (res == null) {
@@ -1126,31 +1139,21 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
 /// ```
 fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
-    var i = 0;
-    repeat (self.value.size()) {
-        val result = self.value.at(i);
-
-        var j = 0;
-        repeat (result.externals.size()) {
-            val external = result.externals.atOrNull<Msg>(j);
-            if (external != null) {
-                // message found
-                return;
-            }
-            j += 1;
-        }
-
-        i += 1;
+    if (self.value.findExternalOutMessage<Msg>() != null) {
+        return;
     }
 
-    self.fail(
+    ffi.failToFindExternalMessage(
+        self.location,
         format(
-            "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
+            "expect(<actual>).toEmitExternalMessage<{}>()",
             reflect.typeNameOf<Msg>(),
-            reflect.typeNameOf<Msg>(),
-            reflect.serializationPrefixOf<Msg>().0,
         ),
+        self.value,
+        reflect.typeNameOf<Msg>(),
+        reflect.serializationPrefixOf<Msg>().0,
     );
+    throw ASSERTION_FAILED;
 }
 
 /// Expect the transaction to consume less than the expected amount of gas.
@@ -1238,7 +1241,6 @@ fun ffi.runGetMethod(
     code: cell,
     methodId: int,
     methodName: string,
-    returnType: string,
     args: tuple,
 ): tuple?
     asm "8 EXTCALL"
@@ -1276,6 +1278,15 @@ fun ffi.failToNotFindTransactionByParams(
     params: tuple,
 ): tuple?
     asm "104 EXTCALL"
+
+fun ffi.failToFindExternalMessage(
+    location: string,
+    message: string,
+    txs: SendResultList,
+    messageName: string,
+    opcode: int,
+): tuple?
+    asm "108 EXTCALL"
 
 fun ffi.loadLibrary(hash: string): cell?
     asm "21 EXTCALL"

@@ -1,11 +1,11 @@
 [
   {
-    "check_name": "E002:unused-variable",
+    "check_name": "E001:unused-variable",
     "content": {
-      "body": "Rule: `unused-variable` (`E002`)\nPrimary: unused variable `x`\nFixes:\n- [auto] prefix with underscore: `_x`"
+      "body": "Rule: `unused-variable` (`E001`)\nPrimary: unused variable `x`\nFixes:\n- [auto] prefix with underscore: `_x`"
     },
     "description": "variable is unused",
-    "fingerprint": "4398a0f1385fe113360a6c6bc502f3adda327b69dc149d65524971051b972b38",
+    "fingerprint": "9975e202f04910667dd80c2c013e8eb91a2a367f1d0512910943baed8b208947",
     "location": {
       "lines": {
         "begin": 3

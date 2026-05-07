@@ -1,3 +1,4 @@
+import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@wrappers/JettonMinter.gen"
@@ -29,7 +30,7 @@ fun main() {
         1,
         null,
     );
-    res.waitForFirstTransaction();
+    println(res.waitForTrace());
 
     printJettonMinterInfo(minter, "JETTON");
     printJettonWalletInfo(minter, sender.address, "JETTON_SENDER");

@@ -1,21 +1,11 @@
-'use client';
-import { useMemo, useState } from 'react';
-import {
-  Check,
-  ChevronDown,
-  Copy,
-  ExternalLinkIcon,
-  MessageCircleIcon,
-} from 'lucide-react';
-import { cn } from '../lib/cn';
-import { useCopyButton } from 'fumadocs-ui/utils/use-copy-button';
-import { buttonVariants } from './ui/button';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from 'fumadocs-ui/components/ui/popover';
-import { cva } from 'class-variance-authority';
+"use client"
+import {useMemo, useState} from "react"
+import {Check, ChevronDown, Copy, ExternalLinkIcon, MessageCircleIcon} from "lucide-react"
+import {cn} from "../lib/cn"
+import {useCopyButton} from "fumadocs-ui/utils/use-copy-button"
+import {buttonVariants} from "./ui/button"
+import {Popover, PopoverContent, PopoverTrigger} from "fumadocs-ui/components/ui/popover"
+import {cva} from "class-variance-authority"
 
 export function LLMCopyButton({
   /**
@@ -23,31 +13,31 @@ export function LLMCopyButton({
    */
   content,
 }: {
-  content: Promise<string>;
+  content: Promise<string>
 }) {
-  const [isLoading, setLoading] = useState(false);
+  const [isLoading, setLoading] = useState(false)
   const [checked, onClick] = useCopyButton(async () => {
-    setLoading(true);
+    setLoading(true)
 
     try {
       await navigator.clipboard.write([
         new ClipboardItem({
-          'text/plain': await content,
+          "text/plain": await content,
         }),
-      ]);
+      ])
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  });
+  })
 
   return (
     <button
       disabled={isLoading}
       className={cn(
         buttonVariants({
-          color: 'secondary',
-          size: 'sm',
-          className: 'gap-2 [&_svg]:size-3.5 [&_svg]:text-fd-muted-foreground',
+          color: "secondary",
+          size: "sm",
+          className: "gap-2 [&_svg]:size-3.5 [&_svg]:text-fd-muted-foreground",
         }),
       )}
       onClick={onClick}
@@ -55,12 +45,12 @@ export function LLMCopyButton({
       {checked ? <Check /> : <Copy />}
       Copy Markdown
     </button>
-  );
+  )
 }
 
 const optionVariants = cva(
-  'text-sm p-2 rounded-lg inline-flex items-center gap-2 hover:text-fd-accent-foreground hover:bg-fd-accent [&_svg]:size-4',
-);
+  "text-sm p-2 rounded-lg inline-flex items-center gap-2 hover:text-fd-accent-foreground hover:bg-fd-accent [&_svg]:size-4",
+)
 
 export function ViewOptions({
   markdownUrl,
@@ -69,23 +59,21 @@ export function ViewOptions({
   /**
    * A URL to the raw Markdown/MDX content of page
    */
-  markdownUrl: string;
+  markdownUrl: string
 
   /**
    * Source file URL on GitHub
    */
-  githubUrl: string;
+  githubUrl: string
 }) {
   const items = useMemo(() => {
     const fullMarkdownUrl =
-      typeof window !== 'undefined'
-        ? new URL(markdownUrl, window.location.origin)
-        : 'loading';
-    const q = `Read ${fullMarkdownUrl}, I want to ask questions about it.`;
+      typeof window !== "undefined" ? new URL(markdownUrl, window.location.origin) : "loading"
+    const q = `Read ${fullMarkdownUrl}, I want to ask questions about it.`
 
     return [
       {
-        title: 'Open in GitHub',
+        title: "Open in GitHub",
         href: githubUrl,
         icon: (
           <svg fill="currentColor" role="img" viewBox="0 0 24 24">
@@ -95,7 +83,7 @@ export function ViewOptions({
         ),
       },
       {
-        title: 'Open in Scira AI',
+        title: "Open in Scira AI",
         href: `https://scira.ai/?${new URLSearchParams({
           q,
         })}`,
@@ -159,9 +147,9 @@ export function ViewOptions({
         ),
       },
       {
-        title: 'Open in ChatGPT',
+        title: "Open in ChatGPT",
         href: `https://chatgpt.com/?${new URLSearchParams({
-          hints: 'search',
+          hints: "search",
           q,
         })}`,
         icon: (
@@ -177,7 +165,7 @@ export function ViewOptions({
         ),
       },
       {
-        title: 'Open in Claude',
+        title: "Open in Claude",
         href: `https://claude.ai/new?${new URLSearchParams({
           q,
         })}`,
@@ -194,23 +182,23 @@ export function ViewOptions({
         ),
       },
       {
-        title: 'Open in T3 Chat',
+        title: "Open in T3 Chat",
         href: `https://t3.chat/new?${new URLSearchParams({
           q,
         })}`,
         icon: <MessageCircleIcon />,
       },
-    ];
-  }, [githubUrl, markdownUrl]);
+    ]
+  }, [githubUrl, markdownUrl])
 
   return (
     <Popover>
       <PopoverTrigger
         className={cn(
           buttonVariants({
-            color: 'secondary',
-            size: 'sm',
-            className: 'gap-2',
+            color: "secondary",
+            size: "sm",
+            className: "gap-2",
           }),
         )}
       >
@@ -218,7 +206,7 @@ export function ViewOptions({
         <ChevronDown className="size-3.5 text-fd-muted-foreground" />
       </PopoverTrigger>
       <PopoverContent className="flex flex-col">
-        {items.map((item) => (
+        {items.map(item => (
           <a
             key={item.href}
             href={item.href}
@@ -233,5 +221,5 @@ export function ViewOptions({
         ))}
       </PopoverContent>
     </Popover>
-  );
+  )
 }

@@ -1,9 +1,11 @@
+use crate::build_info;
 use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
 use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
-    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, default_project_mappings,
+    ActonConfig, ContractConfig, ContractDependency, ContractsConfig, ToolchainConfig,
+    default_project_mappings,
 };
 use anyhow::anyhow;
 use inquire::{Confirm, Select, Text};
@@ -15,7 +17,7 @@ use std::path::Path;
 mod licenses;
 mod template;
 use template::ProjectLayout;
-pub use template::ProjectTemplate;
+pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";
@@ -67,6 +69,9 @@ const BASE_ENV_EXAMPLE: &str = "
 # Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
 # exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
 # You can obtain a key in the bot at https://t.me/toncenter.
+# Acton ignores HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and system proxy settings by default
+# to avoid macOS sandbox proxy autodetection crashes. Set ACTON_USE_PROXY=1 or
+# ACTON_USE_PROXY=true if you need Acton CLI HTTP requests to use those proxies.
 # Uncomment the network keys you need:
 # TONCENTER_MAINNET_API_KEY=\"your-mainnet-key-here\"
 # TONCENTER_TESTNET_API_KEY=\"your-testnet-key-here\"
@@ -138,10 +143,6 @@ pub fn new_cmd(
         path
     };
 
-    if !project_path.exists() {
-        fs::create_dir_all(&project_path)?;
-    }
-
     let default_name = project_path
         .file_name()
         .and_then(|n| n.to_str())
@@ -150,16 +151,18 @@ pub fn new_cmd(
 
     let project_name = if let Some(name) = name {
         name
-    } else {
+    } else if interactive {
         Text::new("Project name:")
             .with_placeholder(default_name)
             .with_default(default_name)
             .prompt()?
+    } else {
+        default_name.to_owned()
     };
 
     let template = if let Some(template) = template {
         template
-    } else {
+    } else if interactive {
         let template_options = template::get_available_templates()
             .into_iter()
             .map(TemplateSelectItem)
@@ -169,6 +172,20 @@ pub fn new_cmd(
             .with_starting_cursor(0)
             .prompt()?
             .0
+    } else {
+        let available_templates = template::get_available_templates()
+            .into_iter()
+            .map(ProjectTemplate::as_str)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let template_flag = "--template <TEMPLATE>".yellow().bold().to_string();
+        let example = format!("acton new {path} --template empty")
+            .cyan()
+            .to_string();
+        let available_templates = available_templates.cyan().to_string();
+        anyhow::bail!(
+            "Project template is required when running acton new non-interactively.\n\nPass {template_flag}, for example:\n  {example}\n\nAvailable templates: {available_templates}"
+        );
     };
 
     let git_available = is_git_available();
@@ -192,10 +209,17 @@ pub fn new_cmd(
         )
     })?;
 
+    if !project_path.exists() {
+        fs::create_dir_all(&project_path)?;
+    }
+
     let mut config = ActonConfig::default();
-    config.package.name = project_name.clone();
-    config.package.description = description.clone();
+    config.package.name.clone_from(&project_name);
+    config.package.description.clone_from(&description);
     config.package.license = Some(license.clone());
+    config.toolchain = Some(ToolchainConfig {
+        acton: Some(build_info::PACKAGE_VERSION.to_owned()),
+    });
 
     std::env::set_current_dir(&project_path)?;
 
@@ -246,6 +270,9 @@ pub fn new_cmd(
             scaffold.deploy_script_path()
         ),
     );
+    for (alias, command) in scaffold.extra_scripts() {
+        scripts.insert(alias, command);
+    }
     config.scripts = Some(scripts);
     config.mappings = Some(project_mappings(scaffold.layout()));
 

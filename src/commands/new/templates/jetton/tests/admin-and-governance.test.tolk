@@ -3,6 +3,7 @@ import "@acton/emulation/network"
 import "@acton/emulation/testing"
 import "@acton/testing/expect"
 import "@acton/types/transaction"
+
 import "@contracts/errors"
 import "@contracts/messages"
 import "@contracts/sharding"
@@ -10,28 +11,13 @@ import "@contracts/storage"
 import "@wrappers/JettonMinter.gen"
 import "@wrappers/JettonWallet.gen"
 import "@wrappers/utils"
+
 import "test-utils"
-
-fun extractUriString(contentCell: cell): string? {
-    val metadata = OnchainMetadataReply.fromCell(contentCell);
-    val uriCell = metadata.contentDict.get("uri".sha256());
-    if (!uriCell.isFound) {
-        return null;
-    }
-    val uri = uriCell.loadValue().load();
-    return uri.string;
-}
-
-fun assertSameShardPrefix(owner: address, wallet: address) {
-    val (_, ownerHash) = owner.getWorkchainAndHash();
-    val (_, walletHash) = wallet.getWorkchainAndHash();
-    expect(ownerHash >> (256 - SHARD_DEPTH)).toEqual(walletHash >> (256 - SHARD_DEPTH));
-}
 
 get fun `test admin: deploy should create minter without bounce`() {
     val deployer = testing.treasury("deployer-manual-deploy");
 
-    val minter = JettonMinter.fromStorage(MinterStorage {
+    val minter = JettonMinter.fromStorage({
         totalSupply: 0,
         adminAddress: deployer.address,
         metadata: buildTestMetadata("link"),
@@ -79,7 +65,7 @@ get fun `test admin: non-admin should not be able to mint jettons`() {
     expect(mintResult).toHaveFailedTx<MintNewJettons>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     val deployerWallet = userWallet(minter, deployer.address);
@@ -111,7 +97,7 @@ get fun `test admin: change-admin flow should work and only next admin can claim
     expect(badClaim).toHaveFailedTx<ClaimMinterAdmin>({
         from: deployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 
     val claimResult = minter.sendClaimMinterAdmin(
@@ -147,7 +133,7 @@ get fun `test admin: non-admin cannot change admin`() {
     expect(changeResult).toHaveFailedTx<ChangeMinterAdmin>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getAdminAddress()).toEqual(deployer.address);
 }
@@ -163,7 +149,7 @@ get fun `test admin: non-admin cannot drop admin access`() {
     expect(dropResult).toHaveFailedTx<DropMinterAdmin>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
 }
 
@@ -222,7 +208,7 @@ get fun `test admin: non-admin cannot change metadata uri`() {
     expect(changeResult).toHaveFailedTx<ChangeMinterMetadata>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getContent().hash()).toEqual(oldContentHash);
 }
@@ -340,7 +326,7 @@ get fun `test admin: non-admin should not be able to upgrade minter`() {
     expect(res).toHaveFailedTx<UpgradeMinterCode>({
         from: notDeployer.address,
         to: minter.address,
-        exitCode: Errors.NotOwner as int32,
+        exitCode: Errors.NotOwner,
     });
     expect(minter.getContent().hash()).toEqual(oldContentHash);
 }
@@ -428,4 +414,22 @@ get fun `test shard: wallet address should keep owner shard prefix in get/discov
 
         prefix += 1;
     }
+}
+
+fun extractUriString(contentCell: cell): string? {
+    val metadata = OnchainMetadataReply.fromCell(contentCell);
+    val uriCell = metadata.contentDict.get("uri".sha256());
+    if (!uriCell.isFound) {
+        return null;
+    }
+    val prefixed = uriCell.loadValue();
+    var s = (prefixed as unknown as cell).beginParse();
+    s.loadUint(8);
+    return s.loadString();
+}
+
+fun assertSameShardPrefix(owner: address, wallet: address) {
+    val (_, ownerHash) = owner.getWorkchainAndHash();
+    val (_, walletHash) = wallet.getWorkchainAndHash();
+    expect(ownerHash >> (256 - SHARD_DEPTH)).toEqual(walletHash >> (256 - SHARD_DEPTH));
 }

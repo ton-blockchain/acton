@@ -1,7 +1,7 @@
 // Standard library for Tolk (LGPL licence).
 // It contains common functions that are available out of the box, the user doesn't have to import anything.
 // More specific functions are required to be imported explicitly, like "@stdlib/gas-payments".
-tolk 1.3
+tolk 1.4
 
 /**
     Built-in types.
@@ -739,14 +739,14 @@ fun random.initialize(): void
 /// otherwise the computation is aborted before visiting the `(maxCells + 1)`-st cell and
 /// a zero flag is returned to indicate failure.
 @pure
-fun cell.calculateSize(self, maxCells: int): (int, int, int, bool)
+fun cell.calculateSize(self, maxCells: int): (int?, int?, int?, bool)
     asm "CDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT"
 
 /// Similar to [cell.calculateSize], but accepting a slice instead of a cell.
 /// The returned value of `x` does not take into account the cell that contains the slice itself;
 /// however, its data bits and cell references are accounted for in `y` and `z`.
 @pure
-fun slice.calculateSize(self, maxCells: int): (int, int, int, bool)
+fun slice.calculateSize(self, maxCells: int): (int?, int?, int?, bool)
     asm "SDATASIZEQ NULLSWAPIFNOT2 NULLSWAPIFNOT"
 
 /// A non-quiet version of [cell.calculateSize] that throws a cell overflow exception (`8`) on failure.
@@ -1562,7 +1562,7 @@ fun reserveExtraCurrenciesOnBalance(nanoTonCoins: coins, extraAmount: dict, rese
     ```
  */
 
-/// mode = 0 is used for ordinary messages; the gas fees are deducted from the senging amount; action phases should NOT be ignored.
+/// mode = 0 is used for ordinary messages; the gas fees are deducted from the sending amount; action phases should NOT be ignored.
 const SEND_MODE_REGULAR = 0
 /// +1 means that the sender wants to pay transfer fees separately.
 const SEND_MODE_PAY_FEES_SEPARATELY = 1
@@ -1936,7 +1936,7 @@ struct InMessageBounced {
     senderAddress: address          // an internal address from which the message was bounced
     valueCoins: coins               // ton amount attached to a message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to a message
-    originalForwardFee: coins       // comission that the sender has paid to send this message
+    originalForwardFee: coins       // commission that the sender has paid to send this message
     createdLt: uint64               // logical time when a message was created (and bounced)
     createdAt: uint32               // unixtime when a message was created (and bounced)
     bouncedBody: slice              // populated depending on `BounceMode` for `createMessage`

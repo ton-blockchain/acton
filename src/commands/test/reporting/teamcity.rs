@@ -48,12 +48,14 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_type,
+                                bin_failure.right_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_type,
+                                bin_failure.left_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                         }
@@ -63,12 +65,14 @@ impl TeamCityReporter {
                         if let Some(formatter) = &formatter {
                             expected = Some(formatter.format_tuple_value(
                                 &bin_failure.right,
-                                &bin_failure.right_type,
+                                bin_failure.right_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                             actual = Some(formatter.format_tuple_value(
                                 &bin_failure.left,
-                                &bin_failure.left_type,
+                                bin_failure.left_ty_idx,
+                                &bin_failure.source_map,
                                 0,
                             ));
                         }
@@ -102,8 +106,16 @@ impl TeamCityReporter {
                 AssertFailure::TransactionIsFound(_) => {
                     message = "Unexpected transaction found".to_string();
                 }
+                AssertFailure::ExternalMessageNotFound(failure) => {
+                    message = format!("External message '{}' not found", failure.message_name);
+                }
                 AssertFailure::WalletNotFound(failure) => {
                     message = format!("Wallet '{}' not found", failure.wallet_name);
+                    if let Some(formatter) = &formatter {
+                        details = FormatterContext::strip_ansi_text(
+                            &formatter.format_wallet_not_found_message(failure),
+                        );
+                    }
                 }
             }
 
@@ -115,7 +127,7 @@ impl TeamCityReporter {
         }
 
         if let Some(ref test_message) = test.message {
-            message = test_message.clone();
+            message.clone_from(test_message);
         }
 
         if let Some(exec) = &test.execution
@@ -158,10 +170,10 @@ impl TestReporter for TeamCityReporter {
     ) -> anyhow::Result<()> {
         let suite_name = extract_suite_name(file_path);
         let escaped_name = self.escape_name(&suite_name);
+        let location_hint = self.escape_name(&format!("file://{}", file_path.display()));
 
         println!(
-            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' locationHint='file://{}']",
-            file_path.display()
+            "##teamcity[testSuiteStarted name='{escaped_name}' nodeId='suite_{escaped_name}' parentNodeId='0' nodeType='file' locationHint='{location_hint}']"
         );
         Ok(())
     }

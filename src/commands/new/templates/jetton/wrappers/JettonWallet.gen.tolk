@@ -55,22 +55,24 @@ fun JettonWallet.sendAskToTransfer(
     sendExcessesTo: address?,
     customPayload: cell?,
     forwardTonAmount: coins,
-    forwardPayload: ForwardPayloadRemainder,
+    forwardPayload: PayloadInline | PayloadInRef,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x0f8a7ea5, 32)
+        .storeAny(queryId)
+        .storeAny(jettonAmount)
+        .storeAny(transferRecipient)
+        .storeAny(sendExcessesTo)
+        .storeAny(customPayload)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: AskToTransfer {
-            queryId,
-            jettonAmount,
-            transferRecipient,
-            sendExcessesTo,
-            customPayload,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: AskToTransfer.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }
@@ -101,21 +103,23 @@ fun JettonWallet.sendInternalTransferStep(
     transferInitiator: address?,
     sendExcessesTo: address?,
     forwardTonAmount: coins,
-    forwardPayload: ForwardPayloadRemainder,
+    forwardPayload: PayloadInline | PayloadInRef,
     config: SendParams = {},
 ): SendResultList {
+    // build body cell manually, because some fields have @abi.clientType
+    val bodyB = beginCell()
+        .storeUint(0x178d4519, 32)
+        .storeAny(queryId)
+        .storeAny(jettonAmount)
+        .storeAny(transferInitiator)
+        .storeAny(sendExcessesTo)
+        .storeAny(forwardTonAmount)
+        .storeAny(forwardPayload);
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: InternalTransferStep {
-            queryId,
-            jettonAmount,
-            transferInitiator,
-            sendExcessesTo,
-            forwardTonAmount,
-            forwardPayload,
-        },
+        body: InternalTransferStep.fromSlice(bodyB.toSlice()),
     });
     return net.send(from, genericMsg);
 }

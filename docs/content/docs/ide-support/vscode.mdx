@@ -7,32 +7,38 @@ The [TON extension for VS Code](https://marketplace.visualstudio.com/items?itemN
 
 For installation instructions, see the [official TON documentation](https://docs.ton.org/contract-dev/ide/vscode).
 
-## Supported Editors
+## Supported editors
 
 The extension is compatible with:
-- Visual Studio Code
-- Cursor
-- Windsurf
-- VSCodium
-- And other VS Code-based editors
 
-## Acton.toml Support
+- Visual Studio Code;
+- Cursor;
+- Windsurf;
+- VSCodium;
+- And other VS Code-based editors.
 
-### Quick Actions
+## `Acton.toml` support
+
+### Quick actions
+
 Code lenses allow running builds and tests directly from the `Acton.toml` file.
 
 #### Building a specific contract
+
 ![](imgs/vscode/acton-toml-build.png)
 
 #### Running project tests
+
 ![](imgs/vscode/acton-toml-run-tests.png)
 
 #### Running a script
+
 ![](imgs/vscode/acton-toml-run-script.png)
 
 ## Testing
 
-### Native Test Runner
+### Native test runner
+
 Acton tests integrate with the IDE's native test runner, providing a hierarchical view and progress indicators.
 
 ![](imgs/vscode/test-runner.png)
@@ -41,17 +47,20 @@ For convenient execution, the plugin provides a test run icon in the editor.
 
 ![](imgs/vscode/test-run.png)
 
-### Failure Analysis
+### Failure analysis
+
 When a test fails, the plugin highlights the specific `expect` call that failed and changes the test icon.
 
 ![](imgs/vscode/fail-tests.png)
 
-### Code Coverage
+### Code coverage
+
 Coverage results are displayed in the editor gutter and file tree, showing which contract lines were executed during tests.
 
 ![](imgs/vscode/test-coverage.png)
 
-### Test Snippets
+### Test snippets
+
 The `test` live template allows generating test structures by typing `test` and pressing Tab.
 
 ![](imgs/vscode/test-completion.png)
@@ -59,12 +68,14 @@ The `test` live template allows generating test structures by typing `test` and 
 
 ## Toolchain Integration
 
-### Wallet Management
+### Wallet management
+
 The Wallets View allows managing project wallets, including generation, import via mnemonic, balance tracking, and testnet TON requests.
 
 ![](imgs/vscode/wallets-view.png)
 
-### Script Execution
+### Script execution
+
 Scripts can be executed via code lenses:
 
 ![](imgs/vscode/scripts-run.png)

@@ -8,4 +8,5 @@ enum Errors {
     NotFromCollection = 405
     InvalidItemIndex = 402
     TooSmallRestAmount = 402
+    IncorrectForwardPayload = 708
 }

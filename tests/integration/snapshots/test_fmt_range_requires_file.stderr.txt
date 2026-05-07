@@ -1,0 +1,1 @@
+Error: --range can only be used with a single .tolk file

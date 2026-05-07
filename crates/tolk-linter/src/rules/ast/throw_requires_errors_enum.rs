@@ -28,7 +28,7 @@ use tree_sitter::Node;
 ///     val storage = lazy Storage.load();
 ///     val isOwner = in.senderAddress == storage.ownerAddress;
 ///     assert (isOwner) throw ERR_NOT_OWNER;
-///     //                     ^^^^^^^^^^^^^ E034: throw code should use `Errors.<Name>`
+///     //                     ^^^^^^^^^^^^^ E028: throw code should use `Errors.<Name>`
 /// }
 /// ```
 ///

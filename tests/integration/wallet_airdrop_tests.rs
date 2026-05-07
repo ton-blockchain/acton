@@ -27,6 +27,7 @@ struct FaucetMockResponse {
 struct CapturedRequest {
     method: String,
     path: String,
+    headers: Vec<(String, String)>,
     body: String,
 }
 
@@ -136,6 +137,7 @@ fn spawn_http_mock(
             let method = parts.next().unwrap_or_default().to_string();
             let path = parts.next().unwrap_or_default().to_string();
 
+            let mut headers = Vec::new();
             let mut content_length = 0_usize;
             loop {
                 let mut header_line = String::new();
@@ -156,6 +158,10 @@ fn spawn_http_mock(
                         .trim();
                     content_length = len_value.parse().unwrap_or(0);
                 }
+
+                if let Some((name, value)) = header_line.split_once(':') {
+                    headers.push((name.trim().to_string(), value.trim().to_string()));
+                }
             }
 
             let mut request_body = Vec::<u8>::new();
@@ -172,6 +178,7 @@ fn spawn_http_mock(
                 .push(CapturedRequest {
                     method: method.clone(),
                     path: path.clone(),
+                    headers,
                     body: String::from_utf8_lossy(&request_body).into_owned(),
                 });
 
@@ -327,16 +334,19 @@ fn status_text(status: u16) -> &'static str {
 }
 
 fn append_localnet_port(project_path: &Path, port: u16) {
+    use std::fmt::Write as _;
+
     let acton_toml_path = project_path.join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("Failed to read generated Acton.toml");
-    acton_toml.push_str(&format!(
+    let _ = write!(
+        acton_toml,
         r"
 
 [localnet]
 port = {port}
 "
-    ));
+    );
     fs::write(&acton_toml_path, acton_toml).expect("Failed to write Acton.toml with localnet port");
 }
 
@@ -378,6 +388,13 @@ fn parse_address_balance(address_information: &Value) -> u128 {
                 serde_json::to_string_pretty(address_information).unwrap_or_default()
             )
         })
+}
+
+fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
 }
 
 #[test]
@@ -1072,8 +1089,20 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
         },
     ]);
 
-    let (toncenter_url, toncenter_handle, captured_requests) =
-        spawn_toncenter_v3_mock(vec![ToncenterMockResponse {
+    let (toncenter_url, toncenter_handle, captured_requests) = spawn_toncenter_v3_mock(vec![
+        ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "0",
+                    "code_boc": Value::Null,
+                    "status": "uninit",
+                }]
+            })
+            .to_string(),
+        },
+        ToncenterMockResponse {
             status: 200,
             body: serde_json::json!({
                 "accounts": [{
@@ -1084,7 +1113,8 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
                 }]
             })
             .to_string(),
-        }]);
+        },
+    ]);
 
     let mut session = project
         .acton()
@@ -1113,14 +1143,133 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
         .expect("captured toncenter requests mutex poisoned");
     assert_eq!(
         captured.len(),
-        1,
-        "expected one balance confirmation request"
+        2,
+        "expected baseline and confirmation balance requests"
     );
     assert_eq!(captured[0].method, "GET");
     assert!(
         captured[0].path.starts_with("/accountStates?address="),
         "unexpected toncenter path: {}",
         captured[0].path
+    );
+    assert_eq!(captured[1].method, "GET");
+    assert!(
+        captured[1].path.starts_with("/accountStates?address="),
+        "unexpected toncenter path: {}",
+        captured[1].path
+    );
+}
+
+#[cfg(unix)]
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("wallet-airdrop-wait-existing-balance").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![
+        FaucetMockResponse {
+            method: "GET",
+            path: "/faucet/challenge",
+            status: 200,
+            body: r#"{"challenge":"airdrop-existing-balance-wait-ok","difficulty":0}"#,
+        },
+        FaucetMockResponse {
+            method: "POST",
+            path: "/faucet/claim",
+            status: 200,
+            body: r#"{"message":"existing balance airdrop wait success"}"#,
+        },
+    ]);
+
+    let (toncenter_url, toncenter_handle, captured_requests) = spawn_toncenter_v3_mock(vec![
+        ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "2200000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        },
+        ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "2200000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        },
+        ToncenterMockResponse {
+            status: 200,
+            body: serde_json::json!({
+                "accounts": [{
+                    "address": "test-address",
+                    "balance": "3400000000",
+                    "code_boc": Value::Null,
+                    "status": "active",
+                }]
+            })
+            .to_string(),
+        },
+    ]);
+
+    let mut session = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .env(TEST_TONCENTER_V3_URL_ENV, &toncenter_url)
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("existing balance airdrop wait success");
+    session.expect("Waiting for testnet balance to increase... Press Enter to skip waiting.");
+    session.expect("Testnet balance increased: 3.4000 TON (+1.2000 TON)");
+    session.expect(Eof);
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+    toncenter_handle
+        .join()
+        .expect("mock toncenter thread must finish without panic");
+
+    let captured = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected baseline, unchanged poll, and increased balance poll"
+    );
+    assert!(captured.iter().all(|request| request.method == "GET"));
+    assert!(
+        captured
+            .iter()
+            .all(|request| request.path.starts_with("/accountStates?address=")),
+        "unexpected toncenter requests: {captured:?}"
     );
 }
 
@@ -1234,7 +1383,7 @@ fn test_wallet_airdrop_rate_limit_uses_friendly_error_message() {
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_wallet_airdrop_claim_request_contains_challenge_nonce_and_address() {
+fn test_wallet_airdrop_claim_request_contains_challenge_nonce_address_and_ton_type() {
     let project = ProjectBuilder::new("wallet-airdrop-claim-payload").build();
 
     project
@@ -1293,11 +1442,22 @@ fn test_wallet_airdrop_claim_request_contains_challenge_nonce_and_address() {
 
     assert_eq!(claim_body["challenge"], "payload-check");
     assert!(claim_body["nonce"].as_u64().is_some(), "nonce must be u64");
+    assert_eq!(claim_body["type"], 1);
     assert!(
         claim_body["address"]
             .as_str()
             .is_some_and(|address| !address.is_empty()),
         "address must be non-empty string"
+    );
+    assert!(claim_body.get("device_uid").is_none());
+    assert!(
+        header_value(&claim_request.headers, "x-device-uid")
+            .is_some_and(|uid| !uid.trim().is_empty()),
+        "x-device-uid header must be a non-empty string"
+    );
+    assert_eq!(
+        header_value(&claim_request.headers, "user-agent"),
+        Some(acton::build_info::user_agent())
     );
 }
 

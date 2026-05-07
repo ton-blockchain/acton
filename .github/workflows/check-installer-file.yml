@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PUBLIC_ACTON_REPOSITORY: i582/acton-public
+  PUBLIC_ACTON_REPOSITORY: ton-blockchain/acton
 
 permissions: { }
 
@@ -124,12 +124,23 @@ jobs:
 
       - name: Install Acton from temporary release
         working-directory: ${{ runner.temp }}
+        shell: bash
         env:
           ACTON_DOWNLOAD_URL: ${{ format('https://github.com/{0}/releases/download/{1}', env.PUBLIC_ACTON_REPOSITORY, needs.create-temporary-release.outputs.release_tag) }}
         # language=Bash
         run: |
-          curl --proto '=https' --tlsv1.2 -fsSL \
-            "${ACTON_DOWNLOAD_URL}/acton-installer.sh" | sh
+          set -euo pipefail
+
+          installer_log="${RUNNER_TEMP}/acton-installer.log"
+          {
+            curl --proto '=https' --tlsv1.2 -fsSL \
+              "${ACTON_DOWNLOAD_URL}/acton-installer.sh" | sh
+          } 2>&1 | tee "${installer_log}"
+
+          if grep -F "no checksums to verify" "${installer_log}"; then
+            echo "::error::installer did not verify the release archive checksum"
+            exit 1
+          fi
 
       - name: Run installer smoke checks
         uses: ./.github/actions/check-release-artifact
