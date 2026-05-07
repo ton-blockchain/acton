@@ -267,7 +267,18 @@ pub(crate) fn compilation_result_for_code(
     code: Option<&Cell>,
     need_project_contract_lookup: bool,
 ) -> Option<(PathBuf, CompilationResult)> {
-    let code = code?;
+    let mut code = code.cloned()?;
+
+    if code.is_exotic() {
+        let mut code_slice = code.as_slice_allow_exotic();
+        if code_slice.load_uint(8) == Ok(2) {
+            let hash = code_slice.load_u256().ok()?;
+            if let Some(cell) = ctx.chain.world_state.find_lib_by_hash(&hash) {
+                code = cell;
+            }
+        }
+    }
+
     // Fast path: wrappers created via `fromStorage()` call `build(...)`, so the
     // matching code hash is already present in the per-run build cache.
     if let Some(result) = ctx.build.build_cache.result_for_code(&Some(code.clone())) {
