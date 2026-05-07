@@ -40,7 +40,7 @@ async function validateExternalUrl(url: URL): Promise<ExternalLinkResult> {
 
 function toRedirectMode(url: URL): RequestRedirect {
   // The latest release can be accessed via a redirect from 'latest'
-  if (url.href.startsWith("https://github.com/ton-blockchain/acton/releases")) {
+  if (url.href.startsWith("https://github.com/ton-blockchain/acton/releases/latest")) {
     return "follow"
   }
 
