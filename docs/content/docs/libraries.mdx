@@ -4,19 +4,21 @@ description: "Learn how to work with on-chain libraries in Acton"
 icon: Book
 ---
 
-On-chain libraries are a powerful feature of the TON blockchain that allows you to store code once and reuse it across multiple contracts, significantly reducing storage costs.
+import {Callout} from "fumadocs-ui/components/callout";
 
-<Callout title="Learn more">
-  For a deep dive into how libraries work in TON, check out the [official documentation](https://docs.ton.org/contract-dev/techniques/using-on-chain-libraries).
+On-chain libraries let the TON blockchain store code once and reuse it across multiple contracts, which cuts storage use compared to duplicating the same code in every account.
+
+<Callout type="info" title="Background">
+  Usage of on-chain libraries is covered in the corresponding [TON documentation guide](https://docs.ton.org/contract-dev/techniques/using-on-chain-libraries).
 </Callout>
 
-## Publishing a Library
+## Publishing a library
 
-Acton provides a convenient command to publish any code as a library to the Masterchain.
+Acton provides `acton library publish` to publish code as a library on the masterchain.
 
 ### Step 1: Create a contract
 
-First, create a simple contract that you want to publish as a library. For example, let's create a `Math.tolk` file:
+Create a minimal contract to publish as a library. For example:
 
 ```tolk title="contracts/Math.tolk"
 fun add(a: int, b: int): int {
@@ -24,35 +26,35 @@ fun add(a: int, b: int): int {
 }
 ```
 
-Make sure to register it in your `Acton.toml`:
+Register it in `Acton.toml`:
 
 ```toml title="Acton.toml"
 [contracts.Math]
-display-name = "Math Library"
+display-name = "Math on-chain library"
 src = "contracts/Math.tolk"
 ```
 
 ### Step 2: Publish the library
 
-Use the `acton library publish` command to deploy your library. You can specify the contract name defined in `Acton.toml`:
+Run `acton library publish` with the contract name from `Acton.toml`:
 
 ```bash
 acton library publish Math
 ```
 
-The CLI will guide you through the process:
+The CLI walks through:
 
-1.  **Compiling**: Acton will compile your contract to get the code cell.
-2.  **Duration**: You'll be asked how long you want to store the library (e.g., `365d` for 1 year).
-3.  **Cost Estimation**: Acton will automatically calculate the required storage fee based on the code size and duration.
-4.  **Wallet**: Select a wallet to pay for the deployment.
-5.  **Payment**: Confirm the transaction amount. The CLI suggests a safe amount (120% of storage fee + gas).
+1. **Compile**: compile the contract to obtain the code cell.
+1. **Duration**: prompt for storage duration, e.g., `365d` for one year.
+1. **Cost estimate**: compute the storage fee from code size and duration.
+1. **Wallet**: select a wallet to pay deployment costs.
+1. **Payment**: confirm the transaction amount suggested by the CLI: 120% of storage fee plus gas.
 
 <Callout type="info">
-  Libraries are always stored on the Masterchain (workchain -1) to be accessible from all other chains.
+  Libraries are always stored on the masterchain (workchain -1) to be accessible from all other chains.
 </Callout>
 
-Upon success, you will see the **Library Hash**. This hash is what you'll use to reference the library in other contracts.
+Upon success, the output includes the **library hash** used to reference the library from other contracts.
 
 ```text
 ...
@@ -62,9 +64,9 @@ Upon success, you will see the **Library Hash**. This hash is what you'll use to
   → Library should be available soon at hash: b993c68...
 ```
 
-### Advanced Options
+### Advanced options
 
-You can also publish arbitrary code using the `--code` flag or specify options non-interactively:
+Publish raw code with `--code` or run non-interactively:
 
 ```bash
 # Publish raw BoC (hex or base64)
@@ -74,26 +76,28 @@ acton library publish --code "te6cckEBAQEAAgAAAEysuc0="
 acton library publish Math --duration 100d --wallet my-wallet --net mainnet
 ```
 
-## Monitoring Library Status
+## Monitoring library status
 
-Once a library is published, it's important to monitor its balance to ensure it doesn't get frozen due to lack of TON for storage fees. Acton provides the `info` command for this:
+After publishing, monitor the library balance so storage fees do not drain and freeze the account. Use `acton library info`:
 
 ```bash
 acton library info Math
 ```
 
-This command shows:
-- **Balance**: Current balance of the library account.
-- **Last top-up**: Timestamp used as the reference point for storage runway calculations.
-- **Remaining**: Estimated storage runway based on current Masterchain storage prices and elapsed time since the last top-up.
-- **Hash and Account**: The library's unique hash and its on-chain address.
+This command prints:
 
-If the estimated runway is exhausted, Acton prints an urgent warning to top up. This warning does not necessarily mean the account is already frozen, but it signals elevated freeze risk.
-For account state transitions (`active`/`frozen`/`nonexist`) and storage debt behavior, see TON docs: [Address states](https://docs.ton.org/foundations/status).
+- **Balance**: current balance of the library account.
+- **Last top-up**: timestamp used as the reference for storage runway calculations.
+- **Remaining**: estimated storage runway from current masterchain storage prices and time since the last top-up.
+- **Hash and account**: the library hash and on-chain address.
 
-## Extending Library Lifetime
+When the estimated runway is exhausted, Acton prints a warning to top up. That warning does not guarantee the account is already frozen; it signals higher freeze risk.
 
-If a library is running low on funds, you can top it up using the `topup` command. You can either specify a duration or a direct TON amount:
+For account state transitions (`active`, `frozen`, `nonexist`) and storage debt, see TON documentation on [address states](https://docs.ton.org/foundations/status).
+
+## Extending library lifetime
+
+When the balance is low, top up with `acton library topup`. Pass either a duration or a TON amount:
 
 ```bash
 # Top up for another 2 years
@@ -103,30 +107,29 @@ acton library topup Math --duration 2y
 acton library topup Math --amount 5.0
 ```
 
-The `topup` command uses the same cost estimation logic as `publish`, ensuring you send enough funds for the desired period.
-After a successful top-up, Acton updates the `last_topup_timestamp` field in library metadata.
+The `topup` command uses the same cost estimation logic as `publish`. After a successful top-up, Acton updates the `last_topup_timestamp` field in library metadata.
 
-## Fetching a Library
+## Fetching a library
 
-If you want to inspect an existing library or get its code, use the `acton library fetch` command.
+To inspect an existing library or read its code, use `acton library fetch`:
 
 ```bash
 acton library fetch <LIBRARY_HASH>
 ```
 
-### Disassembling Library Code
+### Disassembling library code
 
-To understand what a library does, you can disassemble its code immediately after fetching:
+Disassemble code right after fetch:
 
 ```bash
 acton library fetch <LIBRARY_HASH> --disasm
 ```
 
-This will print the TVM assembly (TASM) of the library code.
+This prints the TVM assembly (TASM) of the library code.
 
-### Saving to File
+### Saving to file
 
-You can save the library code to a file for further analysis or usage:
+Save library code to a file for analysis or reuse:
 
 ```bash
 # Save as base64
@@ -139,13 +142,13 @@ acton library fetch <LIBRARY_HASH> -o library.boc
 acton library fetch <LIBRARY_HASH> --disasm -o library.tasm
 ```
 
-<Callout title="Command Reference">
-  For a complete list of options and flags, see the [Library Command Reference](/docs/commands/library).
+<Callout type="info" title="Command reference">
+  Options and flags are listed in [Library command reference](/docs/commands/library).
 </Callout>
 
 ## Working with libraries in tests and scripts
 
-Acton provides handy functions for working with libraries:
+Acton exposes helpers for libraries:
 
 - [`net.loadLibrary(...)`](/docs/standard_library/emulation/network#netloadlibrary) loads a library by hash and returns its code as a cell, or `null` if the library is not found.
 - [`testing.registerLibrary(...)`](/docs/standard_library/emulation/testing#testingregisterlibrary) registers a library in the current test blockchain so contracts can use it.

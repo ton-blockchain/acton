@@ -1,10 +1,11 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, format_captured_requests,
-    spawn_toncenter_v2_mock, spawn_toncenter_v2_mock_with_capture,
+    ToncenterV2MockResponse, ToncenterV3MockResponse, append_custom_network,
+    append_custom_network_with_urls, format_captured_requests, spawn_toncenter_v2_mock,
+    spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
     toncenter_v2_account_info_ok_response, toncenter_v2_error_response,
-    toncenter_v2_seqno_ok_response,
+    toncenter_v2_send_boc_ok_response, toncenter_v2_seqno_ok_response,
 };
 
 use base64::Engine;
@@ -217,6 +218,23 @@ fun main() {
     println("ROOT_CHILD_TXS={}", root.childTxs.size());
     println("FORWARDER_CONTRACT={}", forwarderAddress);
     println("RECEIVER_CONTRACT={}", receiverAddress);
+}
+"#;
+
+const WAIT_FOR_TRACE_TIMEOUT_PRINT_SCRIPT: &str = r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val wallet = scripts.wallet("deployer");
+    val txs = net.send(wallet.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: address("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ"),
+    }));
+
+    println(txs.waitForTrace(false, 1, 1));
 }
 "#;
 
@@ -3353,6 +3371,43 @@ fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
     wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
 
     node.stop();
+}
+
+#[test]
+fn test_script_wait_for_trace_timeout_prints_null() {
+    let project = build_localnet_wait_project(
+        "script-wait-for-trace-timeout-prints-null",
+        "wait_for_trace_timeout",
+        WAIT_FOR_TRACE_TIMEOUT_PRINT_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let (v2_url, v2_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    let (v3_url, v3_handle, _) = spawn_toncenter_v3_mock(vec![ToncenterV3MockResponse {
+        status: 200,
+        body: serde_json::json!({ "traces": [] }).to_string(),
+    }]);
+    append_custom_network_with_urls(project.path(), "mock-trace-timeout", &v2_url, &v3_url);
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_trace_timeout.tolk")
+        .verify_network("custom:mock-trace-timeout")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/test_script_wait_for_trace_timeout_prints_null.stdout.txt",
+        )
+        .assert_not_contains("not a TVM tuple");
+
+    v2_handle.join().expect("mock toncenter v2 must finish");
+    v3_handle.join().expect("mock toncenter v3 must finish");
 }
 
 #[test]

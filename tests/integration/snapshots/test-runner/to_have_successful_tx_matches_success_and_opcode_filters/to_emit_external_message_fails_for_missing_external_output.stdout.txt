@@ -9,7 +9,13 @@
 
  > tests/tx_expect.test.tolk (1 test)
   ✗ ae emit external message missing [TIME]
-    └─ Error: expect(actual).toEmitExternalMessage<ExternalNotice>(): Cannot find external message ExternalNotice (opcode: 0xae110003)
+    └─ Error: expect(actual).toEmitExternalMessage<ExternalNotice>()
+        N/A -> sender A
+        └── Ping 0.5 TON -> harness B                                                   gas=778
+        
+        Cannot find external message ExternalNotice
+        with:
+          opcode=0xae110003 ExternalNotice
       └─ at tests/tx_expect.test[LINE]
 
  ✗ 1 failed in 1 file

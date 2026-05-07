@@ -1,6 +1,7 @@
 use dap::types::ExceptionDetails;
 
 use crate::exit_codes;
+use crate::exit_codes::ExitCodePhase;
 
 use super::replayer::ExceptionInfo;
 
@@ -17,7 +18,7 @@ fn exception_display_name(exc: &ExceptionInfo) -> Option<&str> {
         exc.errno
             .parse::<i32>()
             .ok()
-            .and_then(exit_codes::find)
+            .and_then(|code| exit_codes::find_for_phase(code, ExitCodePhase::Compute))
             .map(|info| info.name)
     })
 }
@@ -60,7 +61,7 @@ pub(crate) fn build_exception_details(exc: &ExceptionInfo) -> ExceptionDetails {
     let mut message_lines = vec![overview.info_description.clone()];
 
     if let Some(code) = exc.errno.parse::<i32>().ok()
-        && let Some(info) = exit_codes::find(code)
+        && let Some(info) = exit_codes::find_for_phase(code, ExitCodePhase::Compute)
     {
         message_lines.push(info.description.to_string());
         message_lines.push(format!("Phase: {}", info.phase));
@@ -115,5 +116,23 @@ mod tests {
         let message = details.message.expect("message");
         assert!(message.contains("Type check error"));
         assert!(message.contains("Phase: Compute phase"));
+    }
+
+    #[test]
+    fn action_phase_exit_code_is_not_used_as_compute_exception_fallback() {
+        let exc = ExceptionInfo {
+            errno: "32".to_owned(),
+            symbolic_name: None,
+            is_uncaught: true,
+        };
+
+        let overview = exception_overview(&exc);
+        assert_eq!(overview.stop_text, "Uncaught TVM exception 32");
+
+        let details = build_exception_details(&exc);
+        let message = details.message.expect("message");
+        assert!(message.contains("Uncaught TVM exception 32"));
+        assert!(!message.contains("Action list is invalid"));
+        assert!(!message.contains("Phase: Action phase"));
     }
 }

@@ -1,3 +1,6 @@
+> [!NOTE]
+> The public release will be on May 11th, please do not share yet!
+
 # Acton
 
 <img align="right" src="docs/public/logo.png" height="150px" alt="Acton logo" />

@@ -143,6 +143,98 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
 }
 
 #[test]
+fn test_coverage_matches_contract_deployed_as_library_reference() {
+    let project = ProjectBuilder::new("coverage-library-reference")
+        .contract(
+            "library_ref_target",
+            r"
+            fun onInternalMessage(_: InMessage) {
+                return;
+            }
+        ",
+        )
+        .file(
+            "wrappers/LibraryRefTarget",
+            r#"
+            import "@stdlib/exotic-cells"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+
+            struct LibraryRefTarget {
+                address: address
+                stateInit: ContractState
+            }
+
+            fun LibraryRefTarget.fromLibraryCode(): LibraryRefTarget {
+                val realCode = build("library_ref_target");
+                testing.registerLibrary(realCode);
+                val stateInit = ContractState {
+                    code: realCode.toLibraryReference(),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit }.calculateAddress();
+                return LibraryRefTarget { address, stateInit };
+            }
+
+            fun LibraryRefTarget.deploy(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: false,
+                    value: ton("0.05"),
+                    dest: { stateInit: self.stateInit },
+                }));
+            }
+
+            fun LibraryRefTarget.sendEmpty(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: true,
+                    value: ton("0.05"),
+                    dest: self.address,
+                    body: createEmptyCell(),
+                }));
+            }
+        "#,
+        )
+        .test_file(
+            "library_ref",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../wrappers/LibraryRefTarget"
+
+            get fun `test coverage sees library-ref contract source`() {
+                val sender = testing.treasury("sender");
+                val target = LibraryRefTarget.fromLibraryCode();
+
+                expect(target.deploy(sender.address)).toHaveSuccessfulDeploy({ to: target.address });
+                expect(target.sendEmpty(sender.address)).toHaveSuccessfulTx({
+                    from: sender.address,
+                    to: target.address,
+                });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("library-ref-coverage.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("library_ref_target.tolk")
+        .assert_snapshot_matches("integration/snapshots/test_coverage_library_reference.stdout.txt")
+        .assert_file_snapshot_matches(
+            "library-ref-coverage.txt",
+            "integration/snapshots/test_coverage_library_reference.txt",
+        );
+}
+
+#[test]
 fn test_coverage_basic_output() {
     let project = ProjectBuilder::new("coverage-basic")
         .contract("simple", SIMPLE_CONTRACT)

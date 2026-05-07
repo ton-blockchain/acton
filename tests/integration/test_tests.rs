@@ -1451,6 +1451,60 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
 }
 
 #[test]
+fn test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description() {
+    let project = ProjectBuilder::new("test-compute-exit-code-32")
+        .contract(
+            "simple",
+            r"
+            enum Errors {
+                UserComputeFailure = 32
+            }
+
+            fun onInternalMessage(_: InMessage) {
+                throw Errors.UserComputeFailure
+            }
+            ",
+        )
+        .test_file(
+            "test",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test compute exit code 32`() {
+                val init = ContractState {
+                    code: build("simple"),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress {
+                    stateInit: init,
+                };
+
+                val sender = testing.treasury("sender");
+                val msg = createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: address,
+                    body: beginCell().storeUint(1, 32).endCell(),
+                });
+                val res = net.send(sender.address, msg);
+                expect(res).toHaveSuccessfulTx();
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_snapshot_matches("integration/snapshots/test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description.stdout.txt");
+}
+
+#[test]
 fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
     let project = action_exit_code_37_project("test-get").build();
 

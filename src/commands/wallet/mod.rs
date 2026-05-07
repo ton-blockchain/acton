@@ -79,6 +79,11 @@ struct AirdropResult {
     message: Option<String>,
 }
 
+struct ResolvedAirdropWallet {
+    name: String,
+    address: String,
+}
+
 enum AirdropTarget {
     Testnet { faucet_url: String },
     Localnet { port: u16, amount_ton: f64 },
@@ -104,6 +109,7 @@ const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
+const AIRDROP_TYPE_TON: u16 = 1;
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -307,10 +313,20 @@ fn airdrop_wallet(
 ) -> anyhow::Result<()> {
     let target = resolve_airdrop_target(net, faucet_url)?;
     let wait_for_balance = matches!(&target, AirdropTarget::Testnet { .. });
-    let run_result = perform_airdrop(name, target, json);
+    let run_result = (|| -> anyhow::Result<_> {
+        let wallet = resolve_airdrop_wallet(name, target.network())?;
+        let balance_before_airdrop = if wait_for_balance {
+            // Existing testnet funds should not satisfy the post-faucet wait.
+            maybe_fetch_balance_before_testnet_airdrop(&wallet.address, no_wait_airdrop, json)
+        } else {
+            None
+        };
+        let result = perform_airdrop_for_wallet(wallet, target, json)?;
+        Ok((result, balance_before_airdrop))
+    })();
 
     match run_result {
-        Ok(result) => {
+        Ok((result, balance_before_airdrop)) => {
             let message = result.message.as_deref().unwrap_or("Success");
             if json {
                 let mut payload = serde_json::json!({
@@ -331,7 +347,11 @@ fn airdrop_wallet(
             } else {
                 println!("{} {}", "✓".green(), message);
                 if wait_for_balance {
-                    maybe_wait_for_testnet_airdrop_balance(&result.address, no_wait_airdrop);
+                    maybe_wait_for_testnet_airdrop_balance(
+                        &result.address,
+                        no_wait_airdrop,
+                        balance_before_airdrop,
+                    );
                 }
             }
             Ok(())
@@ -356,6 +376,14 @@ fn perform_airdrop(
     target: AirdropTarget,
     json: bool,
 ) -> anyhow::Result<AirdropResult> {
+    let wallet = resolve_airdrop_wallet(name, target.network())?;
+    perform_airdrop_for_wallet(wallet, target, json)
+}
+
+fn resolve_airdrop_wallet(
+    name: Option<String>,
+    network: Network,
+) -> anyhow::Result<ResolvedAirdropWallet> {
     let config = ActonConfig::load()?;
 
     let name = select_wallet(name, &config)?;
@@ -364,21 +392,31 @@ fn perform_airdrop(
         .get_wallet(&name)
         .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &name)))?;
 
-    let address = get_wallet_address(&name, wallet, target.network())?;
+    let address = get_wallet_address(&name, wallet, network)?;
 
+    Ok(ResolvedAirdropWallet { name, address })
+}
+
+fn perform_airdrop_for_wallet(
+    wallet: ResolvedAirdropWallet,
+    target: AirdropTarget,
+    json: bool,
+) -> anyhow::Result<AirdropResult> {
     if !json {
         println!(
             "{} Requesting airdrop for wallet {} {}",
             "→".blue().bold(),
-            name.cyan().bold(),
-            address
+            wallet.name.cyan().bold(),
+            wallet.address
         );
     }
 
     match target {
-        AirdropTarget::Testnet { faucet_url } => perform_testnet_airdrop(address, faucet_url, json),
+        AirdropTarget::Testnet { faucet_url } => {
+            perform_testnet_airdrop(wallet.address, faucet_url, json)
+        }
         AirdropTarget::Localnet { port, amount_ton } => {
-            perform_localnet_airdrop(address, amount_ton, port)
+            perform_localnet_airdrop(wallet.address, amount_ton, port)
         }
     }
 }
@@ -482,6 +520,7 @@ fn perform_testnet_airdrop(
         "address": address,
         "challenge": challenge_data.challenge,
         "nonce": nonce,
+        "type": AIRDROP_TYPE_TON,
     });
     let response = send_with_retry(
         || client.post(claim_url.clone()).json(&claim_payload).send(),
@@ -1293,7 +1332,42 @@ fn fetch_testnet_account_balance(
     Ok(Some(balance))
 }
 
-fn maybe_wait_for_testnet_airdrop_balance(address: &str, no_wait_airdrop: bool) {
+fn maybe_fetch_balance_before_testnet_airdrop(
+    address: &str,
+    no_wait_airdrop: bool,
+    json: bool,
+) -> Option<i128> {
+    if json
+        || !should_wait_for_testnet_airdrop_balance(
+            no_wait_airdrop,
+            stdin().is_terminal(),
+            stdout().is_terminal(),
+        )
+    {
+        return None;
+    }
+
+    let client = create_testnet_ton_api_client().ok()?;
+    fetch_testnet_account_balance(&client, address)
+        .ok()
+        .flatten()
+}
+
+const fn testnet_airdrop_balance_has_arrived(
+    balance_before_airdrop: Option<i128>,
+    balance: i128,
+) -> bool {
+    match balance_before_airdrop {
+        Some(balance_before_airdrop) => balance > balance_before_airdrop,
+        None => balance > 0,
+    }
+}
+
+fn maybe_wait_for_testnet_airdrop_balance(
+    address: &str,
+    no_wait_airdrop: bool,
+    balance_before_airdrop: Option<i128>,
+) {
     if !should_wait_for_testnet_airdrop_balance(
         no_wait_airdrop,
         stdin().is_terminal(),
@@ -1318,10 +1392,17 @@ fn maybe_wait_for_testnet_airdrop_balance(address: &str, no_wait_airdrop: bool) 
         }
     };
 
-    println!(
-        "{} Waiting for testnet funds to appear... Press Enter to skip waiting.",
-        "→".blue().bold()
-    );
+    if balance_before_airdrop.is_some_and(|balance| balance > 0) {
+        println!(
+            "{} Waiting for testnet balance to increase... Press Enter to skip waiting.",
+            "→".blue().bold()
+        );
+    } else {
+        println!(
+            "{} Waiting for testnet funds to appear... Press Enter to skip waiting.",
+            "→".blue().bold()
+        );
+    }
     let _ = stdout().flush();
 
     let skip_rx = spawn_wait_skip_listener();
@@ -1338,13 +1419,27 @@ fn maybe_wait_for_testnet_airdrop_balance(address: &str, no_wait_airdrop: bool) 
         }
 
         match fetch_testnet_account_balance(&client, address) {
-            Ok(Some(balance)) if balance > 0 => {
+            Ok(Some(balance))
+                if testnet_airdrop_balance_has_arrived(balance_before_airdrop, balance) =>
+            {
                 let balance_ton = balance as f64 / 1_000_000_000.0;
-                println!(
-                    "{} Testnet funds are available: {}",
-                    "✓".green(),
-                    format!("{balance_ton:.4} TON").green()
-                );
+                if let Some(balance_before_airdrop) = balance_before_airdrop
+                    && balance_before_airdrop > 0
+                {
+                    let increase_ton = (balance - balance_before_airdrop) as f64 / 1_000_000_000.0;
+                    println!(
+                        "{} Testnet balance increased: {} ({})",
+                        "✓".green(),
+                        format!("{balance_ton:.4} TON").green(),
+                        format!("+{increase_ton:.4} TON").green()
+                    );
+                } else {
+                    println!(
+                        "{} Testnet funds are available: {}",
+                        "✓".green(),
+                        format!("{balance_ton:.4} TON").green()
+                    );
+                }
                 return;
             }
             Ok(_) => {}
@@ -1660,7 +1755,7 @@ fn new_wallet(
                         "✓".green(),
                         result.message.as_deref().unwrap_or("Success")
                     );
-                    maybe_wait_for_testnet_airdrop_balance(&result.address, no_wait_airdrop);
+                    maybe_wait_for_testnet_airdrop_balance(&result.address, no_wait_airdrop, None);
                 }
                 Err(err) => {
                     println!(
@@ -2164,6 +2259,28 @@ mod wallet_name_tests {
         assert!(!should_wait_for_testnet_airdrop_balance(true, true, true));
         assert!(!should_wait_for_testnet_airdrop_balance(false, false, true));
         assert!(!should_wait_for_testnet_airdrop_balance(false, true, false));
+    }
+
+    #[test]
+    fn test_airdrop_balance_wait_accepts_positive_balance_without_baseline() {
+        assert!(testnet_airdrop_balance_has_arrived(None, 1));
+        assert!(!testnet_airdrop_balance_has_arrived(None, 0));
+    }
+
+    #[test]
+    fn test_airdrop_balance_wait_requires_increase_from_existing_balance() {
+        assert!(!testnet_airdrop_balance_has_arrived(
+            Some(2_500_000_000),
+            2_500_000_000
+        ));
+        assert!(!testnet_airdrop_balance_has_arrived(
+            Some(2_500_000_000),
+            2_499_000_000
+        ));
+        assert!(testnet_airdrop_balance_has_arrived(
+            Some(2_500_000_000),
+            3_000_000_000
+        ));
     }
 
     #[test]

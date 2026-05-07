@@ -11,79 +11,94 @@ For installation instructions, see the [official TON documentation](https://docs
 
 The plugin is compatible with WebStorm, GoLand, PyCharm, CLion, and other JetBrains IDEs.
 
-## Project Management
+## Project management
 
-### Project Wizard
+### Project wizard
+
 The plugin provides a GUI for `acton new` to set up new projects.
 
 ![](imgs/wizard.png)
 
-### Run Configurations
+### Run configurations
+
 After creating or opening a project, the plugin automatically adds run configurations for tests and builds.
 
 ![](imgs/auto-run-configurations.png)
 
-You can also manually create run configurations for any Acton command. Specialized interfaces are available for some commands like `build` or `test`.
+Run configurations can also be created manually for any Acton command. Specialized interfaces exist for some commands such as `build` or `test`.
 
 ![](imgs/run-configurations.png)
 
 ### Updates
+
 The plugin checks for new Acton versions and provides notifications when an update is available.
 
-## Acton.toml Support
+## `Acton.toml` support
 
-### Quick Actions
+### Quick actions
+
 Gutter icons allow running builds, tests, or scripts directly from the `Acton.toml` file.
 
 #### Building a specific contract
+
 ![](imgs/acton-toml-build.png)
 
 #### Running project tests
+
 ![](imgs/acton-toml-run-tests.png)
 
 #### Running a script
+
 ![](imgs/acton-toml-run-script.png)
 
-### Navigation and Autocompletion
+### Navigation and autocompletion
+
 The plugin provides autocompletion for contract paths and allows navigating to the source code.
 
 ![](imgs/acton-toml-paths.png)
 
-### Fields Documentation
+### Fields documentation
+
 Full validation, autocompletion, and documentation are available for all fields in `Acton.toml`.
 
 ![](imgs/acton-toml-fields.png)
 
-### Contract Usage Search
-You can search for all references to a specific contract within the project.
+### Contract usage search
+
+Search finds all references to a contract in the project.
 
 ![](imgs/acton-toml-go-to-contract-use.png)
 
-## Contract Management
+## Contract management
 
-### Creating a New Contract
+### Creating a new contract
+
 The plugin includes a wizard to create new Tolk files and automatically register them in `Acton.toml`.
 
 ![](imgs/add-new-contract.png)
 
-### Contract Registration
-If you copy a contract from another project, the plugin will suggest registering it in your configuration.
+### Contract registration
+
+When copying a contract from another project, the plugin suggests registering it in `Acton.toml`.
 
 ![](imgs/import-contract.png)
 
-## Code Completion
+## Code completion
 
-### Contract Names
+### Contract names
+
 Autocompletion and navigation are supported for contract names in the `build()` function.
 
 ![](imgs/contract-completion.png)
 
-### Wallet Names
+### Wallet names
+
 The plugin provides autocompletion and navigation for wallet names in the `scripts.wallet()` function.
 
 ![](imgs/wallets-completion.png)
 
-### Get Methods
+### Get methods
+
 Autocompletion is available for get method names in `net.runGetMethod()`.
 
 ![](imgs/get-methods-completion.png)
@@ -94,7 +109,8 @@ The plugin also finds usages of get methods within `net.runGetMethod()` during a
 
 ## Testing
 
-### Native Test Runner
+### Native test runner
+
 Acton tests integrate with the IDE's native test runner, providing a hierarchical view and progress indicators.
 
 ![](imgs/test-runner.png)
@@ -103,40 +119,47 @@ For convenient execution, the plugin provides a test run icon in the editor.
 
 ![](imgs/test-run.png)
 
-### Failure Analysis
+### Failure analysis
+
 When a test fails, the plugin highlights the specific `expect` call that failed and changes the test icon.
 
 ![](imgs/fail-tests.png)
 
-### Code Coverage
+### Code coverage
+
 Coverage results are displayed in the editor gutter and file tree, showing which contract lines were executed during tests.
 
 ![](imgs/test-coverage.png)
 
-### Test Snippets
+### Test snippets
+
 The `test` live template allows generating test structures by typing `test` and pressing Tab.
 
 ![](imgs/test-completion.png)
 ![](imgs/test-completion-after.png)
 
-## Toolchain Integration
+## Toolchain integration
 
-### Wallet Management
+### Wallet management
+
 The Wallets View allows managing project wallets, including generation, import via mnemonic, balance tracking, and testnet TON requests.
 
 ![](imgs/wallets-view.png)
 
-### Terminal Links
+### Terminal links
+
 TON addresses in the terminal are converted into links that open Tonviewer.
 
 ![](imgs/address-links.png)
 
-### Script Execution
+### Script execution
+
 Scripts can be executed via gutter icons or by creating persistent run configurations.
 
 ![](imgs/scripts-run.png)
 
 ### Linting
+
 The linter runs in the background, reporting any problems it finds and offering automatic fixes if any.
 
 ![](imgs/acton-check.png)

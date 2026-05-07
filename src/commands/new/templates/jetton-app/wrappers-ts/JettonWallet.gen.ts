@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a JettonWallet contract in Tolk
+// It's a TypeScript wrapper for a JettonWallet contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -141,16 +141,7 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
-type uint32 = bigint
 type uint64 = bigint
-type uint256 = bigint
 
 /**
  > type ForwardPayloadRemainder = RemainingBitsAndRefs
@@ -251,7 +242,7 @@ export const PayloadInRef = {
  >     sendExcessesTo: address?
  >     customPayload: cell?
  >     forwardTonAmount: coins
- >     forwardPayload: PayloadInline | PayloadInRef
+ >     forwardPayload: ForwardPayloadRemainder
  > }
  */
 export interface AskToTransfer {
@@ -292,7 +283,9 @@ export const AskToTransfer = {
             sendExcessesTo: s.loadMaybeAddress(),
             customPayload: s.loadBoolean() ? s.loadRef() : null,
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('AskToTransfer.forwardPayload'),
         }
     },
     store(self: AskToTransfer, b: c.Builder): void {
@@ -324,7 +317,7 @@ export const AskToTransfer = {
  >     queryId: uint64
  >     jettonAmount: coins
  >     transferInitiator: address?
- >     forwardPayload: PayloadInline | PayloadInRef
+ >     forwardPayload: ForwardPayloadRemainder
  > }
  */
 export interface TransferNotificationForRecipient {
@@ -356,7 +349,9 @@ export const TransferNotificationForRecipient = {
             queryId: s.loadUintBig(64),
             jettonAmount: s.loadCoins(),
             transferInitiator: s.loadMaybeAddress(),
-            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('TransferNotificationForRecipient.forwardPayload'),
         }
     },
     store(self: TransferNotificationForRecipient, b: c.Builder): void {
@@ -385,7 +380,7 @@ export const TransferNotificationForRecipient = {
  >     transferInitiator: address?
  >     sendExcessesTo: address?
  >     forwardTonAmount: coins
- >     forwardPayload: PayloadInline | PayloadInRef
+ >     forwardPayload: ForwardPayloadRemainder
  > }
  */
 export interface InternalTransferStep {
@@ -423,7 +418,9 @@ export const InternalTransferStep = {
             transferInitiator: s.loadMaybeAddress(),
             sendExcessesTo: s.loadMaybeAddress(),
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('InternalTransferStep.forwardPayload'),
         }
     },
     store(self: InternalTransferStep, b: c.Builder): void {
@@ -761,9 +758,9 @@ export class JettonWallet implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }
