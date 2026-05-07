@@ -62,7 +62,6 @@ const actonCliCheckGrammar: LanguageRegistration = {
   embeddedLangs: ["acton-cli"],
 }
 
-// @ts-expect-error CLI wrapper grammar type is wider than LanguageRegistration
 const actonCliWrapperGrammar: LanguageRegistration = {
   ...actonCliWrapperGrammarRaw,
   name: "acton-cli-wrapper",
@@ -76,7 +75,6 @@ const actonCliMutateGrammar: LanguageRegistration = {
   embeddedLangs: ["acton-cli"],
 }
 
-// @ts-expect-error CLI trace grammar type is wider than LanguageRegistration
 const actonCliTraceGrammar: LanguageRegistration = {
   ...actonCliTraceGrammarRaw,
   name: "acton-cli-trace",
