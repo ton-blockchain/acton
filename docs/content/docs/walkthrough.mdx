@@ -285,6 +285,15 @@ $ acton test
  ✓ 3 passed in 1 file
 ```
 
+Other useful test flags:
+
+| Flag | Purpose |
+|------|---------|
+| `--filter <pattern>` | Run only tests whose name matches the pattern |
+| `--fail-fast` | Stop after the first failure |
+| `--save-test-trace` | Write TVM execution traces to `build/traces/` |
+| `--fork-net testnet` | Resolve remote contract and account state from testnet during tests |
+
 ### Collect coverage
 
 `--coverage` collects line and branch coverage and prints a summary after the run:
@@ -309,20 +318,47 @@ acton test --ui --coverage
 
 ### Run mutation testing
 
-Mutation testing finds gaps in tests by introducing targeted code changes and verifying that at least one test fails for each mutation. Use `--mutate-contract` to restrict mutations to a single contract:
+Coverage shows which lines ran — not whether the tests would catch a bug on those lines. Mutation testing fills the gap: it makes small, deliberate changes to the contract — for example, replacing `+= 1` with `-= 1` or removing an `assert` — and reruns the suite. If every test still passes against a mutation, that mutation is a **survivor** — the line is exercised but its behavior is not actually verified.
+
+Use `--mutate-contract` to restrict mutations to a single contract:
 
 ```bash
 acton test --mutate --mutate-contract Counter
 ```
 
-### Additional test flags
+Output:
 
-| Flag | Purpose |
-|------|---------|
-| `--filter <pattern>` | Run only tests whose name matches the pattern |
-| `--fail-fast` | Stop after the first failure |
-| `--save-test-trace` | Write TVM execution traces to `build/traces/` |
-| `--fork-net testnet` | Resolve remote contract and account state from testnet during tests |
+```acton-cli-mutate
+$ acton test --mutate --mutate-contract Counter
+
+Mutation Testing
+────────────────────────────────────────────────────────────
+Session:  20260507-103452-7d8c
+Contract: Counter
+Source:   contracts/src/Counter.tolk
+Files:    1
+Mutants:  6
+
+  ◉ Mutation 1/6 contracts/src/Counter.tolk:18 Replace == with != KILLED
+  ◉ Mutation 2/6 contracts/src/Counter.tolk:22 Replace `+=` with `-=` KILLED
+  ◉ Mutation 3/6 contracts/src/Counter.tolk:22 Remove save() method calls SURVIVED
+  ◉ Mutation 4/6 contracts/src/Counter.tolk:28 Replace `true` with `false` KILLED
+  ◉ Mutation 5/6 contracts/src/Counter.tolk:30 Remove assert statements KILLED
+  ◉ Mutation 6/6 contracts/src/Counter.tolk:33 Remove throw keyword KILLED
+
+    Total mutants        6
+  ✓ Killed               5
+  ✗ Survived             1
+  ! Compile errors       0
+
+  ◆ Mutation Score       83.3%
+```
+
+Each survivor pinpoints a specific line and rule. Add a test that exercises the corresponding path and rerun — the mutation will be killed on the next run.
+
+<Callout type="tip">
+  Use `--mutation-diff branch` to test only mutations on lines changed since the merge base — useful in CI to skip re-testing stable code. See the [mutation testing docs](/docs/testing/mutation-testing/overview) for details.
+</Callout>
 
 ## Debug the contract
 
