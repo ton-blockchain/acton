@@ -9,7 +9,7 @@ use std::env;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 
-const GITHUB_RELEASE_REPOSITORIES: [&str; 2] = ["ton-blockchain/acton", "i582/acton-public"];
+const GITHUB_RELEASE_REPOSITORY: &str = "ton-blockchain/acton";
 #[cfg(debug_assertions)]
 const TEST_GITHUB_API_BASE_ENV: &str = "ACTON_TEST_UP_GITHUB_API_BASE"; // non-release test hook only
 
@@ -45,12 +45,6 @@ pub(super) struct GitHubClient {
     token: Option<String>,
 }
 
-enum RepoFetchResult<T> {
-    Found(T),
-    Missing,
-    Failed(String),
-}
-
 impl GitHubClient {
     pub(super) fn new(token: Option<String>) -> Self {
         Self {
@@ -82,15 +76,15 @@ impl GitHubClient {
         }
     }
 
-    fn api_base_for_repo(repo: &str) -> String {
+    fn api_base() -> String {
         if let Some(base) = test_github_api_base_override() {
             let base = base.trim().trim_end_matches('/');
             if !base.is_empty() {
-                return format!("{base}/repos/{repo}");
+                return format!("{base}/repos/{GITHUB_RELEASE_REPOSITORY}");
             }
         }
 
-        format!("https://api.github.com/repos/{repo}")
+        format!("https://api.github.com/repos/{GITHUB_RELEASE_REPOSITORY}")
     }
 
     fn request(&self, url: &str) -> reqwest::blocking::RequestBuilder {
@@ -104,37 +98,27 @@ impl GitHubClient {
         req
     }
 
-    fn fetch_release_from_repo(&self, repo: &str, path: &str) -> RepoFetchResult<Release> {
-        let url = format!("{}/{path}", Self::api_base_for_repo(repo));
+    fn fetch_release(&self, path: &str) -> Result<Option<Release>> {
+        let url = format!("{}/{path}", Self::api_base());
         let resp = match self.request(&url).send() {
             Ok(resp) => resp,
-            Err(err) => {
-                return RepoFetchResult::Failed(format!(
-                    "could not reach GitHub release API for {repo}: {err}"
-                ));
-            }
+            Err(err) => bail!("could not reach GitHub release API: {err}"),
         };
 
         if resp.status().as_u16() == 404 {
-            return RepoFetchResult::Missing;
+            return Ok(None);
         }
 
         if !resp.status().is_success() {
-            return RepoFetchResult::Failed(format!(
-                "GitHub release API returned {} for {repo}",
-                resp.status()
-            ));
+            bail!("GitHub release API returned {}", resp.status());
         }
 
-        match resp.json() {
-            Ok(release) => RepoFetchResult::Found(release),
-            Err(err) => RepoFetchResult::Failed(format!(
-                "GitHub release API returned invalid JSON for {repo}: {err}"
-            )),
-        }
+        resp.json()
+            .context("GitHub release API returned invalid JSON")
+            .map(Some)
     }
 
-    fn fetch_release_tags_from_repo(&self, repo: &str) -> RepoFetchResult<Vec<String>> {
+    fn fetch_release_tags(&self) -> Result<Vec<String>> {
         let mut tags = Vec::new();
         let per_page = 100;
         let mut page = 1;
@@ -142,35 +126,25 @@ impl GitHubClient {
         loop {
             let url = format!(
                 "{}/releases?per_page={per_page}&page={page}",
-                Self::api_base_for_repo(repo)
+                Self::api_base()
             );
 
             let resp = match self.request(&url).send() {
                 Ok(resp) => resp,
-                Err(err) => {
-                    return RepoFetchResult::Failed(format!(
-                        "could not reach GitHub release API for {repo}: {err}"
-                    ));
-                }
+                Err(err) => bail!("could not reach GitHub release API: {err}"),
             };
 
-            if resp.status().as_u16() == 404 {
-                return RepoFetchResult::Missing;
-            }
-
             if !resp.status().is_success() {
-                return RepoFetchResult::Failed(format!(
-                    "GitHub release API returned {} while listing releases for {repo}",
+                bail!(
+                    "GitHub release API returned {} while listing releases",
                     resp.status()
-                ));
+                );
             }
 
             let releases: Vec<Release> = match resp.json() {
                 Ok(releases) => releases,
                 Err(_) => {
-                    return RepoFetchResult::Failed(format!(
-                        "GitHub release API returned invalid JSON while listing releases for {repo}"
-                    ));
+                    bail!("GitHub release API returned invalid JSON while listing releases");
                 }
             };
             let page_len = releases.len();
@@ -192,7 +166,7 @@ impl GitHubClient {
             page += 1;
         }
 
-        RepoFetchResult::Found(tags)
+        Ok(tags)
     }
 }
 
@@ -209,71 +183,30 @@ fn test_github_api_base_override() -> Option<String> {
 impl ReleaseClient for GitHubClient {
     fn get_release(&self, version: Option<&str>, trunk: bool) -> Result<Release> {
         let path = Self::release_request_path(version, trunk);
-        let mut errors = Vec::new();
-
-        for repo in GITHUB_RELEASE_REPOSITORIES {
-            match self.fetch_release_from_repo(repo, &path) {
-                RepoFetchResult::Found(release) => return Ok(release),
-                RepoFetchResult::Missing => continue,
-                RepoFetchResult::Failed(err) => errors.push(err),
-            }
-        }
-
-        if errors.is_empty() {
-            let requested = requested_release_label(version, trunk);
-            bail!("Release not found: {requested}");
-        }
-
         let requested = requested_release_label(version, trunk);
-        if all_release_errors_are_network_related(&errors) {
-            bail!(
-                "Failed to look up {requested} on GitHub. Check your network connection and try again."
-            );
+
+        match self.fetch_release(&path) {
+            Ok(Some(release)) => Ok(release),
+            Ok(None) => bail!("Release not found: {requested}"),
+            Err(err) if is_release_api_connectivity_error(&err) => {
+                bail!(
+                    "Failed to look up {requested} on GitHub. Check your network connection and try again."
+                );
+            }
+            Err(err) => bail!("Failed to look up {requested} on GitHub. {err}"),
         }
-        bail!(
-            "Failed to look up {requested} on GitHub. {}",
-            errors.join("; ")
-        );
     }
 
     fn list_releases(&self) -> Result<Vec<String>> {
-        let mut tags = Vec::new();
-        let mut success = false;
-        let mut errors = Vec::new();
-
-        for repo in GITHUB_RELEASE_REPOSITORIES {
-            match self.fetch_release_tags_from_repo(repo) {
-                RepoFetchResult::Found(repo_tags) => {
-                    success = true;
-                    for tag in repo_tags {
-                        if !tags.iter().any(|existing| existing == &tag) {
-                            tags.push(tag);
-                        }
-                    }
-                }
-                RepoFetchResult::Missing => {}
-                RepoFetchResult::Failed(err) => errors.push(err),
+        match self.fetch_release_tags() {
+            Ok(tags) => Ok(tags),
+            Err(err) if is_release_api_connectivity_error(&err) => {
+                bail!(
+                    "Failed to fetch the release list from GitHub. Check your network connection and try again."
+                );
             }
+            Err(err) => bail!("Failed to fetch the release list from GitHub. {err}"),
         }
-
-        if success {
-            return Ok(tags);
-        }
-
-        if errors.is_empty() {
-            bail!("No GitHub release metadata was found in the configured repositories");
-        }
-
-        if all_release_errors_are_network_related(&errors) {
-            bail!(
-                "Failed to fetch the release list from GitHub. Check your network connection and try again."
-            );
-        }
-
-        bail!(
-            "Failed to fetch the release list from GitHub. {}",
-            errors.join("; ")
-        )
     }
 
     fn download_asset(&self, asset: &Asset) -> Result<PathBuf> {
@@ -366,9 +299,8 @@ fn requested_release_label(version: Option<&str>, trunk: bool) -> String {
     "the latest release".to_owned()
 }
 
-fn all_release_errors_are_network_related(errors: &[String]) -> bool {
-    !errors.is_empty()
-        && errors
-            .iter()
-            .all(|error| error.starts_with("could not reach GitHub release API"))
+fn is_release_api_connectivity_error(error: &anyhow::Error) -> bool {
+    error
+        .to_string()
+        .starts_with("could not reach GitHub release API")
 }

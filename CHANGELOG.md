@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.4.1] - 08.05.2026
+
+Test release with public repository.
+
 ## [0.4.0] - 04.05.2026
 
 Acton 0.4.0 is a broad follow-up to 0.3.0. It stabilizes the dApp and wrapper

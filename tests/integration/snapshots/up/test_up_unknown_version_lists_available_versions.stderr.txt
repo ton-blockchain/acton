@@ -1,5 +1,4 @@
 Available versions:
   [ACTON_VERSION]
-  trunk
 
 Error: Requested release `0.0.1` was not found in GitHub releases. Run `acton up --list` to inspect available versions.
