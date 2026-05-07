@@ -7,6 +7,9 @@ import funcGrammarRaw from "./grammars/grammar-func.json"
 import tasmGrammarRaw from "./grammars/grammar-tasm.json"
 import tlbGrammarRaw from "./grammars/grammar-tlb.json"
 import actonCliGrammarRaw from "./grammars/grammar-acton-cli.json"
+import actonCliCheckGrammarRaw from "./grammars/grammar-acton-cli-check.json"
+import actonCliWrapperGrammarRaw from "./grammars/grammar-acton-cli-wrapper.json"
+import actonCliTraceGrammarRaw from "./grammars/grammar-acton-cli-trace.json"
 import actonTraceGrammarRaw from "./grammars/grammar-acton-trace.json"
 import lastModified from "fumadocs-mdx/plugins/last-modified"
 import {tolkTwoslasher} from "@/lib/tolk-twoslash"
@@ -51,6 +54,27 @@ const actonCliGrammar: LanguageRegistration = {
   name: "acton-cli",
 }
 
+// @ts-expect-error CLI check grammar type is wider than LanguageRegistration
+const actonCliCheckGrammar: LanguageRegistration = {
+  ...actonCliCheckGrammarRaw,
+  name: "acton-cli-check",
+  embeddedLangs: ["acton-cli"],
+}
+
+// @ts-expect-error CLI wrapper grammar type is wider than LanguageRegistration
+const actonCliWrapperGrammar: LanguageRegistration = {
+  ...actonCliWrapperGrammarRaw,
+  name: "acton-cli-wrapper",
+  embeddedLangs: ["acton-cli"],
+}
+
+// @ts-expect-error CLI trace grammar type is wider than LanguageRegistration
+const actonCliTraceGrammar: LanguageRegistration = {
+  ...actonCliTraceGrammarRaw,
+  name: "acton-cli-trace",
+  embeddedLangs: ["acton-cli", "acton-trace"],
+}
+
 // @ts-expect-error JSON grammar type is wider than LanguageRegistration
 const tlbGrammar: LanguageRegistration = {
   ...tlbGrammarRaw,
@@ -74,6 +98,9 @@ export default defineConfig({
         funcGrammar,
         tasmGrammar,
         actonCliGrammar,
+        actonCliCheckGrammar,
+        actonCliWrapperGrammar,
+        actonCliTraceGrammar,
         actonTraceGrammar,
         tlbGrammar,
       ],
