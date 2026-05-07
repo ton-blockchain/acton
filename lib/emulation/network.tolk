@@ -1139,31 +1139,21 @@ fun Expectation<SendResultList>.toHaveAllSuccessfulTxs(self): void {
 /// expect(txs).toEmitExternalMessage<IncreaseCounter>();
 /// ```
 fun Expectation<SendResultList>.toEmitExternalMessage<Msg>(self): void {
-    var i = 0;
-    repeat (self.value.size()) {
-        val result = self.value.at(i);
-
-        var j = 0;
-        repeat (result.externals.size()) {
-            val external = result.externals.atOrNull<Msg>(j);
-            if (external != null) {
-                // message found
-                return;
-            }
-            j += 1;
-        }
-
-        i += 1;
+    if (self.value.findExternalOutMessage<Msg>() != null) {
+        return;
     }
 
-    self.fail(
+    ffi.failToFindExternalMessage(
+        self.location,
         format(
-            "expect(<actual>).toEmitExternalMessage<{}>(): Cannot find external message {} (opcode: 0x{:x})",
+            "expect(<actual>).toEmitExternalMessage<{}>()",
             reflect.typeNameOf<Msg>(),
-            reflect.typeNameOf<Msg>(),
-            reflect.serializationPrefixOf<Msg>().0,
         ),
+        self.value,
+        reflect.typeNameOf<Msg>(),
+        reflect.serializationPrefixOf<Msg>().0,
     );
+    throw ASSERTION_FAILED;
 }
 
 /// Expect the transaction to consume less than the expected amount of gas.
@@ -1288,6 +1278,15 @@ fun ffi.failToNotFindTransactionByParams(
     params: tuple,
 ): tuple?
     asm "104 EXTCALL"
+
+fun ffi.failToFindExternalMessage(
+    location: string,
+    message: string,
+    txs: SendResultList,
+    messageName: string,
+    opcode: int,
+): tuple?
+    asm "108 EXTCALL"
 
 fun ffi.loadLibrary(hash: string): cell?
     asm "21 EXTCALL"

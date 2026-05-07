@@ -155,6 +155,15 @@ pub struct TransactionGenericAssertFailure {
 }
 
 #[derive(Debug, Clone)]
+pub struct ExternalMessageNotFoundFailure {
+    pub message: Option<String>,
+    pub location: Option<SourceLocation>,
+    pub txs: Vec<TupleItem>,
+    pub message_name: String,
+    pub opcode: Option<u32>,
+}
+
+#[derive(Debug, Clone)]
 pub struct WalletNotFoundFailure {
     pub wallet_name: String,
     pub location: Option<SourceLocation>,
@@ -169,6 +178,7 @@ pub enum AssertFailure {
     GetMethod(GetMethodAssertFailure),
     TransactionNotFound(TransactionGenericAssertFailure),
     TransactionIsFound(TransactionGenericAssertFailure),
+    ExternalMessageNotFound(ExternalMessageNotFoundFailure),
     WalletNotFound(WalletNotFoundFailure),
 }
 
@@ -183,6 +193,7 @@ impl AssertFailure {
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
                 arg.message.clone()
             }
+            AssertFailure::ExternalMessageNotFound(arg) => arg.message.clone(),
         }
     }
 
@@ -196,6 +207,7 @@ impl AssertFailure {
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
                 arg.location.clone()
             }
+            AssertFailure::ExternalMessageNotFound(arg) => arg.location.clone(),
             AssertFailure::WalletNotFound(arg) => arg.location.clone(),
         }
     }
