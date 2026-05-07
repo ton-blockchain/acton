@@ -242,7 +242,9 @@ function ReleaseAnnouncement() {
               Release is coming
             </p>
             <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[0.98] text-white sm:text-7xl md:text-[6.5rem]">
-              Launching on<br/>May 11
+              Launching on
+              <br />
+              May 11
             </h1>
           </div>
         </div>
