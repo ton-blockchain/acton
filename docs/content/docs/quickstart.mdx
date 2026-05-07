@@ -13,29 +13,28 @@ Scaffold a counter contract, install dependencies, and start the development UI.
 - [Acton](/docs/installation) 0.4.0 or later installed.
 - [Node.js](https://nodejs.org/en/download/) 22 or later LTS: required for the TypeScript app scaffold added by `--app`.
 
-## Install Acton
-
-Run:
-
-```bash
-curl --proto '=https' --tlsv1.2 -LsSf https://github.com/i582/acton-public/releases/latest/download/acton-installer.sh | sh
-```
-
-Verify installation:
-
-```bash
-acton --version
-```
-
-It should display version 0.4.0 or later.
-
 ## Create a project
 
-`acton new` scaffolds a new project directory from a built-in template. The `counter` template ships with a ready-made contract, tests, and a deployment script. The `--app` flag adds a Vite-based React frontend scaffold and generated TypeScript wrappers alongside the Tolk sources.
+`acton new` scaffolds a new project directory from a built-in template:
+
+- `counter` template ships with a ready-made contract, tests, and a deployment script.
+- `--app` flag adds a Vite-based React frontend scaffold and generated TypeScript wrappers alongside the Tolk sources.
 
 ```bash
 acton new first_counter --template counter --app
 cd first_counter
+```
+
+Build the contract:
+
+```bash
+acton build
+```
+
+Run tests:
+
+```bash
+acton test
 ```
 
 Install npm workspace dependencies:
@@ -52,9 +51,7 @@ npm run dev
 
 Open the URL shown in the terminal output. The app connects a wallet and sends transactions to the counter contract.
 
-## TODO: more steps (quick)
-
 ## Next steps
 
 - **Familiar with TON** — the [walkthrough](/docs/walkthrough) continues from this point: build, test with coverage and mutation analysis, set up a wallet, deploy, and verify on-chain.
-- **New to TON contracts** — follow the [tutorial](/docs/tutorial/overview) for a step-by-step introduction to Tolk, the TON VM model, and contract testing.
+- **New to TON contracts** — follow the [tutorial](/docs/tutorial/overview) for a step-by-step introduction to smart contract development on TON with Tolk and Acton.
