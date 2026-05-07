@@ -10,11 +10,8 @@ concurrency:
 permissions: { }
 
 env:
-  TON_REPOSITORY: i582/ton
+  TON_REPOSITORY: ton-blockchain/ton
   TON_BRANCH: pmakhnev/acton
-
-  ENABLE_MIRRORING_RELEASE: 'true'
-  PUBLIC_ACTON_REPOSITORY: i582/acton-public
 
 jobs:
   prepare:
@@ -581,34 +578,4 @@ jobs:
             --title "Release Objs" \
             --notes "${release_notes}" \
             --target "${GITHUB_SHA}" \
-            --prerelease
-
-      - name: Delete previous release-objs release and tag (mirror)
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-        # language=Bash
-        run: |
-          gh release delete release-objs --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
-
-          gh api repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/release-objs -X DELETE || true
-
-      - name: Create release-objs release (mirror)
-        if: env.ENABLE_MIRRORING_RELEASE == 'true'
-        env:
-          GH_TOKEN: ${{ secrets.ACTON_PUBLIC }}
-          TON_COMMIT: ${{ needs.prepare.outputs.ton_commit }}
-        # language=Bash
-        run: |
-          release_notes=$(cat <<EOF
-          Generated from TON commit: https://github.com/${TON_REPOSITORY}/commit/${TON_COMMIT}
-          Source Acton commit: https://github.com/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}
-          EOF
-          )
-
-          gh release create release-objs \
-            --repo "${PUBLIC_ACTON_REPOSITORY}" \
-            dist/* \
-            --title "Release Objs" \
-            --notes "${release_notes}" \
             --prerelease
