@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a WalletV5 contract in Tolk
+// It's a TypeScript wrapper for a WalletV5 contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -138,13 +138,6 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
 type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
@@ -428,9 +421,9 @@ export class WalletV5 implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }

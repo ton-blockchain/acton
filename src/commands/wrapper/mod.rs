@@ -14,7 +14,7 @@ use tolk_compiler::abi::{ABIGetMethod, ABIOpcode, ABIResolvedStruct, ContractABI
 use tolk_compiler::source_map::Declaration;
 use tolk_compiler::{CompilerResult, SourceMap};
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.1";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.4";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
@@ -697,7 +697,7 @@ fn generate_send_method(
     let params = fields
         .iter()
         .map(|f| {
-            let type_name = abi.render_param_type(f.ty_idx);
+            let type_name = abi.render_param_type(f.client_or_declared_ty_idx());
             let name = normalize_param_name(&f.name);
             format!("{name}: {type_name}")
         })
@@ -715,7 +715,7 @@ fn generate_send_method(
         "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{"
     );
 
-    if message_type.overrides_client_type {
+    if fields.iter().any(|field| field.client_ty_idx.is_some()) {
         let prefix = message_type.prefix.as_ref();
         code.push_str(
             "    // build body cell manually, because some fields have @abi.clientType\n",
@@ -731,7 +731,7 @@ fn generate_send_method(
         }
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
-            let value = if abi.is_typed_cell(field.ty_idx) {
+            let value = if abi.is_typed_cell(field.client_or_declared_ty_idx()) {
                 format!("{param_name}.toCell()")
             } else {
                 param_name

@@ -227,7 +227,7 @@ pub fn print_type_instantiated_ts<'a>(
     Some(RcDoc::concat([name_doc, types_doc]))
 }
 
-fn single_type_argument_should_stay_inline(typ: &Type) -> bool {
+pub(crate) fn single_type_argument_should_stay_inline(typ: &Type) -> bool {
     !matches!(
         typ,
         Type::TypeInstantiatedTs(inst)

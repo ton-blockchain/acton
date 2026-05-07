@@ -156,6 +156,11 @@ impl<'a> TestRunner<'a> {
 
             // extract code of that contracts to later register in `WorldState`
             for contract in contracts_by_ref {
+                if let Some(cell) = mutation_overrides.get(&contract) {
+                    ref_contracts.insert(contract, cell.clone());
+                    continue;
+                }
+
                 let Some(contract_info) = contracts.get(&contract) else {
                     continue;
                 };
@@ -869,16 +874,19 @@ fn resolve_project_relative_path(project_root: &Path, path: &str) -> String {
 fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap<String, Cell>> {
     let mut mutation_overrides = BTreeMap::new();
 
-    if let Some((name, code_b64)) = config
-        .mutate_overrides
-        .as_ref()
-        .unwrap_or(&String::new())
-        .split_once(':')
-    {
+    let Some(overrides) = config.mutate_overrides.as_deref() else {
+        return Ok(mutation_overrides);
+    };
+
+    for override_entry in overrides.split(',').filter(|entry| !entry.is_empty()) {
+        let Some((name, code_b64)) = override_entry.split_once(':') else {
+            anyhow::bail!("Invalid mutation override entry: {override_entry}");
+        };
         let code_cell = Boc::decode_base64(code_b64)
             .map_err(|e| anyhow!("Failed to decode mutation override for {name}: {e}"))?;
         mutation_overrides.insert(name.to_owned(), code_cell);
     }
+
     Ok(mutation_overrides)
 }
 
@@ -1303,6 +1311,9 @@ fn run_file_tests(
                         Some(formatter.parse_failed_transactions(&tx_failure.txs));
                     test_report.failed_transaction_context =
                         Some(formatter.get_failed_transaction_context(tx_failure));
+                } else if let AssertFailure::ExternalMessageNotFound(external_failure) = failure {
+                    test_report.failed_transactions =
+                        Some(formatter.parse_failed_transactions(&external_failure.txs));
                 }
             } else if expected_exit_code != 0 {
                 test_report.message = Some(format!(

@@ -400,7 +400,7 @@ fn decode_storage_json(
 
 fn compiler_data_to_json(data: &UnpackedValue, network: &Network) -> serde_json::Value {
     match data {
-        UnpackedValue::Null => serde_json::Value::Null,
+        UnpackedValue::Null | UnpackedValue::Void => serde_json::Value::Null,
         UnpackedValue::Number(value) => serde_json::Value::String(value.to_string()),
         UnpackedValue::Bool(value) => serde_json::Value::Bool(*value),
         UnpackedValue::String(value) => serde_json::Value::String(value.clone()),

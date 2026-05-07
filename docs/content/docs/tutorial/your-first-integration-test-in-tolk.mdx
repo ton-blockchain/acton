@@ -180,7 +180,7 @@ acton test counter.test.tolk
 
 The complete test code looks like this:
 
-````tolk
+```tolk
 import "@acton/emulation/testing"
 
 get fun `test should deploy`() {
@@ -200,7 +200,7 @@ get fun `test should deploy`() {
     val res = net.send(deployer.address, msg);
     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
 }
-````
+```
 
 For such a small test, it may seem quite large in terms of lines of code, but we will fix this when we write our second test further on.
 

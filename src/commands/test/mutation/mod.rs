@@ -1,3 +1,6 @@
+use crate::commands::build::{
+    contract_compilation_order, generate_dependency_files, resolve_build_output_dir,
+};
 use crate::commands::common::error_fmt;
 use crate::commands::test::mutation::diff::collect_mutation_diff_scope;
 use crate::commands::test::mutation::rules::{
@@ -9,12 +12,15 @@ use crate::commands::test::mutation::session::{
 };
 use crate::commands::test::{INTERNAL_REQUIRE_TESTS_ENV, INTERNAL_SKIP_BUILD_ENV, TestConfig};
 use acton_config::color::{OwoColorize, colors_enabled};
-use acton_config::config::{ActonConfig, project_root as configured_project_root};
+use acton_config::config::{
+    ActonConfig, ContractConfig, manifest_path as configured_manifest_path,
+    project_root as configured_project_root,
+};
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, Sender, unbounded};
 use path_absolutize::Absolutize;
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::fmt::Write as _;
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -25,6 +31,7 @@ use std::time::{Duration, Instant};
 use std::{fs, process};
 use tempfile::TempDir;
 use tree_sitter::{Node, Point, Query, QueryCursor, StreamingIterator};
+use walkdir::WalkDir;
 
 mod diff;
 mod rules;
@@ -265,8 +272,47 @@ fn mutation_worker_count(config: &TestConfig, total_mutations: usize) -> usize {
     configured.max(1).min(total_mutations.max(1))
 }
 
-fn create_mutation_workspace(sources: &[MutationSourceSnapshot]) -> anyhow::Result<TempDir> {
+fn should_copy_project_source_dir(entry_name: &str) -> bool {
+    !matches!(entry_name, ".git" | "build" | "node_modules" | "target")
+}
+
+fn copy_project_tolk_sources(project_root: &Path, workspace_path: &Path) -> anyhow::Result<()> {
+    for entry in WalkDir::new(project_root)
+        .into_iter()
+        .filter_entry(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .is_none_or(should_copy_project_source_dir)
+        })
+    {
+        let entry = entry?;
+        if !entry.file_type().is_file() || entry.path().extension().is_none_or(|ext| ext != "tolk")
+        {
+            continue;
+        }
+
+        let relative_path = entry.path().strip_prefix(project_root)?;
+        let dest_path = workspace_path.join(relative_path);
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(entry.path(), dest_path)?;
+    }
+
+    Ok(())
+}
+
+fn create_mutation_workspace(
+    project_root: &Path,
+    sources: &[MutationSourceSnapshot],
+) -> anyhow::Result<TempDir> {
     let mutation_dir = TempDir::new()?;
+    fs::copy(
+        configured_manifest_path(),
+        mutation_dir.path().join("Acton.toml"),
+    )?;
+    copy_project_tolk_sources(project_root, mutation_dir.path())?;
 
     for source in sources {
         let dest_path = mutation_dir.path().join(&source.relative_path);
@@ -279,6 +325,99 @@ fn create_mutation_workspace(sources: &[MutationSourceSnapshot]) -> anyhow::Resu
     Ok(mutation_dir)
 }
 
+fn dependent_override_order(
+    contracts: &BTreeMap<String, ContractConfig>,
+    compilation_order: &[String],
+    mutate_contract: &str,
+) -> Vec<String> {
+    let mut affected = HashSet::<String>::from([mutate_contract.to_owned()]);
+    let mut dependents = Vec::new();
+
+    for contract_id in compilation_order {
+        if contract_id == mutate_contract {
+            continue;
+        }
+
+        let Some(contract) = contracts.get(contract_id) else {
+            continue;
+        };
+        if contract
+            .dependency_names()
+            .iter()
+            .any(|dependency| affected.contains(*dependency))
+        {
+            affected.insert(contract_id.clone());
+            dependents.push(contract_id.clone());
+        }
+    }
+
+    dependents
+}
+
+fn build_artifacts_dir(acton_config: &ActonConfig, project_root: &Path) -> PathBuf {
+    let out_dir = acton_config
+        .build
+        .as_ref()
+        .and_then(|build| build.out_dir.clone());
+
+    resolve_build_output_dir(None, out_dir, "build", project_root)
+}
+
+fn generated_dependencies_dir(acton_config: &ActonConfig, project_root: &Path) -> PathBuf {
+    let gen_dir = acton_config
+        .build
+        .as_ref()
+        .and_then(|build| build.gen_dir.clone());
+
+    resolve_build_output_dir(None, gen_dir, "gen", project_root)
+}
+
+fn load_original_contract_bocs(
+    acton_config: &ActonConfig,
+    project_root: &Path,
+    compilation_order: &[String],
+) -> anyhow::Result<HashMap<String, String>> {
+    let build_dir = build_artifacts_dir(acton_config, project_root);
+    let mut compiled_contracts = HashMap::new();
+
+    for contract_id in compilation_order {
+        let artifact_path = build_dir.join(format!("{contract_id}.json"));
+        let artifact = fs::read_to_string(&artifact_path)
+            .map_err(|err| anyhow!("failed to read {}: {err}", artifact_path.display()))?;
+        let artifact: Value = serde_json::from_str(&artifact)
+            .map_err(|err| anyhow!("failed to parse {}: {err}", artifact_path.display()))?;
+        let code_boc64 = artifact
+            .get("code_boc64")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("{} does not contain code_boc64", artifact_path.display()))?;
+
+        compiled_contracts.insert(contract_id.clone(), code_boc64.to_owned());
+    }
+
+    Ok(compiled_contracts)
+}
+
+fn workspace_contract_source_path(
+    workspace_path: &Path,
+    project_root: &Path,
+    contract: &ContractConfig,
+) -> PathBuf {
+    let source_path = contract.absolute_source_path(project_root);
+    if let Ok(relative_path) = source_path.strip_prefix(project_root) {
+        workspace_path.join(relative_path)
+    } else {
+        source_path
+    }
+}
+
+fn format_mutation_overrides_arg(overrides: &BTreeMap<String, String>) -> String {
+    overrides
+        .iter()
+        .map(|(contract, code_boc64)| format!("{contract}:{code_boc64}"))
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
 type MutationExecutionResult = anyhow::Result<MutationExecution>;
 
 enum MutationExecution {
@@ -286,21 +425,51 @@ enum MutationExecution {
     Interrupted,
 }
 
+struct MutationRunContext<'a> {
+    project_root: &'a Path,
+    sources: &'a [MutationSourceSnapshot],
+    mutate_contract: &'a str,
+    contracts: &'a BTreeMap<String, ContractConfig>,
+    dependent_override_order: &'a [String],
+    original_contract_bocs: &'a HashMap<String, String>,
+    acton_config: &'a ActonConfig,
+    path: Option<&'a str>,
+    config: &'a TestConfig,
+    skip_build_for_child_tests: bool,
+}
+
+fn mutation_record(
+    mutation: &GlobalMutation,
+    source: &MutationSourceSnapshot,
+    status: MutationStatus,
+) -> MutationRecord {
+    let pos = mutation.span.start_position;
+    MutationRecord {
+        id: mutation.id,
+        rule_name: mutation.rule.name.clone(),
+        rule_description: mutation.rule.description.clone(),
+        rule_level: mutation.rule.level.as_str().to_owned(),
+        rule_group: mutation.rule.group.clone(),
+        rule_explanation: mutation.rule.explanation.clone(),
+        line: pos.row + 1,
+        column: pos.column + 1,
+        source_path: source.relative_path.to_string_lossy().to_string(),
+        code_context: get_code_context(&source.content, mutation.span, &mutation.rule, 2),
+        status,
+    }
+}
+
 fn run_single_mutation(
     workspace_path: &Path,
-    sources: &[MutationSourceSnapshot],
+    gen_dir: &Path,
     mutation: &GlobalMutation,
-    mutate_contract: &str,
-    path: Option<&str>,
-    config: &TestConfig,
-    skip_build_for_child_tests: bool,
+    context: &MutationRunContext<'_>,
 ) -> anyhow::Result<MutationExecution> {
     if mutation_interrupted() {
         return Ok(MutationExecution::Interrupted);
     }
 
-    let source = &sources[mutation.source_index];
-    let pos = mutation.span.start_position;
+    let source = &context.sources[mutation.source_index];
     let dest_path = workspace_path.join(&source.relative_path);
 
     // apply mutation
@@ -314,35 +483,69 @@ fn run_single_mutation(
     let result = (|| -> anyhow::Result<MutationExecution> {
         fs::write(&dest_path, &mutated_content)?;
 
-        let main_contract_relative_path = &sources[0].relative_path;
-        let main_contract_dest_path = workspace_path.join(main_contract_relative_path);
-        let Some(code_b64) = compile_file(&main_contract_dest_path.to_string_lossy())? else {
+        let compile_workspace_contract =
+            |contract: &ContractConfig| -> anyhow::Result<Option<String>> {
+                let contract_source_path =
+                    workspace_contract_source_path(workspace_path, context.project_root, contract);
+                compile_file(workspace_path, &contract_source_path.to_string_lossy())
+            };
+
+        let mut compiled_contracts = context.original_contract_bocs.clone();
+        let mut mutation_overrides = BTreeMap::new();
+
+        let mutate_contract_config =
+            context
+                .contracts
+                .get(context.mutate_contract)
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Contract '{}' not found in Acton.toml",
+                        context.mutate_contract
+                    )
+                })?;
+        let Some(code_b64) = compile_workspace_contract(mutate_contract_config)? else {
             return Ok(MutationExecution::Interrupted);
         };
         if code_b64.is_empty() {
-            let record = MutationRecord {
-                id: mutation.id,
-                rule_name: mutation.rule.name.clone(),
-                rule_description: mutation.rule.description.clone(),
-                rule_level: mutation.rule.level.as_str().to_owned(),
-                rule_group: mutation.rule.group.clone(),
-                rule_explanation: mutation.rule.explanation.clone(),
-                line: pos.row + 1,
-                column: pos.column + 1,
-                source_path: source.relative_path.to_string_lossy().to_string(),
-                code_context: get_code_context(&source.content, mutation.span, &mutation.rule, 2),
-                status: MutationStatus::CompileError,
-            };
+            let record = mutation_record(mutation, source, MutationStatus::CompileError);
             return Ok(MutationExecution::Completed { record });
+        }
+        compiled_contracts.insert(context.mutate_contract.to_owned(), code_b64.clone());
+        mutation_overrides.insert(context.mutate_contract.to_owned(), code_b64);
+
+        for dependent_contract in context.dependent_override_order {
+            let contract_config = context.contracts.get(dependent_contract).ok_or_else(|| {
+                anyhow!("Contract '{dependent_contract}' not found in Acton.toml")
+            })?;
+            generate_dependency_files(
+                dependent_contract,
+                contract_config,
+                &compiled_contracts,
+                &BTreeMap::new(),
+                context.acton_config,
+                gen_dir,
+                workspace_path,
+            )?;
+
+            let Some(code_b64) = compile_workspace_contract(contract_config)? else {
+                return Ok(MutationExecution::Interrupted);
+            };
+            if code_b64.is_empty() {
+                let record = mutation_record(mutation, source, MutationStatus::CompileError);
+                return Ok(MutationExecution::Completed { record });
+            }
+
+            compiled_contracts.insert(dependent_contract.clone(), code_b64.clone());
+            mutation_overrides.insert(dependent_contract.clone(), code_b64);
         }
 
         let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
         let mut cmd = process::Command::new(exe);
-        append_mutation_test_command_args(&mut cmd, path, config);
+        append_mutation_test_command_args(&mut cmd, context.path, context.config);
         cmd.arg("--mutate-overrides")
-            .arg(format!("{mutate_contract}:{code_b64}"));
+            .arg(format_mutation_overrides_arg(&mutation_overrides));
 
-        if skip_build_for_child_tests {
+        if context.skip_build_for_child_tests {
             cmd.env(INTERNAL_SKIP_BUILD_ENV, "1");
         }
 
@@ -358,19 +561,7 @@ fn run_single_mutation(
             MutationStatus::Killed
         };
 
-        let record = MutationRecord {
-            id: mutation.id,
-            rule_name: mutation.rule.name.clone(),
-            rule_description: mutation.rule.description.clone(),
-            rule_level: mutation.rule.level.as_str().to_owned(),
-            rule_group: mutation.rule.group.clone(),
-            rule_explanation: mutation.rule.explanation.clone(),
-            line: pos.row + 1,
-            column: pos.column + 1,
-            source_path: source.relative_path.to_string_lossy().to_string(),
-            code_context: get_code_context(&source.content, mutation.span, &mutation.rule, 2),
-            status,
-        };
+        let record = mutation_record(mutation, source, status);
 
         Ok(MutationExecution::Completed { record })
     })();
@@ -386,13 +577,9 @@ fn run_single_mutation(
 fn mutation_worker_loop(
     job_rx: Receiver<GlobalMutation>,
     result_tx: Sender<MutationExecutionResult>,
-    sources: &[MutationSourceSnapshot],
-    mutate_contract: &str,
-    path: Option<&str>,
-    config: &TestConfig,
-    skip_build_for_child_tests: bool,
+    context: MutationRunContext<'_>,
 ) -> anyhow::Result<()> {
-    let workspace = match create_mutation_workspace(sources) {
+    let workspace = match create_mutation_workspace(context.project_root, context.sources) {
         Ok(workspace) => workspace,
         Err(err) => {
             let _ = result_tx.send(Err(err));
@@ -400,16 +587,10 @@ fn mutation_worker_loop(
         }
     };
 
+    let gen_dir = generated_dependencies_dir(context.acton_config, workspace.path());
+
     while let Ok(mutation) = job_rx.recv() {
-        let execution = match run_single_mutation(
-            workspace.path(),
-            sources,
-            &mutation,
-            mutate_contract,
-            path,
-            config,
-            skip_build_for_child_tests,
-        ) {
+        let execution = match run_single_mutation(workspace.path(), &gen_dir, &mutation, &context) {
             Ok(execution) => execution,
             Err(err) => {
                 let _ = result_tx.send(Err(err));
@@ -840,6 +1021,12 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
             mutate_contract
         ))
     })?;
+    let Some(contracts) = acton_config.contracts() else {
+        anyhow::bail!("No contracts section found in Acton.toml");
+    };
+    let compilation_order = contract_compilation_order(contracts)?;
+    let dependent_override_order =
+        dependent_override_order(contracts, &compilation_order, mutate_contract);
 
     let project_root = dunce::canonicalize(configured_project_root())
         .unwrap_or_else(|_| configured_project_root().to_path_buf());
@@ -853,6 +1040,8 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
     if mutation_interrupted() {
         exit_mutation_interrupted(path, config, None);
     }
+    let original_contract_bocs =
+        load_original_contract_bocs(&acton_config, &project_root, &compilation_order)?;
 
     let all_disable_rules = &config.disable_rules;
     let selected_mutation_levels = &config.mutation_levels;
@@ -1094,21 +1283,21 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
         for _ in 0..worker_count {
             let worker_job_rx = job_rx.clone();
             let worker_result_tx = result_tx.clone();
-            let worker_sources = &source_snapshots;
-            let worker_contract = mutate_contract.as_str();
-            let worker_path = path;
-            let worker_config = config;
+            let worker_context = MutationRunContext {
+                project_root: &project_root,
+                sources: &source_snapshots,
+                mutate_contract,
+                contracts,
+                dependent_override_order: &dependent_override_order,
+                original_contract_bocs: &original_contract_bocs,
+                acton_config: &acton_config,
+                path,
+                config,
+                skip_build_for_child_tests,
+            };
 
             scope.spawn(move || {
-                let _ = mutation_worker_loop(
-                    worker_job_rx,
-                    worker_result_tx,
-                    worker_sources,
-                    worker_contract,
-                    worker_path,
-                    worker_config,
-                    skip_build_for_child_tests,
-                );
+                let _ = mutation_worker_loop(worker_job_rx, worker_result_tx, worker_context);
             });
         }
 
@@ -1315,10 +1504,15 @@ pub fn test_mutate_cmd(path: Option<&str>, config: &TestConfig) -> anyhow::Resul
     Ok(())
 }
 
-fn compile_file(path: &str) -> anyhow::Result<Option<String>> {
+fn compile_file(project_root: &Path, path: &str) -> anyhow::Result<Option<String>> {
     let exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("acton"));
     let mut cmd = process::Command::new(exe);
-    let cmd = cmd.arg("compile").arg("--json").arg(path);
+    let cmd = cmd
+        .arg("--project-root")
+        .arg(project_root)
+        .arg("compile")
+        .arg("--json")
+        .arg(path);
 
     let compilation_result = match run_command_output_interruptible(cmd)? {
         InterruptibleOutput::Completed(output) => output,

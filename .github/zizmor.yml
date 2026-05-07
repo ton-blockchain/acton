@@ -12,4 +12,3 @@ rules:
     ignore:
       - build.yml # secrets.ACTON_PUBLIC
       - release-objs.yml # secrets.ACTON_PUBLIC
-      - publish-mirror.yml # secrets.ACTON_PUBLIC

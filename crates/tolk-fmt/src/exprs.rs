@@ -261,6 +261,44 @@ fn collect_method_chain_doc<'a>(
                 })
             }
         }
+        Expr::NotNull(not_null) => {
+            let inner = not_null.inner()?;
+            let mut chain = collect_method_chain_doc(ctx, &inner, true)?;
+
+            if chain.has_dot_link {
+                if let Some(last) = chain.links.last_mut() {
+                    last.doc = wrap_doc_with_node_comments(
+                        ctx,
+                        not_null.syntax(),
+                        last.doc.clone().append(RcDoc::text("!")),
+                        include_expr_comments,
+                    );
+                    let not_null_has_leading_comments = include_expr_comments
+                        && has_leading_comments_on_node(ctx, not_null.syntax());
+                    last.has_leading_comments |= not_null_has_leading_comments;
+                    let not_null_has_inline_line_comments = include_expr_comments
+                        && has_inline_line_comments_on_node(ctx, not_null.syntax());
+                    last.has_inline_line_comments |= not_null_has_inline_line_comments;
+                } else {
+                    chain.base = chain.base.append(RcDoc::text("!"));
+                }
+                Some(chain)
+            } else {
+                let inner_doc = print_expression(ctx, &inner)?;
+                let not_null_doc = wrap_doc_with_node_comments(
+                    ctx,
+                    not_null.syntax(),
+                    RcDoc::concat([inner_doc, RcDoc::text("!")]),
+                    include_expr_comments,
+                );
+                Some(MethodChainDoc {
+                    base: not_null_doc,
+                    links: vec![],
+                    has_dot_link: false,
+                    base_is_object_lit: false,
+                })
+            }
+        }
         _ => Some(MethodChainDoc {
             base: print_expression(ctx, expr)?,
             links: vec![],
@@ -667,6 +705,17 @@ fn print_instantiation_types<'a>(
 ) -> Option<RcDoc<'a>> {
     let ts = instantiation.instantiation_ts()?;
     let types: Vec<_> = ts.types().collect();
+
+    if let [single_type] = types.as_slice()
+        && types::single_type_argument_should_stay_inline(single_type)
+    {
+        let single_type_doc = types::print_type(ctx, single_type)?;
+        return Some(RcDoc::concat([
+            RcDoc::text("<"),
+            single_type_doc,
+            RcDoc::text(">"),
+        ]));
+    }
 
     common::print_list(
         ctx,

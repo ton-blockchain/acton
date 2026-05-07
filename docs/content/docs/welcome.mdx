@@ -27,7 +27,10 @@ Acton is an all-in-one TON smart contract development toolkit written in Rust. I
         Install Acton and verify that the binary is available in the shell.
     </Card>
     <Card href="/docs/quickstart" title="Quickstart">
-        Quickly familiarize yourself with Acton through the Tolk smart contract made from a template.
+        Create a counter project from the built-in template.
+    </Card>
+    <Card href="/docs/walkthrough" title="Walkthrough">
+        Continue exploring Acton facilities within the quick start project.
     </Card>
     <Card href="/docs/tutorial/overview" title="Tutorial">
         Write your first smart contract with Tolk and Acton.
@@ -76,11 +79,20 @@ For an existing repository, start with `acton init` and [grow the project](/docs
     </Card>
 </Cards>
 
+## CLI help
+
+Run:
+
+- `acton --help` for the command overview;
+- `acton help <command>` for the long manual for each command;
+- `<nested> --help` for nested subcommands.
+
+For example, `acton wallet list --help` prints a brief help message for the `list` subcommand of the `wallet` command.
+
 ## Quick links
 
 - Shortest path to a running project: [Quickstart](/docs/quickstart).
 - Command syntax: [Commands](/docs/commands/overview).
-- CLI help: `acton --help` for the overview, `acton help <command>` for the long manual, and `<nested> --help` for nested subcommands. For example, `acton wallet list --help`.
 - Tests: [Test runner](/docs/testing/overview).
 - Build configuration, outputs, and dependency handling: [Build system](/docs/building/overview).
 - Standalone Tolk scripts for deployment and automation: [Scripting](/docs/scripting/overview)

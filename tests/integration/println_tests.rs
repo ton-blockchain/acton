@@ -190,3 +190,37 @@ fn test_println_various_slices() {
             "integration/snapshots/test_println_various_slices.stdout.svg",
         );
 }
+
+#[test]
+fn test_println_typed_cell_includes_decoded_value() {
+    let project = ProjectBuilder::new("println-typed-cell-decoded")
+        .script_file(
+            "main",
+            r#"
+            import "../../lib/io"
+
+            struct Child {
+                value: uint8
+            }
+
+            struct Boxed {
+                child: Cell<Child>
+            }
+
+            fun main() {
+                val child = Child { value: 42 }.toCell() as Cell<Child>;
+                println(Boxed { child });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/main.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/test_println_typed_cell_includes_decoded_value.stdout.txt",
+        );
+}
