@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-cli-check",
+  "scopeName": "source.acton-cli-check",
+  "patterns": [
+    {
+      "include": "#diagnostics"
+    },
+    {
+      "include": "source.acton-cli"
+    }
+  ],
+  "repository": {
+    "diagnostics": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(warning|note)(\\[[\\w-]+\\])?(:)",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-check"
+            },
+            "3": {
+              "name": "comment.line.acton-cli-check"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(error)(\\[[\\w-]+\\])?(:)",
+          "captures": {
+            "2": {
+              "name": "markup.deleted.acton-cli-check"
+            },
+            "3": {
+              "name": "comment.line.acton-cli-check"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(-->)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-check"
+            },
+            "4": {
+              "name": "comment.line.acton-cli-check"
+            }
+          }
+        },
+        {
+          "match": "(\\^+)(\\s+)(help|note)(:)",
+          "captures": {
+            "1": {
+              "name": "constant.language.acton-cli-check"
+            },
+            "3": {
+              "name": "entity.name.function.acton-cli-check"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
