@@ -695,9 +695,15 @@ Use `--dry-run` to compile and upload sources without consuming funds to send th
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
 ```
 
-<Callout>
-    To select a wallet through the TON Connect protocol, [use the web interface of the verifier](https://verifier.ton.org).
-</Callout>
+Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
+
+```bash
+acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+```
+
+Acton starts a local TON Connect page and opens it in the browser. If the default page port is busy, pass `--tonconnect-port <PORT>`.
+
+See the [verification guide](/docs/verify) for more.
 
 ## Miscellaneous AI-friendly commands
 
