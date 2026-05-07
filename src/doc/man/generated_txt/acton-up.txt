@@ -54,12 +54,9 @@ OPTIONS
            primary workflow. It remains mutually exclusive with
            --manifest-path.
 
-RELEASE SOURCES
-       Acton queries GitHub release metadata and assets from:
-
-       o  ton-blockchain/acton
-
-       o  i582/acton-public
+RELEASE SOURCE
+       Acton queries GitHub release metadata and assets from
+       ton-blockchain/acton.
 
        If GITHUB_TOKEN is set, Acton uses it for authenticated GitHub API
        requests.
