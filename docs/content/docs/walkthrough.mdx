@@ -504,11 +504,15 @@ To attach other DAP clients, run `acton test` with `--debug` on a fixed `--debug
 
 ## Run scripts
 
-Use [`acton script`](/docs/commands/script) to run Tolk scripts in the same local emulation environment as tests. Additionally, scripts can be broadcast to run on the testnet or mainnet.
+There is no dedicated `acton deploy` command. Instead, contracts are deployed using Tolk scripts.
 
-Scripts are useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network. Broadcast scripts are useful for interacting with deployed contracts.
+Use [`acton script`](/docs/commands/script) to deploy contracts in real network and interact with them. Additionally, Tolk scripts may be run in the same local emulation environment as tests.
 
-For example, add a new script to the `contracts/scripts/` folder to deploy the counter in the emulator and increase its counter:
+Emulating scripts are useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
+
+See the [scripting guides](/docs/scripting/overview) for more.
+
+For example, add a new script to the `contracts/scripts/` folder to deploy the counter and increase its counter:
 
 ```tolk title="contracts/scripts/increase.tolk"
 import "@acton/env"
@@ -569,7 +573,7 @@ fun main() {
 
 To run the script:
 
-```bash
+```acton-cli
 acton script contracts/scripts/increase.tolk
 ```
 
@@ -585,11 +589,25 @@ COUNTER_ADDRESS=kQDTsjXgYkjCOXWs05qZXIIIcodJocB3EiMVhTpe-VptYqWO (Counter)
 Current counter value: 1
 ```
 
-See the [scripting guides](/docs/scripting/overview) for more.
+This command emulated the script in the local environment. Additionally, scripts may be emulated against the real network state.
 
-## Deploy to testnet
+### Fork network state locally
 
-There is no dedicated `acton deploy` command. Instead, contracts are deployed using Tolk scripts. The same deployment script can be used for local emulation and for testnet or mainnet broadcasts.
+`--fork-net` resolves live account and contract state from a network while keeping execution local — no transactions are broadcast:
+
+```bash
+acton script contracts/scripts/deploy.tolk --fork-net testnet
+```
+
+It is strictly recommended to verify scripts using `--fork-net` before executing them in the real network.
+
+### Run a script against a real network
+
+If `--net` flag is passed, then all messages sent by `net.send()` and `net.sendExternal()` will be applied to real network.
+
+```acton-cli
+acton script contracts/scripts/increase.tolk --net testnet
+```
 
 See the [deployment guide](/docs/deploy) for more.
 
@@ -637,22 +655,6 @@ Other useful `acton wallet` subcommands:
 
 See the [wallet management](/docs/wallets) guide and the [`acton wallet`](/docs/commands/wallet) reference for more.
 
-### Run the script
-
-The template includes the deployment script: `contracts/scripts/deploy.tolk`. To deploy in testnet:
-
-```bash
-acton script contracts/scripts/deploy.tolk --net testnet
-```
-
-If successful, the output includes the deployment transaction hash, the contract address, and the freshly read on-chain counter value.
-
-The `Acton.toml` script alias `deploy-testnet` wraps this command, so the following is equivalent:
-
-```bash
-acton run deploy-testnet
-```
-
 ### Use TON Connect
 
 Pass `--tonconnect` to connect a wallet through the TON Connect protocol:
@@ -662,14 +664,6 @@ acton script contracts/scripts/deploy.tolk --net testnet --tonconnect
 ```
 
 Acton saves the TON Connect session to `build/sessions/tonconnect/<network>.json` and reuses it on subsequent runs.
-
-### Fork network state locally
-
-`--fork-net` resolves live account and contract state from a network while keeping execution local — no transactions are broadcast:
-
-```bash
-acton script contracts/scripts/deploy.tolk --fork-net testnet
-```
 
 ### Debug script execution
 
@@ -705,13 +699,38 @@ acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
 
 Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
 
-```bash
+```acton-cli
 acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
 ```
 
 Acton starts a local TON Connect page and opens it in the browser. If the default page port is busy, pass `--tonconnect-port <PORT>`.
 
 See the [verification guide](/docs/verify) for more.
+
+## Manage on-chain libraries
+
+The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in one masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
+
+Publish a configured contract as a library:
+
+```acton-cli
+acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net testnet --local
+```
+
+Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`. After publishing, inspect the library and top it up before storage fees run out. `info` and `topup` use the network saved in the library metadata:
+
+```acton-cli
+acton library info <LIBRARY_NAME>
+acton library topup <LIBRARY_NAME> --duration 1y --wallet deployer
+```
+
+To inspect code that is already on-chain, fetch it by hash:
+
+```acton-cli
+acton library fetch <LIBRARY_HASH> --disasm --net testnet
+```
+
+See the [on-chain libraries guide](/docs/libraries) for the full publish, fetch, and `library_ref` workflow.
 
 ## Miscellaneous AI-friendly commands
 
@@ -775,6 +794,5 @@ Run this command and fix discovered issues before filing a bug report.
 
 - [Testing guide](/docs/testing/overview) — deep dive into writing comprehensive tests.
 - [Acton's Tolk libraries](/docs/standard_library/overview)
-- [Tolk standard library](/docs/tolk_standard_library/overview)
 - [CLI commands reference](/docs/commands/overview)
 - [Linting rules reference](/docs/rules/overview)
