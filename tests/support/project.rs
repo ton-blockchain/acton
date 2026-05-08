@@ -557,7 +557,7 @@ impl ProjectBuilder {
     ///
     /// # Examples
     /// ```
-    /// .test_file_from_path("test", "tests/ffi/get_config.tolk")
+    /// .test_file_from_path("test", "tests/integration/ffi/get_config.tolk")
     /// ```
     pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)

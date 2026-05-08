@@ -1,0 +1,1432 @@
+Step 1 (before):
+  Code:
+     68|
+     69| get fun `test should run counter script`() {
+     70|     val (counter, deployer) = setupTest();
+                                       ^^^^^^^^^^^
+     71|
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 2 (step_in):
+  Code:
+     51|
+     52| fun setupTest(): (Counter, Treasury) {
+     53|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
+                                                 ^^^^^
+     54|
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_in):
+  Code:
+     19| fun Counter.fromStorage(storage: Storage): Counter {
+     20|     val init = ContractState {
+     21|         code: build("counter"),
+                             ^^^^^^^^^
+     22|         data: storage.toCell(),
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 4 (step_in):
+  Code:
+     20|     val init = ContractState {
+     21|         code: build("counter"),
+     22|         data: storage.toCell(),
+                       ^^^^^^^^^^^^^^^^
+     23|     };
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 5 (step_in):
+  Code:
+     18|
+     19| fun Counter.fromStorage(storage: Storage): Counter {
+     20|     val init = ContractState {
+                 ^^^^
+     21|         code: build("counter"),
+  Variables:
+    storage = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 6 (step_in):
+  Code:
+     22|         data: storage.toCell(),
+     23|     };
+     24|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+                                               ^^^^^^^^^^^^^^^
+     25|     return Counter { address, init }
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 64 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 7 (step_in):
+  Code:
+     23|     };
+     24|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+     25|     return Counter { address, init }
+                              ^^^^^^^
+     26| }
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 64 bits, 0 refs, hash: [HASH]
+    address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 8 (step_in):
+  Code:
+     23|     };
+     24|     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+     25|     return Counter { address, init }
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     26| }
+  Variables:
+    storage = <optimized out>
+    init: ContractState
+      code: cell = 80 bits, 1 refs, hash: [HASH]
+      data: cell = 64 bits, 0 refs, hash: [HASH]
+    address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    (return value): Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 9 (step_in):
+  Code:
+     51|
+     52| fun setupTest(): (Counter, Treasury) {
+     53|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
+                 ^^^^^^^
+     54|
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 10 (step_in):
+  Code:
+     53|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
+     54|
+     55|     val deployer = testing.treasury("deployer");
+                                             ^^^^^^^^^^
+     56|     val msg = createMessage({
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 11 (step_in):
+  Code:
+     53|     val counter = Counter.fromStorage({ id: 0, counter: 0 });
+     54|
+     55|     val deployer = testing.treasury("deployer");
+                 ^^^^^^^^
+     56|     val msg = createMessage({
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 12 (step_in):
+  Code:
+     55|     val deployer = testing.treasury("deployer");
+     56|     val msg = createMessage({
+     57|         bounce: false,
+                 ^^^^^^^^^^^^^
+     58|         value: ton("1.0"),
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 13 (step_in):
+  Code:
+     56|     val msg = createMessage({
+     57|         bounce: false,
+     58|         value: ton("1.0"),
+                        ^^^^^^^^^^
+     59|         dest: {
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 14 (step_in):
+  Code:
+     58|         value: ton("1.0"),
+     59|         dest: {
+     60|             stateInit: counter.init,
+                     ^^^^^^^^^^^^^^^^^^^^^^^
+     61|         },
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 15 (step_in):
+  Code:
+     57|         bounce: false,
+     58|         value: ton("1.0"),
+     59|         dest: {
+                 ^
+     60|             stateInit: counter.init,
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 16 (step_in):
+  Code:
+     54|
+     55|     val deployer = testing.treasury("deployer");
+     56|     val msg = createMessage({
+                       ^
+     57|         bounce: false,
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 17 (step_in):
+  Code:
+     61|         },
+     62|     });
+     63|     val res = net.send(deployer.address, msg);
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState = (last seen)
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    msg: OutMessage
+      messageCell: cell = 422 bits, 2 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 18 (step_in):
+  Code:
+     32| }
+     33|
+     34| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 950674
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 19 (step_in):
+  Code:
+     33|
+     34| fun onInternalMessage(in: InMessage) {
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+                 ^^^
+     36|
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 950674
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 20 (step_in):
+  Code:
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+     36|
+     37|     debug.printString("Hello World");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     38|
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 950674
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+    msg: AllowedMessage = (lazy, unresolved)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 21 (step_in):
+  Code:
+     37|     debug.printString("Hello World");
+     38|
+     39|     match (msg) {
+             ^
+     40|         IncreaseCounter => {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 950674
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+    msg: AllowedMessage = (lazy, unresolved)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 22 (step_in):
+  Code:
+     50|
+     51|         else => {
+     52|             assert (in.body.isEmpty()) throw 0xFFFF;
+                                                      ^^^^^^
+     53|         }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 1000000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 950674
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = empty slice
+    msg: AllowedMessage = (lazy, unresolved)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 23 (step_in):
+  Code:
+     61|         },
+     62|     });
+     63|     val res = net.send(deployer.address, msg);
+                 ^^^
+     64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState = (last seen)
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    msg: OutMessage = (last seen)
+      messageCell: cell = 422 bits, 2 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 24 (step_in):
+  Code:
+     62|     });
+     63|     val res = net.send(deployer.address, msg);
+     64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+             ^^^^^^^^^^^
+     65|
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState = (last seen)
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    msg: OutMessage = (last seen)
+      messageCell: cell = 422 bits, 2 refs, hash: [HASH]
+    res: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 25 (step_in):
+  Code:
+     62|     });
+     63|     val res = net.send(deployer.address, msg);
+     64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+                                                      ^^^^^^^^^^^^^^^
+     65|
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState = (last seen)
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    msg: OutMessage = (last seen)
+      messageCell: cell = 422 bits, 2 refs, hash: [HASH]
+    res: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 26 (step_in):
+  Code:
+     64|     expect(res).toHaveSuccessfulDeploy({ to: counter.address });
+     65|
+     66|     return (counter, deployer)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     67| }
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init: ContractState = (last seen)
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    msg: OutMessage = (last seen)
+      messageCell: cell = 422 bits, 2 refs, hash: [HASH]
+    res: BigArray<SendResult> = (last seen)
+      arr: [array<array<SendResult>>, int] = 2 items
+    (return value): (Counter, Treasury) = 2 items
+      0: Counter
+      1: Treasury
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 27 (step_in):
+  Code:
+     68|
+     69| get fun `test should run counter script`() {
+     70|     val (counter, deployer) = setupTest();
+                 ^^^^^^^^^^^^^^^^^^^
+     71|
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 28 (step_in):
+  Code:
+     70|     val (counter, deployer) = setupTest();
+     71|
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
+                                                                     ^^^^^^^^^^^^^^^^
+     73|     println("Counter: {}", counterRes);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 29 (step_in):
+  Code:
+     59|
+     60| get fun currentCounter(): int {
+     61|     val storage = lazy Storage.load();
+                           ^^^^^^^^^^^^^^^^^^^
+     62|     return storage.counter;
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 30 (step_in):
+  Code:
+     60| get fun currentCounter(): int {
+     61|     val storage = lazy Storage.load();
+     62|     return storage.counter;
+             ^^^^^^^^^^^^^^^^^^^^^^
+     63| }
+  Variables:
+    storage: Storage (lazy)
+      id: uint32 = 0 (not loaded)
+      counter: uint32 = 0 (not loaded)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 31 (step_in):
+  Code:
+     60| get fun currentCounter(): int {
+     61|     val storage = lazy Storage.load();
+     62|     return storage.counter;
+             ^^^^^^^^^^^^^^^^^^^^^^
+     63| }
+  Variables:
+    storage: Storage (lazy)
+      id: uint32 = 0 (not loaded)
+      counter: uint32 = 0
+    (return value): int = 0
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 32 (step_in):
+  Code:
+     60| get fun currentCounter(): int {
+     61|     val storage = lazy Storage.load();
+     62|     return storage.counter;
+             ^^^^^^^^^^^^^^^^^^^^^^
+     63| }
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 33 (step_in):
+  Code:
+     70|     val (counter, deployer) = setupTest();
+     71|
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
+                 ^^^^^^^^^^
+     73|     println("Counter: {}", counterRes);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 34 (step_in):
+  Code:
+     71|
+     72|     val counterRes = net.runGetMethod<int>(counter.address, "currentCounter");
+     73|     println("Counter: {}", counterRes);
+                     ^^^^^^^^^^^^^
+     74|
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 35 (step_in):
+  Code:
+     73|     println("Counter: {}", counterRes);
+     74|
+     75|     val info = testing.getAccountState(counter.address)!;
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 36 (step_in):
+  Code:
+    204| /// ```
+    205| fun testing.getAccountState(addr: address): TlbAccountInfo? {
+    206|     return impl.getAccountState(addr);
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    207| }
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 37 (step_in):
+  Code:
+     18|
+     19| fun impl.getAccountState(addr: address): TlbAccountInfo? {
+     20|     val cell = ffi.getAccountState(addr.toCell());
+                                            ^^^^^^^^^^^^^
+     21|     if (cell == null) {
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 38 (step_in):
+  Code:
+     19| fun impl.getAccountState(addr: address): TlbAccountInfo? {
+     20|     val cell = ffi.getAccountState(addr.toCell());
+     21|     if (cell == null) {
+             ^^
+     22|         return null;
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    cell: cell = 441 bits, 2 refs, hash: [HASH]
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 39 (step_in):
+  Code:
+     22|         return null;
+     23|     }
+     24|     val typedCell = cell as Cell<TlbAccountInfo>;
+                 ^^^^^^^^^
+     25|     return typedCell.load();
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    cell: cell = 441 bits, 2 refs, hash: [HASH]
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 40 (step_in):
+  Code:
+     23|     }
+     24|     val typedCell = cell as Cell<TlbAccountInfo>;
+     25|     return typedCell.load();
+                    ^^^^^^^^^^^^^^^^
+     26| }
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    cell: cell = 441 bits, 2 refs, hash: [HASH]
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+    typedCell: Cell<TlbAccountInfo> = 441 bits, 2 refs, hash: [HASH]
+      decoded: TlbAccountInfo
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 41 (step_in):
+  Code:
+    420|
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+                          ^^^^^^^^
+    423|     return s.loadUint(size * 8);
+  Variables:
+    s: slice = 173 bits, 2 refs, hash: [HASH]
+      bits = 173
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 42 (step_in):
+  Code:
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+    423|     return s.loadUint(size * 8);
+                               ^^^^^^^^
+    424| }
+  Variables:
+    s: slice = 170 bits, 2 refs, hash: [HASH]
+      bits = 170
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+    size: int = 1
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 43 (step_in):
+  Code:
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+    423|     return s.loadUint(size * 8);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    424| }
+  Variables:
+    s: slice = 162 bits, 2 refs, hash: [HASH]
+      bits = 162
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+    size: int = 1 (last seen)
+    (return value): int = not a TVM int
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 44 (step_in):
+  Code:
+    420|
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+                          ^^^^^^^^
+    423|     return s.loadUint(size * 8);
+  Variables:
+    s: slice = 162 bits, 2 refs, hash: [HASH]
+      bits = 162
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 45 (step_in):
+  Code:
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+    423|     return s.loadUint(size * 8);
+                               ^^^^^^^^
+    424| }
+  Variables:
+    s: slice = 159 bits, 2 refs, hash: [HASH]
+      bits = 159
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+    size: int = 2
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 46 (step_in):
+  Code:
+    421| fun TlbVarUint7.unpackFromSlice(mutate s: slice): TlbVarUint7 {
+    422|     val size = s.loadUint(3);
+    423|     return s.loadUint(size * 8);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    424| }
+  Variables:
+    s: slice = 143 bits, 2 refs, hash: [HASH]
+      bits = 143
+      refs = 2
+      hash = [HASH]
+      raw = slice{[HEX]} + 2 refs
+    size: int = 2 (last seen)
+    (return value): int = not a TVM int
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 47 (step_in):
+  Code:
+     23|     }
+     24|     val typedCell = cell as Cell<TlbAccountInfo>;
+     25|     return typedCell.load();
+             ^^^^^^^^^^^^^^^^^^^^^^^
+     26| }
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    cell: cell = 441 bits, 2 refs, hash: [HASH] (last seen)
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+    typedCell: Cell<TlbAccountInfo> = 441 bits, 2 refs, hash: [HASH] (last seen)
+      decoded: TlbAccountInfo
+      bits = 441
+      refs = 2
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+    (return value): TlbAccountInfo
+      addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      storageStat: TlbStorageInfo
+      storage: TlbAccountStorage
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 48 (step_in):
+  Code:
+    204| /// ```
+    205| fun testing.getAccountState(addr: address): TlbAccountInfo? {
+    206|     return impl.getAccountState(addr);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    207| }
+  Variables:
+    addr: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      raw = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    (return value): TlbAccountInfo
+      addr = <optimized out>
+      storageStat = <optimized out>
+      storage: TlbAccountStorage
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 49 (step_in):
+  Code:
+     73|     println("Counter: {}", counterRes);
+     74|
+     75|     val info = testing.getAccountState(counter.address)!;
+                 ^^^^
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 50 (step_in):
+  Code:
+     74|
+     75|     val info = testing.getAccountState(counter.address)!;
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+                     ^^^^^^^^^^^^^^^^^
+     77|
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+    info: TlbAccountInfo
+      addr = <optimized out>
+      storageStat = <optimized out>
+      storage: TlbAccountStorage
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 51 (step_in):
+  Code:
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+     77|
+     78|     val res = counter.sendIncrease(deployer.address, 100);
+                               ^^^^^^^^^^^^
+     79|     println(res);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+    info: TlbAccountInfo
+      addr = <optimized out>
+      storageStat = <optimized out>
+      storage: TlbAccountStorage
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 52 (step_in):
+  Code:
+     28| fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
+     29|     val msg = createMessage({
+     30|         bounce: false,
+                 ^^^^^^^^^^^^^
+     31|         value: ton("0.1"),
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 53 (step_in):
+  Code:
+     29|     val msg = createMessage({
+     30|         bounce: false,
+     31|         value: ton("0.1"),
+                        ^^^^^^^^^^
+     32|         dest: self.address,
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 54 (step_in):
+  Code:
+     30|         bounce: false,
+     31|         value: ton("0.1"),
+     32|         dest: self.address,
+                 ^^^^^^^^^^^^^^^^^^
+     33|         body: IncreaseCounter { queryId: 0, increaseBy },
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 55 (step_in):
+  Code:
+     31|         value: ton("0.1"),
+     32|         dest: self.address,
+     33|         body: IncreaseCounter { queryId: 0, increaseBy },
+                                         ^^^^^^^^^^
+     34|     });
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 56 (step_in):
+  Code:
+     27|
+     28| fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
+     29|     val msg = createMessage({
+                       ^
+     30|         bounce: false,
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 57 (step_in):
+  Code:
+     33|         body: IncreaseCounter { queryId: 0, increaseBy },
+     34|     });
+     35|     return net.send(from, msg);
+                    ^^^^^^^^^^^^^^^^^^^
+     36| }
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+    msg: OutMessage
+      messageCell: cell = 544 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 58 (step_in):
+  Code:
+     32| }
+     33|
+     34| fun onInternalMessage(in: InMessage) {
+             ^^^^^^^^^^^^^^^^^
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 59 (step_in):
+  Code:
+     33|
+     34| fun onInternalMessage(in: InMessage) {
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+                 ^^^
+     36|
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH]
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 60 (step_in):
+  Code:
+     35|     val msg = lazy AllowedMessage.fromSlice(in.body);
+     36|
+     37|     debug.printString("Hello World");
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     38|
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH]
+    msg: AllowedMessage = (lazy, unresolved)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 61 (step_in):
+  Code:
+     37|     debug.printString("Hello World");
+     38|
+     39|     match (msg) {
+             ^
+     40|         IncreaseCounter => {
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH]
+    msg: AllowedMessage = (lazy, unresolved)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 62 (step_in):
+  Code:
+     38|
+     39|     match (msg) {
+     40|         IncreaseCounter => {
+                                    ^
+     41|             handleIncreaseCounter(msg.increaseBy);
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH]
+    msg: IncreaseCounter (lazy)
+      queryId: uint64 = 0 (not loaded)
+      increaseBy: uint32 = 100 (not loaded)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 63 (step_in):
+  Code:
+     39|     match (msg) {
+     40|         IncreaseCounter => {
+     41|             handleIncreaseCounter(msg.increaseBy);
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     42|             heavy(msg.increaseBy);
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH] (last seen)
+    msg: IncreaseCounter (lazy)
+      queryId: uint64 = 0 (not loaded)
+      increaseBy: uint32 = 100 (not loaded)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 64 (step_in):
+  Code:
+      9|
+     10| fun handleIncreaseCounter(increaseBy: int) {
+     11|     var storage = lazy Storage.load();
+                           ^^^^^^^^^^^^^^^^^^^
+     12|     storage.counter += increaseBy;
+  Variables:
+    increaseBy: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 65 (step_in):
+  Code:
+     10| fun handleIncreaseCounter(increaseBy: int) {
+     11|     var storage = lazy Storage.load();
+     12|     storage.counter += increaseBy;
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     13|     storage.save();
+  Variables:
+    increaseBy: int = 100
+    storage: Storage (lazy)
+      id: uint32 = 0 (not loaded)
+      counter: uint32 = 0 (not loaded)
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 66 (step_in):
+  Code:
+     11|     var storage = lazy Storage.load();
+     12|     storage.counter += increaseBy;
+     13|     storage.save();
+                     ^^^^
+     14| }
+  Variables:
+    increaseBy: int = 100
+    storage: Storage (lazy)
+      id: uint32 = 0 (not loaded)
+      counter: uint32 = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 67 (step_in):
+  Code:
+     10|
+     11| fun Storage.save(self) {
+     12|     contract.setData(self.toCell());
+                              ^^^^^^^^^^^^^
+     13| }
+  Variables:
+    self: Storage (lazy)
+      id: uint32 = 0 (not loaded)
+      counter: uint32 = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 68 (step_in):
+  Code:
+     40|         IncreaseCounter => {
+     41|             handleIncreaseCounter(msg.increaseBy);
+     42|             heavy(msg.increaseBy);
+                     ^^^^^^^^^^^^^^^^^^^^^
+     43|         }
+  Variables:
+    in: InMessage
+      senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      valueCoins: coins = 100000000
+      valueExtra: map<int32, varuint32> = ()
+      originalForwardFee: coins = 266669
+      createdLt: uint64 = 0
+      createdAt: uint32 = [TIMESTAMP]
+      body: slice = 128 bits, 0 refs, hash: [HASH] (last seen)
+    msg: IncreaseCounter (lazy)
+      queryId: uint64 = 0 (not loaded)
+      increaseBy: uint32 = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 69 (step_in):
+  Code:
+     19| @noinline
+     20| fun heavy(increaseBy: int) {
+     21|     a = increaseBy;
+             ^
+     22|     b = increaseBy;
+  Variables:
+    increaseBy: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 70 (step_in):
+  Code:
+     20| fun heavy(increaseBy: int) {
+     21|     a = increaseBy;
+     22|     b = increaseBy;
+             ^
+     23|
+  Variables:
+    increaseBy: int = 100
+    global a: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 71 (step_in):
+  Code:
+     22|     b = increaseBy;
+     23|
+     24|     inner(increaseBy);
+             ^^^^^^^^^^^^^^^^^
+     25|
+  Variables:
+    increaseBy: int = 100
+    global a: int = 100
+    global b: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 72 (step_in):
+  Code:
+     29| @noinline
+     30| fun inner(increaseBy: int) {
+     31|     b = increaseBy;
+             ^
+     32| }
+  Variables:
+    increaseBy: int = 100
+    global a: int = 100
+    global b: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 73 (step_in):
+  Code:
+     24|     inner(increaseBy);
+     25|
+     26|     a = a + b;
+                 ^
+     27| }
+  Variables:
+    increaseBy: int = 100 (last seen)
+    global a: int = 100
+    global b: int = 100
+  Registers:
+    c4 (storage): Cell<Storage> = 64 bits, 0 refs, hash: [HASH]
+      decoded: Storage
+      bits = 64
+      refs = 0
+      hash = [HASH]
+      raw = cell{[BOC_HEX]}
+
+Step 74 (step_in):
+  Code:
+     33|         body: IncreaseCounter { queryId: 0, increaseBy },
+     34|     });
+     35|     return net.send(from, msg);
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^
+     36| }
+  Variables:
+    self: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      init = <optimized out>
+    from: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (last seen)
+      raw = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+      mainnet = [WALLET_ADDRESS_BASE]
+      testnet = [WALLET_ADDRESS_BASE]
+    increaseBy = <optimized out>
+    msg: OutMessage = (last seen)
+      messageCell: cell = 544 bits, 0 refs, hash: [HASH]
+    (return value): BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 75 (step_in):
+  Code:
+     76|     println("Balance: {:ton}", info.storage.balance.grams);
+     77|
+     78|     val res = counter.sendIncrease(deployer.address, 100);
+                 ^^^
+     79|     println(res);
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      init = <optimized out>
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+    info: TlbAccountInfo
+      addr = <optimized out>
+      storageStat = <optimized out>
+      storage: TlbAccountStorage
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 76 (step_in):
+  Code:
+     77|
+     78|     val res = counter.sendIncrease(deployer.address, 100);
+     79|     println(res);
+             ^^^^^^^^^^^^
+     80| }
+  Variables:
+    counter: Counter
+      address: address = 0:d3ab4bf6769bc8a0888874041305a2d78c6335737e94e574f3a9589f3dc0e9d6 (last seen)
+      init = <optimized out>
+    deployer: Treasury = (last seen)
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    counterRes: int = 0 (last seen)
+    info: TlbAccountInfo
+      addr = <optimized out>
+      storageStat = <optimized out>
+      storage: TlbAccountStorage
+    res: BigArray<SendResult>
+      arr: [array<array<SendResult>>, int] = 2 items
+  Registers:
+    c4 (storage): cell = empty cell
