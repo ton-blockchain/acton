@@ -51,12 +51,9 @@ $ acton new first_counter --template counter --app
 Created Acton.toml with project configuration
 ```
 
-Optional extras: pass `--hooks` to install pre-commit checks, or `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options.
-
-This command can also be run without arguments. It will prompt interactively.
-```acton-cli
-acton new
-```
+<Callout type="tip">
+  Pass `--hooks` to install pre-commit checks, or `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options. When run without arguments, `acton new` prompts interactively.
+</Callout>
 
 Navigate to the project folder:
 
@@ -126,7 +123,9 @@ Build a single contract by name:
 acton build Counter
 ```
 
-Useful build extras: pass `--info` to print resolved project configuration, or `--clear-cache` to discard cached artifacts and recompile from scratch. See [`acton build`](/docs/commands/build) for all options.
+<Callout type="tip">
+    Pass `--info` to print resolved project configuration, or `--clear-cache` to discard cached artifacts and recompile from scratch. See [`acton build`](/docs/commands/build) for all options.
+</Callout>
 
 Print the resolved project configuration without triggering a build:
 
@@ -195,6 +194,7 @@ See the [formatting guide](/docs/format) for more.
 ## Lint contracts
 
 Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics. On a clean project, it prints nothing and exits with status 0.
+
 When issues are found, output looks like this:
 
 ```acton-cli-check
@@ -224,6 +224,7 @@ See the [linting guide](/docs/lint) for more.
 Wrappers are auto-generated from the contract ABI, so regenerate them whenever the ABI changes. Store wrappers in VCS along with the contract sources.
 
 ### Wrappers for tests and scripts
+
 Use [`acton wrapper`](/docs/commands/wrapper) to generate typed Tolk wrappers from the contract's compiler ABI. A prior `acton build` run is not required.
 
 Regenerate wrappers for every contract at once:
@@ -510,7 +511,9 @@ Use [`acton script`](/docs/commands/script) to deploy contracts on a real networ
 
 Script emulation is useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
 
-See the [scripting guides](/docs/scripting/overview) for more.
+<Callout>
+    See the [scripting guides](/docs/scripting/overview) for more.
+</Callout>
 
 For example, add a new script to the `contracts/scripts/` folder to deploy the counter and increase its counter:
 
@@ -613,7 +616,7 @@ See the [deployment guide](/docs/deploy) for more.
 
 ### Set up a wallet
 
-Deployment requires a funded wallet. Use [`acton wallet`](/docs/commands/wallet) to create one and request testnet funds in a single step:
+Deployment to testnet or mainnet requires a funded wallet. Use [`acton wallet`](/docs/commands/wallet) to create one and request testnet funds in a single step:
 
 ```bash
 acton wallet new --name deployer --local --airdrop
@@ -687,7 +690,7 @@ Use [`acton verify`](/docs/commands/verify) to check that the deployed bytecode 
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS>
 ```
 
-Replace `<CONTRACT_ADDRESS>` with the address from the [deployment step](#deploy-to-testnet).
+Replace `<CONTRACT_ADDRESS>` with the address from the [deployment step](#run-scripts).
 
 Verification requires a [funded wallet](#set-up-a-wallet). If there is more than one wallet, choose the target wallet when prompted. If there is a single wallet, it will be selected automatically.
 
