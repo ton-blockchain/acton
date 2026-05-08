@@ -90,7 +90,7 @@ fn test_action_fail() {
         .success()
         .assert_passed(1)
         .assert_contains("action fail")
-        .assert_snapshot_matches("integration/snapshots/test_action_fail.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/actions/test_action_fail.stdout.txt");
 }
 
 #[test]
@@ -105,7 +105,9 @@ fn test_invalid_action_fail() {
         .success()
         .assert_passed(1)
         .assert_contains("action fail")
-        .assert_snapshot_matches("integration/snapshots/test_invalid_action_fail.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/actions/test_invalid_action_fail.stdout.txt",
+        );
 }
 
 #[test]
@@ -120,7 +122,7 @@ fn test_invalid_action_fail_without_backtrace() {
         .assert_passed(1)
         .assert_contains("action fail")
         .assert_snapshot_matches(
-            "integration/snapshots/test_invalid_action_fail_without_backtrace.stdout.txt",
+            "integration/snapshots/actions/test_invalid_action_fail_without_backtrace.stdout.txt",
         );
 }
 
@@ -137,7 +139,7 @@ fn test_invalid_action_fail_without_backtrace_verbose() {
         .assert_passed(1)
         .assert_contains("action fail")
         .assert_snapshot_matches(
-            "integration/snapshots/test_invalid_action_fail_without_backtrace_verbose.stdout.txt",
+            "integration/snapshots/actions/test_invalid_action_fail_without_backtrace_verbose.stdout.txt",
         );
 }
 
@@ -154,7 +156,7 @@ fn test_action_tree_shows_set_code_and_change_library_sources() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_action_tree_shows_set_code_and_change_library_sources.stdout.txt",
+            "integration/snapshots/actions/test_action_tree_shows_set_code_and_change_library_sources.stdout.txt",
         );
 }
 
@@ -171,7 +173,7 @@ fn test_action_tree_hides_code_and_library_actions_without_logs() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_action_tree_hides_code_and_library_actions_without_logs.stdout.txt",
+            "integration/snapshots/actions/test_action_tree_hides_code_and_library_actions_without_logs.stdout.txt",
         );
 }
 
@@ -189,7 +191,7 @@ fn test_action_tree_shows_code_and_library_actions_without_locations_on_verbose(
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_action_tree_shows_code_and_library_actions_without_locations_on_verbose.stdout.txt",
+            "integration/snapshots/actions/test_action_tree_shows_code_and_library_actions_without_locations_on_verbose.stdout.txt",
         );
 }
 
@@ -209,7 +211,7 @@ fn test_action_tree_shows_code_and_library_action_locations_on_coverage() {
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_action_tree_shows_code_and_library_action_locations_on_coverage.stdout.txt",
+            "integration/snapshots/actions/test_action_tree_shows_code_and_library_action_locations_on_coverage.stdout.txt",
         );
 }
 

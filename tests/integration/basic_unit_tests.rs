@@ -26,7 +26,7 @@ fn test_passing_test() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_snapshot_matches("integration/snapshots/test_passing_output.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/basic_unit/test_passing_output.stdout.txt");
 }
 
 #[test]
@@ -49,7 +49,7 @@ fn test_failing_test() {
         .run()
         .failure()
         .assert_failed(1)
-        .assert_snapshot_matches("integration/snapshots/test_failing_output.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/basic_unit/test_failing_output.stdout.txt");
 }
 
 #[test]
@@ -76,5 +76,7 @@ fn test_multiple_passing_tests() {
         .run()
         .success()
         .assert_passed(2)
-        .assert_snapshot_matches("integration/snapshots/test_multiple_passing_output.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/basic_unit/test_multiple_passing_output.stdout.txt",
+        );
 }

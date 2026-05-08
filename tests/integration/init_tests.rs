@@ -61,7 +61,7 @@ fn test_init_empty_directory() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_empty_directory.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_empty_directory.toml.gen"),
     );
 
     assert!(project.path().join(".acton").exists());
@@ -116,7 +116,7 @@ tests = "custom-tests"
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
         snapbox::file!(
-            "snapshots/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
+            "snapshots/init/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
         ),
     );
 }
@@ -157,7 +157,7 @@ wrappers = "wrappers"
         .assert_not_contains("Patched Acton.toml with default mappings")
         .assert_file_snapshot_matches(
             "Acton.toml",
-            "integration/snapshots/test_init_existing_complete_mappings_are_left_unchanged.toml.gen",
+            "integration/snapshots/init/test_init_existing_complete_mappings_are_left_unchanged.toml.gen",
         );
 }
 
@@ -201,7 +201,7 @@ this is intentionally not valid toml
     let output = project.acton().init().arg("--stdlib-only").run().success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_init_stdlib_only_updates_without_touching_acton_toml.stdout.txt",
+        "integration/snapshots/init/test_init_stdlib_only_updates_without_touching_acton_toml.stdout.txt",
     );
     assert_eq!(
         fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
@@ -227,7 +227,7 @@ fn test_init_stdlib_only_installs_without_acton_toml() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_init_stdlib_only_installs_without_acton_toml.stdout.txt",
+            "integration/snapshots/init/test_init_stdlib_only_installs_without_acton_toml.stdout.txt",
         );
 
     assert!(!project.path().join("Acton.toml").exists());
@@ -360,7 +360,7 @@ fn test_init_with_no_contracts() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_with_no_contracts.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_with_no_contracts.toml.gen"),
     );
 }
 
@@ -388,7 +388,7 @@ fn test_init_discovers_single_contract() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_init_discovers_single_contract.toml.gen"),
+        snapbox::file!("snapshots/init/test_init_discovers_single_contract.toml.gen"),
     );
 }
 
@@ -486,7 +486,7 @@ fn test_init_contract_name_formatting() {
     output.assert_contains("Discovered 2 contracts");
     output.assert_file_snapshot_matches(
         "Acton.toml",
-        "integration/snapshots/test_init_contract_name_formatting.toml.gen",
+        "integration/snapshots/init/test_init_contract_name_formatting.toml.gen",
     );
 }
 
@@ -566,7 +566,7 @@ fn test_init_output_format() {
         .init()
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_init_output_format.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/init/test_init_output_format.stdout.txt");
 }
 
 #[test]
@@ -672,7 +672,7 @@ fn test_init_preserves_existing_local_global_wallets_file() {
     );
     output.assert_file_snapshot_matches(
         "global.wallets.toml",
-        "integration/snapshots/test_init_preserves_existing_local_global_wallets.toml.gen",
+        "integration/snapshots/init/test_init_preserves_existing_local_global_wallets.toml.gen",
     );
 }
 
@@ -711,7 +711,7 @@ fn test_init_preserves_existing_local_global_libraries_file() {
     );
     output.assert_file_snapshot_matches(
         "global.libraries.toml",
-        "integration/snapshots/test_init_preserves_existing_local_global_libraries.toml.gen",
+        "integration/snapshots/init/test_init_preserves_existing_local_global_libraries.toml.gen",
     );
 }
 
@@ -742,7 +742,7 @@ fn test_init_patches_gitignore_no_duplicates() {
 
     output.assert_file_snapshot_matches(
         ".gitignore",
-        "integration/snapshots/test_init_patches_gitignore_no_duplicates.gitignore",
+        "integration/snapshots/init/test_init_patches_gitignore_no_duplicates.gitignore",
     );
 }
 
