@@ -32,14 +32,14 @@ const landingUrl = "https://ton-blockchain.github.io/acton"
 const landingOgImage = `${landingUrl}/og/home/image.png`
 
 export const metadata: Metadata = {
-  title: "Acton — TON Development Toolkit",
+  title: "Acton — a unified toolchain for TON",
   description:
-    "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
+    "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
   metadataBase: new URL(landingUrl),
   openGraph: {
-    title: "Acton — TON Development Toolkit",
+    title: "Acton — a unified toolchain for TON",
     description:
-      "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
+      "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
     url: landingUrl,
     images: landingOgImage,
     locale: "en_US",
@@ -47,9 +47,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Acton — TON Development Toolkit",
+    title: "Acton — a unified toolchain for TON",
     description:
-      "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
+      "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
     images: landingOgImage,
   },
 }
@@ -225,7 +225,7 @@ const HEADER_ICON_LINKS: {
 ]
 
 export default function Home() {
-  return <ReleaseAnnouncement />
+  return <LandingHome />
 }
 
 function ReleaseAnnouncement() {
