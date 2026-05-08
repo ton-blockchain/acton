@@ -8,6 +8,10 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.4.2] - 08.05.2026
+
+Test release.
+
 ## [0.4.1] - 08.05.2026
 
 Test release with public repository.
