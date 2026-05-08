@@ -300,6 +300,15 @@ const formatSerializedCellPreview = (
   return `${typeName}(${formatHexPreview(hex)})`
 }
 
+const toSerializedCellScalar = (
+  typeName: "Cell" | "Slice" | "Builder",
+  cell: Cell,
+): ParsedValue => ({
+  kind: "scalar",
+  value: formatSerializedCellPreview(typeName, cell),
+  rawValue: cell.toBoc({idx: false, crc32: false}).toString("hex"),
+})
+
 const toParsedValue = (value: unknown): ParsedValue => {
   if (value === null) {
     return {kind: "null"}
@@ -322,15 +331,15 @@ const toParsedValue = (value: unknown): ParsedValue => {
   }
 
   if (value instanceof Cell) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Cell", value)}
+    return toSerializedCellScalar("Cell", value)
   }
 
   if (value instanceof Slice) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Slice", value.asCell())}
+    return toSerializedCellScalar("Slice", value.asCell())
   }
 
   if (value instanceof Builder) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Builder", value.asCell())}
+    return toSerializedCellScalar("Builder", value.asCell())
   }
 
   if (value instanceof Dictionary) {
