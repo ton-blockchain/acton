@@ -16,7 +16,7 @@
           "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
         },
         "data": "[DATA]",
-        "fee": "887730",
+        "fee": "147956",
         "in_msg": {
           "@type": "raw.message",
           "body_hash": "[HASH]",
@@ -26,7 +26,7 @@
             "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
           },
           "extra_currencies": [],
-          "fwd_fee": "553605",
+          "fwd_fee": "92269",
           "hash": "[HASH]",
           "ihr_fee": "0",
           "msg_data": {
@@ -40,7 +40,7 @@
           },
           "value": "1000000000"
         },
-        "other_fee": "887730",
+        "other_fee": "147956",
         "out_msgs": [
           {
             "@type": "raw.message",
@@ -51,7 +51,7 @@
               "account_address": "0:52f9cf864fbe8616aa05f6627ac3d623fe2b44ccfe89f303d37485261068c533"
             },
             "extra_currencies": [],
-            "fwd_fee": "378670",
+            "fwd_fee": "63113",
             "hash": "[HASH]",
             "ihr_fee": "0",
             "msg_data": {
@@ -63,7 +63,7 @@
               "@type": "accountAddress",
               "account_address": "0:31e0e94916c53e2eb94ee83e8712d22d21d776b37c7f1c5adb69533b0ce0ee15"
             },
-            "value": "199432000"
+            "value": "199905332"
           }
         ],
         "storage_fee": "0",

@@ -258,7 +258,7 @@ Step 18 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 1000000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 950674
+      originalForwardFee: coins = 158447
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = empty slice
@@ -282,7 +282,7 @@ Step 19 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 1000000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 950674
+      originalForwardFee: coins = 158447
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = empty slice
@@ -306,7 +306,7 @@ Step 20 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 1000000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 950674
+      originalForwardFee: coins = 158447
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = empty slice
@@ -331,7 +331,7 @@ Step 21 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 1000000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 950674
+      originalForwardFee: coins = 158447
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = empty slice
@@ -356,7 +356,7 @@ Step 22 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 1000000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 950674
+      originalForwardFee: coins = 158447
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = empty slice
@@ -1029,7 +1029,7 @@ Step 58 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH]
@@ -1053,7 +1053,7 @@ Step 59 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH]
@@ -1077,7 +1077,7 @@ Step 60 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH]
@@ -1102,7 +1102,7 @@ Step 61 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH]
@@ -1127,7 +1127,7 @@ Step 62 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH]
@@ -1154,7 +1154,7 @@ Step 63 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH] (last seen)
@@ -1257,7 +1257,7 @@ Step 68 (step_in):
       senderAddress: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
       valueCoins: coins = 100000000
       valueExtra: map<int32, varuint32> = ()
-      originalForwardFee: coins = 266669
+      originalForwardFee: coins = 44446
       createdLt: uint64 = 0
       createdAt: uint32 = [TIMESTAMP]
       body: slice = 128 bits, 0 refs, hash: [HASH] (last seen)
