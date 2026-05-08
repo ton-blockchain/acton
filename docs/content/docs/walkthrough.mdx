@@ -6,7 +6,7 @@ icon: Sparkle
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-This guide covers the full Acton workflow: creating a counter contract from template, compiling it, linting and formatting code, running tests with coverage and mutation analysis, setting up a wallet, deploying to testnet, and verifying the source.
+This guide covers the full Acton workflow: creating a counter contract from a template, compiling it, linting and formatting code, running tests with coverage and mutation analysis, setting up a wallet, deploying to testnet, and verifying the source.
 
 ## Prerequisites
 
@@ -28,8 +28,8 @@ To enhance agentic workflows, [install Acton development skills](/docs/agent-ski
 
 Use [`acton new`](/docs/commands/new) to create a new project directory from a built-in template:
 
-- `counter` template ships with a ready-made contract, tests, and a deployment script.
-- `--app` flag adds a Vite-based Reacet frontend scaffold and generated TypeScript wrappers alongside the Tolk sources.
+- The `counter` template ships with a ready-made contract, tests, and a deployment script.
+- The `--app` flag adds a Vite-based React frontend scaffold and generated TypeScript wrappers alongside the Tolk sources.
 
 ```bash
 acton new first_counter --template counter --app
@@ -72,7 +72,7 @@ Install the npm workspace dependencies before running any frontend commands:
 npm ci
 ```
 
-The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [acton wallet](/docs/commands/wallet) is already configured, then contract can be instantly deployed to testnet.
+The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [acton wallet](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
 
 ```acton-cli
 acton run deploy-emulation --net testnet
@@ -221,7 +221,7 @@ See the [linting guide](/docs/lint) for more.
 
 ## Regenerate wrappers
 
-Wrappers are auto-generated from contract ABI, so every time it changes, wrappers should be regenerated. It is advised to store wrappers in VCS along with contract sources.
+Wrappers are auto-generated from the contract ABI, so regenerate them whenever the ABI changes. Store wrappers in VCS along with the contract sources.
 
 ### Wrappers for tests and scripts
 Use [`acton wrapper`](/docs/commands/wrapper) to generate typed Tolk wrappers from the contract's compiler ABI. A prior `acton build` run is not required.
@@ -259,11 +259,11 @@ $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.ts
 ```
 
-See the [dApp integration guide](/docs/ui-setup) for more info on TypeScript wrappers usage.
+See the [dApp integration guide](/docs/ui-setup) for more information about using TypeScript wrappers.
 
 ## Test the contract
 
-The template several tests for the counter contract. Use [`acton test`](/docs/commands/test) to discover and run all test files matching `*.test.tolk`:
+The template includes several tests for the counter contract. Use [`acton test`](/docs/commands/test) to discover and run all test files matching `*.test.tolk`:
 
 ```bash
 acton test
@@ -299,7 +299,7 @@ See the [testing guides](/docs/testing/overview) for more.
 
 ### Collect coverage
 
-Pass `--coverage` to collect line and branch coverage and prints a summary after the run:
+Pass `--coverage` to collect line and branch coverage and print a summary after the run:
 
 ```bash
 acton test --coverage
@@ -386,7 +386,7 @@ Each survivor pinpoints a specific line, rule, and diff. Add a test that exercis
 
 ### Exception tracing
 
-To quickly identify the place, where exception occured pass `--backtrace full` to get source locations for a failure without stepping through:
+To quickly identify where an exception occurred, pass `--backtrace full` to get source locations for a failure without stepping through:
 
 ```bash
 acton test --backtrace full
@@ -423,11 +423,11 @@ $ acton test --backtrace full
 Some tests failed.
 ```
 
-### Source-level debug
+### Source-level debugging
 
-For cases, when simple error tracing is now enough, acton ships a source-level debugger that uses the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). It runs the same contract code as production without a separate debug build.
+For cases where simple error tracing is not enough, Acton ships a source-level debugger that uses the [Debug Adapter Protocol (DAP)](https://microsoft.github.io/debug-adapter-protocol/). It runs the same contract code as production without a separate debug build.
 
-It shows everything expected from a source-level debugger:
+It provides the expected source-level debugging features:
 
 - variables: see every local at the current frame and watch how its value changes between steps.
 - lazy objects: `lazy` values are inspectable even when their fields have not been loaded from storage yet.
@@ -457,7 +457,7 @@ Open a `*.test.tolk` file and use the run-configuration **Debug** button. The pl
 
 #### VS Code
 
-To start the test run from the editor, right-click a test inside a `*.test.tolk` file and pick **Debug Test** — TON extension would launch an Acton instance with `--debug` and attach in one step.
+To start the test run from the editor, right-click a test inside a `*.test.tolk` file and pick **Debug Test** — the TON extension launches an Acton instance with `--debug` and attaches in one step.
 
 To attach to a running Acton session, start Acton with `--debug` on a fixed `--debug-port`:
 
@@ -506,9 +506,9 @@ To attach other DAP clients, run `acton test` with `--debug` on a fixed `--debug
 
 There is no dedicated `acton deploy` command. Instead, contracts are deployed using Tolk scripts.
 
-Use [`acton script`](/docs/commands/script) to deploy contracts in real network and interact with them. Additionally, Tolk scripts may be run in the same local emulation environment as tests.
+Use [`acton script`](/docs/commands/script) to deploy contracts on a real network and interact with them. Tolk scripts can also run in the same local emulation environment as tests.
 
-Emulating scripts are useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
+Script emulation is useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
 
 See the [scripting guides](/docs/scripting/overview) for more.
 
@@ -589,7 +589,7 @@ COUNTER_ADDRESS=kQDTsjXgYkjCOXWs05qZXIIIcodJocB3EiMVhTpe-VptYqWO (Counter)
 Current counter value: 1
 ```
 
-This command emulated the script in the local environment. Additionally, scripts may be emulated against the real network state.
+This command emulates the script in the local environment. Scripts can also be emulated against a live network state.
 
 ### Fork network state locally
 
@@ -599,11 +599,11 @@ This command emulated the script in the local environment. Additionally, scripts
 acton script contracts/scripts/deploy.tolk --fork-net testnet
 ```
 
-It is strictly recommended to verify scripts using `--fork-net` before executing them in the real network.
+It is strongly recommended to verify scripts with `--fork-net` before executing them on a real network.
 
 ### Run a script against a real network
 
-If `--net` flag is passed, then all messages sent by `net.send()` and `net.sendExternal()` will be applied to real network.
+If the `--net` flag is passed, all messages sent by `net.send()` and `net.sendExternal()` will be applied to the real network.
 
 ```acton-cli
 acton script contracts/scripts/increase.tolk --net testnet
@@ -709,7 +709,7 @@ See the [verification guide](/docs/verify) for more.
 
 ## Manage on-chain libraries
 
-The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in one masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
+The counter template does not need on-chain libraries, but larger contracts often use them to keep reusable code in a single masterchain account and reference it from many deployments. When a contract dependency in `Acton.toml` uses `kind = "library_ref"`, publish that dependency first with [`acton library`](/docs/commands/library), then build and deploy the contracts that reference it.
 
 Publish a configured contract as a library:
 
@@ -743,10 +743,6 @@ Acton provides several development skills for AI agents to help browse the docum
 See the [agent skills overview](/docs/agent-skills/overview) for more.
 
 ### Inspect remote state
-
-<Callout>
-  To inspect state of contracts deployed to testnet or mainnet without an AI agent, use blockchain explorers such as [Tonscan](https://tonscan.org/).
-</Callout>
 
 Use [`acton rpc`](/docs/commands/rpc) to query remote blockchain account and contract state via TON Center APIs:
 
