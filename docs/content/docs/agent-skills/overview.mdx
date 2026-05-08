@@ -3,42 +3,49 @@ title: "Overview"
 description: "Install coding-agent skills for Acton, Tolk, TON, and FunC-to-Tolk workflows"
 ---
 
-import {Callout} from "fumadocs-ui/components/callout";
-
-Acton dev skills are reusable instructions for coding agents working on TON smart contracts. They help the agent choose the right docs, commands, project layout, and safety checks before editing code.
+Acton development skills are reusable instructions for coding agents working on TON smart contracts. They help the agent choose the right docs, commands, project layout, and safety checks before editing code. All skills follow the [Agent Skills specification](https://agentskills.io/home).
 
 <Callout type="info">
-    Skills guide the assistant, but they do not replace local validation. For project changes, still run the relevant Acton commands such as `acton build`, `acton test`, `acton check`, and `acton fmt --check`.
+    Skills guide the assistant, but they do not replace local validation. For project changes, run the relevant Acton commands such as `acton build`, `acton test`, `acton check`, and `acton fmt --check`.
 </Callout>
 
 ## Available skills
 
-- `acton`: Use for Acton CLI workflows: installation and updates, project scaffolding, `Acton.toml` configuration, builds, single-file compilation, wrapper generation, tests, scripts, wallets, verification, RPC inspection, libraries, linting, formatting, hooks, IDE support, and troubleshooting.
-- `tolk`: Use for writing, reviewing, debugging, and testing Tolk smart contracts. It focuses on typed storage and message schemas, union dispatch, auto-serialization, typed maps, explicit bounce and fee behavior, standard getter shapes, and focused contract tests.
-- `func2tolk`: Use when porting FunC contracts to idiomatic Tolk. It combines `acton func2tolk` with a compatibility pass for TL-B layouts, opcodes, errors, send modes, bounce behavior, typed Tolk refactors, wrappers, tests, scripts, and verification.
-- `ton-blockchain`: Use for TON ecosystem context and standards. It sends the agent to primary TON Docs for TL-B, TVM, cells, BoC, Jettons, wallets, TON Connect, workchains, shardchains, liteservers, and other blockchain concepts.
+- `acton` — Use for Acton CLI workflows: installation and updates, project scaffolding, `Acton.toml` configuration, builds, single-file compilation, wrapper generation, tests, scripts, wallets, verification, RPC inspection, libraries, linting, formatting, hooks, IDE support, and troubleshooting.
+- `tolk` — Use for writing, reviewing, debugging, and testing Tolk smart contracts. It focuses on typed storage and message schemas, union dispatch, auto-serialization, typed maps, explicit bounce and fee behavior, standard getter shapes, and focused contract tests.
+- [`func2tolk`](/docs/agent-skills/func2tolk) — Use for porting FunC contracts to idiomatic Tolk. It combines `acton func2tolk` with a compatibility pass for TL-B layouts, opcodes, errors, send modes, bounce behavior, typed Tolk refactors, wrappers, tests, scripts, and verification.
+- `ton-blockchain` — Use for TON ecosystem context and standards. It directs the agent to the primary TON documentation for TL-B, TVM, cells, BoCs, jettons (tokens), wallets, TON Connect, workchains, shardchains, liteservers, and other blockchain concepts.
 
 ## Installation
 
-TODO: better commands
+Use `npx skills add -g` to install Acton skills globally:
 
-Install the Acton skill globally using `npx skills`:
+```bash
+npx skills add -g https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+```
+
+Remove the `-g` flag to install skills locally in the current Acton project:
 
 ```bash
 npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
 ```
 
-Install the other skills individually the same way by changing the final path:
+Pass `-a <AGENT_NAME>` to install skills for a specific agent only:
 
 ```bash
-npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/tolk
+# Codex
+npx skills add -a codex https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
+
+# Claude Code
+npx skills add -a claude-code https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/
 ```
 
-Or for the specific agent:
+After installation, mention a skill by name in the coding-agent prompt, for example `$acton`, `$tolk`, `$ton-blockchain`, or `$func2tolk`.
+
+## Updates
+
+To update skills, run `npx skills update` followed by the skill name:
 
 ```bash
-npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/ton-blockchain -g -a codex -y
-npx skills add https://github.com/ton-blockchain/acton-contracts/tree/skills/skills/func2tolk -g -a claude-code -y
+npx skills update func2tolk
 ```
-
-After installation, mention a skill by name in your coding-agent prompt, for example `$acton`, `$tolk`, `$ton-blockchain`, or `$func2tolk`.
