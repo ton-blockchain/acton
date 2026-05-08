@@ -69,7 +69,7 @@ Install the npm workspace dependencies before running any frontend commands:
 npm ci
 ```
 
-The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [acton wallet](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
+The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [`acton wallet`](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
 
 ```acton-cli
 acton run deploy-emulation --net testnet
@@ -608,7 +608,7 @@ It is strongly recommended to verify scripts with `--fork-net` before executing 
 
 If the `--net` flag is passed, all messages sent by `net.send()` and `net.sendExternal()` will be applied to the real network.
 
-```acton-cli
+```bash
 acton script contracts/scripts/increase.tolk --net testnet
 ```
 
