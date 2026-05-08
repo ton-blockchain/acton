@@ -33,6 +33,17 @@ OPTIONS
            If omitted, Acton auto-selects the only configured wallet or prompts
            when multiple wallets are available.
 
+       --tonconnect
+           Use TON Connect wallet approval for the verification transaction.
+
+           This uses the wallet selected in the browser and conflicts with
+           --wallet.
+
+       --tonconnect-port port
+           Local TON Connect page port.
+
+           Defaults to 52258.
+
        --compiler-version version
            Tolk compiler version to request on the verifier side.
 
@@ -101,7 +112,8 @@ PREREQUISITES
 
        o  verifier backend availability for the selected network
 
-       o  a configured wallet, funded when not using --dry-run
+       o  a configured wallet or TON Connect wallet, funded when not using
+          --dry-run
 
        o  reproducible compiler settings that match the deployed contract
 
@@ -116,6 +128,9 @@ CONTRACT AND WALLET SELECTION
 
        o  if multiple wallets are configured, Acton prompts for the wallet
 
+       o  if --tonconnect is used, Acton skips local wallet selection and uses
+          the wallet selected in the TON Connect page
+
 REQUIREMENTS AND LIMITATIONS
        o  only .tolk sources can be verified
 
@@ -123,7 +138,8 @@ REQUIREMENTS AND LIMITATIONS
 
        o  localnet and custom:<name> are not supported by verifier backends
 
-       o  verification requires a funded wallet when not using --dry-run
+       o  verification requires a funded local or TON Connect wallet when not
+          using --dry-run
 
        o  if a contract with the same code hash is already verified, the
           backend may skip the final transaction
@@ -179,6 +195,15 @@ DRY RUN
        --dry-run still compiles the contract, uploads sources to the verifier
        backend, and collects the required signatures. It skips only the final
        blockchain transaction.
+
+TON CONNECT
+       Use --tonconnect to approve the final verification transaction through a
+       TON Connect wallet instead of a wallet configured in wallets.toml:
+
+           acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+
+       Acton starts a local TON Connect page and opens it in the browser. Use
+       --tonconnect-port when the default page port is already busy.
 
 RETRIES AND FAILURE HINTS
        o  source upload is attempted up to 8 times total (initial try plus up

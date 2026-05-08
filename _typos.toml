@@ -21,6 +21,7 @@ extend-exclude = [
 
 [default]
 extend-ignore-re = [
+  "\\b[a-zA-Z0-9_+/\\-]{48,}\\b", # user-friendly addresses
   "\\bADDD\\b",
   "\\bTrUe\\b",
   "\\balse\\b",

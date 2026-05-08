@@ -24,24 +24,6 @@ async function validateExternalLinks() {
 }
 
 function whitelist(url: string): boolean {
-  if (url.startsWith("http://localhost")) {
-    return true
-  }
-
-  if (url.startsWith("https://github.com/ton-blockchain/acton")) {
-    return true
-  }
-
-  // TODO(danil42russia): remove after release
-  if (url.startsWith("https://github.com/ton-blockchain/setup-acton")) {
-    return true
-  }
-
-  // TODO(danil42russia): remove after release
-  if (url.startsWith("https://github.com/i582/acton-public/releases")) {
-    return true
-  }
-
   return false
 }
 
@@ -56,10 +38,20 @@ async function validateExternalUrl(url: URL): Promise<ExternalLinkResult> {
   }
 }
 
+function toRedirectMode(url: URL): RequestRedirect {
+  // The latest release can be accessed via a redirect from 'latest'
+  if (url.href.startsWith("https://github.com/ton-blockchain/acton/releases/latest")) {
+    return "follow"
+  }
+
+  return "manual"
+}
+
 async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
+  const redirectMode = toRedirectMode(url)
   const response = await fetch(url, {
     method: "GET",
-    redirect: "manual",
+    redirect: redirectMode,
     signal: AbortSignal.timeout(externalLinkTimeoutMs),
   })
 

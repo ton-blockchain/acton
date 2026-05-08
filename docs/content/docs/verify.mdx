@@ -12,7 +12,7 @@ This guide covers verification for deployed contracts on `testnet` and `mainnet`
 
 Prepare these inputs before running `acton verify`:
 
-- a [wallet configured in Acton](/docs/wallets)
+- a [wallet configured in Acton](/docs/wallets) or a TON Connect wallet
 - a deployed `.tolk` contract that is defined in `Acton.toml`
 - [at least 1 Toncoin on the wallet](/docs/wallets#fund-a-wallet-on-testnet) to cover the final verification transaction when not using `--dry-run`
 
@@ -58,6 +58,16 @@ acton verify Counter --address EQDt7LL... --wallet deployer
 If exactly one wallet is configured, Acton selects it automatically. If multiple wallets are available and `--wallet` is omitted, Acton prompts for the selection.
 
 When `--dry-run` is not used, the final verification transaction sends `0.1 TON`. If the verifier backend reports that the same code hash is already verified, Acton exits successfully without sending another transaction.
+
+## Use TON Connect for the verification transaction
+
+Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
+
+```bash
+acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
+```
+
+Acton starts a local TON Connect page and opens it in the browser. If the default page port is busy, pass `--tonconnect-port <PORT>`.
 
 ## Check the verifier flow without sending the transaction
 

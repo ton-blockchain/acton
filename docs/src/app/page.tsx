@@ -19,18 +19,19 @@ import {InlineInstallationCommand} from "@/components/InstallationCodeBlock"
 import {LandingVideo} from "@/components/LandingVideo"
 import logoDark from "@/public/logo-dark.svg"
 
-const landingOgImage = "/og/home/image.png"
+const landingUrl = "https://ton-blockchain.github.io/acton"
+const landingOgImage = `${landingUrl}/og/home/image.png`
 
 export const metadata: Metadata = {
   title: "Acton — TON Development Toolkit",
   description:
     "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
-  metadataBase: new URL("https://ton-blockchain.github.io/acton"),
+  metadataBase: new URL(landingUrl),
   openGraph: {
     title: "Acton — TON Development Toolkit",
     description:
       "Acton is a blazingly fast toolkit, test runner, build system, formatter, and verifier for TON smart contract development.",
-    url: "https://ton-blockchain.github.io/acton",
+    url: landingUrl,
     images: landingOgImage,
     locale: "en_US",
     type: "website",
@@ -208,6 +209,52 @@ const HEADER_ICON_LINKS: {
 ]
 
 export default function Home() {
+  return <ReleaseAnnouncement />
+}
+
+function ReleaseAnnouncement() {
+  return (
+    <main className="min-h-screen overflow-hidden bg-[#0f1115] text-[#f8f8f4]">
+      <section className="relative flex min-h-screen items-center justify-center px-5 py-12 sm:px-8">
+        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(255,255,255,0.045)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:28px_28px]" />
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#9AE7FF]/70 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#2D83EC]/70 to-transparent" />
+
+        <div className="relative w-full max-w-5xl">
+          <div className="mb-8 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Image
+                src={logoDark}
+                alt="Acton logo"
+                width={36}
+                height={36}
+                className="h-9 w-9 rounded-md"
+                priority
+              />
+              <span className="text-lg font-semibold tracking-tight text-white">Acton</span>
+            </div>
+            <span className="rounded-full border border-[#9AE7FF]/30 bg-[#9AE7FF]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]">
+              May 11
+            </span>
+          </div>
+
+          <div className="border-y border-white/12 py-12 sm:py-16 md:py-20">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#9AE7FF]/80">
+              Release is coming
+            </p>
+            <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[0.98] text-white sm:text-7xl md:text-[6.5rem]">
+              Launching on
+              <br />
+              May 11
+            </h1>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
+}
+
+export function LandingHome() {
   return (
     <div className="home-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#f7f7f2]">
       <SiteHeader />

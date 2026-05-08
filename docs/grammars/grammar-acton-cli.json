@@ -16,6 +16,9 @@
       "include": "#comments"
     },
     {
+      "include": "#diff"
+    },
+    {
       "include": "#stages"
     },
     {
@@ -110,6 +113,29 @@
               "name": "support.type.acton-cli"
             }
           }
+        }
+      ]
+    },
+    "diff": {
+      "patterns": [
+        {
+          "match": "^(Diff in )(.+)(:)$",
+          "captures": {
+            "1": {
+              "name": "support.type.acton-cli"
+            },
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^\\+.*$",
+          "name": "markup.inserted.acton-cli"
+        },
+        {
+          "match": "^-.*$",
+          "name": "markup.deleted.acton-cli"
         }
       ]
     },
@@ -377,7 +403,7 @@
     "keyValue": {
       "patterns": [
         {
-          "match": "^(\\s+)(Project name:|Description:|Template:|License:|Enter license:)(\\s+)(.+)$",
+          "match": "^(\\s+)(Project name:|Description:|Template:|TypeScript app:|License:|Enter license:)(\\s+)(.+)$",
           "captures": {
             "2": {
               "name": "comment.line.acton-cli"
