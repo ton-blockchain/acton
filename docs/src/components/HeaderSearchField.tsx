@@ -15,7 +15,7 @@ export function HeaderSearchField() {
         onClick={() => setOpenSearch(true)}
       >
         <Search className="h-4 w-4 shrink-0" />
-        <span>Search</span>
+        <span>Search docs</span>
         <span className="ml-auto inline-flex gap-0.5">
           {hotKey.map((key, index) => (
             <kbd

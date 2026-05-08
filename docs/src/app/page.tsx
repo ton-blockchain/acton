@@ -6,12 +6,21 @@ import {
   BookOpen,
   Bot,
   Bug,
+  Check,
   CodeXml,
+  Dna,
   FileCode,
   FlaskConical,
+  Gauge,
+  GitFork,
   Github,
+  Library,
   MonitorPlay,
+  ScanSearch,
+  Shuffle,
+  Terminal,
   Wallet,
+  Workflow,
 } from "lucide-react"
 import type {ComponentType, ReactNode, SVGProps} from "react"
 import {HeaderSearchField} from "@/components/HeaderSearchField"
@@ -47,8 +56,10 @@ export const metadata: Metadata = {
 
 interface FeatureWithVideo {
   title: string
+  highlight: string
   description: string
   description2: string
+  icon: ComponentType<SVGProps<SVGSVGElement>>
   url: string
 }
 
@@ -56,54 +67,72 @@ interface FeatureBelow {
   title: string
   description: string
   docLink: string
+  label: string
+  icon: ComponentType<SVGProps<SVGSVGElement>>
+  className: string
+  featured?: boolean
 }
 
 const VIDEO_FEATURES: FeatureWithVideo[] = [
   {
     title: "Native Tolk Tests",
+    highlight: "Tolk",
     description:
-      "Use Tolk itself for testing. Unit tests, transaction flows, and cross-contract interaction — without switching languages.",
-    description2: "50x faster than TypeScript + JS sandbox.",
+      "Use Tolk itself for testing. Unit tests, transaction flows, and cross‑contract interaction — without switching languages.",
+    description2: "50x faster than TypeScript + JS sandbox.",
+    icon: FlaskConical,
     url: "https://cdn.tapps.ninja/tolk/final-1.mov",
   },
   {
     title: "dApp-ready contracts",
-    description: "Generate TypeScript wrappers for frontend and end-to-end testing.",
-    description2: "TON Connect and AppKit as the UI — Tolk and TON Blockchain as the backend.",
+    highlight: "dApp-ready",
+    description: "Generate TypeScript wrappers for frontend and end‑to‑end testing.",
+    description2: "TON Connect and React as the UI — Tolk and TON Blockchain as the backend.",
+    icon: CodeXml,
     url: "https://cdn.tapps.ninja/tolk/final-2.mov",
   },
   {
     title: "Friendly for AI agents",
+    highlight: "AI agents",
     description:
-      "Skills and manuals available out of the box. Acton is a modern CLI tool that becomes an agent's runtime.",
-    description2: "Built for humans — perfect for AI.",
+      "Skills and manuals available out of the box. Acton is a modern CLI tool that becomes an agent's runtime.",
+    description2: "Built for humans — perfect for AI.",
+    icon: Bot,
     url: "https://cdn.tapps.ninja/tolk/final-3.mov",
   },
   {
     title: "Debugger, done right",
+    highlight: "Debugger",
     description:
-      "Test failed with exit code 9? Stop exactly at the exception, inspect the call stack, local variables, lazy fields, and more.",
-    description2: "Works for fully-optimized production contracts, in all IDEs.",
+      "Test failed with exit code 9? Stop exactly at the exception, inspect the call stack, local variables, lazy fields, and more.",
+    description2: "Works for fully‑optimized production contracts, in all IDEs.",
+    icon: Bug,
     url: "https://cdn.tapps.ninja/tolk/final-4.mov",
   },
   {
     title: "Faucet and deployment",
+    highlight: "Faucet",
     description:
-      "Not only develop, but deploy, verify, and configure your contracts. Acton manages wallets and faucet top-ups on testnet.",
-    description2: "Arbitrary on-chain scripts — just using Tolk.",
+      "Not only develop, but deploy, verify, and configure your contracts. Acton manages wallets and faucet top‑ups on testnet.",
+    description2: "Arbitrary on‑chain scripts — just using Tolk.",
+    icon: Wallet,
     url: "https://cdn.tapps.ninja/tolk/final-5.mov",
   },
   {
     title: "IDE integration",
-    description: "Linter and formatter to keep code style consistent. All rules are configurable.",
-    description2: "VS Code, JetBrains, Cursor, Helix, Zed, (Neo)Vim, and other LSP-based editors.",
+    highlight: "IDE",
+    description: "Linter and formatter to keep code style consistent. All rules are configurable.",
+    description2: "VS Code, JetBrains, Cursor, Zed, and other LSP‑based editors.",
+    icon: FileCode,
     url: "https://cdn.tapps.ninja/tolk/final-6.mov",
   },
   {
     title: "Test UI: visualize traces",
+    highlight: "Test UI",
     description:
-      "Inspect transaction trees, messages, fees, storage changes — for every test, in a clean dev-oriented UI.",
-    description2: "Raw binary data decoded based on Tolk ABI.",
+      "Inspect transaction trees, messages, fees, storage changes — for every test, in a clean dev‑oriented UI.",
+    description2: "Raw binary data decoded based on Tolk ABI.",
+    icon: MonitorPlay,
     url: "https://cdn.tapps.ninja/tolk/final-7.mov",
   },
 ]
@@ -114,89 +143,76 @@ const BELOW_FEATURES: FeatureBelow[] = [
     description:
       "Stress the suite by flipping operators, values, and branches to reveal weak checks and untested invariants.",
     docLink: "/docs/testing/mutation-testing/overview",
+    label: "Suite strength",
+    icon: Dna,
+    className: "",
+    featured: true,
   },
   {
     title: "Coverage reports",
     description:
       "Track line and branch coverage, inspect colorful reports in Test UI, and export LCOV for external tooling.",
     docLink: "/docs/testing/code-coverage",
+    label: "Reports",
+    icon: ScanSearch,
+    className: "",
+    featured: true,
   },
   {
     title: "Fork testing",
     description:
       "Run tests against real mainnet state by automatically pulling deployed accounts into the local emulator.",
     docLink: "/docs/testing/fork-testing",
-  },
-  {
-    title: "Fuzz testing",
-    description:
-      "Re-run parameterized tests with generated inputs, assumptions, bounds, and reproducible seeds until the first failure.",
-    docLink: "/docs/testing/fuzz-testing",
+    label: "Mainnet state",
+    icon: GitFork,
+    className: "",
   },
   {
     title: "Gas profiling",
     description:
       "Snapshot transaction-chain gas usage, compare against baselines, and catch fee regressions before they ship.",
     docLink: "/docs/testing/gas-profiling-with-snapshots",
+    label: "Fee regressions",
+    icon: Gauge,
+    className: "",
+  },
+  {
+    title: "Fuzz testing",
+    description:
+      "Re-run parameterized tests with generated inputs, assumptions, bounds, and reproducible seeds until the first failure.",
+    docLink: "/docs/testing/fuzz-testing",
+    label: "Generated inputs",
+    icon: Shuffle,
+    className: "",
   },
   {
     title: "Scripting",
     description:
       "Use Tolk for local experiments, deployment flows, and real blockchain interaction with familiar testing primitives.",
     docLink: "/docs/scripting/overview",
+    label: "Automation",
+    icon: Terminal,
+    className: "",
   },
   {
     title: "CI integration",
     description:
       "Wire Acton into GitHub Actions or GitLab CI for builds, tests, checks, coverage, and secret-backed jobs.",
     docLink: "/docs/ci-setup",
+    label: "Pipelines",
+    icon: Workflow,
+    className: "",
   },
   {
     title: "Masterchain libraries",
     description:
       "Publish reusable code to the Masterchain, track storage runway, top it up, and refer to it in tests and scripts.",
     docLink: "/docs/libraries",
+    label: "Reusable code",
+    icon: Library,
+    className: "",
   },
 ]
-
-const FEATURE_TITLE_ACCENTS: Record<string, string> = {
-  "Native Tolk Tests": "Tolk",
-  "dApp-ready contracts": "dApp-ready",
-  "Friendly for AI agents": "AI",
-  "Debugger, done right": "Debugger",
-  "Faucet and deployment": "Faucet",
-  "IDE integration": "IDE",
-  "Test UI: visualize traces": "Test UI",
-}
-
-const FEATURE_ICONS: Record<
-  string,
-  {
-    icon: ComponentType<SVGProps<SVGSVGElement>>
-  }
-> = {
-  "Native Tolk Tests": {
-    icon: FlaskConical,
-  },
-  "dApp-ready contracts": {
-    icon: CodeXml,
-  },
-  "Friendly for AI agents": {
-    icon: Bot,
-  },
-  "Debugger, done right": {
-    icon: Bug,
-  },
-  "Faucet and deployment": {
-    icon: Wallet,
-  },
-  "IDE integration": {
-    icon: FileCode,
-  },
-  "Test UI: visualize traces": {
-    icon: MonitorPlay,
-  },
-}
 
 const HEADER_ICON_LINKS: {
   href: string
@@ -259,122 +275,144 @@ export function LandingHome() {
     <div className="home-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#f7f7f2]">
       <SiteHeader />
       <main>
-        <section className="mx-auto max-w-[1500px] px-3 pt-8 sm:px-4 sm:pt-14 md:px-8 lg:px-10">
-          <div className="home-hero-panel border-x border-t border-white/10">
-            <div className="px-4 py-10 sm:px-8 sm:pb-12 sm:pt-14 lg:px-12 lg:pb-14 lg:pt-16">
-              <Link
-                href="/docs/welcome"
-                className="mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-[#1AC9FF]/45 bg-[#2D83EC]/10 px-3 py-1.5 text-xs font-medium text-[#9AE7FF] transition-colors hover:bg-[#2D83EC]/15"
-              >
-                <span className="h-1.5 w-1.5 rounded-full bg-[#1AC9FF]" />
-                Acton 1.0 and Tolk 1.4 is here
-                <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
-
-              <h1 className="max-w-5xl text-[2.3rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-6xl sm:leading-[1.04] lg:text-[4.9rem] xl:text-[5.8rem]">
-                Everything You Need to Build Contracts on{" "}
-                <span className="text-[#9AE7FF]">TON</span>
-              </h1>
-              <p className="mt-6 max-w-2xl text-lg leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
-                <span className="font-semibold text-[#9AE7FF]">Acton</span> is an all-in-one TON
-                smart contract development toolkit with blazingly fast feedback loops for building,
-                testing, debugging, scripting, deployment, and many more.
-              </p>
-
-              <div className="mt-8 space-y-4 sm:mt-10">
-                <p className="text-xs font-semibold uppercase text-[#8b8a82]">
-                  Get started in 30 seconds
-                </p>
-                <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
-                  <InlineInstallationCommand />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
-            <div className="max-w-3xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
-                From zero to testnet
-              </p>
-              <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
-                2-minute walkthrough
-              </h2>
-              <p className="mt-5 text-lg leading-7 text-[#c7c6bf] sm:mt-6 sm:text-xl sm:leading-8">
-                Tiny Acton workshop: create a project, launch tests, guide through essential
-                features, airdrop TONs to your wallet, and deploy a contract to TON Blockchain.
-              </p>
-            </div>
-
-            <div className="mt-8 overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#0c0c0c] shadow-[0_24px_80px_rgba(0,0,0,0.28)] sm:mt-10 sm:rounded-[1.75rem]">
-              <div className="flex aspect-video items-center justify-center border-b border-white/8 bg-[linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(180deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:24px_24px] px-4 text-center sm:px-8">
-                <div className="max-w-2xl">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#77766f]">
-                    Placeholder
+        <section className="mx-auto max-w-[1400px] px-3 pt-8 sm:px-4 sm:pt-14 md:px-8 lg:px-10">
+          <div className="home-hero-panel relative overflow-hidden border-x border-t border-white/10">
+            <div className="relative z-10 px-10 pb-[21rem] pt-10 sm:px-8 sm:pb-[28rem] sm:pt-14 lg:px-12 lg:pb-28 lg:pt-16 xl:pb-32">
+              <div className="mx-auto w-full">
+                <div className="max-w-[58rem]">
+                  <Link
+                    href="https://t.me/durov/501"
+                    target="_blank"
+                    className="group mb-8 inline-flex w-fit items-center gap-2 rounded-full border border-[#1AC9FF]/45 bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[#9AE7FF] transition-colors hover:border-[#9AE7FF]/70 hover:bg-[#9AE7FF]/10 hover:text-[#c9f4ff]"
+                  >
+                    MTONGA plan
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </Link>
+                  <h1 className="text-[2.3rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-[2.8rem] sm:leading-[1.04] lg:text-[3.4rem] xl:text-[4rem]">
+                    A unified toolchain for{" "}
+                    <span className="text-[#9AE7FF]">TON&nbsp;smart&nbsp;contracts</span>
+                  </h1>
+                  <p className="mt-6 max-w-2xl text-lg leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
+                    <span className="font-semibold text-[#9AE7FF]">Acton</span> is an all-in-one CLI
+                    built around <span className="font-semibold text-[#9AE7FF]">Tolk</span>
+                    &nbsp;—&nbsp;from project creation to tests, debugging, dApp&nbsp;integration,
+                    deployment, and verification.
                   </p>
-                  <h3 className="mt-4 text-2xl font-semibold leading-tight text-[#f4f4ef] md:text-5xl">
-                    I will record this video the next week
-                  </h3>
+                  <p className="mt-6 max-w-2xl text-lg leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
+                    Built for humans.{" "}
+                    <span className="font-semibold text-[#9AE7FF]">Perfect for AI.</span>
+                  </p>
+
+                  <div className="mt-10 space-y-4 sm:mt-14">
+                    <p className="text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82]">
+                      Installation
+                    </p>
+                    <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
+                      <InlineInstallationCommand />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
+            <div className="pointer-events-none absolute -bottom-6 left-4 right-[-10rem] z-0 sm:-bottom-10 sm:left-8 sm:right-[-12rem] lg:bottom-[-4.5rem] lg:left-auto lg:right-[-5.5rem] lg:w-[62%] xl:right-[-2rem] xl:w-[60%]">
+              <Image
+                src="/landing/hero-ide.png"
+                alt=""
+                width={1436}
+                height={1096}
+                className="h-auto w-full opacity-60"
+                priority
+              />
+              <div
+                className="pointer-events-none absolute inset-y-0 left-10 w-50 bg-gradient-to-r from-[#121212] to-transparent"
+                aria-hidden="true"
+              />
+            </div>
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[#121212] to-transparent"
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute inset-x-0 -bottom-5 h-40 bg-gradient-to-b from-transparent to-[#121212]"
+              aria-hidden="true"
+            />
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+        <section className="mx-auto max-w-[1400px] px-3 sm:px-4 md:px-8 lg:px-10">
+          <div className="border-x border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Essential features"
               title={
                 <>
-                  A unified toolchain for <span className="text-[#9AE7FF]">TON</span>
+                  The <span className="text-[#9AE7FF]">on-chain workflow</span> reimagined
                 </>
               }
-              description="Not another small utility. Not another isolated CLI. A full development environment built as one coherent system around Tolk."
+              description="A full development environment built as one coherent system"
             />
 
-            <div className="mt-8 space-y-10 sm:mt-14">
+            <div className="mt-8 space-y-14 sm:mt-24 sm:space-y-16 lg:space-y-20">
               {VIDEO_FEATURES.map((feature, index) => {
                 const reversed = index % 2 === 1
+                const Icon = feature.icon
+                const highlightIndex = feature.title.indexOf(feature.highlight)
 
                 return (
                   <article
                     key={feature.title}
-                    className="grid overflow-hidden rounded-[1.25rem] border border-white/10 bg-fd-background sm:rounded-[1.75rem] lg:grid-cols-2"
+                    className={`feature-video-card ${
+                      reversed
+                        ? "feature-video-card--video-left"
+                        : "feature-video-card--video-right"
+                    } grid overflow-hidden bg-fd-background ${
+                      reversed ? "lg:grid-cols-[60%_40%]" : "lg:grid-cols-[40%_60%]"
+                    }`}
                   >
-                    <div
-                      className={`flex flex-col justify-start p-5 py-10 sm:p-8 lg:min-h-[440px] lg:p-10 ${
-                        reversed ? "lg:order-2" : ""
-                      }`}
-                    >
+                    <div className={`feature-copy-panel ${reversed ? "lg:order-2" : ""}`}>
                       <div
-                        className={
+                        className={`flex h-full flex-col justify-start pt-12 sm:pt-14 lg:min-h-[360px] lg:pt-14 xl:min-h-[440px] xl:pt-20 ${
                           reversed
-                            ? "lg:ml-auto lg:mt-10 lg:max-w-xl lg:text-right"
-                            : "max-w-xl lg:mt-10"
-                        }
+                            ? "pl-5 pr-10 lg:pl-7 lg:pr-12 xl:pr-14"
+                            : "pl-10 pr-5 lg:pl-12 lg:pr-7 xl:pl-14"
+                        }`}
                       >
-                        <div className={`mb-5 flex ${reversed ? "lg:justify-end" : ""}`}>
-                          <FeatureIcon title={feature.title} />
+                        <div
+                          className={
+                            reversed
+                              ? "max-w-[25rem] lg:ml-auto lg:mr-0 lg:text-right"
+                              : "max-w-[25rem] lg:ml-0 lg:mr-auto"
+                          }
+                        >
+                          <div className={`mb-5 flex ${reversed ? "lg:justify-end" : ""}`}>
+                            <span className="inline-flex text-[#9AE7FF]">
+                              <Icon className="h-9 w-9" strokeWidth={1.8} />
+                            </span>
+                          </div>
+                          <h3
+                            className={`text-3xl font-semibold leading-tight text-[#f4f4ef] sm:text-[2.15rem] lg:whitespace-nowrap xl:text-[2.6rem] ${
+                              reversed ? "lg:-ml-16 xl:-ml-24" : ""
+                            }`}
+                          >
+                            {feature.title.slice(0, highlightIndex)}
+                            <span className="text-[#9AE7FF]">{feature.highlight}</span>
+                            {feature.title.slice(highlightIndex + feature.highlight.length)}
+                          </h3>
+                          <p className="mt-4 text-base leading-5 text-[#c7c6bf] xl:mt-5 xl:text-lg xl:leading-6">
+                            {feature.description}
+                          </p>
+                          <p className="mt-3 text-base leading-5 text-[#c7c6bf] xl:mt-4 xl:text-lg xl:leading-6">
+                            {feature.description2}
+                          </p>
                         </div>
-                        <h3 className="text-3xl font-semibold leading-tight text-[#f4f4ef] sm:text-[2.75rem]">
-                          <FeatureTitle title={feature.title} />
-                        </h3>
-                        <p className="mt-6 text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8">
-                          {feature.description}
-                        </p>
-                        <p className="mt-5 text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8">
-                          {feature.description2}
-                        </p>
                       </div>
                     </div>
 
                     <div className={reversed ? "lg:order-1" : ""}>
-                      <div className="feature-video-panel min-h-[240px] sm:min-h-[380px] lg:min-h-[440px]">
+                      <div className="feature-video-panel min-h-[240px] sm:min-h-[340px] lg:min-h-[360px] xl:min-h-[440px]">
                         <LandingVideo
-                          className="feature-video"
+                          className={`feature-video ${
+                            reversed ? "feature-video--align-left" : "feature-video--align-right"
+                          }`}
                           controls
                           controlsList="nodownload noplaybackrate"
                           playLabel={`Play ${feature.title} video`}
@@ -390,10 +428,8 @@ export function LandingHome() {
                 )
               })}
             </div>
-          </div>
-        </section>
 
-        <section className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
+        <section className="mx-auto mb-16 max-w-[1400px] px-3 sm:mb-20 sm:px-4 md:px-8 lg:px-10">
           <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Extra depth"
@@ -402,146 +438,184 @@ export function LandingHome() {
                   <span className="text-[#9AE7FF]">More</span> than the happy path
                 </>
               }
-              description="Several principle features that allow dive deep into contract development. Focused on security, error prevention, and gas optimization."
+              description="Deep dive into security, error prevention, and gas optimization"
             />
 
-            <div className="mt-8 grid gap-px overflow-hidden rounded-[1.25rem] border border-white/10 bg-white/10 sm:mt-10 sm:rounded-[1.75rem] md:grid-cols-2 xl:grid-cols-4">
-              {BELOW_FEATURES.map(feature => (
-                <Link
-                  key={feature.title}
-                  href={feature.docLink}
-                  className="group min-h-[220px] bg-[#121212] p-5 text-left transition-colors hover:bg-[#111110] sm:min-h-[280px] sm:p-7"
-                >
-                  <div className="flex h-full flex-col">
-                    <h3 className="text-2xl font-semibold leading-tight text-[#f4f4ef]">
-                      {feature.title}
-                    </h3>
-                    <p className="mt-5 text-base leading-7 text-[#c7c6bf]">{feature.description}</p>
-                    <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]">
-                      Read in docs
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </span>
-                  </div>
-                </Link>
-              ))}
+            <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:mt-16 md:grid-cols-2">
+              {BELOW_FEATURES.map(feature => {
+                const Icon = feature.icon
+
+                return (
+                  <Link
+                    key={feature.title}
+                    href={feature.docLink}
+                    className={`group relative min-h-[220px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] p-5 text-left transition duration-200 hover:border-[#9AE7FF]/35 hover:bg-white/[0.04] sm:p-6 ${
+                      feature.featured ? "sm:min-h-[250px]" : "sm:min-h-[230px]"
+                    } ${feature.className}`}
+                  >
+                    <span
+                      className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(154,231,255,0.12),transparent_34%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                    <div className="relative flex h-full flex-col">
+                      <div className="mb-4 flex items-start justify-between gap-4">
+                        <span className="inline-flex shrink-0 items-center justify-start text-[#9AE7FF]">
+                          <Icon
+                            className={feature.featured ? "h-6 w-6" : "h-5 w-5"}
+                            strokeWidth={1.8}
+                          />
+                        </span>
+                        <span className="pt-1 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#65645f]">
+                          {feature.label}
+                        </span>
+                      </div>
+
+                      <h3
+                        className={`font-semibold leading-tight text-[#f4f4ef] ${
+                          feature.featured ? "text-3xl sm:text-[2.1rem]" : "text-2xl"
+                        }`}
+                      >
+                        {feature.title}
+                      </h3>
+                      <p
+                        className={`mt-4 text-[#b9b8b1] ${
+                          feature.featured ? "max-w-2xl text-base leading-7" : "text-base leading-6"
+                        }`}
+                      >
+                        {feature.description}
+                      </p>
+                      <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]/65 transition-colors group-hover:text-[#9AE7FF]">
+                        Read in docs
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </section>
 
-        <section className="mx-auto mt-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border border-white/10 bg-fd-background px-4 pb-20 pt-16 sm:px-8 sm:pb-24 sm:pt-18 lg:px-12 lg:pb-28 lg:pt-20">
-            <div className="grid gap-8 sm:gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
-                  FunC migration
-                </p>
-                <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
-                  FunC to <span className="text-[#9AE7FF]">Tolk</span> in one click
-                </h2>
-                <p className="mt-5 max-w-xl text-base leading-7 text-[#c7c6bf] sm:mt-6 sm:text-lg sm:leading-8">
-                  Convert your existing FunC project to Tolk with a single command, and then
-                  iteratively refactor it keeping green tests.
-                </p>
-              </div>
-              <div className="overflow-hidden rounded-xl border border-white/10 bg-fd-background shadow-[0_24px_80px_rgba(0,0,0,0.3)] lg:translate-y-6">
-                <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-4 py-3 sm:px-5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="h-3 w-3 rounded-full bg-[#ff6b6b]" />
-                    <span className="h-3 w-3 rounded-full bg-[#ffd166]" />
-                    <span className="h-3 w-3 rounded-full bg-[#06d6a0]" />
+            <div className="mx-auto mt-20 max-w-6xl sm:mt-28">
+              <p className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82]">
+                <span className="h-px flex-1 bg-white/10" />
+                <span className="shrink-0 px-2">Migration path</span>
+                <span className="h-px flex-1 bg-white/10" />
+              </p>
+              <div className="pt-10 sm:pt-12 lg:pt-16">
+                <div className="grid gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:items-center xl:gap-12">
+                  <div className="max-w-lg">
+                    <h2 className="text-3xl font-semibold leading-[1.04] text-[#f8f8f4] sm:text-5xl">
+                      Migrate <span className="text-[#9AE7FF]">FunC</span> contracts{" "}
+                      <span className="text-[#9AE7FF]">to Tolk</span>
+                    </h2>
+                    <p className="mt-5 text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:text-lg sm:leading-7">
+                      Give an agent your existing FunC + Blueprint project, and it will handle the migration end-to-end.
+                    </p>
+                    <p className="mt-5 text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:text-lg sm:leading-7">
+                      Available via func2tolk <span className="text-[#9AE7FF]">skill</span> for Codex/Claude.
+                    </p>
+
+                    <div className="mt-8 flex flex-wrap items-center gap-x-4 gap-y-3 sm:mt-10">
+                      <Link
+                        href="/docs/commands/func2tolk"
+                        className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
+                      >
+                        Migrate a FunC project
+                        <ArrowRight className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
-                </div>
-                <div className="p-4 sm:p-5">
-                  <pre className="overflow-x-auto font-mono text-sm leading-7">
-                    <code>
-                      <span className="text-[#77766f]">$ </span>
-                      <span className="text-[#9AE7FF]">acton</span>
-                      <span className="text-sky-200"> func2tolk </span>
-                      <span className="text-[#ef8cff]">contracts/</span>
-                      {"\n"}
-                      <span className="text-[#1AC9FF]">✓</span>
-                      <span className="text-[#d8d7cf]"> parsed </span>
-                      <span className="text-sky-200">14</span>
-                      <span className="text-[#d8d7cf]"> FunC files</span>
-                      {"\n"}
-                      <span className="text-[#1AC9FF]">✓</span>
-                      <span className="text-[#d8d7cf]"> generated </span>
-                      <span className="text-sky-200">Tolk</span>
-                      <span className="text-[#d8d7cf]"> contracts</span>
-                      {"\n"}
-                      <span className="text-[#1AC9FF]">✓</span>
-                      <span className="text-[#d8d7cf]"> wrappers are still compatible</span>
-                      {"\n"}
-                      <span className="text-[#1AC9FF]">✓</span>
-                      <span className="text-[#d8d7cf]"> test snapshots match</span>
-                    </code>
-                  </pre>
+
+                  <div className="relative lg:-translate-y-5 xl:-translate-y-5">
+                    <div className="mx-auto max-w-[720px]">
+                      <Image
+                        src="/landing/func2tolk-migration.png"
+                        alt="FunC to Tolk migration diagram"
+                        width={1365}
+                        height={766}
+                        className="h-auto w-full opacity-75"
+                      />
+                    </div>
+
+                    <div className="mx-auto mt-4 grid max-w-[720px] gap-x-6 gap-y-3 sm:grid-cols-2 lg:translate-x-6 xl:translate-x-8">
+                      <div className="flex items-center gap-3 text-sm font-medium leading-5 text-[#aaa9a2] lg:pl-8 xl:pl-12">
+                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <span>Contracts become idiomatic Tolk</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium leading-5 text-[#aaa9a2]">
+                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <span>Fast native code instead of TypeScript</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium leading-5 text-[#aaa9a2] lg:pl-8 xl:pl-12">
+                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <span>Gas consumption goes down</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-sm font-medium leading-5 text-[#aaa9a2]">
+                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <span>Continue developing with green tests</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </section>
 
-        <section className="mx-auto my-4 max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border border-white/10 bg-fd-background px-4 py-10 sm:px-8 lg:px-12">
-            <div className="flex flex-col items-center gap-6 text-center sm:gap-8">
-              <div className="flex flex-col items-center">
-                <h2 className="text-3xl font-semibold text-[#f8f8f4] sm:text-4xl">
-                  Ready to build?
-                </h2>
-                <p className="mt-3 text-[#c7c6bf]">Install Acton and start from the docs.</p>
-              </div>
-              <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
-                <InlineInstallationCommand />
-              </div>
-              <div className="flex flex-wrap justify-center gap-3">
-                <Link
-                  href="/docs/welcome"
-                  className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-white/90"
-                >
-                  Get Started
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="https://github.com/ton-blockchain/acton"
-                  target="_blank"
-                  className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
-                >
-                  <Github className="h-4 w-4" />
-                  GitHub
-                </Link>
+            <div className="mx-auto mt-20 max-w-6xl sm:mt-28">
+              <SectionHeader
+                eyebrow="Start building"
+                title="Ready to build?"
+                description="Install Acton and start from the docs."
+              />
+              <div className="mt-10 flex flex-col items-center gap-8 text-center sm:mt-12 sm:gap-10">
+                <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
+                  <InlineInstallationCommand />
+                </div>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <Link
+                    href="/docs/welcome"
+                    className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-white/90"
+                  >
+                    Get Started
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href="https://github.com/ton-blockchain/acton"
+                    target="_blank"
+                    className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
+                  >
+                    <Github className="h-4 w-4" />
+                    GitHub
+                  </Link>
+                </div>
               </div>
             </div>
           </div>
         </section>
       </main>
 
-      <footer className="mx-auto max-w-[1500px] px-3 sm:px-4 md:px-8 lg:px-10">
-        <div className="border-x border-t border-white/10 bg-fd-background p-5 sm:p-7 lg:p-8">
-          <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-            <div className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 leading-none">
-              <Link
-                href="/"
-                className="text-xl font-semibold leading-none text-white transition-colors hover:text-[#f8f8f4]"
-              >
-                Acton
-              </Link>
-              <span className="text-sm font-medium leading-none text-[#c7c6bf]">by</span>
-              <Link
-                href="https://t.me/toncore"
-                target="_blank"
-                className="text-sm font-medium leading-none text-[#9AE7FF] transition-colors hover:text-[#1AC9FF]"
-              >
-                TON Core
-              </Link>
-            </div>
-            <div className="grid w-full grid-cols-[auto_1fr] items-center gap-4 text-sm text-[#c7c6bf] md:flex md:w-auto md:justify-end">
-              <div className="justify-self-end flex items-center gap-1">
-                {HEADER_ICON_LINKS.map(({href, label, icon: Icon}) => (
-                  <IconLink key={label} href={href} label={label} icon={Icon} />
-                ))}
-              </div>
-            </div>
+      <footer className="border-t border-white/10 bg-[#121212]/90">
+        <div className="mx-auto flex h-[55px] max-w-[1400px] items-center justify-between px-4 md:h-16 md:px-8 lg:px-10">
+          <div className="inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 leading-none">
+            <Link
+              href="/"
+              className="text-xl font-semibold leading-none text-white transition-colors hover:text-[#f8f8f4]"
+            >
+              Acton
+            </Link>
+            <span className="text-sm font-medium leading-none text-[#c7c6bf]">by</span>
+            <Link
+              href="https://t.me/toncore"
+              target="_blank"
+              className="text-sm font-medium leading-none text-[#9AE7FF] transition-colors hover:text-[#1AC9FF]"
+            >
+              TON Core
+            </Link>
+          </div>
+          <div className="flex items-center gap-1">
+            {HEADER_ICON_LINKS.map(({href, label, icon: Icon}) => (
+              <IconLink key={label} href={href} label={label} icon={Icon} />
+            ))}
           </div>
         </div>
       </footer>
@@ -552,7 +626,7 @@ export function LandingHome() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#121212]/90 backdrop-blur-xl">
-      <nav className="mx-auto flex h-[55px] max-w-[1500px] items-center justify-between px-4 md:h-16 md:px-8 lg:px-10">
+      <nav className="mx-auto flex h-[55px] max-w-[1400px] items-center justify-between px-4 md:h-16 md:px-8 lg:px-10">
         <div className="flex items-center gap-5">
           <Link href="/" className="flex items-center gap-3 md:-translate-x-px">
             <Image
@@ -632,44 +706,6 @@ function TelegramIcon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
-function FeatureTitle({title}: {title: string}) {
-  const accent = FEATURE_TITLE_ACCENTS[title]
-
-  if (!accent) {
-    return title
-  }
-
-  const accentIndex = title.indexOf(accent)
-
-  if (accentIndex === -1) {
-    return title
-  }
-
-  return (
-    <>
-      {title.slice(0, accentIndex)}
-      <span className="text-[#9AE7FF]">{accent}</span>
-      {title.slice(accentIndex + accent.length)}
-    </>
-  )
-}
-
-function FeatureIcon({title}: {title: string}) {
-  const config = FEATURE_ICONS[title]
-
-  if (!config) {
-    return null
-  }
-
-  const Icon = config.icon
-
-  return (
-    <span className="inline-flex text-[#9AE7FF]">
-      <Icon className="h-9 w-9" strokeWidth={1.8} />
-    </span>
-  )
-}
-
 function SectionHeader({
   eyebrow,
   title,
@@ -680,16 +716,20 @@ function SectionHeader({
   description: string
 }) {
   return (
-    <div className="max-w-3xl">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#9AE7FF]/70">
-        {eyebrow}
+    <div className="text-center max-w-5xl mx-auto">
+      <p className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82]">
+        <span className="h-px flex-1 bg-white/10" aria-hidden="true" />
+        <span className="shrink-0 px-2">{eyebrow}</span>
+        <span className="h-px flex-1 bg-white/10" aria-hidden="true" />
       </p>
-      <h2 className="mt-4 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
-        {title}
-      </h2>
-      <p className="mt-5 text-lg leading-7 text-[#c7c6bf] sm:mt-6 sm:text-xl sm:leading-8">
-        {description}
-      </p>
+      <div className="mx-auto max-w-3xl">
+        <h2 className="mt-12 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
+          {title}
+        </h2>
+        <p className="mt-4 text-lg leading-7 text-[#a0a0a0] sm:mt-4 sm:text-xl sm:leading-8 font-light">
+          {description}
+        </p>
+      </div>
     </div>
   )
 }
