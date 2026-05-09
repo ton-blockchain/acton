@@ -256,7 +256,9 @@ TYPESCRIPT APP LAYOUT
 
        o  contracts/src for contract sources and shared Tolk types
 
-       o  contracts/tests for tests and generated Tolk wrappers
+       o  contracts/tests for tests
+
+       o  contracts/wrappers for generated Tolk wrappers
 
        o  contracts/scripts for deployment and utility scripts
 
