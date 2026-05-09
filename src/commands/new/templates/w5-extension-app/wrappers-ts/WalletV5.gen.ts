@@ -304,20 +304,20 @@ export const InternalSignedRequest = {
 
 /**
  > struct ExternalMsgSchema {
- >     signature: bits512
  >     signedData: ExternalSignedRequest
+ >     signature: bits512
  > }
  */
 export interface ExternalMsgSchema {
     readonly $: 'ExternalMsgSchema'
-    signature: bits512
     signedData: ExternalSignedRequest
+    signature: bits512
 }
 
 export const ExternalMsgSchema = {
     create(args: {
-        signature: bits512
         signedData: ExternalSignedRequest
+        signature: bits512
     }): ExternalMsgSchema {
         return {
             $: 'ExternalMsgSchema',
@@ -327,13 +327,13 @@ export const ExternalMsgSchema = {
     fromSlice(s: c.Slice): ExternalMsgSchema {
         return {
             $: 'ExternalMsgSchema',
-            signature: loadTolkBitsN(s, 512),
             signedData: ExternalSignedRequest.fromSlice(s),
+            signature: loadTolkBitsN(s, 512),
         }
     },
     store(self: ExternalMsgSchema, b: c.Builder): void {
-        storeTolkBitsN(self.signature, 512, b);
         ExternalSignedRequest.store(self.signedData, b);
+        storeTolkBitsN(self.signature, 512, b);
     },
     toCell(self: ExternalMsgSchema): c.Cell {
         return makeCellFrom<ExternalMsgSchema>(self, ExternalMsgSchema.store);

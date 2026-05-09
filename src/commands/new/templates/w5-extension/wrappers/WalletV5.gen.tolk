@@ -101,10 +101,10 @@ fun WalletV5.sendAny(self, from: address, body: cell, config: SendParams = {}): 
 
 fun WalletV5.sendExternalExternalMsgSchema(
     self,
-    signature: bits512,
     signedData: ExternalSignedRequest,
+    signature: bits512,
 ): SendResultList? {
-    val body = ExternalMsgSchema { signature, signedData };
+    val body = ExternalMsgSchema { signedData, signature };
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }
