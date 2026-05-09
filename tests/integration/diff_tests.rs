@@ -22,7 +22,7 @@ fn test_diff_for_numbers() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_numbers.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_numbers.stdout.txt");
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn test_diff_for_tensors() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_tensors.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_tensors.stdout.txt");
 }
 
 #[test]
@@ -70,7 +70,7 @@ fn test_diff_for_bools() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_bools.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_bools.stdout.txt");
 }
 
 #[test]
@@ -94,7 +94,7 @@ fn test_diff_for_strings() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_strings.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_strings.stdout.txt");
 }
 
 #[test]
@@ -118,7 +118,7 @@ fn test_diff_for_nullables() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_nullables.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_nullables.stdout.txt");
 }
 
 #[test]
@@ -147,7 +147,7 @@ fn test_diff_for_structs() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_structs.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_structs.stdout.txt");
 }
 
 #[test]
@@ -181,7 +181,9 @@ fn test_diff_for_nested_structs() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_nested_structs.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/diff/test_diff_for_nested_structs.stdout.txt",
+        );
 }
 
 #[test]
@@ -286,7 +288,7 @@ fn test_diff_for_structs_with_nullable_struct_and_union_fields() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_diff_for_structs_with_nullable_struct_and_union_fields.stdout.txt",
+            "integration/snapshots/diff/test_diff_for_structs_with_nullable_struct_and_union_fields.stdout.txt",
         );
 }
 
@@ -344,7 +346,9 @@ fn test_diff_for_top_level_unions() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_top_level_unions.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/diff/test_diff_for_top_level_unions.stdout.txt",
+        );
 }
 
 #[test]
@@ -370,5 +374,5 @@ fn test_diff_for_addresses() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_diff_for_addresses.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/diff/test_diff_for_addresses.stdout.txt");
 }

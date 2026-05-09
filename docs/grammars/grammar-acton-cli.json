@@ -43,6 +43,9 @@
       "include": "#diagnostics"
     },
     {
+      "include": "#placeholders"
+    },
+    {
       "include": "#commands"
     }
   ],
@@ -142,7 +145,7 @@
     "stages": {
       "patterns": [
         {
-          "match": "^(\\s*)(Compiling)(\\s+contracts)$",
+          "match": "^(\\s*)(Compiling)(\\s+.+)$",
           "captures": {
             "2": {
               "name": "string.unquoted.acton-cli"
@@ -461,6 +464,14 @@
         {
           "match": "^Some tests failed\\.$",
           "name": "markup.deleted.acton-cli"
+        }
+      ]
+    },
+    "placeholders": {
+      "patterns": [
+        {
+          "match": "<[A-Za-z][A-Za-z0-9_-]*>",
+          "name": "variable.parameter.acton-cli"
         }
       ]
     },

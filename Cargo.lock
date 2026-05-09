@@ -14,7 +14,7 @@ dependencies = [
 
 [[package]]
 name = "acton"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "acton-debug",
@@ -110,7 +110,7 @@ dependencies = [
 
 [[package]]
 name = "acton-config"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "clap",
@@ -125,7 +125,7 @@ dependencies = [
 
 [[package]]
 name = "acton-debug"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -144,7 +144,7 @@ dependencies = [
 
 [[package]]
 name = "acton-mdman"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "handlebars",
@@ -884,11 +884,11 @@ dependencies = [
 
 [[package]]
 name = "conpty"
-version = "0.3.0"
+version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "977baae4026273d7f9bb69a0a8eb4aed7ab9dac98799f742dce09173a9734754"
+checksum = "b72b06487a0d4683349ad74d62e87ad639b09667082b3c495c5b6bab7d84b3da"
 dependencies = [
- "windows 0.29.0",
+ "windows 0.44.0",
 ]
 
 [[package]]
@@ -1191,7 +1191,7 @@ dependencies = [
 
 [[package]]
 name = "dap-client"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -1671,12 +1671,12 @@ dependencies = [
 
 [[package]]
 name = "expectrl"
-version = "0.5.2"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2795e11f4ee3124984d454f25ac899515a5fa6d956562ef2b147fef6050b02f8"
+checksum = "a0e0706d01b4f43adaf7e0fb460e07477c36b74ae60fdeb1d045001bd77b4bd1"
 dependencies = [
  "conpty",
- "nix 0.23.2",
+ "nix 0.26.4",
  "ptyprocess",
  "regex",
 ]
@@ -1738,7 +1738,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "fift-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -2086,7 +2086,7 @@ dependencies = [
  "parking_lot",
  "portable-atomic",
  "quanta",
- "rand 0.9.2",
+ "rand 0.9.3",
  "smallvec",
  "spinning_top",
  "web-time",
@@ -2842,9 +2842,9 @@ checksum = "f52b00d39961fc5b2736ea853c9cc86238e165017a493d1d5c8eac6bdc4cc273"
 
 [[package]]
 name = "memoffset"
-version = "0.6.5"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
+checksum = "5de893c32cde5f383baa4c04c5d6dbdd735cfd4a794b0debdb2bb1b421da5ff4"
 dependencies = [
  "autocfg",
 ]
@@ -2935,28 +2935,15 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.21.2"
+version = "0.26.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77d9f3521ea8e0641a153b3cddaf008dcbf26acd4ed739a2517295e0760d12c7"
+checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
 dependencies = [
  "bitflags 1.2.1",
- "cc",
  "cfg-if",
  "libc",
  "memoffset",
-]
-
-[[package]]
-name = "nix"
-version = "0.23.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f3790c00a0150112de0f4cd161e3d7fc4b2d8a5542ffc35f099a2562aecb35c"
-dependencies = [
- "bitflags 1.2.1",
- "cc",
- "cfg-if",
- "libc",
- "memoffset",
+ "pin-utils",
 ]
 
 [[package]]
@@ -3530,11 +3517,11 @@ dependencies = [
 
 [[package]]
 name = "ptyprocess"
-version = "0.3.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69c28fcebfd842bfe19d69409fc321230ea8c1bebe31f274906485c761ce1917"
+checksum = "101be273c0b1680d7056afddbaa88f02b6e9f2dc161165c30bee9914b6025a79"
 dependencies = [
- "nix 0.21.2",
+ "nix 0.26.4",
 ]
 
 [[package]]
@@ -3634,9 +3621,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.2"
+version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
+checksum = "7ec095654a25171c2124e9e3393a930bddbffdc939556c914957a4c3e0a87166"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -3914,9 +3901,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.8"
+version = "0.103.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffdfa2f5286e2247234e03f680868ac2815974dc39e00ea15adc445d0aafe52"
+checksum = "61c429a8649f110dddef65e2a5ad240f747e85f7758a6bccc7e5777bd33f756e"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -4603,7 +4590,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-core"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -4618,7 +4605,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4820,7 +4807,7 @@ dependencies = [
 
 [[package]]
 name = "tlb-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4930,7 +4917,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-analysis"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "bitflags 2.9.4",
  "rustc-hash 2.1.1",
@@ -4942,7 +4929,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-compiler"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "dunce",
@@ -4959,7 +4946,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-dataflow"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "rustc-hash 2.1.1",
  "tolk-resolver",
@@ -4968,7 +4955,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-fmt"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4981,7 +4968,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-linter"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "dunce",
@@ -5001,7 +4988,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-macros"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "heck 0.5.0",
  "itertools",
@@ -5012,7 +4999,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-resolver"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -5028,7 +5015,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5038,7 +5025,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-ty"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "dunce",
  "log",
@@ -5066,7 +5053,7 @@ dependencies = [
 
 [[package]]
 name = "toml-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5175,7 +5162,7 @@ dependencies = [
  "num-traits",
  "parking_lot",
  "pbkdf2",
- "rand 0.9.2",
+ "rand 0.9.3",
  "reqwest",
  "serde",
  "serde-aux",
@@ -5195,7 +5182,7 @@ dependencies = [
 
 [[package]]
 name = "ton-api"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "log",
@@ -5212,7 +5199,7 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -5230,7 +5217,7 @@ dependencies = [
 
 [[package]]
 name = "ton-executor"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "hex",
@@ -5246,7 +5233,7 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -5261,7 +5248,7 @@ dependencies = [
 
 [[package]]
 name = "ton-json-schema"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "jsonptr",
@@ -5273,7 +5260,7 @@ dependencies = [
 
 [[package]]
 name = "ton-localnet"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -5300,7 +5287,7 @@ dependencies = [
 
 [[package]]
 name = "ton-ls"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -5329,7 +5316,7 @@ dependencies = [
 
 [[package]]
 name = "ton-networks"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "schemars 0.8.22",
@@ -5338,7 +5325,7 @@ dependencies = [
 
 [[package]]
 name = "ton-objs"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "pkg-config",
  "sha2",
@@ -5347,7 +5334,7 @@ dependencies = [
 
 [[package]]
 name = "ton-retrace"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -5366,7 +5353,7 @@ dependencies = [
 
 [[package]]
 name = "ton-source-map"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "pathdiff",
@@ -5375,7 +5362,7 @@ dependencies = [
 
 [[package]]
 name = "ton-syntax"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "memchr",
@@ -5444,7 +5431,7 @@ dependencies = [
 
 [[package]]
 name = "toncenter-keys"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "ton-networks",
 ]
@@ -5711,7 +5698,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tvm-ffi"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -5724,7 +5711,7 @@ dependencies = [
 
 [[package]]
 name = "tvm-logs"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "thiserror 2.0.18",
  "winnow 0.7.13",
@@ -6167,15 +6154,11 @@ checksum = "712e227841d057c1ee1cd2fb22fa7e5a5461ae8e48fa2ca79ec42cfc1931183f"
 
 [[package]]
 name = "windows"
-version = "0.29.0"
+version = "0.44.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aac7fef12f4b59cd0a29339406cc9203ab44e440ddff6b3f5a41455349fa9cf3"
+checksum = "9e745dab35a0c4c77aa3ce42d595e13d2003d6902d6b08c9ef5fc326d08da12b"
 dependencies = [
- "windows_aarch64_msvc 0.29.0",
- "windows_i686_gnu 0.29.0",
- "windows_i686_msvc 0.29.0",
- "windows_x86_64_gnu 0.29.0",
- "windows_x86_64_msvc 0.29.0",
+ "windows-targets 0.42.2",
 ]
 
 [[package]]
@@ -6339,6 +6322,21 @@ dependencies = [
 
 [[package]]
 name = "windows-targets"
+version = "0.42.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e5180c00cd44c9b1c88adb3693291f1cd93605ded80c250a75d472756b4d071"
+dependencies = [
+ "windows_aarch64_gnullvm 0.42.2",
+ "windows_aarch64_msvc 0.42.2",
+ "windows_i686_gnu 0.42.2",
+ "windows_i686_msvc 0.42.2",
+ "windows_x86_64_gnu 0.42.2",
+ "windows_x86_64_gnullvm 0.42.2",
+ "windows_x86_64_msvc 0.42.2",
+]
+
+[[package]]
+name = "windows-targets"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b724f72796e036ab90c1021d4780d4d3d648aca59e491e6b98e725b84e99973"
@@ -6372,6 +6370,12 @@ dependencies = [
 
 [[package]]
 name = "windows_aarch64_gnullvm"
+version = "0.42.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "597a5118570b68bc08d8d59125332c54f1ba9d9adeedeef5b99b02ba2b0698f8"
+
+[[package]]
+name = "windows_aarch64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32a4622180e7a0ec044bb555404c800bc9fd9ec262ec147edd5989ccd0c02cd3"
@@ -6384,9 +6388,9 @@ checksum = "a9d8416fa8b42f5c947f8482c43e7d89e73a173cead56d044f6a56104a6d1b53"
 
 [[package]]
 name = "windows_aarch64_msvc"
-version = "0.29.0"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c3d027175d00b01e0cbeb97d6ab6ebe03b12330a35786cbaca5252b1c4bf5d9b"
+checksum = "e08e8864a60f06ef0d0ff4ba04124db8b0fb3be5776a5cd47641e942e58c4d43"
 
 [[package]]
 name = "windows_aarch64_msvc"
@@ -6402,9 +6406,9 @@ checksum = "b9d782e804c2f632e395708e99a94275910eb9100b2114651e04744e9b125006"
 
 [[package]]
 name = "windows_i686_gnu"
-version = "0.29.0"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8793f59f7b8e8b01eda1a652b2697d87b93097198ae85f823b969ca5b89bba58"
+checksum = "c61d927d8da41da96a81f029489353e68739737d3beca43145c8afec9a31a84f"
 
 [[package]]
 name = "windows_i686_gnu"
@@ -6432,9 +6436,9 @@ checksum = "fa7359d10048f68ab8b09fa71c3daccfb0e9b559aed648a8f95469c27057180c"
 
 [[package]]
 name = "windows_i686_msvc"
-version = "0.29.0"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8602f6c418b67024be2996c512f5f995de3ba417f4c75af68401ab8756796ae4"
+checksum = "44d840b6ec649f480a41c8d80f9c65108b92d89345dd94027bfe06ac444d1060"
 
 [[package]]
 name = "windows_i686_msvc"
@@ -6450,9 +6454,9 @@ checksum = "1e7ac75179f18232fe9c285163565a57ef8d3c89254a30685b57d83a38d326c2"
 
 [[package]]
 name = "windows_x86_64_gnu"
-version = "0.29.0"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3d615f419543e0bd7d2b3323af0d86ff19cbc4f816e6453f36a2c2ce889c354"
+checksum = "8de912b8b8feb55c064867cf047dda097f92d51efad5b491dfb98f6bbb70cb36"
 
 [[package]]
 name = "windows_x86_64_gnu"
@@ -6468,6 +6472,12 @@ checksum = "9c3842cdd74a865a8066ab39c8a7a473c0778a3f29370b5fd6b4b9aa7df4a499"
 
 [[package]]
 name = "windows_x86_64_gnullvm"
+version = "0.42.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26d41b46a36d453748aedef1486d5c7a85db22e56aff34643984ea85514e94a3"
+
+[[package]]
+name = "windows_x86_64_gnullvm"
 version = "0.52.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24d5b23dc417412679681396f2b49f3de8c1473deb516bd34410872eff51ed0d"
@@ -6480,9 +6490,9 @@ checksum = "0ffa179e2d07eee8ad8f57493436566c7cc30ac536a3379fdf008f47f6bb7ae1"
 
 [[package]]
 name = "windows_x86_64_msvc"
-version = "0.29.0"
+version = "0.42.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11d95421d9ed3672c280884da53201a5c46b7b2765ca6faf34b0d71cf34a3561"
+checksum = "9aec5da331524158c6d1a4ac0ab1541149c0b9505fde06423b02f5ef0106b9f0"
 
 [[package]]
 name = "windows_x86_64_msvc"
@@ -6635,7 +6645,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.4.1"
+version = "0.4.2"
 dependencies = [
  "acton-config",
  "anyhow",

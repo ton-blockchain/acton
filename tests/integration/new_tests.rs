@@ -410,10 +410,10 @@ fn test_new_project_non_interactive_requires_template() {
 
     output
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.txt",
+            "integration/snapshots/new/test_new_project_non_interactive_requires_template.stderr.txt",
         )
         .assert_stderr_svg_snapshot_matches(
-            "integration/snapshots/test_new_project_non_interactive_requires_template.stderr.svg",
+            "integration/snapshots/new/test_new_project_non_interactive_requires_template.stderr.svg",
         );
 
     assert!(
@@ -633,7 +633,7 @@ fn test_new_w5_extension_project_with_agents_flag() {
         .assert_contains("AGENTS.md: included")
         .assert_file_snapshot_matches(
             "foobar/AGENTS.md",
-            "integration/snapshots/test_new_w5_extension_project_with_agents_flag.agents.md.gen",
+            "integration/snapshots/new/test_new_w5_extension_project_with_agents_flag.agents.md.gen",
         );
 
     assert!(project.path().join("foobar/AGENTS.md").exists());
@@ -663,23 +663,23 @@ fn test_new_empty_project_with_app_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_with_app_flag.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/Acton.toml",
-            "integration/snapshots/test_new_empty_project_with_app_flag.acton.toml.gen",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.acton.toml.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_empty_project_with_app_flag.package.json.gen",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.package.json.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/README.md",
-            "integration/snapshots/test_new_empty_project_with_app_flag.readme.md",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.readme.md",
         )
         .assert_file_snapshot_matches(
             "foobar/.github/workflows/ci.yml",
-            "integration/snapshots/test_new_empty_project_with_app_flag.ci.yml",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.ci.yml",
         );
 
     let project_dir = project.path().join("foobar");
@@ -725,15 +725,15 @@ fn test_new_counter_project_with_app_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_with_app_flag.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_with_app_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/Acton.toml",
-            "integration/snapshots/test_new_counter_project_with_app_flag.acton.toml.gen",
+            "integration/snapshots/new/test_new_counter_project_with_app_flag.acton.toml.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_counter_project_with_app_flag.package.json.gen",
+            "integration/snapshots/new/test_new_counter_project_with_app_flag.package.json.gen",
         );
 
     let project_dir = project.path().join("foobar");
@@ -793,15 +793,15 @@ fn test_new_w5_extension_project_with_app_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_with_app_flag.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_with_app_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/Acton.toml",
-            "integration/snapshots/test_new_w5_extension_project_with_app_flag.acton.toml.gen",
+            "integration/snapshots/new/test_new_w5_extension_project_with_app_flag.acton.toml.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_w5_extension_project_with_app_flag.package.json.gen",
+            "integration/snapshots/new/test_new_w5_extension_project_with_app_flag.package.json.gen",
         );
 
     let project_dir = project.path().join("foobar");
@@ -879,15 +879,15 @@ fn test_new_w5_extension_app_project_with_agents_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_app_project_with_agents_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.package.json.gen",
+            "integration/snapshots/new/test_new_w5_extension_app_project_with_agents_flag.package.json.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/AGENTS.md",
-            "integration/snapshots/test_new_w5_extension_app_project_with_agents_flag.agents.md.gen",
+            "integration/snapshots/new/test_new_w5_extension_app_project_with_agents_flag.agents.md.gen",
         );
 }
 
@@ -916,15 +916,15 @@ fn test_new_jetton_app_project_with_agents_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_app_project_with_agents_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.package.json.gen",
+            "integration/snapshots/new/test_new_jetton_app_project_with_agents_flag.package.json.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/AGENTS.md",
-            "integration/snapshots/test_new_jetton_app_project_with_agents_flag.agents.md.gen",
+            "integration/snapshots/new/test_new_jetton_app_project_with_agents_flag.agents.md.gen",
         );
 }
 
@@ -953,15 +953,15 @@ fn test_new_nft_app_project_with_agents_flag() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_app_project_with_agents_flag.stdout.txt",
+            "integration/snapshots/new/test_new_nft_app_project_with_agents_flag.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_nft_app_project_with_agents_flag.package.json.gen",
+            "integration/snapshots/new/test_new_nft_app_project_with_agents_flag.package.json.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/AGENTS.md",
-            "integration/snapshots/test_new_nft_app_project_with_agents_flag.agents.md.gen",
+            "integration/snapshots/new/test_new_nft_app_project_with_agents_flag.agents.md.gen",
         );
 }
 
@@ -1031,7 +1031,7 @@ fn test_new_empty_project_with_agents_flag() {
         .assert_contains("AGENTS.md: included")
         .assert_file_snapshot_matches(
             "foobar/AGENTS.md",
-            "integration/snapshots/test_new_empty_project_with_agents_flag.agents.md.gen",
+            "integration/snapshots/new/test_new_empty_project_with_agents_flag.agents.md.gen",
         );
 
     assert!(project.path().join("foobar/AGENTS.md").exists());
@@ -1059,7 +1059,7 @@ fn test_new_counter_project_rejects_app_value_syntax() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_rejects_app_value_syntax.stderr.txt",
+            "integration/snapshots/new/test_new_counter_project_rejects_app_value_syntax.stderr.txt",
         );
 }
 
@@ -1085,7 +1085,7 @@ fn test_new_project_rejects_hooks_value_syntax() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_project_rejects_hooks_value_syntax.stderr.txt",
+            "integration/snapshots/new/test_new_project_rejects_hooks_value_syntax.stderr.txt",
         );
 }
 
@@ -1111,7 +1111,7 @@ fn test_new_project_rejects_agents_value_syntax() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_project_rejects_agents_value_syntax.stderr.txt",
+            "integration/snapshots/new/test_new_project_rejects_agents_value_syntax.stderr.txt",
         );
 }
 
@@ -1138,7 +1138,7 @@ fn test_new_hooks_flag_requires_git() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_hooks_flag_requires_git.stderr.txt",
+            "integration/snapshots/new/test_new_hooks_flag_requires_git.stderr.txt",
         );
 }
 
@@ -1157,7 +1157,7 @@ fn test_new_invalid_template() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_invalid_template.stderr.txt",
+            "integration/snapshots/new/test_new_invalid_template.stderr.txt",
         );
 }
 
@@ -1562,7 +1562,7 @@ fn test_new_counter_project_can_be_selected_interactively() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_counter_project_can_be_selected_interactively.acton.toml.gen",
+        "integration/snapshots/new/test_new_counter_project_can_be_selected_interactively.acton.toml.gen",
     );
 
     let project_dir = project.path().join("foobar");
@@ -1613,7 +1613,7 @@ fn test_new_w5_extension_project_can_be_selected_interactively() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_w5_extension_project_can_be_selected_interactively.acton.toml.gen",
+        "integration/snapshots/new/test_new_w5_extension_project_can_be_selected_interactively.acton.toml.gen",
     );
 
     let project_dir = project.path().join("foobar");
@@ -1669,11 +1669,11 @@ fn test_new_counter_project_prompts_for_app_when_supported() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_counter_project_prompts_for_app_when_supported.acton.toml.gen",
+        "integration/snapshots/new/test_new_counter_project_prompts_for_app_when_supported.acton.toml.gen",
     );
     session.assert_file_snapshot_matches(
         "foobar/package.json",
-        "integration/snapshots/test_new_counter_project_prompts_for_app_when_supported.package.json.gen",
+        "integration/snapshots/new/test_new_counter_project_prompts_for_app_when_supported.package.json.gen",
     );
 
     assert!(project.path().join("foobar/package.json").exists());
@@ -1722,11 +1722,11 @@ fn test_new_w5_extension_project_prompts_for_app_when_supported() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.acton.toml.gen",
+        "integration/snapshots/new/test_new_w5_extension_project_prompts_for_app_when_supported.acton.toml.gen",
     );
     session.assert_file_snapshot_matches(
         "foobar/package.json",
-        "integration/snapshots/test_new_w5_extension_project_prompts_for_app_when_supported.package.json.gen",
+        "integration/snapshots/new/test_new_w5_extension_project_prompts_for_app_when_supported.package.json.gen",
     );
 
     let project_dir = project.path().join("foobar");
@@ -1780,7 +1780,7 @@ fn test_new_counter_project_interactive_decline_keeps_standard_layout() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_counter_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
+        "integration/snapshots/new/test_new_counter_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
     );
 
     let project_dir = project.path().join("foobar");
@@ -1829,7 +1829,7 @@ fn test_new_w5_extension_project_interactive_decline_keeps_standard_layout() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/Acton.toml",
-        "integration/snapshots/test_new_w5_extension_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
+        "integration/snapshots/new/test_new_w5_extension_project_interactive_decline_keeps_standard_layout.acton.toml.gen",
     );
 
     let project_dir = project.path().join("foobar");
@@ -1888,7 +1888,7 @@ fn test_new_empty_project_prompts_for_agents() {
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "foobar/AGENTS.md",
-        "integration/snapshots/test_new_empty_project_with_agents_flag.agents.md.gen",
+        "integration/snapshots/new/test_new_empty_project_with_agents_flag.agents.md.gen",
     );
 }
 
@@ -1975,15 +1975,15 @@ fn test_new_counter_app_project_supports_npm_scripts() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_app_project_supports_npm_scripts.stdout.txt",
+            "integration/snapshots/new/test_new_counter_app_project_supports_npm_scripts.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/Acton.toml",
-            "integration/snapshots/test_new_counter_app_project_supports_npm_scripts.acton.toml.gen",
+            "integration/snapshots/new/test_new_counter_app_project_supports_npm_scripts.acton.toml.gen",
         )
         .assert_file_snapshot_matches(
             "foobar/package.json",
-            "integration/snapshots/test_new_counter_app_project_supports_npm_scripts.package.json.gen",
+            "integration/snapshots/new/test_new_counter_app_project_supports_npm_scripts.package.json.gen",
         );
 
     let package_lock = fs::read_to_string(project_dir.join("package-lock.json")).unwrap();
@@ -2370,7 +2370,7 @@ fn test_new_empty_project_localnet_deploy_snapshot() {
         false,
         "deployer",
         "scripts/deploy.tolk",
-        "integration/snapshots/test_new_empty_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_empty_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2382,7 +2382,7 @@ fn test_new_counter_project_localnet_deploy_snapshot() {
         false,
         "deployer",
         "scripts/deploy.tolk",
-        "integration/snapshots/test_new_counter_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_counter_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2394,7 +2394,7 @@ fn test_new_counter_app_project_localnet_deploy_snapshot() {
         true,
         "deployer",
         "contracts/scripts/deploy.tolk",
-        "integration/snapshots/test_new_counter_app_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_counter_app_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2406,7 +2406,7 @@ fn test_new_jetton_project_localnet_deploy_snapshot() {
         false,
         "deployer",
         "scripts/deploy.tolk",
-        "integration/snapshots/test_new_jetton_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_jetton_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2418,7 +2418,7 @@ fn test_new_nft_project_localnet_deploy_snapshot() {
         false,
         "deployer",
         "scripts/deployCollection.tolk",
-        "integration/snapshots/test_new_nft_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_nft_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2430,7 +2430,7 @@ fn test_new_w5_extension_project_localnet_deploy_snapshot() {
         false,
         "deployer",
         "scripts/deploy.tolk",
-        "integration/snapshots/test_new_w5_extension_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_w5_extension_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2442,7 +2442,7 @@ fn test_new_w5_extension_app_project_localnet_deploy_snapshot() {
         true,
         "deployer",
         "contracts/scripts/deploy.tolk",
-        "integration/snapshots/test_new_w5_extension_app_project_localnet_deploy.stdout.txt",
+        "integration/snapshots/new/test_new_w5_extension_app_project_localnet_deploy.stdout.txt",
     );
 }
 
@@ -2473,7 +2473,7 @@ fn test_new_empty_project_in_existed_directory() {
         .failure();
 
     output.assert_stderr_snapshot_matches(
-        "integration/snapshots/test_new_empty_project_in_existed_directory.stderr.txt",
+        "integration/snapshots/new/test_new_empty_project_in_existed_directory.stderr.txt",
     );
 }
 
@@ -2502,7 +2502,7 @@ fn test_new_empty_project_in_existed_directory_with_acton_toml() {
 
     output
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_in_existed_directory_with_acton_toml.stderr.txt",
+            "integration/snapshots/new/test_new_empty_project_in_existed_directory_with_acton_toml.stderr.txt",
         );
 }
 
@@ -2577,7 +2577,7 @@ fn test_new_empty_project_in_non_empty_current_directory() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_in_non_empty_current_directory.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_in_non_empty_current_directory.stdout.txt",
         )
         .assert_contains("Project name: non-empty-dot-project");
 
@@ -2662,11 +2662,11 @@ fn test_new_project_fails_when_git_init_fails() {
 
     output
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_project_fails_when_git_init_fails.stderr.txt",
+            "integration/snapshots/new/test_new_project_fails_when_git_init_fails.stderr.txt",
         )
         .assert_file_snapshot_matches(
             "foobar/Acton.toml",
-            "integration/snapshots/test_new_project_fails_when_git_init_fails.acton.toml.gen",
+            "integration/snapshots/new/test_new_project_fails_when_git_init_fails.acton.toml.gen",
         );
     assert!(project_dir.join("contracts").exists());
     assert!(project_dir.join("tests").exists());
@@ -2730,7 +2730,7 @@ fn test_new_project_warns_when_git_is_unavailable_but_still_succeeds() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_new_project_warns_when_git_is_unavailable_but_still_succeeds.stdout.txt",
+        "integration/snapshots/new/test_new_project_warns_when_git_is_unavailable_but_still_succeeds.stdout.txt",
     );
 
     let project_dir = project.path().join("foobar");
@@ -2873,7 +2873,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_new.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -2884,7 +2884,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_build.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -2895,7 +2895,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_test.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -2907,7 +2907,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_script.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -2918,7 +2918,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_check.stderr.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -2930,7 +2930,7 @@ fn test_new_empty_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_empty_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/new/test_new_empty_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -2959,7 +2959,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_new.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -2970,7 +2970,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_build.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -2981,7 +2981,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_test.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -2993,7 +2993,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_script.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -3004,7 +3004,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_check.stderr.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -3016,7 +3016,7 @@ fn test_new_counter_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_counter_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/new/test_new_counter_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -3045,7 +3045,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_new.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -3056,7 +3056,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_build.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -3067,7 +3067,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_test.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -3079,7 +3079,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_script.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -3090,7 +3090,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_check.stderr.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -3102,7 +3102,7 @@ fn test_new_jetton_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_jetton_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/new/test_new_jetton_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -3131,7 +3131,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_new.stdout.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -3142,7 +3142,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_build.stdout.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -3153,7 +3153,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_test.stdout.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -3165,7 +3165,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_script.stdout.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -3176,7 +3176,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_check.stderr.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -3188,7 +3188,7 @@ fn test_new_nft_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_nft_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/new/test_new_nft_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -3217,7 +3217,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_new.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_new.stdout.txt",
         );
 
     // 2. Build project
@@ -3228,7 +3228,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_build.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_build.stdout.txt",
         );
 
     // 3. Run tests
@@ -3239,7 +3239,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_test.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_test.stdout.txt",
         );
 
     // 4. Run deploy script in emulation mode
@@ -3251,7 +3251,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_script.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_script.stdout.txt",
         );
 
     // 5. Run linter check
@@ -3262,7 +3262,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_check.stderr.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_check.stderr.txt",
         );
 
     // 6. Run formatter
@@ -3274,7 +3274,7 @@ fn test_new_w5_extension_project_full_flow() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_new_w5_extension_project_full_flow_fmt.stdout.txt",
+            "integration/snapshots/new/test_new_w5_extension_project_full_flow_fmt.stdout.txt",
         );
 }
 
@@ -3344,7 +3344,7 @@ fn test_new_empty_project_writes_editorconfig_with_tolk_rules() {
         .success()
         .assert_file_snapshot_matches(
             "foobar/.editorconfig",
-            "integration/snapshots/test_new_empty_project_editorconfig.gen",
+            "integration/snapshots/new/test_new_empty_project_editorconfig.gen",
         );
 }
 
