@@ -17,6 +17,7 @@
   --ui-color: #2d83ec;
 
   --color-fd-primary: var(--ui-color);
+  --color-fd-idea: oklch(65% 0.2 145);
 }
 
 .dark {
