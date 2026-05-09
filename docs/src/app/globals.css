@@ -1,5 +1,6 @@
 @import "tailwindcss";
-@import "fumadocs-ui/style.css";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
 @import "fumadocs-twoslash/twoslash.css";
 
 .twoslash .twoslash-error.twoslash-error-level-warning {
@@ -160,7 +161,7 @@ pre {
 
   .feature-video-panel .feature-video {
     aspect-ratio: 16 / 10;
-    object-fit: cover;
+    object-fit: contain;
     transform: scale(1.03);
   }
 }
@@ -318,4 +319,8 @@ pre {
 .inline-doc-link:hover {
   color: rgba(255, 255, 255, 1);
   text-decoration-color: rgba(123, 97, 255, 0.95);
+}
+
+.hidden {
+  display: none;
 }

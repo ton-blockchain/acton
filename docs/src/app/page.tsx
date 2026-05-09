@@ -272,12 +272,12 @@ function ReleaseAnnouncement() {
 
 export function LandingHome() {
   return (
-    <div className="home-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#f7f7f2]">
+    <section className="home-shell min-h-screen overflow-x-hidden bg-[#121212] text-[#f7f7f2]">
       <SiteHeader />
       <main>
-        <section className="mx-auto max-w-[1400px] px-3 pt-6 sm:px-4 sm:pt-14 md:px-8 lg:px-10">
+        <section className="mx-auto max-w-[1376px] pt-6 sm:pt-14">
           <div className="home-hero-panel relative overflow-hidden border-x border-t border-white/10">
-            <div className="relative z-10 px-4 pb-12 pt-8 sm:px-8 sm:pb-16 sm:pt-14 lg:px-12 lg:pb-28 lg:pt-16 xl:pb-32">
+            <div className="relative z-10 px-4 pb-10 pt-8 sm:px-8 sm:pb-14 sm:pt-14 lg:px-12 lg:pb-20 lg:pt-16 xl:pb-32">
               <div className="mx-auto w-full">
                 <div className="max-w-[58rem]">
                   <Link
@@ -294,13 +294,13 @@ export function LandingHome() {
                       TON smart contracts
                     </span>
                   </h1>
-                  <p className="mt-6 max-w-2xl text-base leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
+                  <p className="mt-6 max-w-none text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8 lg:max-w-lg xl:max-w-2xl">
                     <span className="font-semibold text-[#9AE7FF]">Acton</span> is an all-in-one CLI
                     built around <span className="font-semibold text-[#9AE7FF]">Tolk</span>
                     &nbsp;—&nbsp;from project creation to tests, debugging, dApp&nbsp;integration,
                     deployment, and verification.
                   </p>
-                  <p className="mt-6 max-w-2xl text-base leading-7 text-[#c7c6bf] sm:mt-8 sm:text-xl sm:leading-8">
+                  <p className="mt-6 max-w-2xl text-base leading-7 text-[#c7c6bf] sm:text-lg sm:leading-8">
                     Built for humans.{" "}
                     <span className="font-semibold text-[#9AE7FF]">Perfect for AI.</span>
                   </p>
@@ -309,14 +309,14 @@ export function LandingHome() {
                     <p className="text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82]">
                       Installation
                     </p>
-                    <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
+                    <div className="w-full max-w-[31rem] min-w-0 sm:w-fit">
                       <InlineInstallationCommand />
                     </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div className="landing-hero-media pointer-events-none absolute -bottom-10 left-8 right-[-12rem] z-0 lg:bottom-[-4.5rem] lg:left-auto lg:right-[-5.5rem] lg:w-[62%] xl:right-[-2rem] xl:w-[60%]">
+            <div className="landing-hero-media pointer-events-none absolute top-13 left-8 right-[-12rem] z-0 lg:bottom-[-4.5rem] lg:left-auto lg:right-[-5.5rem] lg:w-[62%] xl:right-[-2rem] xl:w-[60%]">
               <Image
                 src="/landing/hero-ide.png"
                 alt=""
@@ -341,8 +341,8 @@ export function LandingHome() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-[1400px] px-3 sm:px-4 md:px-8 lg:px-10">
-          <div className="border-x border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
+        <section className="mx-auto max-w-[1376px]">
+          <div className="border-x border-white/10 bg-fd-background px-4 py-14 sm:py-20">
             <SectionHeader
               eyebrow="Essential features"
               title={
@@ -372,7 +372,7 @@ export function LandingHome() {
                   >
                     <div className={`feature-copy-panel ${reversed ? "lg:order-2" : ""}`}>
                       <div
-                        className={`flex h-full flex-col justify-start pt-8 sm:pt-14 lg:min-h-[360px] lg:pt-14 xl:min-h-[440px] xl:pt-20 ${
+                        className={`flex h-full flex-col justify-start pt-8 sm:pt-10 lg:min-h-[360px] lg:pt-12 xl:min-h-[440px] ${
                           reversed
                             ? "px-5 sm:pl-5 sm:pr-10 lg:pl-7 lg:pr-12 xl:pr-14"
                             : "px-5 sm:pl-10 sm:pr-5 lg:pl-12 lg:pr-7 xl:pl-14"
@@ -381,8 +381,8 @@ export function LandingHome() {
                         <div
                           className={
                             reversed
-                              ? "max-w-[25rem] lg:ml-auto lg:mr-0 lg:text-right"
-                              : "max-w-[25rem] lg:ml-0 lg:mr-auto"
+                              ? "max-w-none xl:max-w-[25rem] lg:ml-auto lg:mr-0 lg:text-right"
+                              : "max-w-none xl:max-w-[25rem] lg:ml-0 lg:mr-auto"
                           }
                         >
                           <div className={`mb-5 flex ${reversed ? "lg:justify-end" : ""}`}>
@@ -391,7 +391,7 @@ export function LandingHome() {
                             </span>
                           </div>
                           <h3
-                            className={`max-w-[12ch] text-[1.75rem] font-semibold leading-tight text-[#f4f4ef] sm:max-w-none sm:text-[2.15rem] lg:whitespace-nowrap xl:text-[2.6rem] ${
+                            className={`max-w-none text-[2rem] font-semibold leading-tight text-[#f4f4ef] sm:text-[2.15rem] lg:whitespace-nowrap xl:text-[2.6rem] ${
                               reversed ? "lg:-ml-16 xl:-ml-24" : ""
                             }`}
                           >
@@ -399,10 +399,10 @@ export function LandingHome() {
                             <span className="text-[#9AE7FF]">{feature.highlight}</span>
                             {feature.title.slice(highlightIndex + feature.highlight.length)}
                           </h3>
-                          <p className="mt-4 text-base leading-5 text-[#c7c6bf] xl:mt-5 xl:text-lg xl:leading-6">
+                          <p className="mt-4 text-base leading-6 text-[#c7c6bf]">
                             {feature.description}
                           </p>
-                          <p className="mt-3 text-base leading-5 text-[#c7c6bf] xl:mt-4 xl:text-lg xl:leading-6">
+                          <p className="mt-4 text-base leading-6 text-[#c7c6bf]">
                             {feature.description2}
                           </p>
                         </div>
@@ -430,99 +430,105 @@ export function LandingHome() {
                 )
               })}
             </div>
+          </div>
+        </section>
 
-            <section className="mx-auto mb-16 max-w-[1400px] px-0 sm:mb-20 sm:px-4 md:px-8 lg:px-10">
-              <div className="border-b border-white/10 bg-fd-background px-0 py-14 sm:border-x sm:px-8 sm:py-20 lg:px-12">
-                <SectionHeader
-                  eyebrow="Extra depth"
-                  title={
-                    <>
-                      <span className="text-[#9AE7FF]">More</span> than the happy path
-                    </>
-                  }
-                  description="Deep dive into security, error prevention, and gas optimization"
-                />
+        <section className="mx-auto max-w-[1376px]">
+          <div className="border-x border-white/10 bg-fd-background px-0 py-14 sm:px-8 sm:py-20 lg:px-12">
+            <SectionHeader
+              eyebrow="Extra depth"
+              title={
+                <>
+                  <span className="text-[#9AE7FF]">More</span> than the happy path
+                </>
+              }
+              description="Deep dive into security, error prevention, and gas optimization"
+            />
 
-                <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:mt-16 md:grid-cols-2">
-                  {BELOW_FEATURES.map(feature => {
-                    const Icon = feature.icon
+            <div className="mx-auto mt-12 grid max-w-6xl gap-4 sm:mt-16 md:grid-cols-2">
+              {BELOW_FEATURES.map(feature => {
+                const Icon = feature.icon
 
-                    return (
-                      <Link
-                        key={feature.title}
-                        href={feature.docLink}
-                        className={`group relative min-h-[220px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] p-5 text-left transition duration-200 hover:border-[#9AE7FF]/35 hover:bg-white/[0.04] sm:p-6 ${
-                          feature.featured ? "sm:min-h-[250px]" : "sm:min-h-[230px]"
-                        } ${feature.className}`}
+                return (
+                  <Link
+                    key={feature.title}
+                    href={feature.docLink}
+                    className={`group relative min-h-[220px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.025] p-5 mx-4 sm:mx-0 text-left transition duration-200 hover:border-[#9AE7FF]/35 hover:bg-white/[0.04] sm:p-6 ${
+                      feature.featured ? "sm:min-h-[250px]" : "sm:min-h-[230px]"
+                    } ${feature.className}`}
+                  >
+                    <span
+                      className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(154,231,255,0.12),transparent_34%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                      aria-hidden="true"
+                    />
+                    <div className="relative flex h-full flex-col">
+                      <div className="mb-4 flex items-start justify-between gap-3">
+                        <span className="inline-flex shrink-0 items-center justify-start text-[#9AE7FF]">
+                          <Icon
+                            className={feature.featured ? "h-6 w-6" : "h-5 w-5"}
+                            strokeWidth={1.8}
+                          />
+                        </span>
+                        <span className="max-w-[8rem] pt-1 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#65645f] sm:max-w-none">
+                          {feature.label}
+                        </span>
+                      </div>
+
+                      <h3
+                        className={`font-semibold leading-tight text-[#f4f4ef] ${
+                          feature.featured ? "text-3xl sm:text-[2.1rem]" : "text-2xl"
+                        }`}
                       >
-                        <span
-                          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(154,231,255,0.12),transparent_34%)] opacity-0 transition-opacity duration-200 group-hover:opacity-100"
-                          aria-hidden="true"
-                        />
-                        <div className="relative flex h-full flex-col">
-                          <div className="mb-4 flex items-start justify-between gap-3">
-                            <span className="inline-flex shrink-0 items-center justify-start text-[#9AE7FF]">
-                              <Icon
-                                className={feature.featured ? "h-6 w-6" : "h-5 w-5"}
-                                strokeWidth={1.8}
-                              />
-                            </span>
-                            <span className="max-w-[8rem] pt-1 text-right text-[0.68rem] font-semibold uppercase tracking-[0.12em] text-[#65645f] sm:max-w-none">
-                              {feature.label}
-                            </span>
-                          </div>
+                        {feature.title}
+                      </h3>
+                      <p
+                        className={`mt-4 text-[#b9b8b1] ${
+                          feature.featured ? "max-w-2xl text-base leading-7" : "text-base leading-6"
+                        }`}
+                      >
+                        {feature.description}
+                      </p>
+                      <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]/65 transition-colors group-hover:text-[#9AE7FF]">
+                        Read in docs
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </span>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        </section>
 
-                          <h3
-                            className={`font-semibold leading-tight text-[#f4f4ef] ${
-                              feature.featured ? "text-3xl sm:text-[2.1rem]" : "text-2xl"
-                            }`}
-                          >
-                            {feature.title}
-                          </h3>
-                          <p
-                            className={`mt-4 text-[#b9b8b1] ${
-                              feature.featured
-                                ? "max-w-2xl text-base leading-7"
-                                : "text-base leading-6"
-                            }`}
-                          >
-                            {feature.description}
-                          </p>
-                          <span className="mt-auto inline-flex items-center gap-2 pt-8 text-sm font-medium text-[#9AE7FF]/65 transition-colors group-hover:text-[#9AE7FF]">
-                            Read in docs
-                            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                          </span>
-                        </div>
-                      </Link>
-                    )
-                  })}
-                </div>
-              </div>
-            </section>
-
-            <div className="mx-auto mt-20 max-w-6xl sm:mt-28">
-              <p className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82]">
+        <section className="mx-auto max-w-[1376px]">
+          <div className="border-x border-white/10 bg-fd-background px-0 py-8 sm:px-8 lg:px-12">
+            <div className="mx-auto max-w-6xl">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.10em] text-[#8b8a82] sm:gap-4">
                 <span className="h-px flex-1 bg-white/10" />
-                <span className="shrink-0 px-2">Migration path</span>
+                <span className="shrink px-2 text-center">Migration path</span>
                 <span className="h-px flex-1 bg-white/10" />
               </p>
               <div className="pt-10 sm:pt-12 lg:pt-16">
-                <div className="grid gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:items-center xl:gap-12">
-                  <div className="mx-auto max-w-lg text-center lg:mx-0 lg:text-left">
-                    <h2 className="mx-auto max-w-[12ch] text-3xl font-semibold leading-[1.04] text-[#f8f8f4] sm:max-w-none sm:text-5xl lg:mx-0">
+                <div className="grid gap-10 lg:grid-cols-[0.78fr_1.22fr] lg:items-top xl:gap-12">
+                  <div className="mx-4 sm:mx-auto max-w-none lg:max-w-lg">
+                    <h2 className="mx-auto text-3xl font-semibold leading-[1.04] text-[#f8f8f4] sm:max-w-none sm:text-5xl lg:mx-0 lg:mt-8">
                       Migrate <span className="text-[#9AE7FF]">FunC</span> contracts{" "}
-                      <span className="text-[#9AE7FF]">to Tolk</span>
+                      <span className="text-[#9AE7FF]">to&nbsp;Tolk</span>
                     </h2>
-                    <p className="mx-auto mt-5 max-w-[20rem] text-center text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:max-w-none sm:text-lg sm:leading-7 lg:mx-0 lg:text-left">
+                    <p className="mx-auto mt-5 text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:leading-7 lg:mx-0">
                       Give an agent your existing FunC + Blueprint project, and it will handle the
                       migration end-to-end.
                     </p>
-                    <p className="mx-auto mt-5 max-w-[20rem] text-center text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:max-w-none sm:text-lg sm:leading-7 lg:mx-0 lg:text-left">
+                    <p className="mx-auto mt-5 text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:max-w-none sm:leading-7 lg:mx-0">
+                      Not only contracts are converted, but also TypeScript tests become native and
+                      fast.
+                    </p>
+                    <p className="mx-auto mt-5 text-base leading-6 text-[#c7c6bf] sm:mt-6 sm:max-w-none sm:leading-7 lg:mx-0">
                       Available via func2tolk <span className="text-[#9AE7FF]">skill</span> for
                       Codex/Claude.
                     </p>
 
-                    <div className="mt-8 flex flex-wrap items-center justify-center gap-x-4 gap-y-3 sm:mt-10 lg:justify-start">
+                    <div className="mt-8 flex flex-wrap items-center justify-start gap-x-4 gap-y-3 sm:mt-10">
                       <Link
                         href="/docs/commands/func2tolk"
                         className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
@@ -545,20 +551,20 @@ export function LandingHome() {
                     </div>
 
                     <div className="mx-auto mt-4 grid w-full max-w-[18rem] gap-x-6 gap-y-3 sm:max-w-[720px] sm:grid-cols-2 lg:translate-x-6 xl:translate-x-8">
-                      <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2] lg:pl-8 xl:pl-12">
-                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                      <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2] sm:pl-10 lg:pl-5 xl:pl-10">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300/75" />
                         <span>Contracts become idiomatic Tolk</span>
                       </div>
                       <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2]">
-                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300/75" />
                         <span>Fast native code instead of TypeScript</span>
                       </div>
-                      <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2] lg:pl-8 xl:pl-12">
-                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                      <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2] sm:pl-10 lg:pl-5 xl:pl-10">
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300/75" />
                         <span>Gas consumption goes down</span>
                       </div>
                       <div className="grid w-full grid-cols-[1rem_minmax(0,1fr)] items-start gap-3 text-left text-sm font-medium leading-5 text-[#aaa9a2]">
-                        <Check className="h-4 w-4 shrink-0 text-emerald-300/75" />
+                        <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300/75" />
                         <span>Continue developing with green tests</span>
                       </div>
                     </div>
@@ -566,34 +572,36 @@ export function LandingHome() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="mx-auto mt-20 max-w-6xl sm:mt-28">
-              <SectionHeader
-                eyebrow="Start building"
-                title="Ready to build?"
-                description="Install Acton and start from the docs."
-              />
-              <div className="mt-10 flex flex-col items-center gap-8 text-center sm:mt-12 sm:gap-10">
-                <div className="w-full max-w-[30rem] min-w-0 sm:w-fit">
-                  <InlineInstallationCommand />
-                </div>
-                <div className="flex flex-wrap justify-center gap-3">
-                  <Link
-                    href="/docs/welcome"
-                    className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-white/90"
-                  >
-                    Get Started
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                  <Link
-                    href="https://github.com/ton-blockchain/acton"
-                    target="_blank"
-                    className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
-                  >
-                    <Github className="h-4 w-4" />
-                    GitHub
-                  </Link>
-                </div>
+        <section className="mx-auto mb-16 max-w-[1376px] sm:mb-20">
+          <div className="border-x border-b border-white/10 bg-fd-background px-0 py-14 sm:px-8 sm:py-20 lg:px-12">
+            <SectionHeader
+              eyebrow="Start building"
+              title="Ready to build?"
+              description="Install Acton and start from the docs"
+            />
+            <div className="mt-10 flex flex-col items-center gap-8 text-center sm:mt-12 sm:gap-10">
+              <div className="w-full max-w-[31rem] min-w-0 sm:w-fit">
+                <InlineInstallationCommand />
+              </div>
+              <div className="flex flex-wrap justify-center gap-3">
+                <Link
+                  href="/docs/welcome"
+                  className="inline-flex h-11 items-center gap-2 rounded-lg bg-white px-5 text-sm font-medium text-black transition-colors hover:bg-white/90"
+                >
+                  Get Started
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  href="https://github.com/ton-blockchain/acton"
+                  target="_blank"
+                  className="inline-flex h-11 items-center gap-2 rounded-lg border border-white/12 bg-white/[0.03] px-5 text-sm font-medium text-[#deddd5] transition-colors hover:bg-white/[0.06]"
+                >
+                  <Github className="h-4 w-4" />
+                  GitHub
+                </Link>
               </div>
             </div>
           </div>
@@ -601,7 +609,7 @@ export function LandingHome() {
       </main>
 
       <footer className="border-t border-white/10 bg-[#121212]/90">
-        <div className="mx-auto flex min-h-[55px] max-w-[1400px] items-center justify-between gap-3 px-4 py-0 md:min-h-16 md:px-8 lg:px-10">
+        <div className="mx-auto flex min-h-[55px] max-w-[1368px] items-center justify-between gap-3 py-0 md:min-h-16">
           <div className="inline-flex min-w-0 items-baseline gap-2 leading-none">
             <Link
               href="/"
@@ -627,14 +635,14 @@ export function LandingHome() {
           </div>
         </div>
       </footer>
-    </div>
+    </section>
   )
 }
 
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#121212]/90 backdrop-blur-xl">
-      <nav className="mx-auto flex min-h-[55px] max-w-[1400px] items-center justify-between gap-3 px-4 py-3 md:min-h-16 md:px-8 md:py-0 lg:px-10">
+      <nav className="mx-auto flex min-h-[55px] max-w-[1368px] items-center justify-between gap-3 py-3 md:min-h-16 md:py-0">
         <div className="flex min-w-0 items-center gap-3 sm:gap-5">
           <Link href="/" className="flex min-w-0 items-center gap-3 md:-translate-x-px">
             <Image
@@ -734,7 +742,7 @@ function SectionHeader({
         <h2 className="mt-12 text-3xl font-semibold leading-tight text-[#f8f8f4] sm:text-5xl">
           {title}
         </h2>
-        <p className="mt-4 text-lg leading-7 text-[#a0a0a0] sm:mt-4 sm:text-xl sm:leading-8 font-light">
+        <p className="mt-4 text-lg leading-7 text-[#a0a0a0] sm:mt-4 sm:leading-8 font-light">
           {description}
         </p>
       </div>
