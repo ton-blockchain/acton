@@ -41,9 +41,7 @@ fun main() {
         },
     );
 
-    val external = net.createExternalMessage(deployer.address, signedBody);
-
-    val extResult = net.sendExternal(external);
+    val extResult = wallet.sendAnyExternal(signedBody.toCell());
     if (extResult == null) {
         println("External message was not accepted");
         return;

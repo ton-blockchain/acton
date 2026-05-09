@@ -67,7 +67,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_run_empty_scripts_section.stderr.txt",
+            "integration/snapshots/run/test_run_empty_scripts_section.stderr.txt",
         );
 }
 

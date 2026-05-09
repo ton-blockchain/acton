@@ -4,7 +4,7 @@ import "messages"
 import "types"
 
 contract NftItem {
-    author: "The Tolk Team"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard NFT Item. TEP-62 and TEP-64 compliant"
     incomingMessages: AllowedMessageToNftItem

@@ -168,7 +168,9 @@ fn test_compile_undefined_symbol() {
         .compile("contracts/undefined.tolk")
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_compile_undefined_symbol.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/compile/test_compile_undefined_symbol.stdout.txt",
+        );
 }
 
 // ========================================
@@ -345,7 +347,7 @@ fn test_compile_json_missing_file_exits_with_failure() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_compile_json_missing_file_exits_with_failure.stdout.txt",
+            "integration/snapshots/compile/test_compile_json_missing_file_exits_with_failure.stdout.txt",
         );
 }
 
@@ -567,7 +569,9 @@ fn test_compile_empty_path() {
         .compile("")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches("integration/snapshots/test_compile_empty_path.stderr.txt");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/compile/test_compile_empty_path.stderr.txt",
+        );
 }
 
 #[test]
@@ -592,7 +596,7 @@ fn test_compile_file_without_read_permission() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_file_without_read_permission.stderr.txt",
+            "integration/snapshots/compile/test_compile_file_without_read_permission.stderr.txt",
         );
 }
 
@@ -627,7 +631,7 @@ fn test_compile_import_from_symlink_file() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_import_from_symlink_file.stderr.txt",
+            "integration/snapshots/compile/test_compile_import_from_symlink_file.stderr.txt",
         );
 }
 
@@ -763,7 +767,7 @@ fn test_compile_boc_output_write_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_boc_output_write_error.stderr.txt",
+            "integration/snapshots/compile/test_compile_boc_output_write_error.stderr.txt",
         );
 }
 
@@ -792,7 +796,7 @@ fn test_compile_fift_output_write_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_fift_output_write_error.stderr.txt",
+            "integration/snapshots/compile/test_compile_fift_output_write_error.stderr.txt",
         );
 }
 
@@ -821,7 +825,7 @@ fn test_compile_source_map_write_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_source_map_write_error.stderr.txt",
+            "integration/snapshots/compile/test_compile_source_map_write_error.stderr.txt",
         );
 }
 
@@ -841,7 +845,7 @@ fn test_compile_invalid_boc_output_path() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_invalid_boc_output_path.stderr.txt",
+            "integration/snapshots/compile/test_compile_invalid_boc_output_path.stderr.txt",
         );
 }
 
@@ -861,6 +865,6 @@ fn test_compile_invalid_fift_output_path() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compile_invalid_fift_output_path.stderr.txt",
+            "integration/snapshots/compile/test_compile_invalid_fift_output_path.stderr.txt",
         );
 }

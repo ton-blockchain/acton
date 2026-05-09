@@ -2179,7 +2179,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if opcode == 0 {
             Self::color_message_name("empty")
         } else {
-            Self::color_message_name(&format!("0x{opcode:x}"))
+            Self::color_message_name(&format!("0x{opcode:08x}"))
         }
     }
 
@@ -2840,7 +2840,7 @@ impl FormatterContext<'_> {
                         .and_then(|build| Self::message_name_from_build(&build, *opcode));
                     params.push(format!(
                         "  opcode={} {}",
-                        format!("0x{opcode:x}").green(),
+                        format!("0x{opcode:08x}").green(),
                         opcode_type
                             .unwrap_or_else(|| if *opcode == 0 {
                                 "empty".to_owned()
@@ -2897,7 +2897,7 @@ impl FormatterContext<'_> {
 
         vec![format!(
             "  opcode={} {}",
-            format!("0x{opcode:x}").green(),
+            format!("0x{opcode:08x}").green(),
             failure.message_name.purple().bold()
         )]
     }

@@ -23,7 +23,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "0.4.1"
+version = "0.4.2"
 authors = ["TON Core"]
 edition = "2024"
 rust-version = "1.94.1"
@@ -306,7 +306,7 @@ strip-ansi-escapes = "0.2.1"
 fs_extra = "1.3.0"
 base64 = { workspace = true }
 expect-test = { workspace = true }
-expectrl = "0.5.2"
+expectrl = "0.8.0"
 dap-client = { workspace = true }
 function_name = { workspace = true }
 owo-colors = { workspace = true } # overall coloring

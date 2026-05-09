@@ -1,0 +1,30 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling simple
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✗ foo [TIME]
+    └─ Error: expect(actual).toHaveSuccessfulTx(expected)
+        N/A -> sender A
+        └── 0x00000001 1 TON -> simple B                                                gas=836 aborted action_result_code=37
+            ├── account created
+            ├── Action phase failed
+            ├── Description: Not enough Toncoin
+            ├── Re-run with --backtrace full to get actions location
+            └── Executed actions:
+                └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
+        
+        Cannot find transaction from <any> to <any>
+        with:
+          success=true
+          exit_code=0
+      └─ at tests/test.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -201,7 +201,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/build_graph_creates_missing_parent_directories.stdout.txt",
+            "integration/snapshots/build/build_graph_creates_missing_parent_directories.stdout.txt",
         )
         .assert_file_exists("graphs/deps.dot");
 }

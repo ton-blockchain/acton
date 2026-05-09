@@ -5,10 +5,11 @@ import "messages"
 import "storage"
 
 contract WalletV5 {
-    author: "The Tolk Team"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Wallet V5. Extensible wallet with plugins support"
     incomingMessages: AllowedMessageToWalletV5
+    incomingExternal: ExternalMsgSchema
     storage: Storage
 }
 

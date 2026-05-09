@@ -1,4 +1,4 @@
 Available versions:
-  [ACTON_VERSION]
+  v0.4.0
 
 Error: Requested release `0.0.1` was not found in GitHub releases. Run `acton up --list` to inspect available versions.

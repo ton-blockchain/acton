@@ -159,7 +159,7 @@ impl ProcessCommandBuilder {
 #[cfg(unix)]
 #[allow(dead_code)]
 pub(crate) struct PtySession {
-    inner: expectrl::Session,
+    inner: expectrl::session::OsSession,
     project_path: PathBuf,
 }
 
@@ -214,7 +214,7 @@ impl NeedleLabel for &[u8] {
 #[cfg(unix)]
 #[allow(dead_code)]
 impl PtySession {
-    fn new(inner: expectrl::Session, project_path: PathBuf) -> Self {
+    fn new(inner: expectrl::session::OsSession, project_path: PathBuf) -> Self {
         Self {
             inner,
             project_path,
@@ -236,7 +236,7 @@ impl PtySession {
         N: expectrl::Needle + NeedleLabel,
     {
         let message = format!("Expected PTY output to match {}", needle.needle_label());
-        self.inner.expect(needle).expect(&message);
+        expectrl::Expect::expect(&mut self.inner, needle).expect(&message);
         self
     }
 
@@ -246,7 +246,7 @@ impl PtySession {
         N: expectrl::Needle + NeedleLabel,
     {
         let label = needle.needle_label();
-        match self.inner.expect(needle) {
+        match expectrl::Expect::expect(&mut self.inner, needle) {
             Err(expectrl::Error::ExpectTimeout | expectrl::Error::Eof) => self,
             Ok(_) => panic!("Expected PTY output to not match {label}"),
             Err(err) => panic!("Expected PTY output to not match {label}, got error: {err}"),
@@ -260,13 +260,20 @@ impl PtySession {
     where
         N: expectrl::Needle,
     {
-        self.inner.expect(needle).expect(message);
+        expectrl::Expect::expect(&mut self.inner, needle).expect(message);
         self
+    }
+
+    pub(crate) fn send<B>(&mut self, buf: B) -> Result<(), expectrl::Error>
+    where
+        B: AsRef<[u8]>,
+    {
+        expectrl::Expect::send(&mut self.inner, buf)
     }
 
     /// Send a line and panic with a custom message on failure.
     pub(crate) fn send_line(&mut self, line: impl AsRef<str>, message: &str) -> &mut Self {
-        self.inner.send_line(line).expect(message);
+        expectrl::Expect::send_line(&mut self.inner, line.as_ref()).expect(message);
         self
     }
 
@@ -317,7 +324,7 @@ impl PtySession {
 
 #[cfg(unix)]
 impl std::ops::Deref for PtySession {
-    type Target = expectrl::Session;
+    type Target = expectrl::session::OsSession;
 
     fn deref(&self) -> &Self::Target {
         &self.inner
@@ -557,7 +564,7 @@ impl ProjectBuilder {
     ///
     /// # Examples
     /// ```
-    /// .test_file_from_path("test", "tests/ffi/get_config.tolk")
+    /// .test_file_from_path("test", "tests/integration/ffi/get_config.tolk")
     /// ```
     pub(crate) fn test_file_from_path(mut self, name: &str, path: &str) -> Self {
         let code = fs::read_to_string(path)
