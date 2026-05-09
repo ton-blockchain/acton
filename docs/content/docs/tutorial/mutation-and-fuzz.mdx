@@ -5,10 +5,6 @@ description: "Use acton test --mutate to find untested mutations and @test.fuzz 
 
 import { Callout } from "fumadocs-ui/components/callout";
 
-<Callout type="info" title="Optional page">
-  This page is independent of pages 6–9. Skip it now and return later if needed.
-</Callout>
-
 Coverage tells which lines ran — not whether tests would catch a bug in them. This page introduces two complementary techniques:
 
 - **Mutation testing**: deliberately breaks the contract code and checks whether tests notice
@@ -24,7 +20,7 @@ The mutation engine makes small, deliberate changes — for example, changing `o
 acton test --mutate --mutate-contract Voter
 ```
 
-```acton-cli
+```acton-cli-mutate
 $ acton test --mutate --mutate-contract Voter
 
 Mutation Testing

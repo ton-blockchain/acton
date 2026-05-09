@@ -688,7 +688,7 @@ acton script contracts/scripts/deploy.tolk --net testnet --verbose --show-bodies
 
 Use [`acton verify`](/docs/commands/verify) to check that the deployed bytecode matches the local sources. It compiles local sources, uploads them to the verifier backend, collects the required signatures, and submits the verification transaction.
 
-```bash
+```acton-cli
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS>
 ```
 
@@ -698,7 +698,7 @@ Verification requires a [funded wallet](#set-up-a-wallet). If there is more than
 
 Use `--dry-run` to compile and upload sources without consuming funds to send the verification message:
 
-```bash
+```acton-cli
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
 ```
 
@@ -724,7 +724,7 @@ In addition to commonly used commands like `acton test`, AI agents can also bene
 
 Use [`acton rpc`](/docs/commands/rpc) to query remote blockchain account and contract state via TON Center APIs:
 
-```bash
+```acton-cli
 acton rpc info <CONTRACT_ADDRESS> --net testnet
 ```
 
@@ -736,7 +736,7 @@ acton rpc block-number --net testnet
 
 Render a transaction trace as a decoded tree with `rpc trace`:
 
-```bash
+```acton-cli
 acton rpc trace <TX_HASH> --net testnet
 ```
 

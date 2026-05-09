@@ -18,7 +18,7 @@ import {pageSchema} from "fumadocs-core/source/schema"
 import {z} from "zod"
 
 export const docs = defineDocs({
-  dir: "fake-docs",
+  dir: "content/docs",
   docs: {
     schema: pageSchema.extend({
       description: z.string(),

@@ -140,19 +140,17 @@ get fun `test voter rejects direct vote`() {
 }
 ```
 
-<Callout type="tip">
-  `poll.calcVoterAddress()` comes from the generated wrapper. If it is missing, add this getter to `Poll.tolk` and regenerate the wrapper with `acton wrapper Poll`:
+`poll.calcVoterAddress()` comes from the generated wrapper. If it is missing, add this getter to `Poll.tolk` and regenerate the wrapper with `acton wrapper Poll`:
 
-  ```tolk
-  get fun calcVoterAddress(voter: address): address {
-      val init = ContractState {
-          code: voterCompiledCode(),
-          data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
-      };
-      return AutoDeployAddress { stateInit: init }.calculateAddress();
-  }
-  ```
-</Callout>
+```tolk
+get fun calcVoterAddress(voter: address): address {
+  val init = ContractState {
+      code: voterCompiledCode(),
+      data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
+  };
+  return AutoDeployAddress { stateInit: init }.calculateAddress();
+}
+```
 
 Run coverage again — coverage should be above 90% for both contracts.
 

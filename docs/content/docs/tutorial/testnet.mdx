@@ -42,7 +42,7 @@ acton wallet list --balance
 acton script scripts/deploy.tolk --net testnet
 ```
 
-<Callout type="caution">
+<Callout type="tip">
   The deploy script calls `scripts.wallet("deployer")`. Pass `WALLET=testnet-deployer` as an environment variable, or update the script to use `scripts.wallet("testnet-deployer")` for testnet runs.
 </Callout>
 
@@ -62,11 +62,11 @@ Acton prints a link to the transaction on the testnet explorer.
 
 ## Inspect on-chain state
 
-```bash
+```acton-cli
 acton rpc info <POLL_ADDRESS> --net testnet
 ```
 
-`<POLL_ADDRESS>` — the address printed by the deploy script.
+`<POLL_ADDRESS>` — the address printed by the deployment script.
 
 ```acton-cli
 $ acton rpc info EQC9R1p... --net testnet
@@ -85,7 +85,7 @@ $ acton rpc info EQC9R1p... --net testnet
 
 Source verification proves the deployed bytecode was compiled from specific source files, letting users inspect the source in a blockchain explorer.
 
-```bash
+```acton-cli
 acton verify Poll --address <POLL_ADDRESS> --net testnet
 ```
 
@@ -99,7 +99,7 @@ $ acton verify Poll --address EQC9R1p... --net testnet
 
 ## Send a vote and retrace the transaction
 
-```bash
+```acton-cli
 acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
 ```
 
@@ -110,13 +110,13 @@ Results: option0=1, option1=0
 
 Use `acton retrace` with the contract source to get source-level line mapping:
 
-```bash
+```acton-cli
 acton retrace <TX_HASH> --net testnet --contract Poll
 ```
 
 `<TX_HASH>` — the transaction hash printed by the vote script.
 
-```acton-cli
+```acton-cli-trace
 $ acton retrace 3b9c... --net testnet --contract Poll
   Fetching transaction 3b9c...
 
@@ -135,7 +135,7 @@ $ acton retrace 3b9c... --net testnet --contract Poll
 
 ## Checkpoint
 
-The poll is live and verified on testnet:
+The poll is live and verified on the testnet:
 
 - Deploy with `acton script scripts/deploy.tolk --net testnet`
 - Inspect state with `acton rpc info --net testnet`
