@@ -10,8 +10,8 @@ contract JettonMinter {
     author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard Jetton Minter. TEP-74 and TEP-89 compliant"
-    incomingMessages: AllowedMessageToMinter
     storage: MinterStorage
+    incomingMessages: AllowedMessageToMinter
 }
 
 type AllowedMessageToMinter =

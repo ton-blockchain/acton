@@ -8,9 +8,9 @@ contract WalletV5 {
     author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Wallet V5. Extensible wallet with plugins support"
+    storage: Storage
     incomingMessages: AllowedMessageToWalletV5
     incomingExternal: ExternalMsgSchema
-    storage: Storage
 }
 
 const SIZE_SIGNATURE = 512

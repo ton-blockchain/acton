@@ -10,8 +10,8 @@ contract JettonWallet {
     author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard Jetton Wallet. TEP-74 and TEP-89 compliant"
-    incomingMessages: AllowedMessageToWallet
     storage: WalletStorage
+    incomingMessages: AllowedMessageToWallet
 }
 
 type AllowedMessageToWallet =

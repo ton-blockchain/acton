@@ -698,7 +698,41 @@ fn test_new_empty_project_with_app_flag() {
             .join("contracts/wrappers/Empty.gen.tolk")
             .exists()
     );
+    assert!(project_dir.join("wrappers-ts/Empty.gen.ts").exists());
     assert!(!project_dir.join("app/src/app.css").exists());
+}
+
+#[test]
+fn test_new_empty_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-empty-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("Empty App Project")
+        .arg("--description")
+        .arg("empty app description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/new/test_new_empty_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/new/test_new_empty_app_project_with_agents_flag.agents.md.gen",
+        );
 }
 
 #[test]

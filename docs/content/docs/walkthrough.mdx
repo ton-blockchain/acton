@@ -72,13 +72,13 @@ npm ci
 The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [`acton wallet`](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
 
 ```acton-cli
-acton run deploy-emulation --net testnet
+acton run deploy-testnet
 ```
 
 Output:
 
 ```acton-cli-trace
-$ acton run deploy-emulation --net testnet
+$ acton run deploy-testnet
    Compiling contracts
     Finished in 712.5ms
 N/A -> deployer A
@@ -237,7 +237,7 @@ Output:
 
 ```acton-cli-wrapper
 $ acton wrapper --all
-   Generated wrappers/Counter.tolk
+   Generated wrappers/Counter.gen.tolk
    Generated contracts/tests/Counter.test.tolk
 ```
 
@@ -257,7 +257,7 @@ acton wrapper Counter --ts
 
 ```acton-cli-wrapper
 $ acton wrapper Counter --ts
-   Generated wrappers-ts/Counter.ts
+   Generated wrappers-ts/Counter.gen.ts
 ```
 
 See the [dApp integration guide](/docs/ui-setup) for more information about using TypeScript wrappers.
@@ -280,21 +280,26 @@ $ acton test
 
  TEST  <root>/first_counter
 
- > ./contracts/tests/counter.test.tolk (3 tests)
-  ✓ increase-counter 4ms
-  ✓ reset-counter 3ms
-  ✓ unknown-message 2ms
+ > ./contracts/tests/counter.test.tolk (8 tests)
+  ✓ deploy exposes initial owner 4ms
+  ✓ increase counter 4ms
+  ✓ reset counter 3ms
+  ✓ decrease counter 4ms
+  ✓ decrease counter fails on underflow 3ms
+  ✓ decrease counter fails on overflow 3ms
+  ✓ non-owner cannot change counter 3ms
+  ✓ unknown message 2ms
 
- ✓ 3 passed in 1 file
+ ✓ 8 passed in 1 file
 ```
 
 Other useful `acton test` flags include:
 
-| Flag | Purpose |
-|------|---------|
-| `--filter <regex>` | Run only tests whose name matches the regular expression |
-| `--fail-fast` | Stop after the first failure |
-| `--save-test-trace` | Write TVM execution traces to `build/traces/` |
+| Flag                | Purpose                                                  |
+|---------------------|----------------------------------------------------------|
+| `--filter <regex>`  | Run only tests whose name matches the regular expression |
+| `--fail-fast`       | Stop after the first failure                             |
+| `--save-test-trace` | Write TVM execution traces to `build/traces/`            |
 
 See the [testing guides](/docs/testing/overview) for more.
 

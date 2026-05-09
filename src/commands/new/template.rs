@@ -511,7 +511,7 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
 }
 
 /// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
-/// without any contract files, for `acton init --create-dapp`.
+/// without contract-specific wrappers, for `acton init --create-dapp`.
 pub fn extract_standalone_app_scaffold(
     target_dir: &Path,
     npm_package_name: &str,
@@ -520,6 +520,7 @@ pub fn extract_standalone_app_scaffold(
         &EMPTY_APP_TEMPLATE_DIR,
         target_dir,
         false,
+        true,
         TemplateRenderContext {
             npm_package_name: Some(npm_package_name),
             author: None,
@@ -541,12 +542,19 @@ pub(super) fn create_project_from_scaffold(
 
     if let Some(overlay_dir) = scaffold.app_overlay_dir {
         extract_base_for_app_layout(scaffold.base_dir, target_dir, render_context)?;
-        extract_template_dir(overlay_dir, target_dir, include_agents, render_context)?;
+        extract_template_dir(
+            overlay_dir,
+            target_dir,
+            include_agents,
+            false,
+            render_context,
+        )?;
     } else {
         extract_template_dir(
             scaffold.base_dir,
             target_dir,
             include_agents,
+            false,
             render_context,
         )?;
     }
@@ -596,10 +604,11 @@ fn extract_template_dir(
     dir: &Dir<'static>,
     base_path: &Path,
     include_agents: bool,
+    skip_wrappers_ts: bool,
     render_context: TemplateRenderContext<'_>,
 ) -> std::io::Result<()> {
     for entry in dir.entries() {
-        if !include_agents && should_skip_entry(entry.path()) {
+        if should_skip_entry(entry.path(), include_agents, skip_wrappers_ts) {
             continue;
         }
 
@@ -607,7 +616,13 @@ fn extract_template_dir(
 
         if let Some(subdir) = entry.as_dir() {
             fs::create_dir_all(&path)?;
-            extract_template_dir(subdir, base_path, include_agents, render_context)?;
+            extract_template_dir(
+                subdir,
+                base_path,
+                include_agents,
+                skip_wrappers_ts,
+                render_context,
+            )?;
             continue;
         }
 
@@ -671,7 +686,10 @@ fn escape_tolk_string_content(value: &str) -> String {
         .replace('\t', "\\t")
 }
 
-fn should_skip_entry(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME))
+fn should_skip_entry(path: &Path, include_agents: bool, skip_wrappers_ts: bool) -> bool {
+    (!include_agents
+        && path
+            .file_name()
+            .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME)))
+        || (skip_wrappers_ts && path.starts_with("wrappers-ts"))
 }
