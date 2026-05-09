@@ -47,8 +47,8 @@ struct (0x73696E74) InternalSignedRequest {
 }
 
 struct ExternalMsgSchema {
-    signature: bits512
     signedData: ExternalSignedRequest
+    signature: bits512
 }
 
 struct (0x7369676E) ExternalSignedRequest {
