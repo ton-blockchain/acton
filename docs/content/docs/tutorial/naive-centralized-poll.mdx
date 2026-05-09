@@ -1,0 +1,75 @@
+---
+title: "2. First attempt: one contract"
+description: "Sketch the obvious single-contract approach for a poll, then discover why it cannot scale on TON."
+---
+
+## The obvious design
+
+A poll needs to:
+
+1. Accept a `Vote` message from any wallet
+2. Check whether that wallet has voted before
+3. If not, count the vote and record the wallet
+
+The first instinct is to keep everything in one contract, using a dictionary stored in the contract's persistent data:
+
+```tolk
+struct PollStorage {
+    owner:    address
+    option0:  uint32
+    option1:  uint32
+    voters:   map<address, bool>
+}
+```
+
+On each `Vote`, look up the sender in the dict. If absent, add them and increment the count:
+
+```tolk
+// TODO: paste complete example, not a snippet
+// Inside onInternalMessage — Vote branch (not runnable, partial sketch)
+var storage = lazy PollStorage.load();
+
+val alreadyVoted = storage.voters.uget(in.senderAddress) ?? false;
+assert (!alreadyVoted) throw Errors.AlreadyVoted;
+
+storage.voters.uset(in.senderAddress, true);
+if (msg.option == 0) {
+    storage.option0 += 1;
+} else {
+    storage.option1 += 1;
+}
+storage.save();
+```
+
+TODO: give a simple test to run and confirm that things work.
+
+With a small number of voters in a test, it works correctly.
+
+## The wall
+
+TON contracts store persistent data in a **cell tree**. A single cell holds at most 1023 bits and up to 4 references. The full tree must fit in the TVM stack when the contract runs. One `address → bool` entry per voter fills up that tree long before a popular poll ends.
+
+More fundamentally: **TON itself shards**. Different contracts run in parallel on different shards. A single contract holding all voter state becomes a sequential bottleneck — every vote is a write to the same storage.
+
+## The target architecture
+
+The canonical solution on TON is per-user contracts. Instead of one large map, deploy a tiny `Voter` contract per wallet address. The parent `Poll` counts votes — it never stores who voted. Each `Voter` tracks whether its owner has already voted. This pattern is called **sharding** and appears everywhere on TON — Jetton wallets, NFT items, and more.
+
+```
+        Wallet A                   Wallet B
+           │   Vote(option=0)         │   Vote(option=1)
+           ▼                          ▼
+       ┌──────┐                  ┌──────┐
+       │ Poll │ ─── deploy ────► │Voter │ (one per wallet)
+       │      │                  │ (A)  │ hasVoted: false → true
+       │ opt0 │                  └──────┘
+       │ opt1 │
+       └──────┘
+```
+
+- `Poll` holds two counters only: `option0` and `option1`
+- On each `Vote`, `Poll` deploys or messages a `Voter` contract at the deterministic address derived from the sender's wallet
+- `Voter` rejects duplicate votes by throwing an error, which bounces the message back to `Poll`
+- `Poll`'s `onBouncedMessage` reverts the count increment
+
+The next two pages implement this: first the contracts, then the tests that prove it works.

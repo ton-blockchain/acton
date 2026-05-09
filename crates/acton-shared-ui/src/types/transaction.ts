@@ -38,6 +38,7 @@ export type ParsedValue =
   | {
       readonly kind: "scalar"
       readonly value: string
+      readonly rawValue?: string
     }
   | {
       readonly kind: "array"

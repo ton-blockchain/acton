@@ -24,6 +24,16 @@ async function validateExternalLinks() {
 }
 
 function whitelist(url: string): boolean {
+  // TODO: remove after opening the repository
+  if (url.startsWith("https://github.com/ton-blockchain/acton/releases/latest")) {
+    return true
+  }
+
+  // TODO: remove after opening the repository
+  if (url.startsWith("https://github.com/ton-blockchain/setup-acton")) {
+    return true
+  }
+
   return false
 }
 

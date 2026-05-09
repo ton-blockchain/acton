@@ -70,7 +70,7 @@ check-docgen:
     cargo run -- docgen --check # always use latest acton
 
 check-docs:
-    cd docs && bun ci && bun run generated-source && bun run fmt:check && bun run docs-lint && bun run build
+    cd docs && bun ci && bun run generated-source && bun run fmt:check && bun run lint:links:internal && bun run lint:navigation && bun run build
 
 check-schema:
     cargo run -p xtask -- schema --schema acton-toml --check

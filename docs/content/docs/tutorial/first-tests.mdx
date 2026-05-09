@@ -1,0 +1,165 @@
+---
+title: "4. Test the multi-contract flow"
+description: "Write integration tests for Poll and Voter, use the Test UI to see message traces, and expose the duplicate-vote bug."
+---
+
+## Set up the test file
+
+Create `tests/poll.test.tolk`:
+
+```tolk title="tests/poll.test.tolk"
+import "@acton/emulation/network"
+import "@acton/emulation/testing"
+import "@acton/testing/expect"
+
+import "@contracts/types"
+import "@wrappers/Poll.gen"
+
+fun setupTest(): (Poll, Treasury, Treasury, Treasury) {
+    val owner   = testing.treasury("owner");
+    val alice   = testing.treasury("alice");
+    val bob     = testing.treasury("bob");
+
+    val poll = Poll.fromStorage(PollStorage {
+        owner:   owner.address,
+        option0: 0,
+        option1: 0,
+    });
+    val res = poll.deploy(owner.address, { value: ton("0.5") });
+    expect(res).toHaveSuccessfulDeploy({ to: poll.address });
+
+    return (poll, owner, alice, bob);
+}
+```
+
+`setupTest()` deploys Poll and returns four handles. Every test calls `setupTest()` at the top to get a fresh contract — this avoids shared-state bugs common in TypeScript tests.
+
+`testing.treasury("name")` creates a funded test account. Each unique name produces a deterministic address.
+
+## Test a successful vote
+
+```tolk title="tests/poll.test.tolk"
+get fun `test alice votes option 0`() {
+    val (poll, _, alice, _) = setupTest();
+
+    val res = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(res).toHaveAllSuccessfulTxs();
+
+    val (opt0, opt1) = poll.results();
+    expect(opt0).toEqual(1);
+    expect(opt1).toEqual(0);
+}
+```
+
+```bash
+acton test -f "alice votes option 0"
+```
+
+```acton-cli
+$ acton test -f "alice votes option 0"
+   Compiling contracts
+    Finished in 612.44µs
+     Running tests
+
+ TEST  <root>/poll
+
+ > ./tests/poll.test.tolk (1 test)
+  ✓ alice votes option 0  18ms
+
+ ✓ 1 passed in 1 file
+```
+
+## Test independent votes from two wallets
+
+```tolk title="tests/poll.test.tolk"
+get fun `test alice and bob vote for different options`() {
+    val (poll, _, alice, bob) = setupTest();
+
+    val res0 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(res0).toHaveAllSuccessfulTxs();
+
+    val res1 = poll.sendVote(bob.address, 1, { value: ton("0.1") });
+    expect(res1).toHaveAllSuccessfulTxs();
+
+    val (opt0, opt1) = poll.results();
+    expect(opt0).toEqual(1);
+    expect(opt1).toEqual(1);
+}
+```
+
+Each voter has an independent Voter contract, so neither interferes with the other.
+
+## Explore traces in the Test UI
+
+```bash
+acton test --ui
+```
+
+```acton-cli
+$ acton test --ui
+  Test UI started at http://localhost:3000
+```
+
+Open that URL, then click the "alice votes option 0" test and expand its trace. Two transactions appear:
+
+1. `alice → Poll` with `Vote(option=0)` — Poll increments `option0` and sends to Voter
+2. `Poll → Voter` with the same `Vote(option=0)` — Voter sets `hasVoted = true`
+
+Press `Ctrl+C` in the terminal to stop the UI server.
+
+## Expose the duplicate-vote bug
+
+```tolk title="tests/poll.test.tolk"
+get fun `test alice cannot vote twice`() {
+    val (poll, _, alice, _) = setupTest();
+
+    val res1 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(res1).toHaveAllSuccessfulTxs();
+
+    // Alice votes a second time.
+    val res2 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+
+    // After fixing the bounce handler on page 5, this will stay at (1, 0).
+    // Right now Poll does not undo the optimistic increment, so option0 is wrongly 2.
+    val (opt0, _) = poll.results();
+    expect(opt0).toEqual(1);  // fails until page 5
+}
+```
+
+```bash
+acton test
+```
+
+```acton-cli
+$ acton test
+   Compiling contracts
+    Finished in 601.33µs
+     Running tests
+
+ TEST  <root>/poll
+
+ > ./tests/poll.test.tolk (3 tests)
+  ✓ alice votes option 0  18ms
+  ✓ alice and bob vote for different options  22ms
+  ✗ alice cannot vote twice  16ms
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            2,
+            1
+        )
+      └─ at tests/poll.test.tolk:61:5
+
+ ✗ 1 failed in 1 file
+```
+
+The third test fails as expected. Poll increments `option0` to 2 even though Voter correctly rejected the second vote. The bounce signal from Voter never triggers Poll's `onBouncedMessage` because that handler currently does nothing.
+
+<Callout type="tip">
+  Open the Test UI again and click the failing test. The trace shows a red bounce arrow from Voter back to Poll that Poll ignores.
+</Callout>
+
+## Checkpoint
+
+Three tests exist: two passing, one deliberately failing. Leave the failing test in place — it passes once the bounce handler is added on the next page.
+
+**Commands introduced:** `acton test`, `acton test -f`, `acton test --ui`

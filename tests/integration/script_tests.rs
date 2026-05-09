@@ -666,7 +666,7 @@ fn test_script_debug_logs_are_hidden_without_verbose_flag() {
         .success()
         .assert_not_contains("stack(0 values)")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_debug_logs_are_hidden_without_verbose_flag.stdout.txt",
+            "integration/snapshots/script/test_script_debug_logs_are_hidden_without_verbose_flag.stdout.txt",
         );
 }
 
@@ -690,7 +690,7 @@ fn test_script_verbose_flag_is_accepted() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_verbose_flag_is_accepted.stdout.txt",
+            "integration/snapshots/script/test_script_verbose_flag_is_accepted.stdout.txt",
         );
 }
 
@@ -716,7 +716,7 @@ fn test_script_rejects_verbose_level_above_one() {
         .failure()
         .assert_stderr_contains("Verbosity levels above 1 are not supported yet")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_rejects_verbose_level_above_one.stderr.txt",
+            "integration/snapshots/script/test_script_rejects_verbose_level_above_one.stderr.txt",
         );
 }
 
@@ -806,7 +806,7 @@ fn test_script_hides_transaction_bodies_without_show_bodies_flag() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
+            "integration/snapshots/script/test_script_hides_transaction_bodies_without_show_bodies_flag.stdout.txt",
         );
 }
 
@@ -821,7 +821,7 @@ fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
+            "integration/snapshots/script/test_script_shows_transaction_bodies_with_show_bodies_flag.stdout.txt",
         );
 }
 
@@ -945,7 +945,7 @@ fun main(sinkAddress: address) {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
+            "integration/snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
         );
 }
 
@@ -1043,7 +1043,7 @@ fn test_script_accepts_hyphenated_trailing_args() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_accepts_hyphenated_trailing_args.stderr.txt",
+            "integration/snapshots/script/test_script_accepts_hyphenated_trailing_args.stderr.txt",
         );
 }
 
@@ -1119,7 +1119,7 @@ fn test_script_typed_args_print_stdout_snapshot() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_typed_args_print_stdout_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_typed_args_print_stdout_snapshot.stdout.txt",
         );
 }
 
@@ -1141,7 +1141,7 @@ fn test_script_bool_arg_rejects_numeric_alias() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
+            "integration/snapshots/script/test_script_bool_arg_rejects_numeric_alias.stderr.txt",
         );
 }
 
@@ -1170,7 +1170,7 @@ fn test_script_missing_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_missing_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_missing_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -1194,7 +1194,7 @@ fn test_script_extra_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_extra_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_extra_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -1216,7 +1216,7 @@ fn test_script_arg_type_mismatch_reports_type_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
+            "integration/snapshots/script/test_script_arg_type_mismatch_reports_type_error.stderr.txt",
         );
 }
 
@@ -1238,7 +1238,7 @@ fn test_script_map_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_map_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_map_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1260,7 +1260,7 @@ fn test_script_dict_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_dict_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_dict_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1282,7 +1282,7 @@ fn test_script_array_unknown_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_array_unknown_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1311,7 +1311,7 @@ fn test_script_array_arg_print_stdout_snapshot() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_array_arg_print_stdout_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_array_arg_print_stdout_snapshot.stdout.txt",
         );
 }
 
@@ -1333,7 +1333,7 @@ fn test_script_unknown_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_unknown_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1355,7 +1355,7 @@ fn test_script_tuple_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_tuple_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1377,7 +1377,7 @@ fn test_script_lisp_list_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_lisp_list_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1405,7 +1405,7 @@ fn test_script_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1431,7 +1431,7 @@ fn test_script_nullable_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_nullable_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1457,7 +1457,7 @@ fn test_script_array_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_array_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1487,7 +1487,7 @@ fn test_script_struct_flat_args_reports_count_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_struct_flat_args_reports_count_error.stderr.txt",
+            "integration/snapshots/script/test_script_struct_flat_args_reports_count_error.stderr.txt",
         );
 }
 
@@ -1511,7 +1511,7 @@ fn test_script_alias_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_alias_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_alias_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1541,7 +1541,7 @@ fn test_script_nested_struct_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_nested_struct_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1667,7 +1667,9 @@ fn test_script_with_bits_arg() {
         .arg(&cell_hex)
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_script_with_bits_arg.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_with_bits_arg.stdout.txt",
+        );
 }
 
 #[test]
@@ -1694,7 +1696,7 @@ fn test_script_builder_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_builder_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_builder_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1716,7 +1718,7 @@ fn test_script_any_address_arg_reports_unsupported_type() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
+            "integration/snapshots/script/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
         );
 }
 
@@ -1743,7 +1745,7 @@ fn test_script_cell_arg_rejects_prefixed_hex() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
+            "integration/snapshots/script/test_script_cell_arg_rejects_prefixed_hex.stderr.txt",
         );
 }
 
@@ -1844,7 +1846,7 @@ fn test_script_with_invalid_arg() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_with_invalid_arg.stderr.txt",
+            "integration/snapshots/script/test_script_with_invalid_arg.stderr.txt",
         );
 }
 
@@ -1910,7 +1912,7 @@ fn test_script_compilation_error() {
         .failure()
         .assert_stderr_contains("undefined symbol")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_compilation_error.stderr.txt",
+            "integration/snapshots/script/test_script_compilation_error.stderr.txt",
         );
 }
 
@@ -2024,7 +2026,9 @@ fn test_script_custom_exit_code() {
         .run()
         .code(1);
 
-    output.assert_snapshot_matches("integration/snapshots/test_script_custom_exit_code.stdout.txt");
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_custom_exit_code.stdout.txt",
+    );
 }
 
 #[test]
@@ -2054,7 +2058,7 @@ fn test_script_custom_exit_code_from_abi_shows_single_name() {
         .code(1)
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
+            "integration/snapshots/script/test_script_custom_exit_code_from_abi_shows_single_name.stdout.txt",
         );
 }
 
@@ -2078,7 +2082,9 @@ fn test_script_success_exit_code() {
         .script("scripts/success.tolk")
         .run()
         .code(0)
-        .assert_snapshot_matches("integration/snapshots/test_script_success_exit_code.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_success_exit_code.stdout.txt",
+        );
 }
 
 #[test]
@@ -2103,7 +2109,7 @@ fn test_script_known_exit_code_shows_description_and_phase() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_known_exit_code_shows_description_and_phase.stdout.txt",
+            "integration/snapshots/script/test_script_known_exit_code_shows_description_and_phase.stdout.txt",
         );
 }
 
@@ -2137,7 +2143,7 @@ fn test_script_known_exit_code_shows_backtrace_with_full_mode() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
+            "integration/snapshots/script/test_script_known_exit_code_shows_backtrace_with_full_mode.stdout.txt",
         );
 }
 
@@ -2176,7 +2182,7 @@ fn test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name()
         .code(1)
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
+            "integration/snapshots/script/test_script_custom_exit_code_from_abi_with_backtrace_full_shows_single_name.stdout.txt",
         );
 }
 
@@ -2202,7 +2208,7 @@ fn test_script_invalid_message_exit_code_shows_description_and_phase() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_invalid_message_exit_code_shows_description_and_phase.stdout.txt",
+            "integration/snapshots/script/test_script_invalid_message_exit_code_shows_description_and_phase.stdout.txt",
         );
 }
 
@@ -2236,7 +2242,7 @@ fn test_script_assert_failure_formats_detailed_output() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_assert_failure_formats_detailed_output.stdout.txt",
+            "integration/snapshots/script/test_script_assert_failure_formats_detailed_output.stdout.txt",
         );
 }
 
@@ -2290,7 +2296,7 @@ fn test_script_to_have_tx_not_found_shows_transaction_search_details() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_to_have_tx_not_found_shows_transaction_search_details.stdout.txt",
+            "integration/snapshots/script/test_script_to_have_tx_not_found_shows_transaction_search_details.stdout.txt",
         );
 }
 
@@ -2318,7 +2324,7 @@ fn test_script_run_get_method_on_undeployed_contract_shows_actionable_error() {
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_run_get_method_on_undeployed_contract_shows_actionable_error.stdout.txt",
+            "integration/snapshots/script/test_script_run_get_method_on_undeployed_contract_shows_actionable_error.stdout.txt",
         );
 }
 
@@ -2363,7 +2369,7 @@ fn test_script_run_get_method_on_contract_without_code_shows_actionable_error() 
         .run()
         .code(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_run_get_method_on_contract_without_code_shows_actionable_error.stdout.txt",
+            "integration/snapshots/script/test_script_run_get_method_on_contract_without_code_shows_actionable_error.stdout.txt",
         );
 }
 
@@ -2389,7 +2395,9 @@ fn test_script_output_snapshot() {
         .script("scripts/output.tolk")
         .run()
         .code(0)
-        .assert_snapshot_matches("integration/snapshots/test_script_output_snapshot.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_output_snapshot.stdout.txt",
+        );
 }
 
 #[test]
@@ -2416,7 +2424,7 @@ fn test_script_multi_arg_println_helpers_snapshot() {
         .run()
         .code(0)
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_multi_arg_println_helpers_snapshot.stdout.txt",
         );
 }
 
@@ -2446,7 +2454,7 @@ fn test_script_invalid_network() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_invalid_network.stderr.txt",
+            "integration/snapshots/script/test_script_invalid_network.stderr.txt",
         );
 }
 
@@ -2462,7 +2470,7 @@ fn test_script_empty_script_file() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_empty_script_file.stderr.txt",
+            "integration/snapshots/script/test_script_empty_script_file.stderr.txt",
         );
 }
 
@@ -2487,7 +2495,7 @@ fn test_script_no_main_function() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_no_main_function.stderr.txt",
+            "integration/snapshots/script/test_script_no_main_function.stderr.txt",
         );
 }
 
@@ -2500,7 +2508,9 @@ fn test_script_empty_path() {
         .script("")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches("integration/snapshots/test_script_empty_path.stderr.txt");
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/script/test_script_empty_path.stderr.txt",
+        );
 }
 
 #[test]
@@ -2534,7 +2544,7 @@ fn test_script_file_without_read_permission() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_file_without_read_permission.stderr.txt",
+            "integration/snapshots/script/test_script_file_without_read_permission.stderr.txt",
         );
 }
 
@@ -2589,7 +2599,7 @@ keys = { mnemonic-file = "mnemonic.txt" }
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_with_wallets.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet_with_wallets.stderr.txt",
         );
 }
 
@@ -2634,7 +2644,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet.stderr.txt",
         );
 }
 
@@ -2680,7 +2690,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_with_nonexistent_wallet_empty_config.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_with_nonexistent_wallet_empty_config.stderr.txt",
         );
 }
 
@@ -2748,7 +2758,7 @@ keys = { mnemonic-file = "mnemonic.txt" }
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_wallet_exposes_key_helpers_for_v5.stdout.txt",
+            "integration/snapshots/script/test_script_broadcast_wallet_exposes_key_helpers_for_v5.stdout.txt",
         );
 }
 
@@ -2777,7 +2787,7 @@ fn test_script_wallet_key_pair_requires_open_broadcast_wallet() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wallet_key_pair_requires_open_broadcast_wallet.stdout.txt",
+        "integration/snapshots/script/test_script_wallet_key_pair_requires_open_broadcast_wallet.stdout.txt",
     );
 }
 
@@ -2806,7 +2816,7 @@ fn test_script_wallet_id_requires_open_broadcast_wallet() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wallet_id_requires_open_broadcast_wallet.stdout.txt",
+        "integration/snapshots/script/test_script_wallet_id_requires_open_broadcast_wallet.stdout.txt",
     );
 }
 
@@ -2835,7 +2845,7 @@ fn test_script_broadcast_treasury_recommends_wallet_api() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_treasury_recommends_wallet_api.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_treasury_recommends_wallet_api.stdout.txt",
     );
 }
 
@@ -2860,7 +2870,7 @@ fn test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_wallet_rejection_shows_actionable_toncenter_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2888,7 +2898,7 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_without_state_init_shows_wallet_setup_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -2916,7 +2926,7 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdrop_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -3118,7 +3128,7 @@ fun main() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
+        "integration/snapshots/script/test_script_fork_block_number_is_forwarded_to_remote_account_requests.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter must finish");
@@ -3132,7 +3142,7 @@ fun main() {
     .expect("failed to write captured script fork-block request log");
     output.assert_file_snapshot_matches(
         "script-fork-block-requests.txt",
-        "integration/snapshots/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+        "integration/snapshots/script/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
     );
 }
 
@@ -3190,7 +3200,7 @@ fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace(
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.deploy_block.stdout.txt",
+            "integration/snapshots/script/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.deploy_block.stdout.txt",
         );
 
     fs::write(
@@ -3227,7 +3237,7 @@ fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace(
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
+            "integration/snapshots/script/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
         );
 
     node.stop();
@@ -3256,7 +3266,7 @@ fn test_script_broadcast_rejects_conflicting_net_and_fork_net() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
+            "integration/snapshots/script/test_script_broadcast_rejects_conflicting_net_and_fork_net.stderr.txt",
         );
 }
 
@@ -3283,7 +3293,7 @@ fn test_script_rejects_non_numeric_fork_block_number() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_rejects_non_numeric_fork_block_number.stderr.txt",
+            "integration/snapshots/script/test_script_rejects_non_numeric_fork_block_number.stderr.txt",
         );
 }
 
@@ -3305,7 +3315,7 @@ fn test_script_tonconnect_requires_net() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_tonconnect_requires_net.stderr.txt",
+            "integration/snapshots/script/test_script_tonconnect_requires_net.stderr.txt",
         );
 }
 
@@ -3328,7 +3338,7 @@ fn test_script_tonconnect_rejects_localnet() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_tonconnect_rejects_localnet.stderr.txt",
+            "integration/snapshots/script/test_script_tonconnect_rejects_localnet.stderr.txt",
         );
 }
 
@@ -3353,7 +3363,7 @@ fn test_script_wait_for_trace_returns_full_trace_on_localnet() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
+        "integration/snapshots/script/test_script_wait_for_trace_returns_full_trace_on_localnet.stdout.txt",
     );
 
     let stdout = output.get_stdout();
@@ -3402,7 +3412,7 @@ fn test_script_wait_for_trace_timeout_prints_null() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_wait_for_trace_timeout_prints_null.stdout.txt",
+            "integration/snapshots/script/test_script_wait_for_trace_timeout_prints_null.stdout.txt",
         )
         .assert_not_contains("not a TVM tuple");
 
@@ -3431,7 +3441,7 @@ fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
         .success();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
+        "integration/snapshots/script/test_script_wait_for_first_transaction_returns_root_on_localnet.stdout.txt",
     );
 
     let stdout = output.get_stdout();
@@ -3477,7 +3487,7 @@ fn test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_missing_account_state_with_state_init_shows_deploy_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -3509,7 +3519,7 @@ fn test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint() {
         .failure();
 
     output.assert_snapshot_matches(
-        "integration/snapshots/test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint.stdout.txt",
+        "integration/snapshots/script/test_script_broadcast_wallet_rejection_with_state_init_shows_deploy_hint.stdout.txt",
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
@@ -3801,7 +3811,7 @@ fn test_script_env_vars_support_coins() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_env_vars_support_coins.stdout.txt",
+            "integration/snapshots/script/test_script_env_vars_support_coins.stdout.txt",
         );
 }
 
@@ -3889,7 +3899,9 @@ fn test_println_nullable_values() {
         .script("scripts/env.tolk")
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_println_nullable_values.stderr.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_nullable_values.stderr.txt",
+        );
 }
 
 #[test]
@@ -3916,7 +3928,7 @@ fn test_println_non_empty_map_values() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_non_empty_map_values.stderr.txt",
+            "integration/snapshots/println/test_println_non_empty_map_values.stderr.txt",
         );
 }
 
@@ -3944,7 +3956,9 @@ fn test_println_empty_map_values() {
         .script("scripts/map_empty_values.tolk")
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_println_empty_map_values.stderr.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_empty_map_values.stderr.txt",
+        );
 }
 
 #[test]
@@ -3992,7 +4006,7 @@ fn test_println_map_supported_key_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_supported_key_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_supported_key_types.stderr.txt",
         );
 }
 
@@ -4066,7 +4080,7 @@ fn test_println_map_supported_value_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_supported_value_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_supported_value_types.stderr.txt",
         );
 }
 
@@ -4103,7 +4117,7 @@ fn test_println_map_fallback_for_unformattable_types() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_fallback_for_unformattable_types.stderr.txt",
+            "integration/snapshots/println/test_println_map_fallback_for_unformattable_types.stderr.txt",
         );
 }
 
@@ -4138,7 +4152,7 @@ fn test_println_map_retyped_from_low_level_dict_parse_failures() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
+            "integration/snapshots/println/test_println_map_retyped_from_low_level_dict_parse_failures.stderr.txt",
         );
 }
 
@@ -4173,7 +4187,7 @@ fn test_println_map_struct_value_falls_back_to_raw_hex() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
+            "integration/snapshots/println/test_println_map_struct_value_falls_back_to_raw_hex.stderr.txt",
         );
 }
 
@@ -4408,7 +4422,7 @@ fun main() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_snapshot.stdout.txt",
         );
 }
 
@@ -4510,10 +4524,10 @@ fun main() {
 
     output
         .assert_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_vm_exit_snapshot.stdout.txt",
         )
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
+            "integration/snapshots/script/test_script_predicate_transaction_matchers_vm_exit_snapshot.stderr.txt",
         );
 }
 

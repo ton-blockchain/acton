@@ -16,7 +16,7 @@
     └─ Test output:
        N/A -> sender A
        └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1828
-           └── FmRelay 0.1994148 TON -> fm_linear_mid C                                gas=1782
+           └── FmRelay 0.199902466 TON -> fm_linear_mid C                              gas=1782
                └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
 
  ✓ 1 passed in 1 file

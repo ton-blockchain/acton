@@ -38,6 +38,24 @@ const getBodyTypeName = (symbols: SymTable, bodyTyIdx: number): string => {
   return renderTy(symbols, bodyTyIdx)
 }
 
+const hasAcceptableMessageDecodeRemainder = (
+  initialSlice: Slice,
+  parser: Slice,
+): boolean => {
+  if (parser.remainingRefs !== 0) {
+    return false
+  }
+
+  // Some message schemas leave trailing bits outside the ABI payload
+  // (for example, attached signatures). Accept them as long as decoding
+  // consumed something and did not leave trailing refs behind.
+  return (
+    parser.remainingBits === 0 ||
+    parser.remainingBits < initialSlice.remainingBits ||
+    parser.remainingRefs < initialSlice.remainingRefs
+  )
+}
+
 const getBodyTypeKey = (bodyTyIdx: number): string => {
   return `ty#${bodyTyIdx}`
 }
@@ -282,6 +300,15 @@ const formatSerializedCellPreview = (
   return `${typeName}(${formatHexPreview(hex)})`
 }
 
+const toSerializedCellScalar = (
+  typeName: "Cell" | "Slice" | "Builder",
+  cell: Cell,
+): ParsedValue => ({
+  kind: "scalar",
+  value: formatSerializedCellPreview(typeName, cell),
+  rawValue: cell.toBoc({idx: false, crc32: false}).toString("hex"),
+})
+
 const toParsedValue = (value: unknown): ParsedValue => {
   if (value === null) {
     return {kind: "null"}
@@ -304,15 +331,15 @@ const toParsedValue = (value: unknown): ParsedValue => {
   }
 
   if (value instanceof Cell) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Cell", value)}
+    return toSerializedCellScalar("Cell", value)
   }
 
   if (value instanceof Slice) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Slice", value.asCell())}
+    return toSerializedCellScalar("Slice", value.asCell())
   }
 
   if (value instanceof Builder) {
-    return {kind: "scalar", value: formatSerializedCellPreview("Builder", value.asCell())}
+    return toSerializedCellScalar("Builder", value.asCell())
   }
 
   if (value instanceof Dictionary) {
@@ -421,7 +448,7 @@ const tryDecodeMessageWithCandidates = (
     const parser = baseSlice.clone()
     try {
       const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty_idx, parser) as unknown
-      if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
+      if (!hasAcceptableMessageDecodeRemainder(baseSlice, parser)) {
         continue
       }
 

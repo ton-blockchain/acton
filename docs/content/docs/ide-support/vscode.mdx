@@ -17,6 +17,11 @@ The extension is compatible with:
 - VSCodium;
 - And other VS Code-based editors.
 
+## Recommended TOML extension
+
+We recommend installing [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
+as well. With it installed, `Acton.toml` gets completion and hover documentation in VS Code-based editors.
+
 ## `Acton.toml` support
 
 ### Quick actions
@@ -35,6 +40,20 @@ Code lenses allow running builds and tests directly from the `Acton.toml` file.
 
 ![](imgs/vscode/acton-toml-run-script.png)
 
+## Contract actions
+
+For contracts declared in Tolk files, the extension adds code lenses to build the contract and
+generate Tolk or TypeScript wrappers.
+
+![](imgs/vscode/contract-actions.png)
+
+## Disassembly
+
+The extension can open an assembly preview for a Tolk contract, making it easier to inspect the
+compiled code without leaving the editor.
+
+![](imgs/vscode/disassembly.png)
+
 ## Testing
 
 ### Native test runner
@@ -42,6 +61,7 @@ Code lenses allow running builds and tests directly from the `Acton.toml` file.
 Acton tests integrate with the IDE's native test runner, providing a hierarchical view and progress indicators.
 
 ![](imgs/vscode/test-runner.png)
+![](imgs/vscode/test-runner-tree.png)
 
 For convenient execution, the plugin provides a test run icon in the editor.
 
@@ -52,6 +72,13 @@ For convenient execution, the plugin provides a test run icon in the editor.
 When a test fails, the plugin highlights the specific `expect` call that failed and changes the test icon.
 
 ![](imgs/vscode/fail-tests.png)
+
+### Debugging
+
+Set breakpoints in Tolk tests and contracts, start
+debugging from the editor, and inspect stack frames, local values, and TVM registers.
+
+![](imgs/vscode/debug.png)
 
 ### Code coverage
 
@@ -79,3 +106,17 @@ The Wallets View allows managing project wallets, including generation, import v
 Scripts can be executed via code lenses:
 
 ![](imgs/vscode/scripts-run.png)
+
+### Terminal links
+
+TON addresses in Acton terminal output are converted into clickable links that open the configured
+block explorer.
+
+![](imgs/vscode/terminal-links.png)
+
+### Linting
+
+The extension runs `acton check` for Tolk files and reports diagnostics directly in the editor.
+Available fixes can be applied from the Problems panel or the inline quick-fix menu.
+
+![](imgs/vscode/check.png)

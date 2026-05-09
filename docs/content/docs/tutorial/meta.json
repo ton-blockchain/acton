@@ -1,13 +1,16 @@
 {
-  "title": "Tutorial",
+  "title": "Your First Smart Contract",
   "icon": "School",
   "pages": [
-    "overview.mdx",
-    "project-init.mdx",
-    "your-first-unit-test-in-tolk",
-    "your-first-integration-test-in-tolk",
-    "setup-wallets.mdx",
-    "contract-deployment.mdx",
-    "contract-verification.mdx"
+    "overview",
+    "scaffolding",
+    "naive-centralized-poll",
+    "splitting-contracts",
+    "first-tests",
+    "bounces-as-feedback",
+    "mutation-and-fuzz",
+    "close-and-owner",
+    "testnet",
+    "frontend"
   ]
 }

@@ -18,7 +18,7 @@
            ├── Action phase failed
            ├── Description: Not enough Toncoin
            └── Executed actions:
-               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL  balance: 0.0990612 TON  at contracts/fm_action_fail[LINE]
-               └── empty 0.5 TON -> EQBS+c..jFM7dP        balance: 0 TON          at contracts/fm_action_fail[LINE]
+               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL  balance: 0.099843532 TON  at contracts/fm_action_fail[LINE]
+               └── empty 0.5 TON -> EQBS+c..jFM7dP        balance: 0 TON            at contracts/fm_action_fail[LINE]
 
  ✓ 1 passed in 1 file

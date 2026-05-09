@@ -1,21 +1,15 @@
 ---
-title: "Fuzz Testing"
+title: "Fuzz testing"
 description: "Run parameterized tests with generated inputs, assumptions, and bounds"
 ---
 
-Fuzz testing means running the same parameterized test many times with
-automatically generated argument values.
+Fuzz testing means running the same parameterized test many times with automatically generated argument values.
 
-In Acton, a fuzz test is just a test function with parameters, for example
-`(value: int, flag: bool)`. The runner generates different values for those
-parameters and re-runs the test until all configured runs pass or one run
-fails.
+In Acton, a fuzz test is just a test function with parameters, for example `(value: int, flag: bool)`. The runner generates different values for those parameters and re-runs the test until all configured runs pass or one run fails.
 
-Acton does not fuzz parameterized tests unless you mark them with one of the
-supported dotted annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or
-`@test.fuzz({ ... })`.
+Acton does not fuzz parameterized tests unless they carry one of the supported dotted annotations: `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`.
 
-## What Happens During a Fuzz Test
+## What happens during a fuzz test
 
 For each fuzz test, Acton:
 
@@ -24,10 +18,9 @@ For each fuzz test, Acton:
 3. runs the test with those values
 4. repeats the process until it reaches the configured run count or finds a failure
 
-If one generated case fails, the fuzz test stops and Acton reports that failing
-input.
+If one generated case fails, the fuzz test stops and Acton reports that failing input.
 
-## Opt In Per Test
+## Opt in per test
 
 Use `@test.fuzz` to enable fuzzing with defaults,
 `@test.fuzz(<runs>)` to override the number of runs for a single test,
@@ -65,7 +58,7 @@ Rules:
 - Legacy `@test({ fuzz: ... })` is ignored by the runner.
 - `runs` means how many generated cases Acton should execute for that test.
 
-## Supported Parameter Types
+## Supported parameter types
 
 Acton currently fuzzes these parameter types:
 
@@ -77,15 +70,13 @@ Acton currently fuzzes these parameter types:
 
 Types such as `bits`, `bytes`, `cell`, structs, containers, and tuple-like values are not supported yet.
 
-## Assumptions and Bounds
+## Assumptions and bounds
 
 Import `@acton/testing/fuzz` to access fuzz-specific helpers.
 
-Use `fuzz.assume(...)` when the property you want to test only applies to part
-of the generated input space.
+Use `fuzz.assume(...)` when the property under test applies only to part of the generated input space.
 
-If the condition is false, the current generated case is discarded and Acton
-tries another one. That rejected case does not count toward `runs`.
+If the condition is false, the current generated case is discarded and Acton tries another one. That rejected case does not count toward `runs`.
 
 Outside fuzz tests, the same call fails the test.
 
@@ -100,9 +91,7 @@ get fun `test only positive values`(value: int) {
 }
 ```
 
-`fuzz.bound(...)` maps integer-like values into an inclusive range with wrap
-behavior. This is useful when your test accepts only a smaller range than the
-full range of the generated type.
+`fuzz.bound(...)` maps integer-like values into an inclusive range with wrap-around. Use it when the test accepts a smaller range than the generated type allows.
 
 ```tolk
 import "@acton/testing/expect"
@@ -118,7 +107,7 @@ get fun `test transfer amounts`(rawAmount: int, rawRecipient: address?) {
 }
 ```
 
-## Configure Defaults
+## Configure defaults
 
 Store project-wide defaults in `Acton.toml`:
 
@@ -139,7 +128,7 @@ seed = 42
 - When `seed` is omitted, Acton picks a new seed for each `acton test` run and shows it in console output.
 - When `max-test-rejects` is omitted, Acton uses `runs * 256`.
 
-## Failure Reporting
+## Failure reporting
 
 Acton stops at the first failing generated case and reports:
 
@@ -148,5 +137,4 @@ Acton stops at the first failing generated case and reports:
 - the first failing run number
 - the generated input values for that failing case
 
-When too many inputs are rejected by `fuzz.assume(...)`, Acton fails the test
-with an error saying that the rejection limit was reached.
+When too many inputs are rejected by `fuzz.assume(...)`, Acton fails the test with an error saying that the rejection limit was reached.

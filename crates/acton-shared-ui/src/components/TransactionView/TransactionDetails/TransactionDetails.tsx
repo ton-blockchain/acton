@@ -388,10 +388,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip
-                    exitCode={computePhase.exitCode}
-                    abi={targetContract?.abi}
-                  />
+                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>

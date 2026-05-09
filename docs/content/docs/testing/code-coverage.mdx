@@ -1,41 +1,33 @@
 ---
-title: "Code Coverage"
+title: "Code coverage"
 description: "Learn how to measure and analyze code coverage in your Tolk smart contract tests"
 ---
 
-Code coverage is a metric that measures how much of your code is executed during testing. It helps you identify untested parts of your codebase and ensure comprehensive test suites. Acton's test runner provides built-in code coverage support with detailed reporting, LCOV export, and a browser UI coverage view.
+Code coverage is a metric that reports how much contract source is executed during tests. It helps identify untested parts of the codebase.
 
-## What is Code Coverage?
-
-Code coverage measures the percentage of your code that is executed when running tests. It helps answer questions like:
-
-- Which parts of my code are tested?
-- Are there dead code paths?
-- How thorough are my tests?
-- Where should I add more tests?
-
-Acton's test runner reports:
+Acton's test runner reports line, branch, and blended score metrics:
 
 - **Line coverage**: executable source lines that were hit during test runs
 - **Branch coverage**: observed branch outcomes that were hit at runtime
 - **Score**: a blended metric that combines both numbers for quick comparison
 
-## Enabling Coverage
+Additionally, it can export coverage data in the [LCOV format](https://en.wikipedia.org/wiki/Gcov#Coverage_summaries) and present the Test UI coverage view in the browser.
 
-### Command Line Flag
+## Enable coverage
 
-To enable coverage collection, use the `--coverage` flag:
+### Command-line flag
+
+Run tests with `--coverage`:
 
 ```bash
 acton test --coverage
 ```
 
-This will run all tests and collect coverage data, then display a summary report.
+That collects coverage for the selected tests and prints a summary table afterward.
 
-### Coverage in Test UI
+### Coverage in the Test UI
 
-To inspect coverage in the browser UI, run tests with both `--coverage` and
-`--ui`:
+Run tests with `--coverage` and `--ui` together:
 
 ```bash
 acton test --coverage --ui
@@ -47,12 +39,11 @@ When both flags are enabled, Test UI shows a `Coverage` tab with:
 - sortable file list
 - per-file source view with annotated lines
 
-You do not need to pass `--coverage-format lcov` for the browser view. The UI
-receives coverage data automatically for the current run.
+The browser view does not require `--coverage-format lcov`; the UI receives coverage for the current run automatically.
 
-### Coverage for Specific Tests
+### Coverage with filters
 
-You can combine coverage with other flags:
+Combine `--coverage` with file paths or `--filter` as usual:
 
 ```bash
 # Run specific test file with coverage
@@ -67,16 +58,16 @@ By default, Acton excludes:
 - `.test.tolk` files
 - files under the `@wrappers` mapping
 
-Use these flags when you want them in the report:
+Pass these flags to include those sources in the report:
 
 ```bash
 acton test --coverage --coverage-include-tests
 acton test --coverage --coverage-include-wrappers
 ```
 
-## Understanding Coverage Reports
+## Read coverage reports
 
-When you enable coverage, you'll see a detailed report after test execution:
+With `--coverage`, Acton prints a table after the run:
 
 ```
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -86,7 +77,7 @@ When you enable coverage, you'll see a detailed report after test execution:
  code/math.tolk               4             4    100.0%                  2                2       100.0%   100.0%
 ```
 
-### Coverage Metrics Explained
+### Coverage columns
 
 - **Covered Lines**: Number of lines that were executed during testing
 - **Total Lines**: Total number of executable lines in the file
@@ -96,7 +87,7 @@ When you enable coverage, you'll see a detailed report after test execution:
 - **% Branches**: Percentage of observed branch outcomes that were hit
 - **Score**: Blended metric used for sorting and quick comparison across files
 
-### Text Report Annotations
+### Text report annotations
 
 The text artifact is line-summary-first, but branch detail still appears inline on executable lines:
 
@@ -110,34 +101,33 @@ When multiple branch sites map to the same source line, Acton keeps them separat
 31 ✓ | return foo != null ? foo : 100; | hits:1 branches:site0 true=0 false=1; site1 true=1 false=0
 ```
 
-## Exporting Coverage Data
+## Export coverage data
 
-### LCOV Format
+### LCOV format
 
-Acton's test runner can export coverage data to LCOV format, which is compatible with many coverage visualization tools like:
+Acton can write LCOV for external tools such as:
 
 - VS Code Coverage Gutters
 - IntelliJ IDEA Coverage
-- lcov tools and report generators
+- LCOV tools and report generators
 
-To generate an LCOV file:
+To emit `lcov.info` in the project root:
 
 ```bash
 acton test --coverage --coverage-format lcov
 ```
 
-This creates a `lcov.info` file in your project root.
+That writes `lcov.info` in the project root.
 
-If you want both browser inspection and an exported LCOV artifact, combine all
-three flags:
+For both the browser view and an LCOV artifact on disk, pass all three flags:
 
 ```bash
 acton test --coverage --ui --coverage-format lcov
 ```
 
-### Using LCOV with External Tools
+### LCOV with other tools
 
-Once you have the `lcov.info` file, you can use various tools:
+After `lcov.info` exists, typical follow-ups include:
 
 ```bash
 # Generate HTML report
@@ -149,20 +139,20 @@ genhtml lcov.info -o coverage-report/
 # Use with other CI/CD tools that support LCOV
 ```
 
-## Best Practices
+## Guidelines
 
-### 1. Aim for High Coverage
+### 1. Set realistic coverage targets
 
-- Target ≥80% line coverage for critical business logic, but don't obsess over 100% coverage
-- Focus on thorough testing of complex functions
+- Aim for high, ≥80% line coverage on critical paths; 100% is rarely worth the cost.
+- Spend effort on complex branches and error paths.
 
-### 2. Understand Coverage Limitations
+### 2. Treat coverage as a signal, not proof
 
-- Coverage doesn't measure test quality
-- 100% coverage doesn't guarantee bug-free code
-- Focus on testing edge cases and error conditions (see [mutation testing](/docs/testing/mutation-testing/overview))
+- Coverage does not measure assertion quality.
+- Full line coverage does not imply absence of bugs.
+- Pair coverage with edge-case tests and, when needed, [mutation testing](/docs/testing/mutation-testing/overview).
 
-## Interpretation Caveats
+## Interpretation caveats
 
 - Executable lines come from source-map debug locations, not from every physical line in the file.
 - The text coverage artifact summarizes only line totals at the top. Branch detail appears inline on annotated executable lines.
@@ -170,19 +160,16 @@ genhtml lcov.info -o coverage-report/
 - Branch totals are runtime-observed, not a full static control-flow denominator for untouched code.
 - `--coverage-minimum-percent` is ignored with `--ui`.
 
-## Troubleshooting
+## Performance
 
-### Performance Considerations
-
-- Coverage collection adds overhead to test execution
-- For large test suites, consider running coverage less frequently
-- Use `--coverage-format lcov` to collect data once and analyze offline
+- Coverage adds execution overhead.
+- For large test suites, run coverage selectively or export LCOV once with `--coverage-format lcov` and inspect offline.
 
 ## Summary
 
-Code coverage helps you:
+Coverage helps with:
 
-1. Measure Test Effectiveness: See which parts of your code are tested
-2. Identify Gaps: Find untested code paths and edge cases
-3. Guide Development: Focus testing efforts where they're most needed
-4. Maintain Quality: Ensure new code doesn't reduce coverage
+1. Measuring reachability: see which code line are tested;
+2. Spotting gaps: find untouched paths or branches;
+3. Prioritizing tests: focus on low-coverage hot spots;
+4. Maintaining itself: ensure new code does not reduce the coverage.

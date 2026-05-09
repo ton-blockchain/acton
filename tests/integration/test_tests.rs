@@ -90,7 +90,9 @@ fn test_unknown_get_method_call() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_unknown_get_method_call.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/test/test_unknown_get_method_call.stdout.txt",
+        );
 }
 
 #[test]
@@ -118,7 +120,7 @@ fn test_unknown_get_method_call_with_backtrace_full() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_unknown_get_method_call_with_backtrace_full.stdout.txt",
+            "integration/snapshots/test/test_unknown_get_method_call_with_backtrace_full.stdout.txt",
         );
 }
 
@@ -147,7 +149,7 @@ fn test_get_method_call_return_type_mismatch() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_return_type_mismatch.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_return_type_mismatch.stdout.txt",
         );
 }
 
@@ -174,7 +176,9 @@ fn test_no_arg_get_method_call() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_no_arg_get_method_call.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/test/test_no_arg_get_method_call.stdout.txt",
+        );
 }
 
 #[test]
@@ -200,7 +204,9 @@ fn test_no_arg_get_method_call_2() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_no_arg_get_method_call_2.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/test/test_no_arg_get_method_call_2.stdout.txt",
+        );
 }
 
 #[test]
@@ -228,7 +234,7 @@ fn test_no_arg_get_method_call_2_with_backtrace_full() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_no_arg_get_method_call_2_with_backtrace_full.stdout.txt",
+            "integration/snapshots/test/test_no_arg_get_method_call_2_with_backtrace_full.stdout.txt",
         );
 }
 
@@ -256,7 +262,7 @@ fn test_get_method_call_shows_exit_code_variant() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_shows_exit_code_variant.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_shows_exit_code_variant.stdout.txt",
         );
 }
 
@@ -285,7 +291,7 @@ fn test_get_method_call_uses_contract_abi_for_custom_exit_code() {
         .failure()
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_uses_contract_abi_for_custom_exit_code.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_uses_contract_abi_for_custom_exit_code.stdout.txt",
         );
 }
 
@@ -315,7 +321,7 @@ fn test_get_method_call_uses_contract_abi_for_custom_exit_code_with_backtrace_fu
         .failure()
         .assert_not_contains("Error: Errors.AbiFailure")
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_uses_contract_abi_for_custom_exit_code_with_backtrace_full.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_uses_contract_abi_for_custom_exit_code_with_backtrace_full.stdout.txt",
         );
 }
 
@@ -344,7 +350,7 @@ fn test_get_method_call_shows_backtrace_with_full_mode() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_shows_backtrace_with_full_mode.stdout.txt",
         );
 }
 
@@ -376,7 +382,7 @@ fn test_get_method_call_shows_backtrace_with_full_mode_from_config() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_get_method_call_shows_backtrace_with_full_mode_from_config.stdout.txt",
+            "integration/snapshots/test/test_get_method_call_shows_backtrace_with_full_mode_from_config.stdout.txt",
         );
 }
 
@@ -401,7 +407,9 @@ fn test_debug_dump_stack_output() {
         .run()
         .success()
         .assert_passed(1)
-        .assert_snapshot_matches("integration/snapshots/test_debug_dump_stack_output.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/test/test_debug_dump_stack_output.stdout.txt",
+        );
 }
 
 #[test]
@@ -433,7 +441,7 @@ fn test_debug_dump_stack_output_mixed_with_stdout_and_stderr() {
         .assert_contains("Test output:")
         .assert_contains("Test stderr:")
         .assert_snapshot_matches(
-            "integration/snapshots/test_debug_dump_stack_output_mixed_with_stdout_and_stderr.stdout.txt",
+            "integration/snapshots/test/test_debug_dump_stack_output_mixed_with_stdout_and_stderr.stdout.txt",
         );
 }
 
@@ -461,7 +469,7 @@ fn test_debug_dump_stack_output_multiple_debug_lines() {
         .assert_passed(1)
         .assert_contains("dbg-line")
         .assert_snapshot_matches(
-            "integration/snapshots/test_debug_dump_stack_output_multiple_debug_lines.stdout.txt",
+            "integration/snapshots/test/test_debug_dump_stack_output_multiple_debug_lines.stdout.txt",
         );
 }
 
@@ -487,7 +495,7 @@ fn test_debug_dump_stack_output_requires_verbose_flag() {
         .assert_passed(1)
         .assert_not_contains("stack(0 values)")
         .assert_snapshot_matches(
-            "integration/snapshots/test_debug_dump_stack_output_requires_verbose_flag.stdout.txt",
+            "integration/snapshots/test/test_debug_dump_stack_output_requires_verbose_flag.stdout.txt",
         );
 }
 
@@ -514,7 +522,7 @@ fn test_debug_dump_stack_output_rejects_verbose_level_above_one() {
         .failure()
         .assert_stderr_contains("Verbosity levels above 1 are not supported yet")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_debug_dump_stack_output_rejects_verbose_level_above_one.stderr.txt",
+            "integration/snapshots/test/test_debug_dump_stack_output_rejects_verbose_level_above_one.stderr.txt",
         );
 }
 
@@ -529,7 +537,7 @@ fn test_test_file_not_found() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_file_not_found.stderr.txt",
+            "integration/snapshots/test/test_test_file_not_found.stderr.txt",
         );
 }
 
@@ -544,7 +552,7 @@ fn test_test_directory_not_found() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_directory_not_found.stderr.txt",
+            "integration/snapshots/test/test_test_directory_not_found.stderr.txt",
         );
 }
 
@@ -562,7 +570,7 @@ fn test_test_invalid_file_extension() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_file_extension.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_file_extension.stderr.txt",
         );
 }
 
@@ -587,7 +595,7 @@ fn test_test_invalid_filter_regex() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_filter_regex.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_filter_regex.stderr.txt",
         );
 }
 
@@ -612,7 +620,7 @@ fn test_test_invalid_exclude_pattern() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_exclude_pattern.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_exclude_pattern.stderr.txt",
         );
 }
 
@@ -637,7 +645,7 @@ fn test_test_invalid_include_pattern() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_include_pattern.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_include_pattern.stderr.txt",
         );
 }
 
@@ -651,7 +659,7 @@ fn test_empty_selection_no_test_files_fails() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_empty_selection_no_test_files.stdout.txt",
+            "integration/snapshots/test/test_empty_selection_no_test_files.stdout.txt",
         );
 }
 
@@ -672,7 +680,7 @@ fn test_empty_selection_include_matches_no_test_files_fails() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_empty_selection_include_matches_no_test_files.stdout.txt",
+            "integration/snapshots/test/test_empty_selection_include_matches_no_test_files.stdout.txt",
         );
 }
 
@@ -694,7 +702,7 @@ fn test_empty_selection_test_file_without_tests_fails() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_empty_selection_test_file_without_tests.stdout.txt",
+            "integration/snapshots/test/test_empty_selection_test_file_without_tests.stdout.txt",
         );
 }
 
@@ -720,7 +728,7 @@ fn test_test_invalid_coverage_format() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_coverage_format.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_coverage_format.stderr.txt",
         );
 }
 
@@ -745,7 +753,7 @@ fn test_test_invalid_reporter() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_test_invalid_reporter.stderr.txt",
+            "integration/snapshots/test/test_test_invalid_reporter.stderr.txt",
         );
 }
 
@@ -769,7 +777,7 @@ fn test_invalid_test_file_syntax() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_invalid_test_file_syntax.stderr.txt",
+            "integration/snapshots/test/test_invalid_test_file_syntax.stderr.txt",
         );
 }
 
@@ -794,7 +802,7 @@ fn test_build_unknown_file() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_build_unknown_file.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/build/test_build_unknown_file.stdout.txt");
 }
 
 #[test]
@@ -818,7 +826,9 @@ fn test_build_unknown_contract() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_build_unknown_contract.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/build/test_build_unknown_contract.stdout.txt",
+        );
 }
 
 #[test]
@@ -848,7 +858,7 @@ fn test_run_get_method_of_not_deployed_contract() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_run_get_method_of_not_deployed_contract.stdout.txt",
+            "integration/snapshots/run/test_run_get_method_of_not_deployed_contract.stdout.txt",
         );
 }
 
@@ -880,7 +890,7 @@ fn test_run_get_method_of_not_deployed_contract_with_backtrace_full() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_run_get_method_of_not_deployed_contract_with_backtrace_full.stdout.txt",
+            "integration/snapshots/run/test_run_get_method_of_not_deployed_contract_with_backtrace_full.stdout.txt",
         );
 }
 
@@ -919,7 +929,7 @@ fn test_send_message_to_not_deployed_contract() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_send_message_to_not_deployed_contract.stdout.txt",
+            "integration/snapshots/test/test_send_message_to_not_deployed_contract.stdout.txt",
         );
 }
 
@@ -959,7 +969,7 @@ fn test_send_message_to_not_deployed_contract_with_register() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_send_message_to_not_deployed_contract_with_register.stdout.txt",
+            "integration/snapshots/test/test_send_message_to_not_deployed_contract_with_register.stdout.txt",
         );
 }
 
@@ -1007,7 +1017,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_run_get_method_of_deployed_contract_with_null_code.stdout.txt",
+            "integration/snapshots/run/test_run_get_method_of_deployed_contract_with_null_code.stdout.txt",
         );
 }
 
@@ -1056,7 +1066,7 @@ fn test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full()
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full.stdout.txt",
+            "integration/snapshots/run/test_run_get_method_of_deployed_contract_with_null_code_with_backtrace_full.stdout.txt",
         );
 }
 
@@ -1096,7 +1106,7 @@ fn test_send_invalid_message() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_send_invalid_message.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_send_invalid_message.stdout.txt");
 }
 
 #[test]
@@ -1148,7 +1158,9 @@ fn test_debug_logs_in_contract() {
         .test()
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_debug_logs_in_contract.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/test/test_debug_logs_in_contract.stdout.txt",
+        );
 }
 
 #[test]
@@ -1168,7 +1180,7 @@ fn test_filter_all_test() {
         .filter("1111111")
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_filter_all_test.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_filter_all_test.stdout.txt");
 }
 
 #[test]
@@ -1196,7 +1208,7 @@ fn test_filter_all_test_with_several_test_files() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_filter_all_test_with_several_test_files.stdout.txt",
+            "integration/snapshots/test/test_filter_all_test_with_several_test_files.stdout.txt",
         );
 }
 
@@ -1261,8 +1273,9 @@ fn test_auto_register_refs_if_any() {
 
     let output = project.acton().test().run().success();
 
-    output
-        .assert_snapshot_matches("integration/snapshots/test_auto_register_refs_if_any.stdout.txt");
+    output.assert_snapshot_matches(
+        "integration/snapshots/test/test_auto_register_refs_if_any.stdout.txt",
+    );
 }
 
 fn replace_library_ref_boc(generated: &str, new_boc_b64: &str) -> String {
@@ -1395,7 +1408,7 @@ fn test_missing_library_ref_is_reported_in_transaction_tree() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_missing_library_ref_is_reported_in_transaction_tree.stdout.txt",
+            "integration/snapshots/test/test_missing_library_ref_is_reported_in_transaction_tree.stdout.txt",
         );
 }
 
@@ -1447,7 +1460,7 @@ fn test_test_success_search_param_for_tx_with_compute_exit_code_10() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_compute_exit_code_10.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_test_success_search_param_for_tx_with_compute_exit_code_10.stdout.txt");
 }
 
 #[test]
@@ -1501,7 +1514,7 @@ fn test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_compute_phase_user_exit_code_32_uses_contract_abi_not_action_description.stdout.txt");
 }
 
 #[test]
@@ -1513,7 +1526,7 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37() {
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_action_exit_code_37.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_test_success_search_param_for_tx_with_action_exit_code_37.stdout.txt");
 }
 
 #[test]
@@ -1526,7 +1539,7 @@ fn test_test_success_search_param_for_tx_with_action_exit_code_37_verbose() {
         .verbose()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_action_exit_code_37_verbose.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_test_success_search_param_for_tx_with_action_exit_code_37_verbose.stdout.txt");
 }
 
 fn action_exit_code_37_project(project_name: &str) -> ProjectBuilder {
@@ -1620,7 +1633,7 @@ fn test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code(
         .test()
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code.stdout.txt");
+        .assert_snapshot_matches("integration/snapshots/test/test_test_success_search_param_for_tx_with_both_compute_and_action_exit_code.stdout.txt");
 }
 
 #[test]
@@ -1672,7 +1685,7 @@ fn test_test_all_successful_tx_matcher_with_fail() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_test_all_successful_tx_matcher_with_fail.stdout.txt",
+            "integration/snapshots/test/test_test_all_successful_tx_matcher_with_fail.stdout.txt",
         );
 }
 
@@ -1725,7 +1738,7 @@ fn test_test_all_successful_tx_matcher_without_fail() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_test_all_successful_tx_matcher_without_fail.stdout.txt",
+            "integration/snapshots/test/test_test_all_successful_tx_matcher_without_fail.stdout.txt",
         );
 }
 
@@ -1772,6 +1785,6 @@ fn test_expect_to_equal_decimal_failure() {
         .run()
         .failure()
         .assert_snapshot_matches(
-            "integration/snapshots/test_expect_to_equal_decimal_failure.stdout.txt",
+            "integration/snapshots/test/test_expect_to_equal_decimal_failure.stdout.txt",
         );
 }

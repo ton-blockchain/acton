@@ -2,7 +2,7 @@ use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, CompilationResult, Context, DebugStopRequested, GetMethodAssertFailure,
     KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep, SearchField, Wallet,
-    code_lookup_hash, to_cell,
+    code_lookup_hash, compile_project_contract_with_cache, to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
@@ -293,34 +293,23 @@ pub(crate) fn compilation_result_for_code(
             continue;
         }
 
-        let mappings = ctx.env.config.mappings();
-        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-        let result = match compiler.compile(&path, ctx.build.need_debug_info) {
-            tolk_compiler::CompilerResult::Success(success) => success,
-            tolk_compiler::CompilerResult::Error(error) => {
-                warn!(
-                    "Failed to compile {path_display} while resolving debug source map: {}",
-                    error.message
-                );
+        let result = match compile_project_contract_with_cache(
+            ctx.env.config,
+            &ctx.env.project_root,
+            contract_id,
+            contract,
+            ctx.build.need_debug_info,
+            None,
+        ) {
+            Ok((_, result)) => result,
+            Err(err) => {
+                warn!("Failed to compile {path_display} while resolving debug source map: {err}");
                 continue;
             }
         };
 
-        let Ok(code_hash) = HashBytes::from_str(&result.code_hash_hex) else {
-            continue;
-        };
-
-        if code_hash == target_hash {
-            return Some((
-                path,
-                CompilationResult {
-                    name: contract.display_name(contract_id).to_owned(),
-                    code_boc64: result.code_boc64,
-                    code_hash,
-                    source_map: Arc::new(result.source_map.unwrap_or_default()),
-                    abi: result.abi.map(Into::into),
-                },
-            ));
+        if result.code_hash == target_hash {
+            return Some((path, result));
         }
     }
 

@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
-use tolk_compiler::source_map::AbiStruct;
+use tolk_compiler::source_map::{AbiStruct, Declaration};
 use tolk_compiler::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -595,11 +595,24 @@ fn pretty_cell_like_value(
     fields: &[(String, RenderedValue)],
     options: &PrettyRenderOptions,
 ) -> String {
-    let value = slice_raw_field(fields).map_or_else(
-        || raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex),
+    let value = pretty_empty_cell_like_text(value).map_or_else(
+        || {
+            slice_raw_field(fields).map_or_else(
+                || raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex),
+                Cow::Borrowed,
+            )
+        },
         Cow::Borrowed,
     );
     pretty_dimmed(&value, options)
+}
+
+const fn pretty_empty_cell_like_text(value: &str) -> Option<&'static str> {
+    match value.as_bytes() {
+        b"empty slice" => Some("slice{}"),
+        b"empty builder" => Some("builder{}"),
+        _ => None,
+    }
 }
 
 fn raw_cell_like_hex(raw: &CellLike) -> Cow<'_, str> {
@@ -1169,6 +1182,27 @@ fn render_cell_fields(
     fields
 }
 
+const fn is_empty_cell_like(bits: Option<usize>, refs: Option<usize>) -> bool {
+    matches!((bits, refs), (Some(0), Some(0)))
+}
+
+fn empty_cell_like_value(
+    type_name: &str,
+    bits: Option<usize>,
+    refs: Option<usize>,
+) -> Option<&'static str> {
+    if !is_empty_cell_like(bits, refs) {
+        return None;
+    }
+
+    match type_name {
+        "cell" => Some("empty cell"),
+        "slice" => Some("empty slice"),
+        "builder" => Some("empty builder"),
+        _ => None,
+    }
+}
+
 fn cell_like_meta(cell: &CellLike) -> (Option<usize>, Option<usize>, Option<String>) {
     let Some(cell) = decode_cell_like(cell) else {
         return (None, None, None);
@@ -1243,11 +1277,21 @@ fn render_openable_cell_like(
     hash: Option<String>,
     raw: Option<CellLike>,
 ) -> RenderedValue {
+    let type_name = type_name.into();
     let raw_value = value.into();
+    if let Some(empty_value) = empty_cell_like_value(&type_name, bits, refs) {
+        return RenderedValue::CellLike {
+            type_name,
+            value: empty_value.to_owned(),
+            fields: Vec::new(),
+            raw,
+        };
+    }
+
     let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
 
     RenderedValue::CellLike {
-        type_name: type_name.into(),
+        type_name,
         value: if summarize_value {
             render_cell_summary(bits, refs, hash.as_deref())
         } else {
@@ -1266,11 +1310,21 @@ fn render_openable_cell_like_name(
     hash: Option<String>,
     raw: Option<CellLike>,
 ) -> RenderedValue {
+    let type_name = type_name.into();
     let raw_value = value.into();
+    if let Some(empty_value) = empty_cell_like_value(&type_name, bits, refs) {
+        return RenderedValue::CellLike {
+            type_name,
+            value: empty_value.to_owned(),
+            fields: Vec::new(),
+            raw,
+        };
+    }
+
     let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
 
     RenderedValue::CellLike {
-        type_name: type_name.into(),
+        type_name,
         value: if summarize_value {
             render_cell_summary(bits, refs, hash.as_deref())
         } else {
@@ -1538,6 +1592,15 @@ fn render_typed_cell_with_decoded_data(
 ) -> RenderedValue {
     let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
+    if decoded.is_none() && is_empty_cell_like(bits, refs) {
+        return RenderedValue::CellOf {
+            type_name,
+            value: "empty cell".to_owned(),
+            fields: Vec::new(),
+            raw: Some(cell.clone()),
+        };
+    }
+
     let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(value));
 
     if let Some((inner_ty_idx, data)) = decoded {
@@ -1576,6 +1639,8 @@ pub(crate) fn render_runtime_storage_with_abi(
         .into_iter()
         .chain(abi.storage.storage_ty_idx)
     {
+        let storage_ty_idx =
+            source_map_ty_idx_for_abi_ty(symbols, abi, storage_ty_idx).unwrap_or(storage_ty_idx);
         let mut parser = decoded_cell.as_slice_allow_exotic();
         if let Some(data) = decode_abi_data(symbols, &mut parser, storage_ty_idx) {
             return Some(render_typed_cell_with_decoded_data(
@@ -1588,6 +1653,28 @@ pub(crate) fn render_runtime_storage_with_abi(
     }
 
     None
+}
+
+fn source_map_ty_idx_for_abi_ty(
+    symbols: &SourceMap,
+    abi: &ContractABI,
+    abi_ty_idx: TyIdx,
+) -> Option<TyIdx> {
+    match abi.ty_by_idx(abi_ty_idx)? {
+        Ty::StructRef { struct_name, .. } => symbols.declarations().iter().find_map(|decl| {
+            let Declaration::Struct(struct_decl) = decl else {
+                return None;
+            };
+            (struct_decl.name == *struct_name).then_some(struct_decl.ty_idx)
+        }),
+        Ty::AliasRef { alias_name, .. } => symbols.declarations().iter().find_map(|decl| {
+            let Declaration::Alias(alias_decl) = decl else {
+                return None;
+            };
+            (alias_decl.name == *alias_name).then_some(alias_decl.ty_idx)
+        }),
+        _ => symbols.ty_by_idx(abi_ty_idx).map(|_| abi_ty_idx),
+    }
 }
 
 fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> RenderedValue {
@@ -3747,6 +3834,53 @@ mod tests {
     }
 
     #[test]
+    fn render_empty_cell_like_values_are_compact() {
+        let cell = CellBuilder::new().build().unwrap();
+        let cell_like = CellLike::Cell(Boc::encode_hex(&cell));
+        let (bits, refs, hash) = cell_like_meta(&cell_like);
+        let rendered = render_openable_cell_like(
+            "cell",
+            render_cell_like(&cell_like),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
+
+        assert_eq!(rendered.dap_parts().0, "empty cell");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("cell"));
+        assert!(!rendered.has_children());
+
+        let rendered = render_openable_cell_like("slice", "slice{}", Some(0), Some(0), None, None);
+        assert_eq!(rendered.dap_parts().0, "empty slice");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("slice"));
+        assert!(!rendered.has_children());
+        assert_eq!(
+            rendered.to_pretty_string(PrettyRenderOptions::default()),
+            "slice{}"
+        );
+
+        let builder_hex = Boc::encode_hex(&cell);
+        let cell_like = CellLike::Builder(builder_hex.clone());
+        let (bits, refs, hash) = cell_like_meta(&cell_like);
+        let rendered = render_openable_cell_like(
+            "builder",
+            render_builder(&builder_hex),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
+        assert_eq!(rendered.dap_parts().0, "empty builder");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("builder"));
+        assert!(!rendered.has_children());
+        assert_eq!(
+            rendered.to_pretty_string(PrettyRenderOptions::default()),
+            "builder{}"
+        );
+    }
+
+    #[test]
     fn render_runtime_in_message_reads_fields_from_c7() {
         let addr = IntAddr::Std(StdAddr::new(0, HashBytes([0x11; 32])));
         let mut builder = CellBuilder::new();
@@ -3923,6 +4057,99 @@ mod tests {
             fields[4].1.dap_parts().0,
             format!("cell{{{}}}", Boc::encode_hex(&cell))
         );
+
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded storage");
+        };
+        assert_eq!(type_name, "Storage");
+        assert_eq!(decoded_fields[0].0, "count");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "7");
+        assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_runtime_storage_maps_abi_type_index_to_source_map_type() {
+        let source_storage_ty_idx = 1;
+        let source_count_ty_idx = 2;
+        let source_types = vec![
+            Ty::Void,
+            Ty::StructRef {
+                struct_name: "Storage".to_owned(),
+                type_args_ty_idx: None,
+            },
+            Ty::UintN { n: 32 },
+        ];
+        let symbols = source_map_with_declarations_and_types(
+            vec![Declaration::Struct(AbiStruct {
+                name: "Storage".to_owned(),
+                ty_idx: source_storage_ty_idx,
+                ident_loc: loc(),
+                type_params: None,
+                prefix: None,
+                fields: vec![FieldInfo {
+                    name: "count".to_owned(),
+                    ty_idx: source_count_ty_idx,
+                }],
+                custom_pack_unpack: None,
+            })],
+            source_types,
+        );
+
+        let abi_count_ty_idx = 1;
+        let abi_storage_ty_idx = 2;
+        let abi = ContractABI {
+            unique_types: vec![
+                Ty::Void,
+                Ty::UintN { n: 32 },
+                Ty::StructRef {
+                    struct_name: "Storage".to_owned(),
+                    type_args_ty_idx: None,
+                },
+            ],
+            declarations: vec![ABIDeclaration::Struct {
+                name: "Storage".to_owned(),
+                ty_idx: abi_storage_ty_idx,
+                type_params: None,
+                prefix: None,
+                fields: vec![ABIStructField {
+                    name: "count".to_owned(),
+                    ty_idx: abi_count_ty_idx,
+                    client_ty_idx: None,
+                    default_value: None,
+                    description: String::new(),
+                }],
+                custom_pack_unpack: None,
+                description: String::new(),
+            }],
+            storage: ABIStorage {
+                storage_ty_idx: Some(abi_storage_ty_idx),
+                storage_at_deployment_ty_idx: None,
+            },
+            ..Default::default()
+        };
+        let mut builder = CellBuilder::new();
+        builder.store_uint(7, 32).unwrap();
+        let cell = builder.build().unwrap();
+
+        let rendered = render_runtime_storage_with_abi(
+            &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &symbols,
+            &abi,
+        )
+        .expect("expected decoded c4");
+
+        let RenderedValue::CellOf {
+            type_name, fields, ..
+        } = rendered
+        else {
+            panic!("expected CellOf");
+        };
+        assert_eq!(type_name, "Cell<Storage>");
+        assert_eq!(fields[0].0, "decoded");
 
         let RenderedValue::Struct {
             type_name,
@@ -4246,12 +4473,11 @@ mod tests {
         assert_eq!(dap_type.as_deref(), Some("cell | int"));
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
-        let RenderedValue::CellLike { fields, .. } = &fields[0].1 else {
+        let RenderedValue::CellLike { value, fields, .. } = &fields[0].1 else {
             panic!("expected nested CellLike");
         };
-        assert_eq!(fields[0].0, "bits");
-        assert_eq!(fields[1].0, "refs");
-        assert_eq!(fields[2].0, "hash");
+        assert_eq!(value, "empty cell");
+        assert!(fields.is_empty());
     }
 
     #[test]

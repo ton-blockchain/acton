@@ -261,7 +261,7 @@ script-name = \"command invocation\""
     #[must_use]
     pub fn no_wallets_found() -> String {
         format!(
-            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more information",
+            "No wallets configured in {} or global.wallets.toml.\nTo add a wallet use {} or add the following to {} manually:\n\n{}\n{}\n{}\n{}\n\nSee https://ton-blockchain.github.io/acton/docs/wallets for more information",
             "wallets.toml".yellow(),
             "acton wallet new".yellow(),
             "wallets.toml".green(),

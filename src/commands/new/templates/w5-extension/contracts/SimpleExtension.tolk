@@ -1,10 +1,12 @@
 import "@stdlib/gas-payments"
 import "@contracts/errors"
-import "@contracts/types"
 import "@contracts/w5-types"
 import "types"
 
 contract SimpleExtension {
+    author: "__ACTON_AUTHOR__"
+    version: "1.0.0"
+    description: "Wallet V5 extension with subscription payments"
     storage: ExtensionStorage
     incomingMessages: AllowedInternalMessages
     incomingExternal: AllowedExternalMessages

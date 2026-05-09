@@ -69,15 +69,14 @@ For more installation details, see the
 
 ## Support policy
 
-Acton is currently distributed as a public beta. The stable release channel is
-the latest numbered GitHub release, and the first-class platform matrix is
-macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
+Acton is stable on the latest numbered GitHub release. The first-class platform
+matrix is macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
 documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
 today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
 follow the Linux installation path there. `trunk` builds installed via
 `acton up --trunk`, WSL installs, and other source-built targets are beta /
 best-effort surfaces for now. The full policy is documented at
-[Support policy](https://ton-blockchain.github.io/acton/docs/miscellaneous/support-policy).
+[Support policy](https://ton-blockchain.github.io/acton/docs/installation#support-policy).
 
 ## From zero to testnet
 
@@ -110,7 +109,7 @@ acton build
 acton test
 ```
 
-For more details, see the [Project initialization](https://ton-blockchain.github.io/acton/docs/tutorial/project-init) article.
+For more details, see the [Project management guide](https://ton-blockchain.github.io/acton/docs/projects).
 
 ## Building from source
 

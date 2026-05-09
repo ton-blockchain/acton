@@ -3,8 +3,9 @@ use crate::commands::common::{
     error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
 };
 use crate::commands::test::coverage::{
-    collect_coverage, generate_lcov_file, generate_lcov_report, generate_text_file,
-    print_coverage_summary, total_coverage_score_percentage,
+    collect_coverage, compile_project_contracts_for_coverage, generate_lcov_file,
+    generate_lcov_report, generate_text_file, print_coverage_summary,
+    total_coverage_score_percentage,
 };
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
@@ -678,6 +679,14 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     if config.coverage {
         let project_root = configured_project_root().to_path_buf();
+        // Contracts can be deployed from generated `gen/*.code.tolk` helpers without calling
+        // `build(...)` at runtime, so coverage needs source maps for project contracts upfront.
+        compile_project_contracts_for_coverage(
+            &mut runner.build_cache,
+            runner.file_build_cache,
+            &runner.acton_config,
+            &project_root,
+        )?;
         let wrapper_roots: Vec<_> = runner
             .acton_config
             .mappings()

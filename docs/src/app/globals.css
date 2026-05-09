@@ -18,6 +18,7 @@
   --ui-color: #2d83ec;
 
   --color-fd-primary: var(--ui-color);
+  --color-fd-idea: oklch(65% 0.2 145);
 }
 
 .dark {
@@ -48,6 +49,10 @@ body {
 code,
 pre {
   font-family: var(--font-geist-mono), "Courier New", monospace;
+}
+
+figure.shiki > div[role="region"] {
+  max-height: 44rem;
 }
 
 .acton-docs-sidebar {
@@ -249,6 +254,11 @@ pre {
   aspect-ratio: 16 / 9;
   object-fit: contain;
   background: var(--color-fd-background);
+}
+
+.docs-video {
+  height: auto;
+  object-fit: contain;
 }
 
 .landing-video:focus {

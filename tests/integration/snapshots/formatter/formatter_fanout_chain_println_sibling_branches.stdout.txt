@@ -19,7 +19,7 @@
            │   queryId: 202
            │   left: [WALLET_ADDRESS_BASE] (fm_fanout_left)
            │   right: [WALLET_ADDRESS_BASE] (fm_fanout_right)
-           ├── FmLeftNotice 0.0996 TON -> fm_fanout_left C                             gas=333
+           ├── FmLeftNotice 0.099933333 TON -> fm_fanout_left C                        gas=333
            │   queryId: 202
            └── FmRightNotice 0.1 TON -> fm_fanout_right D                              gas=486
                queryId: 202

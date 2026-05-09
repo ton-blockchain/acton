@@ -1,6 +1,9 @@
 import "types"
 
 contract Counter {
+    author: "__ACTON_AUTHOR__"
+    version: "1.0.0"
+    description: "Simple counter contract with owner-controlled updates"
     storage: Storage
     incomingMessages: AllowedMessage
 }

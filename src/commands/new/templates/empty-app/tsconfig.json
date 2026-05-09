@@ -18,8 +18,9 @@
     "types": ["vite/client", "node"],
     "baseUrl": ".",
     "paths": {
+      "@wrappers/*": ["wrappers-ts/*"],
       "@/*": ["app/src/*"]
     }
   },
-  "include": ["app/src", "vite.config.ts"]
+  "include": ["app/src", "wrappers-ts", "vite.config.ts"]
 }

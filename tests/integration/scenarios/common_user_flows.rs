@@ -86,7 +86,7 @@ fn create_project_and_run_tests() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
+            "integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_create_project_and_run_tests.stdout.txt",
         )
         .assert_file_exists("foobar/Acton.toml")
         .assert_file_exists("foobar/contracts/Empty.tolk")
@@ -126,6 +126,6 @@ fn deploy_script_fails_when_toncenter_is_unavailable() {
 
     mock_handle.join().expect("mock toncenter v2 must finish");
     output.assert_snapshot_matches(
-        "integration/snapshots/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt",
+        "integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt",
     );
 }

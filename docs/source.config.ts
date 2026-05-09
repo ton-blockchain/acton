@@ -87,7 +87,17 @@ const tlbGrammar: LanguageRegistration = {
   name: "tlb",
 }
 
-const builtinLangs = ["bash", "fish", "json", "nushell", "powershell", "toml", "yaml"] as const
+const builtinLangs = [
+  "bash",
+  "fish",
+  "json",
+  "nushell",
+  "powershell",
+  "toml",
+  "yaml",
+  "typescript",
+  "tsx",
+] as const
 
 export default defineConfig({
   plugins: [lastModified()],
