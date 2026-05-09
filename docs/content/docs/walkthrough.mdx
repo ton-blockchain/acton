@@ -49,7 +49,7 @@ $ acton new first_counter --template counter --app
 Created Acton.toml with project configuration
 ```
 
-<Callout type="tip">
+<Callout type="idea">
   Pass `--hooks` to install pre-commit checks, or `--agents` to add coding-agent guidance. See [`acton new`](/docs/commands/new) for all options. When run without arguments, `acton new` prompts interactively.
 </Callout>
 
@@ -121,7 +121,7 @@ Build a single contract by name:
 acton build Counter
 ```
 
-<Callout type="tip">
+<Callout type="idea">
     Pass `--info` to print resolved project configuration, or `--clear-cache` to discard cached artifacts and recompile from scratch. See [`acton build`](/docs/commands/build) for all options.
 </Callout>
 
@@ -377,7 +377,7 @@ Diff in contracts/src/Counter.tolk:
 
 Each survivor pinpoints a specific line, rule, and diff. Add a test that exercises the corresponding path and rerun — the mutation will be killed on the next run.
 
-<Callout type="tip">
+<Callout type="idea">
   Use `--mutation-diff branch` to test only mutations on lines changed since the merge base — useful in CI to skip re-testing stable code. See the [mutation testing docs](/docs/testing/mutation-testing/overview) for details.
 </Callout>
 
