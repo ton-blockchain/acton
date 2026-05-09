@@ -1163,6 +1163,98 @@ fn test_wrapper_with_message_in_contract() {
 }
 
 #[test]
+fn test_wrapper_with_external_message_in_contract() {
+    let project = ProjectBuilder::new("wrapper_external")
+        .contract(
+            "my_contract",
+            r#"
+                import "@stdlib/gas-payments"
+
+                struct (0xF3000001) ExtTrigger {
+                    queryId: uint64
+                }
+
+                contract MyContract {
+                    incomingExternal: ExtTrigger
+                }
+
+                fun onInternalMessage(in: InMessage) {}
+                fun onExternalMessage() {
+                    acceptExternalMessage();
+                }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .generate_test_stub()
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/MyContract.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_with_external_message_in_contract/wrapper.tolk.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/my_contract.test.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_with_external_message_in_contract/test.tolk.txt",
+        );
+}
+
+#[test]
+fn test_wrapper_with_internal_and_external_messages() {
+    let project = ProjectBuilder::new("wrapper_mixed")
+        .contract(
+            "my_contract",
+            r#"
+                import "@stdlib/gas-payments"
+
+                struct (0x00000001) Increment {
+                    value: int32
+                }
+
+                struct (0xF3000001) ExtPing {
+                    queryId: uint64
+                }
+
+                contract MyContract {
+                    incomingMessages: Increment
+                    incomingExternal: ExtPing
+                }
+
+                fun onInternalMessage(in: InMessage) {}
+                fun onExternalMessage() {
+                    acceptExternalMessage();
+                }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/MyContract.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_with_internal_and_external_messages/wrapper.tolk.txt",
+        );
+}
+
+#[test]
 fn test_generated_wrapper_test_runs_with_contract_local_types() {
     let workspace = ProjectBuilder::new("wrapper_types_runtime")
         .without_acton_toml()
@@ -1214,6 +1306,90 @@ fn test_generated_wrapper_test_runs_with_contract_local_types() {
                 fun onInternalMessage(_: InMessage) {}
                 fun onBouncedMessage(_: InMessageBounced) {}
             ",
+    )
+    .expect("Failed to write contract");
+
+    workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .wrapper("Counter")
+        .generate_test_stub()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(workspace.path())
+        .run()
+        .success()
+        .assert_contains("Generated");
+
+    workspace
+        .acton()
+        .arg("--project-root")
+        .arg(&generated_project_path_str)
+        .test()
+        .env("ACTON_LOG_DIR", ".acton/logs")
+        .current_dir(workspace.path())
+        .run()
+        .success()
+        .assert_passed(1);
+}
+
+#[test]
+fn test_generated_wrapper_compiles_with_external_message_methods() {
+    let workspace = ProjectBuilder::new("wrapper_external_runtime")
+        .without_acton_toml()
+        .build();
+
+    let generated_project_name = "generated-ext-counter";
+    let generated_project_path = workspace.path().join(generated_project_name);
+    let generated_project_path_str = generated_project_path.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&generated_project_path_str)
+        .arg("--name")
+        .arg(generated_project_name)
+        .arg("--description")
+        .arg("External wrapper runtime check")
+        .arg("--template")
+        .arg("counter")
+        .arg("--license")
+        .arg("MIT")
+        .current_dir(workspace.path())
+        .run()
+        .success();
+
+    let tests_dir = generated_project_path.join("tests");
+    if tests_dir.exists() {
+        fs::remove_dir_all(&tests_dir).expect("Failed to remove template tests directory");
+    }
+    fs::create_dir_all(generated_project_path.join("wrappers"))
+        .expect("Failed to recreate wrappers directory");
+
+    fs::write(
+        generated_project_path.join("contracts/Counter.tolk"),
+        r#"
+                import "@stdlib/gas-payments"
+
+                struct Storage {
+                    counter: uint32
+                }
+
+                struct (0xF3000001) ExtTrigger {
+                    queryId: uint64
+                }
+
+                contract Counter {
+                    storage: Storage
+                    incomingExternal: ExtTrigger
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onExternalMessage() {
+                    acceptExternalMessage();
+                }
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
     )
     .expect("Failed to write contract");
 
