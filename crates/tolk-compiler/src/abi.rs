@@ -433,6 +433,25 @@ impl ContractABI {
         Ok(resolved)
     }
 
+    pub fn resolve_incoming_external_message_structs(
+        &self,
+    ) -> anyhow::Result<Vec<ABIResolvedStruct>> {
+        let mut resolved = Vec::new();
+        let mut seen_structs = HashSet::new();
+
+        for message in &self.incoming_external {
+            collect_structs_from_type(
+                self,
+                message.body_ty_idx,
+                &mut HashSet::new(),
+                &mut seen_structs,
+                &mut resolved,
+            )?;
+        }
+
+        Ok(resolved)
+    }
+
     pub fn resolve_single_struct(
         &self,
         ty_idx: TyIdx,
@@ -542,10 +561,10 @@ fn collect_structs_from_type(
         | Ty::LispListOf { inner_ty_idx } => {
             collect_structs_from_type(abi, *inner_ty_idx, visited_aliases, seen_structs, resolved)
         }
-        _ => anyhow::bail!(
-            "Unsupported ABI type {} while resolving contract wrapper types",
-            abi.render_type(ty_idx)
-        ),
+        // Primitive bodies (slice, cell, etc.) yield no structs — silently skip.
+        // Callers that require a struct (e.g. `resolve_single_struct`) bail when `resolved`
+        // ends up empty.
+        _ => Ok(()),
     }
 }
 

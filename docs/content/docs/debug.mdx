@@ -50,7 +50,7 @@ For live contract debugging, Acton runs the same contract code path as in produc
 
 ### Starting a session
 
-```bash
+```acton-cli
 # Debug one test or a small filtered subset
 acton test tests/counter.test.tolk --filter "deploy" --debug
 
@@ -312,7 +312,7 @@ These workflows matter when the bug depends on real or previously prepared state
 
 Use `acton retrace` when the bug already happened on-chain and the closest Acton reproduction of that exact transaction is needed.
 
-```bash
+```acton-cli
 acton retrace <HASH>
 acton retrace <HASH> --contract JettonMinter
 acton retrace <HASH> --contract JettonMinter --debug

@@ -33,10 +33,7 @@ export function DisasmSection({
       return
     }
 
-    if (
-      (state.status === "ready" || state.status === "error") &&
-      state.bocHex === bocHex
-    ) {
+    if ((state.status === "ready" || state.status === "error") && state.bocHex === bocHex) {
       return
     }
 

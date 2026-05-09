@@ -41,7 +41,10 @@ acton fmt --check
 ## Notes
 
 - The app uses Vite, npm, shadcn-style UI primitives, and Tailwind CSS.
-- Copy `.env.example` to a local `.env` for Toncenter keys when an Acton project
-  provides it. Both Acton CLI and the Vite app read
+- CI runs `npm run typecheck`, `npm run build`, `npm run fmt:check`, and,
+  when `Acton.toml` exists, `acton build`, `acton test`,
+  `acton check --output-format github`, and `acton fmt --check`.
+- Copy `.env.example` to a local `.env` for Toncenter keys. Both Acton CLI
+  (when this app is generated inside an Acton project) and the Vite app read
   `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY`; Vite allows the
   `TONCENTER_` prefix via `envPrefix` in `vite.config.ts`.

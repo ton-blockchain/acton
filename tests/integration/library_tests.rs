@@ -53,7 +53,9 @@ fn test_library_fetch_basic() {
         .with_api_key(toncenter_api_key())
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_library_fetch_basic.stdio.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/library/test_library_fetch_basic.stdio.txt",
+        );
 }
 
 #[test]
@@ -71,7 +73,9 @@ fn test_library_fetch_json() {
         .with_json()
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_library_fetch_json.stdout.json.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/library/test_library_fetch_json.stdout.json.txt",
+        );
 }
 
 #[test]
@@ -90,7 +94,7 @@ fn test_library_fetch_fail_json() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_library_fetch_fail_json.stdout.json.txt",
+            "integration/snapshots/library/test_library_fetch_fail_json.stdout.json.txt",
         );
 }
 
@@ -109,7 +113,7 @@ fn test_library_fetch_unknown() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_fetch_unknown.stderr.txt",
+            "integration/snapshots/library/test_library_fetch_unknown.stderr.txt",
         );
 }
 
@@ -129,7 +133,7 @@ fn test_library_fetch_unknown_json() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_library_fetch_unknown.stdout.json.txt",
+            "integration/snapshots/library/test_library_fetch_unknown.stdout.json.txt",
         );
 }
 
@@ -149,7 +153,9 @@ fn test_library_fetch_disasm() {
         .run()
         .success()
         .assert_contains("Fetched successfully")
-        .assert_snapshot_matches("integration/snapshots/test_library_fetch_basic_disasm.stdio.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/library/test_library_fetch_basic_disasm.stdio.txt",
+        );
 }
 
 #[test]
@@ -177,7 +183,7 @@ fn test_library_fetch_output() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_library_fetch_basic.lib.txt"),
+        snapbox::file!("snapshots/library/test_library_fetch_basic.lib.txt"),
     );
 }
 
@@ -231,7 +237,7 @@ fn test_library_fetch_disasm_output() {
 
     assertion().eq(
         normalize_output(content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_library_fetch_basic.lib.tasm.txt"),
+        snapbox::file!("snapshots/library/test_library_fetch_basic.lib.tasm.txt"),
     );
 }
 
@@ -249,7 +255,7 @@ fn test_library_fetch_invalid_hash_format() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_fetch_invalid_hash_format.stderr.txt",
+            "integration/snapshots/library/test_library_fetch_invalid_hash_format.stderr.txt",
         );
 }
 
@@ -265,7 +271,7 @@ fn test_library_fetch_invalid_network() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_fetch_invalid_network.stderr.txt",
+            "integration/snapshots/library/test_library_fetch_invalid_network.stderr.txt",
         );
 }
 
@@ -282,7 +288,7 @@ fn test_library_publish_invalid_network() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_invalid_network.stderr.txt",
+            "integration/snapshots/library/test_library_publish_invalid_network.stderr.txt",
         );
 }
 
@@ -300,7 +306,7 @@ fn test_library_publish_invalid_code() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_invalid_code.stderr.txt",
+            "integration/snapshots/library/test_library_publish_invalid_code.stderr.txt",
         );
 }
 
@@ -324,7 +330,7 @@ version = "0.1.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_contract_not_found.stderr.txt",
+            "integration/snapshots/library/test_library_publish_contract_not_found.stderr.txt",
         );
 }
 
@@ -344,7 +350,7 @@ fn test_library_publish_compilation_error() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_compilation_error.stderr.txt",
+            "integration/snapshots/library/test_library_publish_compilation_error.stderr.txt",
         );
 }
 
@@ -365,7 +371,7 @@ fn test_library_publish_invalid_duration() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_invalid_duration.stderr.txt",
+            "integration/snapshots/library/test_library_publish_invalid_duration.stderr.txt",
         );
 }
 
@@ -402,7 +408,7 @@ src = "contracts/simple.tolk"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_wallet_not_found.stderr.txt",
+            "integration/snapshots/library/test_library_publish_wallet_not_found.stderr.txt",
         );
 }
 
@@ -426,7 +432,7 @@ fn test_library_publish_no_wallets() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_no_wallets.stderr.txt",
+            "integration/snapshots/library/test_library_publish_no_wallets.stderr.txt",
         );
 }
 
@@ -461,7 +467,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_unknown_wallet.stderr.txt",
+            "integration/snapshots/library/test_library_publish_unknown_wallet.stderr.txt",
         );
 }
 
@@ -492,7 +498,9 @@ cells = 4
         .arg("my-lib")
         .run()
         .success()
-        .assert_snapshot_matches("integration/snapshots/test_library_info_basic.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/library/test_library_info_basic.stdout.txt",
+        );
 }
 
 #[test]
@@ -613,7 +621,7 @@ src = "contracts/simple.fif"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_publish_rejects_non_tolk_contract_source.stderr.txt",
+            "integration/snapshots/library/test_library_publish_rejects_non_tolk_contract_source.stderr.txt",
         );
 }
 
@@ -631,7 +639,7 @@ fn test_library_topup_no_libraries() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_topup_no_libraries.stderr.txt",
+            "integration/snapshots/library/test_library_topup_no_libraries.stderr.txt",
         );
 }
 
@@ -663,7 +671,7 @@ cells = 1
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_topup_not_found.stderr.txt",
+            "integration/snapshots/library/test_library_topup_not_found.stderr.txt",
         );
 }
 
@@ -707,7 +715,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_topup_invalid_duration.stderr.txt",
+            "integration/snapshots/library/test_library_topup_invalid_duration.stderr.txt",
         );
 }
 
@@ -752,7 +760,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_library_topup_invalid_amount.stderr.txt",
+            "integration/snapshots/library/test_library_topup_invalid_amount.stderr.txt",
         );
 }
 
@@ -846,7 +854,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
     session.expect(Eof);
     session.assert_file_snapshot_matches(
         "libraries.toml",
-        "integration/snapshots/test_library_topup_interactive_cancel.libraries.toml",
+        "integration/snapshots/library/test_library_topup_interactive_cancel.libraries.toml",
     );
 }
 

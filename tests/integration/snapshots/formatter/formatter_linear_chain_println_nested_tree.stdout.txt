@@ -19,7 +19,7 @@
            │   queryId: 101
            │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid)
            │   sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
-           └── FmRelay 0.1994148 TON -> fm_linear_mid C                                gas=1782
+           └── FmRelay 0.199902466 TON -> fm_linear_mid C                              gas=1782
                queryId: 101, sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
                └── FmDelivered 0.1 TON -> fm_linear_sink D                             gas=333
                    queryId: 101, hop: 2

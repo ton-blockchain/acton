@@ -8,10 +8,13 @@ ready-to-run deployment and management scripts.
 
 - `contracts/NftCollection.tolk` implements the NFT collection.
 - `contracts/NftItem.tolk` implements individual NFT items.
-- `contracts/messages.tolk`, `contracts/types.tolk`, and `contracts/errors.tolk`
-  define shared messages, storage-facing types, and starter errors.
+- `contracts/messages.tolk`, `contracts/types.tolk`, `contracts/errors.tolk`,
+  and `contracts/fees-management.tolk` define shared messages,
+  storage-facing types, fees, and starter errors.
 - `wrappers/NftCollection.gen.tolk` and `wrappers/NftItem.gen.tolk` are the
   wrappers used by tests and scripts.
+- `wrappers/utils.tolk` contains hand-written NFT transfer helpers used by
+  scripts.
 - `tests/nft-collection.test.tolk` and `tests/nft-item.test.tolk` cover
   collection behavior and item behavior in focused reference suites.
 - `.github/workflows/ci.yml` runs build, test, lint, and format checks on
@@ -39,13 +42,15 @@ acton run deploy-emulation
 
 Scripts in `scripts/` cover deployment and collection or item management:
 
-- `deployCollection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
-- `deployItem.tolk` — mints a single NFT item into an existing collection.
-- `deployBatch.tolk` — batch-mints multiple items in a single transaction.
-- `transferItem.tolk` — transfers an NFT item to a new owner.
-- `changeAdmin.tolk` — changes the admin address of an existing collection.
+- `deploy-collection.tolk` — deploys an NFT collection with on-chain metadata and royalty params.
+- `deploy-item.tolk` — mints a single NFT item into an existing collection.
+- `deploy-batch.tolk` — batch-mints multiple items in a single transaction.
+- `transfer-item.tolk` — transfers an NFT item to a new owner.
+- `change-admin.tolk` — changes the admin address of an existing collection.
 
-Run them with `acton script scripts/<name>.tolk`.
+Run them directly with `acton script scripts/<name>.tolk` or through the
+generated aliases such as `acton run nft-deploy-item` and
+`acton run nft-transfer-item`.
 
 ## Customize The Starter
 
@@ -59,7 +64,8 @@ Run them with `acton script scripts/<name>.tolk`.
 
 ## Deploy To Testnet
 
-The deployment scripts expect a wallet named `deployer`.
+The deployment scripts prompt for a wallet by default. Set `NFT_DEPLOYER` in
+`.env` or your shell when you need non-interactive execution.
 
 1. Create a local wallet and request testnet TON:
 
@@ -72,7 +78,7 @@ acton wallet new --name deployer --local --airdrop
 3. Broadcast the collection deployment to testnet:
 
 ```bash
-acton script scripts/deployCollection.tolk --net testnet
+acton script scripts/deploy-collection.tolk --net testnet
 ```
 
 You can also use the generated script aliases:

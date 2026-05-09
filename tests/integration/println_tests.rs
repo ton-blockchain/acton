@@ -59,7 +59,7 @@ fn test_println_formatting() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_formatting.stdout.svg",
+            "integration/snapshots/println/test_println_formatting.stdout.svg",
         );
 }
 
@@ -101,7 +101,7 @@ fn test_println_tuples_and_tensors() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_tuples_and_tensors.stdout.svg",
+            "integration/snapshots/println/test_println_tuples_and_tensors.stdout.svg",
         );
 }
 
@@ -151,7 +151,7 @@ fn test_println_nesting_complex() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_nesting_complex.stdout.svg",
+            "integration/snapshots/println/test_println_nesting_complex.stdout.svg",
         );
 }
 
@@ -187,7 +187,7 @@ fn test_println_various_slices() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_various_slices.stdout.svg",
+            "integration/snapshots/println/test_println_various_slices.stdout.svg",
         );
 }
 
@@ -221,6 +221,6 @@ fn test_println_typed_cell_includes_decoded_value() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_println_typed_cell_includes_decoded_value.stdout.txt",
+            "integration/snapshots/println/test_println_typed_cell_includes_decoded_value.stdout.txt",
         );
 }

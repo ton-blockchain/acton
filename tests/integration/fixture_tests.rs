@@ -9,7 +9,9 @@ fn test_basic_fixture_passing() {
         .run()
         .success()
         .assert_passed(2)
-        .assert_snapshot_matches("integration/snapshots/test_basic_fixture_passing.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/fixture/test_basic_fixture_passing.stdout.txt",
+        );
 }
 
 #[test]
@@ -23,7 +25,7 @@ fn test_basic_fixture_with_failing_contract() {
         .assert_failed(2)
         .assert_contains("exit_code=10")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_failing_contract.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_failing_contract.stdout.txt",
         );
 }
 
@@ -39,7 +41,7 @@ fn test_basic_fixture_with_failing_contract_and_backtrace_full() {
         .assert_failed(2)
         .assert_contains("exit_code=10")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_failing_contract_and_backtrace_full.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_failing_contract_and_backtrace_full.stdout.txt",
         );
 }
 
@@ -54,7 +56,7 @@ fn test_basic_fixture_with_gas_limit() {
         .assert_failed(1)
         .assert_contains("Gas limit exceeded")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_gas_limit.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_gas_limit.stdout.txt",
         );
 }
 
@@ -68,7 +70,7 @@ fn test_basic_fixture_with_expect_failure() {
         .failure()
         .assert_failed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_expect_failure.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_expect_failure.stdout.txt",
         );
 }
 
@@ -83,7 +85,7 @@ fn test_basic_fixture_with_exit_code_mismatch() {
         .assert_failed(1)
         .assert_contains("Expected exit_code=")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_exit_code_mismatch.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_exit_code_mismatch.stdout.txt",
         );
 }
 
@@ -98,7 +100,7 @@ fn test_basic_fixture_with_throw_in_test() {
         .assert_failed(1)
         .assert_contains("exit_code=9")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_throw_in_test.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_throw_in_test.stdout.txt",
         );
 }
 
@@ -114,7 +116,7 @@ fn test_basic_fixture_with_throw_in_test_and_backtrace_full() {
         .assert_failed(1)
         .assert_contains("exit_code=9")
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_throw_in_test_and_backtrace_full.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_throw_in_test_and_backtrace_full.stdout.txt",
         );
 }
 
@@ -128,7 +130,7 @@ fn test_basic_fixture_with_debug_output() {
         .with_backtrace("full")
         .run()
         .success()
-        .assert_passed(2).assert_snapshot_matches("integration/snapshots/test_basic_fixture_with_debug_output.stdout.txt")
+        .assert_passed(2).assert_snapshot_matches("integration/snapshots/fixture/test_basic_fixture_with_debug_output.stdout.txt")
         // .assert_contains("Hello World") // TODO
     ;
 }
@@ -144,7 +146,7 @@ fn test_basic_fixture_with_stderr_output() {
         .success()
         .assert_passed(2)
         .assert_snapshot_matches(
-            "integration/snapshots/test_basic_fixture_with_stderr_output.stdout.txt",
+            "integration/snapshots/fixture/test_basic_fixture_with_stderr_output.stdout.txt",
         );
 }
 
@@ -158,6 +160,6 @@ fn test_compilation_error_fixture() {
         .failure()
         .assert_contains("field `body2` doesn't exist in type `InMessage`")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_compilation_error_fixture.stderr.txt",
+            "integration/snapshots/fixture/test_compilation_error_fixture.stderr.txt",
         );
 }

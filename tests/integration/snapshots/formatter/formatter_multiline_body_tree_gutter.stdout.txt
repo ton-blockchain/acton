@@ -17,6 +17,6 @@
            │       newAdminAddress: [WALLET_ADDRESS_BASE] (not_deployer)
            │       tonAmount: 1000000000
            │   }
-           └── empty 0.0096 TON -> sender A                                            gas=309
+           └── empty 0.009933333 TON -> sender A                                       gas=309
 
  ✓ 1 passed in 1 file

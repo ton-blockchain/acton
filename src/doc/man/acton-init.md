@@ -215,4 +215,4 @@ With `--stdlib-only`, `acton init` writes only inside `.acton/`.
 
 - `acton help new`
 - `acton help doctor`
-- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/tutorial/project-init)
+- [Project management guide](https://ton-blockchain.github.io/acton/docs/projects)

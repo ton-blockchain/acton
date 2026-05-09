@@ -47,7 +47,7 @@ install-path = "~/.acton/bin"
 # Whether to install an updater program
 install-updater = false
 # Where to host releases
-hosting = ["simple", "github"]
+hosting = ["github"]
 
 [dist.github-custom-runners]
 global = "ubicloud-standard-2-ubuntu-2204"

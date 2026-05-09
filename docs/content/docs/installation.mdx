@@ -16,16 +16,9 @@ import {SiApple, SiLinux} from "react-icons/si";
 Acton ships as a single, dependency-free executable. You can install it via the public installer, by downloading a release asset directly, or by using the published Docker image.
 
 <Callout type="info" title="Support policy">
-    First-class support covers versioned releases on macOS (ARM64 and x86_64)
-    and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is
-    Ubuntu 22 or newer. The `trunk` builds and WSL installs are beta or
-    best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22 or newer and follow the Linux steps.
+    First-class support covers versioned releases on macOS (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is Ubuntu 22 or newer. The `trunk` builds and WSL installs are beta or best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22 or newer and follow the Linux steps.
 
     See [platform tiers](#platform-tiers) for the full matrix.
-</Callout>
-
-<Callout>
-    After installation, verify with `acton --version`
 </Callout>
 
 ## Installation
@@ -56,7 +49,7 @@ Acton ships as a single, dependency-free executable. You can install it via the 
     </Tab>
 </Tabs>
 
-<Callout type="warning">
+<Callout type="warning" title="Use WSL on Windows">
     On Windows, use WSL with Ubuntu 22 or newer; native Windows is not supported.
 </Callout>
 
@@ -68,9 +61,7 @@ acton --version
 
 The printed line is the Acton version.
 
-<Callout type="warning">
-    If Acton is installed but the shell reports `command not found`, add the installation directory to `PATH` manually.
-</Callout>
+If Acton is installed but the shell reports `command not found`, add the installation directory to `PATH` manually:
 
 <Accordions>
     <Accordion title="Add Acton to the PATH">
@@ -105,13 +96,17 @@ The printed line is the Acton version.
     </Accordion>
 </Accordions>
 
-<Callout type="info" title="Shell completions">
-    [Shell completions](/docs/commands/shell-completions) add suggestions for commands and contract names.
-</Callout>
+### Shell completions
+
+Use [`acton completions`](/docs/commands/shell-completions) to add suggestions for commands and contract names in the shells like Bash, Zsh, Fish, Elvish, and Nushell.
+
+### Agent skills
+
+See the [Acton skills overview](/docs/agent-skills/overview) for available agent skills and their installation.
 
 ## Direct Downloads
 
-To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/ton-blockchain/acton/releases) or use the latest release links below.
+To download Acton binaries directly, visit the [releases page on GitHub](https://github.com/ton-blockchain/acton/releases) or use the latest release links below:
 
 <Cards cols={2}>
     <Card
@@ -152,13 +147,13 @@ Acton is also published as a Docker image at `ghcr.io/ton-blockchain/acton`. Thi
 
 To verify that the image is available and print the Acton version:
 
-```bash
+```acton-cli
 docker run --rm ghcr.io/ton-blockchain/acton:<version> --version
 ```
 
 To run Acton against the current project from a container:
 
-```bash
+```acton-cli
 docker run --rm \
   -v "$PWD":/workspace \
   -w /workspace \
@@ -196,8 +191,8 @@ acton up --list
 
 To install a specific version:
 
-```bash
-acton up 0.1.5
+```acton-cli
+acton up <VERSION_NUMBER>
 ```
 
 ### Switch to trunk

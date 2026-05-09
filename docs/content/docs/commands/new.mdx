@@ -342,8 +342,9 @@ Depending on the selected template and options, Acton may also generate:
 - wrappers
 - wrappers that usually include helper shapes such as `fromStorage(...)`,
   `deploy(...)`, `send{Name}(...)`, `sendAny(...)`, and typed get-method calls
-- deployment scripts
-- `[scripts]` aliases such as `deploy-emulation` and `deploy-testnet` in `Acton.toml`
+- deployment and management scripts
+- `[scripts]` aliases such as `deploy-emulation`, `deploy-testnet`, and
+  template-specific management aliases in `Acton.toml`
 - frontend files for `--app`
 - `.githooks/pre-commit` for `--hooks`
 - `AGENTS.md` for `--agents`
@@ -354,7 +355,8 @@ When `--app` is used with a template that supports the app layout, the project
 includes:
 
 - `contracts/src` for contract sources and shared Tolk types
-- `contracts/tests` for tests and generated Tolk wrappers
+- `contracts/tests` for tests
+- `contracts/wrappers` for generated Tolk wrappers
 - `contracts/scripts` for deployment and utility scripts
 - `wrappers-ts/` for generated TypeScript wrappers in app templates that call
   contracts from the frontend
@@ -378,7 +380,7 @@ Common commands in that generated app workspace:
   `acton build` first
 - `npm run typecheck` for TypeScript checking
 - `npm run fmt` and `npm run fmt:check` for frontend formatting
-- `npm test` to run the bundled `acton test` command when the template provides
+- `npm run test` to run the bundled `acton test` command when the template provides
   it
 
 ## Side Effects
@@ -436,5 +438,5 @@ The command does not create a commit and does not modify parent directories.
 ## See Also
 
 - `acton help init`
-- [Project initialization guide](/docs/tutorial/project-init)
+- [Project management guide](/docs/projects)
 - [Build system configuration reference](/docs/building/reference)

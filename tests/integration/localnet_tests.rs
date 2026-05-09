@@ -496,7 +496,9 @@ fn localnet_serves_get_shard_account_cell_for_empty_account() {
     );
     assertion().eq(
         normalize_output_preserve_escapes(&response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_empty.response.json"),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_get_shard_account_cell_empty.response.json"
+        ),
     );
 
     node.stop();
@@ -563,7 +565,9 @@ fn localnet_serves_get_shard_account_cell_for_active_account() {
     );
     assertion().eq(
         normalize_output_preserve_escapes(&response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_shard_account_cell_active.summary.json"),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_get_shard_account_cell_active.summary.json"
+        ),
     );
 
     node.stop();
@@ -638,7 +642,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     assertion().eq(
         normalize_output_preserve_escapes(&response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_out_msg_queue_size.response.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_get_out_msg_queue_size.response.json"),
     );
 
     let script_result = project
@@ -706,7 +710,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
 
     assertion().eq(
         normalize_output_preserve_escapes(&tx_std_response_json, project.path()),
-        snapbox::file!("snapshots/test_localnet_get_transactions_std.response.json"),
+        snapbox::file!("snapshots/localnet/test_localnet_get_transactions_std.response.json"),
     );
 
     node.stop();
@@ -787,7 +791,7 @@ fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
         .assert_contains("Broadcast send (synthetic result)")
         .assert_not_contains("compute phase skipped")
         .assert_snapshot_matches(
-            "integration/snapshots/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
+            "integration/snapshots/localnet/test_localnet_script_println_net_send_in_broadcast_shows_synthetic_hint.stdout.txt",
         );
 
     node.stop();
@@ -822,7 +826,7 @@ fn localnet_script_invalidates_remote_cache_after_broadcast_before_get_method() 
         .assert_contains("BEFORE=7")
         .assert_contains("AFTER=12")
         .assert_snapshot_matches(
-            "integration/snapshots/test_localnet_script_invalidates_remote_cache_after_broadcast_before_get_method.stdout.txt",
+            "integration/snapshots/localnet/test_localnet_script_invalidates_remote_cache_after_broadcast_before_get_method.stdout.txt",
         );
 
     node.stop();

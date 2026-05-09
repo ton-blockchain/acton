@@ -29,6 +29,7 @@ npm ci
 ```bash
 acton build
 acton test
+npm run test
 npm run build
 npm run typecheck
 npm run fmt:check
@@ -37,13 +38,16 @@ npm run dev
 
 ## Scripts
 
-- `acton script contracts/scripts/deploy.tolk` — deploys the jetton minter and mints the initial supply.
+- `acton script contracts/scripts/deploy.tolk` — deploys the jetton minter and prints minter/admin wallet info.
 - `acton script contracts/scripts/mint.tolk` — mints jettons to a recipient.
 - `acton script contracts/scripts/transfer.tolk` — transfers jettons between wallets.
 - `acton script contracts/scripts/info.tolk` — displays minter and wallet info.
 - `acton script contracts/scripts/change-admin.tolk` — changes the minter admin.
 - `acton script contracts/scripts/change-metadata.tolk` — updates jetton metadata.
 - `acton script contracts/scripts/claim-admin.tolk` — claims pending admin status.
+
+The same scripts are available through generated aliases such as
+`acton run jetton-mint` and `acton run jetton-info`.
 
 ## Notes
 
@@ -54,6 +58,9 @@ npm run dev
   regenerate the TypeScript wrappers under `wrappers-ts/`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
+- CI runs `npm run test`, `npm run typecheck`, `npm run build`,
+  `acton check --output-format github`, `acton fmt --check`, and
+  `npm run fmt:check`.
 - The app reads blockchain data through Toncenter. Set
   `TONCENTER_TESTNET_API_KEY` and/or `TONCENTER_MAINNET_API_KEY` in a local
   `.env` copied from `.env.example` if you need higher rate limits. Acton CLI

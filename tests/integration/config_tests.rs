@@ -158,7 +158,7 @@ acton = "0.0.0"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_toolchain_acton_version_mismatch.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_version_mismatch.stderr.txt",
         );
 }
 
@@ -184,7 +184,7 @@ acton = ""
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_toolchain_acton_empty_version.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_empty_version.stderr.txt",
         );
 }
 
@@ -214,7 +214,7 @@ acton = "{}"
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_toolchain_acton_current_version.stdout.txt",
+            "integration/snapshots/config/test_toolchain_acton_current_version.stdout.txt",
         );
 }
 
@@ -243,7 +243,7 @@ acton = "v{}"
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
         );
 }
 
@@ -332,7 +332,9 @@ fn test_backtrace_via_config() {
         .failure()
         .assert_failed(1)
         .assert_contains("exit_code=42")
-        .assert_snapshot_matches("integration/snapshots/test_backtrace_via_config.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/config/test_backtrace_via_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -395,7 +397,7 @@ fn test_filter_and_coverage_via_config() {
         .assert_contains("unit div")
         .assert_not_contains("integration triple")
         .assert_snapshot_matches(
-            "integration/snapshots/test_filter_and_coverage_via_config.stdout.txt",
+            "integration/snapshots/config/test_filter_and_coverage_via_config.stdout.txt",
         );
 }
 
@@ -660,7 +662,7 @@ fn test_include_patterns_via_config_with_explicit_directory_path() {
         .run()
         .success()
         .assert_snapshot_matches(
-            "integration/snapshots/test_include_patterns_via_config_with_explicit_directory_path.stdout.txt",
+            "integration/snapshots/config/test_include_patterns_via_config_with_explicit_directory_path.stdout.txt",
         );
 }
 
@@ -800,7 +802,9 @@ fn test_fail_fast_via_config() {
         .assert_contains("second fail")
         .assert_not_contains("third pass")
         .assert_not_contains("fourth pass")
-        .assert_snapshot_matches("integration/snapshots/test_with_fail_fast_via_config.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/config/test_with_fail_fast_via_config.stdout.txt",
+        );
 }
 
 #[test]
@@ -845,7 +849,7 @@ fn test_fail_on_diff_via_config_exits_non_zero_for_profile_drift() {
     failed
         .assert_contains("CHAIN GAS & FEES SUMMARY COMPARISON")
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_fail_on_diff_via_config_exits_non_zero_for_profile_drift.stderr.txt",
+            "integration/snapshots/config/test_fail_on_diff_via_config_exits_non_zero_for_profile_drift.stderr.txt",
         );
 }
 

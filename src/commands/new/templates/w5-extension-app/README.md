@@ -33,6 +33,7 @@ npm ci
 ```bash
 acton build
 acton test
+npm run test
 npm run build
 npm run typecheck
 npm run fmt:check
@@ -44,6 +45,9 @@ npm run dev
 - `acton script contracts/scripts/deploy.tolk` — deploys the extension with the deployer wallet as admin and prints the deployed address.
 - `EXT_ADDRESS=<deployed-address> acton script contracts/scripts/install-extension.tolk` — adds the deployed extension to a real Wallet V5 via a signed external message. Prompts for the address interactively if `EXT_ADDRESS` is not set.
 - `EXT_ADDRESS=<deployed-address> acton script contracts/scripts/delete-extension.tolk` — removes the extension from the wallet via a signed external message. Prompts for the address interactively if `EXT_ADDRESS` is not set.
+
+The install and delete scripts are also available as `acton run install-extension`
+and `acton run delete-extension`.
 
 ## Notes
 
@@ -58,6 +62,9 @@ npm run dev
   regenerate the TypeScript wrappers under `wrappers-ts/`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
+- CI runs `npm run test`, `npm run typecheck`, `npm run build`,
+  `acton check --output-format github`, `acton fmt --check`, and
+  `npm run fmt:check`.
 - The scripts select a Wallet V5 with `promptWallet`. Set `W5_DEPLOYER` in
   non-interactive contexts.
 - The app reads blockchain data through Toncenter. Set

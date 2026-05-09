@@ -57,7 +57,9 @@ export function resolveTransactionOpcodeName(
   const destinationContract = inMessage?.info.dest
     ? contracts.get(inMessage.info.dest.toString())
     : targetContract
-  const sourceContract = inMessage?.info.src ? contracts.get(inMessage.info.src.toString()) : undefined
+  const sourceContract = inMessage?.info.src
+    ? contracts.get(inMessage.info.src.toString())
+    : undefined
   const isBouncedInternal = inMessage?.info.type === "internal" && inMessage.info.bounced
 
   if (isBouncedInternal) {

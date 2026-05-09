@@ -3,6 +3,8 @@ pub(crate) mod assertions;
 #[cfg(test)]
 pub(crate) mod compilation;
 #[cfg(test)]
+pub(crate) mod debugger;
+#[cfg(test)]
 pub(crate) mod fixtures;
 #[cfg(test)]
 pub(crate) mod localnet;
