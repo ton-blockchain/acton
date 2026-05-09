@@ -1,5 +1,6 @@
 import "@stdlib/strings"
 import "@acton/build"
+import "@acton/env"
 import "@acton/io"
 import "@acton/prompts"
 import "@acton/emulation/network"
@@ -37,7 +38,11 @@ fun buildOnchainMetadata(info: NftCollectionInfo): cell {
         .endCell();
 }
 
-fun promptNftWallet(message: string): ActonWallet {
+fun promptNftWallet(envName: string, message: string): ActonWallet {
+    val nameFromEnv = env<string>(envName);
+    if (nameFromEnv != null) {
+        return scripts.wallet(nameFromEnv);
+    }
     return scripts.wallet(promptWallet(message));
 }
 

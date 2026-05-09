@@ -1,6 +1,5 @@
 import "@stdlib/gas-payments"
 import "@contracts/errors"
-import "@contracts/types"
 import "@contracts/w5-types"
 import "types"
 

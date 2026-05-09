@@ -187,6 +187,8 @@ pub(super) struct TemplateCatalog {
 #[derive(Debug, Clone, Serialize)]
 struct TemplateCatalogEntry {
     id: &'static str,
+    aliases: &'static [&'static str],
+    category: &'static str,
     description: &'static str,
     supports_app: bool,
     scaffolds: Vec<TemplateScaffoldInfo>,
@@ -196,7 +198,15 @@ struct TemplateCatalogEntry {
 struct TemplateScaffoldInfo {
     kind: &'static str,
     includes_typescript_app: bool,
+    deploy_script: String,
+    scripts: Vec<TemplateScriptInfo>,
     contracts: Vec<TemplateContractInfo>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TemplateScriptInfo {
+    alias: String,
+    command: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -307,7 +317,7 @@ const JETTON_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::Standard,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    extra_scripts: &[],
+    extra_scripts: JETTON_EXTRA_SCRIPTS,
 };
 
 const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -316,16 +326,72 @@ const JETTON_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     layout: ProjectLayout::App,
     contracts: &JETTON_CONTRACTS,
     deploy_script: "scripts/deploy.tolk",
-    extra_scripts: &[],
+    extra_scripts: JETTON_EXTRA_SCRIPTS,
 };
+
+const JETTON_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "jetton-mint",
+        script: "scripts/mint.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-transfer",
+        script: "scripts/transfer.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-info",
+        script: "scripts/info.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-change-admin",
+        script: "scripts/change-admin.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-change-metadata",
+        script: "scripts/change-metadata.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "jetton-claim-admin",
+        script: "scripts/claim-admin.tolk",
+        net: None,
+    },
+];
+
+const NFT_EXTRA_SCRIPTS: &[ExtraScript] = &[
+    ExtraScript {
+        alias: "nft-deploy-item",
+        script: "scripts/deploy-item.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-deploy-batch",
+        script: "scripts/deploy-batch.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-transfer-item",
+        script: "scripts/transfer-item.tolk",
+        net: None,
+    },
+    ExtraScript {
+        alias: "nft-change-admin",
+        script: "scripts/change-admin.tolk",
+        net: None,
+    },
+];
 
 const NFT_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     base_dir: &NFT_TEMPLATE_DIR,
     app_overlay_dir: None,
     layout: ProjectLayout::Standard,
     contracts: &NFT_CONTRACTS,
-    deploy_script: "scripts/deployCollection.tolk",
-    extra_scripts: &[],
+    deploy_script: "scripts/deploy-collection.tolk",
+    extra_scripts: NFT_EXTRA_SCRIPTS,
 };
 
 const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
@@ -333,8 +399,8 @@ const NFT_APP_SCAFFOLD: ProjectScaffold = ProjectScaffold {
     app_overlay_dir: Some(&NFT_APP_TEMPLATE_DIR),
     layout: ProjectLayout::App,
     contracts: &NFT_CONTRACTS,
-    deploy_script: "scripts/deployCollection.tolk",
-    extra_scripts: &[],
+    deploy_script: "scripts/deploy-collection.tolk",
+    extra_scripts: NFT_EXTRA_SCRIPTS,
 };
 
 const W5_EXTENSION_EXTRA_SCRIPTS: &[ExtraScript] = &[
@@ -387,6 +453,24 @@ impl ProjectTemplate {
             Self::Jetton => "jetton",
             Self::Nft => "nft",
             Self::W5Extension => "w5-extension",
+        }
+    }
+
+    #[must_use]
+    pub const fn aliases(self) -> &'static [&'static str] {
+        match self {
+            Self::W5Extension => &["w5-plugin"],
+            _ => &[],
+        }
+    }
+
+    #[must_use]
+    pub const fn category(self) -> &'static str {
+        match self {
+            Self::Empty | Self::Counter => "starter",
+            Self::Jetton => "token",
+            Self::Nft => "nft",
+            Self::W5Extension => "wallet",
         }
     }
 
@@ -465,6 +549,8 @@ pub(super) fn template_catalog() -> TemplateCatalog {
 
             TemplateCatalogEntry {
                 id: template.as_str(),
+                aliases: template.aliases(),
+                category: template.category(),
                 description: template.description(),
                 supports_app: definition.app_scaffold.is_some(),
                 scaffolds,
@@ -495,9 +581,31 @@ pub(super) const fn project_scaffold(
 }
 
 fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
+    let mut scripts = vec![
+        TemplateScriptInfo {
+            alias: "deploy-emulation".to_owned(),
+            command: format!("acton script {}", scaffold.deploy_script_path()),
+        },
+        TemplateScriptInfo {
+            alias: "deploy-testnet".to_owned(),
+            command: format!(
+                "acton script {} --net testnet",
+                scaffold.deploy_script_path()
+            ),
+        },
+    ];
+    scripts.extend(
+        scaffold
+            .extra_scripts()
+            .into_iter()
+            .map(|(alias, command)| TemplateScriptInfo { alias, command }),
+    );
+
     TemplateScaffoldInfo {
         kind: scaffold.layout().as_str(),
         includes_typescript_app: scaffold.layout().includes_typescript_app(),
+        deploy_script: scaffold.deploy_script_path(),
+        scripts,
         contracts: scaffold
             .contracts()
             .iter()
@@ -511,7 +619,7 @@ fn serialize_scaffold(scaffold: ProjectScaffold) -> TemplateScaffoldInfo {
 }
 
 /// Extracts the standalone TypeScript dApp scaffold (the empty-app overlay)
-/// without any contract files, for `acton init --create-dapp`.
+/// without contract-specific wrappers, for `acton init --create-dapp`.
 pub fn extract_standalone_app_scaffold(
     target_dir: &Path,
     npm_package_name: &str,
@@ -520,6 +628,7 @@ pub fn extract_standalone_app_scaffold(
         &EMPTY_APP_TEMPLATE_DIR,
         target_dir,
         false,
+        true,
         TemplateRenderContext {
             npm_package_name: Some(npm_package_name),
             author: None,
@@ -541,12 +650,19 @@ pub(super) fn create_project_from_scaffold(
 
     if let Some(overlay_dir) = scaffold.app_overlay_dir {
         extract_base_for_app_layout(scaffold.base_dir, target_dir, render_context)?;
-        extract_template_dir(overlay_dir, target_dir, include_agents, render_context)?;
+        extract_template_dir(
+            overlay_dir,
+            target_dir,
+            include_agents,
+            false,
+            render_context,
+        )?;
     } else {
         extract_template_dir(
             scaffold.base_dir,
             target_dir,
             include_agents,
+            false,
             render_context,
         )?;
     }
@@ -596,10 +712,11 @@ fn extract_template_dir(
     dir: &Dir<'static>,
     base_path: &Path,
     include_agents: bool,
+    skip_wrappers_ts: bool,
     render_context: TemplateRenderContext<'_>,
 ) -> std::io::Result<()> {
     for entry in dir.entries() {
-        if !include_agents && should_skip_entry(entry.path()) {
+        if should_skip_entry(entry.path(), include_agents, skip_wrappers_ts) {
             continue;
         }
 
@@ -607,7 +724,13 @@ fn extract_template_dir(
 
         if let Some(subdir) = entry.as_dir() {
             fs::create_dir_all(&path)?;
-            extract_template_dir(subdir, base_path, include_agents, render_context)?;
+            extract_template_dir(
+                subdir,
+                base_path,
+                include_agents,
+                skip_wrappers_ts,
+                render_context,
+            )?;
             continue;
         }
 
@@ -671,7 +794,10 @@ fn escape_tolk_string_content(value: &str) -> String {
         .replace('\t', "\\t")
 }
 
-fn should_skip_entry(path: &Path) -> bool {
-    path.file_name()
-        .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME))
+fn should_skip_entry(path: &Path, include_agents: bool, skip_wrappers_ts: bool) -> bool {
+    (!include_agents
+        && path
+            .file_name()
+            .is_some_and(|name| name == OsStr::new(AGENTS_FILE_NAME)))
+        || (skip_wrappers_ts && path.starts_with("wrappers-ts"))
 }

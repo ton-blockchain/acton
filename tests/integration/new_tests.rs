@@ -461,6 +461,67 @@ fn test_new_counter_project_non_interactive() {
 }
 
 #[test]
+fn test_new_jetton_project_non_interactive() {
+    let project = ProjectBuilder::new("new-jetton")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("jetton-project")
+        .arg("--description")
+        .arg("jetton description")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    output.assert_contains("Template: jetton");
+
+    let project_dir = project.path().join("foobar");
+    let acton_toml = project_dir.join("Acton.toml");
+    let content = fs::read_to_string(&acton_toml).unwrap();
+    assert!(content.contains(r#"name = "jetton-project""#));
+    assert!(content.contains(r"[contracts.JettonMinter]"));
+    assert!(content.contains(r"[contracts.JettonWallet]"));
+    assert!(content.contains("acton script scripts/deploy.tolk"));
+    assert!(content.contains("jetton-mint = \"acton script scripts/mint.tolk\""));
+    assert!(content.contains("jetton-transfer = \"acton script scripts/transfer.tolk\""));
+    assert!(content.contains("jetton-info = \"acton script scripts/info.tolk\""));
+    assert!(content.contains("jetton-change-admin = \"acton script scripts/change-admin.tolk\""));
+    assert!(
+        content.contains("jetton-change-metadata = \"acton script scripts/change-metadata.tolk\"")
+    );
+    assert!(content.contains("jetton-claim-admin = \"acton script scripts/claim-admin.tolk\""));
+
+    assert!(project_dir.join("contracts/JettonMinter.tolk").exists());
+    assert!(project_dir.join("contracts/JettonWallet.tolk").exists());
+    assert!(project_dir.join("contracts/storage.tolk").exists());
+    assert!(project_dir.join("contracts/messages.tolk").exists());
+    assert!(project_dir.join("contracts/errors.tolk").exists());
+    assert!(project_dir.join("wrappers/JettonMinter.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/JettonWallet.gen.tolk").exists());
+    assert!(project_dir.join("wrappers/utils.tolk").exists());
+    assert!(project_dir.join("scripts/deploy.tolk").exists());
+    assert!(project_dir.join("scripts/mint.tolk").exists());
+    assert!(project_dir.join("scripts/transfer.tolk").exists());
+    assert!(project_dir.join("scripts/info.tolk").exists());
+    assert!(project_dir.join("scripts/change-admin.tolk").exists());
+    assert!(project_dir.join("scripts/change-metadata.tolk").exists());
+    assert!(project_dir.join("scripts/claim-admin.tolk").exists());
+    assert!(project_dir.join("tests/test-utils.tolk").exists());
+    assert!(project_dir.join("tests/state-init.test.tolk").exists());
+    assert!(project_dir.join("tests/wallet-behavior.test.tolk").exists());
+    assert!(!project_dir.join("package.json").exists());
+    assert!(!project_dir.join("app").exists());
+}
+
+#[test]
 fn test_new_nft_project_non_interactive() {
     let project = ProjectBuilder::new("new-nft").without_acton_toml().build();
 
@@ -487,19 +548,19 @@ fn test_new_nft_project_non_interactive() {
     assert!(content.contains(r#"name = "nft-project""#));
     assert!(content.contains(r"[contracts.NftCollection]"));
     assert!(content.contains(r"[contracts.NftItem]"));
-    assert!(content.contains("acton script scripts/deployCollection.tolk"));
-    assert!(content.contains("acton script scripts/deployCollection.tolk --net testnet"));
+    assert!(content.contains("acton script scripts/deploy-collection.tolk"));
+    assert!(content.contains("acton script scripts/deploy-collection.tolk --net testnet"));
 
     assert!(project_dir.join("contracts/NftCollection.tolk").exists());
     assert!(project_dir.join("contracts/NftItem.tolk").exists());
     assert!(project_dir.join("wrappers/NftCollection.gen.tolk").exists());
     assert!(project_dir.join("wrappers/NftItem.gen.tolk").exists());
     assert!(project_dir.join("wrappers/utils.tolk").exists());
-    assert!(project_dir.join("scripts/deployCollection.tolk").exists());
-    assert!(project_dir.join("scripts/deployItem.tolk").exists());
-    assert!(project_dir.join("scripts/deployBatch.tolk").exists());
-    assert!(project_dir.join("scripts/transferItem.tolk").exists());
-    assert!(project_dir.join("scripts/changeAdmin.tolk").exists());
+    assert!(project_dir.join("scripts/deploy-collection.tolk").exists());
+    assert!(project_dir.join("scripts/deploy-item.tolk").exists());
+    assert!(project_dir.join("scripts/deploy-batch.tolk").exists());
+    assert!(project_dir.join("scripts/transfer-item.tolk").exists());
+    assert!(project_dir.join("scripts/change-admin.tolk").exists());
     assert!(project_dir.join("tests/nft-collection.test.tolk").exists());
     assert!(project_dir.join("tests/nft-item.test.tolk").exists());
     assert!(!project_dir.join("package.json").exists());
@@ -698,7 +759,41 @@ fn test_new_empty_project_with_app_flag() {
             .join("contracts/wrappers/Empty.gen.tolk")
             .exists()
     );
+    assert!(project_dir.join("wrappers-ts/Empty.gen.ts").exists());
     assert!(!project_dir.join("app/src/app.css").exists());
+}
+
+#[test]
+fn test_new_empty_app_project_with_agents_flag() {
+    let project = ProjectBuilder::new("new-empty-app-agents")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project.path().join("foobar").display().to_string())
+        .arg("--name")
+        .arg("Empty App Project")
+        .arg("--description")
+        .arg("empty app description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--app")
+        .arg("--agents")
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/new/test_new_empty_app_project_with_agents_flag.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/AGENTS.md",
+            "integration/snapshots/new/test_new_empty_app_project_with_agents_flag.agents.md.gen",
+        );
 }
 
 #[test]
@@ -1193,188 +1288,9 @@ fn test_new_templates_returns_machine_readable_json() {
     let json: JsonValue =
         serde_json::from_str(&output.get_stdout()).expect("new --templates must return valid JSON");
 
-    assert_eq!(
-        json,
-        serde_json::json!({
-            "schema_version": 1,
-            "templates": [
-                {
-                    "id": "empty",
-                    "description": "Minimal project skeleton",
-                    "supports_app": true,
-                    "scaffolds": [
-                        {
-                            "kind": "standard",
-                            "includes_typescript_app": false,
-                            "contracts": [
-                                {
-                                    "id": "Empty",
-                                    "name": "Empty",
-                                    "src": "contracts/Empty.tolk"
-                                }
-                            ]
-                        },
-                        {
-                            "kind": "app",
-                            "includes_typescript_app": true,
-                            "contracts": [
-                                {
-                                    "id": "Empty",
-                                    "name": "Empty",
-                                    "src": "contracts/src/Empty.tolk"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": "counter",
-                    "description": "Simple counter contract",
-                    "supports_app": true,
-                    "scaffolds": [
-                        {
-                            "kind": "standard",
-                            "includes_typescript_app": false,
-                            "contracts": [
-                                {
-                                    "id": "Counter",
-                                    "name": "Counter",
-                                    "src": "contracts/Counter.tolk"
-                                }
-                            ]
-                        },
-                        {
-                            "kind": "app",
-                            "includes_typescript_app": true,
-                            "contracts": [
-                                {
-                                    "id": "Counter",
-                                    "name": "Counter",
-                                    "src": "contracts/src/Counter.tolk"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": "jetton",
-                    "description": "Jetton minter and wallet contracts",
-                    "supports_app": true,
-                    "scaffolds": [
-                        {
-                            "kind": "standard",
-                            "includes_typescript_app": false,
-                            "contracts": [
-                                {
-                                    "id": "JettonMinter",
-                                    "name": "JettonMinter",
-                                    "src": "contracts/JettonMinter.tolk"
-                                },
-                                {
-                                    "id": "JettonWallet",
-                                    "name": "JettonWallet",
-                                    "src": "contracts/JettonWallet.tolk"
-                                }
-                            ]
-                        },
-                        {
-                            "kind": "app",
-                            "includes_typescript_app": true,
-                            "contracts": [
-                                {
-                                    "id": "JettonMinter",
-                                    "name": "JettonMinter",
-                                    "src": "contracts/src/JettonMinter.tolk"
-                                },
-                                {
-                                    "id": "JettonWallet",
-                                    "name": "JettonWallet",
-                                    "src": "contracts/src/JettonWallet.tolk"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": "nft",
-                    "description": "NFT collection and item contracts",
-                    "supports_app": true,
-                    "scaffolds": [
-                        {
-                            "kind": "standard",
-                            "includes_typescript_app": false,
-                            "contracts": [
-                                {
-                                    "id": "NftCollection",
-                                    "name": "NftCollection",
-                                    "src": "contracts/NftCollection.tolk"
-                                },
-                                {
-                                    "id": "NftItem",
-                                    "name": "NftItem",
-                                    "src": "contracts/NftItem.tolk"
-                                }
-                            ]
-                        },
-                        {
-                            "kind": "app",
-                            "includes_typescript_app": true,
-                            "contracts": [
-                                {
-                                    "id": "NftCollection",
-                                    "name": "NftCollection",
-                                    "src": "contracts/src/NftCollection.tolk"
-                                },
-                                {
-                                    "id": "NftItem",
-                                    "name": "NftItem",
-                                    "src": "contracts/src/NftItem.tolk"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "id": "w5-extension",
-                    "description": "Wallet V5 extension contract and subscription example",
-                    "supports_app": true,
-                    "scaffolds": [
-                        {
-                            "kind": "standard",
-                            "includes_typescript_app": false,
-                            "contracts": [
-                                {
-                                    "id": "SimpleExtension",
-                                    "name": "SimpleExtension",
-                                    "src": "contracts/SimpleExtension.tolk"
-                                },
-                                {
-                                    "id": "WalletV5",
-                                    "name": "WalletV5",
-                                    "src": "contracts/walletv5/WalletV5.tolk"
-                                }
-                            ]
-                        },
-                        {
-                            "kind": "app",
-                            "includes_typescript_app": true,
-                            "contracts": [
-                                {
-                                    "id": "SimpleExtension",
-                                    "name": "SimpleExtension",
-                                    "src": "contracts/src/SimpleExtension.tolk"
-                                },
-                                {
-                                    "id": "WalletV5",
-                                    "name": "WalletV5",
-                                    "src": "contracts/src/walletv5/WalletV5.tolk"
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        })
+    assert_eq!(json["schema_version"], 1);
+    output.assert_snapshot_matches(
+        "integration/snapshots/new/test_new_templates_returns_machine_readable_json.stdout.txt",
     );
 }
 
@@ -2301,6 +2217,7 @@ fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
         ".prettierrc",
         "components.json",
         "eslint.config.js",
+        "package-lock.json",
         "tsconfig.json",
         "vite.config.ts",
     ] {
@@ -2417,7 +2334,7 @@ fn test_new_nft_project_localnet_deploy_snapshot() {
         "nft",
         false,
         "deployer",
-        "scripts/deployCollection.tolk",
+        "scripts/deploy-collection.tolk",
         "integration/snapshots/new/test_new_nft_project_localnet_deploy.stdout.txt",
     );
 }
@@ -3166,7 +3083,7 @@ fn test_new_nft_project_full_flow() {
         .acton()
         .current_dir(&project_dir)
         .arg("script")
-        .arg("scripts/deployCollection.tolk")
+        .arg("scripts/deploy-collection.tolk")
         .run()
         .success()
         .assert_snapshot_matches(

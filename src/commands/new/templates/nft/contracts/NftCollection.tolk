@@ -8,8 +8,8 @@ contract NftCollection {
     author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard NFT Collection. TEP-62 and TEP-64 compliant"
-    incomingMessages: AllowedMessageToNftCollection
     storage: NftCollectionStorage
+    incomingMessages: AllowedMessageToNftCollection
 }
 
 fun deployNftItem(

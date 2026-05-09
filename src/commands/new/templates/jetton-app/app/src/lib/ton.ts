@@ -1,7 +1,10 @@
 import { TonClient } from '@ton/ton';
 import { Address, beginCell } from '@ton/core';
+import { QueryClient } from '@tanstack/react-query';
 
-type Network = 'mainnet' | 'testnet';
+export type Network = 'mainnet' | 'testnet';
+
+export const queryClient = new QueryClient();
 
 const clients: Record<string, TonClient> = {};
 

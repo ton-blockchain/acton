@@ -142,6 +142,60 @@ type uint32 = bigint
 type uint64 = bigint
 
 /**
+ > struct (0x6578746e) W5ExtensionActionRequest {
+ >     queryId: uint64
+ >     outActions: cell?
+ >     hasExtraActions: bool
+ >     extraActions: RemainingBitsAndRefs
+ > }
+ */
+export interface W5ExtensionActionRequest {
+    readonly $: 'W5ExtensionActionRequest'
+    queryId: uint64
+    outActions: c.Cell | null
+    hasExtraActions: boolean
+    extraActions: RemainingBitsAndRefs
+}
+
+export const W5ExtensionActionRequest = {
+    PREFIX: 0x6578746e,
+
+    create(args: {
+        queryId: uint64
+        outActions: c.Cell | null
+        hasExtraActions: boolean
+        extraActions: RemainingBitsAndRefs
+    }): W5ExtensionActionRequest {
+        return {
+            $: 'W5ExtensionActionRequest',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): W5ExtensionActionRequest {
+        loadAndCheckPrefix32(s, 0x6578746e, 'W5ExtensionActionRequest');
+        return {
+            $: 'W5ExtensionActionRequest',
+            queryId: s.loadUintBig(64),
+            outActions: s.loadBoolean() ? s.loadRef() : null,
+            hasExtraActions: s.loadBoolean(),
+            extraActions: loadTolkRemaining(s),
+        }
+    },
+    store(self: W5ExtensionActionRequest, b: c.Builder): void {
+        b.storeUint(0x6578746e, 32);
+        b.storeUint(self.queryId, 64);
+        storeTolkNullable<c.Cell>(self.outActions, b,
+            (v,b) => b.storeRef(v)
+        );
+        b.storeBit(self.hasExtraActions);
+        storeTolkRemaining(self.extraActions, b);
+    },
+    toCell(self: W5ExtensionActionRequest): c.Cell {
+        return makeCellFrom<W5ExtensionActionRequest>(self, W5ExtensionActionRequest.store);
+    }
+}
+
+/**
  > struct ExtensionStorage {
  >     walletAddress: address
  >     admin: address
@@ -357,60 +411,6 @@ export const TopUp = {
     },
     toCell(self: TopUp): c.Cell {
         return makeCellFrom<TopUp>(self, TopUp.store);
-    }
-}
-
-/**
- > struct (0x6578746e) W5ExtensionActionRequest {
- >     queryId: uint64
- >     outActions: cell?
- >     hasExtraActions: bool
- >     extraActions: RemainingBitsAndRefs
- > }
- */
-export interface W5ExtensionActionRequest {
-    readonly $: 'W5ExtensionActionRequest'
-    queryId: uint64
-    outActions: c.Cell | null
-    hasExtraActions: boolean
-    extraActions: RemainingBitsAndRefs
-}
-
-export const W5ExtensionActionRequest = {
-    PREFIX: 0x6578746e,
-
-    create(args: {
-        queryId: uint64
-        outActions: c.Cell | null
-        hasExtraActions: boolean
-        extraActions: RemainingBitsAndRefs
-    }): W5ExtensionActionRequest {
-        return {
-            $: 'W5ExtensionActionRequest',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): W5ExtensionActionRequest {
-        loadAndCheckPrefix32(s, 0x6578746e, 'W5ExtensionActionRequest');
-        return {
-            $: 'W5ExtensionActionRequest',
-            queryId: s.loadUintBig(64),
-            outActions: s.loadBoolean() ? s.loadRef() : null,
-            hasExtraActions: s.loadBoolean(),
-            extraActions: loadTolkRemaining(s),
-        }
-    },
-    store(self: W5ExtensionActionRequest, b: c.Builder): void {
-        b.storeUint(0x6578746e, 32);
-        b.storeUint(self.queryId, 64);
-        storeTolkNullable<c.Cell>(self.outActions, b,
-            (v,b) => b.storeRef(v)
-        );
-        b.storeBit(self.hasExtraActions);
-        storeTolkRemaining(self.extraActions, b);
-    },
-    toCell(self: W5ExtensionActionRequest): c.Cell {
-        return makeCellFrom<W5ExtensionActionRequest>(self, W5ExtensionActionRequest.store);
     }
 }
 

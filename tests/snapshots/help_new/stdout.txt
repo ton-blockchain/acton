@@ -239,10 +239,10 @@ FILES
           deploy(...), send{Name}(...), sendAny(...), and typed get-method
           calls
 
-       o  deployment scripts
+       o  deployment and management scripts
 
-       o  [scripts] aliases such as deploy-emulation and deploy-testnet in
-          Acton.toml
+       o  [scripts] aliases such as deploy-emulation, deploy-testnet, and
+          template-specific management aliases in Acton.toml
 
        o  frontend files for --app
 
@@ -256,7 +256,9 @@ TYPESCRIPT APP LAYOUT
 
        o  contracts/src for contract sources and shared Tolk types
 
-       o  contracts/tests for tests and generated Tolk wrappers
+       o  contracts/tests for tests
+
+       o  contracts/wrappers for generated Tolk wrappers
 
        o  contracts/scripts for deployment and utility scripts
 
@@ -287,7 +289,7 @@ TYPESCRIPT APP LAYOUT
 
        o  npm run fmt and npm run fmt:check for frontend formatting
 
-       o  npm test to run the bundled acton test command when the template
+       o  npm run test to run the bundled acton test command when the template
           provides it
 
 SIDE EFFECTS
