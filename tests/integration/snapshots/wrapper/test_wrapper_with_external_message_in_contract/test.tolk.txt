@@ -8,6 +8,7 @@ import "../wrappers/MyContract.gen"
 /// Example test case demonstrating the basic flow
 get fun `test basic flow`() {
     val (contract, deployer, notDeployer) = setupTest();
+    // TODO: Implement your test logic here
     // Example:
     // val res = contract.sendMsg(deployer.address, ...);
     // expect(res).toHaveTransaction({ ... });

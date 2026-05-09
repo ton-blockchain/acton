@@ -1215,6 +1215,7 @@ fn generate_example_test(_contract_name: &str) -> String {
     code.push_str("get fun `test basic flow`() {\n");
     code.push_str("    val (contract, deployer, notDeployer) = setupTest();\n");
     code.push('\n');
+    code.push_str("    // TODO: Implement your test logic here\n");
     code.push_str("    // Example:\n");
     code.push_str("    // val res = contract.sendMsg(deployer.address, ...);\n");
     code.push_str("    // expect(res).toHaveTransaction({ ... });\n");
