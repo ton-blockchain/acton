@@ -72,6 +72,7 @@ pub mod mutation;
 mod profiling;
 pub mod reporting;
 pub mod trace;
+pub mod tui;
 
 const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 pub(crate) const INTERNAL_SKIP_BUILD_ENV: &str = "ACTON_INTERNAL_SKIP_BUILD";

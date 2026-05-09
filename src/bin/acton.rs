@@ -20,6 +20,7 @@ use acton::commands::retrace::retrace_cmd;
 use acton::commands::rpc::{RpcCommand, rpc_cmd};
 use acton::commands::run::run_cmd;
 use acton::commands::script::script_cmd;
+use acton::commands::test::tui::test_tui_cmd;
 use acton::commands::test::{mutation, test_cmd};
 use acton::commands::up::up_cmd;
 use acton::commands::verify::verify_cmd;
@@ -471,6 +472,12 @@ enum Commands {
             help_heading = "Reporting"
         )]
         ui: bool,
+        #[arg(
+            long,
+            help = "Debug tests in an interactive terminal UI",
+            help_heading = "Debugging"
+        )]
+        tui: bool,
         #[arg(
             long,
             help = "UI server port (default: [test].ui-port or 12344)",
@@ -1841,6 +1848,7 @@ fn main() {
             fuzz_seed,
             fork_block_number,
             ui,
+            tui,
             ui_port,
         } => match (
             fork_net.as_deref().map(Network::from_str).transpose(),
@@ -1896,8 +1904,14 @@ fn main() {
                     ui_port,
                 ) {
                     Ok(config) => {
-                        if mutate {
+                        if mutate && tui {
+                            Err(anyhow::anyhow!(
+                                "--tui cannot be combined with mutation testing yet"
+                            ))
+                        } else if mutate {
                             mutation::test_mutate_cmd(path.as_deref(), &config)
+                        } else if tui {
+                            test_tui_cmd(path, &config)
                         } else {
                             test_cmd(path, &config)
                         }

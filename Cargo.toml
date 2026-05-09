@@ -111,6 +111,8 @@ include_dir = "0.7" # include stdlib and Acton lib
 inquire = "0.9.1" # for interactive cli
 crossbeam-channel = "0.5.15" # dap communication
 dap = "0.4.1-alpha1"
+crossterm = "0.29.0"
+ratatui = { version = "0.30.0", features = ["crossterm_0_29"] }
 log = "0.4.29" # overall logging
 fern = "0.7.1" # overall logging
 chrono = { version = "0.4", features = ["serde"] }
@@ -247,6 +249,10 @@ toml = { workspace = true }
 include_dir = { workspace = true } # include stdlib and Acton lib
 inquire = { workspace = true } # for interactive cli
 crossbeam-channel = { workspace = true }
+dap-client = { workspace = true }
+dap = { workspace = true }
+crossterm = { workspace = true }
+ratatui = { workspace = true }
 log = { workspace = true } # overall logging
 fern = { workspace = true } # overall logging
 chrono = { workspace = true }
