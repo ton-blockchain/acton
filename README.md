@@ -69,9 +69,8 @@ For more installation details, see the
 
 ## Support policy
 
-Acton is currently distributed as a public beta. The stable release channel is
-the latest numbered GitHub release, and the first-class platform matrix is
-macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
+Acton is stable on the latest numbered GitHub release. The first-class platform
+matrix is macOS (ARM64, x86_64) plus Linux GNU (x86_64, ARM64). For Linux, the
 documented baseline is Ubuntu 20.04 or newer. Native Windows is not supported
 today. If you use Windows, run Acton inside WSL with Ubuntu 20.04 or newer and
 follow the Linux installation path there. `trunk` builds installed via
