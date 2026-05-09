@@ -1,6 +1,9 @@
 import "types"
 
 contract Counter {
+    author: "The Tolk Team"
+    version: "1.0.0"
+    description: "Simple counter contract with owner-controlled updates"
     storage: Storage
     incomingMessages: AllowedMessage
 }

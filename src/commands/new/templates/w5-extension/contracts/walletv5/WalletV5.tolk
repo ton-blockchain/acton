@@ -9,6 +9,7 @@ contract WalletV5 {
     version: "1.0.0"
     description: "Wallet V5. Extensible wallet with plugins support"
     incomingMessages: AllowedMessageToWalletV5
+    incomingExternal: ExternalMsgSchema
     storage: Storage
 }
 
