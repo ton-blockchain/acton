@@ -3,7 +3,7 @@ title: "Quickstart"
 description: "Step-by-step guide to run Test UI and inspect failed tests, traces, transactions, and logs"
 ---
 
-This quickstart shows how to go from `acton test --ui` to diagnosing a failed test.
+The `acton test --ui` runs the suite, opens the browser UI, and surfaces failed tests, traces, and logs.
 
 ## 1. Run tests with UI
 
@@ -24,8 +24,7 @@ acton test tests/counter.test.tolk --ui --filter "test deploy"
 acton test --coverage --ui
 ```
 
-If you start Test UI with both `--coverage` and `--ui`, an additional
-`Coverage` tab appears next to the regular test results view.
+With both `--coverage` and `--ui`, an extra `Coverage` tab appears next to the regular test results view.
 
 ## 2. Open failed test first
 

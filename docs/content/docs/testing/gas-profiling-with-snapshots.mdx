@@ -1,35 +1,29 @@
 ---
-title: "Gas Profiling with Snapshots"
+title: "Gas profiling with snapshots"
 description: "Learn how to profile gas and fees of transaction chains with --snapshot and baseline comparison"
 ---
 
-Gas profiling helps you track performance regressions in tests by measuring gas and fee metrics for opcodes and full transaction chains.
+Gas profiling records gas and fee metrics for opcodes. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs.
 
 ## What gets profiled
 
 When profiling is enabled, Acton prints:
 
-- **Opcode gas table** (min/max/avg per opcode or message opcode name)
-- **Chain gas & fees summary** (per test)
-- **Chain gas & fees details** (per trace inside each test)
+- Opcode gas usage table: min, max, and avg gas per opcode or message opcode name.
+- Per test gas and fees summary.
+- Per trace gas and fees details inside each test.
 
-For chain-level metrics, Acton tracks:
+For chain-level metrics, Acton tracks: transaction count, gas used, gas fee, forward fee, and the total fee.
 
-- transaction count
-- gas used
-- gas fee
-- forward fee
-- total fee
+## Quick start
 
-## Quick Start
-
-### 1. Create a baseline snapshot
+### Create a baseline snapshot
 
 ```bash
 acton test --snapshot gas-baseline.json
 ```
 
-This runs tests and saves a JSON snapshot with opcode and trace-chain stats.
+This runs tests and writes a JSON snapshot of opcode and trace-chain statistics:
 
 ```text
  GAS USAGE
@@ -51,7 +45,7 @@ This runs tests and saves a JSON snapshot with opcode and trace-chain stats.
  test unknown message         5    5       2568   0.0010272 TON   0.002266953 TON   0.0010272 TON
 ```
 
-### 2. Compare current run with baseline
+### Compare current run with baseline
 
 ```bash
 acton test --baseline-snapshot gas-baseline.json
@@ -107,7 +101,7 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
   In comparison tables, changed chains are shown as baseline row, current row, and diff row.
 </Callout>
 
-### 2.1 Fail CI on drift
+### Fail CI on drift
 
 Use strict mode to return non-zero exit code when baseline and current profile differ:
 
@@ -115,14 +109,14 @@ Use strict mode to return non-zero exit code when baseline and current profile d
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 ```
 
-You can also enable it by default in `Acton.toml`:
+To enable it by default, set the `fail-on-diff` to `true` in the `Acton.toml`:
 
-```toml
+```toml title="Acton.toml"
 [test]
 fail-on-diff = true
 ```
 
-### 3. Update baseline intentionally
+### Update the baseline on purpose
 
 If changes are expected, recreate baseline:
 
@@ -131,10 +125,10 @@ acton test --snapshot gas-baseline.json
 ```
 
 <Callout type="info" title="Compare mode does not overwrite snapshot">
-If you pass both `--snapshot` and `--baseline-snapshot`, Acton runs in compare mode and does not rewrite the snapshot file.
+  With both `--snapshot` and `--baseline-snapshot`, Acton runs in compare mode and does not rewrite the snapshot file.
 </Callout>
 
-## Naming trace chains for readable reports
+## Name trace chains for readable reports
 
 Chain reports are much easier to read when traces have explicit names.
 
@@ -153,14 +147,11 @@ get fun `test transfer flow`() {
 
 Without custom names, traces are shown as `Trace 1`, `Trace 2`, and so on.
 
-## How snapshot matching works
+## How baseline matching works
 
-Baseline comparison is key-based rather than fuzzy.
+Baseline comparison is key-based rather than fuzzy. Opcode rows are keyed by the resolved opcode label.
 
-- Opcode rows are keyed by the resolved opcode label.
-- If ABI metadata resolves the opcode, the key is the message name such as
-  `IncreaseCounter`.
-- Otherwise the key falls back to the raw hex opcode such as `0x00000999`.
+If ABI metadata resolves the opcode, the key is the message name such as `IncreaseCounter`. Otherwise, the key falls back to the raw hex opcode such as `0x00000999`.
 
 Trace-chain rows are keyed by a stable internal snapshot key:
 
@@ -168,22 +159,19 @@ Trace-chain rows are keyed by a stable internal snapshot key:
 <test-name>::trace#<1-based trace index>
 ```
 
-That key comes from the test name plus the 1-based position of the trace in
-that test's execution order. `trace_name` is stored only for display. Renaming a
-trace with `giveName(...)` makes reports easier to read, but it does not change
-how baseline matching works.
+That key comes from the test name plus the 1-based position of the trace in that test's execution order. `trace_name` is stored only for display. Renaming a trace with `giveName(...)` makes reports easier to read, but it does not change how baseline matching works.
 
-## Reading comparison output
+## Read comparison output
 
 In baseline comparison mode:
 
-- New opcodes/traces are shown as `NEW`
+- New opcodes and traces are shown as `NEW`
 - Higher usage is highlighted as regression
 - Lower usage is highlighted as improvement
 - Unchanged rows are dimmed
 
 <Callout type="idea" title="Stabilize test data first">
-For meaningful diffs, keep tests deterministic: fixed inputs, stable send order, and no random/time-dependent behavior unless explicitly controlled.
+  For meaningful diffs, keep tests deterministic: use fixed inputs, stable send order, and no random or time-dependent behavior unless controlled explicitly.
 </Callout>
 
 ## Snapshot file format
@@ -217,7 +205,7 @@ Gas snapshot is stored as JSON with this high-level structure:
 
 ```
 
-## Useful flags to combine with profiling
+## Flags that pair well with profiling
 
 ```bash
 # Profile only selected tests
@@ -229,37 +217,34 @@ acton test tests/wallet.test.tolk --baseline-snapshot gas-baseline.json
 
 ## Troubleshooting
 
-### Baseline file is missing or invalid
+### Baseline file missing or invalid
 
 Default behavior: Acton prints a warning and continues without baseline comparison.
 
-With strict mode (`--fail-on-diff` or `[test].fail-on-diff = true`), Acton exits with error.
+With strict mode, i.e., `--fail-on-diff` or `[test].fail-on-diff = true`, Acton exits with error.
 
-### Snapshot is not created
+### Snapshot file was not created
 
 Snapshot is written only when:
 
-- `--snapshot` is set
-- `--baseline-snapshot` is **not** set
-- profiling collected at least one opcode or trace-chain metric
+- `--snapshot` is set;
+- `--baseline-snapshot` is **not** set;
+- profiling collected at least one opcode or trace-chain metric.
 
 ### Trace names changed but diff mapping is still stable
 
-Trace comparison is matched by stable snapshot key (`<test-name>::trace#<index>`), while `trace_name` is used for display.
+Trace comparison is matched by stable snapshot key, while `trace_name` is used for display: `<test-name>::trace#<index>`.
 
 ### `--fail-on-diff` is stricter than the tables
 
-The comparison tables mainly show aggregated numbers such as averages and fee
-totals. Strict drift detection compares the full snapshot content except for the
-top-level `timestamp`.
+The comparison tables mainly show aggregated numbers such as averages and fee totals. Strict drift detection compares the full snapshot content except for the top-level `timestamp`.
 
 That means `--fail-on-diff` treats these as real drift:
 
 - opcode sample-count changes
-- `min_gas` / `max_gas` / `avg_gas` changes
+- `min_gas`, `max_gas`, or `avg_gas` changes
 - differences in per-opcode `all_values`
 - per-trace `tx_count` or fee changes
 - changed `trace_name` for the same snapshot key
 
-For stable CI baselines, keep both the execution order and the profiled test
-data deterministic.
+For stable CI baselines, keep both the execution order and the profiled test data deterministic.

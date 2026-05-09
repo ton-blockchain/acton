@@ -1,0 +1,366 @@
+---
+title: "9. Build the React frontend"
+description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + React + TON Connect UI, and build a live poll page."
+---
+
+import { Callout } from "fumadocs-ui/components/callout";
+
+## Prerequisites for this page
+
+- [Node.js](https://nodejs.org/en/download/) 20 or later
+- A deployed poll on [testnet](/docs/tutorial/testnet)
+
+## Scaffold the dApp
+
+```bash
+acton init --create-dapp app/
+```
+
+```acton-cli
+$ acton init --create-dapp app/
+✓ Created TypeScript app scaffold
+  Directory: app
+
+Next steps:
+
+  # Install app dependencies
+  cd app
+  npm ci
+  # Start the TypeScript app
+  npm run dev
+```
+
+The scaffold is a standalone Vite project preconfigured with:
+
+- React 19 + Vite + TypeScript
+- Tailwind CSS with shadcn-style UI primitives (`Button`, `DropdownMenu`)
+- `@tonconnect/ui-react` for wallet connection
+- `@ton/ton` and `@ton/core` for chain queries
+- `@tanstack/react-query` for state management
+
+The directory layout matters for the next steps:
+
+```text
+app/                  # dApp project root (package.json, vite.config.ts)
+├── app/              # Vite source root
+│   └── src/
+│       ├── App.tsx
+│       ├── lib/      # ton.ts, router.ts, utils.ts
+│       └── ...
+└── wrappers-ts/      # placeholder, will be replaced
+```
+
+```bash
+cd app/
+npm ci
+```
+
+## Generate the TypeScript wrapper
+
+From the Acton project root, generate a typed TypeScript wrapper for `Poll` and write it directly into the dApp:
+
+```bash
+acton wrapper Poll --ts --output-dir app/wrappers-ts
+```
+
+The generated `app/wrappers-ts/Poll.gen.ts` exposes typed helpers built from the contract ABI:
+
+- `Poll.fromAddress(address)` — open a deployed contract
+- `Poll.createCellOfVote({ option })` — build a `Vote` message body
+- `Poll.createCellOfClosePoll({})` — build a `ClosePoll` message body
+- `getResults()`, `getOwner()`, `getIsClosed()` — typed getter calls
+
+The placeholder wrapper from the scaffold is no longer needed:
+
+```bash
+rm app/wrappers-ts/Empty.gen.ts
+```
+
+<Callout type="info">
+  Re-run `acton wrapper Poll --ts --output-dir app/wrappers-ts` whenever messages
+  or getters change. The file is regenerated from scratch every time — do not
+  edit it manually.
+</Callout>
+
+## Wire up the path aliases
+
+Add a `@wrappers/*` alias next to the existing `@/*` alias in
+`app/tsconfig.json`:
+
+```json title="app/tsconfig.json"
+{
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["app/src/*"],
+      "@wrappers/*": ["wrappers-ts/*"]
+    }
+  },
+  "include": ["app/src", "wrappers-ts", "vite.config.ts"]
+}
+```
+
+Mirror it in `app/vite.config.ts` so Vite resolves the path at runtime:
+
+```ts title="app/vite.config.ts"
+resolve: {
+  alias: {
+    '@':         path.resolve(projectRoot, 'app/src'),
+    '@wrappers': path.resolve(projectRoot, 'wrappers-ts'),
+  },
+},
+```
+
+## Configure environment
+
+Create `app/.env`:
+
+```acton-cli title="app/.env"
+VITE_POLL_ADDRESS=<POLL_ADDRESS>
+TONCENTER_TESTNET_API_KEY=<TONCENTER_API_KEY>
+```
+
+`<POLL_ADDRESS>` — the testnet address from page 8.
+`<TONCENTER_API_KEY>` — get a free key at [Toncenter TG bot](https://t.me/toncenter).
+
+The bundled `vite.config.ts` exposes both `VITE_*` and `TONCENTER_*` prefixes via `envPrefix`, so the same `TONCENTER_TESTNET_API_KEY` works for the Acton CLI and the Vite dev server.
+
+## Add the poll module
+
+Create `app/app/src/lib/poll.ts`. It centralizes everything poll-specific: it
+reads the contract state through getters, builds typed message bodies with the
+wrapper, and prepares TON Connect transaction requests:
+
+```typescript title="app/app/src/lib/poll.ts"
+import { Address, toNano } from '@ton/core';
+import type { SendTransactionRequest } from '@tonconnect/ui-react';
+
+import { Poll } from '@wrappers/Poll.gen';
+import { formatAddressForNetwork, getTonClient, networkChain } from './ton';
+
+const POLL_ADDRESS = import.meta.env.VITE_POLL_ADDRESS as string;
+const TX_TTL_SECONDS = 5 * 60;
+
+const pollAddress = () => Address.parse(POLL_ADDRESS);
+const txExpiry = () => Math.floor(Date.now() / 1000) + TX_TTL_SECONDS;
+
+export async function fetchPollState() {
+  const client = getTonClient('testnet');
+  const results = await client.runMethod(pollAddress(), 'results');
+  const owner = await client.runMethod(pollAddress(), 'owner');
+  const closed = await client.runMethod(pollAddress(), 'isClosed');
+
+  return {
+    option0: Number(results.stack.readBigNumber()),
+    option1: Number(results.stack.readBigNumber()),
+    owner: formatAddressForNetwork(
+      owner.stack.readAddress().toString(),
+      'testnet',
+    ),
+    isClosed: closed.stack.readBoolean(),
+  };
+}
+
+export function buildVoteRequest(option: number): SendTransactionRequest {
+  return {
+    network: networkChain('testnet'),
+    validUntil: txExpiry(),
+    messages: [
+      {
+        address: pollAddress().toString(),
+        amount: toNano('0.1').toString(),
+        // The wrapper generates `uint8` as `bigint`, so cast the option.
+        payload: Poll.createCellOfVote({ option: BigInt(option) })
+          .toBoc()
+          .toString('base64'),
+      },
+    ],
+  };
+}
+
+export function buildClosePollRequest(): SendTransactionRequest {
+  return {
+    network: networkChain('testnet'),
+    validUntil: txExpiry(),
+    messages: [
+      {
+        address: pollAddress().toString(),
+        amount: toNano('0.05').toString(),
+        payload: Poll.createCellOfClosePoll({})
+          .toBoc()
+          .toString('base64'),
+      },
+    ],
+  };
+}
+```
+
+`getTonClient`, `networkChain`, and `formatAddressForNetwork` are already
+provided by the scaffold in `app/app/src/lib/ton.ts`. The wrapper handles the
+opcode bytes and option encoding — no manual `beginCell` calls needed.
+
+## Replace the App component
+
+Replace `app/app/src/App.tsx` with a minimal poll UI:
+
+```tsx title="app/app/src/App.tsx"
+import { useEffect, useState } from 'react';
+import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
+
+import { Button } from '@/components/ui/button';
+import {
+  buildClosePollRequest,
+  buildVoteRequest,
+  fetchPollState,
+} from './lib/poll';
+
+interface PollState {
+  option0: number;
+  option1: number;
+  owner: string;
+  isClosed: boolean;
+}
+
+const initialState: PollState = {
+  option0: 0,
+  option1: 0,
+  owner: '',
+  isClosed: false,
+};
+
+export default function App() {
+  const walletAddress = useTonAddress();
+  const [tonConnectUI] = useTonConnectUI();
+  const [state, setState] = useState<PollState>(initialState);
+
+  useEffect(() => {
+    const refresh = () => fetchPollState().then(setState).catch(console.error);
+    refresh();
+    const interval = setInterval(refresh, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const total = state.option0 + state.option1 || 1;
+  const isOwner = Boolean(walletAddress) && walletAddress === state.owner;
+
+  return (
+    <div className="min-h-screen flex flex-col items-center gap-6 p-8">
+      <header className="flex items-center justify-between w-full max-w-sm">
+        <h1 className="text-2xl font-bold">Acton Poll</h1>
+        <TonConnectButton />
+      </header>
+
+      {state.isClosed && (
+        <p className="text-sm text-muted-foreground">This poll is closed.</p>
+      )}
+
+      <div className="space-y-3 w-full max-w-sm">
+        <ResultBar label="Option A" votes={state.option0} total={total} />
+        <ResultBar label="Option B" votes={state.option1} total={total} />
+      </div>
+
+      {walletAddress && !state.isClosed && (
+        <div className="flex gap-3">
+          <Button onClick={() => tonConnectUI.sendTransaction(buildVoteRequest(0))}>
+            Vote A
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => tonConnectUI.sendTransaction(buildVoteRequest(1))}
+          >
+            Vote B
+          </Button>
+        </div>
+      )}
+
+      {isOwner && !state.isClosed && (
+        <Button
+          variant="destructive"
+          onClick={() => tonConnectUI.sendTransaction(buildClosePollRequest())}
+        >
+          Close poll
+        </Button>
+      )}
+
+      {!walletAddress && !state.isClosed && (
+        <p className="text-sm text-muted-foreground">Connect a wallet to vote.</p>
+      )}
+    </div>
+  );
+}
+
+function ResultBar({
+  label,
+  votes,
+  total,
+}: {
+  label: string;
+  votes: number;
+  total: number;
+}) {
+  const pct = (votes / total) * 100;
+  return (
+    <div>
+      <div className="flex justify-between text-sm mb-1">
+        <span>{label}</span>
+        <span>{votes} votes</span>
+      </div>
+      <div className="h-3 bg-secondary rounded-full overflow-hidden">
+        <div
+          className="h-3 bg-primary transition-all"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+```
+
+The `Button` primitive, Tailwind theme tokens (`bg-secondary`, `bg-primary`,
+`text-muted-foreground`), and the `TonConnectUIProvider` wiring all come from
+the scaffold. `App.tsx` only contains poll-specific logic.
+
+<Callout type="info">
+  The scaffold ships a default TON Connect manifest URL pointing at a generic
+  Acton-hosted manifest. For a production app, host your own at a stable URL
+  and update `manifestUrl` in `app/app/src/providers/AppProviders.tsx`.
+</Callout>
+
+## Run the app
+
+The scaffold defaults to mainnet. For testnet, append `?testnet=true` to the URL — the bundled router picks up the flag and sends transactions via the testnet chain id.
+
+```bash
+npm run dev
+```
+
+```acton-cli
+  VITE v6.x.x  ready in 312 ms
+  ➜  Local:   http://localhost:5173/
+```
+
+Open [http://localhost:5173/?testnet=true](http://localhost:5173/?testnet=true). The page shows:
+
+1. An **Acton Poll** header with a **Connect Wallet** button
+2. Two progress bars with current vote counts, refreshed every 5 seconds
+3. **Vote A** and **Vote B** buttons when a wallet is connected
+4. A **Close poll** button visible only to the poll owner
+
+Connect a testnet wallet (such as Tonkeeper), click **Vote A**, and confirm the transaction. The bars update within a few seconds. A second vote from the same wallet still sends the transaction, but the count reverts as the bounce propagates back to Poll.
+
+## Complete
+
+The project now includes:
+
+- Smart contracts in Tolk (`Poll.tolk`, `Voter.tolk`) with bounce-based duplicate vote prevention
+- Integration tests with multi-contract traces, coverage, mutation, and fuzz testing
+- Deploy and vote scripts for localnet and testnet
+- Verified source on verifier.ton.org
+- React frontend with live results and TON Connect wallet integration
+
+## Next steps
+
+- [Testing guide](/docs/testing/overview) — fork testing against live testnet state
+- [Libraries](/docs/libraries) — share common code between contracts
+- [Jetton template](/docs/commands/new) — a production-grade example of the parent-child pattern at scale
+
+**Commands introduced:** `acton wrapper --ts`, `acton init --create-dapp`

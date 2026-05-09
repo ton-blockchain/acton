@@ -17,6 +17,7 @@ const COUNTER_TEMPLATE_WRAPPER: &str =
     include_str!("../../src/commands/new/templates/counter/wrappers/Counter.gen.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
+const COUNTER_TEMPLATE_AUTHOR: &str = "Acton User";
 
 const COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS: &str = r#"
 import "@acton/emulation/network"
@@ -57,9 +58,10 @@ fun setupTest(): (Counter, Treasury, Treasury) {
 "#;
 
 fn build_counter_template_project(name: &str, test_source: &str) -> Project {
+    let contract = COUNTER_TEMPLATE_CONTRACT.replace("__ACTON_AUTHOR__", COUNTER_TEMPLATE_AUTHOR);
     let project = ProjectBuilder::new(name)
         .without_acton_toml()
-        .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
+        .file("contracts/Counter", &contract)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
         .file("wrappers/Counter.gen", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)

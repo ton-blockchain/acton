@@ -1,20 +1,17 @@
 ---
-title: "Custom Matchers"
+title: "Custom matchers"
 description: "Learn how to add custom matchers for expect() calls"
 ---
 
-This guide will walk you through creating your own custom matchers for `expect()` assertions. Custom matchers allow you to extend the standard set of assertions with your own domain-specific logic, making your tests more readable and expressive.
+Custom matchers extend `expect()` with project-specific checks while keeping the fluent `expect(...).matcher(...)` style.
 
-<Callout type="info">
-Before writing a custom matcher, check
-[Built-in Matchers and Helpers](/docs/testing/built-in-matchers-and-helpers).
-Acton already provides built-in transaction matchers, map expectations, and
-out-action helpers that often cover the common cases.
+<Callout>
+    Before writing a custom matcher, review [built-in matchers and helpers](/docs/testing/built-in-matchers-and-helpers). Acton already ships transaction matchers, map expectations, and out-action helpers for many workflows.
 </Callout>
 
-## The Problem with Standalone Check Functions
+## Standalone check helpers are vague and poorly readable
 
-Imagine you have some validation logic that you want to extract into a function. By extracting it into a function, you'll get code like this:
+Validation logic extracted into a plain helper often reads like this:
 
 ```tolk
 import "@acton/testing/expect"
@@ -31,11 +28,11 @@ get fun `test unit`() {
 }
 ```
 
-This approach works, but it breaks the fluent API pattern of `expect()` and makes tests harder to read. It's not immediately clear what is being asserted.
+That pattern works, but it drops out of the `expect()` fluent chain and hides what is being asserted. This makes tests harder to read.
 
-### The Solution: Custom Matchers
+### Use custom matchers on `Expectation<T>`
 
-This code can be written much more readably and consistently by creating a custom matcher:
+The same check can fit the matcher style as an extension on `Expectation<T>`:
 
 ```tolk
 import "@acton/testing/expect"
@@ -52,19 +49,13 @@ get fun `test unit`() {
 }
 ```
 
-As you can see, instead of a standalone function, we added a new method directly to the `Expectation<int>` type. The `expect()` function returns an instance of `Expectation<T>`, where `T` is the type of the value passed to `expect()`. By extending this type, you can add your own matchers.
+The `expect()` call returns `Expectation<T>` for the wrapped value `T`. Write extension methods on `Expectation<T>` to add custom matchers.
 
-Now using your matcher is no different from standard ones.
+Custom matchers centralize validation logic on `Expectation<T>` so failures stay consistent with the built-in matchers, carefully hiding the implementation details and providing abstractions that are easy to reason about.
 
-<Callout type="info">
-Custom matchers are a powerful way to create reusable validation logic. They keep your tests clean and focused on the business logic rather than implementation details.
-</Callout>
+## Define a matcher
 
-## Creating Custom Matchers
-
-To create a custom matcher, you need to define a function that extends the `Expectation<T>` struct. The `T` is a generic parameter that will be replaced with the actual type of the value you're testing.
-
-Here's a basic structure of a custom matcher:
+A matcher is an extension function on `Expectation<T>`:
 
 ```tolk
 fun Expectation<T>.myCustomMatcher(self, arg1: Type1, arg2: Type2) {
@@ -73,13 +64,13 @@ fun Expectation<T>.myCustomMatcher(self, arg1: Type1, arg2: Type2) {
 }
 ```
 
-### Matchers for Specific Types
+### Matchers for specific types
 
-While you can define generic matchers for `Expectation<T>`, it's often more useful to create matchers for specific data types. This allows you to build powerful, domain-specific assertions.
+Generic matchers on `Expectation<T>` are allowed, whereas matchers on a concrete `T` are often clearer for domain-specific data types.
 
-#### Example: `int` Matcher
+#### Example: even `int` matcher
 
-Let's create a matcher that checks if an integer is even.
+The `toBeEven()` matcher checks if an integer is even:
 
 ```tolk
 import "@acton/testing/expect"
@@ -100,11 +91,12 @@ get fun `test even number`() {
     // expect(9).toBeEven(); // This would fail
 }
 ```
-In this example, `toBeEven` is defined on `Expectation<int>`, so it will only be available when `expect()` is called with an `int`. Inside the matcher, `self.value` holds the integer `10`.
 
-#### Example: `address` Matcher
+Here, `toBeEven` is defined on `Expectation<int>`, so it is available only after `expect()` receives an `int`. Inside the matcher, `self.value` holds that integer, e.g., `10`.
 
-You can create matchers for any type, including complex ones like `address`. Let's create a matcher to check if an address has a specific workchain.
+#### Example: `address` workchain matcher
+
+The `toHaveWorkchain()` matcher checks if an `address` has a specific workchain:
 
 ```tolk
 import "@acton/testing/expect"
@@ -131,9 +123,9 @@ get fun `test address workchain`() {
 }
 ```
 
-#### Example: `string` Matcher
+#### Example: `string` length matcher
 
-Here is how you can write a matcher for a `string` to check if it has desired length.
+The `toHaveLength()` matcher checks if a `string` is of desired length:
 
 ```tolk
 import "@acton/testing/expect"
@@ -159,11 +151,11 @@ get fun `test string len`() {
 }
 ```
 
-## Matchers for Custom Structs
+## Matchers for structs
 
-You can create matchers for any custom type in your project including structs. This is a great way to build a domain-specific testing language that makes your tests more readable.
+Matches can be created for any custom type, including structures.
 
-Let's say you have a `User` struct:
+Start from a sample struct:
 
 ```tolk
 struct User {
@@ -173,14 +165,14 @@ struct User {
 }
 ```
 
-Now, let's create a matcher to verify that a user is active.
+Add a matcher `toBeActive()` that asserts `isActive` is true:
 
 ```tolk
 import "@acton/testing/expect"
 import "@acton/testing/assert"
 import "@acton/fmt"
 
-// Assume User struct is defined here or imported
+// NOTE: Assume User struct is defined here or imported
 
 fun Expectation<User>.toBeActive(self) {
     if (!self.value.isActive) {
@@ -200,53 +192,56 @@ get fun `test user status`() {
 }
 ```
 
-## Leveraging `Assert`
+## Use `Assert` inside matchers
 
-Inside your custom matchers, you can use the `Assert` library to perform checks and produce descriptive error messages. This is the preferred way to report assertion failures.
+Inside custom matchers, use the `Assert` type from the `@acton/testing/assert` library to perform checks and produce descriptive error messages. This is the preferred way to report assertion failures.
 
-The `Assert.fail()` function is particularly useful for providing custom error messages. It takes the error message and an optional `location` parameter, which is available as `self.location` in your matcher. The testing framework uses this location to point to the exact line in your test where the assertion failed.
+```tolk
+import "@acton/testing/assert"
+```
+
+The `Assert.fail(message, location)` is the usual choice for custom error messages. Pass the error message as the first argument, and `self.location` as the second, so the runner could point to the exact line where the assertion is made when that assertion fails.
 
 ```tolk
 fun Expectation<int>.toBePositive(self) {
     if (self.value <= 0) {
         Assert.fail(
             format("Expected {} to be a positive number", self.value),
-            self.location // Pass the location for better error reporting
+            // Pass the location to attribute the failure to the code of this assertion
+            self.location,
         );
     }
 }
 ```
 
-By using `Assert` functions, your custom matchers will integrate seamlessly with the test runner, providing consistent and helpful output on failures.
+With `Assert` functions, custom matchers provide consistent and helpful runner output.
 
-## Best Practices
+## Guidelines
 
-Here are some tips to help you write effective and maintainable custom matchers.
+### Clear error messages
 
-### Providing Clear Error Messages
+On failure, state both the expectation and the observed value. Including actual values and error locations in assertions helps with debugging.
 
-A good matcher is only as good as its error message. When an assertion fails, the message should clearly explain what was expected and what was actually received.
+Bad:
 
-**Bad:**
 ```tolk
 Assert.fail("Value is not even");
 ```
 
-**Good:**
+Good:
+
 ```tolk
 Assert.fail(
     format("Expected {} to be even, but it was odd.", self.value),
-    self.location
+    self.location,
 );
 ```
 
-Including the actual value in the error message helps developers debug failures much faster.
+### Group matchers in one module
 
-### Organizing Your Matchers
+As matchers accumulate, keep them in a dedicated module instead of scattering copies across test files. This keeps testing utilities organized and reusable across the project.
 
-As your test suite grows, you'll likely accumulate many custom matchers. Instead of scattering them across your test files, it's a good practice to group them in dedicated files.
-
-For example, you could create a `matchers.tolk` file in your `tests` directory:
+Example layout:
 
 ```
 my-project/
@@ -254,11 +249,11 @@ my-project/
 │   └── ...
 ├── tests/
 │   ├── my_contract.test.tolk
-│   └── matchers.tolk  <-- Your custom matchers
+│   └── matchers.tolk
 └── Acton.toml
 ```
 
-Then, you can import them in your test files where needed:
+Import the shared module from tests:
 
 ```tolk
 import "./matchers"
@@ -267,4 +262,3 @@ get fun `test my`() {
     expect(42).toBeEven();
 }
 ```
-This keeps your testing utilities organized and reusable across your entire project.

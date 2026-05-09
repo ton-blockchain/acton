@@ -115,7 +115,5 @@ fun setupInstalledExtension(): (WalletV5, Treasury, SimpleExtension) {
 }
 
 fun collectPayment(extension: SimpleExtension, queryId: uint64): SendResultList? {
-    return net.sendExternal(
-        net.createExternalMessage(extension.address, CollectPaymentFromWallet { queryId }),
-    );
+    return extension.sendExternalCollectPaymentFromWallet(queryId);
 }

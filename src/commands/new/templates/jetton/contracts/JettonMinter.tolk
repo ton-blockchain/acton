@@ -7,11 +7,11 @@ import "sharding"
 import "storage"
 
 contract JettonMinter {
-    author: "Your Name"
+    author: "__ACTON_AUTHOR__"
     version: "1.0.0"
     description: "Standard Jetton Minter. TEP-74 and TEP-89 compliant"
-    incomingMessages: AllowedMessageToMinter
     storage: MinterStorage
+    incomingMessages: AllowedMessageToMinter
 }
 
 type AllowedMessageToMinter =

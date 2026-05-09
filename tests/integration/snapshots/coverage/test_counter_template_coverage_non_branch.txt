@@ -7,60 +7,63 @@ Annotated Code:
  1   | import "types"                                                                                 |
  2   |                                                                                                |
  3   | contract Counter {                                                                             |
- 4   |     storage: Storage                                                                           |
- 5   |     incomingMessages: AllowedMessage                                                           |
- 6   | }                                                                                              |
- 7   |                                                                                                |
- 8   | type AllowedMessage =                                                                          |
- 9   |     | IncreaseCounter                                                                          |
-10   |     | DecreaseCounter                                                                          |
-11   |     | ResetCounter                                                                             |
-12   |                                                                                                |
-13 ✓ | fun onInternalMessage(in: InMessage) {                                                         | hits:13 branches:true=0 false=13
-14 ✓ |     val msg = lazy AllowedMessage.fromSlice(in.body);                                          | hits:13
+ 4   |     author: "Acton User"                                                                       |
+ 5   |     version: "1.0.0"                                                                           |
+ 6   |     description: "Simple counter contract with owner-controlled updates"                       |
+ 7   |     storage: Storage                                                                           |
+ 8   |     incomingMessages: AllowedMessage                                                           |
+ 9   | }                                                                                              |
+10   |                                                                                                |
+11   | type AllowedMessage =                                                                          |
+12   |     | IncreaseCounter                                                                          |
+13   |     | DecreaseCounter                                                                          |
+14   |     | ResetCounter                                                                             |
 15   |                                                                                                |
-16 ✓ |     match (msg) {                                                                              | hits:13 branches:site0 true=1 false=5; site1 true=3 false=6; site2 true=4 false=9
-17 ✓ |         IncreaseCounter => {                                                                   | hits:4
-18 ✓ |             var storage = lazy Storage.load();                                                 | hits:4
-19 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:4 branches:throw=0 continue=4
-20   |                                                                                                |
-21 ✓ |             storage.counter += msg.increaseBy;                                                 | hits:4
-22 ✓ |             storage.save();                                                                    | hits:4
-23   |         }                                                                                      |
-24 ✓ |         DecreaseCounter => {                                                                   | hits:3
-25 ✓ |             var storage = lazy Storage.load();                                                 | hits:3
-26 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:3 branches:throw=0 continue=3
-27 ✓ |             assert (storage.counter >= msg.decreaseBy) throw Errors.CounterUnderflow;          | hits:3 branches:throw=2 continue=1
-28   |                                                                                                |
-29 ✓ |             storage.counter -= msg.decreaseBy;                                                 | hits:1
-30 ✓ |             storage.save();                                                                    | hits:1
-31   |         }                                                                                      |
-32 ✓ |         ResetCounter => {                                                                      | hits:1
-33 ✓ |             var storage = lazy Storage.load();                                                 | hits:1
-34 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:1 branches:throw=0 continue=1
-35   |                                                                                                |
-36 ✓ |             storage.counter = 0;                                                               | hits:1
-37 ✓ |             storage.save();                                                                    | hits:1
-38   |         }                                                                                      |
-39   |         else => {                                                                              |
-40 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;                            | hits:5 branches:throw=0 continue=5
+16 ✓ | fun onInternalMessage(in: InMessage) {                                                         | hits:13 branches:true=0 false=13
+17 ✓ |     val msg = lazy AllowedMessage.fromSlice(in.body);                                          | hits:13
+18   |                                                                                                |
+19 ✓ |     match (msg) {                                                                              | hits:13 branches:site0 true=1 false=5; site1 true=3 false=6; site2 true=4 false=9
+20 ✓ |         IncreaseCounter => {                                                                   | hits:4
+21 ✓ |             var storage = lazy Storage.load();                                                 | hits:4
+22 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:4 branches:throw=0 continue=4
+23   |                                                                                                |
+24 ✓ |             storage.counter += msg.increaseBy;                                                 | hits:4
+25 ✓ |             storage.save();                                                                    | hits:4
+26   |         }                                                                                      |
+27 ✓ |         DecreaseCounter => {                                                                   | hits:3
+28 ✓ |             var storage = lazy Storage.load();                                                 | hits:3
+29 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:3 branches:throw=0 continue=3
+30 ✓ |             assert (storage.counter >= msg.decreaseBy) throw Errors.CounterUnderflow;          | hits:3 branches:throw=2 continue=1
+31   |                                                                                                |
+32 ✓ |             storage.counter -= msg.decreaseBy;                                                 | hits:1
+33 ✓ |             storage.save();                                                                    | hits:1
+34   |         }                                                                                      |
+35 ✓ |         ResetCounter => {                                                                      | hits:1
+36 ✓ |             var storage = lazy Storage.load();                                                 | hits:1
+37 ✓ |             assert (storage.owner == in.senderAddress) throw Errors.NotOwner;                  | hits:1 branches:throw=0 continue=1
+38   |                                                                                                |
+39 ✓ |             storage.counter = 0;                                                               | hits:1
+40 ✓ |             storage.save();                                                                    | hits:1
 41   |         }                                                                                      |
-42   |     }                                                                                          |
-43   | }                                                                                              |
-44   |                                                                                                |
-45   | fun onBouncedMessage(_in: InMessageBounced) {}                                                 |
-46   |                                                                                                |
-47   | get fun currentCounter(): int {                                                                |
-48 ✓ |     val storage = lazy Storage.load();                                                         | hits:5
+42   |         else => {                                                                              |
+43 ✓ |             assert (in.body.isEmpty()) throw Errors.InvalidMessage;                            | hits:5 branches:throw=0 continue=5
+44   |         }                                                                                      |
+45   |     }                                                                                          |
+46   | }                                                                                              |
+47   |                                                                                                |
+48   | fun onBouncedMessage(_in: InMessageBounced) {}                                                 |
 49   |                                                                                                |
-50 ✓ |     return storage.counter;                                                                    | hits:5
-51   | }                                                                                              |
+50   | get fun currentCounter(): int {                                                                |
+51 ✓ |     val storage = lazy Storage.load();                                                         | hits:5
 52   |                                                                                                |
-53   | get fun owner(): address {                                                                     |
-54 ✗ |     val storage = lazy Storage.load();                                                         | hits:0
+53 ✓ |     return storage.counter;                                                                    | hits:5
+54   | }                                                                                              |
 55   |                                                                                                |
-56 ✗ |     return storage.owner;                                                                      | hits:0
-57   | }                                                                                              |
+56   | get fun owner(): address {                                                                     |
+57 ✗ |     val storage = lazy Storage.load();                                                         | hits:0
+58   |                                                                                                |
+59 ✗ |     return storage.owner;                                                                      | hits:0
+60   | }                                                                                              |
 
 File: [ROOT]/contracts/types.tolk
 Annotated Code:

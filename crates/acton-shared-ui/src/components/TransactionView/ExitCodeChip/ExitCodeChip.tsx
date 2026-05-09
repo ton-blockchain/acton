@@ -39,9 +39,7 @@ const getCustomExitCodeInfo = (
   }
 }
 
-const getFallbackExitCodeInfo = (
-  phase: "compute" | "action",
-): FallbackExitCodeInfo => ({
+const getFallbackExitCodeInfo = (phase: "compute" | "action"): FallbackExitCodeInfo => ({
   name: "Custom Exit Code",
   description:
     "Contract returned a user-defined exit code that is not declared in the ABI, so no symbolic description is available for this value.",
@@ -65,7 +63,11 @@ export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeViewerP
     standardDescription?.description ?? customExitCode?.description ?? fallbackExitCode?.description
   const origin =
     standardDescription?.phase ??
-    (customExitCode ? (phase === "action" ? "Action phase" : "Compute phase") : fallbackExitCode?.origin)
+    (customExitCode
+      ? phase === "action"
+        ? "Action phase"
+        : "Compute phase"
+      : fallbackExitCode?.origin)
   const docsUrl = standardDescription ? getExitCodeDocsUrl(exitCode) : undefined
 
   const tooltipContent = (

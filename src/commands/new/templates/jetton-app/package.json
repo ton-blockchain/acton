@@ -1,7 +1,7 @@
 {
   "name": "__ACTON_NPM_PACKAGE_NAME__",
-  "version": "0.1.0",
   "private": true,
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "build": "acton build && vite build",
