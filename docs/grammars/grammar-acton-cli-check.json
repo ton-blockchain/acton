@@ -14,6 +14,17 @@
     "diagnostics": {
       "patterns": [
         {
+          "match": "^(\\s*)(Checking)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "support.type.acton-cli-check"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli-check"
+            }
+          }
+        },
+        {
           "match": "^(\\s*)(warning|note)(\\[[\\w-]+\\])?(:)",
           "captures": {
             "2": {
