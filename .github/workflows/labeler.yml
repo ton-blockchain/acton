@@ -17,7 +17,7 @@ permissions: { }
 jobs:
   label:
     runs-on: ubicloud-standard-2-ubuntu-2204
-    if: github.repository == 'ton-blockchain/acton' && github.event.pull_request.draft != true
+    if: github.repository == 'ton-blockchain/acton' && github.event.pull_request.draft == false
 
     permissions:
       contents: read
