@@ -12,9 +12,10 @@ All notable changes to this project will be documented in this file.
 
 Acton 0.5.0 is a focused public-release follow-up to 0.4.0, adding TON Connect
 support for verification approval transactions, improving typed cell and
-cell-tree formatting, making mutation testing work for dependent contracts,
-refreshing the Tolk compiler and TON executor config, and tightening
-documentation, release CI, debugger snapshots, and UI inspection flows.
+cell-tree formatting, making mutation testing and coverage work for dependent
+contracts, expanding wrapper generation and starter templates, refreshing the
+Tolk compiler and TON executor config, and tightening documentation, release
+CI, debugger snapshots, and UI inspection flows.
 
 ### Breaking Changes and Migration
 
@@ -42,6 +43,23 @@ documentation, release CI, debugger snapshots, and UI inspection flows.
   trace, including the timeout path used by scripts that print the result.
 - `acton verify`, `acton up`, and related generated man/help output were
   regenerated around the new flags and release repository behavior.
+
+### Project Templates and Wrappers
+
+- Tolk wrapper generation now supports external incoming messages, including
+  contracts that expose both internal and external message surfaces.
+- Starter templates and app scaffolds were normalized across Counter, Empty,
+  Jetton, NFT, and W5 Extension projects: app templates gained `.env.example`
+  files, generated project metadata became more consistent, and the empty-app
+  and W5 app templates now include project-specific `AGENTS.md` guidance.
+- `acton new --templates` now returns richer machine-readable template
+  metadata, and generated help/man output was refreshed around the updated
+  template list and app scaffolds.
+- Generated contract headers now use the local Git user name when available,
+  falling back to `Acton User` when it is missing.
+- Jetton, NFT, and W5 Extension templates received consistency fixes, including
+  unified author metadata, kebab-case NFT script names, refreshed W5 wrapper
+  helpers, and regenerated TypeScript wrappers.
 
 ### Stdlib, Formatting, and ABI Decoding
 
@@ -73,6 +91,9 @@ documentation, release CI, debugger snapshots, and UI inspection flows.
   `empty cell`, `empty slice`, and `empty builder` values, and storage decoding
   is more reliable in debugger snapshots.
 - Coverage now works for library-reference-based contracts such as Wallet W5.
+- Coverage now also resolves project contracts deployed from generated
+  dependency-code helpers such as `gen/*.code.tolk`, which fixes coverage for
+  dependent-contract flows like Jetton minter/wallet setups.
 - W5 debugging no longer emits an unnecessary warning and handles the W5 flow
   correctly.
 
@@ -85,17 +106,29 @@ documentation, release CI, debugger snapshots, and UI inspection flows.
   full hex BoC.
 - UI packages were updated alongside the compiler ABI refresh and typed-cell
   decoding changes.
+- Shared UI transaction rendering was refined for the updated tutorial and
+  inspection flows, including clearer account details, disassembly, action
+  summaries, transaction tree entries, and exit-code chips.
 
 ### Docs, Release CI, and Internal Polish
 
 - Documentation gained wallet-management, verification, and deployment how-to
-  guides, a refreshed quickstart/walkthrough, agent-skills pages, and style
-  corrections across Acton.toml, debugging, IDE support, installation,
-  libraries, and welcome pages.
+  guides, a refreshed quickstart/walkthrough, a full tutorial flow, agent-skills
+  pages, and style corrections across Acton.toml, debugging, testing, IDE
+  support, installation, libraries, and welcome pages.
+- JetBrains and VS Code documentation was expanded with reorganized screenshot
+  assets, new extension feature coverage, terminal/action/test-runner views, and
+  updated demo media.
+- Documentation gained a reusable `Callout` component and stricter external
+  link validation around redirects.
 - Release CI now generates cargo-dist manifest checksums for release binaries,
   links the released `acton-installer.sh`, and removes obsolete mirroring
   workflows for trunk, objects, and release artifacts.
+- Documentation deployment and labeler workflows now skip draft pull requests.
 - Dockerfile links were updated to match the current public-release layout.
+- `ton-objs` archive checksum mismatch diagnostics now mention
+  `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY` for environments that intentionally
+  bypass archive verification.
 - Tree-sitter dependencies were refreshed, including the `ip-address` update,
   and the TON executor config was updated.
 
