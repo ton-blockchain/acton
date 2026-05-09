@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a WalletV5 contract in Tolk
+// It's a TypeScript wrapper for a WalletV5 contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -48,6 +48,16 @@ function storeCellRef<T>(cell: CellRef<T>, b: c.Builder, storeFn_T: StoreCallbac
 function loadCellRef<T>(s: c.Slice, loadFn_T: LoadCallback<T>): CellRef<T> {
     let s_ref = s.loadRef().beginParse();
     return { ref: loadFn_T(s_ref) };
+}
+
+function storeTolkBitsN(v: c.Slice, nBits: number, b: c.Builder): void {
+    if (v.remainingBits !== nBits) { throw new Error(`expected ${nBits} bits, got ${v.remainingBits}`); }
+    if (v.remainingRefs !== 0) { throw new Error(`expected 0 refs, got ${v.remainingRefs}`); }
+    b.storeSlice(v);
+}
+
+function loadTolkBitsN(s: c.Slice, nBits: number): c.Slice {
+    return new c.Slice(new c.BitReader(s.loadBits(nBits)), []);
 }
 
 function storeTolkRemaining(v: RemainingBitsAndRefs, b: c.Builder): void {
@@ -138,16 +148,11 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
 type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
+
+type bits512 = c.Slice
 
 /**
  > type OutActionsCell = cell
@@ -298,6 +303,106 @@ export const InternalSignedRequest = {
 }
 
 /**
+ > struct ExternalMsgSchema {
+ >     signedData: ExternalSignedRequest
+ >     signature: bits512
+ > }
+ */
+export interface ExternalMsgSchema {
+    readonly $: 'ExternalMsgSchema'
+    signedData: ExternalSignedRequest
+    signature: bits512
+}
+
+export const ExternalMsgSchema = {
+    create(args: {
+        signedData: ExternalSignedRequest
+        signature: bits512
+    }): ExternalMsgSchema {
+        return {
+            $: 'ExternalMsgSchema',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ExternalMsgSchema {
+        return {
+            $: 'ExternalMsgSchema',
+            signedData: ExternalSignedRequest.fromSlice(s),
+            signature: loadTolkBitsN(s, 512),
+        }
+    },
+    store(self: ExternalMsgSchema, b: c.Builder): void {
+        ExternalSignedRequest.store(self.signedData, b);
+        storeTolkBitsN(self.signature, 512, b);
+    },
+    toCell(self: ExternalMsgSchema): c.Cell {
+        return makeCellFrom<ExternalMsgSchema>(self, ExternalMsgSchema.store);
+    }
+}
+
+/**
+ > struct (0x7369676e) ExternalSignedRequest {
+ >     walletId: uint32
+ >     validUntil: uint32
+ >     seqno: uint32
+ >     outActions: OutActionsCell?
+ >     hasExtraActions: bool
+ >     extraActions: SnakedExtraActions
+ > }
+ */
+export interface ExternalSignedRequest {
+    readonly $: 'ExternalSignedRequest'
+    walletId: uint32
+    validUntil: uint32
+    seqno: uint32
+    outActions: OutActionsCell | null
+    hasExtraActions: boolean
+    extraActions: SnakedExtraActions
+}
+
+export const ExternalSignedRequest = {
+    PREFIX: 0x7369676e,
+
+    create(args: {
+        walletId: uint32
+        validUntil: uint32
+        seqno: uint32
+        outActions: OutActionsCell | null
+        hasExtraActions: boolean
+        extraActions: SnakedExtraActions
+    }): ExternalSignedRequest {
+        return {
+            $: 'ExternalSignedRequest',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): ExternalSignedRequest {
+        loadAndCheckPrefix32(s, 0x7369676e, 'ExternalSignedRequest');
+        return {
+            $: 'ExternalSignedRequest',
+            walletId: s.loadUintBig(32),
+            validUntil: s.loadUintBig(32),
+            seqno: s.loadUintBig(32),
+            outActions: s.loadBoolean() ? OutActionsCell.fromSlice(s) : null,
+            hasExtraActions: s.loadBoolean(),
+            extraActions: SnakedExtraActions.fromSlice(s),
+        }
+    },
+    store(self: ExternalSignedRequest, b: c.Builder): void {
+        b.storeUint(0x7369676e, 32);
+        b.storeUint(self.walletId, 32);
+        b.storeUint(self.validUntil, 32);
+        b.storeUint(self.seqno, 32);
+        storeTolkNullable<OutActionsCell>(self.outActions, b, OutActionsCell.store);
+        b.storeBit(self.hasExtraActions);
+        SnakedExtraActions.store(self.extraActions, b);
+    },
+    toCell(self: ExternalSignedRequest): c.Cell {
+        return makeCellFrom<ExternalSignedRequest>(self, ExternalSignedRequest.store);
+    }
+}
+
+/**
  > type ExtensionsDict = map<uint256, bool>
  */
 export type ExtensionsDict = c.Dictionary<uint256, boolean>
@@ -428,9 +533,9 @@ export class WalletV5 implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }

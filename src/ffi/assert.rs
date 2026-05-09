@@ -1,6 +1,7 @@
 use crate::context::{
-    AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, FailAssertFailure,
-    TransactionGenericAssertFailure, TransactionNotFoundParams, WalletNotFoundFailure,
+    AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, ExternalMessageNotFoundFailure,
+    FailAssertFailure, TransactionGenericAssertFailure, TransactionNotFoundParams,
+    WalletNotFoundFailure,
 };
 use acton_debug::{RenderedValue, render_tuple_as_tolk_type};
 use anyhow::{Context as ErrorContext, anyhow};
@@ -472,6 +473,28 @@ fn fail_wallet_not_found_impl(
     Ok(())
 }
 
+extension!(fail_to_find_external_message in (Context) with (opcode: BigInt, message_name: String, txs: Vec<TupleItem>, message: String, location: String) using fail_to_find_external_message_impl);
+fn fail_to_find_external_message_impl(
+    ctx: &mut Context,
+    _stack: &mut Tuple,
+    opcode: BigInt,
+    message_name: String,
+    txs: Vec<TupleItem>,
+    message: String,
+    location: String,
+) -> anyhow::Result<()> {
+    *ctx.asserts.assert_failure = Some(AssertFailure::ExternalMessageNotFound(
+        ExternalMessageNotFoundFailure {
+            message: Some(message),
+            location: SourceLocation::parse(&location)?,
+            txs,
+            message_name,
+            opcode: opcode.to_u32(),
+        },
+    ));
+    Ok(())
+}
+
 #[must_use]
 pub fn process_txs_and_search_params(
     txs: &[TupleItem],
@@ -673,5 +696,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         105 => fail_wallet_not_found : 2,
         106 => assert_decimal : 5,
         107 => assume_reject : 2,
+        108 => fail_to_find_external_message : 5,
     });
 }

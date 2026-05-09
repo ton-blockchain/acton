@@ -1,0 +1,329 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-cli-mutate",
+  "scopeName": "source.acton-cli-mutate",
+  "patterns": [
+    {
+      "include": "#sectionHeaders"
+    },
+    {
+      "include": "#keyValue"
+    },
+    {
+      "include": "#mutationLine"
+    },
+    {
+      "include": "#summary"
+    },
+    {
+      "include": "#score"
+    },
+    {
+      "include": "#detailLabels"
+    },
+    {
+      "include": "#sourceContext"
+    },
+    {
+      "include": "#closingNotes"
+    },
+    {
+      "include": "source.acton-cli"
+    }
+  ],
+  "repository": {
+    "sectionHeaders": {
+      "patterns": [
+        {
+          "match": "^(Mutation Testing)$",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(Survived Mutants)$",
+          "captures": {
+            "1": {
+              "name": "constant.language.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "keyValue": {
+      "patterns": [
+        {
+          "match": "^(Session:|Contract:|Source:|Diff:|Changed:|Levels:|IDs:|Files:|Mutants:)(\\s+)(.+)$",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "3": {
+              "name": "string.unquoted.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "mutationLine": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\u25C9)(\\s+)(Mutation)(\\s+)(\\d+/\\d+)(\\s+)(\\S+)(\\s+)(.+?)(\\s+)(KILLED)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli-mutate"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli-mutate"
+            },
+            "8": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "10": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "12": {
+              "name": "string.unquoted.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25C9)(\\s+)(Mutation)(\\s+)(\\d+/\\d+)(\\s+)(\\S+)(\\s+)(.+?)(\\s+)(SURVIVED)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli-mutate"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli-mutate"
+            },
+            "8": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "10": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "12": {
+              "name": "markup.deleted.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25C9)(\\s+)(Mutation)(\\s+)(\\d+/\\d+)(\\s+)(\\S+)(\\s+)(.+?)(\\s+)(COMPILE ERROR)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli-mutate"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli-mutate"
+            },
+            "8": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "10": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "12": {
+              "name": "constant.language.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "summary": {
+      "patterns": [
+        {
+          "match": "^(\\s+)(Total mutants)(\\s+)(\\d+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(!)(\\s+)(Compile errors)(\\s+)(\\d+)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "4": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "6": {
+              "name": "constant.language.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "score": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(\\u25C6)(\\s+)(Mutation Score)(\\s+)((?:[0-4]?\\d|50)(?:\\.\\d+)?%)$",
+          "captures": {
+            "2": {
+              "name": "markup.deleted.acton-cli-mutate"
+            },
+            "4": {
+              "name": "markup.deleted.acton-cli-mutate"
+            },
+            "6": {
+              "name": "markup.deleted.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25C6)(\\s+)(Mutation Score)(\\s+)((?:5[1-9]|[67]\\d|80)(?:\\.\\d+)?%)$",
+          "captures": {
+            "2": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "4": {
+              "name": "constant.language.acton-cli-mutate"
+            },
+            "6": {
+              "name": "constant.language.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u25C6)(\\s+)(Mutation Score)(\\s+)((?:8[1-9]|9\\d|100)(?:\\.\\d+)?%)$",
+          "captures": {
+            "2": {
+              "name": "string.unquoted.acton-cli-mutate"
+            },
+            "4": {
+              "name": "string.unquoted.acton-cli-mutate"
+            },
+            "6": {
+              "name": "string.unquoted.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "detailLabels": {
+      "patterns": [
+        {
+          "match": "^(\\s*)(Rule:)(\\s+)(.+?)(\\s+)(\\[[\\w-]+\\])$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "6": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Level:)(\\s+)(critical)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "markup.deleted.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Level:)(\\s+)(major)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "constant.language.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Level:)(\\s+)(minor)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "support.type.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Group:)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(at)(\\s+)(\\S+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Why it's bad:)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "sourceContext": {
+      "patterns": [
+        {
+          "match": "^(\\s+)(\\d+)(\\s+)(\\u2502)",
+          "captures": {
+            "2": {
+              "name": "comment.line.acton-cli-mutate"
+            },
+            "4": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    },
+    "closingNotes": {
+      "patterns": [
+        {
+          "match": "^(These mutants were not caught by your tests!)$",
+          "captures": {
+            "1": {
+              "name": "markup.deleted.acton-cli-mutate"
+            }
+          }
+        },
+        {
+          "match": "^(Consider adding more test cases.*)$",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-cli-mutate"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

@@ -1,13 +1,13 @@
 ---
-title: "Built-in Matchers and Helpers"
+title: "Built-in matchers and helpers"
 description: "Reference map for transaction predicates, map expectations, and out-action helpers in Acton tests"
 ---
 
 Before writing custom matchers, check the built-in ones first. Acton already ships a useful set of helpers for transaction search, map assertions, and out-action inspection.
 
-## Transaction Search Matchers
+## Transaction search matchers
 
-Use these when you want to find or assert on transactions produced by `net.send(...)`:
+Use these functions to find or assert on transactions from `net.send(...)`:
 
 - `findTransaction()`
 - `toHaveSuccessfulDeploy()`
@@ -33,7 +33,7 @@ expect(res).toHaveTx({
 Important matcher semantics:
 
 - `SearchParams` fields accept either exact values or predicate functions.
-- `toHaveSuccessfulTx()` forces `success = true` and defaults `exitCode = 0` unless you override it explicitly.
+- `toHaveSuccessfulTx()` forces `success = true` and defaults `exitCode = 0` unless overridden explicitly.
 - `toHaveFailedTx()` requires a non-zero `exitCode`.
 - Bounced-message opcode matching should be done with `toHaveBouncedTx()` or an explicit `bounced: true` filter.
 - Predicate functions can be useful for custom diagnostics, but runtime errors inside those predicates surface back to the test output.
@@ -44,7 +44,7 @@ Go deeper in:
 - [Transaction matchers](/docs/standard_library/emulation/network#expectationsendresultlisttohavesuccessfultx)
 - [Reading Transaction Chains](/docs/testing/reading-transaction-chains)
 
-## Map Expectations
+## Map expectations
 
 Map helpers are useful for get-method results and in-memory fixtures:
 
@@ -77,9 +77,9 @@ Go deeper in:
 
 - [Map expectations](/docs/standard_library/testing/expect#expectationmapk-vtocontainkey)
 
-## Out-action Helpers
+## Out-action helpers
 
-Use out-action helpers when you need to inspect C5 output, planned sends, or action kinds:
+Use action helpers to inspect C5 output, planned sends, or action kinds:
 
 ```tolk
 val outActions = testing.outActions();
@@ -113,8 +113,6 @@ Go deeper in:
 - [SendResult.allOutActions()](/docs/standard_library/emulation/network#sendresultalloutactions)
 - [out_actions helpers](/docs/standard_library/types/out_actions)
 
-## When To Write Custom Matchers
+## When to write custom matchers
 
-If the built-in helpers still do not match your domain language, extend `Expectation<T>` with a custom matcher.
-
-See [Custom Matchers](/docs/testing/writing-your-own-matchers).
+If the built-in helpers still do not match a domain-specific vocabulary, extend `Expectation<T>` with a [custom matcher](/docs/testing/writing-your-own-matchers).

@@ -46,6 +46,11 @@ struct (0x73696E74) InternalSignedRequest {
     // ends with a signature (512 bits), but it's parsed and compared separately
 }
 
+struct ExternalMsgSchema {
+    signedData: ExternalSignedRequest
+    signature: bits512
+}
+
 struct (0x7369676E) ExternalSignedRequest {
     walletId: uint32
     validUntil: uint32

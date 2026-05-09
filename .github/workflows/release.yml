@@ -245,27 +245,16 @@ jobs:
       plan: ${{ needs.plan.outputs.val }}
     secrets: inherit
 
-  custom-check-installer-file:
-    needs:
-      - plan
-      - build-global-artifacts
-      - custom-build-docker-image
-    uses: ./.github/workflows/check-installer-file.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit
-
   # Create a GitHub Release while uploading all files to it
   announce:
     needs:
       - plan
       - host
       - custom-check-release-binary
-      - custom-check-installer-file
     # use "always() && ..." to allow us to wait for all publish jobs while
     # still allowing individual publish jobs to skip themselves (for prereleases).
     # "host" however must run to completion, no skipping allowed!
-    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release-binary.result == 'success' && needs.custom-check-installer-file.result == 'success' }}
+    if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release-binary.result == 'success' }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -290,11 +279,12 @@ jobs:
           PRERELEASE_FLAG: "${{ fromJson(needs.host.outputs.val).announcement_is_prerelease && '--prerelease' || '' }}"
           ANNOUNCEMENT_TITLE: "${{ fromJson(needs.host.outputs.val).announcement_title }}"
           ANNOUNCEMENT_BODY: "${{ fromJson(needs.host.outputs.val).announcement_github_body }}"
+          RELEASE_COMMIT: "${{ github.sha }}"
         run: |
           # Write and read notes from a file to avoid quoting breaking things
           echo "$ANNOUNCEMENT_BODY" > $RUNNER_TEMP/notes.txt
 
-          gh release create "${{ needs.plan.outputs.tag }}" --repo "${GITHUB_REPOSITORY}" --verify-tag $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
+          gh release create "${{ needs.plan.outputs.tag }}" --target "$RELEASE_COMMIT" $PRERELEASE_FLAG --title "$ANNOUNCEMENT_TITLE" --notes-file "$RUNNER_TEMP/notes.txt" artifacts/*
 
   custom-publish-docker-image:
     needs:
@@ -306,12 +296,3 @@ jobs:
     secrets: inherit
     permissions:
       "packages": "write"
-
-  custom-publish-mirror:
-    needs:
-      - plan
-      - announce
-    uses: ./.github/workflows/publish-mirror.yml
-    with:
-      plan: ${{ needs.plan.outputs.val }}
-    secrets: inherit

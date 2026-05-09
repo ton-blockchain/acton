@@ -8,6 +8,105 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [0.5.0] - 10.05.2026
+
+Acton 0.5.0 is a focused public-release follow-up to 0.4.0, adding TON Connect
+support for verification approval transactions, improving typed cell and
+cell-tree formatting, making mutation testing work for dependent contracts,
+refreshing the Tolk compiler and TON executor config, and tightening
+documentation, release CI, debugger snapshots, and UI inspection flows.
+
+### Breaking Changes and Migration
+
+- `acton up` now reads release metadata only from the public
+  `ton-blockchain/acton` repository. The temporary fallback repository used
+  during the public-release transition is no longer queried, so mirrors or
+  tooling that depended on fallback release metadata should switch to the
+  primary repository.
+- Compiler ABI JSON now uses `client_ty_idx` on struct fields that have
+  `@abi.clientType(...)` after the Tolk compiler update. Direct ABI consumers
+  should read the indexed client type from `unique_types` instead of relying on
+  the previous field shape.
+
+### CLI, Wallets, and Verification
+
+- Added `acton verify --tonconnect` and `--tonconnect-port` so contract
+  verification can be approved through a TON Connect wallet instead of a stored
+  Acton wallet.
+- `acton up` now targets the public Acton release repository, keeps a hidden
+  `--yes` flag for JetBrains plugin compatibility, and reports release lookup
+  and release-list failures with clearer GitHub/network diagnostics.
+- Wallet airdrops now use the new faucet endpoint and wait for airdrop
+  completion more reliably.
+- `acton script` now gives a clearer error when `waitForTrace()` cannot find a
+  trace, including the timeout path used by scripts that print the result.
+- `acton verify`, `acton up`, and related generated man/help output were
+  regenerated around the new flags and release repository behavior.
+
+### Stdlib, Formatting, and ABI Decoding
+
+- Added the `{:cell-tree}` formatter for `format()` and `println()` so
+  cells, slices, builders, and typed `Cell<T>` values can be rendered as a tree
+  of cell references.
+- Typed `Cell<T>` values now display decoded data when the compiler ABI can
+  parse the cell, improving `println`, formatted output, and debugger/type
+  views.
+- `Expectation<SendResultList>.toEmitExternalMessage<T>()` now reports a much
+  more actionable failure, including the searched message type/opcode and the
+  transaction list context.
+- Exit-code formatting now distinguishes compute-phase and action-phase exit
+  codes, so known codes are shown in the correct phase-specific context.
+- Small opcodes such as `0x1` are formatted more consistently in transaction
+  and message output.
+- `tolk-fmt` handles `!` chains more predictably and no longer breaks
+  single-argument generic type syntax such as `<T>` in common chains.
+
+### Testing, Mutation, Coverage, and Debugging
+
+- Mutation testing now supports contracts that depend on the mutated contract,
+  including embedded and library-ref dependencies such as Jetton minter/wallet
+  setups. Dependent contracts are rebuilt with the mutated dependency override
+  before child test runs.
+- Test trace snapshot paths now normalize test names, which makes generated
+  trace artifacts more stable and filesystem-friendly.
+- Debug rendering now prints empty cells, slices, and builders as explicit
+  `empty cell`, `empty slice`, and `empty builder` values, and storage decoding
+  is more reliable in debugger snapshots.
+- Coverage now works for library-reference-based contracts such as Wallet W5.
+- W5 debugging no longer emits an unnecessary warning and handles the W5 flow
+  correctly.
+
+### UI and Trace Inspection
+
+- Test UI now warns when the connection to the runner is lost.
+- Parsed cell/slice views can parse values even when remaining bits are present,
+  which is useful for W5 and other partially decoded payloads.
+- Parsed cell, slice, and builder values now include a button for copying the
+  full hex BoC.
+- UI packages were updated alongside the compiler ABI refresh and typed-cell
+  decoding changes.
+
+### Docs, Release CI, and Internal Polish
+
+- Documentation gained wallet-management, verification, and deployment how-to
+  guides, a refreshed quickstart/walkthrough, agent-skills pages, and style
+  corrections across Acton.toml, debugging, IDE support, installation,
+  libraries, and welcome pages.
+- Release CI now generates cargo-dist manifest checksums for release binaries,
+  links the released `acton-installer.sh`, and removes obsolete mirroring
+  workflows for trunk, objects, and release artifacts.
+- Dockerfile links were updated to match the current public-release layout.
+- Tree-sitter dependencies were refreshed, including the `ip-address` update,
+  and the TON executor config was updated.
+
+## [0.4.2] - 08.05.2026
+
+Test release.
+
+## [0.4.1] - 08.05.2026
+
+Test release with public repository.
+
 ## [0.4.0] - 04.05.2026
 
 Acton 0.4.0 is a broad follow-up to 0.3.0. It stabilizes the dApp and wrapper

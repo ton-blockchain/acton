@@ -13,6 +13,7 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
+      '@wrappers': path.resolve(projectRoot, 'wrappers-ts'),
       '@': path.resolve(projectRoot, 'app/src'),
     },
   },
@@ -34,6 +35,9 @@ export default defineConfig({
     },
   },
   server: {
+    fs: {
+      allow: ['.', path.resolve(projectRoot, 'wrappers-ts')],
+    },
     port: 5173,
   },
 });

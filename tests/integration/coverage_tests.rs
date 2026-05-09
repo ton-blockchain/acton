@@ -17,6 +17,7 @@ const COUNTER_TEMPLATE_WRAPPER: &str =
     include_str!("../../src/commands/new/templates/counter/wrappers/Counter.gen.tolk");
 const COUNTER_TEMPLATE_TESTS: &str =
     include_str!("../../src/commands/new/templates/counter/tests/counter.test.tolk");
+const COUNTER_TEMPLATE_AUTHOR: &str = "Acton User";
 
 const COUNTER_TEMPLATE_SPLIT_UNKNOWN_MESSAGE_TESTS: &str = r#"
 import "@acton/emulation/network"
@@ -57,9 +58,10 @@ fun setupTest(): (Counter, Treasury, Treasury) {
 "#;
 
 fn build_counter_template_project(name: &str, test_source: &str) -> Project {
+    let contract = COUNTER_TEMPLATE_CONTRACT.replace("__ACTON_AUTHOR__", COUNTER_TEMPLATE_AUTHOR);
     let project = ProjectBuilder::new(name)
         .without_acton_toml()
-        .file("contracts/Counter", COUNTER_TEMPLATE_CONTRACT)
+        .file("contracts/Counter", &contract)
         .file("contracts/types", COUNTER_TEMPLATE_TYPES)
         .file("wrappers/Counter.gen", COUNTER_TEMPLATE_WRAPPER)
         .test_file("counter", test_source)
@@ -143,6 +145,100 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
 }
 
 #[test]
+fn test_coverage_matches_contract_deployed_as_library_reference() {
+    let project = ProjectBuilder::new("coverage-library-reference")
+        .contract(
+            "library_ref_target",
+            r"
+            fun onInternalMessage(_: InMessage) {
+                return;
+            }
+        ",
+        )
+        .file(
+            "wrappers/LibraryRefTarget",
+            r#"
+            import "@stdlib/exotic-cells"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+
+            struct LibraryRefTarget {
+                address: address
+                stateInit: ContractState
+            }
+
+            fun LibraryRefTarget.fromLibraryCode(): LibraryRefTarget {
+                val realCode = build("library_ref_target");
+                testing.registerLibrary(realCode);
+                val stateInit = ContractState {
+                    code: realCode.toLibraryReference(),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit }.calculateAddress();
+                return LibraryRefTarget { address, stateInit };
+            }
+
+            fun LibraryRefTarget.deploy(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: false,
+                    value: ton("0.05"),
+                    dest: { stateInit: self.stateInit },
+                }));
+            }
+
+            fun LibraryRefTarget.sendEmpty(self, from: address): SendResultList {
+                return net.send(from, createMessage({
+                    bounce: true,
+                    value: ton("0.05"),
+                    dest: self.address,
+                    body: createEmptyCell(),
+                }));
+            }
+        "#,
+        )
+        .test_file(
+            "library_ref",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../wrappers/LibraryRefTarget"
+
+            get fun `test coverage sees library-ref contract source`() {
+                val sender = testing.treasury("sender");
+                val target = LibraryRefTarget.fromLibraryCode();
+
+                expect(target.deploy(sender.address)).toHaveSuccessfulDeploy({ to: target.address });
+                expect(target.sendEmpty(sender.address)).toHaveSuccessfulTx({
+                    from: sender.address,
+                    to: target.address,
+                });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("library-ref-coverage.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_contains("library_ref_target.tolk")
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_library_reference.stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            "library-ref-coverage.txt",
+            "integration/snapshots/coverage/test_coverage_library_reference.txt",
+        );
+}
+
+#[test]
 fn test_coverage_basic_output() {
     let project = ProjectBuilder::new("coverage-basic")
         .contract("simple", SIMPLE_CONTRACT)
@@ -192,10 +288,12 @@ fn test_coverage_basic_output() {
         .assert_passed(1)
         .assert_contains(" COVERAGE ")
         .assert_contains("math.tolk")
-        .assert_snapshot_matches("integration/snapshots/test_coverage_basic_output.stdout.txt")
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_basic_output.stdout.txt",
+        )
         .assert_file_snapshot_matches(
             "coverage.txt",
-            "integration/snapshots/test_coverage_basic_output.txt",
+            "integration/snapshots/coverage/test_coverage_basic_output.txt",
         );
 }
 
@@ -247,10 +345,12 @@ fn test_coverage_multiple_tests() {
         .assert_passed(2)
         .assert_contains(" COVERAGE ")
         .assert_contains("calculator.tolk")
-        .assert_snapshot_matches("integration/snapshots/test_coverage_multiple_tests.stdout.txt")
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_multiple_tests.stdout.txt",
+        )
         .assert_file_snapshot_matches(
             "coverage.txt",
-            "integration/snapshots/test_coverage_multiple_tests.txt",
+            "integration/snapshots/coverage/test_coverage_multiple_tests.txt",
         );
 }
 
@@ -300,11 +400,11 @@ fn test_coverage_with_failing_tests() {
         .assert_contains(" COVERAGE ")
         .assert_contains("validator.tolk")
         .assert_snapshot_matches(
-            "integration/snapshots/test_coverage_with_failing_tests.stdout.txt",
+            "integration/snapshots/coverage/test_coverage_with_failing_tests.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "coverage.txt",
-            "integration/snapshots/test_coverage_with_failing_tests.txt",
+            "integration/snapshots/coverage/test_coverage_with_failing_tests.txt",
         );
 }
 
@@ -353,10 +453,12 @@ fn test_coverage_with_filter() {
         .assert_passed(2)
         .assert_contains(" COVERAGE ")
         .assert_contains("helpers.tolk")
-        .assert_snapshot_matches("integration/snapshots/test_coverage_with_filter_all.stdout.txt")
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_with_filter_all.stdout.txt",
+        )
         .assert_file_snapshot_matches(
             "coverage.txt",
-            "integration/snapshots/test_coverage_with_filter_all.txt",
+            "integration/snapshots/coverage/test_coverage_with_filter_all.txt",
         );
 
     project
@@ -370,10 +472,12 @@ fn test_coverage_with_filter() {
         .assert_passed(1)
         .assert_contains(" COVERAGE ")
         .assert_contains("helpers.tolk")
-        .assert_snapshot_matches("integration/snapshots/test_coverage_with_filter.stdout.txt")
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_with_filter.stdout.txt",
+        )
         .assert_file_snapshot_matches(
             "coverage.txt",
-            "integration/snapshots/test_coverage_with_filter.txt",
+            "integration/snapshots/coverage/test_coverage_with_filter.txt",
         );
 }
 
@@ -427,7 +531,7 @@ fn test_coverage_lcov_snapshot() {
     let lcov_content = fs::read_to_string(&lcov_path).expect("Should read lcov.info");
     assertion().eq(
         normalize_output(lcov_content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_coverage_lcov_snapshot.lcov"),
+        snapbox::file!("snapshots/coverage/test_coverage_lcov_snapshot.lcov"),
     );
 }
 
@@ -483,7 +587,7 @@ fn test_coverage_exports_files_with_zero_hits() {
         .assert_passed(1)
         .assert_file_snapshot_matches(
             "zero-hit-coverage.txt",
-            "integration/snapshots/test_coverage_zero_hit_file.txt",
+            "integration/snapshots/coverage/test_coverage_zero_hit_file.txt",
         );
 
     let lcov_path = project.path().join("zero-hit-lcov.info");
@@ -505,7 +609,7 @@ fn test_coverage_exports_files_with_zero_hits() {
     let lcov_content = fs::read_to_string(&lcov_path).expect("Should read zero-hit-lcov.info");
     assertion().eq(
         normalize_output(lcov_content.as_str(), project.path()),
-        snapbox::file!("snapshots/test_coverage_zero_hit_file.lcov"),
+        snapbox::file!("snapshots/coverage/test_coverage_zero_hit_file.lcov"),
     );
 }
 
@@ -613,7 +717,7 @@ fn test_coverage_empty_functions_snapshot() {
 
     output.assert_passed(1).assert_file_snapshot_matches(
         "empty-functions-coverage.txt",
-        "integration/snapshots/test_coverage_empty_functions.txt",
+        "integration/snapshots/coverage/test_coverage_empty_functions.txt",
     );
 
     let report = fs::read_to_string(project.path().join("empty-functions-coverage.txt"))
@@ -726,7 +830,7 @@ fn test_coverage_runtime_branch_opcodes_text_snapshot() {
 
     output.assert_passed(8).assert_file_snapshot_matches(
         "runtime-branches.txt",
-        "integration/snapshots/test_coverage_runtime_branch_opcodes.txt",
+        "integration/snapshots/coverage/test_coverage_runtime_branch_opcodes.txt",
     );
 
     let report = fs::read_to_string(project.path().join("runtime-branches.txt"))
@@ -789,7 +893,7 @@ fn test_coverage_keeps_multiple_branch_sites_on_same_line_separate() {
 
     output.assert_passed(2).assert_file_snapshot_matches(
         "multi-branch-sites.txt",
-        "integration/snapshots/test_coverage_multiple_branch_sites_same_line.txt",
+        "integration/snapshots/coverage/test_coverage_multiple_branch_sites_same_line.txt",
     );
 
     let report = fs::read_to_string(project.path().join("multi-branch-sites.txt"))
@@ -822,7 +926,7 @@ fn test_coverage_keeps_multiple_branch_sites_on_same_line_separate() {
     let normalized_lcov = normalize_output(lcov_content.as_str(), project.path());
     assertion().eq(
         normalized_lcov.as_str(),
-        snapbox::file!("snapshots/test_coverage_multiple_branch_sites_same_line.lcov"),
+        snapbox::file!("snapshots/coverage/test_coverage_multiple_branch_sites_same_line.lcov"),
     );
 
     let branch_records = normalized_lcov
@@ -851,7 +955,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .assert_passed(8)
         .assert_file_snapshot_matches(
             "counter-template-all.txt",
-            "integration/snapshots/test_counter_template_coverage_all.txt",
+            "integration/snapshots/coverage/test_counter_template_coverage_all.txt",
         );
 
     project
@@ -866,7 +970,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .assert_passed(1)
         .assert_file_snapshot_matches(
             "counter-template-unknown-only.txt",
-            "integration/snapshots/test_counter_template_coverage_unknown_only.txt",
+            "integration/snapshots/coverage/test_counter_template_coverage_unknown_only.txt",
         );
 
     project
@@ -881,7 +985,7 @@ fn test_counter_template_coverage_text_snapshots() {
         .assert_passed(5)
         .assert_file_snapshot_matches(
             "counter-template-non-branch.txt",
-            "integration/snapshots/test_counter_template_coverage_non_branch.txt",
+            "integration/snapshots/coverage/test_counter_template_coverage_non_branch.txt",
         );
 }
 
@@ -904,7 +1008,7 @@ fn test_counter_template_split_unknown_message_branch_text_snapshots() {
         .assert_passed(1)
         .assert_file_snapshot_matches(
             "counter-template-reject-only.txt",
-            "integration/snapshots/test_counter_template_coverage_reject_only.txt",
+            "integration/snapshots/coverage/test_counter_template_coverage_reject_only.txt",
         );
 
     project
@@ -919,7 +1023,7 @@ fn test_counter_template_split_unknown_message_branch_text_snapshots() {
         .assert_passed(1)
         .assert_file_snapshot_matches(
             "counter-template-accept-only.txt",
-            "integration/snapshots/test_counter_template_coverage_accept_only.txt",
+            "integration/snapshots/coverage/test_counter_template_coverage_accept_only.txt",
         );
 }
 
@@ -945,7 +1049,9 @@ fn test_coverage_empty_no_tests() {
         .with_coverage_file("empty-coverage.txt")
         .run()
         .failure()
-        .assert_snapshot_matches("integration/snapshots/test_coverage_empty_no_tests.stdout.txt");
+        .assert_snapshot_matches(
+            "integration/snapshots/coverage/test_coverage_empty_no_tests.stdout.txt",
+        );
 
     assert!(
         !project.path().join("empty-coverage.txt").exists(),
@@ -1001,7 +1107,7 @@ fn test_coverage_text_custom_filename() {
         .assert_file_exists("my-custom-coverage.txt")
         .assert_file_snapshot_matches(
             "my-custom-coverage.txt",
-            "integration/snapshots/test_coverage_text_custom_filename.txt",
+            "integration/snapshots/coverage/test_coverage_text_custom_filename.txt",
         );
 
     let default_path = project.path().join("coverage.txt");
@@ -1067,7 +1173,7 @@ fn test_coverage_text_custom_filename_from_config() {
         .assert_file_exists("my-custom-coverage.txt")
         .assert_file_snapshot_matches(
             "my-custom-coverage.txt",
-            "integration/snapshots/test_coverage_text_custom_filename.txt",
+            "integration/snapshots/coverage/test_coverage_text_custom_filename.txt",
         );
 
     let default_path = project.path().join("coverage.txt");
@@ -1093,7 +1199,7 @@ fn test_coverage_wrappers_are_excluded_by_default_and_can_be_included() {
         .assert_file_exists("default-coverage.txt")
         .assert_file_snapshot_matches(
             "default-coverage.txt",
-            "integration/snapshots/test_coverage_scope_default.txt",
+            "integration/snapshots/coverage/test_coverage_scope_default.txt",
         );
 
     project
@@ -1109,7 +1215,7 @@ fn test_coverage_wrappers_are_excluded_by_default_and_can_be_included() {
         .assert_file_exists("with-wrappers.txt")
         .assert_file_snapshot_matches(
             "with-wrappers.txt",
-            "integration/snapshots/test_coverage_scope_with_wrappers.txt",
+            "integration/snapshots/coverage/test_coverage_scope_with_wrappers.txt",
         )
         .assert_file_contains("with-wrappers.txt", "generated/abi/TestWrapper.tolk")
         .assert_file_contains("with-wrappers.txt", "callThroughWrapper");
@@ -1131,7 +1237,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
         .assert_file_exists("default-coverage.txt")
         .assert_file_snapshot_matches(
             "default-coverage.txt",
-            "integration/snapshots/test_coverage_scope_default.txt",
+            "integration/snapshots/coverage/test_coverage_scope_default.txt",
         );
 
     project
@@ -1147,7 +1253,7 @@ fn test_coverage_tests_are_excluded_by_default_and_can_be_included() {
         .assert_file_exists("with-tests.txt")
         .assert_file_snapshot_matches(
             "with-tests.txt",
-            "integration/snapshots/test_coverage_scope_with_tests.txt",
+            "integration/snapshots/coverage/test_coverage_scope_with_tests.txt",
         )
         .assert_file_contains("with-tests.txt", "tests/test.test.tolk")
         .assert_file_contains("with-tests.txt", "tests/support_helpers.tolk")
@@ -1217,7 +1323,7 @@ fn test_coverage_include_wrappers_and_tests_from_config() {
         .assert_file_exists("from-config.txt")
         .assert_file_snapshot_matches(
             "from-config.txt",
-            "integration/snapshots/test_coverage_scope_from_config.txt",
+            "integration/snapshots/coverage/test_coverage_scope_from_config.txt",
         )
         .assert_file_contains("from-config.txt", "generated/abi/TestWrapper.tolk")
         .assert_file_contains("from-config.txt", "tests/test.test.tolk")
@@ -1260,7 +1366,7 @@ fn test_coverage_text_output_write_error_is_non_zero() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_coverage_text_output_write_error.stderr.txt",
+            "integration/snapshots/coverage/test_coverage_text_output_write_error.stderr.txt",
         );
 }
 
@@ -1279,11 +1385,11 @@ fn test_coverage_minimum_percent_via_cli_fails_when_score_is_below_threshold() {
         .failure()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_coverage_minimum_percent_via_cli.stdout.txt",
+            "integration/snapshots/coverage/test_coverage_minimum_percent_via_cli.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "threshold.txt",
-            "integration/snapshots/test_coverage_minimum_percent_via_cli.txt",
+            "integration/snapshots/coverage/test_coverage_minimum_percent_via_cli.txt",
         );
 }
 
@@ -1306,11 +1412,11 @@ fn test_coverage_minimum_percent_via_config_fails_when_score_is_below_threshold(
         .failure()
         .assert_passed(1)
         .assert_snapshot_matches(
-            "integration/snapshots/test_coverage_minimum_percent_via_config.stdout.txt",
+            "integration/snapshots/coverage/test_coverage_minimum_percent_via_config.stdout.txt",
         )
         .assert_file_snapshot_matches(
             "threshold.txt",
-            "integration/snapshots/test_coverage_minimum_percent_via_config.txt",
+            "integration/snapshots/coverage/test_coverage_minimum_percent_via_config.txt",
         );
 }
 
@@ -1331,7 +1437,7 @@ fn test_coverage_minimum_percent_from_config_rejects_invalid_values() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_coverage_minimum_percent_invalid_config.stderr.txt",
+            "integration/snapshots/coverage/test_coverage_minimum_percent_invalid_config.stderr.txt",
         );
 }
 
@@ -1371,7 +1477,7 @@ fn test_coverage_lcov_output_write_error_is_non_zero() {
         .run()
         .failure()
         .assert_stderr_snapshot_matches(
-            "integration/snapshots/test_coverage_lcov_output_write_error.stderr.txt",
+            "integration/snapshots/coverage/test_coverage_lcov_output_write_error.stderr.txt",
         );
 }
 

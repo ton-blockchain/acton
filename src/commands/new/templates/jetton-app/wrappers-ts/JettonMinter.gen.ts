@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a JettonMinter contract in Tolk
+// It's a TypeScript wrapper for a JettonMinter contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -166,14 +166,6 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
-type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
 
@@ -275,7 +267,7 @@ export const PayloadInRef = {
  >     transferInitiator: address?
  >     sendExcessesTo: address?
  >     forwardTonAmount: coins
- >     forwardPayload: PayloadInline | PayloadInRef
+ >     forwardPayload: ForwardPayloadRemainder
  > }
  */
 export interface InternalTransferStep {
@@ -313,7 +305,9 @@ export const InternalTransferStep = {
             transferInitiator: s.loadMaybeAddress(),
             sendExcessesTo: s.loadMaybeAddress(),
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('InternalTransferStep.forwardPayload'),
         }
     },
     store(self: InternalTransferStep, b: c.Builder): void {
@@ -1007,9 +1001,9 @@ export class JettonMinter implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }

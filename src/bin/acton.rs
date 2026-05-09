@@ -785,6 +785,20 @@ enum Commands {
         compiler_version: Option<String>,
         #[arg(long, help = "Run verification without sending the final transaction")]
         dry_run: bool,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the verification transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
     },
     #[command(
         about = "Check project Tolk sources for errors",
@@ -943,6 +957,8 @@ enum Commands {
         list: bool,
         #[arg(long, hide = true, help = "Check for updates and return info as JSON")]
         check: bool,
+        #[arg(long, hide = true)]
+        yes: bool,
     },
     #[command(
         name = "func2tolk",
@@ -2053,7 +2069,18 @@ fn main() {
             wallet,
             compiler_version,
             dry_run,
-        } => verify_cmd(contract_id, address, net, wallet, compiler_version, dry_run),
+            tonconnect,
+            tonconnect_port,
+        } => verify_cmd(
+            contract_id,
+            address,
+            net,
+            wallet,
+            compiler_version,
+            dry_run,
+            tonconnect,
+            tonconnect_port,
+        ),
         Commands::Library { command } => match command {
             LibraryCommand::Publish {
                 contract_id,
@@ -2124,6 +2151,7 @@ fn main() {
             force,
             list,
             check,
+            yes: _,
         } => {
             let result = up_cmd(version, trunk, stable, force, list, check);
             if check {

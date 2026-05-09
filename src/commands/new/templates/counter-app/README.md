@@ -29,6 +29,7 @@ npm ci
 ```bash
 acton build
 acton test
+npm run test
 npm run build
 npm run typecheck
 npm run fmt:check
@@ -42,6 +43,9 @@ npm run dev
 - `acton wrapper Counter --ts` regenerates `wrappers-ts/Counter.gen.ts`.
 - `npm run build` runs the contract build and the frontend build.
 - `npm run test` delegates to `acton test`.
+- CI runs `npm run test`, `npm run typecheck`, `npm run build`,
+  `acton check --output-format github`, `acton fmt --check`, and
+  `npm run fmt:check`.
 - The app uses Vite, npm, shadcn-style UI primitives, and Tailwind CSS.
 - Copy `.env.example` to a local `.env` for Toncenter keys. Both Acton CLI and
   the Vite app read `TONCENTER_MAINNET_API_KEY` and

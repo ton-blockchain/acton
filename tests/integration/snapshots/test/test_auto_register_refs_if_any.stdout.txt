@@ -1,0 +1,21 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling lib
+    Finished in [TIME]
+   Compiling main
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/test.test.tolk (1 test)
+  ✓ action fail [TIME]
+    └─ Test output:
+       N/A -> deployer A
+       └── empty 0.2 TON -> main B                                                     gas=1754
+           ├── account created
+           └── empty 0.1 TON -> lib C                                                  gas=353
+               └── account created
+
+ ✓ 1 passed in 1 file

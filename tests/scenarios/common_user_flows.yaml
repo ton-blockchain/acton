@@ -27,7 +27,7 @@ scenarios:
     generated_tests:
       - id: create_project_and_run_tests
         file: tests/integration/scenarios/common_user_flows.rs
-        snapshot: tests/integration/snapshots/scenario_common_user_flows_create_project_and_run_tests.stdout.txt
+        snapshot: tests/integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_create_project_and_run_tests.stdout.txt
         status: active
 
   - id: deploy_script_fails_when_toncenter_is_unavailable
@@ -53,5 +53,5 @@ scenarios:
     generated_tests:
       - id: deploy_script_fails_when_toncenter_is_unavailable
         file: tests/integration/scenarios/common_user_flows.rs
-        snapshot: tests/integration/snapshots/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt
+        snapshot: tests/integration/snapshots/scenarios/common_user_flows/scenario_common_user_flows_deploy_script_fails_when_toncenter_is_unavailable.stdout.txt
         status: active

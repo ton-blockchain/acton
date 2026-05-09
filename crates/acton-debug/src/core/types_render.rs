@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
-use tolk_compiler::source_map::AbiStruct;
+use tolk_compiler::source_map::{AbiStruct, Declaration};
 use tolk_compiler::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -315,6 +315,28 @@ impl RenderedValue {
             RenderedValue::CellOf {
                 type_name,
                 value,
+                fields,
+                ..
+            } if cell_of_has_decoded(fields) => {
+                writeln!(
+                    out,
+                    "{} {} {}",
+                    pretty_magenta(type_name, options),
+                    pretty_dimmed(value, options),
+                    pretty_dimmed("{", options)
+                )?;
+                for (name, value) in fields {
+                    write_indent(out, indent + 4)?;
+                    write!(out, "{name}: ")?;
+                    value.write_pretty(out, indent + 4, options)?;
+                    writeln!(out, ",")?;
+                }
+                write_indent(out, indent)?;
+                write!(out, "{}", pretty_dimmed("}", options))
+            }
+            RenderedValue::CellOf {
+                type_name,
+                value,
                 raw,
                 ..
             } => write!(
@@ -394,6 +416,7 @@ impl RenderedValue {
     fn wants_multiline_pretty(&self) -> bool {
         match self {
             RenderedValue::Struct { fields, .. } => !fields.is_empty(),
+            RenderedValue::CellOf { fields, .. } => cell_of_has_decoded(fields),
             RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => {
                 items.iter().any(Self::wants_multiline_pretty)
             }
@@ -402,6 +425,10 @@ impl RenderedValue {
             _ => false,
         }
     }
+}
+
+fn cell_of_has_decoded(fields: &[(String, RenderedValue)]) -> bool {
+    fields.iter().any(|(name, _)| name == "decoded")
 }
 
 fn pretty_field_name<'a>(
@@ -568,11 +595,24 @@ fn pretty_cell_like_value(
     fields: &[(String, RenderedValue)],
     options: &PrettyRenderOptions,
 ) -> String {
-    let value = slice_raw_field(fields).map_or_else(
-        || raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex),
+    let value = pretty_empty_cell_like_text(value).map_or_else(
+        || {
+            slice_raw_field(fields).map_or_else(
+                || raw.map_or_else(|| compact_cell_like_text(value), raw_cell_like_hex),
+                Cow::Borrowed,
+            )
+        },
         Cow::Borrowed,
     );
     pretty_dimmed(&value, options)
+}
+
+const fn pretty_empty_cell_like_text(value: &str) -> Option<&'static str> {
+    match value.as_bytes() {
+        b"empty slice" => Some("slice{}"),
+        b"empty builder" => Some("builder{}"),
+        _ => None,
+    }
 }
 
 fn raw_cell_like_hex(raw: &CellLike) -> Cow<'_, str> {
@@ -1142,6 +1182,27 @@ fn render_cell_fields(
     fields
 }
 
+const fn is_empty_cell_like(bits: Option<usize>, refs: Option<usize>) -> bool {
+    matches!((bits, refs), (Some(0), Some(0)))
+}
+
+fn empty_cell_like_value(
+    type_name: &str,
+    bits: Option<usize>,
+    refs: Option<usize>,
+) -> Option<&'static str> {
+    if !is_empty_cell_like(bits, refs) {
+        return None;
+    }
+
+    match type_name {
+        "cell" => Some("empty cell"),
+        "slice" => Some("empty slice"),
+        "builder" => Some("empty builder"),
+        _ => None,
+    }
+}
+
 fn cell_like_meta(cell: &CellLike) -> (Option<usize>, Option<usize>, Option<String>) {
     let Some(cell) = decode_cell_like(cell) else {
         return (None, None, None);
@@ -1216,11 +1277,21 @@ fn render_openable_cell_like(
     hash: Option<String>,
     raw: Option<CellLike>,
 ) -> RenderedValue {
+    let type_name = type_name.into();
     let raw_value = value.into();
+    if let Some(empty_value) = empty_cell_like_value(&type_name, bits, refs) {
+        return RenderedValue::CellLike {
+            type_name,
+            value: empty_value.to_owned(),
+            fields: Vec::new(),
+            raw,
+        };
+    }
+
     let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
 
     RenderedValue::CellLike {
-        type_name: type_name.into(),
+        type_name,
         value: if summarize_value {
             render_cell_summary(bits, refs, hash.as_deref())
         } else {
@@ -1239,11 +1310,21 @@ fn render_openable_cell_like_name(
     hash: Option<String>,
     raw: Option<CellLike>,
 ) -> RenderedValue {
+    let type_name = type_name.into();
     let raw_value = value.into();
+    if let Some(empty_value) = empty_cell_like_value(&type_name, bits, refs) {
+        return RenderedValue::CellLike {
+            type_name,
+            value: empty_value.to_owned(),
+            fields: Vec::new(),
+            raw,
+        };
+    }
+
     let summarize_value = bits.is_some() || refs.is_some() || hash.is_some();
 
     RenderedValue::CellLike {
-        type_name: type_name.into(),
+        type_name,
         value: if summarize_value {
             render_cell_summary(bits, refs, hash.as_deref())
         } else {
@@ -1511,6 +1592,15 @@ fn render_typed_cell_with_decoded_data(
 ) -> RenderedValue {
     let value = render_cell_like(cell);
     let (bits, refs, hash) = cell_like_meta(cell);
+    if decoded.is_none() && is_empty_cell_like(bits, refs) {
+        return RenderedValue::CellOf {
+            type_name,
+            value: "empty cell".to_owned(),
+            fields: Vec::new(),
+            raw: Some(cell.clone()),
+        };
+    }
+
     let mut fields = render_cell_fields(bits, refs, hash.clone(), Some(value));
 
     if let Some((inner_ty_idx, data)) = decoded {
@@ -1549,6 +1639,8 @@ pub(crate) fn render_runtime_storage_with_abi(
         .into_iter()
         .chain(abi.storage.storage_ty_idx)
     {
+        let storage_ty_idx =
+            source_map_ty_idx_for_abi_ty(symbols, abi, storage_ty_idx).unwrap_or(storage_ty_idx);
         let mut parser = decoded_cell.as_slice_allow_exotic();
         if let Some(data) = decode_abi_data(symbols, &mut parser, storage_ty_idx) {
             return Some(render_typed_cell_with_decoded_data(
@@ -1563,24 +1655,36 @@ pub(crate) fn render_runtime_storage_with_abi(
     None
 }
 
+fn source_map_ty_idx_for_abi_ty(
+    symbols: &SourceMap,
+    abi: &ContractABI,
+    abi_ty_idx: TyIdx,
+) -> Option<TyIdx> {
+    match abi.ty_by_idx(abi_ty_idx)? {
+        Ty::StructRef { struct_name, .. } => symbols.declarations().iter().find_map(|decl| {
+            let Declaration::Struct(struct_decl) = decl else {
+                return None;
+            };
+            (struct_decl.name == *struct_name).then_some(struct_decl.ty_idx)
+        }),
+        Ty::AliasRef { alias_name, .. } => symbols.declarations().iter().find_map(|decl| {
+            let Declaration::Alias(alias_decl) = decl else {
+                return None;
+            };
+            (alias_decl.name == *alias_name).then_some(alias_decl.ty_idx)
+        }),
+        _ => symbols.ty_by_idx(abi_ty_idx).map(|_| abi_ty_idx),
+    }
+}
+
 fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> RenderedValue {
     let type_name = render_ty(symbols, ty_idx);
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
+    if abi_object_is_enum(symbols, shape_ty_idx) {
+        return render_abi_enum_data(symbols, data, type_name, shape_ty_idx);
+    }
+
     match data {
-        UnpackedValue::Object { name, fields } if abi_object_is_enum(symbols, ty_idx) => {
-            let mut fields = fields.into_iter();
-            match fields.next() {
-                Some((_, value)) => {
-                    let enum_ty_idx = resolve_alias_shape_ty(symbols, ty_idx).unwrap_or(ty_idx);
-                    let raw_ty_idx = enum_raw_value_ty(symbols, enum_ty_idx).unwrap_or(ty_idx);
-                    render_enum_value_name(
-                        type_name,
-                        name,
-                        render_abi_data(symbols, value, raw_ty_idx),
-                    )
-                }
-                None => typed_leaf(type_name, name),
-            }
-        }
         UnpackedValue::Object { name, fields } => {
             let object_ty_idx = abi_object_context_ty(symbols, &name, ty_idx).unwrap_or(ty_idx);
             RenderedValue::Struct {
@@ -1613,10 +1717,28 @@ fn render_abi_data(symbols: &SourceMap, data: UnpackedValue, ty_idx: TyIdx) -> R
             typed_leaf(type_name, format_abi_bits(&bytes, bit_len))
         }
         UnpackedValue::Null => typed_leaf(type_name, "null"),
+        UnpackedValue::Void => typed_leaf(type_name, "(void)"),
         UnpackedValue::Number(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::Bool(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::String(value) => typed_leaf(type_name, format!("\"{value}\"")),
     }
+}
+
+fn render_abi_enum_data(
+    symbols: &SourceMap,
+    data: UnpackedValue,
+    type_name: String,
+    enum_ty_idx: TyIdx,
+) -> RenderedValue {
+    let raw_ty_idx = enum_raw_value_ty(symbols, enum_ty_idx).unwrap_or(enum_ty_idx);
+    let value_name = abi_enum_value_name(symbols, enum_ty_idx, &data)
+        .unwrap_or_else(|| abi_enum_fallback_value(symbols, enum_ty_idx, &data));
+
+    render_enum_value_name(
+        type_name,
+        value_name,
+        render_abi_data(symbols, data, raw_ty_idx),
+    )
 }
 
 fn render_abi_array_items(
@@ -1675,8 +1797,15 @@ fn render_abi_map(
 }
 
 fn format_abi_map_key(symbols: &SourceMap, data: &UnpackedValue, key_ty_idx: TyIdx) -> String {
+    let shape_ty_idx = resolve_alias_shape_ty(symbols, key_ty_idx).unwrap_or(key_ty_idx);
+    if abi_object_is_enum(symbols, shape_ty_idx) {
+        return abi_enum_value_name(symbols, shape_ty_idx, data)
+            .unwrap_or_else(|| abi_enum_fallback_value(symbols, shape_ty_idx, data));
+    }
+
     match data {
         UnpackedValue::Null => "null".to_owned(),
+        UnpackedValue::Void => "(void)".to_owned(),
         UnpackedValue::Number(value) => value.to_string(),
         UnpackedValue::Bool(value) => value.to_string(),
         UnpackedValue::String(value) => format!("\"{value}\""),
@@ -1709,6 +1838,34 @@ fn enum_raw_value_ty(symbols: &SourceMap, ty_idx: TyIdx) -> Option<TyIdx> {
         Ty::EnumRef { enum_name } => Some(symbols.get_enum(enum_name).encoded_as_ty_idx),
         Ty::AliasRef { .. } => enum_raw_value_ty(symbols, symbols.alias_target_of(ty_idx)?),
         _ => None,
+    }
+}
+
+fn abi_enum_value_name(symbols: &SourceMap, ty_idx: TyIdx, data: &UnpackedValue) -> Option<String> {
+    let Ty::EnumRef { enum_name } = symbols.ty_by_idx(ty_idx)? else {
+        return None;
+    };
+    let enum_ref = symbols.get_enum(enum_name);
+    enum_ref
+        .members
+        .iter()
+        .find(|member| match data {
+            UnpackedValue::Number(value) => member.value == value.to_string(),
+            UnpackedValue::Bool(value) => member.value == value.to_string(),
+            _ => false,
+        })
+        .map(|member| format!("{}.{}", enum_ref.name, member.name))
+}
+
+fn abi_enum_fallback_value(symbols: &SourceMap, ty_idx: TyIdx, data: &UnpackedValue) -> String {
+    let enum_name = match symbols.ty_by_idx(ty_idx) {
+        Some(Ty::EnumRef { enum_name }) => enum_name.as_str(),
+        _ => return format!("{data:?}"),
+    };
+    match data {
+        UnpackedValue::Number(value) => format!("{enum_name}({value})"),
+        UnpackedValue::Bool(value) => format!("{enum_name}({value})"),
+        other => format!("{enum_name}({other:?})"),
     }
 }
 
@@ -3466,10 +3623,11 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
 mod tests {
     use super::*;
     use tolk_compiler::abi::{
-        ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage, ABIStructField,
+        ABICustomPackUnpack, ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage,
+        ABIStructField,
     };
     use tolk_compiler::source_map::{
-        AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
+        AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
     use tolk_compiler::types_kernel::UnionVariant;
     use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
@@ -3609,14 +3767,7 @@ mod tests {
             })],
             unique_types,
         );
-        let rendered = render_abi_data(
-            &symbols,
-            UnpackedValue::Object {
-                name: "Color.Blue".to_owned(),
-                fields: vec![("value".to_owned(), UnpackedValue::Number(2.into()))],
-            },
-            color_ty_idx,
-        );
+        let rendered = render_abi_data(&symbols, UnpackedValue::Number(2.into()), color_ty_idx);
 
         let RenderedValue::EnumValue {
             type_name,
@@ -3679,6 +3830,53 @@ mod tests {
         assert_eq!(
             fields[3].1.dap_parts().0,
             format!("cell{{{}}}", Boc::encode_hex(&cell))
+        );
+    }
+
+    #[test]
+    fn render_empty_cell_like_values_are_compact() {
+        let cell = CellBuilder::new().build().unwrap();
+        let cell_like = CellLike::Cell(Boc::encode_hex(&cell));
+        let (bits, refs, hash) = cell_like_meta(&cell_like);
+        let rendered = render_openable_cell_like(
+            "cell",
+            render_cell_like(&cell_like),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
+
+        assert_eq!(rendered.dap_parts().0, "empty cell");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("cell"));
+        assert!(!rendered.has_children());
+
+        let rendered = render_openable_cell_like("slice", "slice{}", Some(0), Some(0), None, None);
+        assert_eq!(rendered.dap_parts().0, "empty slice");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("slice"));
+        assert!(!rendered.has_children());
+        assert_eq!(
+            rendered.to_pretty_string(PrettyRenderOptions::default()),
+            "slice{}"
+        );
+
+        let builder_hex = Boc::encode_hex(&cell);
+        let cell_like = CellLike::Builder(builder_hex.clone());
+        let (bits, refs, hash) = cell_like_meta(&cell_like);
+        let rendered = render_openable_cell_like(
+            "builder",
+            render_builder(&builder_hex),
+            bits,
+            refs,
+            hash,
+            Some(cell_like),
+        );
+        assert_eq!(rendered.dap_parts().0, "empty builder");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("builder"));
+        assert!(!rendered.has_children());
+        assert_eq!(
+            rendered.to_pretty_string(PrettyRenderOptions::default()),
+            "builder{}"
         );
     }
 
@@ -3796,11 +3994,12 @@ mod tests {
                     fields: vec![ABIStructField {
                         name: "count".to_owned(),
                         ty_idx: count_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
-                    overrides_client_type: false,
+                    description: String::new(),
                 },
                 ABIDeclaration::Struct {
                     name: "DeploymentStorage".to_owned(),
@@ -3810,17 +4009,17 @@ mod tests {
                     fields: vec![ABIStructField {
                         name: "ready".to_owned(),
                         ty_idx: ready_ty_idx,
+                        client_ty_idx: None,
                         default_value: None,
                         description: String::new(),
                     }],
                     custom_pack_unpack: None,
-                    overrides_client_type: false,
+                    description: String::new(),
                 },
             ],
             storage: ABIStorage {
                 storage_ty_idx: Some(storage_ty_idx),
                 storage_at_deployment_ty_idx: Some(deployment_ty_idx),
-                description: String::new(),
             },
             ..Default::default()
         };
@@ -3870,6 +4069,207 @@ mod tests {
         assert_eq!(decoded_fields[0].0, "count");
         assert_eq!(decoded_fields[0].1.dap_parts().0, "7");
         assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_runtime_storage_maps_abi_type_index_to_source_map_type() {
+        let source_storage_ty_idx = 1;
+        let source_count_ty_idx = 2;
+        let source_types = vec![
+            Ty::Void,
+            Ty::StructRef {
+                struct_name: "Storage".to_owned(),
+                type_args_ty_idx: None,
+            },
+            Ty::UintN { n: 32 },
+        ];
+        let symbols = source_map_with_declarations_and_types(
+            vec![Declaration::Struct(AbiStruct {
+                name: "Storage".to_owned(),
+                ty_idx: source_storage_ty_idx,
+                ident_loc: loc(),
+                type_params: None,
+                prefix: None,
+                fields: vec![FieldInfo {
+                    name: "count".to_owned(),
+                    ty_idx: source_count_ty_idx,
+                }],
+                custom_pack_unpack: None,
+            })],
+            source_types,
+        );
+
+        let abi_count_ty_idx = 1;
+        let abi_storage_ty_idx = 2;
+        let abi = ContractABI {
+            unique_types: vec![
+                Ty::Void,
+                Ty::UintN { n: 32 },
+                Ty::StructRef {
+                    struct_name: "Storage".to_owned(),
+                    type_args_ty_idx: None,
+                },
+            ],
+            declarations: vec![ABIDeclaration::Struct {
+                name: "Storage".to_owned(),
+                ty_idx: abi_storage_ty_idx,
+                type_params: None,
+                prefix: None,
+                fields: vec![ABIStructField {
+                    name: "count".to_owned(),
+                    ty_idx: abi_count_ty_idx,
+                    client_ty_idx: None,
+                    default_value: None,
+                    description: String::new(),
+                }],
+                custom_pack_unpack: None,
+                description: String::new(),
+            }],
+            storage: ABIStorage {
+                storage_ty_idx: Some(abi_storage_ty_idx),
+                storage_at_deployment_ty_idx: None,
+            },
+            ..Default::default()
+        };
+        let mut builder = CellBuilder::new();
+        builder.store_uint(7, 32).unwrap();
+        let cell = builder.build().unwrap();
+
+        let rendered = render_runtime_storage_with_abi(
+            &VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&cell))),
+            &symbols,
+            &abi,
+        )
+        .expect("expected decoded c4");
+
+        let RenderedValue::CellOf {
+            type_name, fields, ..
+        } = rendered
+        else {
+            panic!("expected CellOf");
+        };
+        assert_eq!(type_name, "Cell<Storage>");
+        assert_eq!(fields[0].0, "decoded");
+
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded storage");
+        };
+        assert_eq!(type_name, "Storage");
+        assert_eq!(decoded_fields[0].0, "count");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "7");
+        assert_eq!(decoded_fields[0].1.dap_parts().1.as_deref(), Some("uint32"));
+    }
+
+    #[test]
+    fn render_typed_cell_decodes_builtin_tlb_varuint_custom_aliases() {
+        let mut unique_types = Vec::new();
+        let int_ty_idx = add_ty(&mut unique_types, Ty::Int);
+        let varuint7_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::AliasRef {
+                alias_name: "TlbVarUint7".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let varuint3_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::AliasRef {
+                alias_name: "TlbVarUint3".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let gas_record_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::StructRef {
+                struct_name: "GasRecord".to_owned(),
+                type_args_ty_idx: None,
+            },
+        );
+        let custom_pack_unpack = Some(ABICustomPackUnpack {
+            pack_to_builder: Some(true),
+            unpack_from_slice: Some(true),
+        });
+        let symbols = source_map_with_declarations_and_types(
+            vec![
+                Declaration::Alias(AbiAlias {
+                    name: "TlbVarUint7".to_owned(),
+                    ty_idx: varuint7_ty_idx,
+                    ident_loc: loc(),
+                    target_ty_idx: int_ty_idx,
+                    type_params: None,
+                    custom_pack_unpack: custom_pack_unpack.clone(),
+                }),
+                Declaration::Alias(AbiAlias {
+                    name: "TlbVarUint3".to_owned(),
+                    ty_idx: varuint3_ty_idx,
+                    ident_loc: loc(),
+                    target_ty_idx: int_ty_idx,
+                    type_params: None,
+                    custom_pack_unpack,
+                }),
+                Declaration::Struct(AbiStruct {
+                    name: "GasRecord".to_owned(),
+                    ty_idx: gas_record_ty_idx,
+                    ident_loc: loc(),
+                    type_params: None,
+                    prefix: None,
+                    fields: vec![
+                        FieldInfo {
+                            name: "gasUsed".to_owned(),
+                            ty_idx: varuint7_ty_idx,
+                        },
+                        FieldInfo {
+                            name: "gasCredit".to_owned(),
+                            ty_idx: varuint3_ty_idx,
+                        },
+                    ],
+                    custom_pack_unpack: None,
+                }),
+            ],
+            unique_types,
+        );
+        let mut builder = CellBuilder::new();
+        builder.store_uint(1, 3).unwrap();
+        builder.store_uint(118, 8).unwrap();
+        builder.store_uint(2, 2).unwrap();
+        builder.store_uint(1024, 16).unwrap();
+        let cell = builder.build().unwrap();
+
+        let rendered = render_typed_cell(
+            &symbols,
+            "Cell<GasRecord>".to_owned(),
+            gas_record_ty_idx,
+            &CellLike::Cell(Boc::encode_hex(&cell)),
+        );
+
+        let RenderedValue::CellOf { fields, .. } = rendered else {
+            panic!("expected CellOf");
+        };
+        assert_eq!(fields[0].0, "decoded");
+        let RenderedValue::Struct {
+            type_name,
+            fields: decoded_fields,
+        } = &fields[0].1
+        else {
+            panic!("expected decoded cell");
+        };
+        assert_eq!(type_name, "GasRecord");
+        assert_eq!(decoded_fields[0].0, "gasUsed");
+        assert_eq!(decoded_fields[0].1.dap_parts().0, "118");
+        assert_eq!(
+            decoded_fields[0].1.dap_parts().1.as_deref(),
+            Some("TlbVarUint7")
+        );
+        assert_eq!(decoded_fields[1].0, "gasCredit");
+        assert_eq!(decoded_fields[1].1.dap_parts().0, "1024");
+        assert_eq!(
+            decoded_fields[1].1.dap_parts().1.as_deref(),
+            Some("TlbVarUint3")
+        );
     }
 
     #[test]
@@ -4073,12 +4473,11 @@ mod tests {
         assert_eq!(dap_type.as_deref(), Some("cell | int"));
         assert_eq!(fields.len(), 1);
         assert_eq!(fields[0].0, "value");
-        let RenderedValue::CellLike { fields, .. } = &fields[0].1 else {
+        let RenderedValue::CellLike { value, fields, .. } = &fields[0].1 else {
             panic!("expected nested CellLike");
         };
-        assert_eq!(fields[0].0, "bits");
-        assert_eq!(fields[1].0, "refs");
-        assert_eq!(fields[2].0, "hash");
+        assert_eq!(value, "empty cell");
+        assert!(fields.is_empty());
     }
 
     #[test]
@@ -4388,11 +4787,10 @@ mod tests {
                 }),
                 fields: vec![],
                 custom_pack_unpack: None,
-                overrides_client_type: false,
+                description: String::new(),
             }],
             outgoing_messages: vec![ABIOutgoingMessage {
                 body_ty_idx: transfer_ty_idx,
-                description: String::new(),
             }],
             ..Default::default()
         };

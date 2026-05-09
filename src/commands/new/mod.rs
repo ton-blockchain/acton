@@ -213,6 +213,8 @@ pub fn new_cmd(
         fs::create_dir_all(&project_path)?;
     }
 
+    let author = get_git_user_name().unwrap_or_else(|| "Acton User".to_string());
+
     let mut config = ActonConfig::default();
     config.package.name.clone_from(&project_name);
     config.package.description.clone_from(&description);
@@ -233,6 +235,7 @@ pub fn new_cmd(
         Path::new("."),
         include_agents,
         normalized_npm_package_name.as_deref(),
+        &author,
     )?;
 
     let mut contracts = BTreeMap::new();
@@ -282,7 +285,6 @@ pub fn new_cmd(
 
     stdlib::ensure_latest(Path::new("."))?;
 
-    let author = get_git_user_name().unwrap_or_else(|| "Acton User".to_string());
     let year = chrono::Local::now().format("%Y").to_string();
     if let Some(license_text) = licenses::get_license_text(&license, &year, &author) {
         fs::write("LICENSE", license_text)?;

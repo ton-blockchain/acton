@@ -1590,6 +1590,7 @@ fn test_up_rejects_conflicting_flag_combinations() {
         (&["--force", "--list"], &["--force", "--list"]),
         (&["--force", "--check"], &["--force", "--check"]),
         (&["--list", "--check"], &["--list", "--check"]),
+        (&["--yes", "--list", "--check"], &["--list", "--check"]),
     ];
 
     for (args, expected_needles) in cases {

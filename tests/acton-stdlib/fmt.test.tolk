@@ -135,7 +135,7 @@ get fun `test format message`() {
             other: map<int32, varuint32> {},
         },
         extraFlags: 0,
-        fwdFee: 266669,
+        fwdFee: 44446,
         createdLt: 0,
         createdAt: 0,
     },

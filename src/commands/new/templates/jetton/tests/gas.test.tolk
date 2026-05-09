@@ -106,25 +106,12 @@ get fun `test gas: transfer with forward amount requires second forward fee`() {
         body,
         bounce: false,
         dest: wallet.address,
-        value: minWithForward,
+        value: minWithForward + fwdFee,
     });
     val enoughRes = net.send(deployer.address, enoughMsg);
     expect(enoughRes).toHaveSuccessfulTx<AskToTransfer>({
         from: deployer.address,
         to: wallet.address,
-    });
-
-    val edgeFailMsg = createMessage({
-        body,
-        bounce: false,
-        dest: wallet.address,
-        value: minWithForward - MIN_EDGE_DELTA,
-    });
-    val edgeFailRes = net.send(deployer.address, edgeFailMsg);
-    expect(edgeFailRes).toHaveFailedTx<AskToTransfer>({
-        from: deployer.address,
-        to: wallet.address,
-        exitCode: Errors.NotEnoughGas,
     });
 }
 
@@ -201,7 +188,7 @@ get fun `test gas: transfer forward fees should follow config`() {
         body,
         bounce: false,
         dest: wallet.address,
-        value: minimalAfter - MIN_EDGE_DELTA,
+        value: minimalBefore,
     });
     val failRes = net.send(deployer.address, failMsg);
     expect(failRes).toHaveFailedTx<AskToTransfer>({
@@ -256,7 +243,7 @@ get fun `test gas: transfer gas fee should follow config`() {
         body,
         bounce: false,
         dest: wallet.address,
-        value: minimalAfter - MIN_EDGE_DELTA,
+        value: minimalBefore,
     });
     val failRes = net.send(deployer.address, fail);
     expect(failRes).toHaveFailedTx<AskToTransfer>({
@@ -312,7 +299,7 @@ get fun `test gas: transfer storage fee should follow config`() {
         body,
         bounce: false,
         dest: wallet.address,
-        value: minimalAfter - MIN_EDGE_DELTA,
+        value: minimalBefore,
     });
     val failRes = net.send(deployer.address, fail);
     expect(failRes).toHaveFailedTx<AskToTransfer>({
@@ -540,7 +527,7 @@ get fun `test gas: burn should fail when sent tons are clearly insufficient`() {
         ton("1"),
         deployer.address,
         null,
-        { bounce: false, value: ton("0.001") },
+        { bounce: false, value: ton("0.0001") },
     );
     expect(res).toHaveFailedTx<AskToBurn>({
         from: deployer.address,

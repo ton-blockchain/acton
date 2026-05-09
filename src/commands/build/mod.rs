@@ -30,6 +30,13 @@ pub struct BuildCommandOptions {
     pub show_info: bool,
 }
 
+pub(crate) fn contract_compilation_order(
+    contracts: &BTreeMap<String, ContractConfig>,
+) -> anyhow::Result<Vec<String>> {
+    let flatten_contracts = contracts.iter().collect::<Vec<_>>();
+    dep_graph::build_dependency_graph(&flatten_contracts)
+}
+
 pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
     let BuildCommandOptions {
         contract_id,
@@ -128,8 +135,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
     let mut error_count = 0;
     let total_start = Instant::now();
 
-    let flatten_contracts = contracts.iter().collect::<Vec<_>>();
-    let compilation_order = dep_graph::build_dependency_graph(&flatten_contracts)?;
+    let compilation_order = contract_compilation_order(contracts)?;
     debug!("Compilation order: {compilation_order:?}");
 
     let filtered_compilation_order = if let Some(filter) = &contract_id {
@@ -666,7 +672,7 @@ fn rewrite_compiler_error_paths_for_display(
     }
 }
 
-fn resolve_build_output_dir(
+pub(crate) fn resolve_build_output_dir(
     cli_path: Option<String>,
     config_path: Option<String>,
     default_dir: &str,

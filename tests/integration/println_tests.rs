@@ -59,7 +59,7 @@ fn test_println_formatting() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_formatting.stdout.svg",
+            "integration/snapshots/println/test_println_formatting.stdout.svg",
         );
 }
 
@@ -101,7 +101,7 @@ fn test_println_tuples_and_tensors() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_tuples_and_tensors.stdout.svg",
+            "integration/snapshots/println/test_println_tuples_and_tensors.stdout.svg",
         );
 }
 
@@ -151,7 +151,7 @@ fn test_println_nesting_complex() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_nesting_complex.stdout.svg",
+            "integration/snapshots/println/test_println_nesting_complex.stdout.svg",
         );
 }
 
@@ -187,6 +187,40 @@ fn test_println_various_slices() {
         .run()
         .success()
         .assert_stdout_svg_snapshot_matches(
-            "integration/snapshots/test_println_various_slices.stdout.svg",
+            "integration/snapshots/println/test_println_various_slices.stdout.svg",
+        );
+}
+
+#[test]
+fn test_println_typed_cell_includes_decoded_value() {
+    let project = ProjectBuilder::new("println-typed-cell-decoded")
+        .script_file(
+            "main",
+            r#"
+            import "../../lib/io"
+
+            struct Child {
+                value: uint8
+            }
+
+            struct Boxed {
+                child: Cell<Child>
+            }
+
+            fun main() {
+                val child = Child { value: 42 }.toCell() as Cell<Child>;
+                println(Boxed { child });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/main.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/println/test_println_typed_cell_includes_decoded_value.stdout.txt",
         );
 }

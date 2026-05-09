@@ -1,0 +1,23 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling library_ref_target
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/library_ref.test.tolk (1 test)
+  ✓ coverage sees library-ref contract source [TIME]
+
+ ✓ 1 passed in 1 file
+
+ COVERAGE  
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ File                                Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score 
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+ All files                                       1             1    100.0%                  1                2        50.0%   66.7% 
+ contracts/library_ref_target.tolk               1             1    100.0%                  1                2        50.0%   66.7% 
+
+Text coverage file saved in library-ref-coverage.txt

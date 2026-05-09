@@ -332,11 +332,12 @@ Depending on the selected template and options, Acton may also generate:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'deployment scripts
+\h'-04'\(bu\h'+03'deployment and management scripts
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB[scripts]\fR aliases such as \fBdeploy\-emulation\fR and \fBdeploy\-testnet\fR in \fBActon.toml\fR
+\h'-04'\(bu\h'+03'\fB[scripts]\fR aliases such as \fBdeploy\-emulation\fR, \fBdeploy\-testnet\fR, and
+template\-specific management aliases in \fBActon.toml\fR
 .RE
 .sp
 .RS 4
@@ -359,7 +360,11 @@ includes:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBcontracts/tests\fR for tests and generated Tolk wrappers
+\h'-04'\(bu\h'+03'\fBcontracts/tests\fR for tests
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcontracts/wrappers\fR for generated Tolk wrappers
 .RE
 .sp
 .RS 4
@@ -411,7 +416,7 @@ Common commands in that generated app workspace:
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fBnpm test\fR to run the bundled \fBacton test\fR command when the template provides
+\h'-04'\(bu\h'+03'\fBnpm run test\fR to run the bundled \fBacton test\fR command when the template provides
 it
 .RE
 .SH "SIDE EFFECTS"

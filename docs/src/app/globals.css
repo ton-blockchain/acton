@@ -49,6 +49,10 @@ pre {
   font-family: var(--font-geist-mono), "Courier New", monospace;
 }
 
+figure.shiki > div[role="region"] {
+  max-height: 44rem;
+}
+
 .acton-docs-sidebar {
   background-color: var(--color-fd-background);
 }

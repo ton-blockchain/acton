@@ -1,4 +1,4 @@
-enum Errors: int32 {
+enum Errors {
     BalanceError = 47
     NotEnoughGas = 48
     InvalidMessage = 49

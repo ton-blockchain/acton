@@ -2,8 +2,9 @@ use crate::commands::test::reporting::{FailedTransactionContext, TestReport};
 use crate::commands::test::trace::TransactionInfo;
 use crate::context;
 use crate::context::{
-    AssertFailure, BuildCache, DisplayParam, EmulationsState, GetMethodAssertFailure,
-    KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
+    AssertFailure, BuildCache, DisplayParam, EmulationsState, ExternalMessageNotFoundFailure,
+    GetMethodAssertFailure, KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure,
+    to_cell,
 };
 use crate::ffi::assert::{rendered_values_equal, union_case_payload};
 use crate::retrace::{
@@ -1368,6 +1369,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Null => "null".to_owned(),
+            UnpackedValue::Void => "(void)".to_owned(),
             UnpackedValue::Number(value) => value.to_string(),
             UnpackedValue::Bool(value) => value.to_string(),
             UnpackedValue::String(value) => format!("{value:?}"),
@@ -1515,7 +1517,10 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
 
                     extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
 
-                    if let Some(info) = exit_codes::find(action.result_code) {
+                    if let Some(info) = exit_codes::find_for_phase(
+                        action.result_code,
+                        exit_codes::ExitCodePhase::Action,
+                    ) {
                         extra_infos.push(FormattedExtraInfo::Tree(format!(
                             "Description: {}",
                             info.description.to_string().yellow()
@@ -1653,7 +1658,9 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
             .red()
             .to_string();
 
-        if let Some(info) = exit_codes::find(compute.exit_code) {
+        if let Some(info) =
+            exit_codes::find_for_phase(compute.exit_code, exit_codes::ExitCodePhase::Compute)
+        {
             extra_infos.push(FormattedExtraInfo::Tree(format!(
                 "Compute phase failed: {}",
                 info.description.to_string().yellow()
@@ -2172,7 +2179,7 @@ See https://ton-blockchain.github.io/acton/docs/tutorial/setup-wallets for more 
         if opcode == 0 {
             Self::color_message_name("empty")
         } else {
-            Self::color_message_name(&format!("0x{opcode:x}"))
+            Self::color_message_name(&format!("0x{opcode:08x}"))
         }
     }
 
@@ -2833,7 +2840,7 @@ impl FormatterContext<'_> {
                         .and_then(|build| Self::message_name_from_build(&build, *opcode));
                     params.push(format!(
                         "  opcode={} {}",
-                        format!("0x{opcode:x}").green(),
+                        format!("0x{opcode:08x}").green(),
                         opcode_type
                             .unwrap_or_else(|| if *opcode == 0 {
                                 "empty".to_owned()
@@ -2880,6 +2887,22 @@ impl FormatterContext<'_> {
     }
 
     #[must_use]
+    pub fn format_external_message_search_parameters(
+        &self,
+        failure: &ExternalMessageNotFoundFailure,
+    ) -> Vec<String> {
+        let Some(opcode) = failure.opcode else {
+            return Vec::new();
+        };
+
+        vec![format!(
+            "  opcode={} {}",
+            format!("0x{opcode:08x}").green(),
+            failure.message_name.purple().bold()
+        )]
+    }
+
+    #[must_use]
     pub fn highlight_actual_expected(message: &str) -> String {
         message
             .replace("<actual>", &"actual".red().to_string())
@@ -2888,7 +2911,7 @@ impl FormatterContext<'_> {
 
     #[must_use]
     pub fn format_exit_code(code: i32) -> String {
-        if let Some(info) = exit_codes::find(code) {
+        if let Some(info) = exit_codes::find_for_phase(code, exit_codes::ExitCodePhase::Compute) {
             return info.name.to_owned();
         }
 
@@ -2897,7 +2920,7 @@ impl FormatterContext<'_> {
 
     #[must_use]
     pub fn format_exit_code_with_number(code: i32) -> String {
-        if let Some(info) = exit_codes::find(code) {
+        if let Some(info) = exit_codes::find_for_phase(code, exit_codes::ExitCodePhase::Compute) {
             return format!("{code} ({}): {}", info.name, info.description);
         }
 
@@ -2980,7 +3003,9 @@ impl FormatterContext<'_> {
             }
         }
 
-        if let Some(info) = exit_codes::find(failure.vm_exit_code) {
+        if let Some(info) =
+            exit_codes::find_for_phase(failure.vm_exit_code, exit_codes::ExitCodePhase::Compute)
+        {
             writeln!(details, "Description: {}", info.description).ok();
             writeln!(details, "Phase: {}", info.phase).ok();
         } else if let Some(info) =
@@ -3240,6 +3265,23 @@ impl FormatterContext<'_> {
                     }
                 }
             }
+            AssertFailure::ExternalMessageNotFound(external_failure) => {
+                let params = self.format_external_message_search_parameters(external_failure);
+                let tx_tree = self.format_transaction_list(&external_failure.txs);
+                writeln!(result, "{tx_tree}").ok();
+                writeln!(
+                    result,
+                    "Cannot find external message {}",
+                    external_failure.message_name.purple().bold()
+                )
+                .ok();
+                if !params.is_empty() {
+                    writeln!(result, "with:").ok();
+                    for param in params {
+                        writeln!(result, "  {param}").ok();
+                    }
+                }
+            }
             AssertFailure::WalletNotFound(failure) => {
                 let message = self.format_wallet_not_found_message(failure);
                 let highlighted_message = Self::highlight_actual_expected(&message);
@@ -3317,7 +3359,9 @@ impl FormatterContext<'_> {
             .ok();
         }
 
-        if let Some(info) = exit_codes::find(exit_code) {
+        if let Some(info) =
+            exit_codes::find_for_phase(exit_code, exit_codes::ExitCodePhase::Compute)
+        {
             writeln!(output, "Description: {}", info.description).ok();
             writeln!(output, "Phase: {}", info.phase).ok();
         } else if !Self::is_special_get_method_exit_code(exit_code)

@@ -14,6 +14,6 @@
        └── FmDestroyNow 0.2 TON -> EQBstq..62kAiU B                                    gas=1557
            queryId: 1
            ├── account destroyed
-           └── empty 1.198846 TON -> sender A                                          gas=309
+           └── empty 1.199807664 TON -> sender A                                       gas=309
 
  ✓ 1 passed in 1 file

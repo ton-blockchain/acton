@@ -1,10 +1,13 @@
 ---
-title: "Saved Trace Bundles"
+title: "Saved trace bundles"
 description: "Reference for the files produced by `acton test --save-test-trace` and reused by the Test UI"
 ---
 
-`acton test --save-test-trace` writes reusable JSON artifacts for offline inspection.
-The browser Test UI reads the same trace and contract files.
+Pass `--save-test-trace` to [`acton test`](/docs/commands/test) to write reusable JSON artifacts for offline inspection. The browser [Test UI](/docs/testing/test-ui/overview) can read the same trace and contract files.
+
+```bash
+acton test --save-test-trace
+```
 
 ## When bundles are written
 
@@ -30,7 +33,7 @@ build/traces/
 - Contract metadata is stored once per output directory under `contracts/<contract-name>.json`, even when multiple tests reuse the same contract.
 - Filenames are derived only from the test name and contract name. If those names collide across files, later exports overwrite earlier artifacts in the same output directory.
 
-## Root Trace File
+## Root trace file
 
 Each `<test-name>_trace.json` file has this top-level structure:
 
@@ -66,7 +69,7 @@ Each `<test-name>_trace.json` file has this top-level structure:
 - `wallets`: known-address map used to preserve local wallet names such as `deployer` or `sender`.
 - `traces`: logical transaction chains captured during the test.
 
-## Trace Chains
+## Trace chains
 
 Each item in `traces` represents one logical message chain:
 
@@ -97,7 +100,7 @@ Each transaction entry carries both raw and decoded debugging context:
 - `actions`: optional base64-encoded actions cell copied from the trace export. Runtime helpers may decode it later when needed.
 - `dest_contract_info`: contract name hint for lookup in `contracts/<name>.json`.
 
-## Contract Files
+## Contract files
 
 Each `contracts/<contract-name>.json` file stores the metadata needed to decode and inspect transactions:
 
@@ -109,8 +112,8 @@ Each `contracts/<contract-name>.json` file stores the metadata needed to decode 
 
 This lets offline tooling and the Test UI map traces back to source locations and known message layouts.
 
-## Step-by-step Execution
+## Step-by-step execution
 
 Trace export keeps logical chains intact even when execution is split into batches with [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/testing#testingcreatetraceiterationcursor).
 
-If you run part of a chain with `executeN()` and then continue with `executeAllRemaining()`, Acton merges those batches back into one exported trace when they belong to the same root transaction. Naming any batch with `giveName(...)` keeps that logical trace readable in the final JSON.
+Running part of a chain with `executeN()` and then `executeAllRemaining()` merges those batches back into one exported trace when they share the same root transaction. Naming any batch with `giveName(...)` keeps that logical trace readable in the final JSON.

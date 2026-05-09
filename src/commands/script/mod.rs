@@ -509,7 +509,7 @@ fn format_nonzero_script_exit_code_details<'a>(
         }
     }
 
-    if let Some(info) = exit_codes::find(exit_code) {
+    if let Some(info) = exit_codes::find_for_phase(exit_code, exit_codes::ExitCodePhase::Compute) {
         let should_show_fallback_description = exit_code_info
             .as_ref()
             .is_none_or(|exception| exception.description.is_empty());

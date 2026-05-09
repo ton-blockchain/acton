@@ -14,7 +14,7 @@ use tolk_compiler::abi::{ABIGetMethod, ABIOpcode, ABIResolvedStruct, ContractABI
 use tolk_compiler::source_map::Declaration;
 use tolk_compiler::{CompilerResult, SourceMap};
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.1";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.4";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
@@ -26,6 +26,7 @@ struct WrapperModel {
     code_boc64: String,
     storage: Option<ABIResolvedStruct>,
     incoming_messages: Vec<ABIResolvedStruct>,
+    incoming_external_messages: Vec<ABIResolvedStruct>,
     storage_path: Option<PathBuf>,
     message_paths: Vec<PathBuf>,
     wrapper_path: PathBuf,
@@ -120,11 +121,13 @@ fn build_model(
         .and_then(|mappings| mappings.get("@wrappers").cloned());
     let storage = abi.resolve_storage_struct()?;
     let incoming_messages = abi.resolve_incoming_message_structs()?;
+    let incoming_external_messages = abi.resolve_incoming_external_message_structs()?;
     let storage_path = storage
         .iter()
         .find_map(|storage| find_type_path(&source_map, &storage.name));
     let message_paths = incoming_messages
         .iter()
+        .chain(incoming_external_messages.iter())
         .filter_map(|message| find_type_path(&source_map, &message.name))
         .collect::<BTreeSet<_>>();
 
@@ -156,6 +159,7 @@ fn build_model(
         code_boc64,
         storage,
         incoming_messages,
+        incoming_external_messages,
         storage_path,
         message_paths,
         wrapper_path,
@@ -592,6 +596,18 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push_str(&generate_send_any_method(contract));
     code.push('\n');
 
+    for message in &model.incoming_external_messages {
+        code.push_str(&generate_send_external_method(
+            contract, &model.abi, message,
+        ));
+        code.push('\n');
+    }
+
+    if !model.abi.incoming_external.is_empty() {
+        code.push_str(&generate_send_any_external_method(contract));
+        code.push('\n');
+    }
+
     for get_method in &model.abi.get_methods {
         code.push_str(&generate_get_method(contract, &model.abi, get_method));
         code.push('\n');
@@ -697,7 +713,7 @@ fn generate_send_method(
     let params = fields
         .iter()
         .map(|f| {
-            let type_name = abi.render_param_type(f.ty_idx);
+            let type_name = abi.render_param_type(f.client_or_declared_ty_idx());
             let name = normalize_param_name(&f.name);
             format!("{name}: {type_name}")
         })
@@ -715,7 +731,7 @@ fn generate_send_method(
         "fun {contract_name}.{method_name}(self, from: address, {params_str}config: SendParams = {{}}): SendResultList {{"
     );
 
-    if message_type.overrides_client_type {
+    if fields.iter().any(|field| field.client_ty_idx.is_some()) {
         let prefix = message_type.prefix.as_ref();
         code.push_str(
             "    // build body cell manually, because some fields have @abi.clientType\n",
@@ -731,7 +747,7 @@ fn generate_send_method(
         }
         for field in &fields {
             let param_name = normalize_param_name(&field.name);
-            let value = if abi.is_typed_cell(field.ty_idx) {
+            let value = if abi.is_typed_cell(field.client_or_declared_ty_idx()) {
                 format!("{param_name}.toCell()")
             } else {
                 param_name
@@ -820,6 +836,115 @@ fn generate_send_any_method(contract_name: &str) -> String {
     code.push_str("        body,\n");
     code.push_str("    });\n");
     code.push_str("    return net.send(from, genericMsg)\n");
+    code.push_str("}\n");
+
+    code
+}
+
+fn generate_send_external_method(
+    contract_name: &str,
+    abi: &ContractABI,
+    message_type: &ABIResolvedStruct,
+) -> String {
+    let mut code = String::new();
+    let method_name = format!("sendExternal{}", message_type.name);
+
+    let fields: Vec<_> = message_type.fields.iter().collect();
+
+    let params = fields
+        .iter()
+        .map(|f| {
+            let type_name = abi.render_param_type(f.client_or_declared_ty_idx());
+            let name = normalize_param_name(&f.name);
+            format!("{name}: {type_name}")
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+
+    if params.is_empty() {
+        let _ = writeln!(
+            code,
+            "fun {contract_name}.{method_name}(self): SendResultList? {{"
+        );
+    } else {
+        let _ = writeln!(
+            code,
+            "fun {contract_name}.{method_name}(self, {params}): SendResultList? {{"
+        );
+    }
+
+    if fields.iter().any(|field| field.client_ty_idx.is_some()) {
+        let prefix = message_type.prefix.as_ref();
+        code.push_str(
+            "    // build body cell manually, because some fields have @abi.clientType\n",
+        );
+        code.push_str("    val bodyB = beginCell()\n");
+        let mut chain: Vec<String> = Vec::new();
+        if let Some(prefix) = prefix {
+            chain.push(format!(
+                ".storeUint({}, {})",
+                format_prefix_literal(prefix),
+                prefix.prefix_len
+            ));
+        }
+        for field in &fields {
+            let param_name = normalize_param_name(&field.name);
+            let value = if abi.is_typed_cell(field.client_or_declared_ty_idx()) {
+                format!("{param_name}.toCell()")
+            } else {
+                param_name
+            };
+            chain.push(format!(".storeAny({value})"));
+        }
+        if chain.is_empty() {
+            code.push_str("        ;\n");
+        } else {
+            let last = chain.len() - 1;
+            for (idx, call) in chain.iter().enumerate() {
+                let suffix = if idx == last { ";" } else { "" };
+                let _ = writeln!(code, "        {call}{suffix}");
+            }
+        }
+        let _ = writeln!(
+            code,
+            "    val body = {}.fromSlice(bodyB.toSlice());",
+            message_type.name
+        );
+    } else if fields.is_empty() {
+        let _ = writeln!(code, "    val body = {} {{}};", message_type.name);
+    } else {
+        let _ = writeln!(code, "    val body = {} {{", message_type.name);
+        for field in &fields {
+            let param_name = normalize_param_name(&field.name);
+
+            if abi.is_typed_cell(field.ty_idx) {
+                let _ = writeln!(code, "        {}: {}.toCell(),", field.name, param_name);
+            } else if field.name == param_name {
+                let _ = writeln!(code, "        {},", field.name);
+            } else {
+                let _ = writeln!(code, "        {}: {},", field.name, param_name);
+            }
+        }
+        code.push_str("    };\n");
+    }
+
+    code.push_str("    val msg = net.createExternalMessage(self.address, body);\n");
+    code.push_str("    return net.sendExternal(msg)\n");
+    code.push_str("}\n");
+
+    code
+}
+
+fn generate_send_any_external_method(contract_name: &str) -> String {
+    let mut code = String::new();
+
+    code.push_str("/// Send an external-in message to the contract with a custom body cell\n");
+    let _ = writeln!(
+        code,
+        "fun {contract_name}.sendAnyExternal(self, body: cell): SendResultList? {{"
+    );
+    code.push_str("    val msg = net.createExternalMessage(self.address, body);\n");
+    code.push_str("    return net.sendExternal(msg)\n");
     code.push_str("}\n");
 
     code

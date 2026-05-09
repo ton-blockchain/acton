@@ -55,12 +55,9 @@ List available release tags and exit.
 
 {{> options-project-pass-through }}
 
-## Release Sources
+## Release Source
 
-Acton queries GitHub release metadata and assets from:
-
-- `ton-blockchain/acton`
-- `i582/acton-public`
+Acton queries GitHub release metadata and assets from `ton-blockchain/acton`.
 
 If `GITHUB_TOKEN` is set, Acton uses it for authenticated GitHub API requests.
 

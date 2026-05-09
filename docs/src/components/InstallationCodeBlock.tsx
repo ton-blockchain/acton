@@ -3,14 +3,17 @@
 import React, {useState} from "react"
 import {Copy, Check} from "lucide-react"
 
-export const INSTALL_COMMAND = "curl -LsSf https://ton.org/acton/install.sh | sh"
+export const INSTALL_COMMAND =
+  "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh"
 
 export function HighlightedInstallCommand() {
   return (
     <>
       <span className="text-[#9AE7FF]">curl</span>
       <span className="text-sky-200"> -LsSf </span>
-      <span className="text-[#ef8cff]">https://ton.org/acton/install.sh</span>
+      <span className="text-[#ef8cff]">
+        https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh
+      </span>
       <span className="text-white/35"> | </span>
       <span className="text-[#9AE7FF]">sh</span>
     </>

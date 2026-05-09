@@ -100,6 +100,24 @@ fun SimpleExtension.sendAny(
     return net.send(from, genericMsg);
 }
 
+fun SimpleExtension.sendExternalCollectPaymentFromWallet(self, queryId: uint64): SendResultList? {
+    val body = CollectPaymentFromWallet { queryId };
+    val msg = net.createExternalMessage(self.address, body);
+    return net.sendExternal(msg);
+}
+
+fun SimpleExtension.sendExternalWithdrawExtensionBalance(self): SendResultList? {
+    val body = WithdrawExtensionBalance {};
+    val msg = net.createExternalMessage(self.address, body);
+    return net.sendExternal(msg);
+}
+
+/// Send an external-in message to the contract with a custom body cell
+fun SimpleExtension.sendAnyExternal(self, body: cell): SendResultList? {
+    val msg = net.createExternalMessage(self.address, body);
+    return net.sendExternal(msg);
+}
+
 fun SimpleExtension.extensionInfo(self): ExtensionStorage {
     return net.runGetMethod(self.address, "extensionInfo");
 }

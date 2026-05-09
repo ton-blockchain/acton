@@ -698,6 +698,20 @@ fn test_generic_instantiation() {
 }
 
 #[test]
+fn test_single_generic_instantiation_argument_does_not_break_on_small_width() {
+    check_with_width(
+        "fun test() { val reply = result.findTransaction<ReplyWalletAddressMessage>()!.loadBody<RepLyWalletAddressMessage>(); }",
+        expect![[r"
+                fun test() {
+                    val reply = result
+                        .findTransaction<ReplyWalletAddressMessage>()!
+                        .loadBody<RepLyWalletAddressMessage>();
+                }"]],
+        60,
+    );
+}
+
+#[test]
 fn test_complex_binary_operators() {
     check(
         "fun test() { x = a + b * c - d / e % f; }",

@@ -1,5 +1,5 @@
 // AUTO-GENERATED, do not edit
-// it's a TypeScript wrapper for a NftItem contract in Tolk
+// It's a TypeScript wrapper for a NftItem contract in Tolk.
 /* eslint-disable */
 
 import * as c from '@ton/core';
@@ -153,14 +153,6 @@ class StackReader {
 
 type coins = bigint
 
-type int8 = bigint
-type int16 = bigint
-type int32 = bigint
-type int256 = bigint
-
-type uint8 = bigint
-type uint16 = bigint
-type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
 
@@ -326,7 +318,7 @@ export const PayloadInRef = {
  > struct (0x05138d91) NotificationForNewOwner {
  >     queryId: uint64
  >     oldOwnerAddress: address
- >     payload: PayloadInline | PayloadInRef
+ >     payload: RemainingBitsAndRefs
  > }
  */
 export interface NotificationForNewOwner {
@@ -355,7 +347,9 @@ export const NotificationForNewOwner = {
             $: 'NotificationForNewOwner',
             queryId: s.loadUintBig(64),
             oldOwnerAddress: s.loadAddress(),
-            payload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            payload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('NotificationForNewOwner.payload'),
         }
     },
     store(self: NotificationForNewOwner, b: c.Builder): void {
@@ -420,7 +414,7 @@ export const ReturnExcessesBack = {
  >     sendExcessesTo: address?
  >     customPayload: cell?
  >     forwardTonAmount: coins
- >     forwardPayload: PayloadInline | PayloadInRef
+ >     forwardPayload: RemainingBitsAndRefs
  > }
  */
 export interface AskToChangeOwnership {
@@ -458,7 +452,9 @@ export const AskToChangeOwnership = {
             sendExcessesTo: s.loadMaybeAddress(),
             customPayload: s.loadBoolean() ? s.loadRef() : null,
             forwardTonAmount: s.loadCoins(),
-            forwardPayload: s.loadBoolean() ? PayloadInRef.fromSlice(s) : PayloadInline.fromSlice(s),
+            forwardPayload: lookupPrefix(s, 0b0, 1) ? PayloadInline.fromSlice(s) :
+                lookupPrefix(s, 0b1, 1) ? PayloadInRef.fromSlice(s) :
+                throwNonePrefixMatch('AskToChangeOwnership.forwardPayload'),
         }
     },
     store(self: AskToChangeOwnership, b: c.Builder): void {
@@ -664,9 +660,9 @@ export class NftItem implements c.Contract {
     }
 
     readonly address: c.Address
-    readonly init?: { code: c.Cell, data: c.Cell }
+    readonly init: { code: c.Cell, data: c.Cell } | undefined
 
-    private constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
+    protected constructor(address: c.Address, init?: { code: c.Cell, data: c.Cell }) {
         this.address = address;
         this.init = init;
     }

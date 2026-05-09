@@ -16,6 +16,9 @@
       "include": "#comments"
     },
     {
+      "include": "#diff"
+    },
+    {
       "include": "#stages"
     },
     {
@@ -38,6 +41,9 @@
     },
     {
       "include": "#diagnostics"
+    },
+    {
+      "include": "#placeholders"
     },
     {
       "include": "#commands"
@@ -113,10 +119,33 @@
         }
       ]
     },
+    "diff": {
+      "patterns": [
+        {
+          "match": "^(Diff in )(.+)(:)$",
+          "captures": {
+            "1": {
+              "name": "support.type.acton-cli"
+            },
+            "2": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^\\+.*$",
+          "name": "markup.inserted.acton-cli"
+        },
+        {
+          "match": "^-.*$",
+          "name": "markup.deleted.acton-cli"
+        }
+      ]
+    },
     "stages": {
       "patterns": [
         {
-          "match": "^(\\s*)(Compiling)(\\s+contracts)$",
+          "match": "^(\\s*)(Compiling)(\\s+.+)$",
           "captures": {
             "2": {
               "name": "string.unquoted.acton-cli"
@@ -377,7 +406,7 @@
     "keyValue": {
       "patterns": [
         {
-          "match": "^(\\s+)(Project name:|Description:|Template:|License:|Enter license:)(\\s+)(.+)$",
+          "match": "^(\\s+)(Project name:|Description:|Template:|TypeScript app:|License:|Enter license:)(\\s+)(.+)$",
           "captures": {
             "2": {
               "name": "comment.line.acton-cli"
@@ -435,6 +464,14 @@
         {
           "match": "^Some tests failed\\.$",
           "name": "markup.deleted.acton-cli"
+        }
+      ]
+    },
+    "placeholders": {
+      "patterns": [
+        {
+          "match": "<[A-Za-z][A-Za-z0-9_-]*>",
+          "name": "variable.parameter.acton-cli"
         }
       ]
     },

@@ -192,6 +192,7 @@ fn build_ui_api_router(state: Arc<UiServerState>) -> Router {
         .route("/api/file", get(handle_api_file))
         .route("/api/coverage.lcov", get(handle_api_coverage_lcov))
         .route("/api/config", get(handle_api_config))
+        .route("/api/health", get(handle_api_health))
         .with_state(state)
 }
 
@@ -288,6 +289,10 @@ async fn handle_api_reports(State(state): State<Arc<UiServerState>>) -> impl Int
         .map(UiTestReport::from)
         .collect::<Vec<_>>();
     Json(reports)
+}
+
+async fn handle_api_health() -> impl IntoResponse {
+    StatusCode::NO_CONTENT
 }
 
 #[derive(Deserialize)]

@@ -146,6 +146,14 @@
         {
           "match": "\\b(?:exit_code|action_result_code)=\\d+\\b",
           "name": "markup.deleted.acton-trace"
+        },
+        {
+          "match": "\\bsuccess=true\\b",
+          "name": "string.unquoted.acton-trace"
+        },
+        {
+          "match": "\\bsuccess=false\\b",
+          "name": "markup.deleted.acton-trace"
         }
       ]
     },
