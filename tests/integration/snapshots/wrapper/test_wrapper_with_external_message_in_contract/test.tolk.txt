@@ -1,0 +1,30 @@
+import "@stdlib/gas-payments"
+import "@acton/emulation/network"
+import "@acton/emulation/testing"
+import "@acton/testing/expect"
+import "../contracts/my_contract"
+import "../wrappers/MyContract.gen"
+
+/// Example test case demonstrating the basic flow
+get fun `test basic flow`() {
+    val (contract, deployer, notDeployer) = setupTest();
+    // Example:
+    // val res = contract.sendMsg(deployer.address, ...);
+    // expect(res).toHaveTransaction({ ... });
+}
+
+/// Initializes the test environment, creating a fresh instance of the contract.
+/// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).
+fun setupTest(): (MyContract, Treasury, Treasury) {
+    // Create a treasury account for deployment (typically the owner)
+    val deployer = testing.treasury("deployer");
+    // Create another treasury account for testing interactions from other users
+    val notDeployer = testing.treasury("notDeployer");
+
+    // Initialize and deploy the contract with default values
+    val contract = MyContract.fromStorage();
+    val res = contract.deploy(deployer.address, { value: ton("1") });
+    expect(res).toHaveSuccessfulDeploy({ to: contract.address });
+
+    return (contract, deployer, notDeployer);
+}

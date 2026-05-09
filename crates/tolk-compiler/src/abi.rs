@@ -433,6 +433,65 @@ impl ContractABI {
         Ok(resolved)
     }
 
+    pub fn resolve_incoming_external_message_structs(
+        &self,
+    ) -> anyhow::Result<Vec<ABIResolvedStruct>> {
+        let mut resolved = Vec::new();
+        let mut seen_structs = HashSet::new();
+
+        for message in &self.incoming_external {
+            if !self.body_resolves_to_structs(message.body_ty_idx) {
+                continue;
+            }
+            collect_structs_from_type(
+                self,
+                message.body_ty_idx,
+                &mut HashSet::new(),
+                &mut seen_structs,
+                &mut resolved,
+            )?;
+        }
+
+        Ok(resolved)
+    }
+
+    fn body_resolves_to_structs(&self, ty_idx: TyIdx) -> bool {
+        let mut visited_aliases = HashSet::new();
+        Self::body_resolves_to_structs_impl(self, ty_idx, &mut visited_aliases)
+    }
+
+    fn body_resolves_to_structs_impl(
+        &self,
+        ty_idx: TyIdx,
+        visited_aliases: &mut HashSet<TyIdx>,
+    ) -> bool {
+        let Some(ty) = self.ty_by_idx(ty_idx) else {
+            return false;
+        };
+        match ty {
+            Ty::StructRef { .. } => true,
+            Ty::AliasRef { .. } => {
+                if !visited_aliases.insert(ty_idx) {
+                    return false;
+                }
+                let target = self.alias_target_of(ty_idx).ok();
+                let result =
+                    target.is_some_and(|t| self.body_resolves_to_structs_impl(t, visited_aliases));
+                visited_aliases.remove(&ty_idx);
+                result
+            }
+            Ty::Union { variants, .. } => variants
+                .iter()
+                .all(|v| self.body_resolves_to_structs_impl(v.variant_ty_idx, visited_aliases)),
+            Ty::Nullable { inner_ty_idx, .. }
+            | Ty::CellOf { inner_ty_idx }
+            | Ty::LispListOf { inner_ty_idx } => {
+                self.body_resolves_to_structs_impl(*inner_ty_idx, visited_aliases)
+            }
+            _ => false,
+        }
+    }
+
     pub fn resolve_single_struct(
         &self,
         ty_idx: TyIdx,
