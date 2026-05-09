@@ -1,7 +1,7 @@
 import "types"
 
 contract Counter {
-    author: "The Tolk Team"
+    author: "Your Name"
     version: "1.0.0"
     description: "Simple counter contract with owner-controlled updates"
     storage: Storage

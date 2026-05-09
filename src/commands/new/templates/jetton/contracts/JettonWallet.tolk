@@ -7,7 +7,7 @@ import "sharding"
 import "storage"
 
 contract JettonWallet {
-    author: "The Tolk Team"
+    author: "Your Name"
     version: "1.0.0"
     description: "Standard Jetton Wallet. TEP-74 and TEP-89 compliant"
     incomingMessages: AllowedMessageToWallet

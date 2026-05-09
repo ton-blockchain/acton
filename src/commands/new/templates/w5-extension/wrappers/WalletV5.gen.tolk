@@ -99,6 +99,16 @@ fun WalletV5.sendAny(self, from: address, body: cell, config: SendParams = {}): 
     return net.send(from, genericMsg);
 }
 
+fun WalletV5.sendExternalExternalMsgSchema(
+    self,
+    signature: bits512,
+    signedData: ExternalSignedRequest,
+): SendResultList? {
+    val body = ExternalMsgSchema { signature, signedData };
+    val msg = net.createExternalMessage(self.address, body);
+    return net.sendExternal(msg);
+}
+
 /// Send an external-in message to the contract with a custom body cell
 fun WalletV5.sendAnyExternal(self, body: cell): SendResultList? {
     val msg = net.createExternalMessage(self.address, body);

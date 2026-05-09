@@ -1,7 +1,7 @@
 import "types"
 
 contract Empty {
-    author: "The Tolk Team"
+    author: "Your Name"
     version: "1.0.0"
     description: "Minimal starter contract with owner management"
     storage: Storage

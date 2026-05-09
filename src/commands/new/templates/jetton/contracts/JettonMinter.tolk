@@ -7,7 +7,7 @@ import "sharding"
 import "storage"
 
 contract JettonMinter {
-    author: "The Tolk Team"
+    author: "Your Name"
     version: "1.0.0"
     description: "Standard Jetton Minter. TEP-74 and TEP-89 compliant"
     incomingMessages: AllowedMessageToMinter
