@@ -1,6 +1,7 @@
 import {defineConfig, defineDocs} from "fumadocs-mdx/config"
 import {transformerTwoslash} from "fumadocs-twoslash"
 import {createFileSystemTypesCache} from "fumadocs-twoslash/cache-fs"
+import {readFileSync} from "node:fs"
 import type {LanguageRegistration} from "shiki"
 import tolkGrammarRaw from "./grammars/grammar-tolk.json"
 import funcGrammarRaw from "./grammars/grammar-func.json"
@@ -99,11 +100,18 @@ const builtinLangs = [
   "tsx",
 ] as const
 
+const tonGradientIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
+
 export default defineConfig({
   plugins: [lastModified()],
   mdxOptions: {
     rehypeCodeOptions: {
       lazy: false,
+      icon: {
+        extend: {
+          tolk: tonGradientIcon,
+        },
+      },
       themes: {
         light: "one-light",
         dark: "one-dark-pro",
