@@ -87,7 +87,7 @@ export function CalloutTitle({children, className, ...props}: ComponentProps<"p"
 export function CalloutDescription({children, className, ...props}: ComponentProps<"p">) {
   return (
     <div
-      className={cn("text-fd-muted-foreground prose-no-margin empty:hidden", className)}
+      className={cn("text-fd-muted-foreground prose-no-margin empty:hidden leading-6 [&_code]:py-0", className)}
       {...props}
     >
       {children}
