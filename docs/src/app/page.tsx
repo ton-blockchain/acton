@@ -576,14 +576,14 @@ export function LandingHome() {
         </section>
 
         <section className="mx-auto mb-16 max-w-[1376px] sm:mb-20">
-          <div className="border-x border-b border-white/10 bg-fd-background px-0 py-14 sm:px-8 sm:py-20 lg:px-12">
+          <div className="border-x border-b border-white/10 bg-fd-background px-4 py-14 sm:px-8 sm:py-20 lg:px-12">
             <SectionHeader
               eyebrow="Start building"
               title="Ready to build?"
               description="Install Acton and start from the docs"
             />
             <div className="mt-10 flex flex-col items-center gap-8 text-center sm:mt-12 sm:gap-10">
-              <div className="w-full max-w-[31rem] min-w-0 sm:w-fit">
+              <div className="w-full max-w-full min-w-0 sm:w-fit">
                 <InlineInstallationCommand />
               </div>
               <div className="flex flex-wrap justify-center gap-3">
@@ -609,7 +609,7 @@ export function LandingHome() {
       </main>
 
       <footer className="border-t border-white/10 bg-[#121212]/90">
-        <div className="mx-auto flex min-h-[55px] max-w-[1368px] items-center justify-between gap-3 py-0 md:min-h-16">
+        <div className="mx-auto px-4 flex min-h-[55px] max-w-[1400px] items-center justify-between gap-3 py-0 md:min-h-16">
           <div className="inline-flex min-w-0 items-baseline gap-2 leading-none">
             <Link
               href="/"
@@ -642,7 +642,7 @@ export function LandingHome() {
 function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-white/10 bg-[#121212]/90 backdrop-blur-xl">
-      <nav className="mx-auto flex min-h-[55px] max-w-[1368px] items-center justify-between gap-3 py-3 md:min-h-16 md:py-0">
+      <nav className="mx-auto px-4 flex min-h-[55px] max-w-[1400px] items-center justify-between gap-3 py-3 md:min-h-16 md:py-0">
         <div className="flex min-w-0 items-center gap-3 sm:gap-5">
           <Link href="/" className="flex min-w-0 items-center gap-3 md:-translate-x-px">
             <Image
