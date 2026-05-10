@@ -7,7 +7,11 @@ Acton scripts can interact with the real TON blockchain, enabling contract deplo
 
 ## Prerequisites
 
-Before interacting with the real blockchain, configure a wallet. Follow the [wallet management](/docs/wallets) guide to either set up a funded wallet or connect one through TON Connect.
+Before interacting with the real blockchain, configure a wallet. Follow the [wallet management](/docs/wallets) guide to either set up a funded wallet or connect one through TON Connect via passing `--tonconnect` on the CLI:
+
+```acton-cli
+acton script <SCRIPT_PATH> --tonconnect
+```
 
 ## The `--net` Flag
 
@@ -30,10 +34,10 @@ Always test the scripts without `--net` first. The local emulator allows validat
 # Test locally without spending real TON
 acton script deploy.tolk
 
-# Deploy to testnet using real wallet
+# Deploy to testnet using real testnet wallet
 acton script deploy.tolk --net testnet
 
-# Deploy to mainnet using real wallet
+# Deploy to mainnet using real mainnet wallet
 acton script deploy.tolk --net mainnet
 ```
 
