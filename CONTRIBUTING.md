@@ -79,6 +79,10 @@ Optional CLI tools:
   ```bash
   cargo install cargo-deny --version 0.19.4 --locked
   ```
+- `cargo-audit` (RustSec advisory checks for `just check-audit` / `just check-security`)
+  ```bash
+  cargo install cargo-audit --version 0.22.1 --locked
+  ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
   cargo install typos-cli --version 1.45.1 --locked
@@ -318,15 +322,16 @@ Run repository-wide dependency and supply-chain audits with:
 just check-security
 ```
 
-This target stops on the first failure and currently checks:
+`just check-security` stops on the first failure and currently checks:
 
 - Rust dependencies with `cargo deny check`
+- RustSec advisories for `Cargo.lock` with `cargo audit`
 - root/UI workspace dependencies with `bun audit`
 - `docs/`, `crates/tree-sitter-*`, and `crates/ton-ls/editors/code` with
   `yarn npm audit`
 - `src/commands/new/templates/counter-app` with `npm audit`
 
-Run it when your PR changes lockfiles, dependency manifests, or package
+Run this check when your PR changes lockfiles, dependency manifests, or package
 versions anywhere in the repository.
 
 ## Coverage

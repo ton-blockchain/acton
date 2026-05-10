@@ -35,7 +35,7 @@ acton new first_counter --template counter --app
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton new first_counter --template counter --app
   Installing standard library v0.4.0
 > Initialized empty Git repository in /home/you/first_counter/.git/
@@ -81,7 +81,7 @@ acton run deploy-testnet
 
 Output:
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton run deploy-testnet
 acton script contracts/scripts/deploy.tolk
 N/A -> deployer A
@@ -103,7 +103,7 @@ acton build
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build
    Compiling contracts
    Compiling Counter
@@ -138,7 +138,7 @@ acton build --info
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build --info
    Compiling contracts
     Finished in 2.7ms
@@ -160,7 +160,7 @@ acton fmt
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt
 All files are already formatted
 ```
@@ -173,7 +173,7 @@ acton fmt --check
 
 When a file is not formatted correctly, `--check` prints a unified diff and exits with a non-zero status:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt --check
 Diff in contracts/src/Counter.tolk:
 -fun onInternalMessage(in:InMessage){
@@ -205,7 +205,7 @@ $ acton check
 
 When issues are found, output looks like this:
 
-```acton-cli-check
+```acton-cli-check noCopy
 $ acton check
 warning[E001]: variable `x` is unused
   --> contracts/src/Counter.tolk:12:9
@@ -243,7 +243,7 @@ acton wrapper --all
 
 Output:
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper --all
    Generated contracts/wrappers/Counter.gen.tolk
 ```
@@ -262,7 +262,7 @@ Pass `--ts` to emit a TypeScript wrapper instead, which the app template consume
 acton wrapper Counter --ts
 ```
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.gen.ts
 ```
@@ -279,7 +279,7 @@ acton test
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test
    Compiling contracts
     Finished in 726.375µs
@@ -352,7 +352,7 @@ acton test --mutate --mutate-contract Counter
 
 Output:
 
-```acton-cli-mutate
+```acton-cli-mutate noCopy
 $ acton test --mutate --mutate-contract Counter
 
 Mutation Testing
@@ -406,10 +406,9 @@ To quickly identify where an exception occurred, pass `--backtrace full` to get 
 acton test --backtrace full
 ```
 
-The clean counter template passes. The output below shows the kind of source
-locations Acton prints when a test fails:
+The clean counter template passes. The output below shows the kind of source locations Acton prints when a test fails:
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton test --backtrace full
    Compiling contracts
    Compiling Counter
@@ -484,7 +483,7 @@ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug --debug-port 4711
   Compiling contracts
    Finished in 6.2ms
@@ -512,7 +511,7 @@ Acton blocks the selected test until a client attaches. Add the following to `.v
 }
 ```
 
-Once the terminal shows `Debugger server listening on 127.0.0.1:4711`, open the **Run and Debug** panel, pick **Retrace DAP** from the configuration dropdown, and run it. VS Code connects to the listening port and the test launches under the debugger.
+Once the terminal shows `Debugger server listening on 127.0.0.1:4711`, open the **Run and Debug** panel, pick **Attach to Acton debug session** from the configuration dropdown, and run it. VS Code connects to the listening port and the test launches under the debugger.
 
 The same configuration works for `acton script --debug` and `acton retrace --debug` — match the `--debug-port` value with the `debugServer` option.
 
@@ -601,7 +600,7 @@ acton script contracts/scripts/increase.tolk
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton script contracts/scripts/increase.tolk
 Deploy value: 5000000
 Increasing counter by 1
@@ -642,7 +641,7 @@ acton wallet new --name deployer --local --airdrop --version v5r1
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton wallet new --name deployer --local --airdrop --version v5r1
 
 ✓ Wallet successfully created and added to wallets.toml
