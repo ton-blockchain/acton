@@ -22,7 +22,7 @@ fun main(a: int, b: int) {
 Run this script and pass the arguments:
 
 ```bash
-acton script add.tolk 10 20
+acton script scripts/add.tolk 10 20
 ```
 
 The output will be:
@@ -60,10 +60,10 @@ Run it with:
 
 ```bash
 # Pass null
-acton script process_optional.tolk null
+acton script scripts/processOptional.tolk null
 
 # Pass an actual value
-acton script process_optional.tolk 42
+acton script scripts/processOptional.tolk 42
 ```
 
 <Callout type="info">
@@ -74,7 +74,7 @@ acton script process_optional.tolk 42
 
 Arrays are written as `[item1, item2]`:
 
-```tolk title="process_array.tolk"
+```tolk title="scripts/processArray.tolk"
 import "@acton/io"
 
 fun main(items: array<int>) {
@@ -87,7 +87,7 @@ fun main(items: array<int>) {
 Run it with:
 
 ```bash
-acton script process_array.tolk "[10 20 30]"
+acton script scripts/processArray.tolk "[10 20 30]"
 ```
 
 ## Strings
@@ -105,7 +105,7 @@ fun main(name: string) {
 Execute it with:
 
 ```bash
-acton script hello_string.tolk World
+acton script scripts/helloString.tolk World
 ```
 
 Output:
@@ -117,7 +117,7 @@ Hello, World
 Pass a quoted string literal to provide escape sequences or explicit whitespace:
 
 ```bash
-acton script hello_string.tolk '"hello\nworld"'
+acton script scripts/helloString.tolk '"hello\nworld"'
 ```
 
 <Callout type="info">
@@ -142,7 +142,7 @@ First, create a cell with some data and get its hex representation. Then, run th
 
 ```bash
 # Example with a cell containing a 32-bit integer 999
-acton script process_cell.tolk b5ee9c72...
+acton script scripts/processCell.tolk b5ee9c72...
 ```
 
 For `bitsN`, pass the same plain BoC hex format as for a `slice`.
@@ -161,7 +161,7 @@ fun main(owner: address, backup: address?) {
 ```
 
 ```bash
-acton script process_address.tolk EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ null
+acton script scripts/processAddress.tolk EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ null
 ```
 
 ## Unsupported types
