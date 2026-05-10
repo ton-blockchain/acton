@@ -143,6 +143,10 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
     } else {
         compilation_order
     };
+    let filtered_contracts = filtered_compilation_order
+        .iter()
+        .cloned()
+        .collect::<HashSet<_>>();
 
     debug!("Build next contracts: {filtered_compilation_order:?}");
 
@@ -215,6 +219,28 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
         compiled_contracts.insert(parent_contract.clone(), code_boc64.clone());
         if compiled_from_source {
             rebuilt_contracts.insert(parent_contract.clone());
+        }
+
+        // In a targeted build (`acton build Order`), dependents such as `Multisig`
+        // are intentionally not recompiled. Still, their generated dependency
+        // helpers (`gen/Order.code.tolk`) must be refreshed from the new BoC so
+        // `library_ref` / embedded-code helpers do not stay stale.
+        if contract_id.is_some()
+            && let Err(err) = generate_reverse_dependency_files(
+                &parent_contract,
+                ReverseDependencyFilesContext {
+                    compiled_contracts: &compiled_contracts,
+                    failed_contracts: &compile_errors,
+                    acton_config: &config,
+                    contracts,
+                    filtered_contracts: &filtered_contracts,
+                    gen_dir: &gen_dir,
+                    project_root,
+                },
+            )
+        {
+            record_contract_error(&mut artifact_errors, &parent_contract, err);
+            error_count += 1;
         }
 
         if show_info {
@@ -578,6 +604,52 @@ pub(crate) fn generate_dependency_files(
             gen_dir,
             project_root,
         )?;
+    }
+
+    Ok(any_changed)
+}
+
+struct ReverseDependencyFilesContext<'a> {
+    compiled_contracts: &'a HashMap<String, String>,
+    failed_contracts: &'a BTreeMap<String, anyhow::Error>,
+    acton_config: &'a ActonConfig,
+    contracts: &'a BTreeMap<String, ContractConfig>,
+    filtered_contracts: &'a HashSet<String>,
+    gen_dir: &'a Path,
+    project_root: &'a Path,
+}
+
+fn generate_reverse_dependency_files(
+    dependency_contract: &str,
+    context: ReverseDependencyFilesContext<'_>,
+) -> anyhow::Result<bool> {
+    let mut any_changed = false;
+    for (parent_contract, parent_config) in context.contracts {
+        // Forward dependency generation already runs for contracts in the
+        // current build set. This reverse pass is only for parents omitted by
+        // the target filter, e.g. `acton build Order` updating Multisig's
+        // `gen/Order.code.tolk` without building Multisig itself.
+        if context.filtered_contracts.contains(parent_contract) {
+            continue;
+        }
+
+        let Some(depends) = &parent_config.depends else {
+            continue;
+        };
+
+        for dependency in depends {
+            if dependency.name() == dependency_contract {
+                any_changed |= generate_single_dependency_file(
+                    parent_contract,
+                    dependency,
+                    context.compiled_contracts,
+                    context.failed_contracts,
+                    context.acton_config,
+                    context.gen_dir,
+                    context.project_root,
+                )?;
+            }
+        }
     }
 
     Ok(any_changed)
