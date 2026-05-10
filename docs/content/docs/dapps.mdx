@@ -76,19 +76,38 @@ npm i @tanstack/react-query @tonconnect/ui-react @ton/core @ton/ton buffer
 
 Add the `Buffer` polyfill required by the TON packages for Vite projects:
 
-```ts title="vite.config.ts"
-import { defineConfig } from 'vite';
+```ts title="app/src/polyfills.ts"
+import { Buffer } from 'buffer';
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      buffer: 'buffer/',
-    },
-  },
-  define: {
-    Buffer: ['buffer', 'Buffer'],
-  },
-});
+const globalWithBuffer = globalThis as typeof globalThis & {
+  Buffer?: typeof Buffer;
+};
+
+if (!globalWithBuffer.Buffer) {
+  globalWithBuffer.Buffer = Buffer;
+}
+```
+
+Import it before other app modules so dependencies that read `globalThis.Buffer` would see the polyfill during initialization:
+
+```tsx title="app/src/main.tsx"
+import './polyfills';
+
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+
+import './styles.css';
+
+import App from './App';
+import { AppProviders } from './providers/AppProviders';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <AppProviders>
+      <App />
+    </AppProviders>
+  </StrictMode>,
+);
 ```
 
 ### Initialize TON Connect
