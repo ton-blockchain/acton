@@ -16,6 +16,17 @@ fn read_artifact(project_path: &Path, contract_name: &str) -> String {
     })
 }
 
+fn read_artifact_code_boc64(project_path: &Path, contract_name: &str) -> String {
+    let artifact: serde_json::Value =
+        serde_json::from_str(&read_artifact(project_path, contract_name))
+            .expect("Build artifact should be valid JSON");
+
+    artifact["code_boc64"]
+        .as_str()
+        .unwrap_or_else(|| panic!("Build artifact for '{contract_name}' should contain code_boc64"))
+        .to_string()
+}
+
 fn assert_compilation_matches_snapshot(compiled: &[String], snapshot_path: &str) {
     let mut actual = compiled.join("\n");
     actual.push('\n');
@@ -26,6 +37,82 @@ fn assert_compilation_matches_snapshot(compiled: &[String], snapshot_path: &str)
     assert_eq!(
         actual, expected,
         "Compilation order snapshot mismatch for '{snapshot_path}'"
+    );
+}
+
+#[test]
+fn library_ref_dependency_file_updates_after_dependency_source_change() {
+    let project = ProjectBuilder::new("build-rebuild-library-ref-generated-dependency")
+        .contract(
+            "lib",
+            r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 100;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract_with_detailed_deps(
+            "app",
+            r#"
+import "../gen/lib.code.tolk"
+
+fun onInternalMessage(in: InMessage) {
+    val code = libCompiledCode();
+    assert (in.body.isEmpty()) throw 200;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+            vec![("lib", Some("library_ref"), None, None)],
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_path = project.path().join("gen/lib.code.tolk");
+    let generated_before =
+        fs::read_to_string(&generated_path).expect("Generated library_ref file should exist");
+    let lib_boc_before = read_artifact_code_boc64(project.path(), "lib");
+    assert!(
+        generated_before.contains(&format!("\"{lib_boc_before}\" base64>B B>boc hashu")),
+        "Generated library_ref file should contain the initially compiled library BoC"
+    );
+
+    fs::write(
+        project.path().join("contracts/lib.tolk"),
+        r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 101;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+    )
+    .expect("Failed to update library contract source");
+
+    let output = project.acton().build().run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_compilation_matches_snapshot(
+        &compiled,
+        "tests/integration/snapshots/build/build_cmd_rebuild_after_source_change_tests/library_ref_dependency_file_updates_after_dependency_source_change.compilation-order.txt",
+    );
+
+    let generated_after =
+        fs::read_to_string(&generated_path).expect("Generated library_ref file should exist");
+    let lib_boc_after = read_artifact_code_boc64(project.path(), "lib");
+
+    assert_ne!(
+        lib_boc_before, lib_boc_after,
+        "Library contract BoC should change after source edit"
+    );
+    assert_ne!(
+        generated_before, generated_after,
+        "Generated library_ref helper should be regenerated after dependency source edit"
+    );
+    assert!(
+        generated_after.contains(&format!("\"{lib_boc_after}\" base64>B B>boc hashu")),
+        "Generated library_ref helper should contain the updated library BoC"
+    );
+    assert!(
+        !generated_after.contains(&lib_boc_before),
+        "Generated library_ref helper should not retain the stale library BoC"
     );
 }
 
