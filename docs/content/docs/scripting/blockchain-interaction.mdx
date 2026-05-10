@@ -3,11 +3,15 @@ title: "Interacting with the real blockchain"
 description: "Learn how to use scripts to deploy contracts and send transactions on testnet and mainnet"
 ---
 
-Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using `--net <network>`, your scripts can execute real operations using configured wallets.
+Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using `--net <network>`, Tolk scripts can execute real operations using configured wallets.
 
 ## Prerequisites
 
-Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/wallets) guide to configure your wallet with a mnemonic.
+Before interacting with the real blockchain, configure a wallet. Follow the [wallet management](/docs/wallets) guide to either set up a funded wallet or connect one through TON Connect via passing `--tonconnect` on the CLI:
+
+```acton-cli
+acton script <SCRIPT_PATH> --tonconnect
+```
 
 ## The `--net` Flag
 
@@ -16,24 +20,30 @@ Scripts in Acton can run in two modes:
 1. **Local mode** (default): Uses a local blockchain emulator with test wallets
 2. **Broadcast mode** (`--net <network>`): Connects to the real blockchain and uses configured wallets
 
+| Aspect            | Local Mode             | Broadcast Mode          |
+|-------------------|------------------------|-------------------------|
+| Blockchain        | Local emulator         | Real blockchain         |
+| Wallets           | Generated test wallets | Configured real wallets |
+| Toncoin spent     | None (emulated)        | Real Toncoin            |
+| Transaction speed | Instant                | Real network timing     |
+| State persistence | Lost after script ends | Permanent on blockchain |
+
+Always test the scripts without `--net` first. The local emulator allows validating the logic before spending real TON on testnet or mainnet:
+
 ```bash
 # Test locally without spending real TON
 acton script deploy.tolk
 
-# Deploy to testnet using real wallet
+# Deploy to testnet using real testnet wallet
 acton script deploy.tolk --net testnet
 
-# Deploy to mainnet using real wallet
+# Deploy to mainnet using real mainnet wallet
 acton script deploy.tolk --net mainnet
 ```
 
-<Callout type="error">
-Always test your scripts without `--net` first. The local emulator allows you to verify logic before spending real TON on testnet or mainnet.
-</Callout>
+### Manually controlling broadcasting mode
 
-### Manually Controlling Broadcasting Mode
-
-For advanced use cases, you can additionally manually control the broadcasting flag using `net.enableBroadcast()` and `net.disableBroadcast()`:
+For advanced use cases, control the broadcasting flag using `net.enableBroadcast()` and `net.disableBroadcast()`:
 
 ```tolk
 fun main() {
@@ -49,7 +59,7 @@ fun main() {
 }
 ```
 
-## Deploying a Contract
+## Deploying a contract
 
 Here's a complete example of deploying a counter contract to the blockchain:
 
@@ -142,12 +152,9 @@ Deploy to mainnet:
 acton script deploy.tolk --net mainnet
 ```
 
-In broadcast mode, post-deploy getter calls such as
-`counter.currentCounter()` automatically read from the selected broadcast
-network. You do not need a separate `--fork-net` for the common deploy-and-check
-flow.
+In broadcast mode, post-deploy getter calls such as `counter.currentCounter()` automatically read from the selected broadcast network. An explicit `--fork-net` is not required for the common deploy-and-check flow.
 
-## Using Wallets in Scripts
+## Using wallets in scripts
 
 The `scripts.wallet()` function returns a wallet struct with an `address` field:
 
@@ -160,13 +167,14 @@ fun main() {
 }
 ```
 
-**Behavior:**
-- Without `--net`: Creates a local test wallet (similar to `testing.treasury()`)
+Behavior:
+
+- Without `--net`: Creates a local test wallet similar to `testing.treasury()`
 - With `--net`: Uses the real wallet configured in `wallets.toml` or global wallets
 
-This dual behavior allows you to test scripts locally before running them on the real blockchain.
+This dual behavior allows testing scripts locally before running them on the real blockchain.
 
-## Sending Messages
+## Sending messages
 
 Use `net.send()` to send messages from a wallet address:
 
@@ -188,15 +196,15 @@ fun main() {
 }
 ```
 
-<Callout type="error">
-Be extremely careful with `--net`. While local tests allow arbitrary big values, sending messages with large values to the real blockchain will spend real TON.
+<Callout type="warn">
+    Be extremely careful with `--net`. While local tests allow arbitrary big values, sending messages with large values to the real blockchain will spend real TON.
 
-**Recommendation:** Use small values like `ton("0.05")` or `ton("0.1")` for most operations.
+    **Recommendation:** Use smaller values like `ton("0.05")` or `ton("0.1")` for most operations.
 </Callout>
 
-## Waiting for Transactions
+## Waiting for transactions
 
-When broadcasting transactions to the real network, you may want to wait for them to be processed. `SendResultList.waitForFirstTransaction()` polls until the first transaction from the result list is confirmed, while `SendResultList.waitForTrace()` waits for the complete descendant trace:
+The `SendResultList.waitForFirstTransaction()` polls until the first transaction from the result list is confirmed, while `SendResultList.waitForTrace()` waits for the complete descendant trace:
 
 ```tolk
 import "@acton/emulation/scripts"
@@ -222,7 +230,7 @@ fun main() {
 }
 ```
 
-You can also check the result of waiting:
+Check the waiting result:
 
 ```tolk
 fun main() {
@@ -238,7 +246,7 @@ fun main() {
 }
 ```
 
-### Behavior in Different Modes
+### Behavior in different modes
 
 Both wait helpers automatically adapt to the execution mode:
 
@@ -247,7 +255,7 @@ Both wait helpers automatically adapt to the execution mode:
 | Local (default)   | Returns the already processed local transaction or trace immediately |
 | `--net <network>` | Polls the network until the transaction or trace is found            |
 
-You can check the current mode using `net.isBroadcasting()`:
+Check the current mode using `net.isBroadcasting()`:
 
 ```tolk
 if (net.isBroadcasting()) {
@@ -257,7 +265,7 @@ if (net.isBroadcasting()) {
 }
 ```
 
-## Querying Blockchain State
+## Querying blockchain state
 
 Scripts can read contract state using `net.runGetMethod()`:
 
@@ -269,11 +277,9 @@ fun main() {
 }
 ```
 
-### Local vs Remote State
+### Local vs remote state
 
-By default, `net.runGetMethod()` queries the **local emulator state** when the
-script runs without `--net`. To query **real deployed contracts** without
-broadcasting, use the `--fork-net` flag:
+By default, `net.runGetMethod()` queries the **local emulator state** when the script runs without `--net`. To query **real deployed contracts** without broadcasting, use the `--fork-net` flag:
 
 ```bash
 # Query a contract on testnet
@@ -286,26 +292,19 @@ acton script query.tolk --fork-net mainnet
 TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
-When `--fork-net` is enabled, Acton automatically fetches account state from
-the real blockchain and caches it locally for the script execution. This allows
-you to:
+When `--fork-net` is enabled, Acton automatically fetches account state from the real blockchain and caches it locally for the script execution. This allows to:
+
 - Query real contract state
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
 
-When the script runs with `--net`, the selected network already becomes
-the default remote read network. This means deploy scripts can send a
-transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper
-getters against the same chain without passing `--fork-net`.
+When the script runs with `--net`, the selected network already becomes the default remote read network. This means deploy scripts can send a transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper getters against the same chain without passing `--fork-net`.
 
-<Callout type="info">
-Learn more about fork testing in the [Fork Testing](/docs/testing/fork-testing) article.
-</Callout>
+See the [fork testing](/docs/testing/fork-testing) guide for more.
 
 ### Combining with `--net`
 
-`--fork-net` and `--net` can still be combined, but in broadcast mode
-they must point to the same network.
+`--fork-net` and `--net` can be combined, but in broadcast mode they must point to the same network.
 
 | Flags                                          | Blockchain State           | Wallets      | Use Case                                                        |
 |------------------------------------------------|----------------------------|--------------|-----------------------------------------------------------------|
@@ -315,38 +314,11 @@ they must point to the same network.
 | `--net mainnet`                                | Real mainnet state         | Real wallets | Mainnet deployment and post-deploy verification                 |
 | `--net testnet --fork-net testnet`             | Real testnet state         | Real wallets | Explicit same-network fork setup, optionally with block pinning |
 
-Passing different `--net` and `--fork-net` values in broadcast mode is
-rejected to avoid reading from one network while sending to another.
+Passing different `--net` and `--fork-net` values in broadcast mode is rejected to avoid reading from one network while sending to another.
 
-## Network Selection
+## See also
 
-Acton scripts support testnet, mainnet, and localnet:
-
-```bash
-# Testnet
-acton script deploy.tolk --net testnet
-
-# Mainnet
-acton script deploy.tolk --net mainnet
-
-# Localnet
-acton script deploy.tolk --net localnet
-```
-
-## Local Testing vs Broadcasting
-
-It's crucial to understand the difference:
-
-| Aspect            | Local Mode             | Broadcast Mode          |
-|-------------------|------------------------|-------------------------|
-| Blockchain        | Local emulator         | Real blockchain         |
-| Wallets           | Generated test wallets | Configured real wallets |
-| TON spent         | None (simulated)       | Real TON                |
-| Transaction speed | Instant                | Real network timing     |
-| State persistence | Lost after script ends | Permanent on blockchain |
-
-## Next Steps
-
-- Check the [script command reference](/docs/commands/script) for all available options
-- Learn more about [wallet configuration](/docs/wallets)
-- Explore [verifying your deployed contracts](/docs/verify)
+- [Wallet management guide](/docs/wallets)
+- [Deployment guide](/docs/deploy)
+- [`acton script` command reference](/docs/commands/script)
+- [`acton run` command reference](/docs/commands/run)
