@@ -1,103 +1,203 @@
 ---
 title: "Project management"
-description: "Learn how to manage project structure, contracts, and Acton manifest"
+description: "Learn how to manage project structure, contracts, and the Acton manifest"
 icon: FolderTree
 ---
 
-Acton projects are defined by `Acton.toml`. That manifest tells Acton where contracts live, how they depend on each other, where generated files go, and which path aliases the compiler should resolve. See the [`Acton.toml` reference](/docs/acton-toml) for the full field-by-field description list.
+Acton projects are defined by `Acton.toml` manifest. It tells Acton where contracts live, how they depend on each other, where generated files go, and which path aliases (import mappings) the compiler should resolve. See the [`Acton.toml` reference](/docs/acton-toml) for the full field-by-field description.
 
-TODO: reference TOML specification and `acton.schema.json` for LSPs too.
-TODO: use `acton init`, use `acton new`. And link to the deeper manuals for each command.
+For coding-agent workflows, the `acton` skill covers CLI commands and `Acton.toml` configuration, and the `tolk` skill covers writing and reviewing Tolk contracts. See the [agent skills](/docs/agent-skills) guide for installation and usage.
 
-Additionally, all acton
+## Create or initialize a project
 
-TODO: place all info on `acton init` in one place
+### Start from a template
 
-TODO:
-- .env for mnemonics, TON Center APIs, and re-use in app/
-- Basic project facilities: creation, etc. -- somewhat covered by the page.
-- What to do to add a new contract to Acton.toml, etc -- somewhat covered by the page.
-- Project structure / layout
-  - Contract layout? Or just a closer look at the `contracts/` folder
-  - Two distinct mappings for templates with and without an app UI
-  - ...
-- Add "see also", and add "Learn how to" (in descriptions)
-- Yo: `acton init` after cloning any Acton project from GitHub, since
+Use [`acton new`](/docs/commands/new) to create a new project from a template:
 
-<Callout type="warn" title="Remote Git-hosted Acton projects">
-    All Acton projects
-
-    The `.acton/` folder with Acton's Tolk libraries is treated like `node_modules/` and usually added to `.gitignore`. Hence, after cloning a remote Git repository with an Acton project, always run `acton init` to set up library dependencies and regenerate the `.acton/` folder.
-</Callout>
-
-## Use `acton init`
-
-TODO: ...
-
-## Use `acton new`
-
-TODO: ...
-
-## Start from a new or existing directory
-
-Use `acton new` to create a new project from a scaffold template:
-
-```bash
+```acton-cli
 acton new <PATH>
 ```
 
-Four built-in templates are available:
+Five built-in templates are available:
 
-| Template  | Description                                                                      |
-|-----------|----------------------------------------------------------------------------------|
-| `empty`   | Minimal scaffold with a single empty contract.                                   |
-| `counter` | State-management example with tests, wrappers, and a deploy script.              |
-| `jetton`  | Multi-contract Jetton implementation with minter, wallet, and a full test suite. |
-| `nft`     | NFT collection and item scaffold with tests and deploy scripts.                  |
+| Template       | Description                                                               |
+|----------------|---------------------------------------------------------------------------|
+| `empty`        | Minimal template with a single empty contract.                            |
+| `counter`      | State-management example with wrappers, tests, and a deploy script.       |
+| `jetton`       | Jetton minter and wallet contracts with wrappers, tests, and scripts.     |
+| `nft`          | NFT collection and item contracts with wrappers, tests, and scripts.      |
+| `w5-extension` | Wallet V5 extension contract and subscription example. Alias: `w5-plugin`.|
 
-`acton new` is interactive by default. It prompts for project name, template, description, license, Git hooks, and `AGENTS.md` guidance. Pass flags to skip prompts:
+`acton new` is interactive by default. It prompts for project name, template, description, license, Git hooks, and `AGENTS.md` guidance.
 
-- `--app` — add a React + Vite frontend scaffold (`counter`, `jetton`, and `nft` only).
+Pass flags to skip prompts:
+
+- `--app` — add a React and Vite frontend; supported by all templates.
 - `--hooks` — install a pre-commit hook under `.githooks/` and set `core.hooksPath`.
 - `--agents` — copy the template's `AGENTS.md` into the project root.
 
-In non-interactive mode, all three options stay disabled unless their flags are passed explicitly.
+All three options are disabled unless their flags are passed explicitly.
 
-Use `acton init` when the repository already exists and only needs an Acton manifest, standard library files, and default project mappings.
+See the [`acton new`](/docs/commands/new) command reference for all available flags.
+
+### Initialize an existing directory
+
+Use [`acton init`](/docs/commands/init) to initialize or [refresh](#refresh-the-project) the Acton project in the current directory:
 
 ```bash
 acton init
 ```
 
-To add a Vite-based TypeScript app scaffold to an existing project without touching `Acton.toml`, pass `--create-dapp`:
+- When `Acton.toml` does not exist, `acton init` scans the directory tree for `.tolk` files that define `onInternalMessage()` and registers them as contracts in a newly created `Acton.toml`.
+- When `Acton.toml` already exists, `acton init` patches missing default [import mappings](#configure-import-mappings).
+
+`acton init` also refreshes Tolk libraries in `.acton/` and updates `.gitignore` with the commonly ignored Acton-related entries. It is safe to rerun `acton init` after moving files around or after removing import mappings in `Acton.toml` by accident.
+
+<Callout type="caution">
+    `acton init` preserves other supported settings in `Acton.toml`, but does **not** preserve TOML comments and unrecognized keys.
+</Callout>
+
+Pass `--stdlib-only` to only refresh the standard library in `.acton/` folder:
+
+```bash
+acton init --stdlib-only
+```
+
+Pass `--create-dapp` to skip project initialization and only scaffold a Vite-based TypeScript app:
 
 ```bash
 acton init --create-dapp
 ```
 
-The target `app/` directory must not already exist.
+It changes the project layout to the [dApp layout](#dapp-layout). The target `app/` directory must not already exist.
 
-`acton init` works in place. When `Acton.toml` does not exist, it scans the current directory tree for `.tolk` files that define `onInternalMessage` and registers them as contracts. When `Acton.toml` already exists, it does not recreate the project. It only patches missing default import mappings, refreshes `.acton/tolk-stdlib`, and updates `.gitignore` with the usual Acton entries.
+<Callout>
+    `acton init` also manages symlinks for [`global.wallets.toml`](/docs/wallets) and [`global.libraries.toml`](/docs/libraries):
 
-> TODO: Extract info on `onInternalMessage()` and place it somewhere above to describe that in contracts/ folder there are many Tolk files, and only those with this special function are considered as contracts (entrypoints).
+    - If either file already exists locally, it is left untouched.
+    - If the matching global file does not exist, no symlink is created.
 
-`acton init` is safe to rerun after moving files around or after removing default mappings by accident.
-
-<Callout type="caution">
-  On an existing project, `acton init` reloads and writes `Acton.toml` again.
-  Supported settings are preserved, but TOML comments and unknown keys are not.
+    Dangling symlinks are recreated with a warning.
 </Callout>
 
-`acton init` also manages symlinks to global overlay files. The rules are conservative:
+### Refresh the project
 
-- If `global.wallets.toml` or `global.libraries.toml` already exists locally, `acton init` leaves it alone.
-- If the matching global file does not exist, no symlink is created.
-- If a local symlink is dangling, `acton init` attempts to recreate it and prints a warning.
-- If symlink creation is unsupported on the current system, `acton init` prints a warning and continues.
+Rerun `acton init` when the project needs a light reset:
 
-## Update project metadata
+- `Acton.toml` is missing the default import mappings or is nonexistent — contract files were added before the manifest was created.
+- `.acton/` is stale or nonexistent.
+- `.gitignore` is missing the commonly ignored Acton-related entries.
 
-Edit `[package]` section to update the project metadata:
+`acton init` does not alter **other** files, override project structure, or delete existing files.
+
+### Default project layout
+
+To create a project with the default layout, run [`acton new`](/docs/commands/new) without `--app` and the TypeScript dApp.
+
+```bash
+acton new acton-project
+```
+
+Directory overview:
+
+```
+acton-project/
+├── Acton.toml  # Project manifest — edit directly
+├── .env        # Local secrets — not committed
+├── .acton/     # Acton-managed internal state and Tolk libraries
+├── contracts/  # Tolk source files
+├── wrappers/   # Generated Tolk wrappers (.gen.tolk)
+├── tests/      # Test files (.test.tolk)
+├── scripts/    # Deployment and utility Tolk scripts
+├── build/      # Compiled output (.boc, .fif)
+└── gen/        # Generated dependency helpers (.code.tolk)
+```
+
+### dApp project layout
+
+Pass `--app` to `acton new` to add a React + Vite frontend. The dApp layout nests contract files under `contracts/` subdirectories and creates `app/` and `wrappers-ts/`:
+
+```files
+acton-project/
+├── Acton.toml
+├── .env
+├── .acton/
+├── app/             # React + Vite frontend
+├── wrappers-ts/     # Generated TypeScript wrappers
+├── contracts/
+│   ├── src/         # Tolk source files
+│   ├── wrappers/    # Generated Tolk wrappers
+│   ├── tests/       # Test files
+│   └── scripts/     # Deployment and utility Tolk scripts
+├── build/
+└── gen/
+```
+
+See the [dApps guide](/docs/ui-setup) for more information on features of the generated dApp and usage of TypeScript wrappers.
+
+### Import mappings
+
+Acton uses `[import-mappings]` to control the project structure and provide path aliases:
+
+```toml
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+tests = "tests"
+wrappers = "wrappers"
+gen = "gen"
+```
+
+This allows imports such as:
+
+```tolk
+// Acton's Tolk library
+import "@acton/testing/expect"
+
+// Another file in the mapped contracts folder
+import "@contracts/types"
+
+// A file in the mapped Tolk wrappers folder
+import "@wrappers/Counter"
+```
+
+Projects created with `acton new` include the default mappings already. The [dApp layout](#dapp-project-layout) adjusts them to match the nested directory structure:
+
+| Mapping      | Standard layout | App layout (`--app`)  |
+|--------------|-----------------|-----------------------|
+| `@acton`     | `.acton/`       | `.acton/`             |
+| `@contracts` | `contracts/`    | `contracts/src/`      |
+| `@tests`     | `tests/`        | `contracts/tests/`    |
+| `@wrappers`  | `wrappers/`     | `contracts/wrappers/` |
+| `@gen`       | `gen/`          | `gen/`                |
+
+<Callout type="warn">
+    Do not change the `[import-mappings]` unless necessary. To inspect and validate the resolved project setup, run [`acton doctor`](/docs/commands/doctor).
+</Callout>
+
+### Commit policy for generated files and directories
+
+The `build/` and `gen/` folders are generated with each build — **do not** commit these to version control systems like Git. Additionally, do not commit the `.acton/` directory.
+
+The Tolk wrappers and the `wrappers/` folder are created by the [`acton wrapper`](/docs/commands/wrapper) command. They closely follow contract interfaces and are safe to commit. The same applies to non-Tolk wrapper files and folders, such as `wrappers-ts/`.
+
+| Path           | Commit to Git | Description                                                    |
+|----------------|:-------------:|----------------------------------------------------------------|
+| `.acton/`      | No            | Acton libraries and internal state. Managed by `acton init`.   |
+| `build/`       | No            | Compiled output. Regenerated each build.                       |
+| `gen/`         | No            | Dependency helpers from `acton build`. Regenerated each build. |
+| `wrappers/`    | Yes           | Tolk wrappers from `acton wrapper`.                            |
+| `wrappers-ts/` | Yes           | TypeScript wrappers from `acton wrapper --ts`.                 |
+
+<Callout>
+    Avoid editing generated files: make changes in the Tolk sources instead, or add auxiliary files that depend on generated ones.
+</Callout>
+
+## Configure the manifest
+
+### Update project metadata
+
+Edit the `[package]` section to update the project name, description, version, repository, and license:
 
 ```toml
 [package]
@@ -108,202 +208,46 @@ repository = "https://github.com/example/my-acton-project"
 license = "MIT"
 ```
 
-## Add a new contract
+### Store credentials in `.env`
 
-To add a contract to an existing project, do two things:
-
-- add the `.tolk` source file
-- register it under `[contracts]` in `Acton.toml`
-
-Example:
-
-```toml
-[contracts.Counter]
-src = "contracts/Counter.tolk"
-depends = []
-```
-
-> TODO: Describe what this field does. Describe gen directory
->
-> 1. Intro to describe what's in which directories. `build/`, `gen/`, `.acton/`, especially. Directory overview! Move these to dApp: `wrappers-ts`, `app/`.
-> 2. Contract dependencies, `initOf`-esque
-
-The contract key, `counter` in this example, is the contract ID. Acton commands use that ID, not the display name.
+Acton loads `.env` automatically. Copy `.env.example` to `.env` and uncomment the keys needed:
 
 ```bash
-acton build counter # this is not necessary here, TODO: remove
-acton wrapper counter
+# .env
+TONCENTER_TESTNET_API_KEY="your-testnet-key-here"
+TONCENTER_MAINNET_API_KEY="your-mainnet-key-here"
 ```
 
-> TODO: optional display name can be used to clarify...
-
-Use `display-name` only for logs and UI. Keep the contract ID stable once other files or scripts start referring to it.
-
-<Callout type="important">
-  `display-name` is not a command name. `acton build Counter` fails if the
-  manifest key is `counter`.
-</Callout>
-
-## Choose a good contract ID
-
-The key in the manifest table is the contract identifier, which ...
-
-> TODO: Alphanumeric, no spaces, PascalCase.
->
-> Identifiers may contain Latin lowercase letters `a-z`, Latin uppercase letters `A-Z`, underscores `_,` and digits `0-9`, but may not start with a digit. No other symbols are allowed, and Unicode identifiers are prohibited. The PascalCase is the conventional/standard casing for contract identifiers. NOPE: may start with a digit.
->
-> https://docs.tact-lang.org/book/expressions/#identifiers
->
-> Bare keys may only contain ASCII letters, ASCII digits, underscores, and dashes (A-Za-z0-9_-). Note that bare keys are allowed to be composed of only ASCII digits, e.g. 1234, but are always interpreted as strings.
->
-> https://toml.io/en/v1.1.0
-
-Treat the manifest key as the durable identifier for the contract. Use a short, lowercase, machine-friendly name:
-
-```toml
-[contracts.jetton_minter]
-display-name = "Jetton Minter"
-src = "contracts/JettonMinter.tolk"
-depends = ["jetton_wallet"]
-```
-
-This keeps command lines predictable and makes dependency declarations easier to read. The display name can stay human-readable and change later without breaking command usage.
-
-## Move or rename a contract file
-
-> TODO: renames are not a nice user case to highlight or document. Like, just a) make the move, b) adjust the src path in Acton.toml, that's it.
-
-When a contract source file moves, update `src` in `Acton.toml`.
-
-```toml
-[contracts.counter]
-display-name = "Counter"
-src = "contracts/src/counter.tolk"
-depends = []
-```
-
-When only the file path changes, keep the contract ID if possible. That avoids unnecessary edits in scripts, tests, CI, and other contracts that reference the ID in `depends`.
-
-When the contract itself is being renamed, update:
-
-- the source file path in `src`
-- the contract header inside the `.tolk` file, if needed
-- any `depends` entries that refer to the old contract ID
-- wrapper imports or scripts that use the old generated file name
+Without a key, Acton falls back to keyless TON Center access, which is rate-limited to 1 RPS and may slow down testnet and mainnet operations.
 
 <Callout>
-    TODO: actually, move this to `acton init` info.
-
-    If the project layout changed substantially, rerun `acton init` to restore missing default mappings and refresh project glue.
+    Obtain a key in the [`@toncenter`](https://t.me/toncenter) Telegram bot.
 </Callout>
 
-## Declare contract dependencies
+Set `ACTON_USE_PROXY=1` to route Acton's HTTP requests through `HTTP_PROXY`, `HTTPS_PROXY`, or `ALL_PROXY`. Proxy use is off by default to prevent macOS sandbox autodetection issues.
 
-> TODO: `gen` section, which should be observed in detail
->
-> Template project layout
-> two folder structures: templates with and without `--app`
-> Project layout:
-> `build`
-> `gen`
-> `tests`
-> `wrappers`
-> `contracts`
-> `scripts` -- not mapped, since there is `scripts` section AND the scripts are launched from whatever place, so that does not matter much.
->   `display-name`.
->   the key should correspond to the filename of the contract entry point.
->   ...
+<Callout type="warn">
+    Keep `.env` out of version control. Both `acton new` and `acton init` add it to `.gitignore` automatically.
+</Callout>
 
-Use `depends` when one contract needs another contract's compiled code or a library reference during the build.
+### Set build output directories
 
-The short form is enough in most projects:
-
-```toml
-[contracts.root]
-src = "contracts/Root.tolk"
-depends = ["wallet"]
-```
-
-Use the detailed form when the generated helper needs a custom function name, dependency kind, or output path:
-
-```toml
-[contracts.root]
-src = "contracts/Root.tolk"
-depends = [
-  { name = "wallet", kind = "library_ref", function = "get_wallet_code" }
-]
-```
-
-Dependency names always refer to contract IDs from `Acton.toml`, not display names.
-
-## Control where build artifacts go
-
-Use `[build]` when the default `build/` and `gen/` directories no longer fit the project layout.
+Use the `[build]` section to redirect the default output directories:
 
 ```toml
 [build]
-out-dir = "artifacts"
-gen-dir = "artifacts/gen"
-output-fift = "artifacts/fift"
+out-dir = "artifacts" # defaults to build/
+gen-dir = "artifacts/gen" # defaults to gen/
+output-fift = "artifacts/fift" # omitted by default
 ```
 
-This is useful when:
+This is useful when CI expects artifacts at a fixed path or when Fift output must be saved on disk. By default, `out-dir` is `build/` and `gen-dir` is `gen/`.
 
-- CI expects artifacts in a fixed directory
-- generated dependency helpers should stay out of the source tree
-- compiled Fift output should be preserved explicitly TODO: confusing wording, improve this stuff
+Note that `gen` in [`[import-mappings]`](#import-mappings) and `gen-dir` in `[build]` are independent settings — keep them aligned when both are configured.
 
-Per-contract `output` is separate from `[build]`. Use it when a compiled `.boc` must land at an exact path:
+### Configure wrapper output
 
-```toml
-[contracts.wallet]
-src = "contracts/Wallet.tolk"
-output = "artifacts/wallet.boc"
-depends = []
-```
-
-> TODO:
->
-> Showcase how to save Fift output on disk:
->
-> ```
-> [build]
-> output-fift = "build/fift"
-> ```
->
-> NOTE: does `gen` in import-mappings conflict with `gen-dir` in `build`??
->
-> "##" Import mappings.
-
-## Keep imports stable as the project grows
-
-Use `[import-mappings]` to avoid brittle relative imports and to preserve a clean layout as directories move.
-
-```toml
-[import-mappings]
-acton = ".acton"
-contracts = "contracts/src"
-tests = "contracts/tests"
-wrappers = "contracts/wrappers"
-gen = "gen"
-```
-
-This allows imports such as:
-
-```tolk
-import "@contracts/types"
-import "@wrappers/Counter"
-import "@acton/testing/expect"
-```
-
-Projects created with `acton new` and patched by `acton init` include the default mappings. Edit them when the project layout changes. Keep `@acton` in place unless the standard library location is being changed deliberately.
-
-> TODO: double-check technical accuracy with the Acton source code
-> Describe the default mappings instead, for both `--app` and non-`--app` templates
-
-## Change wrapper output paths
-
-Use `[wrappers]` when generated wrappers should live in a stable location.
+Use the `[wrappers]` section to fix the output location for generated wrappers and avoid repeating `--output-dir` on every `acton wrapper` run:
 
 ```toml
 [wrappers.tolk]
@@ -315,16 +259,13 @@ test-output-dir = "tests"
 output-dir = "wrappers-ts"
 ```
 
-This is useful when wrappers are committed to the repository or imported by app code. It also avoids repeating `--output-dir` on every `acton wrapper` run.
+The `@wrappers` in `import "@wrappers/..."` always resolves to the Tolk wrapper directory, regardless of existence of non-Tolk wrappers.
 
-For Tolk wrappers, Acton falls back to the `@wrappers` mapping when `[wrappers.tolk].output-dir` is not configured. Keep those two settings aligned if both are present.
+See the [`acton wrapper` command reference](/docs/commands/wrapper) for more.
 
-> TODO: this section is a bit off.>
-> `@wrappers` always resolves to Tolk ones.
+### Define project scripts
 
-## Add project scripts
-
-Use `[scripts]` for repeated project commands.
+Use the `[scripts]` section to store repeated commands in the manifest:
 
 ```toml
 [scripts]
@@ -332,34 +273,166 @@ deploy = "acton script scripts/deploy.tolk"
 check = "acton test --filter=.*_check"
 ```
 
-This keeps routine tasks in the manifest instead of spreading them across shell history or ad hoc README snippets.
+Run a named script with [`acton run`](/docs/commands/run):
 
-> TODO: "Use with acton run"
-> "how to run"
+```bash
+acton run check
+```
 
-## Know what not to edit manually
+The `acton run` executes the script command from the project root via `sh -c`.
 
-Do not treat everything in the project root as source of truth.
+## Manage contracts
 
-- `Acton.toml` is the manifest to edit directly.
-- `.acton/` is Acton-managed internal state and standard library content.
-- `build/` and `gen/` are generated outputs unless the manifest redirects them.
+The `contracts/` directory can contain many `.tolk` files. Acton treats a file as a contract entrypoint only when it defines a top-level `onInternalMessage()` function. Supporting files, such as shared types and utility helpers, are imported normally and compiled as part of their entrypoint's build graph.
 
-Keep generated directories in `.gitignore` unless the repository has a clear reason to commit them.
+By convention, contract file names should use `PascalCase`, whereas other Tolk files can use either `camelCase` or `kebab-case`.
 
-> TODO: wrappers should be committed to git. `gen` and `build` should not.
+### Add a contract
 
-## Use `acton init` as a repair tool
+To add a contract to an existing project:
 
-Rerun `acton init` when the project needs a light reset without re-scaffolding the repository.
+1. Create the `.tolk` source file with a top-level `onInternalMessage()` function.
+2. Register it under `[contracts]` section in `Acton.toml`:
 
-> TODO: consolidate with the other `acton init` info on top.
+   ```toml
+   [contracts.Counter]
+   src = "contracts/Counter.tolk"
+   depends = []
+   ```
 
-Common cases:
+The `[contracts]` table key, e.g., `Counter`, is the [contract identifier (ID)](#choose-a-contract-id) used by all Acton commands. It is also the default display name of the contract in logs and the browser [Test UI](/docs/testing/test-ui/overview).
 
-- `Acton.toml` is missing the default import mappings
-- `.acton/tolk-stdlib` needs to be refreshed
-- `.gitignore` no longer contains the standard Acton entries
-- contract files were added before the first manifest was created
+The contract ID must be a valid TOML bare key (`A-Za-z0-9_-`): only ASCII letters, digits, underscores, and dashes are allowed.
 
-`acton init` does not replace an existing project structure. It fills in the missing Acton-specific pieces.
+Use short names in `PascalCase`:
+
+```toml
+[contracts.DnsCollection]
+src = "dns/contracts/DnsCollection.tolk"
+depends = []
+```
+
+Keep the contract ID stable once scripts, tests, CI pipelines, or other contracts start referring to it.
+
+### Alter displayed name
+
+To display a different name for the contract, set the optional `display-name` key:
+
+```toml
+[contracts.DnsCollection]
+src = "dns/contracts/DnsCollection.tolk"
+depends = []
+display-name = "Alive Internet Theory"
+```
+
+The `display-name` does not affect command-line usage, only the presentation. For example, `acton build 'Alive Internet Theory'` will not find the contract, whereas `acton build Counter` will.
+
+### Declare contract dependencies
+
+Set `depends` when a parent contract depends on the compiled code of other contracts, such that it can deploy them as its children:
+
+```toml
+[contracts.NftCollection]
+src = "contracts/NftCollection.tolk"
+depends = ["NftItem"]
+
+[contracts.NftItem]
+src = "contracts/NftItem.tolk"
+depends = []
+```
+
+Dependency names always refer to contract IDs in `Acton.toml`, not displayed names. Acton compiles each dependency and generates a helper file in `gen/`, e.g., `gen/NftItem.code.tolk`:
+
+```tolk title="gen/NftItem.code.tolk"
+/// Returns `NftItem` code as a cell.
+@pure
+fun nftItemCompiledCode(): cell asm """
+    "te6ccgECBwEAAWYAART/APSkE/S88sgLAQIBYgIDAeTQ+JHyQO1E0NM/+kggxwCOHDD4kiHHBfLhlQL6SNTRAsjLPxP6UhL6UszJ7VTg+kjXTCTXLCL+Yeik4wJsIdcsIX5ZNRSOITMC1ws/+JLIz4UI+lKCEIt3FzXPC47LP8v/+lLJgED7AOBfA4QPAccA8vQEADWhH5/aiaGmf/SQQY4BKmDgstrbwfSRrpj+qmEC+jX4kiLHBfLhkQTTP/pI+lD0AfoAINdLIfLixCLXCwCfAcABlMABwwCSMHDi8uLEkVviI/pEMPLRTfiTcPg6+CdvEIIK+vCAoSOUUzGgod4kbpExmCT6RDDy0U2i4iDC//LhkiKSNlvjDSBukxNfA+MOAsjLP/pS+lLMye1UBQYASMjPkBRONkYmzws/F/pSzsnIz4UIUkD6Ulj6AnHPC2rMyXH7AAAyyM+FCPpSUAP6AoIQ1TJ2288Liss/yXH7AA==" base64>B B>boc PUSHREF
+"""
+```
+
+To embed the dependency code at compile time, import the helper and use the provided function:
+
+```tolk title="contracts/NftCollection.tolk"
+import "@gen/NftItem.code"
+
+// ...
+
+get fun get_nft_item_code(): cell {
+    return nftItemCompiledCode();
+}
+```
+
+To supply the code in deployments and store it in the contract's data storage instead of embedding the code:
+
+1. Extend the storage struct:
+
+   ```tolk title="contracts/NftCollection.tolk"
+   struct NftCollectionStorage {
+       // ...
+       nftItemCode: cell
+   }
+
+   contract NftCollection {
+       // ...
+       storage: NftCollectionStorage
+   }
+   ```
+
+2. Use the `build("<CONTRACT_ID>")` function in the [Tolk scripts](/docs/scripting/overview) when composing the initial storage data for the parent contract deployments:
+
+   ```tolk title="scripts/utils.tolk"
+   import "@acton/build"
+
+   // ...
+
+   fun makeNftCollectionStorage(): NftCollectionStorage {
+       return {
+           // ...
+           nftItemCode: build("NftItem"),
+       }
+   }
+   ```
+
+3. Access the `storage.childContractCode` in the parent contract, on chain:
+
+   ```tolk title="contracts/NftCollection.tolk"
+   get fun get_nft_item_code(): cell {
+       val storage = lazy NftCollectionStorage.load();
+       return storage.nftItemCode;
+   }
+   ```
+
+By default, `depends` uses the `embed_code` kind. Use the detailed form to customize the generated function name or generate it as a [library reference](/docs/libraries) instead:
+
+```toml
+[contracts.Parent]
+src = "contracts/Parent.tolk"
+depends = [
+  { name = "Child", kind = "library_ref", function = "childLibraryCodeRef" }
+]
+```
+
+### Set a per-contract BoC output path
+
+Set `output` to place a compiled binary `.boc` file with the contract's code at an exact path:
+
+```toml
+[contracts.Counter]
+src = "contracts/Wallet.tolk"
+output = "artifacts/Counter.boc"
+depends = []
+```
+
+Per-contract `output` is independent of `[build].out-dir`. Both can coexist.
+
+### Move or rename a contract
+
+When a contract source file moves, update `src` in `Acton.toml`:
+
+```toml
+[contracts.Counter]
+src = "contracts/src/counter.tolk"
+```
+
+When moving the file only, keep the contract ID unchanged. That avoids edits across scripts, tests, CI pipelines, and `depends` entries in other contracts.
