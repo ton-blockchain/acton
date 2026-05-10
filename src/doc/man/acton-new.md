@@ -240,5 +240,5 @@ The command does not create a commit and does not modify parent directories.
 ## See Also
 
 - `acton help init`
-- [Project initialization guide](https://ton-blockchain.github.io/acton/docs/tutorial/project-init)
+- [Project management guide](https://ton-blockchain.github.io/acton/docs/projects)
 - [Build system configuration reference](https://ton-blockchain.github.io/acton/docs/building/reference)

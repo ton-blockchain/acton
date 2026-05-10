@@ -61,6 +61,8 @@ Requested publication duration such as \fB100d\fR or \fB1y\fR\&.
 \fB\-\-wallet\fR \fIwallet\fR
 .RS 4
 Wallet to use for the publication transaction.
+.sp
+Cannot be used with \fB\-\-tonconnect\fR\&.
 .RE
 .sp
 \fB\-\-net\fR \fInetwork\fR
@@ -68,6 +70,21 @@ Wallet to use for the publication transaction.
 Network to use.
 .sp
 Defaults to \fBtestnet\fR\&.
+.RE
+.sp
+\fB\-\-tonconnect\fR
+.RS 4
+Use TON Connect wallet approval for the publication transaction.
+.sp
+Supported only with \fB\-\-net mainnet\fR and \fB\-\-net testnet\fR\&. When enabled, Acton
+opens a local TON Connect page and uses the wallet selected in the browser.
+.RE
+.sp
+\fB\-\-tonconnect\-port\fR \fIport\fR
+.RS 4
+Local TON Connect page port.
+.sp
+Defaults to \fB52258\fR\&.
 .RE
 .sp
 \fB\-\-amount\fR \fIton\fR
@@ -169,6 +186,24 @@ Overrides duration\-based estimation.
 \fB\-\-wallet\fR \fIwallet\fR
 .RS 4
 Wallet to use for the top\-up transaction.
+.sp
+Cannot be used with \fB\-\-tonconnect\fR\&.
+.RE
+.sp
+\fB\-\-tonconnect\fR
+.RS 4
+Use TON Connect wallet approval for the top\-up transaction.
+.sp
+Supported only for libraries stored with \fBnetwork = "mainnet"\fR or
+\fBnetwork = "testnet"\fR\&. When enabled, Acton opens a local TON Connect page and
+uses the wallet selected in the browser.
+.RE
+.sp
+\fB\-\-tonconnect\-port\fR \fIport\fR
+.RS 4
+Local TON Connect page port.
+.sp
+Defaults to \fB52258\fR\&.
 .RE
 .sp
 \fB\-y\fR, \fB\-\-yes\fR
@@ -239,6 +274,12 @@ For \fBpublish\fR and \fBtopup\fR, \fB\-\-duration\fR is used to estimate the re
 amount from the library size and storage duration.
 .sp
 If \fB\-\-amount\fR is passed, it overrides that estimate completely.
+.SH "TON CONNECT"
+\fBpublish\fR and \fBtopup\fR can send their transactions through TON Connect with
+\fB\-\-tonconnect\fR\&. The connected wallet supplies the sender address and approves
+the internal message in the wallet UI. TON Connect is available only for
+mainnet and testnet; use configured Acton wallets for localnet and custom
+networks.
 .SH "METADATA FILES"
 Saved library metadata typically includes:
 .sp
@@ -357,7 +398,27 @@ acton library topup Math \-\-duration 1y
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Fetch raw code into a BoC file:
+\h'-04' 5.\h'+01'Publish with TON Connect:
+.sp
+.RS 4
+.nf
+acton library publish Math \-\-net mainnet \-\-tonconnect
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Top up with TON Connect:
+.sp
+.RS 4
+.nf
+acton library topup Math \-\-tonconnect
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Fetch raw code into a BoC file:
 .sp
 .RS 4
 .nf

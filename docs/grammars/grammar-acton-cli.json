@@ -169,6 +169,17 @@
           }
         },
         {
+          "match": "^(\\s*)(Artifacts of)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "support.type.acton-cli"
+            },
+            "4": {
+              "name": "entity.name.function.acton-cli"
+            }
+          }
+        },
+        {
           "match": "^(\\s*)(Installing|Discovered|Created|Patched|Initialized)(\\b.*)$",
           "captures": {
             "2": {
@@ -379,6 +390,17 @@
             },
             "4": {
               "name": "keyword.control.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(\\u2192)(\\s+)(.+)$",
+          "captures": {
+            "2": {
+              "name": "support.type.acton-cli"
+            },
+            "4": {
+              "name": "support.type.acton-cli"
             }
           }
         },

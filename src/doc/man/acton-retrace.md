@@ -177,7 +177,7 @@ For a manual setup, create `.vscode/launch.json` like this:
 
 Then start retrace in a terminal from the project root:
 
-```bash
+```acton-cli
 acton retrace <HASH> --contract <NAME> --debug --debug-port 4711
 ```
 

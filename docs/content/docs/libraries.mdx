@@ -4,8 +4,6 @@ description: "Learn how to work with on-chain libraries in Acton"
 icon: Book
 ---
 
-import {Callout} from "fumadocs-ui/components/callout";
-
 On-chain libraries let the TON blockchain store code once and reuse it across multiple contracts, which cuts storage use compared to duplicating the same code in every account.
 
 <Callout type="info" title="Background">
@@ -113,7 +111,7 @@ The `topup` command uses the same cost estimation logic as `publish`. After a su
 
 To inspect an existing library or read its code, use `acton library fetch`:
 
-```bash
+```acton-cli
 acton library fetch <LIBRARY_HASH>
 ```
 
@@ -121,7 +119,7 @@ acton library fetch <LIBRARY_HASH>
 
 Disassemble code right after fetch:
 
-```bash
+```acton-cli
 acton library fetch <LIBRARY_HASH> --disasm
 ```
 
@@ -131,7 +129,7 @@ This prints the TVM assembly (TASM) of the library code.
 
 Save library code to a file for analysis or reuse:
 
-```bash
+```acton-cli
 # Save as base64
 acton library fetch <LIBRARY_HASH> -o library.txt
 

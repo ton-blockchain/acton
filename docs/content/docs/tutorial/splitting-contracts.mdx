@@ -1,0 +1,259 @@
+---
+title: "3. Sharding: Poll + Voter"
+description: "Write two contracts, where the parent deploys a child contract for each unique voter address."
+---
+
+<Callout type="info">
+  Delete `contracts/Empty.tolk`, `wrappers/Empty.gen.tolk`, and `tests/contract.test.tolk` — they are no longer needed. Remove the `Empty` contract entry from `Acton.toml`.
+</Callout>
+
+## Write the shared types
+
+Replace `contracts/types.tolk` with the types for both contracts:
+
+```tolk title="contracts/types.tolk"
+enum Errors {
+    InvalidOption  = 100
+    AlreadyVoted   = 101
+    NotFromPoll    = 102
+    InvalidMessage = 0xFFFF
+}
+
+// ----- Poll storage -----
+
+struct PollStorage {
+    owner:   address
+    option0: uint32
+    option1: uint32
+}
+
+fun PollStorage.load(): PollStorage {
+    return PollStorage.fromCell(contract.getData());
+}
+
+fun PollStorage.save(self) {
+    contract.setData(self.toCell());
+}
+
+// ----- Voter storage -----
+
+struct VoterStorage {
+    poll:     address
+    voter:    address
+    hasVoted: bool
+}
+
+fun VoterStorage.load(): VoterStorage {
+    return VoterStorage.fromCell(contract.getData());
+}
+
+fun VoterStorage.save(self) {
+    contract.setData(self.toCell());
+}
+
+// ----- Messages -----
+
+struct (0x694d6f6e) Vote {
+    option: uint8
+}
+```
+
+Two things to note:
+
+- Each struct gets a **`.load()` / `.save()` pair** — extension methods (the `self` parameter is the implicit first argument in `.save()`). These are the idiomatic way to read and write contract storage in Tolk.
+- `struct (0x694d6f6e) Vote` — the hex literal is the **opcode**. The TVM reads the first 32 bits of every message body to pick the right type in a `match`. Use any unique 32-bit value that doesn't clash with other messages in the project.
+
+## Write Voter
+
+Create `contracts/Voter.tolk`:
+
+```tolk title="contracts/Voter.tolk"
+import "types"
+
+type AllowedVoterMessage = Vote
+
+contract Voter {
+    storage: VoterStorage
+    incomingMessages: AllowedVoterMessage
+}
+
+fun onInternalMessage(in: InMessage) {
+    val msg = lazy AllowedVoterMessage.fromSlice(in.body);
+
+    match (msg) {
+        Vote => {
+            var storage = lazy VoterStorage.load();
+            assert (in.senderAddress == storage.poll) throw Errors.NotFromPoll;
+            assert (!storage.hasVoted) throw Errors.AlreadyVoted;
+            storage.hasVoted = true;
+            storage.save();
+        }
+        else => {
+            assert (in.body.isEmpty()) throw Errors.InvalidMessage;
+        }
+    }
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {}
+```
+
+`assert (!storage.hasVoted) throw Errors.AlreadyVoted` — on a duplicate vote, this throws a TVM exception. The TVM bounces the message back to the sender (Poll). Page 5 adds the bounce handler to Poll.
+
+`assert (in.senderAddress == storage.poll) throw Errors.NotFromPoll` — Voter only accepts votes forwarded by its own Poll contract, blocking anyone from faking a vote directly to a Voter.
+
+The initial `VoterStorage` (with `hasVoted: false`) is baked into the contract's stateInit when Poll deploys it. The first time Voter receives a `Vote` message, `hasVoted` is `false` and the assert passes.
+
+## Write Poll
+
+Create `contracts/Poll.tolk`:
+
+```tolk title="contracts/Poll.tolk"
+import "types"
+import "@gen/Voter.code"
+
+type AllowedPollMessage = Vote
+
+contract Poll {
+    storage: PollStorage
+    incomingMessages: AllowedPollMessage
+}
+
+fun onInternalMessage(in: InMessage) {
+    val msg = lazy AllowedPollMessage.fromSlice(in.body);
+
+    match (msg) {
+        Vote => {
+            var storage = lazy PollStorage.load();
+            assert (msg.option == 0 || msg.option == 1) throw Errors.InvalidOption;
+
+            // Optimistic increment — reverted in onBouncedMessage if Voter rejects.
+            if (msg.option == 0) {
+                storage.option0 += 1;
+            } else {
+                storage.option1 += 1;
+            }
+            storage.save();
+
+            // Deploy or message the Voter for this sender.
+            // If Voter doesn't exist, the stateInit deploys it.
+            // If it already exists, the stateInit is ignored; only the body is processed.
+            val voterInit = ContractState {
+                code:  voterCompiledCode(),
+                data:  VoterStorage { poll: contract.getAddress(), voter: in.senderAddress, hasVoted: false }.toCell(),
+            };
+            val outMsg = createMessage({
+                bounce: BounceMode.Only256BitsOfBody,
+                value:  ton("0.05"),
+                dest:   { stateInit: voterInit },
+                body:   msg,
+            });
+            outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
+        }
+        else => {
+            assert (in.body.isEmpty()) throw Errors.InvalidMessage;
+        }
+    }
+}
+
+fun onBouncedMessage(_in: InMessageBounced) {
+    // Bounce handling added later in the tutorial.
+}
+
+get fun results(): (uint32, uint32) {
+    val storage = lazy PollStorage.load();
+    return (storage.option0, storage.option1);
+}
+
+get fun owner(): address {
+    val storage = lazy PollStorage.load();
+    return storage.owner;
+}
+```
+
+- `import "@gen/Voter.code"` — imports the generated dependency helper. When `[contracts.Poll]` declares `depends = ["Voter"]` in `Acton.toml`, `acton build` compiles Voter first and writes `gen/Voter.code.tolk`, which exposes a `voterCompiledCode()` function that returns Voter's compiled code as a cell.
+
+- `VoterStorage { poll: ..., voter: in.senderAddress, ... }` — the `voter` field makes each sender's stateInit unique. Because a contract's address is derived from its stateInit (code + initial data), there is exactly one possible address for each `(poll, voter)` pair, and it can also be calculated off-chain.
+
+- `dest: { stateInit: voterInit }` — instead of a plain address, pass a `ContractState` (code + initial data). Tolk derives the address from the stateInit automatically.
+
+- `bounce: BounceMode.Only256BitsOfBody` — if the message fails on Voter, the first 256 bits of the body are included in the bounced message returned to Poll. The `Vote` struct is 40 bits (32-bit opcode + 8-bit option), which fits entirely within that limit.
+
+## Register both contracts in `Acton.toml`
+
+Replace the `[contracts.Empty]` section with entries for both Poll and Voter. Keep the rest of the file (including `[import-mappings]`) as generated by the scaffold:
+
+```toml title="Acton.toml"
+[contracts.Poll]
+src = "contracts/Poll.tolk"
+depends = ["Voter"]
+
+[contracts.Voter]
+src = "contracts/Voter.tolk"
+```
+
+Both contracts must be listed. `depends = ["Voter"]` tells Acton to compile Voter first and generate `gen/Voter.code.tolk`, which Poll imports to embed the compiled bytecode.
+
+## Build and inspect
+
+```bash
+acton build
+```
+
+```acton-cli noCopy
+$ acton build
+  Compiling contracts
+   Finished in 521.83µs
+```
+
+```bash
+acton build --info
+```
+
+```acton-cli noCopy
+$ acton build --info
+  Compiling contracts
+   Finished in 498.21µs
+
+Contract: Poll
+  Hash:  C4A1...
+  Cells: 9
+  Bits:  1842
+
+Contract: Voter
+  Hash:  7F3B...
+  Cells: 4
+  Bits:  712
+```
+
+Poll is larger than Voter because it carries Voter's compiled code inside its own bytecode — that is what `voterCompiledCode()` embeds via the generated `gen/Voter.code.tolk`.
+
+## Generate wrappers
+
+Wrappers provide a typed API for deploying and messaging contracts from tests and scripts:
+
+```bash
+acton wrapper Poll
+acton wrapper Voter
+```
+
+This creates `wrappers/Poll.gen.tolk` and `wrappers/Voter.gen.tolk`. Do not edit these files — regenerate them with `acton wrapper` whenever the contract changes.
+
+The generated `Poll` wrapper includes:
+
+- `Poll.fromStorage(storage: PollStorage)` — creates a contract instance and calculates its address
+- `Poll.deploy(from, config)` — deploys the contract
+- `Poll.sendVote(from, option, config)` — sends a `Vote` message
+- `Poll.results()` — calls the `results` getter
+- `Poll.owner()` — calls the `owner` getter
+
+<Callout type="tip">
+  Re-run `acton wrapper` after adding, renaming, or removing messages or getter methods.
+</Callout>
+
+## Checkpoint
+
+Two contracts compile and wrappers are generated. Poll deploys a unique Voter per sender address. Voter rejects duplicate votes — currently causing a bounce that Poll ignores. That bounce handler is the subject of later pages in the tutorial.
+
+Run `acton check` and `acton fmt` before moving on.
+
+**Commands introduced:** `acton build`, `acton build --info`, `acton wrapper`

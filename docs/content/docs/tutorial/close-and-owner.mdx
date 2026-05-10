@@ -1,0 +1,228 @@
+---
+title: "7. Close the poll"
+description: "Add a ClosePoll message, owner access control, and a gas snapshot baseline."
+---
+
+## Add ClosePoll to types.tolk
+
+Add two new error codes to the `Errors` enum in `contracts/types.tolk`:
+
+```tolk title="contracts/types.tolk"
+enum Errors {
+    InvalidOption  = 100
+    AlreadyVoted   = 101
+    NotFromPoll    = 102
+    NotOwner       = 103
+    PollClosed     = 104
+    InvalidMessage = 0xFFFF
+}
+```
+
+Add `isClosed` to `PollStorage`:
+
+```tolk title="contracts/types.tolk"
+struct PollStorage {
+    owner:    address
+    option0:  uint32
+    option1:  uint32
+    isClosed: bool
+}
+```
+
+Add the message type at the bottom of the file:
+
+```tolk title="contracts/types.tolk"
+struct (0x14160e21) ClosePoll {}
+```
+
+## Update `Poll.tolk`
+
+The final `contracts/Poll.tolk` with all changes applied:
+
+```tolk title="contracts/Poll.tolk"
+import "types"
+import "@gen/Voter.code"
+
+type AllowedPollMessage = Vote | ClosePoll
+
+contract Poll {
+    storage: PollStorage
+    incomingMessages: AllowedPollMessage
+}
+
+fun onInternalMessage(in: InMessage) {
+    val msg = lazy AllowedPollMessage.fromSlice(in.body);
+
+    match (msg) {
+        Vote => {
+            var storage = lazy PollStorage.load();
+            assert (!storage.isClosed) throw Errors.PollClosed;
+            assert (msg.option == 0 || msg.option == 1) throw Errors.InvalidOption;
+
+            if (msg.option == 0) {
+                storage.option0 += 1;
+            } else {
+                storage.option1 += 1;
+            }
+            storage.save();
+
+            val voterInit = ContractState {
+                code: voterCompiledCode(),
+                data: VoterStorage { poll: contract.getAddress(), voter: in.senderAddress, hasVoted: false }.toCell(),
+            };
+            val outMsg = createMessage({
+                bounce: BounceMode.Only256BitsOfBody,
+                value:  ton("0.05"),
+                dest:   { stateInit: voterInit },
+                body:   msg,
+            });
+            outMsg.send(SEND_MODE_PAY_FEES_SEPARATELY);
+        }
+        ClosePoll => {
+            var storage = lazy PollStorage.load();
+            assert (in.senderAddress == storage.owner) throw Errors.NotOwner;
+            storage.isClosed = true;
+            storage.save();
+
+            // Return remaining message value to the owner.
+            val returnMsg = createMessage({
+                bounce: false,
+                value:  0,
+                dest:   storage.owner,
+            });
+            returnMsg.send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_DESTROY);
+        }
+        else => {
+            assert (in.body.isEmpty()) throw Errors.InvalidMessage;
+        }
+    }
+}
+
+fun onBouncedMessage(in: InMessageBounced) {
+    in.bouncedBody.skipBouncedPrefix();
+    val msg = lazy Vote.fromSlice(in.bouncedBody);
+
+    var storage = lazy PollStorage.load();
+    if (msg.option == 0) {
+        storage.option0 -= 1;
+    } else {
+        storage.option1 -= 1;
+    }
+    storage.save();
+}
+
+get fun calcVoterAddress(voter: address): address {
+    val init = ContractState {
+        code: voterCompiledCode(),
+        data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
+    };
+    return AutoDeployAddress { stateInit: init }.calculateAddress();
+}
+
+get fun results(): (uint32, uint32) {
+    val storage = lazy PollStorage.load();
+    return (storage.option0, storage.option1);
+}
+
+get fun owner(): address {
+    val storage = lazy PollStorage.load();
+    return storage.owner;
+}
+
+get fun isClosed(): bool {
+    val storage = lazy PollStorage.load();
+    return storage.isClosed;
+}
+```
+
+Regenerate the wrapper to pick up `sendClosePoll` and `isClosed`:
+
+```bash
+acton wrapper Poll
+```
+
+<Callout type="info">
+  `PollStorage` now has an `isClosed` field. Update `setupTest()` to include `isClosed: false` in the `PollStorage` initializer.
+</Callout>
+
+## Test the close logic
+
+```tolk title="tests/poll.test.tolk"
+get fun `test non-owner cannot close poll`() {
+    val (poll, _, alice, _) = setupTest();
+
+    val res = poll.sendClosePoll(alice.address, { value: ton("0.05") });
+    expect(res).toHaveFailedTx({
+        from:     alice.address,
+        to:       poll.address,
+        exitCode: Errors.NotOwner as int,
+    });
+
+    expect(poll.isClosed()).toEqual(false);
+}
+
+get fun `test owner closes poll`() {
+    val (poll, owner, alice, _) = setupTest();
+
+    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(voteRes).toHaveAllSuccessfulTxs();
+
+    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
+
+    expect(poll.isClosed()).toEqual(true);
+}
+
+get fun `test vote rejected after close`() {
+    val (poll, owner, alice, _) = setupTest();
+
+    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
+
+    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    expect(voteRes).toHaveFailedTx({
+        from:     alice.address,
+        to:       poll.address,
+        exitCode: Errors.PollClosed as int,
+    });
+}
+```
+
+```bash
+acton test
+```
+
+All tests pass.
+
+## Capture a gas snapshot baseline
+
+A gas snapshot records the gas consumed by each test. Once saved, future runs can detect regressions.
+
+```bash
+acton test --snapshot baseline.json
+```
+
+Commit `baseline.json`. From now on, detect regressions with:
+
+```bash
+acton test --baseline-snapshot baseline.json
+```
+
+If any test uses significantly more gas than the baseline, the command exits with an error.
+
+<Callout type="info">
+  Re-capture the baseline after intentional changes that affect gas — for example, adding a field to storage.
+</Callout>
+
+## Checkpoint
+
+The poll contract is complete:
+
+- Binary voting (option 0 or 1)
+- Duplicate vote prevention via bounced messages
+- Owner-only close with balance return
+- Votes rejected after close
+
+Run `acton build` and `acton test` before moving to deployment.
+
+**Commands introduced:** `acton wrapper`, `acton test --snapshot`, `acton test --baseline-snapshot`

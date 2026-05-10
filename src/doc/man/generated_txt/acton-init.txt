@@ -224,6 +224,6 @@ SEE ALSO
 
        o  acton help doctor
 
-       o  Project initialization guide
-          <https://ton-blockchain.github.io/acton/docs/tutorial/project-init>
+       o  Project management guide
+          <https://ton-blockchain.github.io/acton/docs/projects>
 

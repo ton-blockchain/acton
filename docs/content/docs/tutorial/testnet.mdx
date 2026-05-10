@@ -1,0 +1,145 @@
+---
+title: "8. Deploy to testnet"
+description: "Create a funded testnet wallet, deploy the poll, verify source code, and retrace a transaction."
+---
+
+<Callout type="warn" title="Testnet only">
+  All commands on this page target testnet. TON testnet has no real value, but treat the wallet mnemonic with the same care as a mainnet wallet — never commit it to git.
+</Callout>
+
+## Create and fund a testnet wallet
+
+```bash
+acton wallet new --name testnet-deployer --local --airdrop
+```
+
+```acton-cli noCopy
+$ acton wallet new --name testnet-deployer --local --airdrop
+✓ Created wallet 'testnet-deployer'
+  Kind:     v5r1
+  Address:  0QB8X7Yq3...
+  Stored:   wallets.toml (mnemonic in system keyring)
+
+Requesting airdrop...
+✓ Airdrop confirmed. Balance: 2.0 TON
+```
+
+`--airdrop` requests test TON from the configured faucet. If the faucet is rate-limited, fund the wallet manually via the [Testnet Giver Bot](https://t.me/testgiver_ton_bot).
+
+```bash
+acton wallet list --balance
+```
+
+<Callout type="info">
+  `acton wallet list --balance` queries TON Center for live balances. Set `TONCENTER_TESTNET_API_KEY` in the environment for a higher rate limit.
+</Callout>
+
+## Deploy to testnet
+
+```bash
+acton script scripts/deploy.tolk --net testnet
+```
+
+<Callout type="tip">
+  The deploy script calls `scripts.wallet("deployer")`. Pass `WALLET=testnet-deployer` as an environment variable, or update the script to use `scripts.wallet("testnet-deployer")` for testnet runs.
+</Callout>
+
+```acton-cli noCopy
+$ acton script scripts/deploy.tolk --net testnet
+   Compiling contracts
+    Finished in 598.71µs
+
+Deploying Poll to EQC9R1p...
+  Tx: https://testnet.tonviewer.com/transaction/7a1f...
+Deployed. Address: EQC9R1p...
+Owner: 0QB8X7Yq3...
+Votes: option0=0, option1=0
+```
+
+Acton prints a link to the transaction on the testnet explorer.
+
+## Inspect on-chain state
+
+```acton-cli
+acton rpc info <POLL_ADDRESS> --net testnet
+```
+
+`<POLL_ADDRESS>` — the address printed by the deployment script.
+
+```acton-cli noCopy
+$ acton rpc info EQC9R1p... --net testnet
+  Contract: EQC9R1p...
+  Balance:  0.095 TON
+  Status:   active
+
+  Storage (decoded):
+    owner:    0QB8X7Yq3...
+    option0:  0
+    option1:  0
+    isClosed: false
+```
+
+## Verify the source code
+
+Source verification proves the deployed bytecode was compiled from specific source files, letting users inspect the source in a blockchain explorer.
+
+```acton-cli
+acton verify Poll --address <POLL_ADDRESS> --net testnet
+```
+
+```acton-cli noCopy
+$ acton verify Poll --address EQC9R1p... --net testnet
+  Verifying Poll at EQC9R1p...
+  ✓ Bytecode matches source
+  ✓ Verification submitted to verifier.ton.org
+  View: https://verifier.ton.org/EQC9R1p...
+```
+
+## Send a vote and retrace the transaction
+
+```acton-cli
+acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
+```
+
+```acton-cli
+Results: option0=1, option1=0
+  Tx: https://testnet.tonviewer.com/transaction/3b9c...
+```
+
+Use `acton retrace` with the contract source to get source-level line mapping:
+
+```acton-cli
+acton retrace <TX_HASH> --net testnet --contract Poll
+```
+
+`<TX_HASH>` — the transaction hash printed by the vote script.
+
+```acton-cli-trace noCopy
+$ acton retrace 3b9c... --net testnet --contract Poll
+  Fetching transaction 3b9c...
+
+  Poll.onInternalMessage (contracts/Poll.tolk:14)
+    Vote =>
+      storage.option0 += 1           contracts/Poll.tolk:23  ✓
+      voterInit = ContractState{...}  contracts/Poll.tolk:31  ✓
+      createMessage(...).send(...)    contracts/Poll.tolk:37  ✓
+
+  Voter.onInternalMessage (contracts/Voter.tolk:11)
+    Vote =>
+      storage.hasVoted = true         contracts/Voter.tolk:17  ✓
+```
+
+`retrace` maps each TVM instruction back to its source line.
+
+## Checkpoint
+
+The poll is live and verified on the testnet:
+
+- Deploy with `acton script scripts/deploy.tolk --net testnet`
+- Inspect state with `acton rpc info --net testnet`
+- Debug transactions with `acton retrace --contract Poll`
+- Source visible at verifier.ton.org
+
+The next page builds the React frontend.
+
+**Commands introduced:** `acton wallet`, `acton script --net testnet`, `acton rpc info --net testnet`, `acton verify`, `acton retrace`

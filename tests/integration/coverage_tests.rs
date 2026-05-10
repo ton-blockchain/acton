@@ -145,6 +145,78 @@ fn build_partial_coverage_project(name: &str) -> ProjectBuilder {
 }
 
 #[test]
+fn test_coverage_resolves_contract_deployed_from_generated_dependency_code() {
+    let project = ProjectBuilder::new("coverage-generated-dependency-code")
+        .contract(
+            "Child",
+            r"
+            fun onInternalMessage(_: InMessage) {
+                if (contract.getOriginalBalance() > 0) {
+                    return;
+                }
+            }
+        ",
+        )
+        .contract_with_deps(
+            "Parent",
+            r"
+            fun onInternalMessage(_: InMessage) {}
+        ",
+            vec!["child"],
+        )
+        .mapping("gen", "gen")
+        .test_file(
+            "generated_dependency_code",
+            r#"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+            import "@gen/child.code"
+
+            get fun `test coverage resolves generated dependency code`() {
+                val sender = testing.treasury("sender");
+                val stateInit = ContractState {
+                    code: childCompiledCode(),
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit }.calculateAddress();
+
+                val deploy = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.1"),
+                    dest: { stateInit },
+                }));
+                expect(deploy).toHaveSuccessfulDeploy({ to: address });
+
+                val res = net.send(sender.address, createMessage({
+                    bounce: true,
+                    value: ton("0.1"),
+                    dest: address,
+                    body: createEmptyCell(),
+                }));
+                expect(res).toHaveSuccessfulTx({ from: sender.address, to: address });
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .with_coverage()
+        .with_coverage_format("text")
+        .with_coverage_file("generated-dependency-coverage.txt")
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_file_exists("generated-dependency-coverage.txt")
+        .assert_file_snapshot_matches(
+            "generated-dependency-coverage.txt",
+            "integration/snapshots/coverage/test_coverage_generated_dependency_code.txt",
+        );
+}
+
+#[test]
 fn test_coverage_matches_contract_deployed_as_library_reference() {
     let project = ProjectBuilder::new("coverage-library-reference")
         .contract(

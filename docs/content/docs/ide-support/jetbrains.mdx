@@ -3,11 +3,17 @@ title: "JetBrains IDEs"
 description: "Learn about Acton support in JetBrains IDEs"
 ---
 
+import {LandingVideo} from "@/components/LandingVideo"
+
 The [TON plugin for JetBrains IDEs](https://plugins.jetbrains.com/plugin/23382-ton) supports Acton development, providing project automation and toolchain integration.
 
 For installation instructions, see the [official TON documentation](https://docs.ton.org/contract-dev/ide/jetbrains).
 
-## Supported IDEs
+<Callout type="warning" title="Install the TOML plugin">
+  Install the [JetBrains TOML plugin](https://plugins.jetbrains.com/plugin/8195-toml) as well.
+  Acton project configuration relies on TOML support, and the TON plugin works correctly only when
+  TOML files are handled by the IDE.
+</Callout>
 
 The plugin is compatible with WebStorm, GoLand, PyCharm, CLion, and other JetBrains IDEs.
 
@@ -17,17 +23,43 @@ The plugin is compatible with WebStorm, GoLand, PyCharm, CLion, and other JetBra
 
 The plugin provides a GUI for `acton new` to set up new projects.
 
-![](imgs/wizard.png)
+<LandingVideo
+  className="docs-video rounded-lg border bg-fd-muted"
+  controls
+  controlsList="nodownload noplaybackrate"
+  height={1080}
+  playsInline
+  playLabel="Play new project wizard video"
+  preload="metadata"
+  src="imgs/new-project.mp4"
+  style={{aspectRatio: "1348 / 1080"}}
+  width={1348}
+>
+  Your browser does not support the video tag.
+</LandingVideo>
 
 ### Run configurations
 
 After creating or opening a project, the plugin automatically adds run configurations for tests and builds.
 
-![](imgs/auto-run-configurations.png)
+<LandingVideo
+  className="docs-video rounded-lg border bg-fd-muted"
+  controls
+  controlsList="nodownload noplaybackrate"
+  height={1080}
+  playsInline
+  playLabel="Play new project wizard video"
+  preload="metadata"
+  src="imgs/configurations.mp4"
+  style={{aspectRatio: "1648 / 1080"}}
+  width={1648}
+>
+  Your browser does not support the video tag.
+</LandingVideo>
 
 Run configurations can also be created manually for any Acton command. Specialized interfaces exist for some commands such as `build` or `test`.
 
-![](imgs/run-configurations.png)
+![](imgs/jetbrains/run-configurations.png)
 
 ### Updates
 
@@ -41,33 +73,33 @@ Gutter icons allow running builds, tests, or scripts directly from the `Acton.to
 
 #### Building a specific contract
 
-![](imgs/acton-toml-build.png)
+![](imgs/jetbrains/acton-toml-build.png)
 
 #### Running project tests
 
-![](imgs/acton-toml-run-tests.png)
+![](imgs/jetbrains/acton-toml-run-tests.png)
 
 #### Running a script
 
-![](imgs/acton-toml-run-script.png)
+![](imgs/jetbrains/acton-toml-run-script.png)
 
 ### Navigation and autocompletion
 
 The plugin provides autocompletion for contract paths and allows navigating to the source code.
 
-![](imgs/acton-toml-paths.png)
+![](imgs/jetbrains/acton-toml-paths.png)
 
 ### Fields documentation
 
 Full validation, autocompletion, and documentation are available for all fields in `Acton.toml`.
 
-![](imgs/acton-toml-fields.png)
+![](imgs/jetbrains/acton-toml-fields.png)
 
 ### Contract usage search
 
 Search finds all references to a contract in the project.
 
-![](imgs/acton-toml-go-to-contract-use.png)
+![](imgs/jetbrains/acton-toml-go-to-contract-use.png)
 
 ## Contract management
 
@@ -75,13 +107,27 @@ Search finds all references to a contract in the project.
 
 The plugin includes a wizard to create new Tolk files and automatically register them in `Acton.toml`.
 
-![](imgs/add-new-contract.png)
+![](imgs/jetbrains/add-new-contract.png)
 
 ### Contract registration
 
 When copying a contract from another project, the plugin suggests registering it in `Acton.toml`.
 
-![](imgs/import-contract.png)
+![](imgs/jetbrains/import-contract.png)
+
+### Contract actions
+
+For contracts declared in Tolk files, the plugin provides actions to build the contract and generate
+Tolk or TypeScript wrappers.
+
+![](imgs/jetbrains/contract-actions.png)
+
+### Disassembly
+
+The plugin can compile a Tolk contract and open the generated assembly, making it easier to inspect
+the code that will run on TVM.
+
+![](imgs/jetbrains/disassembly.png)
 
 ## Code completion
 
@@ -89,23 +135,23 @@ When copying a contract from another project, the plugin suggests registering it
 
 Autocompletion and navigation are supported for contract names in the `build()` function.
 
-![](imgs/contract-completion.png)
+![](imgs/jetbrains/complete-build.png)
 
 ### Wallet names
 
 The plugin provides autocompletion and navigation for wallet names in the `scripts.wallet()` function.
 
-![](imgs/wallets-completion.png)
+![](imgs/jetbrains/complete-wallet.png)
 
 ### Get methods
 
 Autocompletion is available for get method names in `net.runGetMethod()`.
 
-![](imgs/get-methods-completion.png)
+![](imgs/jetbrains/get-method-completion.png)
 
 The plugin also finds usages of get methods within `net.runGetMethod()` during a reference search.
 
-![](imgs/get-methods-references.png)
+![](imgs/jetbrains/get-methods-references.png)
 
 ## Testing
 
@@ -113,30 +159,50 @@ The plugin also finds usages of get methods within `net.runGetMethod()` during a
 
 Acton tests integrate with the IDE's native test runner, providing a hierarchical view and progress indicators.
 
-![](imgs/test-runner.png)
+<LandingVideo
+  className="docs-video rounded-lg border bg-fd-muted"
+  controls
+  controlsList="nodownload noplaybackrate"
+  height={1080}
+  playsInline
+  playLabel="Play native test runner video"
+  preload="metadata"
+  src="imgs/test-runner.mp4"
+  style={{aspectRatio: "1576 / 1080"}}
+  width={1576}
+>
+  Your browser does not support the video tag.
+</LandingVideo>
 
 For convenient execution, the plugin provides a test run icon in the editor.
 
-![](imgs/test-run.png)
+![](imgs/jetbrains/test-run.png)
 
 ### Failure analysis
 
 When a test fails, the plugin highlights the specific `expect` call that failed and changes the test icon.
 
-![](imgs/fail-tests.png)
+![](imgs/jetbrains/fail-tests.png)
+
+### Debugging
+
+Set breakpoints in Tolk tests and contracts, start debugging from the IDE, and inspect stack frames,
+local values, and TVM registers.
+
+![](imgs/jetbrains/debug.png)
 
 ### Code coverage
 
 Coverage results are displayed in the editor gutter and file tree, showing which contract lines were executed during tests.
 
-![](imgs/test-coverage.png)
+![](imgs/jetbrains/test-coverage.png)
 
 ### Test snippets
 
 The `test` live template allows generating test structures by typing `test` and pressing Tab.
 
-![](imgs/test-completion.png)
-![](imgs/test-completion-after.png)
+![](imgs/jetbrains/test-completion.png)
+![](imgs/jetbrains/test-completion-after.png)
 
 ## Toolchain integration
 
@@ -144,22 +210,22 @@ The `test` live template allows generating test structures by typing `test` and 
 
 The Wallets View allows managing project wallets, including generation, import via mnemonic, balance tracking, and testnet TON requests.
 
-![](imgs/wallets-view.png)
+![](imgs/jetbrains/wallets.png)
 
 ### Terminal links
 
 TON addresses in the terminal are converted into links that open Tonviewer.
 
-![](imgs/address-links.png)
+![](imgs/jetbrains/address-links.png)
 
 ### Script execution
 
 Scripts can be executed via gutter icons or by creating persistent run configurations.
 
-![](imgs/scripts-run.png)
+![](imgs/jetbrains/scripts-run.png)
 
 ### Linting
 
 The linter runs in the background, reporting any problems it finds and offering automatic fixes if any.
 
-![](imgs/acton-check.png)
+![](imgs/jetbrains/acton-check.png)

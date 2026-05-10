@@ -7,7 +7,7 @@ Acton scripts can interact with the real TON blockchain, enabling contract deplo
 
 ## Prerequisites
 
-Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/tutorial/setup-wallets) guide to configure your wallet with a mnemonic.
+Before interacting with the real blockchain, you need to configure a wallet in your `wallets.toml` (or global configuration). Follow the [Setting up wallets](/docs/wallets) guide to configure your wallet with a mnemonic.
 
 ## The `--net` Flag
 
@@ -41,7 +41,7 @@ fun main() {
     // ...
     // This send will be emulated and not sent to the real blockchain
     val result = net.send(wallet.address, msg);
-    result.wait();
+    result.waitForFirstTransaction();
 
     // Enable broadcasting mode again
     net.enableBroadcast();
@@ -70,7 +70,7 @@ fun main() {
     });
 
     val result = counter.deploy(deployer.address, ton("0.05"));
-    if (!result.wait()) {
+    if (result.waitForFirstTransaction() == null) {
         return;
     }
 
@@ -196,7 +196,7 @@ Be extremely careful with `--net`. While local tests allow arbitrary big values,
 
 ## Waiting for Transactions
 
-When broadcasting transactions to the real network, you may want to wait for them to be processed. The `SendResultList.wait()` method polls the network until the transaction is confirmed:
+When broadcasting transactions to the real network, you may want to wait for them to be processed. `SendResultList.waitForFirstTransaction()` polls until the first transaction from the result list is confirmed, while `SendResultList.waitForTrace()` waits for the complete descendant trace:
 
 ```tolk
 import "@acton/emulation/scripts"
@@ -210,13 +210,13 @@ fun main() {
         counter: 0,
     });
     val deployResult = counter.deploy(deployer.address, ton("0.05"));
-    deployResult.wait(); // Wait for deployment
+    deployResult.waitForFirstTransaction(); // Wait for deployment
 
     println("Counter deployed at {}", counter.address);
 
     // Send increase message
     val increaseResult = counter.sendIncrease(deployer.address, 5);
-    increaseResult.wait(); // Wait for transaction
+    increaseResult.waitForTrace(); // Wait for the full message chain
 
     println("Counter increased!");
 }
@@ -229,8 +229,8 @@ fun main() {
     // ...
     val result = net.send(deployer.address, msg);
 
-    val success = result.wait();
-    if (success) {
+    val tx = result.waitForFirstTransaction();
+    if (tx != null) {
         println("Transaction confirmed!");
     } else {
         println("Transaction not found after max attempts");
@@ -240,12 +240,12 @@ fun main() {
 
 ### Behavior in Different Modes
 
-The `wait()` method automatically adapts to the execution mode:
+Both wait helpers automatically adapt to the execution mode:
 
-| Mode            | Behavior                                       |
-|-----------------|------------------------------------------------|
-| Local (default) | Returns `true` immediately (no waiting needed) |
-| `--net <network>` | Polls the network until transaction is found |
+| Mode              | Behavior                                                             |
+|-------------------|----------------------------------------------------------------------|
+| Local (default)   | Returns the already processed local transaction or trace immediately |
+| `--net <network>` | Polls the network until the transaction or trace is found            |
 
 You can check the current mode using `net.isBroadcasting()`:
 
@@ -348,5 +348,5 @@ It's crucial to understand the difference:
 ## Next Steps
 
 - Check the [script command reference](/docs/commands/script) for all available options
-- Learn more about [wallet configuration](/docs/tutorial/setup-wallets)
+- Learn more about [wallet configuration](/docs/wallets)
 - Explore [verifying your deployed contracts](/docs/verify)

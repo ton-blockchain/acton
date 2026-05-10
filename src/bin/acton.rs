@@ -1109,6 +1109,20 @@ pub enum LibraryCommand {
         wallet: Option<String>,
         #[arg(long, help = "Network to use", default_value = "testnet")]
         net: String,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the publication transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
         #[arg(long, help = "Amount of TON to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -1159,6 +1173,20 @@ pub enum LibraryCommand {
         duration: Option<String>,
         #[arg(long, help = "Wallet to use for topping up (prompts if not provided)")]
         wallet: Option<String>,
+        #[arg(
+            long,
+            help = "Use TON Connect wallet approval for the top-up transaction",
+            help_heading = "Broadcasting",
+            conflicts_with = "wallet"
+        )]
+        tonconnect: bool,
+        #[arg(
+            long,
+            default_value_t = acton::tonconnect::DEFAULT_TONCONNECT_PORT,
+            help = "Local TON Connect page port",
+            help_heading = "Broadcasting"
+        )]
+        tonconnect_port: u16,
         #[arg(
             long,
             help = "Amount of TON to send (overrides duration-based calculation)"
@@ -2088,6 +2116,8 @@ fn main() {
                 duration,
                 wallet,
                 net,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -2098,6 +2128,8 @@ fn main() {
                 duration,
                 wallet,
                 net,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
                 local,
@@ -2122,9 +2154,19 @@ fn main() {
                 name,
                 duration,
                 wallet,
+                tonconnect,
+                tonconnect_port,
                 amount,
                 yes,
-            } => commands::library::topup_cmd(name, duration, wallet, amount, yes),
+            } => commands::library::topup_cmd(
+                name,
+                duration,
+                wallet,
+                tonconnect,
+                tonconnect_port,
+                amount,
+                yes,
+            ),
         },
         Commands::Check {
             fix,

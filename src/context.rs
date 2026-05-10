@@ -6,11 +6,13 @@ use acton_config::config::{ActonConfig, ContractConfig, Explorer, WalletsConfig}
 use acton_config::test::BacktraceMode;
 use acton_debug::replayer::StepMode;
 use acton_debug::{ChildDebugContextSpec, ReplayerDebugSession};
+use log::warn;
 use num_bigint::BigInt;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
+use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
@@ -287,6 +289,66 @@ pub struct CompilationResult {
     pub code_hash: HashBytes,
     pub source_map: Arc<SourceMap>,
     pub abi: Option<Arc<ContractABI>>,
+}
+
+pub(crate) fn compile_project_contract_with_cache(
+    acton_config: &ActonConfig,
+    project_root: &Path,
+    contract_id: &str,
+    contract: &ContractConfig,
+    need_debug_info: bool,
+    file_cache: Option<&mut FileBuildCache>,
+) -> anyhow::Result<(PathBuf, CompilationResult)> {
+    let path = contract.absolute_source_path(project_root);
+    let path_display = path.display().to_string();
+
+    let result = if let Some(file_cache) = file_cache {
+        if let Some(cached) = file_cache.get(&path_display, need_debug_info, false, 2, "1.3") {
+            tolk_compiler::compiler::CompilerResultSuccess {
+                fift_code: cached.fift_code.unwrap_or_default(),
+                code_boc64: cached.code_boc64,
+                code_hash_hex: cached.code_hash_hex,
+                source_map: cached.source_map,
+                abi: cached.abi,
+            }
+        } else {
+            let result = compile_project_contract(acton_config, &path, need_debug_info)?;
+            if let Err(err) =
+                file_cache.put(&path_display, &result, need_debug_info, false, 2, "1.3")
+            {
+                warn!("Failed to cache build for {path_display}: {err}");
+            }
+            result
+        }
+    } else {
+        compile_project_contract(acton_config, &path, need_debug_info)?
+    };
+
+    Ok((
+        path,
+        CompilationResult {
+            name: contract.display_name(contract_id).to_owned(),
+            code_boc64: result.code_boc64,
+            code_hash: HashBytes::from_str(&result.code_hash_hex)?,
+            source_map: Arc::new(result.source_map.unwrap_or_default()),
+            abi: result.abi.map(Into::into),
+        },
+    ))
+}
+
+fn compile_project_contract(
+    acton_config: &ActonConfig,
+    path: &Path,
+    need_debug_info: bool,
+) -> anyhow::Result<tolk_compiler::compiler::CompilerResultSuccess> {
+    let mappings = acton_config.mappings();
+    match tolk_compiler::Compiler::new(2)
+        .with_mappings(&mappings)
+        .compile(path, need_debug_info)
+    {
+        tolk_compiler::CompilerResult::Success(result) => Ok(result),
+        tolk_compiler::CompilerResult::Error(error) => anyhow::bail!("{}", error.message.trim()),
+    }
 }
 
 #[derive(Debug, Clone)]

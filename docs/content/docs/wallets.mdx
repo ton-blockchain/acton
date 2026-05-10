@@ -4,8 +4,6 @@ description: "How to manage wallets with Acton"
 icon: "Wallet"
 ---
 
-import { Callout } from "fumadocs-ui/components/callout";
-
 Use `acton wallet` to create, import, inspect, fund, export, sign with, and remove wallets used by Acton workflows. For the full command surface and every flag, see the [`acton wallet` reference](/docs/commands/wallet).
 
 ## Create a wallet
@@ -225,7 +223,7 @@ address-testnet = "0QD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8ZLd"
 
 Message bodies composed outside of Acton workflows can be signed via `acton wallet sign` without writing a script:
 
-```bash
+```acton-cli
 acton wallet sign deployer --body <HEX_OR_BASE64_BOC>
 ```
 

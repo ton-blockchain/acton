@@ -17,6 +17,7 @@
   --ui-color: #2d83ec;
 
   --color-fd-primary: var(--ui-color);
+  --color-fd-idea: oklch(65% 0.2 145);
 }
 
 .dark {
@@ -115,6 +116,11 @@ figure.shiki > div[role="region"] {
   aspect-ratio: 16 / 9;
   object-fit: cover;
   background: var(--color-fd-background);
+}
+
+.docs-video {
+  height: auto;
+  object-fit: contain;
 }
 
 .landing-video-play-button {

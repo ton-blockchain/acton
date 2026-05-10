@@ -1,5 +1,7 @@
-use crate::context::{BuildCache, EmulationsState};
+use crate::context::{BuildCache, EmulationsState, compile_project_contract_with_cache};
+use crate::file_build_cache::FileBuildCache;
 use acton_config::color::OwoColorize;
+use acton_config::config::ActonConfig;
 use acton_debug::replayer::{RuntimeStack, StepMode, Tick, TolkReplayer};
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use std::cmp::Ordering;
@@ -105,6 +107,45 @@ pub(super) fn collect_coverage(
     files.sort_by(|left, right| left.file.cmp(&right.file));
 
     Coverage { files }
+}
+
+pub(super) fn compile_project_contracts_for_coverage(
+    build_cache: &mut BuildCache,
+    file_cache: &mut FileBuildCache,
+    acton_config: &ActonConfig,
+    project_root: &Path,
+) -> anyhow::Result<()> {
+    let Some(contracts) = acton_config.contracts() else {
+        return Ok(());
+    };
+
+    for (contract_id, contract) in contracts {
+        let path = contract.absolute_source_path(project_root);
+        if path.to_string_lossy().ends_with(".boc") {
+            continue;
+        }
+
+        if build_cache
+            .built
+            .get(&path)
+            .is_some_and(|result| result.source_map.has_debug_marks())
+        {
+            // already compiled earlier
+            continue;
+        }
+
+        let (_, result) = compile_project_contract_with_cache(
+            acton_config,
+            project_root,
+            contract_id,
+            contract,
+            true,
+            Some(&mut *file_cache),
+        )?;
+        build_cache.built.insert(path, result);
+    }
+
+    Ok(())
 }
 
 struct SourceMapAndLogs {

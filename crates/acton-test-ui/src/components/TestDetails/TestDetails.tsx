@@ -667,7 +667,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({test, trace, projectRoo
                 <div className={`${styles.infoValue} ${styles[test.status.toLowerCase()]}`}>
                   {test.status}
                 </div>
-                {statusDescription && <div className={styles.statusDescription}>{statusDescription}</div>}
+                {statusDescription && (
+                  <div className={styles.statusDescription}>{statusDescription}</div>
+                )}
               </div>
             </div>
             <div className={styles.infoItem}>
