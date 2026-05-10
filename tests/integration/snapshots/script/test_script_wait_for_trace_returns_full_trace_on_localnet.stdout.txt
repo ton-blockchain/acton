@@ -3,7 +3,7 @@ TRACE_OUTPUT_BEGIN
 N/A -> external
 └── [EXT_IN_OPCODE] -> EQBRPs..l6nHTG A                                       gas=0
     └── TriggerForward 0.4 TON -> EQDnzm..T3h1OM B                              gas=0
-        └── empty 0.2 TON -> EQCwEV..w/D2xp C                                   gas=0
+        └── empty 0.2 TON -> EQDGH2..HvQahs C                                   gas=0
 
 TRACE_OUTPUT_END
 TRACE_READY=true

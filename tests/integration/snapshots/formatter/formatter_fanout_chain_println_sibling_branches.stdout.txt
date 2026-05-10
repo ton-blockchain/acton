@@ -21,7 +21,7 @@
            │   right: [WALLET_ADDRESS_BASE] (fm_fanout_right)
            ├── FmLeftNotice 0.099933333 TON -> fm_fanout_left C                        gas=333
            │   queryId: 202
-           └── FmRightNotice 0.1 TON -> fm_fanout_right D                              gas=486
+           └── FmRightNotice 0.1 TON -> fm_fanout_right D                              gas=437
                queryId: 202
 
  ✓ 1 passed in 1 file

@@ -14,7 +14,7 @@ use tolk_compiler::abi::{ABIGetMethod, ABIOpcode, ABIResolvedStruct, ContractABI
 use tolk_compiler::source_map::Declaration;
 use tolk_compiler::{CompilerResult, SourceMap};
 
-const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.3.4";
+const TYPESCRIPT_WRAPPER_PACKAGE: &str = "gen-typescript-from-tolk-dev@0.4.1";
 const DEFAULT_TOLK_WRAPPER_DIR: &str = "wrappers";
 const DEFAULT_TYPESCRIPT_WRAPPER_DIR: &str = "wrappers-ts";
 
