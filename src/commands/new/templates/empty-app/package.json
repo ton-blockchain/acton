@@ -29,6 +29,9 @@
     "tailwind-merge": "^3.5.0",
     "tslib": "^2.8.1"
   },
+  "overrides": {
+    "axios": "^1.15.2"
+  },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
     "@tailwindcss/vite": "^4.2.4",
