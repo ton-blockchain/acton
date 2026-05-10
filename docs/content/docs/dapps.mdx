@@ -4,7 +4,7 @@ description: "Learn how to create dApps with Acton templates, and connect a Reac
 icon: "TreePalm"
 ---
 
-Acton can generate TypeScript wrappers from Tolk contract ABIs by running [`acton wrapper --ts`](/docs/commands/wrapper). Those wrappers handle address derivation, message encoding, and getter calls, so frontend or other TypeScript code never needs hand-written serialization.
+Acton can generate TypeScript wrappers from Tolk contract ABIs by running [`acton wrapper --all --ts`](/docs/commands/wrapper). Those wrappers handle address derivation, message encoding, and getter calls, so frontend or other TypeScript code never needs hand-written serialization.
 
 ## Scaffold a new project with a frontend
 
@@ -43,7 +43,7 @@ This creates `app/` with a Vite-based React project. It does not modify `Acton.t
 TypeScript wrappers expose the contract ABI. Generate one before writing UI or other TypeScript code:
 
 ```bash
-acton wrapper Counter --ts --output-dir wrappers-ts
+acton wrapper Counter --ts
 ```
 
 This produces `wrappers-ts/Counter.gen.ts`. The generated file provides:
@@ -56,13 +56,6 @@ This produces `wrappers-ts/Counter.gen.ts`. The generated file provides:
 <Callout title="Regenerate after ABI changes">
     Run `acton wrapper Counter --ts` after any change to storage, incoming messages, or get methods. Do not edit `*.gen.ts` files by hand.
 </Callout>
-
-Set a default output directory in `Acton.toml` to omit the flag on every invocation:
-
-```toml title="Acton.toml"
-[wrappers.typescript]
-output-dir = "wrappers-ts"
-```
 
 ## Use wrappers and TON packages in a project
 
@@ -214,7 +207,7 @@ export function buildDeployStateInit(counterId: bigint, owner: string) {
 }
 ```
 
-All message payloads and getter calls go through `wrappers-ts/Counter.gen.ts`, not hand-written serialization. Regenerating the wrapper by running `acton wrapper --ts` after an ABI change keeps the frontend in sync.
+All message payloads and getter calls go through `wrappers-ts/Counter.gen.ts`, not hand-written serialization. Regenerating the wrapper by running `acton wrapper --all --ts` after an ABI change keeps the frontend in sync.
 
 ### Send messages from React
 
