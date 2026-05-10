@@ -458,7 +458,7 @@ fn test_wallet_airdrop_rejects_unsupported_challenge_version() {
         method: "GET",
         path: "/faucet/challenge",
         status: 200,
-        body: r#"{"version":2,"challenge":"mock-challenge","difficulty":0}"#,
+        body: r#"{"version":999999,"challenge":"mock-challenge","difficulty":0}"#,
     }]);
 
     let output = project
@@ -474,7 +474,7 @@ fn test_wallet_airdrop_rejects_unsupported_challenge_version() {
         .join()
         .expect("mock faucet thread must finish without panic");
 
-    output.assert_stderr_contains("Unsupported challenge version from faucet: 2");
+    output.assert_stderr_contains("Unsupported challenge version from faucet: 999999");
 }
 
 #[test]
