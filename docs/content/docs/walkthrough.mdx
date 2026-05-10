@@ -35,7 +35,7 @@ acton new first_counter --template counter --app
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton new first_counter --template counter --app
   Installing standard library 0.4.0
 > Initialized empty Git repository in /home/you/first_counter/.git/
@@ -75,7 +75,7 @@ acton run deploy-testnet
 
 Output:
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton run deploy-testnet
    Compiling contracts
     Finished in 712.5ms
@@ -98,7 +98,7 @@ acton build
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build
    Compiling contracts
    Compiling Counter
@@ -133,7 +133,7 @@ acton build --info
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build --info
    Compiling contracts
    Compiling Counter
@@ -157,7 +157,7 @@ acton fmt
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt
 All files are properly formatted
 ```
@@ -170,7 +170,7 @@ acton fmt --check
 
 When a file is not formatted correctly, `--check` prints a unified diff and exits with a non-zero status:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt --check
 Diff in contracts/src/Counter.tolk:
 -fun onInternalMessage(in:InMessage){
@@ -195,7 +195,7 @@ Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whol
 
 When issues are found, output looks like this:
 
-```acton-cli-check
+```acton-cli-check noCopy
 $ acton check
 warning[unused-variable]: variable `x` is unused
   --> contracts/src/Counter.tolk:12:9
@@ -233,7 +233,7 @@ acton wrapper --all
 
 Output:
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper --all
    Generated wrappers/Counter.gen.tolk
 ```
@@ -252,7 +252,7 @@ Pass `--ts` to emit a TypeScript wrapper instead, which the app template consume
 acton wrapper Counter --ts
 ```
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.gen.ts
 ```
@@ -269,7 +269,7 @@ acton test
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test
    Compiling contracts
     Finished in 726.375µs
@@ -342,7 +342,7 @@ acton test --mutate --mutate-contract Counter
 
 Output:
 
-```acton-cli-mutate
+```acton-cli-mutate noCopy
 $ acton test --mutate --mutate-contract Counter
 
 Mutation Testing
@@ -395,7 +395,7 @@ To quickly identify where an exception occurred, pass `--backtrace full` to get 
 acton test --backtrace full
 ```
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton test --backtrace full
    Compiling contracts
    Compiling Counter
@@ -470,7 +470,7 @@ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug --debug-port 4711
   Compiling contracts
    Finished in 6.2ms
@@ -584,7 +584,7 @@ acton script contracts/scripts/increase.tolk
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton script contracts/scripts/increase.tolk
     Updating standard library to v0.4.0
 Deploy value: 5000000
@@ -626,7 +626,7 @@ acton wallet new --name deployer --local --airdrop
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton wallet new --name deployer --local --airdrop
 
 ✓ Wallet successfully created and added to wallets.toml

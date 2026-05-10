@@ -2,7 +2,7 @@ import {defineConfig, defineDocs} from "fumadocs-mdx/config"
 import {transformerTwoslash} from "fumadocs-twoslash"
 import {createFileSystemTypesCache} from "fumadocs-twoslash/cache-fs"
 import {readFileSync} from "node:fs"
-import type {LanguageRegistration} from "shiki"
+import type {LanguageRegistration, ShikiTransformer} from "shiki"
 import tolkGrammarRaw from "./grammars/grammar-tolk.json"
 import funcGrammarRaw from "./grammars/grammar-func.json"
 import tasmGrammarRaw from "./grammars/grammar-tasm.json"
@@ -16,6 +16,7 @@ import actonTraceGrammarRaw from "./grammars/grammar-acton-trace.json"
 import lastModified from "fumadocs-mdx/plugins/last-modified"
 import {tolkTwoslasher} from "@/lib/tolk-twoslash"
 import {pageSchema} from "fumadocs-core/source/schema"
+import {parseCodeBlockAttributes} from "fumadocs-core/mdx-plugins/codeblock-utils"
 import {z} from "zod"
 
 export const docs = defineDocs({
@@ -102,6 +103,22 @@ const builtinLangs = [
 
 const tonGradientIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
 
+const transformerNoCopy: ShikiTransformer = {
+  name: "acton:no-copy",
+  pre(pre) {
+    const raw = this.options?.meta?.__raw
+    if (!raw) return pre
+
+    const {attributes} = parseCodeBlockAttributes(raw, ["noCopy"])
+
+    if ("noCopy" in attributes) {
+      pre.properties.allowCopy = ""
+    }
+
+    return pre
+  },
+}
+
 export default defineConfig({
   plugins: [lastModified()],
   mdxOptions: {
@@ -130,6 +147,7 @@ export default defineConfig({
         tlbGrammar,
       ],
       transformers: [
+        transformerNoCopy,
         transformerTwoslash({
           typesCache: createFileSystemTypesCache(),
           langs: ["tolk"],
