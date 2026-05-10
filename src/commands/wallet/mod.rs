@@ -111,7 +111,7 @@ const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
-const AIRDROP_TYPE_TON: u16 = 1;
+const AIRDROP_TYPE_TON: u32 = 1;
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -476,8 +476,17 @@ fn perform_testnet_airdrop(
     if !json {
         println!("{} Fetching PoW challenge...", "→".blue().bold());
     }
+    let challenge_payload = serde_json::json!({
+        "address": address.as_str(),
+        "type": AIRDROP_TYPE_TON,
+    });
     let challenge_res = send_with_retry(
-        || client.get(challenge_url.clone()).send(),
+        || {
+            client
+                .post(challenge_url.clone())
+                .json(&challenge_payload)
+                .send()
+        },
         "challenge",
         "Failed to get challenge from faucet",
         json,
@@ -525,7 +534,7 @@ fn perform_testnet_airdrop(
 
     // 3. Send claim
     let claim_payload = serde_json::json!({
-        "address": address,
+        "address": address.as_str(),
         "version": challenge_data.version,
         "challenge": challenge_data.challenge,
         "nonce": nonce,
