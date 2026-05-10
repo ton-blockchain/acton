@@ -15,19 +15,17 @@ import {NotFound} from "@/components/layouts/not-found"
 import {getSuggestions} from "./suggestions"
 
 interface PageProps {
-  params: Promise<{slug?: string[]}>
+  params: Promise<{slug: string[]}>
 }
+
+const metadataBase = new URL("https://ton-blockchain.github.io/acton")
 
 export default async function Page(props: PageProps) {
   const params = await props.params
   const page = source.getPage(params.slug)
 
   if (!page) {
-    return (
-      <NotFound
-        getSuggestions={async () => (params.slug ? getSuggestions(params.slug.join(" ")) : [])}
-      />
-    )
+    return <NotFound getSuggestions={async () => getSuggestions(params.slug.join(" "))} />
   }
 
   const {body: MDX, lastModified} = page.data
@@ -79,14 +77,14 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   if (!page) {
     return {
       title: "Not Found",
-      metadataBase: new URL("https://ton-blockchain.github.io/acton"),
+      metadataBase,
     }
   }
 
   return {
     title: page.data.title,
     description: page.data.description,
-    metadataBase: new URL("https://ton-blockchain.github.io/acton"),
+    metadataBase,
     openGraph: {
       images: getPageImage(page).url,
     },
