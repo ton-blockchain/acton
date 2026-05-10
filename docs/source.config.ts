@@ -101,6 +101,19 @@ const builtinLangs = [
   "tsx",
 ] as const
 
+const customLangs = [
+  tolkGrammar,
+  funcGrammar,
+  tasmGrammar,
+  actonCliGrammar,
+  actonCliCheckGrammar,
+  actonCliWrapperGrammar,
+  actonCliMutateGrammar,
+  actonCliTraceGrammar,
+  actonTraceGrammar,
+  tlbGrammar,
+] as const
+
 const tonGradientIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
 
 const transformerNoCopy: ShikiTransformer = {
@@ -133,19 +146,7 @@ export default defineConfig({
         light: "one-light",
         dark: "one-dark-pro",
       },
-      langs: [
-        ...builtinLangs,
-        tolkGrammar,
-        funcGrammar,
-        tasmGrammar,
-        actonCliGrammar,
-        actonCliCheckGrammar,
-        actonCliWrapperGrammar,
-        actonCliMutateGrammar,
-        actonCliTraceGrammar,
-        actonTraceGrammar,
-        tlbGrammar,
-      ],
+      langs: [...builtinLangs, ...customLangs],
       transformers: [
         transformerNoCopy,
         transformerTwoslash({
