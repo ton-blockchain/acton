@@ -2,7 +2,7 @@ struct (0x03) W5RemoveExtensionExtraAction {
     addr: address
 }
 
-struct (0x6578746E) W5ExtensionActionRequest {
+struct (0x6578746e) W5ExtensionActionRequest {
     queryId: uint64
     outActions: cell?
     hasExtraActions: bool

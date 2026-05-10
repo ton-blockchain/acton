@@ -55,7 +55,7 @@ fun WalletV5.sendExtensionActionBody(
     config: SendParams = {},
 ): SendResultList {
     val body = beginCell()
-        .storeUint(0x6578746E, 32)
+        .storeUint(0x6578746e, 32)
         .storeUint(queryId, 64)
         .storeSlice(actionsBody.beginParse())
         .endCell();
@@ -145,7 +145,7 @@ fun sendMsgAction(dest: address, value: coins): SendAction {
     };
 }
 
-struct (0x73696E74) SignedPayload {
+struct (0x73696e74) SignedPayload {
     subwalletId: int32
     now: uint32
     seqno: uint32
@@ -197,7 +197,7 @@ fun deployWalletWithKey(keyPair: KeyPair): (WalletV5, Treasury) {
     return deployWallet(storage);
 }
 
-struct (0x7369676E) ExternalSignedPayload {
+struct (0x7369676e) ExternalSignedPayload {
     subwalletId: int32
     validUntil: uint32
     seqno: uint32
