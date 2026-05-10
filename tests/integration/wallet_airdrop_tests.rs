@@ -417,7 +417,7 @@ fn test_wallet_airdrop_rejects_difficulty_above_256() {
         method: "GET",
         path: "/faucet/challenge",
         status: 200,
-        body: r#"{"challenge":"mock-challenge","difficulty":257}"#,
+        body: r#"{"version":1,"challenge":"mock-challenge","difficulty":257}"#,
     }]);
 
     let output = project
@@ -436,6 +436,45 @@ fn test_wallet_airdrop_rejects_difficulty_above_256() {
     output.assert_stderr_snapshot_matches(
         "integration/snapshots/wallet_airdrop/test_wallet_airdrop_rejects_difficulty_above_256.stderr.txt",
     );
+}
+
+#[test]
+fn test_wallet_airdrop_rejects_unsupported_challenge_version() {
+    let project = ProjectBuilder::new("wallet-airdrop-unsupported-challenge-version").build();
+
+    project
+        .acton()
+        .wallet_import()
+        .arg("--name")
+        .arg("airdrop-wallet")
+        .arg("--version")
+        .arg("v5r1")
+        .arg("--local")
+        .arg(TEST_MNEMONIC)
+        .run()
+        .success();
+
+    let (faucet_url, faucet_handle, _) = spawn_faucet_mock(vec![FaucetMockResponse {
+        method: "GET",
+        path: "/faucet/challenge",
+        status: 200,
+        body: r#"{"version":2,"challenge":"mock-challenge","difficulty":0}"#,
+    }]);
+
+    let output = project
+        .acton()
+        .wallet_airdrop()
+        .arg("airdrop-wallet")
+        .arg("--faucet-url")
+        .arg(&faucet_url)
+        .run()
+        .failure();
+
+    faucet_handle
+        .join()
+        .expect("mock faucet thread must finish without panic");
+
+    output.assert_stderr_contains("Unsupported challenge version from faucet: 2");
 }
 
 #[test]
@@ -459,7 +498,7 @@ fn test_wallet_airdrop_json_error_exits_non_zero() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"mock-challenge","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"mock-challenge","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -529,7 +568,7 @@ fn test_wallet_airdrop_json_success_with_message() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -590,7 +629,7 @@ fn test_wallet_airdrop_json_success_without_message_uses_default() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -651,7 +690,7 @@ fn test_wallet_airdrop_non_json_success_outputs_human_readable_message() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"human-readable-success","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"human-readable-success","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1016,7 +1055,7 @@ fn test_wallet_airdrop_without_name_selects_wallet_via_prompt() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"select-wallet-success","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"select-wallet-success","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1077,7 +1116,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"airdrop-interactive-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"airdrop-interactive-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1183,7 +1222,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"airdrop-existing-balance-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"airdrop-existing-balance-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1296,7 +1335,7 @@ fn test_wallet_airdrop_interactive_no_wait_flag_skips_balance_confirmation() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"airdrop-interactive-no-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"airdrop-interactive-no-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1351,7 +1390,7 @@ fn test_wallet_airdrop_rate_limit_uses_friendly_error_message() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1401,7 +1440,7 @@ fn test_wallet_airdrop_claim_request_contains_challenge_nonce_address_and_ton_ty
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"payload-check","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"payload-check","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1438,6 +1477,7 @@ fn test_wallet_airdrop_claim_request_contains_challenge_nonce_address_and_ton_ty
     let claim_body: Value =
         serde_json::from_str(&claim_request.body).expect("claim body must be valid JSON");
 
+    assert_eq!(claim_body["version"], 1);
     assert_eq!(claim_body["challenge"], "payload-check");
     assert!(claim_body["nonce"].as_u64().is_some(), "nonce must be u64");
     assert_eq!(claim_body["type"], 1);
@@ -1589,7 +1629,7 @@ fn test_wallet_airdrop_challenge_invalid_json_response() {
         method: "GET",
         path: "/faucet/challenge",
         status: 200,
-        body: r#"{"challenge":"only-challenge"}"#,
+        body: r#"{"version":1,"challenge":"only-challenge"}"#,
     }]);
 
     let output = project
@@ -1631,7 +1671,7 @@ fn test_wallet_airdrop_claim_success_invalid_json_response() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1680,7 +1720,7 @@ fn test_wallet_airdrop_claim_error_uses_message_fallback() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1729,7 +1769,7 @@ fn test_wallet_airdrop_claim_error_uses_raw_body_fallback() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"challenge-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"challenge-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1845,7 +1885,7 @@ fn test_wallet_airdrop_retries_challenge_request_after_server_error() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"retry-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"retry-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1909,7 +1949,7 @@ fn test_wallet_airdrop_retries_claim_request_after_server_error() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"retry-claim","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"retry-claim","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -1974,7 +2014,7 @@ fn test_wallet_airdrop_json_outputs_error_for_challenge_parse_failures() {
         method: "GET",
         path: "/faucet/challenge",
         status: 200,
-        body: r#"{"challenge":"only-challenge"}"#,
+        body: r#"{"version":1,"challenge":"only-challenge"}"#,
     }]);
 
     let output = project
@@ -2141,7 +2181,7 @@ fn test_wallet_new_airdrop_uses_cli_faucet_url_success_non_json() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"new-wallet-cli-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"new-wallet-cli-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2196,7 +2236,7 @@ fn test_wallet_new_airdrop_failure_keeps_wallet_and_prints_warning() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"new-wallet-fail","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"new-wallet-fail","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2242,7 +2282,7 @@ fn test_wallet_new_airdrop_json_success_has_airdrop_block() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"new-wallet-json-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"new-wallet-json-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2289,7 +2329,7 @@ fn test_wallet_new_airdrop_json_failure_has_airdrop_error_block() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"new-wallet-json-fail","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"new-wallet-json-fail","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2344,7 +2384,7 @@ fn test_wallet_new_prompted_airdrop_yes_uses_cli_faucet_url() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"prompted-cli-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"prompted-cli-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2406,7 +2446,7 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"prompted-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"prompted-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2503,7 +2543,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"interactive-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"interactive-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2583,7 +2623,7 @@ fn test_wallet_new_airdrop_interactive_wait_can_be_skipped_with_enter() {
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"interactive-skip-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"interactive-skip-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
@@ -2634,7 +2674,7 @@ fn test_wallet_new_airdrop_interactive_no_wait_flag_skips_balance_confirmation()
             method: "GET",
             path: "/faucet/challenge",
             status: 200,
-            body: r#"{"challenge":"interactive-no-wait-ok","difficulty":0}"#,
+            body: r#"{"version":1,"challenge":"interactive-no-wait-ok","difficulty":0}"#,
         },
         FaucetMockResponse {
             method: "POST",
