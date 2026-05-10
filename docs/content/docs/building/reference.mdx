@@ -5,7 +5,7 @@ description: "Complete reference for all build system configuration options, CLI
 
 This page provides a complete reference for all configuration options available in Acton's build system.
 
-## Path Resolution Rules
+## Path resolution rules
 
 Acton uses two different path-resolution models:
 
@@ -74,9 +74,9 @@ acton build --output-abi build/abi
 acton build --output-fift build/fift
 ```
 
-## Acton.toml Configuration
+## `Acton.toml` configuration
 
-### Build Section
+### Build section
 
 Use `[build]` to configure default outputs for `acton build`:
 
@@ -105,7 +105,7 @@ acton build --output-fift artifacts/fift
 
 Config values in `[build]` are project-root-relative. CLI paths such as `--out-dir`, `--gen-dir`, `--output-abi`, `--output-fift`, and `--graph` remain cwd-relative unless absolute.
 
-### Wrappers Section
+### Wrappers section
 
 Use `[wrappers]` to configure default output locations for `acton wrapper`:
 
@@ -137,7 +137,7 @@ Override rules:
 
 Configured wrapper paths are project-root-relative. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` remain cwd-relative unless absolute.
 
-### Contracts Section
+### Contracts section
 
 Contracts are defined using `[contracts.*]` sections where `*` is the contract name.
 
@@ -149,7 +149,7 @@ output = "build/MyContract.boc"
 depends = []
 ```
 
-#### Contract Fields
+#### Contract fields
 
 | Field          | Type   | Required | Description                                                                                                        |
 |----------------|--------|----------|--------------------------------------------------------------------------------------------------------------------|
@@ -158,34 +158,36 @@ depends = []
 | `output`       | string | No       | Path where the compiled `.boc` file should be saved. If omitted, the compiled contract is only cached              |
 | `depends`      | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
 
-#### Contract Names
+#### Contract names
 
-The contract name (`[contracts.NAME]` in `Acton.toml`, e.g., `Counter`) is used:
-- As a contract entrypoint `contracts/Counter.tolk` (with `onInternalMessage`, get methods, etc.)
+The `[contracts.ID]` in `Acton.toml` is used:
+
+- As a contract entrypoint, referencing a Tolk file with `onInternalMessage()`
 - As a filename for generated wrappers (e.g., `wrappers/Counter.gen.tolk`, `wrappers-ts/Counter.gen.ts`)
 - As the dependency name when referencing this contract
 - To generate the output file name in the dependency output directory (default: `gen/`, e.g., `Counter` → `gen/Counter.code.tolk`)
 - To generate the function name (e.g., `Counter` → `counterCompiledCode()`)
 - In console messages and web UI, unless overridden by optional `display-name` in `Acton.toml`
 
-Names should use PascalCase (e.g., `JettonWallet`, `NftCollection`).
+Contract IDs should use PascalCase, e.g., `JettonWallet`, `NftCollection`.
 
-### Dependencies Configuration
+### Dependencies configuration
 
 Dependencies can be specified in two formats:
 
-#### Simple Format
+#### Simple format
 
 ```toml
 depends = ["ChildContract", "AnotherContract"]
 ```
 
 Uses default settings:
+
 - `kind = "embed_code"`
 - Generated file: `{gen-dir}/{contract-name}.code.tolk` (`gen-dir` defaults to `gen`)
 - Generated function: auto-derived from the dependency key using the normalization rules below
 
-#### Detailed Format
+#### Detailed format
 
 ```toml
 depends = [
@@ -200,7 +202,7 @@ depends = [
 | `function` | string | No       | Auto-generated               | Custom name for the generated function. If omitted, Acton derives it from the dependency key using the rules below |
 | `path`     | string | No       | `{gen-dir}/{name}.code.tolk` | Custom output path for the generated file. Relative manifest paths are resolved from the project root              |
 
-#### Dependency Helper Generation Rules
+#### Dependency helper generation rules
 
 Acton generates one helper file per direct dependency of the parent contract.
 Those helper paths and function names are derived from the dependency `name`
@@ -227,10 +229,10 @@ Default helper filenames use the raw dependency key:
 
 Default helper function names are normalized separately:
 
-1. Replace `-`, `.`, and spaces with `_`
-2. If the first character is not alphabetic, prefix `contract_`
-3. Convert the result to lowerCamelCase
-4. Append `CompiledCode`
+1. The `-`, `.`, and spaces are replaced with `_`
+2. If the first character is not alphabetic, they are prefixed with `contract_`
+3. The result is converted to `camelCase`
+4. `CompiledCode` suffix is appended.
 
 Examples:
 
@@ -238,10 +240,9 @@ Examples:
 - `child.lib` -> `childLibCompiledCode()`
 - `123contract` -> `contract123contractCompiledCode()`
 
-Custom `function` overrides only the function name. Custom `path` overrides only
-the output file location.
+Custom `function` overrides only the function name. Custom `path` overrides only the output file location.
 
-#### Dependency Kinds
+#### Dependency kinds
 
 **`embed_code`** (default)
 
@@ -254,6 +255,7 @@ depends = [{ name = "Wallet", kind = "embed_code" }]
 ```
 
 Generated assembly:
+
 ```tolk
 @pure
 fun walletCompiledCode(): cell asm """
@@ -270,6 +272,7 @@ depends = [{ name = "Wallet", kind = "library_ref" }]
 ```
 
 Generated assembly:
+
 ```tolk
 @pure
 fun walletCompiledCode(): cell asm """
@@ -277,9 +280,9 @@ fun walletCompiledCode(): cell asm """
 """
 ```
 
-### Using Precompiled Contracts
+### Using precompiled contracts
 
-You can use precompiled `.boc` files instead of `.tolk` sources:
+It is possible to use precompiled `.boc` files instead of `.tolk` sources:
 
 ```toml
 [contracts.Precompiled]
@@ -289,14 +292,16 @@ depends = []
 ```
 
 When using `.boc` files:
+
 - No compilation is performed
 - The BoC is loaded and cached directly
 - Dependencies can still reference this contract
-- Useful for third-party contracts or cross-platform builds
 
-### Path Mappings
+This is useful for referencing third-party contracts.
 
-You can define path aliases for the Tolk compiler in the `[import-mappings]` section. These are useful for importing library code without using complex relative paths.
+### Path mappings
+
+Define additional path aliases for the Tolk compiler in the `[import-mappings]` section. These are useful for importing library code without using complex relative paths.
 
 ```toml
 [import-mappings]
@@ -305,6 +310,7 @@ utils = "./libs/utils"
 ```
 
 In Tolk code:
+
 ```tolk
 import "@core/math.tolk"
 ```
@@ -319,18 +325,15 @@ Built-in project mappings commonly used in Acton projects:
 | `@wrappers`  | `wrappers` or `contracts/wrappers` | Generated wrappers such as `@wrappers/Counter`           |
 | `@gen`       | `gen`                              | Generated dependency helper files                        |
 
-These defaults are usually written into `Acton.toml` by `acton new` and
-`acton init`. Standard scaffolds use `contracts` / `tests` / `wrappers`, while
-`--app` scaffolds use `contracts/src` / `contracts/tests` /
-`contracts/wrappers`. If you remove them manually, Acton does not recreate them
-during normal compilation.
+These defaults are usually written into `Acton.toml` by `acton new` and `acton init`. Standard scaffolds use `contracts`, `tests`, and `wrappers`, while `--app` scaffolds use `contracts/src`, `contracts/tests`, and `contracts/wrappers`. Acton does not recreate these folders during normal compilation.
 
 Mappings follow these rules:
+
 1. **Normalization**: Any mapping key missing the `@` prefix will have it added automatically.
 2. **Resolution**: Mappings are resolved relative to project root for the current invocation.
 3. **Exact Match**: When importing, the first part of the path (before the first slash) is used to look up the mapping. For example, `import "@core/math.tolk"` will look for a mapping named `@core`.
 
-## Dependency Graph Visualization
+## Dependency graph visualization
 
 Generate a DOT representation of contract dependencies:
 

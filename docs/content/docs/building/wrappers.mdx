@@ -1,6 +1,147 @@
 ---
-title: "Create and use wrappers"
-description: "How to create and use contract wrappers"
+title: "Tolk wrappers"
+description: "Learn how to generate Tolk wrappers and use them in tests and scripts"
 ---
 
-Stub.
+[`acton wrapper`](/docs/commands/wrapper) generates a typed Tolk wrapper from a contract's compiler ABI. The wrapper exposes methods to create, deploy, send messages to, and call get methods on the contract — the same API works in both tests and scripts.
+
+## Generate a Tolk wrapper
+
+Run `acton wrapper` with the contract name from `Acton.toml`:
+
+```bash
+acton wrapper Counter
+```
+
+This writes a `Counter.gen.tolk` wrapper to `wrappers/` by default. The `acton wrapper` does not require a prior `acton build` run.
+
+Generate wrappers for every contract in `Acton.toml` at once:
+
+```bash
+acton wrapper --all
+```
+
+Pass `--test` to also emit a runnable test stub alongside the wrapper:
+
+```bash
+acton wrapper Counter --test
+```
+
+The stub is written to `tests/Counter.test.tolk` and contains a `setupTest()` helper with an example test case ready to extend.
+
+### Wrapper file structure
+
+The generated file provides:
+
+- `Counter.fromStorage(storage)` — initializes contract state from a storage struct instance and calculates the deployment address.
+- `counter.deploy(from, config)` — deploys the contract.
+- `counter.send{MessageName}(from, ...)` — one method per incoming message type declared in `contract { incomingMessages: ... }`.
+- `counter.{getMethodName}()` — one method per declared get method.
+
+Fine tune wrapper generation with the `contract { ... }` header in the contract entrypoint file:
+
+- `storage: ...` enables the typed `fromStorage()` initializer; without it, the initializer falls back to an untyped form.
+- `incomingMessages: ...` enables `send{MessageName}` helpers; without it, no message-sending methods are generated.
+
+### Use a wrapper in a Tolk test
+
+Import the wrapper and any types it references, then create and deploy the contract:
+
+```tolk title="tests/Counter.test.tolk"
+import "@wrappers/Counter"
+import "@contracts/types"
+import "@acton/emulation/testing"
+
+get fun `test increase`() {
+    val deployer = testing.treasury("deployer");
+
+    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val deployResult = contract.deploy(deployer.address, ton("0.05"));
+    expect(deployResult).toHaveSuccessfulDeploy({ to: contract.address });
+
+    val sendResult = contract.sendIncrease(deployer.address, 5);
+    expect(sendResult).toHaveTransaction({ success: true });
+
+    expect(contract.currentCounter()).toEqual(5);
+}
+```
+
+See the [testing guides](/docs/testing/overview) for more.
+
+### Use a wrapper in a Tolk script
+
+Replace `testing.treasury()` with `scripts.wallet()`:
+
+```tolk title="scripts/deploy.tolk"
+import "@wrappers/Counter"
+import "@contracts/types"
+// Replaces @acton/emulation/testing:
+import "@acton/emulation/scripts"
+
+fun main() {
+    val deployer = scripts.wallet("deployer");
+
+    val contract = Counter.fromStorage({ id: 0, counter: 0 });
+    val result = contract.deploy(deployer.address, ton("0.05"));
+    result.waitForFirstTransaction();
+
+    println("Deployed to {}", contract.address);
+}
+```
+
+Run and test locally first, then broadcast to testnet with `--net`:
+
+```bash
+acton script scripts/deploy.tolk
+acton script scripts/deploy.tolk --net testnet
+```
+
+See the [scripting guides](/docs/testing/overview) for more.
+
+### Regenerate after contract changes
+
+Regenerate the wrapper whenever the contract's storage struct, accepted messages, or get-methods change:
+
+```bash
+acton wrapper Counter
+```
+
+## Generate a TypeScript wrapper
+
+Pass `--ts` to emit a TypeScript wrapper:
+
+```bash
+acton wrapper Counter --ts
+```
+
+This writes a `Counter.gen.ts` wrapper to `wrappers-ts/` by default.
+
+<Callout type="warn">
+    Node.js, `npm`, and `npx` must be available in the `PATH`.
+</Callout>
+
+See the [dApps development guide](/docs/dapps) for working with TypeScript wrappers.
+
+## Configure wrapper defaults
+
+Set per-project defaults in `Acton.toml`:
+
+```toml title="Acton.toml"
+[wrappers.tolk]
+output-dir = "wrappers"
+generate-test = true
+test-output-dir = "tests"
+
+[wrappers.typescript]
+output-dir = "wrappers-ts"
+```
+
+See the [build reference](/docs/building/reference#wrappers-section) for all available fields.
+
+## See also
+
+- [Testing guides](/docs/testing/overview)
+- [Scripting guides](/docs/scripting/overview)
+- [Deployment](/docs/deploy)
+- [dApp development](/docs/dapps)
+- [`acton wrapper` command reference](/docs/commands/wrapper)

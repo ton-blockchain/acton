@@ -3,9 +3,9 @@ title: "9. Build the React frontend"
 description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + React + TON Connect UI, and build a live poll page."
 ---
 
-## Prerequisites for this page
+## Prerequisites
 
-- [Node.js](https://nodejs.org/en/download/) 20 or later
+- [Node.js](https://nodejs.org/en/download/) 22 or later
 - A deployed poll on [testnet](/docs/tutorial/testnet)
 
 ## Scaffold the dApp
@@ -118,7 +118,7 @@ TONCENTER_TESTNET_API_KEY=<TONCENTER_API_KEY>
 ```
 
 `<POLL_ADDRESS>` — the testnet address from page 8.
-`<TONCENTER_API_KEY>` — get a free key at [Toncenter TG bot](https://t.me/toncenter).
+`<TONCENTER_API_KEY>` — get a free key in [TON Center Telegram bot](https://t.me/toncenter).
 
 The bundled `vite.config.ts` exposes both `VITE_*` and `TONCENTER_*` prefixes via `envPrefix`, so the same `TONCENTER_TESTNET_API_KEY` works for the Acton CLI and the Vite dev server.
 

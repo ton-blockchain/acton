@@ -3,7 +3,6 @@
   "icon": "Wrench",
   "pages": [
     "overview",
-    "contracts",
     "wrappers",
     "reference"
   ]
