@@ -122,7 +122,7 @@ export function AppProviders({ children }: PropsWithChildren) {
 `TonConnectButton`, `useTonAddress()`, and `useTonConnectUI()` work anywhere inside the provider tree.
 
 <Callout>
-    Set `TONCENTER_MAINNET_API_KEY` and `TONCENTER_TESTNET_API_KEY` in `.env` to avoid `429` rate-limit errors. Vite inlines variables into the browser bundle, so treat these keys as public.
+    Set `VITE_TONCENTER_MAINNET_API_KEY` and `VITE_TONCENTER_TESTNET_API_KEY` in `.env` to avoid `429` rate-limit errors. Vite inlines `VITE_`-prefixed variables into the browser bundle, so treat these keys as public.
 
     For stricter key protection, proxy TON Center calls through a server-side endpoint and omit the key from the frontend config.
 </Callout>
@@ -144,8 +144,8 @@ export const tonClient = new TonClient({
     ? 'https://testnet.toncenter.com/api/v2/jsonRPC'
     : 'https://toncenter.com/api/v2/jsonRPC',
   apiKey: IS_TESTNET
-    ? import.meta.env.TONCENTER_TESTNET_API_KEY
-    : import.meta.env.TONCENTER_MAINNET_API_KEY,
+    ? import.meta.env.VITE_TONCENTER_TESTNET_API_KEY
+    : import.meta.env.VITE_TONCENTER_MAINNET_API_KEY,
 });
 
 export function openCounter(address: string) {
