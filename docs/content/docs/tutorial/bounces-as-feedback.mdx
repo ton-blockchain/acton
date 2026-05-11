@@ -144,7 +144,11 @@ get fun `test voter rejects direct vote`() {
 get fun calcVoterAddress(voter: address): address {
   val init = ContractState {
       code: voterCompiledCode(),
-      data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
+      data: VoterStorage {
+          poll: contract.getAddress(),
+          voter,
+          hasVoted: false,
+      }.toCell(),
   };
   return AutoDeployAddress { stateInit: init }.calculateAddress();
 }

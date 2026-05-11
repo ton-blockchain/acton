@@ -80,10 +80,9 @@ rm app/wrappers-ts/Empty.gen.ts
   edit it manually.
 </Callout>
 
-## Wire up the path aliases
+## Check the path aliases
 
-Add a `@wrappers/*` alias next to the existing `@/*` alias in
-`app/tsconfig.json`:
+The current dApp scaffold already includes both aliases in `app/tsconfig.json`:
 
 ```json title="app/tsconfig.json"
 {
@@ -97,7 +96,7 @@ Add a `@wrappers/*` alias next to the existing `@/*` alias in
 }
 ```
 
-Mirror it in `app/vite.config.ts` so Vite resolves the path at runtime:
+It also mirrors them in `app/vite.config.ts` so Vite resolves the path at runtime:
 
 ```ts title="app/vite.config.ts"
 resolve: {

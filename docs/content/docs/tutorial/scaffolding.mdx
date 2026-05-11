@@ -74,6 +74,9 @@ include = ["tests/**"]
 import "types"
 
 contract Empty {
+    author: "<author>"
+    version: "1.0.0"
+    description: "Minimal starter contract with owner management"
     storage: Storage
     incomingMessages: AllowedMessage
 }
@@ -114,7 +117,7 @@ The shape to remember:
 
 ```tolk title="contracts/types.tolk"
 enum Errors {
-    NotOwner      = 100
+    NotOwner       = 100
     InvalidMessage = 0xFFFF
 }
 
@@ -173,10 +176,9 @@ $ acton build --info
   Compiling contracts
    Finished in 298.17µs
 
-Contract: Empty
-  Hash:  A7F3...
-  Cells: 4
-  Bits:  824
+   Artifacts of Empty
+        Code te6ccgEBBAEATwABFP8A9KQT9Lzy...
+        Hash 0x469C66F1F6F75827610074DD67EBF392486301F438BDCF02FFFEF95E17761DA8
 ```
 
 ## Lint and format
@@ -187,7 +189,9 @@ acton check
 
 ```acton-cli noCopy
 $ acton check
-  No issues found.
+    Checking Empty
+    Checking scripts/deploy.tolk
+    Checking tests/contract.test.tolk
 ```
 
 ```bash
@@ -196,7 +200,7 @@ acton fmt --check
 
 ```acton-cli noCopy
 $ acton fmt --check
-  All files are already formatted.
+All files are properly formatted
 ```
 
 Run `acton fmt` without `--check` to auto-format files in place.

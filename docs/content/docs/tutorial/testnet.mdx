@@ -89,11 +89,11 @@ acton verify Poll --address <POLL_ADDRESS> --net testnet
 
 ```acton-cli noCopy
 $ acton verify Poll --address EQC9R1p... --net testnet
-  Verifying Poll at EQC9R1p...
-  ✓ Bytecode matches source
-  ✓ Verification submitted to verifier.ton.org
-  View: https://verifier.ton.org/EQC9R1p...
+✓ Contract verification completed!
+View at: https://verifier.ton.org/EQC9R1p...?testnet
 ```
+
+When `--dry-run` is not used, the final verification transaction sends `0.1 TON` unless the verifier backend reports that the same code hash is already verified.
 
 ## Send a vote and retrace the transaction
 

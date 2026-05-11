@@ -133,16 +133,16 @@ Because `option: uint8` already constrains generated values to `0..255`, no extr
 import "@acton/testing/expect"
 
 @test.fuzz
-get fun `fuzz vote option boundary`(option: uint8) {
+get fun `test fuzz vote option boundary`(option: uint8) {
     val (poll, _, alice, _) = setupTest();
 
-    val msg = createMessage({
+    val voteMessage = createMessage({
         bounce: false,
         value: ton("0.1"),
         dest: poll.address,
         body: Vote { option },
     });
-    val res = net.send(alice.address, msg);
+    val res = net.send(alice.address, voteMessage);
 
     if (option == 0 || option == 1) {
         expect(res).toHaveSuccessfulTx({ from: alice.address, to: poll.address });
