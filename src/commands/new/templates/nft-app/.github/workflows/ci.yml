@@ -31,17 +31,38 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: npm
+
       - name: Setup Acton
         uses: ton-blockchain/setup-acton@005f3ac616cd74b0b16d40884502e231e14f5f2d # v0.3.0
 
-      - name: Build
+      - name: Acton Build
         run: acton build
 
-      - name: Test
+      - name: Acton Test
         run: acton test
 
-      - name: Linter
+      - name: Acton Linter
         run: acton check --output-format github
 
-      - name: Formatter
+      - name: Acton Formatter
         run: acton fmt --check
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Node Formatter
+        run: npm run fmt:check
+
+      - name: Node Typecheck
+        run: npm run typecheck
+
+      - name: Node Build
+        run: npm run build
+
+      - name: Node Test
+        run: npm run test
