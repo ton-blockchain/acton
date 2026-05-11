@@ -8,6 +8,21 @@ All notable changes to this project will be documented in this file.
 
 - No unreleased entries yet.
 
+## [1.0.0] - 11.05.2026
+
+Acton 1.0 is the first stable release available to everyone. It marks the
+result of six months of work, thousands of engineering hours, and hundreds of
+thousands of lines of code.
+
+Acton rethinks smart-contract development on TON: fast tests, straightforward
+testnet and mainnet deployment, local and production debugging, AI-assisted
+workflows, and many other tools that finally make smart-contract development
+productive and approachable.
+
+Learn more about Acton on the official website:
+
+https://ton-blockchain.github.io/acton/
+
 ## [0.5.0] - 10.05.2026
 
 Acton 0.5.0 is a focused public-release follow-up to 0.4.0, adding TON Connect
