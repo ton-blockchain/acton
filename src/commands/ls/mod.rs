@@ -31,20 +31,20 @@ pub async fn ls_cmd(
     }
     let project_root = dunce::canonicalize(configured_project_root())
         .unwrap_or_else(|_| configured_project_root().to_path_buf());
-    let mappings = match ActonConfig::load() {
-        Ok(config) => config.mappings(),
+    let (mappings, acton_config) = match ActonConfig::load() {
+        Ok(config) => (config.mappings(), Some(Arc::new(config))),
         Err(e) => {
             eprintln!("  ⚠ Failed to load Acton.toml: {e:#}");
-            None
+            (None, None)
         }
     };
 
     if port.is_none() && !stdio {
         // default to stdio if no port is provided and stdio is not explicitly set
-        return ls_cmd_internal(port, true, file_db, project_root, mappings).await;
+        return ls_cmd_internal(port, true, file_db, project_root, mappings, acton_config).await;
     }
 
-    ls_cmd_internal(port, stdio, file_db, project_root, mappings).await
+    ls_cmd_internal(port, stdio, file_db, project_root, mappings, acton_config).await
 }
 
 async fn ls_cmd_internal(
@@ -53,6 +53,7 @@ async fn ls_cmd_internal(
     file_db: FileDb,
     project_root: PathBuf,
     mappings: Option<BTreeMap<String, String>>,
+    acton_config: Option<Arc<ActonConfig>>,
 ) -> anyhow::Result<()> {
     let (service, socket) = LspService::new(|client| {
         #[cfg(feature = "profiling")]
@@ -75,6 +76,7 @@ async fn ls_cmd_internal(
             file_db: Arc::new(file_db),
             project_root: project_root.clone(),
             mappings: mappings.clone(),
+            acton_config: acton_config.clone(),
             documents: DashMap::new(),
             analysis: DashMap::new(),
             file_urls: DashMap::new(),

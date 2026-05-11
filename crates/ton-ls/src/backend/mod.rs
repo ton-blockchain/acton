@@ -40,6 +40,7 @@ pub struct Backend {
     pub file_db: Arc<FileDb>,
     pub project_root: PathBuf,
     pub mappings: Option<BTreeMap<String, String>>,
+    pub acton_config: Option<Arc<acton_config::config::ActonConfig>>,
     pub documents: DashMap<Url, String>,
     pub analysis: DashMap<Url, Arc<AnalysisResult>>,
     pub file_urls: DashMap<FileId, Url>,

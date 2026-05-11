@@ -1,13 +1,15 @@
 use crate::AnalysisResult;
 use crate::backend::Backend;
 use crate::backend::utils::FileInfoExt;
+use acton_config::config::LintLevel;
 use lsp_types::MessageType;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use tolk_linter::Checker;
+use tolk_linter::{Checker, Rule};
 use tolk_resolver::ProjectIndexBuilder;
+use tolk_resolver::file_db::FileInfo;
 use tolk_resolver::symbol_resolver::resolve;
 use tolk_ty::{TypeDb, TypeInterner, infer};
 use tower_lsp::lsp_types::Url;
@@ -128,8 +130,16 @@ impl Backend {
         );
 
         let now = Instant::now();
+
+        let root_file = self
+            .file_db
+            .get_by_id(root_file_id)
+            .expect("root file not found");
+        let lint_settings = self.settings_for_root(&root_file);
+
         let mut checker = Checker::new(&self.file_db, &mut type_db, &all_body_types)
-            .with_project_root(self.project_root.clone());
+            .with_project_root(self.project_root.clone())
+            .with_settings(lint_settings);
 
         for file_id in &reachable {
             let file_info = self.file_db.get_by_id(*file_id).expect("file not found");
@@ -150,5 +160,40 @@ impl Backend {
             all_body_types,
             diagnostics,
         })
+    }
+
+    /// Mirrors the per-root lint-settings dispatch used by `acton check`. The root file
+    /// (the one currently being analyzed) determines which rule set is applied to every
+    /// reachable file, so wrappers, helpers, and the test file itself share one config:
+    /// contract-only rules (`ActonImportInContract`, `RandomRequiresInitialization`,
+    /// `DivideBeforeMultiply`) are suppressed whenever the root is a test or script.
+    fn settings_for_root(&self, root_file: &FileInfo) -> HashMap<Rule, LintLevel> {
+        let Some(config) = self.acton_config.as_deref() else {
+            return HashMap::new();
+        };
+
+        let root_path = root_file.path();
+        let canonical_root = self
+            .file_db
+            .canonicalize(root_path)
+            .unwrap_or_else(|_| root_path.clone());
+
+        if let Some(contracts) = config.contracts() {
+            for (id, contract) in contracts {
+                let source = contract.absolute_source_path(&self.project_root);
+                let canonical_source = self.file_db.canonicalize(&source).unwrap_or(source);
+                if canonical_source == canonical_root {
+                    return Checker::build_settings(config, Some(id.as_str()));
+                }
+            }
+        }
+
+        // Any file that is not a declared contract source is treated like a test or
+        // script root — matching `acton check`'s behavior when invoked on a bare path.
+        let mut settings = Checker::build_settings(config, None);
+        settings.insert(Rule::ActonImportInContract, LintLevel::Allow);
+        settings.insert(Rule::RandomRequiresInitialization, LintLevel::Allow);
+        settings.insert(Rule::DivideBeforeMultiply, LintLevel::Allow);
+        settings
     }
 }

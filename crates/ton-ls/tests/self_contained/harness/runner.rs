@@ -624,6 +624,7 @@ impl TestServer {
             file_db: Arc::new(FileDb::new(stdlib_root.clone(), Some(acton_root.clone()))),
             project_root: project_root.clone(),
             mappings: Option::<BTreeMap<String, String>>::None,
+            acton_config: None,
             documents: DashMap::new(),
             analysis: DashMap::new(),
             file_urls: DashMap::new(),
