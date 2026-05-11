@@ -1,17 +1,29 @@
-name: CI
+name: Build and Test
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
 
 jobs:
   build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -20,7 +32,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@82b1fb8d8f60584dd552f4014b3cd2de2e599dfb
+        uses: ton-blockchain/setup-acton@005f3ac616cd74b0b16d40884502e231e14f5f2d # v0.3.0
 
       - name: Build
         run: acton build

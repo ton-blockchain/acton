@@ -1,17 +1,29 @@
-name: CI
+name: Build and Test
 
 on:
   push:
     branches:
       - main
+      - master
   pull_request:
     branches:
       - main
+      - master
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
 
 jobs:
   build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -19,32 +31,17 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
-        with:
-          node-version: 22
-          cache: npm
-
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@82b1fb8d8f60584dd552f4014b3cd2de2e599dfb
-
-      - name: Install Node dependencies
-        run: npm ci
-
-      - name: Test
-        run: npm run test
-
-      - name: Typecheck
-        run: npm run typecheck
+        uses: ton-blockchain/setup-acton@005f3ac616cd74b0b16d40884502e231e14f5f2d # v0.3.0
 
       - name: Build
-        run: npm run build
+        run: acton build
+
+      - name: Test
+        run: acton test
 
       - name: Linter
         run: acton check --output-format github
 
-      - name: Acton Formatter
+      - name: Formatter
         run: acton fmt --check
-
-      - name: Prettier
-        run: npm run fmt:check
