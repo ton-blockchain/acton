@@ -34,14 +34,14 @@ jobs:
       - name: Setup Acton
         uses: ton-blockchain/setup-acton@005f3ac616cd74b0b16d40884502e231e14f5f2d # v0.3.0
 
-      - name: Build
+      - name: Acton Build
         run: acton build
 
-      - name: Test
-        run: acton test
+      - name: Acton Formatter
+        run: acton fmt --check
 
-      - name: Linter
+      - name: Acton Linter
         run: acton check --output-format github
 
-      - name: Formatter
-        run: acton fmt --check
+      - name: Acton Test
+        run: acton test
