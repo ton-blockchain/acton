@@ -21,7 +21,11 @@ pub async fn ls_cmd(
 
     let project_root = dunce::canonicalize(configured_project_root())
         .unwrap_or_else(|_| configured_project_root().to_path_buf());
-    stdlib::ensure_latest(&project_root)?;
+    if port.is_none() {
+        stdlib::ensure_latest_quiet(&project_root)?;
+    } else {
+        stdlib::ensure_latest(&project_root)?;
+    }
 
     let stdlib_path = dunce::canonicalize(project_root.join(".acton/tolk-stdlib"))?;
     let acton_stdlib_path = dunce::canonicalize(project_root.join(".acton"))

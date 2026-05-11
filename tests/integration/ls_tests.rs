@@ -1,4 +1,4 @@
-use crate::support::project::ProjectBuilder;
+use crate::support::{TestOutputExt, project::ProjectBuilder};
 use std::fs;
 
 #[test]
@@ -19,7 +19,7 @@ fn test_ls_ensure_latest_uses_project_root_from_nested_directory() {
         "stdlib must not exist in nested cwd before ls command"
     );
 
-    project
+    let output = project
         .acton()
         .arg("--project-root")
         .arg("..")
@@ -29,6 +29,8 @@ fn test_ls_ensure_latest_uses_project_root_from_nested_directory() {
         .current_dir(&nested_dir)
         .run()
         .success();
+    output.assert_not_contains("Installing standard library");
+    output.assert_not_contains("Updating standard library");
 
     assert!(
         root_stdlib.exists(),
