@@ -17,8 +17,9 @@ library, and optionally initializes Git hooks and \fBAGENTS.md\fR guidance.
 .sp
 If \fB_path_\fR already exists as a directory, \fBacton new\fR fails instead of trying
 to merge into that directory, even when it is empty. \fBacton new .\fR is the
-explicit exception: it scaffolds into the current directory and may overwrite
-existing files whose paths collide with the selected template.
+explicit exception: it scaffolds into the current directory. If generated files
+would collide with existing files, interactive mode asks for confirmation and
+non\-interactive mode refuses unless \fB\-\-overwrite\fR is passed.
 .sp
 If \fBgit\fR is available in \fBPATH\fR, \fBacton new\fR runs \fBgit init\fR in the project
 directory and then runs \fBgit add .\fR, which stages all current\-directory
@@ -95,6 +96,15 @@ template.
 If \fB\-\-agents\fR is not provided, interactive mode offers this choice after you
 opt into advanced options. Non\-interactive mode leaves \fBAGENTS.md\fR disabled
 unless \fB\-\-agents\fR is passed explicitly.
+.RE
+.sp
+\fB\-\-overwrite\fR
+.RS 4
+Overwrite existing files whose paths collide with the selected template or
+generated project files.
+.sp
+Without \fB\-\-overwrite\fR, non\-interactive mode refuses to replace colliding files.
+Interactive mode asks for confirmation unless \fB\-\-overwrite\fR is passed.
 .RE
 .SS "Display Options"
 .sp

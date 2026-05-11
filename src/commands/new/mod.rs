@@ -12,7 +12,7 @@ use inquire::{Confirm, Select, Text};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{IsTerminal, Write, stdin, stdout};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 mod licenses;
 mod template;
@@ -98,6 +98,9 @@ const ACTON_TOML_REFERENCE_FOOTER: &str = "
 # https://ton-blockchain.github.io/acton/docs/acton-toml
 ";
 
+const GENERATED_PROJECT_FILES: &[&str] =
+    &["Acton.toml", ".gitignore", ".env.example", ".editorconfig"];
+
 #[derive(Clone, Copy)]
 struct TemplateSelectItem(ProjectTemplate);
 
@@ -117,6 +120,7 @@ pub fn new_cmd(
     app: bool,
     hooks: bool,
     agents: bool,
+    overwrite: bool,
     templates: bool,
 ) -> anyhow::Result<()> {
     if templates {
@@ -212,6 +216,10 @@ pub fn new_cmd(
     if !project_path.exists() {
         fs::create_dir_all(&project_path)?;
     }
+
+    let colliding_files =
+        find_colliding_project_files(&project_path, scaffold, include_agents, &license);
+    confirm_or_reject_colliding_files(&colliding_files, interactive, overwrite)?;
 
     let author = get_git_user_name().unwrap_or_else(|| "Acton User".to_string());
 
@@ -534,6 +542,71 @@ fn project_mappings(layout: ProjectLayout) -> BTreeMap<String, String> {
     mappings.insert("tests".to_owned(), layout.tests_mapping().to_owned());
     mappings.insert("wrappers".to_owned(), layout.wrappers_mapping().to_owned());
     mappings
+}
+
+fn find_colliding_project_files(
+    project_path: &Path,
+    scaffold: template::ProjectScaffold,
+    include_agents: bool,
+    license: &str,
+) -> Vec<PathBuf> {
+    let mut paths = template::scaffold_file_paths(scaffold, include_agents);
+    paths.extend(GENERATED_PROJECT_FILES.iter().map(PathBuf::from));
+
+    if licenses::get_license_text(license, "", "").is_some() {
+        paths.push(PathBuf::from("LICENSE"));
+    }
+
+    paths.sort();
+    paths.dedup();
+    paths
+        .into_iter()
+        .filter(|relative| project_path.join(relative).exists())
+        .collect()
+}
+
+fn confirm_or_reject_colliding_files(
+    colliding_files: &[PathBuf],
+    interactive: bool,
+    overwrite: bool,
+) -> anyhow::Result<()> {
+    if colliding_files.is_empty() || overwrite {
+        return Ok(());
+    }
+
+    let file_list = format_colliding_files(colliding_files);
+
+    if !interactive {
+        let overwrite_flag = "--overwrite".yellow().bold();
+        anyhow::bail!(
+            "Refusing to overwrite existing files in non-interactive mode:\n{file_list}\n\nMove or remove these files, or pass {overwrite_flag} to replace them."
+        );
+    }
+
+    println!(
+        "\n{} acton new will overwrite existing files:",
+        "Warning:".yellow().bold()
+    );
+    print!("{file_list}");
+    println!();
+
+    let overwrite = Confirm::new("Overwrite existing files?")
+        .with_default(false)
+        .prompt()?;
+
+    if !overwrite {
+        anyhow::bail!("Aborted to avoid overwriting existing files.");
+    }
+
+    Ok(())
+}
+
+fn format_colliding_files(colliding_files: &[PathBuf]) -> String {
+    colliding_files
+        .iter()
+        .map(|path| format!("  {}", path.display()))
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn normalize_npm_package_name(project_name: &str) -> String {

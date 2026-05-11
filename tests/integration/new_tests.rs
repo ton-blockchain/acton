@@ -2619,6 +2619,154 @@ fn test_new_empty_project_in_non_empty_current_directory() {
     assert!(current_dir.join(".git").exists());
 }
 
+#[test]
+fn test_new_current_directory_rejects_colliding_files_non_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-noninteractive")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("collision-project")
+        .arg("--description")
+        .arg("collision description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/new/test_new_current_directory_rejects_colliding_files_non_interactively.stderr.txt",
+        );
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("README.md")).unwrap(),
+        "# Existing README\n"
+    );
+    assert!(!project.path().join("Acton.toml").exists());
+}
+
+#[test]
+fn test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-overwrite")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let output = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("collision-overwrite-project")
+        .arg("--description")
+        .arg("collision overwrite description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--overwrite")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_file_snapshot_matches(
+            "README.md",
+            "integration/snapshots/new/test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively.readme.md",
+        );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_current_directory_warns_before_overwriting_colliding_files_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-current-directory-collision-interactive")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let mut session = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("interactive-collision")
+        .arg("--description")
+        .arg("interactive collision description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Warning: acton new will overwrite existing files:");
+    session.expect("README.md");
+    session.expect("Overwrite existing files?");
+    session.send_line("", "failed to reject overwrite prompt");
+    session.expect("Aborted to avoid overwriting existing files.");
+    session.expect(Eof);
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("README.md")).unwrap(),
+        "# Existing README\n"
+    );
+    assert!(!project.path().join("Acton.toml").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_current_directory_overwrites_after_confirmation_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-interactive-confirm")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let mut session = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("interactive-collision-confirm")
+        .arg("--description")
+        .arg("interactive collision confirm description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Warning: acton new will overwrite existing files:");
+    session.expect("README.md");
+    session.expect("Overwrite existing files?");
+    session.send_line("y", "failed to confirm overwrite prompt");
+    session.expect("Created new Acton project");
+    session.assert_file_snapshot_matches(
+        "README.md",
+        "integration/snapshots/new/test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively.readme.md",
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn test_new_project_leaves_partial_scaffold_when_git_add_fails() {

@@ -42,6 +42,9 @@ Options:
       --agents
           Include an AGENTS.md file with coding-agent guidance
 
+      --overwrite
+          Overwrite existing files whose paths collide with the template
+
   -h, --help
           Print help (see a summary with '-h')
 

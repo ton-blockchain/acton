@@ -145,6 +145,11 @@ enum Commands {
         agents: bool,
         #[arg(
             long,
+            help = "Overwrite existing files whose paths collide with the template"
+        )]
+        overwrite: bool,
+        #[arg(
+            long,
             hide = true,
             help = "Print machine-readable template metadata as JSON",
             conflicts_with_all = [
@@ -155,7 +160,8 @@ enum Commands {
                 "license",
                 "app",
                 "hooks",
-                "agents"
+                "agents",
+                "overwrite"
             ]
         )]
         templates: bool,
@@ -1816,6 +1822,7 @@ fn main() {
             app,
             hooks,
             agents,
+            overwrite,
             templates,
         } => new_cmd(
             path.as_deref(),
@@ -1826,6 +1833,7 @@ fn main() {
             app,
             hooks,
             agents,
+            overwrite,
             templates,
         ),
         Commands::Test {

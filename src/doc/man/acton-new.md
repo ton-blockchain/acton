@@ -19,8 +19,9 @@ library, and optionally initializes Git hooks and `AGENTS.md` guidance.
 
 If `_path_` already exists as a directory, `acton new` fails instead of trying
 to merge into that directory, even when it is empty. `acton new .` is the
-explicit exception: it scaffolds into the current directory and may overwrite
-existing files whose paths collide with the selected template.
+explicit exception: it scaffolds into the current directory. If generated files
+would collide with existing files, interactive mode asks for confirmation and
+non-interactive mode refuses unless `--overwrite` is passed.
 
 If `git` is available in `PATH`, `acton new` runs `git init` in the project
 directory and then runs `git add .`, which stages all current-directory

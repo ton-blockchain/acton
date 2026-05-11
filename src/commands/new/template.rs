@@ -3,7 +3,7 @@ use include_dir::{Dir, include_dir};
 use serde::Serialize;
 use std::ffi::OsStr;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 static EMPTY_TEMPLATE_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/src/commands/new/templates/empty");
@@ -669,6 +669,46 @@ pub(super) fn create_project_from_scaffold(
     Ok(())
 }
 
+pub(super) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: bool) -> Vec<PathBuf> {
+    let mut paths = Vec::new();
+
+    if let Some(overlay_dir) = scaffold.app_overlay_dir {
+        paths.extend(
+            template_files(scaffold.base_dir)
+                .into_iter()
+                .filter_map(|path| remap_for_app_layout(&path)),
+        );
+        paths.extend(
+            template_files(overlay_dir)
+                .into_iter()
+                .filter(|path| !should_skip_entry(path, include_agents, false)),
+        );
+    } else {
+        paths.extend(
+            template_files(scaffold.base_dir)
+                .into_iter()
+                .filter(|path| !should_skip_entry(path, include_agents, false)),
+        );
+    }
+
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+fn template_files(dir: &Dir<'static>) -> Vec<PathBuf> {
+    let mut paths = dir
+        .files()
+        .map(|file| file.path().to_path_buf())
+        .collect::<Vec<_>>();
+
+    for subdir in dir.dirs() {
+        paths.extend(template_files(subdir));
+    }
+
+    paths
+}
+
 fn extract_base_for_app_layout(
     dir: &Dir<'static>,
     base_path: &Path,
@@ -698,11 +738,11 @@ const APP_LAYOUT_REMAPPINGS: &[(&str, &str)] = &[
     ("wrappers/", "contracts/wrappers/"),
 ];
 
-fn remap_for_app_layout(path: &Path) -> Option<std::path::PathBuf> {
+fn remap_for_app_layout(path: &Path) -> Option<PathBuf> {
     let path_str = path.to_str()?;
     for &(from, to) in APP_LAYOUT_REMAPPINGS {
         if let Some(rest) = path_str.strip_prefix(from) {
-            return Some(std::path::PathBuf::from(format!("{to}{rest}")));
+            return Some(PathBuf::from(format!("{to}{rest}")));
         }
     }
     None
