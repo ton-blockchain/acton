@@ -109,7 +109,7 @@ Acton offers a GitHub action to set itself up. [`setup-acton`](https://github.co
 
 ```yaml
 - name: Setup Acton
-  uses: ton-blockchain/setup-acton@master
+  uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
   id: setup-acton
   with:
     # (optional) Acton version to install.
@@ -167,7 +167,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@master
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
 
       - name: Build
         run: acton build
@@ -215,7 +215,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@master
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
 
       - name: Run tests with coverage
         run: acton test --coverage --coverage-format lcov
@@ -266,7 +266,7 @@ jobs:
           cache: npm
 
       - name: Setup Acton
-        uses: ton-blockchain/setup-acton@master
+        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
 
       - name: Install Node dependencies
         run: npm ci
