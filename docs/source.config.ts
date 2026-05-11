@@ -21,7 +21,7 @@ import {parseCodeBlockAttributes} from "fumadocs-core/mdx-plugins/codeblock-util
 import {z} from "zod"
 
 export const docs = defineDocs({
-  dir: "fake-docs",
+  dir: "content/docs",
   docs: {
     schema: pageSchema.extend({
       description: z.string(),

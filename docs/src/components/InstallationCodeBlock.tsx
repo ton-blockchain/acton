@@ -4,7 +4,7 @@ import React, {useState} from "react"
 import {Copy, Check} from "lucide-react"
 
 export const INSTALL_COMMAND =
-  "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh"
+  "curl -LsSf https://github.com/ton-blockchain/acton/releases/latest/download/acton-installer.sh | sh"
 
 export function HighlightedInstallCommand() {
   return (
