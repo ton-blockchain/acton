@@ -1,7 +1,7 @@
 use crate::commands::build::{
     contract_compilation_order, generate_dependency_files, resolve_build_output_dir,
 };
-use crate::commands::common::error_fmt;
+use crate::commands::common::{error_fmt, shell_quote};
 use crate::commands::test::mutation::diff::collect_mutation_diff_scope;
 use crate::commands::test::mutation::rules::{
     MutationEdit, MutationMatcher, MutationRule, load_custom_rules, merge_rules, rules,
@@ -808,17 +808,6 @@ fn command_output_details(output: &process::Output) -> String {
         stdout
     } else {
         format!("exit status {}", output.status)
-    }
-}
-
-fn shell_quote(value: &str) -> String {
-    if value
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | ','))
-    {
-        value.to_owned()
-    } else {
-        format!("'{}'", value.replace('\'', "'\"'\"'"))
     }
 }
 

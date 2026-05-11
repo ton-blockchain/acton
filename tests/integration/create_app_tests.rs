@@ -67,6 +67,43 @@ fn test_init_create_app_scaffolds_empty_ui_into_custom_directory() {
 }
 
 #[test]
+fn test_init_create_app_next_steps_quote_path_with_spaces() {
+    let project = ProjectBuilder::new("init-create-app-spaces")
+        .without_acton_toml()
+        .build();
+
+    project
+        .acton()
+        .init()
+        .arg("--create-dapp=frontend with spaces")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/create_app/test_init_create_app_next_steps_quote_path_with_spaces.stdout.txt",
+        );
+}
+
+#[test]
+fn test_init_create_app_next_steps_escape_single_quote_in_path() {
+    let project = ProjectBuilder::new("init-create-app-single-quote")
+        .without_acton_toml()
+        .build();
+
+    let output = project
+        .acton()
+        .init()
+        .arg("--create-dapp=frontend with 'quote")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    assert!(
+        stdout.contains("cd 'frontend with '\\''quote'"),
+        "expected create-dapp cd command to POSIX-escape the single quote, got:\n{stdout}"
+    );
+}
+
+#[test]
 fn test_init_create_app_rejects_existing_app_directory() {
     let project = ProjectBuilder::new("init-create-app-existing")
         .without_acton_toml()

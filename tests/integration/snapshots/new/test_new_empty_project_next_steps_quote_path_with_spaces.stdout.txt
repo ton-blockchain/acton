@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+> Initialized empty Git repository in [ROOT]/project with spaces/.git/
+✓ Created new Acton project
+  Project name: spaces-project
+  Description: spaces description
+  Template: empty
+  License: MIT
+
+Created Acton.toml with project configuration
+
+Next steps:
+
+  # Navigate to project
+  cd '[ROOT]/project with spaces'
+  # Build your contract
+  acton build
+  # Run tests
+  acton test

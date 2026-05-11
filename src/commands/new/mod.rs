@@ -1,5 +1,5 @@
 use crate::build_info;
-use crate::commands::common::{symlink_global_libraries, symlink_global_wallets};
+use crate::commands::common::{shell_quote, symlink_global_libraries, symlink_global_wallets};
 use crate::commands::hooks::scaffold_and_install_default_hooks;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
@@ -136,7 +136,7 @@ pub fn new_cmd(
             anyhow::bail!(
                 "Directory {} already exists, if you want to create a new project inside this directory run following commands:\n  {}\n  {}",
                 path.display().to_string().yellow(),
-                format!("cd {}", path.display()).bold(),
+                format!("cd {}", shell_quote(&path.display().to_string())).bold(),
                 "acton new .".bold()
             )
         }
@@ -355,7 +355,11 @@ pub fn new_cmd(
     println!("Next steps:");
     println!();
     println!("  {}", "# Navigate to project".dimmed());
-    println!("  {} {}", "cd".bold(), project_path.display());
+    println!(
+        "  {} {}",
+        "cd".bold(),
+        shell_quote(&project_path.display().to_string())
+    );
     println!("  {}", "# Build your contract".dimmed());
     println!("  {} build", "acton".bold());
     println!("  {}", "# Run tests".dimmed());

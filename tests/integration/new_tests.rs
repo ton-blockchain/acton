@@ -392,6 +392,115 @@ fn test_new_empty_project_non_interactive() {
 }
 
 #[test]
+fn test_new_empty_project_next_steps_quote_path_with_spaces() {
+    let project = ProjectBuilder::new("new-path-with-spaces")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("project with spaces");
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("spaces-project")
+        .arg("--description")
+        .arg("spaces description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/new/test_new_empty_project_next_steps_quote_path_with_spaces.stdout.txt",
+        );
+
+    project
+        .acton()
+        .build()
+        .current_dir(&project_dir)
+        .run()
+        .success();
+    project
+        .acton()
+        .test()
+        .current_dir(&project_dir)
+        .run()
+        .success();
+}
+
+#[test]
+fn test_new_empty_project_next_steps_escape_single_quote_in_path() {
+    let project = ProjectBuilder::new("new-path-with-single-quote")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("project with 'quote");
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("quote-project")
+        .arg("--description")
+        .arg("quote description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    assert!(
+        stdout.contains("cd '") && stdout.contains("project with '\\''quote'"),
+        "expected next-step cd command to POSIX-escape the single quote, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_new_existing_directory_hint_quotes_path_with_spaces() {
+    let project = ProjectBuilder::new("new-existing-dir-path-with-spaces")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("existing project with spaces");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/new/test_new_existing_directory_hint_quotes_path_with_spaces.stderr.txt",
+        );
+}
+
+#[test]
+fn test_new_existing_directory_hint_escapes_single_quote_in_path() {
+    let project = ProjectBuilder::new("new-existing-dir-path-with-quote")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("existing project with 'quote");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .run()
+        .failure();
+
+    let stderr = output.get_stderr();
+    assert!(
+        stderr.contains("cd '") && stderr.contains("existing project with '\\''quote'"),
+        "expected existing-directory cd hint to POSIX-escape the single quote, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn test_new_project_non_interactive_requires_template() {
     let project = ProjectBuilder::new("new-non-interactive-requires-template")
         .without_acton_toml()
