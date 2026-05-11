@@ -284,15 +284,15 @@ fn render_cards(docs: &[FileDoc]) -> String {
                 .map(|l| format!("        {l}"))
                 .collect::<Vec<_>>()
                 .join("\n");
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "    <Card href=\"{}\" title=\"{}\">\n{}\n    </Card>\n",
+                "    <Card href=\"{}\" title=\"{}\">\n{}\n    </Card>",
                 doc.docs_url, doc.title, indented
             );
         } else {
-            let _ = write!(
+            let _ = writeln!(
                 out,
-                "    <Card href=\"{}\" title=\"{}\" />\n",
+                "    <Card href=\"{}\" title=\"{}\" />",
                 doc.docs_url, doc.title
             );
         }
