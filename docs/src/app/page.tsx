@@ -380,7 +380,7 @@ export function LandingHome() {
                   >
                     <div className={`feature-copy-panel ${reversed ? "lg:order-2" : ""}`}>
                       <div
-                        className={`flex h-full flex-col justify-start pt-8 sm:pt-10 lg:min-h-[360px] lg:pt-12 xl:min-h-[440px] ${
+                        className={`flex h-full flex-col justify-start pt-8 sm:pt-10 lg:min-h-[360px] lg:pt-16 xl:min-h-[440px] ${
                           reversed
                             ? "px-5 sm:pl-5 sm:pr-10 lg:pl-7 lg:pr-12 xl:pr-14"
                             : "px-5 sm:pl-10 sm:pr-5 lg:pl-12 lg:pr-7 xl:pl-14"
