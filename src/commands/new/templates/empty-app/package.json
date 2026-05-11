@@ -10,6 +10,7 @@
     "fmt:check": "prettier --check .",
     "lint": "eslint --max-warnings 0 .",
     "lint:fix": "eslint --fix .",
+    "test": "echo \"no test specified\" && exit 0",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
