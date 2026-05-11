@@ -36,9 +36,10 @@ fn test_init_create_app_scaffolds_empty_ui_into_app_directory() {
         "app/README.md",
         "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.readme.md",
     );
+    assert!(!app_dir.join(".github/workflows/contracts.yml").exists());
     output.assert_file_snapshot_matches(
-        "app/.github/workflows/ci.yml",
-        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.ci.yml",
+        "app/.github/workflows/dapp.yml",
+        "integration/snapshots/create_app/test_init_create_app_scaffolds_empty_ui_into_app_directory.dapp.yml",
     );
 }
 

@@ -739,8 +739,12 @@ fn test_new_empty_project_with_app_flag() {
             "integration/snapshots/new/test_new_empty_project_with_app_flag.readme.md",
         )
         .assert_file_snapshot_matches(
-            "foobar/.github/workflows/ci.yml",
-            "integration/snapshots/new/test_new_empty_project_with_app_flag.ci.yml",
+            "foobar/.github/workflows/contracts.yml",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.contracts.yml",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/.github/workflows/dapp.yml",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.dapp.yml",
         );
 
     let project_dir = project.path().join("foobar");
@@ -2212,7 +2216,8 @@ fn test_new_w5_extension_app_template_matches_contract_app_package_sections() {
 #[test]
 fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
     for relative_path in [
-        ".github/workflows/ci.yml",
+        ".github/workflows/contracts.yml",
+        ".github/workflows/dapp.yml",
         ".prettierignore",
         ".prettierrc",
         "components.json",

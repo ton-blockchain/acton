@@ -95,7 +95,7 @@ fn create_project_and_run_tests() {
         .assert_file_exists("foobar/wrappers/Empty.gen.tolk")
         .assert_file_exists("foobar/scripts/deploy.tolk")
         .assert_file_exists("foobar/README.md")
-        .assert_file_exists("foobar/.github/workflows/ci.yml");
+        .assert_file_exists("foobar/.github/workflows/contracts.yml");
 }
 
 // Source scenario: tests/scenarios/common_user_flows.yaml
