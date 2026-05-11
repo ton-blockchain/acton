@@ -104,8 +104,7 @@ ABI REQUIREMENTS
        untyped initializer.
 
 TYPESCRIPT GENERATION
-       acton wrapper --ts shells out to npx --yes
-       @ton/tolk-abi-to-typescript@0.5.0.
+       acton wrapper --ts shells out to npx @ton/tolk-abi-to-typescript@0.5.0.
 
        o  Node.js, npm, and npx must be available in PATH
 
