@@ -40,14 +40,14 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
-      - name: Node Formatter
+      - name: Formatter
         run: npm run fmt:check
 
-      - name: Node Typecheck
+      - name: Typecheck
         run: npm run typecheck
 
-      - name: Node Build
+      - name: Build
         run: npm run build
 
-      - name: Node Test
+      - name: Test
         run: npm run test
