@@ -69,13 +69,13 @@ npm ci
 
 The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. Start with local emulation; it does not require a wallet, a network connection, or testnet funds.
 
-```acton-cli
+```bash
 acton run deploy-emulation
 ```
 
 If [`acton wallet`](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
 
-```acton-cli
+```bash
 acton run deploy-testnet
 ```
 
@@ -194,9 +194,15 @@ See the [formatting guide](/docs/format) for more.
 
 ## Lint contracts
 
-Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics. On a clean project, it prints the checked targets and exits with status 0:
+Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics:
 
-```acton-cli-check
+```bash
+acton check
+```
+
+On a clean project, it prints the checked targets and exits with status 0:
+
+```acton-cli-check noCopy
 $ acton check
     Checking Counter
     Checking contracts/scripts/deploy.tolk
@@ -594,7 +600,7 @@ fun main() {
 
 To run the script:
 
-```acton-cli
+```bash
 acton script contracts/scripts/increase.tolk
 ```
 
@@ -709,7 +715,7 @@ acton script contracts/scripts/deploy.tolk --net testnet --verbose --show-bodies
 
 Use [`acton verify`](/docs/commands/verify) to check that the deployed bytecode matches the local sources. It compiles local sources, uploads them to the verifier backend, collects the required signatures, and submits the verification transaction.
 
-```acton-cli
+```bash
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS>
 ```
 
@@ -719,13 +725,13 @@ Verification requires a [funded wallet](#set-up-a-wallet). If there is more than
 
 Use `--dry-run` to compile and upload sources without consuming funds to send the verification message:
 
-```acton-cli
+```bash
 acton verify Counter --net testnet --address <CONTRACT_ADDRESS> --dry-run
 ```
 
 Pass `--tonconnect` to approve the final verification transaction through a TON Connect wallet instead of a wallet from `wallets.toml`:
 
-```acton-cli
+```bash
 acton verify Counter --address EQDt7LL... --net mainnet --tonconnect
 ```
 
@@ -739,20 +745,20 @@ The counter template does not need on-chain libraries, but larger contracts ofte
 
 Publish a configured contract as a library:
 
-```acton-cli
+```bash
 acton library publish <CONTRACT_NAME> --duration 365d --wallet deployer --net testnet --local
 ```
 
 Acton compiles the contract, estimates the storage payment for the requested duration, sends the funding transaction, and saves the resulting metadata to `libraries.toml`. After publishing, inspect the library and top it up before storage fees run out. `info` and `topup` use the network saved in the library metadata:
 
-```acton-cli
+```bash
 acton library info <LIBRARY_NAME>
 acton library topup <LIBRARY_NAME> --duration 1y --wallet deployer
 ```
 
 To inspect code that is already on-chain, fetch it by hash:
 
-```acton-cli
+```bash
 acton library fetch <LIBRARY_HASH> --disasm --net testnet
 ```
 
@@ -772,7 +778,7 @@ See the [agent skills overview](/docs/agent-skills/overview) for more.
 
 Use [`acton rpc`](/docs/commands/rpc) to query remote blockchain account and contract state via TON Center APIs:
 
-```acton-cli
+```bash
 acton rpc info <CONTRACT_ADDRESS> --net testnet
 ```
 
@@ -784,7 +790,7 @@ acton rpc block-number --net testnet
 
 Render a transaction trace as a decoded tree with `rpc trace`:
 
-```acton-cli
+```bash
 acton rpc trace <TX_HASH> --net testnet
 ```
 
