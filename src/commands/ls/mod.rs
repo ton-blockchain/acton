@@ -1,4 +1,4 @@
-use crate::paths;
+use crate::{paths, stdlib};
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use dashmap::DashMap;
 use std::collections::BTreeMap;
@@ -19,18 +19,19 @@ pub async fn ls_cmd(
         setup_ls_logging(log_file)?;
     }
 
-    let stdlib_path =
-        dunce::canonicalize(PathBuf::from(".acton/tolk-stdlib")).expect("Failed to canonicalize");
-    let acton_stdlib_path =
-        dunce::canonicalize(PathBuf::from(".acton/")).unwrap_or_else(|_| PathBuf::from(".acton/"));
+    let project_root = dunce::canonicalize(configured_project_root())
+        .unwrap_or_else(|_| configured_project_root().to_path_buf());
+    stdlib::ensure_latest(&project_root)?;
+
+    let stdlib_path = dunce::canonicalize(project_root.join(".acton/tolk-stdlib"))?;
+    let acton_stdlib_path = dunce::canonicalize(project_root.join(".acton"))
+        .unwrap_or_else(|_| project_root.join(".acton"));
     let common_tolk = stdlib_path.join("common.tolk");
 
     let file_db = FileDb::new(stdlib_path, Some(acton_stdlib_path));
     if common_tolk.exists() {
         let _ = file_db.process(&common_tolk);
     }
-    let project_root = dunce::canonicalize(configured_project_root())
-        .unwrap_or_else(|_| configured_project_root().to_path_buf());
     let mappings = match ActonConfig::load() {
         Ok(config) => config.mappings(),
         Err(e) => {
