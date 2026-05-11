@@ -24,7 +24,7 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
     ensure_latest_with_output(project_root, true)
 }
 
-pub fn ensure_latest_quiet(project_root: &Path) -> anyhow::Result<()> {
+pub(crate) fn ensure_latest_quiet(project_root: &Path) -> anyhow::Result<()> {
     ensure_latest_with_output(project_root, false)
 }
 
