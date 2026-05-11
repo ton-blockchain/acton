@@ -649,9 +649,14 @@ fun net.createExternalMessage<TBody>(
 /// Sends an external-in message to the specified destination address.
 /// Read more about external incoming messages: https://docs.ton.org/foundations/messages/external-in#incoming-external-messages
 ///
-/// This helper recursively processes the resulting trace in local emulation
-/// just like [net.send], but it starts from an already composed external-in
+/// In local emulation, this helper recursively processes the resulting trace just
+/// like [net.send], but it starts from an already composed external-in
 /// message instead of an internal message sent from a wallet-like address.
+///
+/// In broadcast mode without `--tonconnect`, Acton sends the external-in message to
+/// the network and returns a single pseudo transaction placeholder. With
+/// `--tonconnect`, `net.sendExternal` is rejected; use [net.send] with an
+/// internal wallet message so the connected wallet can approve it.
 ///
 /// Returns `null` if the external message was not accepted or the destination
 /// account does not exist.
@@ -694,7 +699,10 @@ fun OutMessage.bounced(self): OutMessage {
     return { messageCell: msg.toCell() };
 }
 
-/// Returns `true` if the script is running in broadcasting mode (with `--net`), `false` otherwise.
+/// Returns the current runtime broadcast flag.
+///
+/// The flag is normally enabled by running a script with `--net`, and can also be
+/// changed at runtime with [net.enableBroadcast] and [net.disableBroadcast].
 ///
 /// This is useful for writing scripts that behave differently in emulation and broadcasting modes.
 ///

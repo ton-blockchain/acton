@@ -43,17 +43,19 @@ pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Re
 
     let acton_toml_exists = Path::new("Acton.toml").exists();
 
+    if !acton_toml_exists && current_directory_is_empty()? {
+        println!(
+            "  {} This directory is empty. For new projects, prefer creating from a template with {}",
+            "Warning:".yellow().bold(),
+            "acton new .".cyan().bold()
+        );
+    }
+
     if acton_toml_exists {
         println!(
             "    {} Acton.toml project configuration",
             "Skipping".green().bold()
         );
-        if patch_default_mappings()? {
-            println!(
-                "     {} Acton.toml with default mappings",
-                "Patched".green().bold()
-            );
-        }
     } else {
         let mut config = ActonConfig::default();
         config.ensure_default_mappings();
@@ -121,16 +123,8 @@ pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Re
     Ok(())
 }
 
-fn patch_default_mappings() -> anyhow::Result<bool> {
-    let content = fs::read_to_string("Acton.toml")?;
-    let mut config: ActonConfig = toml::from_str(&content)?;
-
-    if !config.ensure_default_mappings() {
-        return Ok(false);
-    }
-
-    config.save()?;
-    Ok(true)
+fn current_directory_is_empty() -> anyhow::Result<bool> {
+    Ok(fs::read_dir(".")?.next().is_none())
 }
 
 fn patch_or_create_gitignore() -> anyhow::Result<()> {

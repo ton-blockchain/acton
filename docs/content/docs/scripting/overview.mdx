@@ -3,29 +3,19 @@ title: "Overview"
 description: "Learn how to run Tolk files as standalone scripts for local experiments, contract deployment, and blockchain interactions"
 ---
 
-Acton provides the ability to run individual Tolk files as standalone scripts through the `script` command.
-Such scripts can be used both for learning the Tolk language, local experiments, and for
-real tasks like contract deployment or sending messages to the real blockchain.
+Acton provides the ability to run individual Tolk files as standalone scripts through the `script` command. Such scripts can be used both for learning the Tolk language, local experiments, and for real tasks like contract deployment or sending messages to the real blockchain.
 
-Scripts can use all the functions that are used in tests, which means that within scripts
-it is possible to deploy a contract to a local blockchain, send messages, and call get methods.
+Scripts can use all the functions that are used in tests, which means that within scripts it is possible to deploy a contract to a local blockchain, send messages, and call get methods. The state is not preserved between script runs.
 
-The main difference between scripts and tests is that scripts define a `main()` function which
-becomes the entry point. The `main()` function can optionally accept arguments passed from the command line,
-and those arguments are parsed against the ABI for `main()`.
+The main difference between scripts and tests is that scripts define a `main()` function which becomes the entry point. The `main()` function can optionally accept arguments passed from the command line, and those arguments are parsed against the ABI for `main()`.
 
-Each script is a regular smart contract, so, for example, sending a message through `msg.send()`
-will update the `c5` register.
+Each script is a regular smart contract, so, for example, sending a message through `msg.send()` will update the `c5` register.
 
 Scripts terminate with an exit code equal to the `exit_code` of the `main` get method execution. The maximum exit code is 255 due to the standard Unix/Linux operating system limitation, where exit codes are stored in an 8-bit unsigned integer. Any `exit_code` value larger than 255 will be wrapped using modulo 256 (`x % 256`).
 
-<Callout type="info">
-The state is not preserved between script runs.
-</Callout>
-
 The following script shows the simplest Hello World written in Tolk:
 
-```tolk title="hello.tolk"
+```tolk title="scripts/hello.tolk"
 import "@acton/io"
 
 fun main() {
@@ -36,14 +26,14 @@ fun main() {
 To run it, execute the following command:
 
 ```bash
-acton script hello.tolk
+acton script scripts/hello.tolk
 
 # Hello World
 ```
 
 And the following script calculates the storage fee for a library code of a given duration in seconds:
 
-```tolk title="storage_fee_calculator.tolk"
+```tolk title="scripts/storageFeeCalculator.tolk"
 import "@stdlib/gas-payments"
 
 fun main(libraryCode: cell, duration: int) {
@@ -57,18 +47,17 @@ fun main(libraryCode: cell, duration: int) {
 }
 ```
 
-To run it, you need to pass the library code as a cell and the duration in seconds:
+To run it, pass the library code as a cell and the duration in seconds:
 
 ```bash
-acton script storage_fee_calculator.tolk b5ee9c72010101010006000008000003e7 3600
+acton script scripts/storageFeeCalculator.tolk b5ee9c72010101010006000008000003e7 3600
 
 # Storage fee: 0.002140812 TON
 ```
 
+## Next steps
 
-## Next Steps
-
-- Learn how to [pass arguments](/docs/scripting/passing-arguments) to your scripts
+- Learn how to [pass arguments](/docs/scripting/passing-arguments) to Tolk scripts
 - Read the [script command reference](/docs/commands/script) for all available options
 - Learn how to [set up wallets](/docs/wallets) for real blockchain interactions
 - Explore [blockchain interaction](/docs/scripting/blockchain-interaction) to deploy contracts and send transactions

@@ -12,11 +12,15 @@ use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 #[derive(Debug, Clone)]
 pub(crate) struct ConsoleConfig {
     pub show_output: bool,
+    pub project_root: PathBuf,
 }
 
 impl Default for ConsoleConfig {
     fn default() -> Self {
-        Self { show_output: true }
+        Self {
+            show_output: true,
+            project_root: PathBuf::from("."),
+        }
     }
 }
 
@@ -58,11 +62,10 @@ impl ConsoleReporter {
 
 impl TestReporter for ConsoleReporter {
     fn on_testing_started(&mut self) -> anyhow::Result<()> {
-        let cwd = std::env::current_dir().unwrap_or_else(|_| Path::new(".").to_path_buf());
         println!(
             "\n{} {}\n",
             " TEST ".bold().on_blue(),
-            cwd.display().dimmed()
+            self.config.project_root.display().dimmed()
         );
         Ok(())
     }
@@ -135,8 +138,7 @@ impl TestReporter for ConsoleReporter {
     ) -> anyhow::Result<()> {
         self.count_suites += 1;
 
-        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let relative = pathdiff::diff_paths(file_path, cwd);
+        let relative = pathdiff::diff_paths(file_path, &self.config.project_root);
         let relative_path = relative.unwrap_or_else(|| file_path.to_owned());
 
         println!(

@@ -139,7 +139,7 @@ max-warnings = 0
 Then run:
 
 ```bash
-acton check # plain stdout output
+acton check # plain terminal output
 ```
 
 For machine-readable reports, choose a non-plain output format:
@@ -151,7 +151,7 @@ acton check --output-format github
 acton check --output-format gitlab --output-file gl-code-quality-report.json
 ```
 
-Non-plain formats report diagnostics but do not rewrite source files, even when `--fix` is passed.
+`--fix` can only be used with plain output. With `json`, `sarif`, `github`, or `gitlab`, Acton rejects the command instead of rewriting files.
 
 Refer to the [CI integration](/docs/ci-setup) page for more information on output formats and overall CI setup.
 

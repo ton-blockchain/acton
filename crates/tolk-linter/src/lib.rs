@@ -5,9 +5,9 @@ use crate::ast::{
     acton_import_in_contract, bless_call_missing_safety_comment, create_message_body_to_cell,
     dangerous_send_mode_missing_safety_comment, deprecated_symbol_use, dict_type_use,
     duplicated_condition, enum_cast_missing_safety_comment, explicit_return_type,
-    identical_conditional_branches, incoming_messages_duplicate_opcode, missing_contract_header,
-    negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
-    several_not_null_assertions, throw_requires_documented_error_value, throw_requires_errors_enum,
+    identical_conditional_branches, missing_contract_header, negated_is_type_can_use_not_is,
+    no_bounce_handler, no_global_variables, several_not_null_assertions,
+    throw_requires_documented_error_value, throw_requires_errors_enum,
 };
 use crate::rules::ast::{
     asm_function_missing_safety_comment, field_init_can_be_folded, import_path_can_use_mappings,
@@ -432,11 +432,6 @@ impl<'file> Walker<'file> for CheckerWalker<'_, '_> {
             self.checker,
             Rule::MessageShouldBeNamed,
             message_entity_naming::check_file_for_message_name(self.checker, self.file_id)
-        );
-        run_rule!(
-            self.checker,
-            Rule::IncomingMessagesDuplicateOpcode,
-            incoming_messages_duplicate_opcode::check_file(self.checker, self.file_id)
         );
         run_rule!(
             self.checker,

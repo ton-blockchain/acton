@@ -5,13 +5,13 @@ use crate::ast::{
     acton_import_in_contract, asm_function_missing_safety_comment, compiler_error,
     create_message_body_to_cell, deprecated_symbol_use, dict_type_use, duplicated_condition,
     explicit_return_type, field_init_can_be_folded, identical_conditional_branches,
-    import_path_can_use_mappings, incoming_messages_duplicate_opcode, message_entity_naming,
-    method_can_be_static, missing_contract_header, mutable_parameter_can_be_immutable,
-    mutable_variable_can_be_immutable, name_case_checker, negated_is_type_can_use_not_is,
-    no_bounce_handler, no_global_variables, pure_function_call_unused, reserve_mode_literal,
-    send_mode_literal, several_not_null_assertions, throw_requires_documented_error_value,
-    throw_requires_errors_enum, unused_expression, unused_import, unused_variable,
-    used_ignored_identifier, write_only_variable,
+    import_path_can_use_mappings, message_entity_naming, method_can_be_static,
+    missing_contract_header, mutable_parameter_can_be_immutable, mutable_variable_can_be_immutable,
+    name_case_checker, negated_is_type_can_use_not_is, no_bounce_handler, no_global_variables,
+    pure_function_call_unused, reserve_mode_literal, send_mode_literal,
+    several_not_null_assertions, throw_requires_documented_error_value, throw_requires_errors_enum,
+    unused_expression, unused_import, unused_variable, used_ignored_identifier,
+    write_only_variable,
 };
 use crate::dfa::{divide_before_multiply, random_requires_initialization, unauthorized_access};
 use serde::Serialize;
@@ -85,7 +85,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Tolk, "E020") => duplicated_condition::DuplicatedCondition,
         (Tolk, "E021") => identical_conditional_branches::IdenticalConditionalBranches,
         (Tolk, "E022") => no_global_variables::NoGlobalVariables,
-        (Tolk, "E023") => incoming_messages_duplicate_opcode::IncomingMessagesDuplicateOpcode,
         (Tolk, "E024") => EnumCastMissingSafetyComment,
         (Tolk, "E025") => missing_contract_header::MissingContractHeader,
         (Tolk, "E026") => unused_expression::UnusedExpression,

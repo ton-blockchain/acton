@@ -2,9 +2,9 @@
     Finished in [TIME]
      Running tests
 
- TEST  [ROOT]/runner
+ TEST  [ROOT]/generated-project
 
- > ../generated-project/tests/contract.test.tolk (4 tests)
+ > tests/contract.test.tolk (4 tests)
   ✓ deploy exposes initial owner [TIME]
   ✓ owner can transfer ownership [TIME]
   ✓ non-owner cannot transfer ownership [TIME]

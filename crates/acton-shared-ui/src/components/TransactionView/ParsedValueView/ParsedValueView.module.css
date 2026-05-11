@@ -69,12 +69,14 @@
 
 .parsedPlainScalar,
 .parsedNull,
+.parsedVoid,
 .parsedEmpty {
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .parsedNull,
+.parsedVoid,
 .parsedEmpty {
   color: var(--text-muted);
 }

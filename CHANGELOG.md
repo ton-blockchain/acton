@@ -28,17 +28,28 @@ CI, debugger snapshots, and UI inspection flows.
   `@abi.clientType(...)` after the Tolk compiler update. Direct ABI consumers
   should read the indexed client type from `unique_types` instead of relying on
   the previous field shape.
+- The Acton linter no longer ships the `E023`
+  `incoming-messages-duplicate-opcode` rule because duplicate incoming-message
+  opcodes are now handled by the Tolk compiler. Configurations that explicitly
+  enable, disable, or explain `E023` should remove that rule reference.
 
 ### CLI, Wallets, and Verification
 
 - Added `acton verify --tonconnect` and `--tonconnect-port` so contract
   verification can be approved through a TON Connect wallet instead of a stored
   Acton wallet.
+- Added `acton library publish --tonconnect` and
+  `acton library topup --tonconnect`, with `--tonconnect-port`, so library
+  publication and top-up transactions can also be approved through TON Connect.
 - `acton up` now targets the public Acton release repository, keeps a hidden
   `--yes` flag for JetBrains plugin compatibility, and reports release lookup
   and release-list failures with clearer GitHub/network diagnostics.
 - Wallet airdrops now use the new faucet endpoint and wait for airdrop
   completion more reliably.
+- Wallet airdrop challenge handling now validates the challenge version before
+  using the response.
+- Wallet airdrop challenge requests now use the faucet's JSON `POST` flow with
+  the target address and TON airdrop type, matching the current faucet API.
 - `acton script` now gives a clearer error when `waitForTrace()` cannot find a
   trace, including the timeout path used by scripts that print the result.
 - `acton verify`, `acton up`, and related generated man/help output were
@@ -48,10 +59,19 @@ CI, debugger snapshots, and UI inspection flows.
 
 - Tolk wrapper generation now supports external incoming messages, including
   contracts that expose both internal and external message surfaces.
+- The bundled Tolk compiler/TON objects and TypeScript wrapper generator were
+  updated to the Tolk 1.4.
 - Starter templates and app scaffolds were normalized across Counter, Empty,
   Jetton, NFT, and W5 Extension projects: app templates gained `.env.example`
   files, generated project metadata became more consistent, and the empty-app
   and W5 app templates now include project-specific `AGENTS.md` guidance.
+- Generated GitHub Actions workflows in starter templates are now split into
+  contract and dApp checks where appropriate, cover both `main` and `master`,
+  use least-privilege permissions and concurrency cancellation, and pin the
+  refreshed `setup-acton` action.
+- App template `npm run test` scripts now succeed without requiring an Acton
+  project, so generated dApp-only workflows can run independently from contract
+  checks.
 - `acton new --templates` now returns richer machine-readable template
   metadata, and generated help/man output was refreshed around the updated
   template list and app scaffolds.
@@ -60,6 +80,10 @@ CI, debugger snapshots, and UI inspection flows.
 - Jetton, NFT, and W5 Extension templates received consistency fixes, including
   unified author metadata, kebab-case NFT script names, refreshed W5 wrapper
   helpers, and regenerated TypeScript wrappers.
+- The W5 Extension starter template was finalized with refreshed message
+  definitions, generated Tolk wrappers, and TypeScript wrappers.
+- Template opcode and hex literal casing is now normalized to lowercase in the
+  built-in templates.
 
 ### Stdlib, Formatting, and ABI Decoding
 
@@ -85,6 +109,9 @@ CI, debugger snapshots, and UI inspection flows.
   including embedded and library-ref dependencies such as Jetton minter/wallet
   setups. Dependent contracts are rebuilt with the mutated dependency override
   before child test runs.
+- Targeted `acton build <contract>` runs now refresh generated dependency-code
+  helpers for parent contracts that embed or reference the rebuilt contract,
+  preventing stale `library_ref` and embedded-code helper files.
 - Test trace snapshot paths now normalize test names, which makes generated
   trace artifacts more stable and filesystem-friendly.
 - Debug rendering now prints empty cells, slices, and builders as explicit
@@ -119,6 +146,11 @@ CI, debugger snapshots, and UI inspection flows.
 - JetBrains and VS Code documentation was expanded with reorganized screenshot
   assets, new extension feature coverage, terminal/action/test-runner views, and
   updated demo media.
+- Documentation gained new dApp development and project-management guides,
+  including TypeScript wrapper workflows and expanded library, scripting,
+  walkthrough, and IDE-support coverage.
+- The documentation site now redirects `/docs` to `/docs/welcome` locally and
+  supports richer file-tree visualization in docs pages.
 - Documentation gained a reusable `Callout` component and stricter external
   link validation around redirects.
 - Release CI now generates cargo-dist manifest checksums for release binaries,

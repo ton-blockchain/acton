@@ -61,4 +61,12 @@ opt into advanced options. Non-interactive mode leaves `AGENTS.md` disabled
 unless `--agents` is passed explicitly.
 {{/option}}
 
+{{#option "`--overwrite`" }}
+Overwrite existing files whose paths collide with the selected template or
+generated project files.
+
+Without `--overwrite`, non-interactive mode refuses to replace colliding files.
+Interactive mode asks for confirmation unless `--overwrite` is passed.
+{{/option}}
+
 {{/options}}

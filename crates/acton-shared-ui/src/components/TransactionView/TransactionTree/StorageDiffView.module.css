@@ -108,7 +108,8 @@
   overflow-wrap: break-word;
 }
 
-.storageNullValue {
+.storageNullValue,
+.storageVoidValue {
   display: inline-block;
   color: var(--text-muted);
   white-space: pre-wrap;

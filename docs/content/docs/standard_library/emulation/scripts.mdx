@@ -42,9 +42,11 @@ struct ActonWallet {
 
 `ActonWallet` is a wallet created or registered by `acton wallet` CLI command.
 Use `scripts.wallet("name")` to "connect" a wallet by name.
-Available wallets are stored in `Acton.toml` either project-wise (local) or system-wise (global).
+Configured wallets are stored in project `wallets.toml` or global
+`global.wallets.toml`; with `--tonconnect`, `scripts.wallet(...)` resolves to
+the connected TON Connect wallet address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L30" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L32" />
 
 ## `ActonWallet.toKeyPair`
 
@@ -58,7 +60,7 @@ The `privateKey` field is the 32-byte Ed25519 seed used by [crypto.sign](/docs/s
 and [crypto.rawSign](/docs/standard_library/crypto#cryptorawsign). This is available only for wallets opened by
 [scripts.wallet](#scriptswallet) when the script was started with `--net`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L39" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L41" />
 
 ## `ActonWallet.privateKey`
 
@@ -68,7 +70,7 @@ fun ActonWallet.privateKey(self): int
 
 Returns the wallet private key as a 32-byte Ed25519 seed.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L50" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L52" />
 
 ## `ActonWallet.publicKey`
 
@@ -78,7 +80,7 @@ fun ActonWallet.publicKey(self): int
 
 Returns the wallet public key.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L55" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L57" />
 
 ## `ActonWallet.walletId`
 
@@ -91,7 +93,7 @@ Returns the wallet id used by the opened wallet contract.
 For wallet v5 this is the wallet_id stored in wallet data and used for
 signed requests.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L63" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L65" />
 
 ## `ActonWallet.sign`
 
@@ -101,7 +103,7 @@ fun ActonWallet.sign(self, data: cell): slice
 
 Hashes and signs a cell with the wallet private key.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L73" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L75" />
 
 ## `ActonWallet.rawSign`
 
@@ -111,7 +113,7 @@ fun ActonWallet.rawSign(self, data: int): slice
 
 Signs an already computed 256-bit hash with the wallet private key.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L78" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L80" />
 
 ## `scripts.wallet`
 
@@ -120,8 +122,9 @@ fun scripts.wallet(name: string): ActonWallet
 ```
 
 Creates a new wallet for use in scripts. Unlike `testing.treasury`, the wallet
-can refer to a real wallet described in Acton.toml, and therefore can be used
-in scripts launched with `--net` to execute transactions on the real blockchain.
+can refer to a real wallet from `wallets.toml` or `global.wallets.toml`, or to
+the connected TON Connect wallet, and therefore can be used in scripts launched
+with `--net` to execute transactions on the real blockchain.
 
 Without `--net`, the wallet refers to an internal wallet, created in the
 same way as in `testing.treasury`.
@@ -145,7 +148,7 @@ fun main() {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L107" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L110" />
 
 ## `scripts.fetchAccountState`
 
@@ -169,7 +172,7 @@ if (state != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L138" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L141" />
 
 ## `scripts.fetchAccountStorageFee`
 
@@ -189,7 +192,7 @@ if (storageFee != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L153" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L156" />
 
 ## `scripts.fetchAccountBalance`
 
@@ -207,7 +210,7 @@ val balance = scripts.fetchAccountBalance(address);
 println("{:ton}", balance);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L166" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L169" />
 
 ## `scripts.fetchShardAccount`
 
@@ -227,7 +230,7 @@ if (shard != null) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L181" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L184" />
 
 ## `scripts.fetchConfig`
 
@@ -260,7 +263,7 @@ val globalVersion = config.getGlobalVersion();
 println("Network version: {}", globalVersion.version);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L209" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L212" />
 
 ## `scripts.isContractDeployed`
 
@@ -285,5 +288,5 @@ fun JettonWallet.getJettonBalance(self): coins {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L229" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L232" />
 

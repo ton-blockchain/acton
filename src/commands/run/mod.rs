@@ -1,4 +1,4 @@
-use crate::commands::common::error_fmt;
+use crate::commands::common::{error_fmt, shell_quote};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::anyhow;
@@ -28,7 +28,7 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
                 script_command,
                 extra_args
                     .iter()
-                    .map(|a| shell_escape_posix(a))
+                    .map(|a| shell_quote(a))
                     .collect::<Vec<_>>()
                     .join(" ")
             )
@@ -125,20 +125,6 @@ pub fn run_cmd(script_name: &str, extra_args: &[String]) -> anyhow::Result<()> {
         }
 
         Ok(())
-    }
-}
-
-#[cfg(not(target_os = "windows"))]
-fn shell_escape_posix(s: &str) -> String {
-    if s.is_empty() {
-        "''".to_string()
-    } else if s
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || "-._/".contains(c))
-    {
-        s.to_string()
-    } else {
-        format!("'{}'", s.replace('\'', r"'\''"))
     }
 }
 

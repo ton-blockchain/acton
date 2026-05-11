@@ -7,6 +7,9 @@ export type StorageLeafValue =
       readonly kind: "null"
     }
   | {
+      readonly kind: "void"
+    }
+  | {
       readonly kind: "address"
       readonly value: string
     }
@@ -64,6 +67,10 @@ const nullValue = (): StorageLeafValue => ({
   kind: "null",
 })
 
+const voidValue = (): StorageLeafValue => ({
+  kind: "void",
+})
+
 const addressValue = (value: string): StorageLeafValue => ({
   kind: "address",
   value,
@@ -89,6 +96,9 @@ const stringifyParsedValue = (value: ParsedValue): string => {
   switch (value.kind) {
     case "null": {
       return "null"
+    }
+    case "void": {
+      return "void"
     }
     case "address":
     case "scalar": {
@@ -119,6 +129,9 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
   switch (value.kind) {
     case "null": {
       return nullValue()
+    }
+    case "void": {
+      return voidValue()
     }
     case "boolean": {
       return booleanValue(value.value)

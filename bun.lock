@@ -28,9 +28,9 @@
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
         "@ton/core": "0.62.0",
+        "@ton/tolk-abi-to-typescript": "^0.5.0",
         "@types/react-router-dom": "^5.3.3",
         "buffer": "^6.0.3",
-        "gen-typescript-from-tolk-dev": "^0.3.4",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
@@ -55,9 +55,9 @@
       "version": "1.0.0",
       "dependencies": {
         "@ton/core": "0.62.0",
+        "@ton/tolk-abi-to-typescript": "^0.5.0",
         "buffer": "^6.0.3",
         "clsx": "^2.1.1",
-        "gen-typescript-from-tolk-dev": "^0.3.4",
         "lucide-react": "^0.474.0",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
@@ -78,10 +78,10 @@
       "dependencies": {
         "@acton/shared-ui": "workspace:*",
         "@ton/core": "0.62.0",
+        "@ton/tolk-abi-to-typescript": "^0.5.0",
         "bignumber.js": "^9.3.1",
         "buffer": "^6.0.3",
         "d3-hierarchy": "^1.1.9",
-        "gen-typescript-from-tolk-dev": "^0.3.4",
         "react-d3-tree": "^3.6.6",
         "react-icons": "^5.5.0",
         "shiki": "^3.22.0",
@@ -322,6 +322,8 @@
     "@ton/crypto": ["@ton/crypto@3.3.0", "", { "dependencies": { "@ton/crypto-primitives": "2.1.0", "jssha": "3.2.0", "tweetnacl": "1.0.3" } }, "sha512-/A6CYGgA/H36OZ9BbTaGerKtzWp50rg67ZCH2oIjV1NcrBaCK9Z343M+CxedvM7Haf3f/Ee9EhxyeTp0GKMUpA=="],
 
     "@ton/crypto-primitives": ["@ton/crypto-primitives@2.1.0", "", { "dependencies": { "jssha": "3.2.0" } }, "sha512-PQesoyPgqyI6vzYtCXw4/ZzevePc4VGcJtFwf08v10OevVJHVfW238KBdpj1kEDQkxWLeuNHEpTECNFKnP6tow=="],
+
+    "@ton/tolk-abi-to-typescript": ["@ton/tolk-abi-to-typescript@0.5.0", "", { "bin": { "tolk-abi-to-typescript": "dist/cli.js" } }, "sha512-/eS8bwMoGBT+S3KJrB/5DXJatoixLKGxe9BQEqzb3TJXnAOPNWyuGvS/WEz6Y8D3cR8XFJjTCvaE5aNwzstoww=="],
 
     "@tonstudio/parser-runtime": ["@tonstudio/parser-runtime@0.0.1", "", {}, "sha512-5s4fLkXWxa4SAd7QGGvJXe13GakEo0J3VF5dUI/i3A//bGZxMwCp1FcnbErpNs3y0LcAZoXE5FCUnDowDQptqw=="],
 
@@ -730,8 +732,6 @@
     "function.prototype.name": ["function.prototype.name@1.1.8", "", { "dependencies": { "call-bind": "^1.0.8", "call-bound": "^1.0.3", "define-properties": "^1.2.1", "functions-have-names": "^1.2.3", "hasown": "^2.0.2", "is-callable": "^1.2.7" } }, "sha512-e5iwyodOHhbMr/yNrc7fDYG4qlbIvI5gajyzPnb5TCwyhjApznQh1BMFou9b30SevY43gCJKXycoCBjMbsuW0Q=="],
 
     "functions-have-names": ["functions-have-names@1.2.3", "", {}, "sha512-xckBUXyTIqT97tq2x2AMb+g163b5JFysYk0x4qxNFwbfQkmNZoiRHb6sPzI9/QV33WeuvVYBUIiD4NzNIyqaRQ=="],
-
-    "gen-typescript-from-tolk-dev": ["gen-typescript-from-tolk-dev@0.3.4", "", { "bin": { "gen-typescript-from-tolk": "dist/cli.js" } }, "sha512-Sl2XjlzYPzKfUSWi61LZ2euj6dBX9NOgVpYaY9b6dr3/wfXj0eyyphxYzHgd69qDlqZf/vvyX+wRiv1NxBsbKQ=="],
 
     "generator-function": ["generator-function@2.0.1", "", {}, "sha512-SFdFmIJi+ybC0vjlHN0ZGVGHc3lgE0DxPAT0djjVg+kjOnSqclqmj0KQ7ykTOLP6YxoqOvuAODGdcHJn+43q3g=="],
 

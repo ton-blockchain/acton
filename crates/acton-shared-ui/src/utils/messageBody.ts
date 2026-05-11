@@ -1,12 +1,12 @@
 import {Address, Builder, Cell, Dictionary, Slice, loadShardAccount} from "@ton/core"
 import type {Message, MessageRelaxed} from "@ton/core"
-import type {ContractABI, SymTable, Ty} from "gen-typescript-from-tolk-dev"
+import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {
   DynamicCtx,
   SymTable as CompilerSymTable,
   renderTy,
   unpackFromSliceDynamic,
-} from "gen-typescript-from-tolk-dev"
+} from "@ton/tolk-abi-to-typescript"
 
 import type {BackendContractInfo} from "@/types"
 import type {
@@ -315,7 +315,7 @@ const toParsedValue = (value: unknown): ParsedValue => {
   }
 
   if (value === undefined) {
-    return {kind: "scalar", value: "undefined"}
+    return {kind: "void"}
   }
 
   if (typeof value === "boolean") {
@@ -366,6 +366,13 @@ const toParsedValue = (value: unknown): ParsedValue => {
     }
 
     const typeName = typeof objectValue.$ === "string" ? objectValue.$ : undefined
+    if (
+      typeName === "void" &&
+      Object.prototype.hasOwnProperty.call(objectValue, "value") &&
+      objectValue.value === undefined
+    ) {
+      return {kind: "void"}
+    }
 
     return {
       kind: "object",

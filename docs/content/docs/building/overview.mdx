@@ -1,214 +1,82 @@
 ---
-title: "Overview"
-description: "Learn how Acton's build system manages smart contract compilation, dependencies, and code generation"
+title: "Build system overview"
+description: "How Acton's build system manages smart contract compilation, dependencies, and code generation"
 ---
 
-Acton provides a flexible smart contract build system with support for code generation and dependency management between contracts. The build system automatically handles contract compilation, dependency resolution, and generates helper functions for embedding child contracts.
+Two commands drive compilation:
 
-For a complete reference of all configuration options and CLI flags, see:
+- [`acton build`](/docs/commands/build) runs the full project pipeline: it compiles Tolk contracts registered in `Acton.toml`, resolves the [dependency graph](#contract-dependencies), and [writes artifacts](#best-effort-builds) to be consumed by [tests](/docs/testing/overview), [wrappers](/docs/building/wrappers), and [scripts](/docs/scripting/overview).
+- [`acton compile`](/docs/commands/compile) targets a single `.tolk` file — useful for quick inspection of compiler output or producing standalone `.boc` and `.fif` files outside a project build.
 
 <Cards>
-  <Card href="/docs/building/reference" title="Build Reference">
-    Complete reference for all build system configuration options, CLI flags, and contract settings
+  <Card href="/docs/building/wrappers" title="Tolk wrappers">
+    Generate typed Tolk wrappers and use them to deploy and interact with contracts
+  </Card>
+  <Card href="/docs/building/reference" title="Build reference">
+    Complete reference for all build system configuration options and CLI flags
   </Card>
 </Cards>
 
-## Basic Configuration
+## Contract dependencies
 
-Contracts are described in the Acton.toml project configuration file. A simple contract might look like this:
-
-```toml title=Acton.toml
-[package]
-name = "my-counter"
-description = "The Best Counter Ever"
-version = "0.1.0"
-license = "MIT"
-
-[contracts.Counter]
-display-name = "Counter"
-src = "contracts/Counter.tolk"
-depends = []
-```
-
-Now when calling `acton build`, the contract will be compiled and added to the cache.
-
-## Contract Dependencies
-
-Very often, one contract's code needs to be included in another contract. There are three main ways to implement this:
-
-1. **Storage approach**: Store the code in `Storage` during deployment
-2. **Code embedding**: Compile the child contract code and embed it through an assembly function directly into the parent contract's code
-3. **Library reference**: Deploy a library with the child contract code and reference this library through an assembly function
-
-Acton supports all three approaches and provides convenient file generation for the second and third methods.
-
-### Code Embedding
-
-Let's imagine we have a Jetton Minter and Jetton Wallet, and we need the Wallet code inside the Minter. All you need to do to embed the Wallet code into the Minter is to specify the dependency in Acton.toml:
+Parent contracts often need child contract code at runtime — to deploy children or verify their code hash. The dependencies are declared in `Acton.toml`:
 
 ```toml
 [contracts.JettonMinter]
-display-name = "Minter"
 src = "contracts/JettonMinter.tolk"
 depends = ["JettonWallet"]
 
 [contracts.JettonWallet]
-display-name = "Wallet"
 src = "contracts/JettonWallet.tolk"
 depends = []
 ```
 
-Now after calling `acton build`, a file `gen/JettonWallet.code.tolk` will appear in the `gen/` folder with the function `jettonWalletCompiledCode` which returns a Cell with the Wallet code.
+See how to [declare contract dependencies](/docs/projects#declare-contract-dependencies) in the project management guide.
 
+### No circular dependencies
 
-### Library References
+Acton resolves the full dependency graph and compiles contracts in topological order. A circular dependency aborts the build before any contract is compiled:
 
-If you want to reference code through a library reference, specify the dependency kind in the `depends` array:
-
-```toml
-[contracts.JettonMinter]
-display-name = "Minter"
-src = "contracts/JettonMinter.tolk"
-depends = [
-  { name = "JettonWallet", kind = "library_ref" }
-]
-
-[contracts.JettonWallet]
-display-name = "Wallet"
-src = "contracts/JettonWallet.tolk"
-depends = []
 ```
-
-The generated file `gen/JettonWallet.code.tolk` will contain the function `jettonWalletCompiledCode` which references the library by its hash instead of embedding the full code.
-
-<Callout type="info">
-Check out the [Libraries](/docs/libraries) guide for more information on how to deploy and use libraries.
-</Callout>
-
-### Dependency Resolution
-
-Acton automatically resolves contract dependencies and ensures they are compiled in the correct order. If a circular dependency is detected between contracts, the build will fail with a detailed error message showing the cycle path:
-
-```bash
 Error: Circular dependency detected in contracts: A → B → A → C
 ```
 
-Dependency-graph failures such as missing contracts or cycles happen before the
-main compile loop starts, so those failures do not leave behind partial build
-artifacts.
+Dependency-graph failures such as missing contracts or cycles happen before the main compile loop starts, so those failures do not leave behind partial build artifacts.
 
-## Best-Effort Builds
+## Best-effort builds
 
-Once dependency resolution succeeds, `acton build` switches to best-effort
-execution:
+When compiled with `acton build`, each successful contract build produces: a JSON file with Base64- and hex-encoded contract code in `build/`, a JSON file with compiler ABI in `build/abi/`, and dependency helper files in `gen/` for contracts with declared dependencies.
 
-- a compile failure for one contract is recorded, but Acton continues building
-  other eligible contracts
-- artifact-writing failures are also collected instead of aborting the whole run
-- contracts that compiled successfully before a later failure keep their JSON,
-  BoC, helper, or Fift artifacts on disk
+Once dependency resolution succeeds, Acton builds eligible contracts, discarding those failed to compile and not aborting the build immediately. Same goes for artifact-writing failures. Further, artifacts produced from successful builds in the current run remain on disk.
 
-This means a failing build can still leave useful partial outputs behind for the
-contracts that already succeeded.
+Compilation of a parent contract may still fail if its dependency failed to build or its helper file in `gen/` was never produced.
 
-There is one dependency-related caveat: if a dependency failed earlier, its
-generated helper file is not produced. A parent contract may then fail later
-because the expected generated import is missing.
+To limit the build set to a single contract and its transitive dependencies, provide its ID explicitly, e.g., by running `acton build Counter`.
 
-When you run `acton build <NAME>`, Acton does not build every configured
-contract. It limits work to the requested contract and its transitive
-dependencies.
+## Build caching
 
-## Build vs Compile
+Acton uses a shared file-based cache under `build/cache/`. Each cache entry is keyed on the source file path, Tolk compiler version, optimization level, debug mode, Fift generation flag, and import mappings from `Acton.toml`.
 
-`acton build` and `acton compile` share the same compiler and cache, but they
-solve different problems:
+A cache entry is valid only if the content hash of every imported source file matches the stored hash. This includes helper files generated in `gen/`, so changing a child contract's source also invalidates the cache for any parent that imports the generated helper.
 
-| Aspect   | `acton build`                                                       | `acton compile`                                                 |
-|----------|---------------------------------------------------------------------|-----------------------------------------------------------------|
-| Scope    | Contract graph from `Acton.toml`                                    | One explicit `.tolk` file                                       |
-| Manifest | Required for normal operation                                       | Optional; used for mappings/project context when available      |
-| Outputs  | Project build JSON, optional BoC, dependency helpers, optional Fift | Only the files explicitly requested via CLI flags               |
-| Defaults | Uses `[build]` config and contract metadata                         | Does not use `[build]` output defaults or generate helper files |
+The same cache directory is shared by `acton build`, `acton compile`, and [`acton test`](/docs/commands/test). Recent builds often speed up subsequent test runs.
 
-Use `build` when you want project-aware artifact generation. Use `compile` when
-you want to inspect or export one file in isolation.
+Clear the cache to force a full rebuild:
 
-## Build Caching
+```bash
+acton build --clear-cache
+```
 
-Acton uses a shared file-based compilation cache to speed up repeated `build`,
-`compile`, and test runs. By default it lives under `build/cache` relative to
-the project root.
-
-### Cache Layout
-
-| Path                       | Purpose                                                                  |
-|----------------------------|--------------------------------------------------------------------------|
-| `build/cache/*.json`       | Normal compilation cache entries                                         |
-| `build/cache/debug/*.json` | Debug-oriented entries compiled with source-map/debug metadata           |
-| `build/cache/.lock`        | A write lock that coordinates concurrent cache updates between processes |
-
-Debug and non-debug compilation results are stored separately, so a
-source-map-enabled compile does not overwrite the normal cached artifact for
-the same file.
-
-### Cache Management
-
-| Command                     | Description                        |
-|-----------------------------|------------------------------------|
-| `acton build`               | Build with incremental caching     |
-| `acton build --clear-cache` | Clear cache and rebuild everything |
-
-### How Caching Works
-
-The build system tracks:
-- Source file content and imported file content
-- Declared contract dependencies from `Acton.toml`
-- Compiler mode differences such as debug/source-map output and Fift output
-- Compiler/cache schema version changes
-
-Each cache entry stores the compiled code, code hash, and any optional metadata
-requested for that compilation mode, such as ABI, source-map data, debug marks,
-or Fift output.
-
-When Acton checks whether a cache entry is still valid, it recomputes a hash
-across the normalized dependency set for that source file. This includes both
-regular file imports and source files pulled in through contract dependencies.
-If any of those inputs change, the cached entry is treated as stale and the file
-is recompiled.
-
-Because dependency hashes are part of cache validation, changing a child
-contract or imported file invalidates parent cache entries that depend on it.
-That is what lets incremental builds recompile only the affected part of the
-graph instead of rebuilding everything.
-
-### What `--clear-cache` Actually Clears
-
-Commands that expose `--clear-cache` wipe the shared file cache before
-continuing. In practice this means:
-
-- all cached JSON entries under `build/cache/` are removed
-- the debug cache subdirectory `build/cache/debug/` is removed and recreated on demand
-- the lock file `build/cache/.lock` is preserved
-- other generated artifacts are not deleted automatically
-
-So `--clear-cache` does **not** clean the rest of `build/`, your generated
-helpers under `gen/`, saved traces under `build/traces/`, logs under
-`build/logs/`, or mutation-session artifacts. It only forces recompilation by
-resetting the file compilation cache.
-
-### Shared Cache Across Commands
-
-The same cache directory is reused by several workflows:
-
-- `acton build` reads and writes cache entries while building project contracts
-- `acton compile` uses the same cache for standalone file compilation
-- `acton test` reuses the same cache during the contract build/preparation phase
-
-This shared design means a recent `acton build` often speeds up a later
-`acton test`, and vice versa.
-
-<Callout type="info">
-Cache writes are guarded by `build/cache/.lock`. If another process is already
-updating the cache, Acton waits for that lock instead of writing concurrently.
+<Callout>
+    `--clear-cache` removes all entries under `build/cache/` but does not delete other artifacts in `build/`, generated helpers in `gen/`, or saved traces.
 </Callout>
+
+## See also
+
+- [Tolk wrappers](/docs/building/wrappers)
+- [Build system reference](/docs/building/reference)
+- [`acton build` command reference](/docs/commands/build)
+- [`acton compile` command reference](/docs/commands/compile)
+
+- [TypeScript wrappers](/docs/dapps)
+- [`acton wrapper` command reference](/docs/commands/wrapper)

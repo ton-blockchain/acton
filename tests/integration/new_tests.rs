@@ -392,6 +392,115 @@ fn test_new_empty_project_non_interactive() {
 }
 
 #[test]
+fn test_new_empty_project_next_steps_quote_path_with_spaces() {
+    let project = ProjectBuilder::new("new-path-with-spaces")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("project with spaces");
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("spaces-project")
+        .arg("--description")
+        .arg("spaces description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/new/test_new_empty_project_next_steps_quote_path_with_spaces.stdout.txt",
+        );
+
+    project
+        .acton()
+        .build()
+        .current_dir(&project_dir)
+        .run()
+        .success();
+    project
+        .acton()
+        .test()
+        .current_dir(&project_dir)
+        .run()
+        .success();
+}
+
+#[test]
+fn test_new_empty_project_next_steps_escape_single_quote_in_path() {
+    let project = ProjectBuilder::new("new-path-with-single-quote")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("project with 'quote");
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .arg("--name")
+        .arg("quote-project")
+        .arg("--description")
+        .arg("quote description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    let stdout = output.get_stdout();
+    assert!(
+        stdout.contains("cd '") && stdout.contains("project with '\\''quote'"),
+        "expected next-step cd command to POSIX-escape the single quote, got:\n{stdout}"
+    );
+}
+
+#[test]
+fn test_new_existing_directory_hint_quotes_path_with_spaces() {
+    let project = ProjectBuilder::new("new-existing-dir-path-with-spaces")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("existing project with spaces");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/new/test_new_existing_directory_hint_quotes_path_with_spaces.stderr.txt",
+        );
+}
+
+#[test]
+fn test_new_existing_directory_hint_escapes_single_quote_in_path() {
+    let project = ProjectBuilder::new("new-existing-dir-path-with-quote")
+        .without_acton_toml()
+        .build();
+    let project_dir = project.path().join("existing project with 'quote");
+    fs::create_dir_all(&project_dir).unwrap();
+
+    let output = project
+        .acton()
+        .arg("new")
+        .arg(&project_dir.display().to_string())
+        .run()
+        .failure();
+
+    let stderr = output.get_stderr();
+    assert!(
+        stderr.contains("cd '") && stderr.contains("existing project with '\\''quote'"),
+        "expected existing-directory cd hint to POSIX-escape the single quote, got:\n{stderr}"
+    );
+}
+
+#[test]
 fn test_new_project_non_interactive_requires_template() {
     let project = ProjectBuilder::new("new-non-interactive-requires-template")
         .without_acton_toml()
@@ -739,8 +848,12 @@ fn test_new_empty_project_with_app_flag() {
             "integration/snapshots/new/test_new_empty_project_with_app_flag.readme.md",
         )
         .assert_file_snapshot_matches(
-            "foobar/.github/workflows/ci.yml",
-            "integration/snapshots/new/test_new_empty_project_with_app_flag.ci.yml",
+            "foobar/.github/workflows/contracts.yml",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.contracts.yml",
+        )
+        .assert_file_snapshot_matches(
+            "foobar/.github/workflows/dapp.yml",
+            "integration/snapshots/new/test_new_empty_project_with_app_flag.dapp.yml",
         );
 
     let project_dir = project.path().join("foobar");
@@ -2099,24 +2212,13 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    if template == "empty" {
-        assert!(
-            !scripts.contains_key("test"),
-            "empty app template is also used by acton init --create-dapp and must not require an Acton project"
-        );
-    } else {
-        assert!(
-            scripts.contains_key("test"),
-            "{template} app template must expose npm run test"
-        );
-        let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
-        assert!(
-            test_output.status.success(),
-            "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&test_output.stdout),
-            String::from_utf8_lossy(&test_output.stderr)
-        );
-    }
+    let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
+    assert!(
+        test_output.status.success(),
+        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&test_output.stdout),
+        String::from_utf8_lossy(&test_output.stderr)
+    );
 
     let typecheck_output =
         run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
@@ -2212,7 +2314,8 @@ fn test_new_w5_extension_app_template_matches_contract_app_package_sections() {
 #[test]
 fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
     for relative_path in [
-        ".github/workflows/ci.yml",
+        ".github/workflows/contracts.yml",
+        ".github/workflows/dapp.yml",
         ".prettierignore",
         ".prettierrc",
         "components.json",
@@ -2508,6 +2611,154 @@ fn test_new_empty_project_in_non_empty_current_directory() {
     assert!(current_dir.join("tests").exists());
     assert!(current_dir.join("LICENSE").exists());
     assert!(current_dir.join(".git").exists());
+}
+
+#[test]
+fn test_new_current_directory_rejects_colliding_files_non_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-noninteractive")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("collision-project")
+        .arg("--description")
+        .arg("collision description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/new/test_new_current_directory_rejects_colliding_files_non_interactively.stderr.txt",
+        );
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("README.md")).unwrap(),
+        "# Existing README\n"
+    );
+    assert!(!project.path().join("Acton.toml").exists());
+}
+
+#[test]
+fn test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-overwrite")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let output = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("collision-overwrite-project")
+        .arg("--description")
+        .arg("collision overwrite description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .arg("--overwrite")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Created new Acton project")
+        .assert_file_snapshot_matches(
+            "README.md",
+            "integration/snapshots/new/test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively.readme.md",
+        );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_current_directory_warns_before_overwriting_colliding_files_interactively() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("new-current-directory-collision-interactive")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let mut session = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("interactive-collision")
+        .arg("--description")
+        .arg("interactive collision description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Warning: acton new will overwrite existing files:");
+    session.expect("README.md");
+    session.expect("Overwrite existing files?");
+    session.send_line("", "failed to reject overwrite prompt");
+    session.expect("Aborted to avoid overwriting existing files.");
+    session.expect(Eof);
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("README.md")).unwrap(),
+        "# Existing README\n"
+    );
+    assert!(!project.path().join("Acton.toml").exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn test_new_current_directory_overwrites_after_confirmation_interactively() {
+    let project = ProjectBuilder::new("new-current-directory-collision-interactive-confirm")
+        .without_acton_toml()
+        .raw_file("README.md", "# Existing README\n")
+        .build();
+
+    let mut session = project
+        .acton()
+        .current_dir(project.path())
+        .arg("new")
+        .arg(".")
+        .arg("--name")
+        .arg("interactive-collision-confirm")
+        .arg("--description")
+        .arg("interactive collision confirm description")
+        .arg("--template")
+        .arg("empty")
+        .arg("--license")
+        .arg("MIT")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Include the TypeScript dApp?");
+    session.send_line("", "failed to keep default no-app choice");
+    session.expect("Do you want to configure advanced options (Git hooks, license, etc.)?");
+    session.send_line("", "failed to keep default no-advanced choice");
+    session.expect("Warning: acton new will overwrite existing files:");
+    session.expect("README.md");
+    session.expect("Overwrite existing files?");
+    session.send_line("y", "failed to confirm overwrite prompt");
+    session.expect("Created new Acton project");
+    session.assert_file_snapshot_matches(
+        "README.md",
+        "integration/snapshots/new/test_new_current_directory_overwrites_colliding_files_with_flag_non_interactively.readme.md",
+    );
 }
 
 #[cfg(unix)]

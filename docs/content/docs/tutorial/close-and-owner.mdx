@@ -40,8 +40,8 @@ struct (0x14160e21) ClosePoll {}
 The final `contracts/Poll.tolk` with all changes applied:
 
 ```tolk title="contracts/Poll.tolk"
-import "types"
 import "@gen/Voter.code"
+import "types"
 
 type AllowedPollMessage = Vote | ClosePoll
 
@@ -68,7 +68,11 @@ fun onInternalMessage(in: InMessage) {
 
             val voterInit = ContractState {
                 code: voterCompiledCode(),
-                data: VoterStorage { poll: contract.getAddress(), voter: in.senderAddress, hasVoted: false }.toCell(),
+                data: VoterStorage {
+                    poll: contract.getAddress(),
+                    voter: in.senderAddress,
+                    hasVoted: false,
+                }.toCell(),
             };
             val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
@@ -90,6 +94,8 @@ fun onInternalMessage(in: InMessage) {
                 value:  0,
                 dest:   storage.owner,
             });
+            // SAFETY: only the poll owner can close, and this returns the remaining
+            // message value after storage has been marked closed.
             returnMsg.send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_DESTROY);
         }
         else => {
@@ -114,7 +120,11 @@ fun onBouncedMessage(in: InMessageBounced) {
 get fun calcVoterAddress(voter: address): address {
     val init = ContractState {
         code: voterCompiledCode(),
-        data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
+        data: VoterStorage {
+            poll: contract.getAddress(),
+            voter,
+            hasVoted: false,
+        }.toCell(),
     };
     return AutoDeployAddress { stateInit: init }.calculateAddress();
 }

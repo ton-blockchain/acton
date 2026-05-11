@@ -1,4 +1,6 @@
 import defaultMdxComponents from "fumadocs-ui/mdx"
+import {File, Folder, Files} from "fumadocs-ui/components/files"
+import {Cards, Card} from "fumadocs-ui/components/card"
 import * as Twoslash from "fumadocs-twoslash/ui"
 import type {MDXComponents} from "mdx/types"
 import {
@@ -18,6 +20,11 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     CommandOptionMeta,
     CommandOptions,
     CommandOptionTitle,
+    Cards,
+    Card,
+    File,
+    Folder,
+    Files,
     // See: https://www.fumadocs.dev/docs/ui/components/image-zoom
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     img: props => <ImageZoom {...(props as any)} />,

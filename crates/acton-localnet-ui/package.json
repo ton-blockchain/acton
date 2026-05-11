@@ -21,7 +21,7 @@
     "@ton/core": "0.62.0",
     "@types/react-router-dom": "^5.3.3",
     "buffer": "^6.0.3",
-    "gen-typescript-from-tolk-dev": "^0.3.4",
+    "@ton/tolk-abi-to-typescript": "^0.5.0",
     "lucide-react": "^0.474.0",
     "react-d3-tree": "^3.6.6",
     "react-icons": "^5.5.0",

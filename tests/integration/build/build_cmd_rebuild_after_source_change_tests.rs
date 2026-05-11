@@ -16,6 +16,29 @@ fn read_artifact(project_path: &Path, contract_name: &str) -> String {
     })
 }
 
+fn read_artifact_code_boc64(project_path: &Path, contract_name: &str) -> String {
+    let artifact: serde_json::Value =
+        serde_json::from_str(&read_artifact(project_path, contract_name))
+            .expect("Build artifact should be valid JSON");
+
+    artifact["code_boc64"]
+        .as_str()
+        .unwrap_or_else(|| panic!("Build artifact for '{contract_name}' should contain code_boc64"))
+        .to_string()
+}
+
+fn assert_generated_helper_contains_boc(
+    generated: &str,
+    boc: &str,
+    expected_asm_suffix: &str,
+    helper_description: &str,
+) {
+    assert!(
+        generated.contains(&format!("\"{boc}\" {expected_asm_suffix}")),
+        "{helper_description} should contain the expected compiled BoC"
+    );
+}
+
 fn assert_compilation_matches_snapshot(compiled: &[String], snapshot_path: &str) {
     let mut actual = compiled.join("\n");
     actual.push('\n');
@@ -26,6 +49,265 @@ fn assert_compilation_matches_snapshot(compiled: &[String], snapshot_path: &str)
     assert_eq!(
         actual, expected,
         "Compilation order snapshot mismatch for '{snapshot_path}'"
+    );
+}
+
+#[test]
+fn library_ref_dependency_file_updates_after_dependency_source_change() {
+    let project = ProjectBuilder::new("build-rebuild-library-ref-generated-dependency")
+        .contract(
+            "lib",
+            r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 100;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract_with_detailed_deps(
+            "app",
+            r#"
+import "../gen/lib.code.tolk"
+
+fun onInternalMessage(in: InMessage) {
+    val code = libCompiledCode();
+    assert (in.body.isEmpty()) throw 200;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+            vec![("lib", Some("library_ref"), None, None)],
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_path = project.path().join("gen/lib.code.tolk");
+    let generated_before =
+        fs::read_to_string(&generated_path).expect("Generated library_ref file should exist");
+    let lib_boc_before = read_artifact_code_boc64(project.path(), "lib");
+    assert_generated_helper_contains_boc(
+        &generated_before,
+        &lib_boc_before,
+        "base64>B B>boc hashu",
+        "Generated library_ref file",
+    );
+
+    fs::write(
+        project.path().join("contracts/lib.tolk"),
+        r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 101;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+    )
+    .expect("Failed to update library contract source");
+
+    let output = project.acton().build().contract("lib").run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_compilation_matches_snapshot(
+        &compiled,
+        "tests/integration/snapshots/build/build_cmd_rebuild_after_source_change_tests/library_ref_dependency_file_updates_after_dependency_source_change.compilation-order.txt",
+    );
+
+    let generated_after =
+        fs::read_to_string(&generated_path).expect("Generated library_ref file should exist");
+    let lib_boc_after = read_artifact_code_boc64(project.path(), "lib");
+
+    assert_ne!(
+        lib_boc_before, lib_boc_after,
+        "Library contract BoC should change after source edit"
+    );
+    assert_ne!(
+        generated_before, generated_after,
+        "Generated library_ref helper should be regenerated after dependency source edit"
+    );
+    assert_generated_helper_contains_boc(
+        &generated_after,
+        &lib_boc_after,
+        "base64>B B>boc hashu",
+        "Generated library_ref helper",
+    );
+    assert!(
+        !generated_after.contains(&lib_boc_before),
+        "Generated library_ref helper should not retain the stale library BoC"
+    );
+}
+
+#[test]
+fn embed_code_dependency_file_updates_after_dependency_targeted_build() {
+    let project = ProjectBuilder::new("build-rebuild-embed-code-generated-dependency")
+        .contract(
+            "child",
+            r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 100;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract_with_detailed_deps(
+            "parent",
+            r#"
+import "../gen/child.code.tolk"
+
+fun onInternalMessage(in: InMessage) {
+    val code = childCompiledCode();
+    assert (in.body.isEmpty()) throw 200;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+            vec![("child", Some("embed_code"), None, None)],
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_path = project.path().join("gen/child.code.tolk");
+    let generated_before =
+        fs::read_to_string(&generated_path).expect("Generated embed_code file should exist");
+    let child_boc_before = read_artifact_code_boc64(project.path(), "child");
+    assert_generated_helper_contains_boc(
+        &generated_before,
+        &child_boc_before,
+        "base64>B B>boc PUSHREF",
+        "Generated embed_code file",
+    );
+
+    fs::write(
+        project.path().join("contracts/child.tolk"),
+        r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 101;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+    )
+    .expect("Failed to update child contract source");
+
+    let output = project.acton().build().contract("child").run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_compilation_matches_snapshot(
+        &compiled,
+        "tests/integration/snapshots/build/build_cmd_rebuild_after_source_change_tests/embed_code_dependency_file_updates_after_dependency_targeted_build.compilation-order.txt",
+    );
+
+    let generated_after =
+        fs::read_to_string(&generated_path).expect("Generated embed_code file should exist");
+    let child_boc_after = read_artifact_code_boc64(project.path(), "child");
+
+    assert_ne!(
+        child_boc_before, child_boc_after,
+        "Child contract BoC should change after source edit"
+    );
+    assert_ne!(
+        generated_before, generated_after,
+        "Generated embed_code helper should be regenerated after dependency source edit"
+    );
+    assert_generated_helper_contains_boc(
+        &generated_after,
+        &child_boc_after,
+        "base64>B B>boc PUSHREF",
+        "Generated embed_code helper",
+    );
+    assert!(
+        !generated_after.contains(&child_boc_before),
+        "Generated embed_code helper should not retain the stale child BoC"
+    );
+}
+
+#[test]
+fn custom_dependency_file_path_updates_after_dependency_targeted_build() {
+    let project = ProjectBuilder::new("build-rebuild-custom-generated-dependency")
+        .contract(
+            "child",
+            r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 100;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract_with_detailed_deps(
+            "parent",
+            r#"
+import "../generated/custom-child-code"
+
+fun onInternalMessage(in: InMessage) {
+    val code = customChildCode();
+    assert (in.body.isEmpty()) throw 200;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+            vec![(
+                "child",
+                Some("library_ref"),
+                Some("customChildCode"),
+                Some("generated/custom-child-code.tolk"),
+            )],
+        )
+        .build();
+
+    project.acton().build().run().success();
+
+    let generated_path = project.path().join("generated/custom-child-code.tolk");
+    let default_generated_path = project.path().join("gen/child.code.tolk");
+    assert!(
+        !default_generated_path.exists(),
+        "Default dependency helper should not be created when custom path is configured"
+    );
+
+    let generated_before =
+        fs::read_to_string(&generated_path).expect("Custom generated dependency file should exist");
+    let child_boc_before = read_artifact_code_boc64(project.path(), "child");
+    assert!(
+        generated_before.contains("fun customChildCode(): cell"),
+        "Custom generated dependency file should use the configured function name"
+    );
+    assert_generated_helper_contains_boc(
+        &generated_before,
+        &child_boc_before,
+        "base64>B B>boc hashu",
+        "Custom generated dependency file",
+    );
+
+    fs::write(
+        project.path().join("contracts/child.tolk"),
+        r"fun onInternalMessage(in: InMessage) {
+    assert (in.body.isEmpty()) throw 101;
+}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+    )
+    .expect("Failed to update child contract source");
+
+    let output = project.acton().build().contract("child").run().success();
+    let compiled = extract_compiled_contracts(&output.get_normalized_stdout());
+    assert_compilation_matches_snapshot(
+        &compiled,
+        "tests/integration/snapshots/build/build_cmd_rebuild_after_source_change_tests/custom_dependency_file_path_updates_after_dependency_targeted_build.compilation-order.txt",
+    );
+
+    let generated_after =
+        fs::read_to_string(&generated_path).expect("Custom generated dependency file should exist");
+    let child_boc_after = read_artifact_code_boc64(project.path(), "child");
+
+    assert_ne!(
+        child_boc_before, child_boc_after,
+        "Child contract BoC should change after source edit"
+    );
+    assert_ne!(
+        generated_before, generated_after,
+        "Custom generated dependency helper should be regenerated after dependency source edit"
+    );
+    assert_generated_helper_contains_boc(
+        &generated_after,
+        &child_boc_after,
+        "base64>B B>boc hashu",
+        "Custom generated dependency helper",
+    );
+    assert!(
+        !generated_after.contains(&child_boc_before),
+        "Custom generated dependency helper should not retain the stale child BoC"
+    );
+    assert!(
+        !default_generated_path.exists(),
+        "Reverse dependency generation should continue honoring the custom path"
     );
 }
 

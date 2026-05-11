@@ -20,7 +20,7 @@
     "verify.mdx",
     "libraries.mdx",
     "!localnet",
-    "ui-setup.mdx",
+    "dapps.mdx",
     "ci-setup.mdx",
     "--- Reference ---",
     "acton-toml.mdx",

@@ -17,7 +17,7 @@ Step 2 (step_over):
      16|     val senderWallet = mintTo(minter, deployer, deployer.address, ton("20"));
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -35,7 +35,7 @@ Step 3 (step_over):
      17|     val receiverWallet = userWallet(minter, notDeployer.address);
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -54,7 +54,7 @@ Step 4 (step_over):
      18|
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -62,7 +62,7 @@ Step 4 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -76,7 +76,7 @@ Step 5 (step_over):
      22|         transferAmount,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -84,10 +84,10 @@ Step 5 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -101,7 +101,7 @@ Step 6 (step_over):
      26|         DEFAULT_FORWARD_TON_AMOUNT,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -109,10 +109,10 @@ Step 6 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -126,7 +126,7 @@ Step 7 (step_over):
      27|         null,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -134,10 +134,10 @@ Step 7 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -151,7 +151,7 @@ Step 8 (step_over):
      28|     );
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -159,10 +159,10 @@ Step 8 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -176,7 +176,7 @@ Step 9 (step_over):
      20|         deployer.address,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -184,10 +184,10 @@ Step 9 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
   Registers:
     c4 (storage): cell = empty cell
@@ -201,7 +201,7 @@ Step 10 (step_over):
      30|         from: deployer.address,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -209,10 +209,10 @@ Step 10 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
@@ -228,7 +228,7 @@ Step 11 (step_over):
      32|     });
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -236,10 +236,10 @@ Step 11 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult>
       arr: [array<array<SendResult>>, int] = 2 items
@@ -255,7 +255,7 @@ Step 12 (step_over):
      31|         to: senderWallet.address,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -263,10 +263,10 @@ Step 12 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
@@ -282,7 +282,7 @@ Step 13 (step_over):
      30|         from: deployer.address,
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -290,10 +290,10 @@ Step 13 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
@@ -309,7 +309,7 @@ Step 14 (step_over):
      35|     expect(receiverWallet.getJettonBalance()).toEqual(transferAmount);
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury = (last seen)
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -317,10 +317,10 @@ Step 14 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items
@@ -336,7 +336,7 @@ Step 15 (step_over):
      36| }
   Variables:
     minter: JettonMinter
-      address: address = 0:5301ef44ced43d6bfa2d181d935a5bea1f9b35478c23ee51b5b36a840f45149a (last seen)
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
       stateInit = <optimized out>
     deployer: Treasury = (last seen)
       address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
@@ -344,10 +344,10 @@ Step 15 (step_over):
       address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
     transferAmount: coins = 5000000000
     senderWallet: JettonWallet = (last seen)
-      address: address = 0:6f5dfd896ee2ab064df5ac91a1aea25923c74a7044795787e346115a93b20e60
+      address: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       stateInit: ContractState? = null
     receiverWallet: JettonWallet
-      address: address = 0:48c53452a2e338b5f6bc8678cc09414faafb648a8b460bc3dbcf2db9fccaad86
+      address: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       stateInit: ContractState? = null
     res: BigArray<SendResult> = (last seen)
       arr: [array<array<SendResult>>, int] = 2 items

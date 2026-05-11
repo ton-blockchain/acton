@@ -1,6 +1,8 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::commands::disasm::disasm_cmd;
+use crate::context::Wallet;
 use crate::external_send::{SendBocContext, format_send_boc_error};
+use crate::tonconnect::TonConnectSession;
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, global_libraries_path, project_root};
@@ -21,7 +23,6 @@ use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
-use tycho_types::boc::BocRepr;
 use tycho_types::cell::{Cell, CellBuilder, CellImpl, CellSliceParts, HashBytes};
 use tycho_types::models::{
     Base64StdAddrFlags, CurrencyCollection, DisplayBase64StdAddr, IntAddr, IntMsgInfo, MsgInfo,
@@ -35,6 +36,8 @@ pub fn publish_cmd(
     duration_arg: Option<String>,
     wallet_name: Option<String>,
     net: String,
+    tonconnect: bool,
+    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
     local: bool,
@@ -43,6 +46,7 @@ pub fn publish_cmd(
     let mut contract_id = contract;
     let config = ActonConfig::load()?;
     let network = Network::from_str(&net)?;
+    validate_tonconnect_options(tonconnect, wallet_name.as_deref(), &network)?;
 
     let library_code_cell = if let Some(code_str) = code_arg {
         if let Ok(cell) = Boc::decode_base64(&code_str) {
@@ -128,18 +132,8 @@ pub fn publish_cmd(
         format_std_address(&publisher_address, &network).dimmed()
     );
 
-    let wallet_name = select_wallet(wallet_name, &config)?;
-    let mut wallets = open_wallets(&config, Some(&network), true)?;
-    let wallet = wallets
-        .remove(&wallet_name)
-        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
-
-    println!(
-        "  {} Using wallet: {} {}",
-        "→".blue().bold(),
-        wallet_name.cyan(),
-        format_std_address(&wallet.address(), &network).dimmed()
-    );
+    let sender =
+        prepare_library_sender(&config, &network, wallet_name, tonconnect, tonconnect_port)?;
 
     let (bits, cells) = calculate_cell_size(library_code_cell.as_ref(), &mut HashSet::new());
 
@@ -186,21 +180,14 @@ pub fn publish_cmd(
         }
     }
 
-    let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
     let api_client = TonApiClient::new(network.clone(), custom_networks)?;
-    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
-    let expire_at = expired_at_time
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs() as u32;
 
     let message_info = IntMsgInfo {
         ihr_disabled: true,
         bounce: false,
         bounced: false,
-        src: IntAddr::Std(wallet.address()),
+        src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(publisher_address.clone()),
         value: CurrencyCollection::new(amount_to_send_nanoton),
         ihr_fee: Default::default(),
@@ -209,26 +196,15 @@ pub fn publish_cmd(
         created_lt: 0,
     };
 
-    let message = OwnedMessage {
+    let message_cell = CellBuilder::build_from(OwnedMessage {
         info: MsgInfo::Int(message_info),
         init: Some(state_init),
         body: CellSliceParts::from(CellBuilder::new().build()?),
         layout: None,
-    };
+    })?;
 
-    let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = TonCell::from_boc(message_cell_boc)?;
-    let external =
-        wallet
-            .wallet
-            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
-
-    let boc = &external.to_boc_base64()?;
-    let network_name = network.to_string();
-    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
-    api_client
-        .send_boc(boc)
-        .map_err(|error| format_send_boc_error(error, context))
+    sender
+        .send_message(&message_cell, &network, &api_client, "publication")
         .context("Failed to send publication transaction")?;
 
     println!("  {} Transaction sent successfully", "✓".green().bold());
@@ -258,6 +234,123 @@ pub fn publish_cmd(
 
     println!("  {} Library info saved", "✓".green().bold());
     Ok(())
+}
+
+enum LibrarySender {
+    Local {
+        wallet: Wallet,
+    },
+    TonConnect {
+        session: TonConnectSession,
+        address: StdAddr,
+    },
+}
+
+impl LibrarySender {
+    fn address(&self) -> StdAddr {
+        match self {
+            Self::Local { wallet } => wallet.address(),
+            Self::TonConnect { address, .. } => address.clone(),
+        }
+    }
+
+    fn send_message(
+        &self,
+        message: &Cell,
+        network: &Network,
+        api_client: &TonApiClient,
+        operation: &str,
+    ) -> anyhow::Result<()> {
+        match self {
+            Self::Local { wallet } => {
+                let (seqno, need_state_init) = wallet.seqno(api_client)?;
+                let expired_at_time =
+                    std::time::SystemTime::now() + std::time::Duration::from_secs(600);
+                let expire_at = expired_at_time
+                    .duration_since(std::time::UNIX_EPOCH)?
+                    .as_secs() as u32;
+
+                let message_cell = TonCell::from_boc(Boc::encode(message.clone()))?;
+                let external = wallet.wallet.create_ext_in_msg(
+                    vec![message_cell],
+                    seqno,
+                    expire_at,
+                    need_state_init,
+                )?;
+
+                let boc = external.to_boc_base64()?;
+                let network_name = network.to_string();
+                let context = SendBocContext::wallet(wallet, &network_name, seqno, need_state_init);
+                api_client
+                    .send_boc(&boc)
+                    .map_err(|error| format_send_boc_error(error, context))?;
+            }
+            Self::TonConnect { session, .. } => {
+                let transaction = crate::tonconnect::transaction_from_message(message, network)?;
+                session.send_transaction(transaction).with_context(|| {
+                    format!("TON Connect failed to send {operation} transaction")
+                })?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn validate_tonconnect_options(
+    tonconnect: bool,
+    wallet_name: Option<&str>,
+    network: &Network,
+) -> anyhow::Result<()> {
+    if !tonconnect {
+        return Ok(());
+    }
+
+    crate::tonconnect::ensure_supported_network(network)?;
+    if wallet_name.is_some() {
+        anyhow::bail!(
+            "{} cannot be used with {}; TON Connect uses the wallet selected in the browser",
+            "--wallet".yellow(),
+            "--tonconnect".yellow()
+        );
+    }
+    Ok(())
+}
+
+fn prepare_library_sender(
+    config: &ActonConfig,
+    network: &Network,
+    wallet_name: Option<String>,
+    tonconnect: bool,
+    tonconnect_port: u16,
+) -> anyhow::Result<LibrarySender> {
+    if tonconnect {
+        let storage_path = crate::tonconnect::session_storage_path(project_root(), network)?;
+        let session = TonConnectSession::start(tonconnect_port, storage_path)?;
+        let connected_wallet = session.connect(network)?;
+        let address = connected_wallet.address;
+        println!(
+            "  {} Using TON Connect wallet: {}",
+            "→".blue().bold(),
+            format_std_address(&address, network).dimmed()
+        );
+        return Ok(LibrarySender::TonConnect { session, address });
+    }
+
+    let wallet_name = select_wallet(wallet_name, config)?;
+    let mut wallets = open_wallets(config, Some(network), true)?;
+    let wallet = wallets
+        .remove(&wallet_name)
+        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(config, &wallet_name)))?;
+
+    println!(
+        "  {} Using wallet: {} {}",
+        "→".blue().bold(),
+        wallet_name.cyan(),
+        format_std_address(&wallet.address(), network).dimmed()
+    );
+
+    Ok(LibrarySender::Local { wallet })
 }
 
 fn calculate_cell_size(cell: &dyn CellImpl, seen: &mut HashSet<HashBytes>) -> (u64, u64) {
@@ -468,6 +561,8 @@ pub fn topup_cmd(
     name: Option<String>,
     duration_arg: Option<String>,
     wallet_name: Option<String>,
+    tonconnect: bool,
+    tonconnect_port: u16,
     amount_arg: Option<String>,
     yes: bool,
 ) -> anyhow::Result<()> {
@@ -491,19 +586,10 @@ pub fn topup_cmd(
         .get(&lib_name)
         .ok_or_else(|| anyhow!(error_fmt::library_not_found(&config, &lib_name)))?;
 
-    let wallet_name = select_wallet(wallet_name, &config)?;
     let network = Network::from_str(&lib.network.to_string())?;
-    let mut wallets = open_wallets(&config, Some(&network), true)?;
-    let wallet = wallets
-        .remove(&wallet_name)
-        .ok_or_else(|| anyhow!(error_fmt::wallet_not_found(&config, &wallet_name)))?;
-
-    println!(
-        "  {} Using wallet: {} {}",
-        "→".blue().bold(),
-        wallet_name.cyan(),
-        format_std_address(&wallet.address(), &network).dimmed()
-    );
+    validate_tonconnect_options(tonconnect, wallet_name.as_deref(), &network)?;
+    let sender =
+        prepare_library_sender(&config, &network, wallet_name, tonconnect, tonconnect_port)?;
 
     let amount_to_send_nanoton = if let Some(amount_str) = amount_arg {
         parse_ton_to_nanoton(&amount_str)?
@@ -551,16 +637,8 @@ pub fn topup_cmd(
         }
     }
 
-    let config = ActonConfig::load().unwrap_or_default();
     let custom_networks = config.custom_networks();
-    let network_name = network.to_string();
-    let api_client = TonApiClient::new(network, custom_networks)?;
-    let (seqno, need_state_init) = wallet.seqno(&api_client)?;
-
-    let expired_at_time = std::time::SystemTime::now() + std::time::Duration::from_secs(600);
-    let expire_at = expired_at_time
-        .duration_since(std::time::UNIX_EPOCH)?
-        .as_secs() as u32;
+    let api_client = TonApiClient::new(network.clone(), custom_networks)?;
 
     let dest_address = StdAddr::from_str_ext(&lib.account, StdAddrFormat::any())
         .with_context(|| format!("Invalid account address {}", lib.account))?
@@ -569,7 +647,7 @@ pub fn topup_cmd(
         ihr_disabled: true,
         bounce: true,
         bounced: false,
-        src: IntAddr::Std(wallet.address()),
+        src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(dest_address),
         value: CurrencyCollection::new(amount_to_send_nanoton),
         ihr_fee: Default::default(),
@@ -578,26 +656,16 @@ pub fn topup_cmd(
         created_lt: 0,
     };
 
-    let message = OwnedMessage {
+    let message_cell = CellBuilder::build_from(OwnedMessage {
         info: MsgInfo::Int(message_info),
         init: None,
         body: Default::default(),
         layout: None,
-    };
-
-    let message_cell_boc = BocRepr::encode(message)?;
-    let message_cell = TonCell::from_boc(message_cell_boc)?;
-    let external =
-        wallet
-            .wallet
-            .create_ext_in_msg(vec![message_cell], seqno, expire_at, need_state_init)?;
+    })?;
 
     println!("  {} Sending transaction...", "→".blue().bold());
-    let boc = &external.to_boc_base64()?;
-    let context = SendBocContext::wallet(&wallet, &network_name, seqno, need_state_init);
-    api_client
-        .send_boc(boc)
-        .map_err(|error| format_send_boc_error(error, context))
+    sender
+        .send_message(&message_cell, &network, &api_client, "top-up")
         .context("Failed to send top-up transaction")?;
 
     println!(

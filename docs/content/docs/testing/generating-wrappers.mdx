@@ -32,15 +32,16 @@ import "@acton/emulation/testing"
 
 /// Initializes the test environment, creating a fresh instance of the contract.
 /// Returns the contract wrapper and two treasury accounts (`deployer` and `notDeployer`).
-fun setupTest() {
+fun setupTest(): (Counter, Treasury, Treasury) {
     // Create a treasury account for deployment (typically the owner)
     val deployer = testing.treasury("deployer");
     // Create another treasury account for testing interactions from other users
-    val notDeployer = testing.treasury("not_deployer");
+    val notDeployer = testing.treasury("notDeployer");
 
     // Initialize and deploy the contract with default values
     val contract = Counter.fromStorage({
         id: 0,
+        owner: deployer.address,
         counter: 0,
     });
     val res = contract.deploy(deployer.address, { value: ton("1") });
@@ -146,7 +147,7 @@ The generated wrapper provides a struct representing the contract and helper met
 The wrapper provides static `fromStorage()` method to create the initial state and a `deploy` method to put it on the chain.
 
 ```tolk title="tests/Counter.test.tolk"
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 // NOTE: Always import types used by the storage struct!
 import "@contracts/types"
 import "@acton/emulation/testing"

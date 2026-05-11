@@ -311,6 +311,23 @@ fn test_library_publish_invalid_code() {
 }
 
 #[test]
+fn test_library_publish_tonconnect_rejects_localnet() {
+    let project = ProjectBuilder::new("library-publish-tonconnect-localnet").build();
+
+    project
+        .acton()
+        .library()
+        .publish()
+        .arg("--tonconnect")
+        .with_net("localnet")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/library/test_library_publish_tonconnect_rejects_localnet.stderr.txt",
+        );
+}
+
+#[test]
 fn test_library_publish_contract_not_found() {
     thread::sleep(Duration::from_secs(1));
     let project = ProjectBuilder::new("library-publish-contract-not-found").build();
@@ -672,6 +689,39 @@ cells = 1
         .failure()
         .assert_stderr_snapshot_matches(
             "integration/snapshots/library/test_library_topup_not_found.stderr.txt",
+        );
+}
+
+#[test]
+fn test_library_topup_tonconnect_rejects_localnet() {
+    let project = ProjectBuilder::new("library-topup-tonconnect-localnet").build();
+    let home_temp = tempfile::TempDir::new().unwrap();
+
+    let libraries_toml = r#"[libraries.my-lib]
+name = "MyLib"
+hash = "..."
+code = "..."
+account = "EQD..."
+duration = 100
+network = "localnet"
+timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
+bits = 10
+cells = 1
+"#;
+    fs::write(project.path().join("libraries.toml"), libraries_toml).expect("Write libraries.toml");
+
+    project
+        .acton()
+        .env("HOME", home_temp.path().to_str().unwrap())
+        .library()
+        .arg("topup")
+        .arg("my-lib")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/library/test_library_topup_tonconnect_rejects_localnet.stderr.txt",
         );
 }
 

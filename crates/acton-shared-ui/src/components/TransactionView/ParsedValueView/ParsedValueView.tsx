@@ -150,6 +150,9 @@ export function ParsedValueView({
     case "null": {
       return <span className={styles.parsedNull}>null</span>
     }
+    case "void": {
+      return <span className={styles.parsedVoid}>void</span>
+    }
     case "address": {
       return (
         <ContractChip

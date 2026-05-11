@@ -26,7 +26,9 @@ struct scripts
 
 /// `ActonWallet` is a wallet created or registered by `acton wallet` CLI command.
 /// Use `scripts.wallet("name")` to "connect" a wallet by name.
-/// Available wallets are stored in `Acton.toml` either project-wise (local) or system-wise (global).
+/// Configured wallets are stored in project `wallets.toml` or global
+/// `global.wallets.toml`; with `--tonconnect`, `scripts.wallet(...)` resolves to
+/// the connected TON Connect wallet address.
 struct ActonWallet {
     address: address
 }
@@ -80,8 +82,9 @@ fun ActonWallet.rawSign(self, data: int): slice {
 }
 
 /// Creates a new wallet for use in scripts. Unlike `testing.treasury`, the wallet
-/// can refer to a real wallet described in Acton.toml, and therefore can be used
-/// in scripts launched with `--net` to execute transactions on the real blockchain.
+/// can refer to a real wallet from `wallets.toml` or `global.wallets.toml`, or to
+/// the connected TON Connect wallet, and therefore can be used in scripts launched
+/// with `--net` to execute transactions on the real blockchain.
 ///
 /// Without `--net`, the wallet refers to an internal wallet, created in the
 /// same way as in `testing.treasury`.

@@ -61,6 +61,7 @@ enum SignMessageFormat {
 
 #[derive(serde::Deserialize)]
 struct FaucetChallengeResponse {
+    version: u32,
     challenge: String,
     difficulty: u32,
 }
@@ -102,6 +103,7 @@ const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
 const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
 const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
+const CHALLENGE_VERSION: [u32; 1] = [1];
 const DEFAULT_FAUCET_URL: &str = "https://faucet.ton.org/";
 const DEFAULT_LOCALNET_PORT: u16 = 5411;
 const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
@@ -109,7 +111,7 @@ const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
 const WALLET_DEVICE_UID_HEADER: &str = "x-device-uid";
-const AIRDROP_TYPE_TON: u16 = 1;
+const AIRDROP_TYPE_TON: u32 = 1;
 
 impl SignMessageFormat {
     const fn as_str(self) -> &'static str {
@@ -474,8 +476,17 @@ fn perform_testnet_airdrop(
     if !json {
         println!("{} Fetching PoW challenge...", "→".blue().bold());
     }
+    let challenge_payload = serde_json::json!({
+        "address": address.as_str(),
+        "type": AIRDROP_TYPE_TON,
+    });
     let challenge_res = send_with_retry(
-        || client.get(challenge_url.clone()).send(),
+        || {
+            client
+                .post(challenge_url.clone())
+                .json(&challenge_payload)
+                .send()
+        },
         "challenge",
         "Failed to get challenge from faucet",
         json,
@@ -493,6 +504,12 @@ fn perform_testnet_airdrop(
     let challenge_data: FaucetChallengeResponse = challenge_res
         .json()
         .context("Failed to parse challenge response")?;
+    if !is_supported_challenge_version(challenge_data.version) {
+        anyhow::bail!(
+            "Unsupported challenge version from faucet: {}",
+            challenge_data.version
+        );
+    }
     if challenge_data.difficulty > 256 {
         anyhow::bail!(
             "Invalid PoW difficulty from faucet: {} (max 256)",
@@ -517,7 +534,8 @@ fn perform_testnet_airdrop(
 
     // 3. Send claim
     let claim_payload = serde_json::json!({
-        "address": address,
+        "address": address.as_str(),
+        "version": challenge_data.version,
         "challenge": challenge_data.challenge,
         "nonce": nonce,
         "type": AIRDROP_TYPE_TON,
@@ -725,6 +743,10 @@ fn solve_challenge(challenge: &str, difficulty: u32) -> anyhow::Result<u64> {
         POW_MAX_SOLVE_DURATION,
         POW_MAX_NONCE_ATTEMPTS,
     )
+}
+
+fn is_supported_challenge_version(version: u32) -> bool {
+    CHALLENGE_VERSION.contains(&version)
 }
 
 fn solve_challenge_with_limits(
@@ -2210,6 +2232,13 @@ mod wallet_name_tests {
                 .contains("PoW difficulty must be at most 256 bits"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn test_challenge_version_support_list_accepts_version_one_only() {
+        assert!(is_supported_challenge_version(1));
+        assert!(!is_supported_challenge_version(0));
+        assert!(!is_supported_challenge_version(2));
     }
 
     #[test]

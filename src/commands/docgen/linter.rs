@@ -151,7 +151,7 @@ fn write_linter_meta(out_dir: &Path, rules: &[LinterRuleDoc]) -> anyhow::Result<
     pages.insert(0, "overview".to_string());
     let content = serde_json::to_string_pretty(&serde_json::json!({
         "title": "Linting rules",
-        "icon": "FileCheck",
+        "icon": "ListChecks",
         "pages": pages,
     }))?;
     fs::write(out_dir.join("meta.json"), format!("{content}\n"))?;

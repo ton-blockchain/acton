@@ -48,10 +48,24 @@ SUBCOMMANDS
           --wallet wallet
               Wallet to use for the publication transaction.
 
+              Cannot be used with --tonconnect.
+
           --net network
               Network to use.
 
               Defaults to testnet.
+
+          --tonconnect
+              Use TON Connect wallet approval for the publication transaction.
+
+              Supported only with --net mainnet and --net testnet. When
+              enabled, Acton opens a local TON Connect page and uses the wallet
+              selected in the browser.
+
+          --tonconnect-port port
+              Local TON Connect page port.
+
+              Defaults to 52258.
 
           --amount ton
               Explicit TON amount to send.
@@ -133,6 +147,20 @@ SUBCOMMANDS
           --wallet wallet
               Wallet to use for the top-up transaction.
 
+              Cannot be used with --tonconnect.
+
+          --tonconnect
+              Use TON Connect wallet approval for the top-up transaction.
+
+              Supported only for libraries stored with network = "mainnet" or
+              network = "testnet". When enabled, Acton opens a local TON
+              Connect page and uses the wallet selected in the browser.
+
+          --tonconnect-port port
+              Local TON Connect page port.
+
+              Defaults to 52258.
+
           -y, --yes
               Skip confirmation prompts.
 
@@ -189,6 +217,13 @@ AMOUNT ESTIMATION
        amount from the library size and storage duration.
 
        If --amount is passed, it overrides that estimate completely.
+
+TON CONNECT
+       publish and topup can send their transactions through TON Connect with
+       --tonconnect. The connected wallet supplies the sender address and
+       approves the internal message in the wallet UI. TON Connect is available
+       only for mainnet and testnet; use configured Acton wallets for localnet
+       and custom networks.
 
 METADATA FILES
        Saved library metadata typically includes:
@@ -250,7 +285,15 @@ EXAMPLES
 
               acton library topup Math --duration 1y
 
-       5. Fetch raw code into a BoC file:
+       5. Publish with TON Connect:
+
+              acton library publish Math --net mainnet --tonconnect
+
+       6. Top up with TON Connect:
+
+              acton library topup Math --tonconnect
+
+       7. Fetch raw code into a BoC file:
 
               acton library fetch <HASH> --output build/math-lib.boc
 

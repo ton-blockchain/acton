@@ -10,7 +10,7 @@
     "fmt:check": "prettier --check .",
     "lint": "eslint --max-warnings 0 .",
     "lint:fix": "eslint --fix .",
-    "test": "acton test",
+    "test": "echo /"no test specified/" && exit 0",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -34,6 +34,9 @@
     "react-dom": "^19.2.5",
     "tailwind-merge": "^3.5.0",
     "tslib": "^2.8.1"
+  },
+  "overrides": {
+    "axios": "^1.15.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",

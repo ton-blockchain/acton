@@ -16,7 +16,7 @@ Acton supports two methods for configuring test behavior:
 
 When both methods are used, the precedence order is:
 
-1. Command line flags (highest priority) — override everything.
+1. Command line flags (highest priority) — override matching project settings.
 2. `Acton.toml` settings (medium priority) — project defaults.
 3. Built-in defaults (lowest priority) — fallback values.
 
@@ -49,7 +49,7 @@ format = "lcov"
 
 ## Command-line overrides
 
-Any configuration option can be overridden with command-line flags:
+Many configuration options can be overridden with command-line flags:
 
 ```bash
 # Use specific reporter
@@ -251,10 +251,10 @@ junit-merge = true
 
 ### Fork testing options
 
-| Configuration       | CLI Flag              | Type      | Description                                                                                          |
-|:--------------------|:----------------------|:----------|:-----------------------------------------------------------------------------------------------------|
-| `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or a custom network defined in `[networks]`). |
-| `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                  |
+| Configuration       | CLI Flag              | Type      | Description                                                                                                              |
+|:--------------------|:----------------------|:----------|:-------------------------------------------------------------------------------------------------------------------------|
+| `fork-net`          | `--fork-net`          | `string`  | Network name to fork state from (`mainnet`, `testnet`, or `custom:<name>` for a custom network defined in `[networks]`). |
+| `fork-block-number` | `--fork-block-number` | `integer` | Specific block number to fork from.                                                                                      |
 
 Examples:
 
@@ -272,5 +272,5 @@ Using a custom network:
 api = { v2 = "http://localhost:8081/api/v2/jsonRPC" }
 
 [test]
-fork-net = "my-local-node"
+fork-net = "custom:my-local-node"
 ```

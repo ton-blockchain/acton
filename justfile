@@ -80,8 +80,10 @@ check-schema:
 check-deny:
     cargo deny check
 
-check-security:
-    cargo deny check
+check-audit:
+    cargo audit
+
+check-security: check-deny check-audit
     bun audit --audit-level=moderate
     cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate

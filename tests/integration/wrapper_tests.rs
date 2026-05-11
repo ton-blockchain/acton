@@ -19,11 +19,14 @@ if [ "${1:-}" = "--yes" ]; then
 fi
 
 package="${1:-}"
-package_name="${package%%@*}"
-if [ "$package_name" != "gen-typescript-from-tolk" ] && [ "$package_name" != "gen-typescript-from-tolk-dev" ]; then
-    echo "unexpected package: ${package}" >&2
-    exit 1
-fi
+case "$package" in
+    gen-typescript-from-tolk|gen-typescript-from-tolk@*) ;;
+    @ton/tolk-abi-to-typescript|@ton/tolk-abi-to-typescript@*) ;;
+    *)
+        echo "unexpected package: ${package}" >&2
+        exit 1
+        ;;
+esac
 
 if [ "${ACTON_TS_WRAPPER_REQUIRE_CACHE:-0}" = "1" ]; then
     if [ -z "${npm_config_cache:-}" ] || [ ! -d "${npm_config_cache}" ]; then

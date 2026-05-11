@@ -42,7 +42,7 @@ The handler undoes the optimistic increment from `onInternalMessage`.
 acton test
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton test
    Compiling contracts
     Finished in 608.91µs
@@ -69,7 +69,7 @@ All three tests pass. Open the Test UI and inspect the "alice cannot vote twice"
 acton test --coverage
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton test --coverage
    Compiling contracts
     Finished in 611.29µs
@@ -144,7 +144,11 @@ get fun `test voter rejects direct vote`() {
 get fun calcVoterAddress(voter: address): address {
   val init = ContractState {
       code: voterCompiledCode(),
-      data: VoterStorage { poll: contract.getAddress(), voter, hasVoted: false }.toCell(),
+      data: VoterStorage {
+          poll: contract.getAddress(),
+          voter,
+          hasVoted: false,
+      }.toCell(),
   };
   return AutoDeployAddress { stateInit: init }.calculateAddress();
 }

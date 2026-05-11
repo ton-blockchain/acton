@@ -23,7 +23,7 @@ import {
 import type React from "react"
 import {useMemo, useState, useEffect} from "react"
 import {useNavigate} from "react-router-dom"
-import type {ContractABI} from "gen-typescript-from-tolk-dev"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
   FullAccountState,

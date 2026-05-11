@@ -35,9 +35,9 @@ acton new first_counter --template counter --app
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton new first_counter --template counter --app
-  Installing standard library 0.4.0
+  Installing standard library v0.4.0
 > Initialized empty Git repository in /home/you/first_counter/.git/
 ✓ Created new Acton project
   Project name: first_counter
@@ -61,13 +61,19 @@ cd first_counter
 
 With `--app`, the project layout places Tolk sources under `contracts/src/`, tests under `contracts/tests/`, and scripts under `contracts/scripts/`. Generated TypeScript wrappers go into `wrappers-ts/`, and the React frontend lives in `app/`.
 
-Install the npm workspace dependencies before running any frontend commands:
+Install the NPM workspace dependencies before running any frontend commands:
 
 ```bash
 npm ci
 ```
 
-The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. If [`acton wallet`](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
+The generated `Acton.toml` includes ready-to-run script aliases `deploy-emulation` and `deploy-testnet`. Start with local emulation; it does not require a wallet, a network connection, or testnet funds.
+
+```acton-cli
+acton run deploy-emulation
+```
+
+If [`acton wallet`](/docs/commands/wallet) is already configured, the contract can be deployed to testnet immediately.
 
 ```acton-cli
 acton run deploy-testnet
@@ -75,16 +81,15 @@ acton run deploy-testnet
 
 Output:
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton run deploy-testnet
-   Compiling contracts
-    Finished in 712.5ms
+acton script contracts/scripts/deploy.tolk
 N/A -> deployer A
 └── empty 0.005 TON -> Counter B    gas=692
     └── account created
 
-Deployed counter to EQB...m6n (Counter)
-Counter owner is EQB...m6n (deployer)
+Deployed counter to kQD...tVe (Counter)
+Counter owner is kQB...iD (deployer)
 Counter value is 0
 ```
 
@@ -98,7 +103,7 @@ acton build
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build
    Compiling contracts
    Compiling Counter
@@ -110,8 +115,8 @@ Each compiled contract produces a JSON artifact:
 
 ```json title="build/Counter.json"
 {
-  "code_boc64": "te6ccgEBBAEAbwABFP8A9KQT9Lzy...",
-  "hash": "1F6548A25E04497496242AD7804B653E6DA9A47E474DC17436...."
+  "code_boc64": "te6ccgEBBwEA1gABFP8A9KQT9Lzy...",
+  "hash": "15407004A66E0CF95A67C39EDBB54A531DFDB6DF93FB7D365FAE57A34B874747"
 }
 ```
 
@@ -122,10 +127,10 @@ acton build Counter
 ```
 
 <Callout type="idea">
-    Pass `--info` to print resolved project configuration, or `--clear-cache` to discard cached artifacts and recompile from scratch. See [`acton build`](/docs/commands/build) for all options.
+    Pass `--info` to print artifact details, or `--clear-cache` to discard cached artifacts and recompile from scratch. See [`acton build`](/docs/commands/build) for all options.
 </Callout>
 
-Print the resolved project configuration without triggering a build:
+Print artifact details and resolved build output:
 
 ```bash
 acton build --info
@@ -133,16 +138,14 @@ acton build --info
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton build --info
    Compiling contracts
-   Compiling Counter
-    Finished in 4.6ms
-    Finished in 730.0µs
+    Finished in 2.7ms
 
    Artifacts of Counter
-        Code te6ccgEBBAEAbwABFP8A9KQT9LzyyAsBAgEgAgMAAtIA...
-        Hash 0x1F6548A25E04497496242AD7804B653E6DA9A47E474DC174364...
+        Code te6ccgEBBwEA1gABFP8A9KQT9LzyyAsBAgFiAgMB+ND4...
+        Hash 0x15407004A66E0CF95A67C39EDBB54A531DFDB6DF93FB7D365FAE57A34B874747
 ```
 
 See the [building guides](/docs/building/overview) for more.
@@ -157,9 +160,9 @@ acton fmt
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt
-All files are properly formatted
+All files are already formatted
 ```
 
 Run in check mode to detect formatting violations without rewriting files:
@@ -170,7 +173,7 @@ acton fmt --check
 
 When a file is not formatted correctly, `--check` prints a unified diff and exits with a non-zero status:
 
-```acton-cli
+```acton-cli noCopy
 $ acton fmt --check
 Diff in contracts/src/Counter.tolk:
 -fun onInternalMessage(in:InMessage){
@@ -191,13 +194,20 @@ See the [formatting guide](/docs/format) for more.
 
 ## Lint contracts
 
-Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics. On a clean project, it prints nothing and exits with status 0.
-
-When issues are found, output looks like this:
+Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics. On a clean project, it prints the checked targets and exits with status 0:
 
 ```acton-cli-check
 $ acton check
-warning[unused-variable]: variable `x` is unused
+    Checking Counter
+    Checking contracts/scripts/deploy.tolk
+    Checking contracts/tests/counter.test.tolk
+```
+
+When issues are found, output looks like this:
+
+```acton-cli-check noCopy
+$ acton check
+warning[E001]: variable `x` is unused
   --> contracts/src/Counter.tolk:12:9
    |
 12 |     val x = 1;
@@ -206,7 +216,7 @@ warning[unused-variable]: variable `x` is unused
 1 issue can be fixed automatically, rerun with --fix flag.
 
 Use acton check --explain <CODE> to get detailed explanation of a rule.
-For example: acton check --explain unused-variable
+For example: acton check --explain E001
 ```
 
 Check a specific contract by name or file path:
@@ -233,9 +243,9 @@ acton wrapper --all
 
 Output:
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper --all
-   Generated wrappers/Counter.gen.tolk
+   Generated contracts/wrappers/Counter.gen.tolk
 ```
 
 Generate the wrapper for a single contract:
@@ -252,12 +262,12 @@ Pass `--ts` to emit a TypeScript wrapper instead, which the app template consume
 acton wrapper Counter --ts
 ```
 
-```acton-cli-wrapper
+```acton-cli-wrapper noCopy
 $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.gen.ts
 ```
 
-See the [dApp integration guide](/docs/ui-setup) for more information about using TypeScript wrappers.
+See the [dApp development guide](/docs/dapps) for more information about using TypeScript wrappers.
 
 ## Test the contract
 
@@ -269,7 +279,7 @@ acton test
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test
    Compiling contracts
     Finished in 726.375µs
@@ -277,7 +287,7 @@ $ acton test
 
  TEST  <root>/first_counter
 
- > ./contracts/tests/counter.test.tolk (8 tests)
+ > contracts/tests/counter.test.tolk (8 tests)
   ✓ deploy exposes initial owner 4ms
   ✓ increase counter 4ms
   ✓ reset counter 3ms
@@ -342,11 +352,12 @@ acton test --mutate --mutate-contract Counter
 
 Output:
 
-```acton-cli-mutate
+```acton-cli-mutate noCopy
 $ acton test --mutate --mutate-contract Counter
 
 Mutation Testing
 ────────────────────────────────────────────────────────────
+Session:  ace2c3aae5a827a2
 Contract: Counter
 Source:   contracts/src/Counter.tolk
 Files:    1
@@ -395,7 +406,9 @@ To quickly identify where an exception occurred, pass `--backtrace full` to get 
 acton test --backtrace full
 ```
 
-```acton-cli-trace
+The clean counter template passes. The output below shows the kind of source locations Acton prints when a test fails:
+
+```acton-cli-trace noCopy
 $ acton test --backtrace full
    Compiling contracts
    Compiling Counter
@@ -470,16 +483,19 @@ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug --debug-port 4711
   Compiling contracts
    Finished in 6.2ms
     Running tests
- Debug adapter listening on 127.0.0.1:4711
- Waiting for client to connect...
+
+ TEST  /home/you/first_counter
+
+Debugger server listening on 127.0.0.1:4711
+ > contracts/tests/counter.test.tolk (1 test)
 ```
 
-Acton blocks until a client attaches. Add the following to `.vscode/launch.json`:
+Acton blocks the selected test until a client attaches. Add the following to `.vscode/launch.json`:
 
 ```json title=".vscode/launch.json"
 {
@@ -488,14 +504,14 @@ Acton blocks until a client attaches. Add the following to `.vscode/launch.json`
    {
      "type": "tolk",
      "request": "launch",
-     "name": "Retrace DAP",
+     "name": "Attach to Acton debug session",
      "debugServer": 4711
    }
  ]
 }
 ```
 
-Once the terminal shows `Waiting for client to connect...`, open the **Run and Debug** panel, pick **Retrace DAP** from the configuration dropdown, and run it. VS Code connects to the listening port and the test launches under the debugger.
+Once the terminal shows `Debugger server listening on 127.0.0.1:4711`, open the **Run and Debug** panel, pick **Attach to Acton debug session** from the configuration dropdown, and run it. VS Code connects to the listening port and the test launches under the debugger.
 
 The same configuration works for `acton script --debug` and `acton retrace --debug` — match the `--debug-port` value with the `debugServer` option.
 
@@ -538,8 +554,8 @@ fun explicitCounterAddress(): address? {
 fun targetCounter(ownerAddress: address): Counter {
     val expected = Counter.fromStorage(Storage {
         id: 0,
-        counter: 0,
         owner: ownerAddress,
+        counter: 0,
     });
     val counterAddress = explicitCounterAddress();
     if (counterAddress == null) {
@@ -584,13 +600,12 @@ acton script contracts/scripts/increase.tolk
 
 Output:
 
-```acton-cli
+```acton-cli noCopy
 $ acton script contracts/scripts/increase.tolk
-    Updating standard library to v0.4.0
 Deploy value: 5000000
 Increasing counter by 1
-Counter address: kQDTsjXgYkjCOXWs05qZXIIIcodJocB3EiMVhTpe-VptYqWO (Counter)
-COUNTER_ADDRESS=kQDTsjXgYkjCOXWs05qZXIIIcodJocB3EiMVhTpe-VptYqWO (Counter)
+Counter address: kQD...tVe (Counter)
+COUNTER_ADDRESS=kQD...tVe (Counter)
 Current counter value: 1
 ```
 
@@ -608,7 +623,7 @@ It is strongly recommended to verify scripts with `--fork-net` before executing 
 
 ### Run a script against a real network
 
-If the `--net` flag is passed, all messages sent by `net.send()` and `net.sendExternal()` will be applied to the real network.
+If the `--net` flag is passed, all messages sent by `net.send()` and `net.sendExternal()` will be applied to the real network. Use this only after configuring a funded wallet and confirming the local emulation path works.
 
 ```bash
 acton script contracts/scripts/increase.tolk --net testnet
@@ -621,19 +636,25 @@ See the [deployment guide](/docs/deploy) for more.
 Deployment to testnet or mainnet requires a funded wallet. Use [`acton wallet`](/docs/commands/wallet) to create one and request testnet funds in a single step:
 
 ```bash
-acton wallet new --name deployer --local --airdrop
+acton wallet new --name deployer --local --airdrop --version v5r1
 ```
 
 Output:
 
-```acton-cli
-$ acton wallet new --name deployer --local --airdrop
+```acton-cli noCopy
+$ acton wallet new --name deployer --local --airdrop --version v5r1
 
 ✓ Wallet successfully created and added to wallets.toml
 ✓ Wallet address is EQB...m6n
 
 ✓ The mnemonic is securely stored in your system's keyring.
 → Requesting airdrop for wallet deployer EQB...m6n
+→ Fetching PoW challenge...
+→ Solving challenge (difficulty: 20 bits)...
+✓ Challenge solved in 46.8ms
+✓ Your claim has been queued. It will be processed soon.
+
+NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
 
 To check wallet balances run acton wallet list --balance.
 ```
@@ -650,7 +671,7 @@ Other useful `acton wallet` subcommands:
 
 | Command | Purpose |
 |---------|---------|
-| `acton wallet new --name deployer --local --airdrop` | Create a wallet and request testnet funds |
+| `acton wallet new --name deployer --local --airdrop --version v5r1` | Create a Wallet V5 R1 wallet and request testnet funds |
 | `acton wallet import --name deployer` | Import an existing mnemonic |
 | `acton wallet list --balance` | List configured wallets and their on-chain balances |
 | `acton wallet airdrop deployer --net testnet` | Request testnet funds for an existing wallet |
@@ -772,7 +793,7 @@ acton rpc trace <TX_HASH> --net testnet
 Use [`acton doc tvm`](/docs/commands/doc) to look up TVM reference instruction documentation:
 
 ```bash
-acton doc tvm PUSHINT
+acton doc tvm PUSHINT_8
 ```
 
 Add `--find` to fuzzy search instruction names and `--description` to also match descriptions, tags, and operands:

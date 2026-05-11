@@ -13,7 +13,7 @@ description: "Create a funded testnet wallet, deploy the poll, verify source cod
 acton wallet new --name testnet-deployer --local --airdrop
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton wallet new --name testnet-deployer --local --airdrop
 ✓ Created wallet 'testnet-deployer'
   Kind:     v5r1
@@ -44,7 +44,7 @@ acton script scripts/deploy.tolk --net testnet
   The deploy script calls `scripts.wallet("deployer")`. Pass `WALLET=testnet-deployer` as an environment variable, or update the script to use `scripts.wallet("testnet-deployer")` for testnet runs.
 </Callout>
 
-```acton-cli
+```acton-cli noCopy
 $ acton script scripts/deploy.tolk --net testnet
    Compiling contracts
     Finished in 598.71µs
@@ -66,7 +66,7 @@ acton rpc info <POLL_ADDRESS> --net testnet
 
 `<POLL_ADDRESS>` — the address printed by the deployment script.
 
-```acton-cli
+```acton-cli noCopy
 $ acton rpc info EQC9R1p... --net testnet
   Contract: EQC9R1p...
   Balance:  0.095 TON
@@ -87,13 +87,13 @@ Source verification proves the deployed bytecode was compiled from specific sour
 acton verify Poll --address <POLL_ADDRESS> --net testnet
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton verify Poll --address EQC9R1p... --net testnet
-  Verifying Poll at EQC9R1p...
-  ✓ Bytecode matches source
-  ✓ Verification submitted to verifier.ton.org
-  View: https://verifier.ton.org/EQC9R1p...
+✓ Contract verification completed!
+View at: https://verifier.ton.org/EQC9R1p...?testnet
 ```
+
+When `--dry-run` is not used, the final verification transaction sends `0.1 TON` unless the verifier backend reports that the same code hash is already verified.
 
 ## Send a vote and retrace the transaction
 
@@ -114,7 +114,7 @@ acton retrace <TX_HASH> --net testnet --contract Poll
 
 `<TX_HASH>` — the transaction hash printed by the vote script.
 
-```acton-cli-trace
+```acton-cli-trace noCopy
 $ acton retrace 3b9c... --net testnet --contract Poll
   Fetching transaction 3b9c...
 

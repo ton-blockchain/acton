@@ -1,6 +1,6 @@
 {
   "title": "Scripting",
-  "icon": "FileCode",
+  "icon": "Terminal",
   "pages": [
     "overview",
     "passing-arguments",

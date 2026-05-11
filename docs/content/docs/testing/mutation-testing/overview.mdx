@@ -42,19 +42,19 @@ acton test --mutate --mutate-contract Wallet
 
 ### Options
 
-| Option                            | Description                                                                        |
-|-----------------------------------|------------------------------------------------------------------------------------|
-| `--mutate`                        | Enables mutation testing mode.                                                     |
-| `--mutate-contract <NAME>`        | Specifies which contract from `Acton.toml` to mutate.                            |
-| `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope.  |
-| `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.               |
-| `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                       |
-| `--mutation-rules-file <PATH>`    | Loads custom query-based mutation rules from a JSON file.                          |
-| `--mutation-session-id <ID>`      | Reuses a session ID and appends progress to `.acton/mutation-sessions/<ID>.jsonl`. |
-| `--mutation-workers <N>`          | Overrides mutation parallelism. Defaults to the host's available parallelism.      |
-| `--mutation-id <ID>`              | Re-runs only specific mutation IDs from a previous mutation report.                |
-| `--mutation-minimum-percent <P>`  | Fails the run when the mutation score drops below the required percentage.         |
-| `--mutation-disable-rules <RULE>` | Disables specific mutation rules (can be used multiple times).                     |
+| Option                            | Description                                                                       |
+|-----------------------------------|-----------------------------------------------------------------------------------|
+| `--mutate`                        | Enables mutation testing mode.                                                    |
+| `--mutate-contract <NAME>`        | Specifies which contract from `Acton.toml` to mutate.                             |
+| `--mutation-diff <MODE>`          | Limits mutation testing to changed lines in `worktree`, `ref`, or `branch` scope. |
+| `--mutation-diff-ref <REF>`       | Base ref used by `ref` mode and optional override for `branch` mode.              |
+| `--mutation-levels <LEVELS>`      | Runs only selected mutation levels such as `critical,major`.                      |
+| `--mutation-rules-file <PATH>`    | Loads custom query-based mutation rules from a JSON file.                         |
+| `--mutation-session-id <ID>`      | Reuses a session ID and appends progress to `build/mutation-sessions/<ID>.jsonl`. |
+| `--mutation-workers <N>`          | Overrides mutation parallelism. Defaults to the host's available parallelism.     |
+| `--mutation-id <ID>`              | Re-runs only specific mutation IDs from a previous mutation report.               |
+| `--mutation-minimum-percent <P>`  | Fails the run when the mutation score drops below the required percentage.        |
+| `--mutation-disable-rules <RULE>` | Disables specific mutation rules (can be used multiple times).                    |
 
 ### Parallel workers
 
@@ -161,7 +161,7 @@ Currently, JSON rules support only the serializable `query` matcher and `remove`
 
 #### Session logs and resume
 
-Each mutation run gets a session ID. Without explicit `--mutation-session-id`, Acton generates a hash-like ID and appends progress to `.acton/mutation-sessions/<SESSION_ID>.jsonl`.
+Each mutation run gets a session ID. Without explicit `--mutation-session-id`, Acton generates a hash-like ID and appends progress to `build/mutation-sessions/<SESSION_ID>.jsonl`.
 
 Use `--mutation-session-id` to keep that ID stable and append to the same log on later runs:
 
@@ -262,7 +262,7 @@ Mutants:  51
 
 - **KILLED**: tests failed on the mutant as expected.
 - **SURVIVED**: tests still passed, failing to detect the bug; add a test case and tighten coverage for this scenario.
-- **Session log**: Progress is written incrementally to `.acton/mutation-sessions/<SESSION_ID>.jsonl`, which makes interrupted runs resumable.
+- **Session log**: Progress is written incrementally to `build/mutation-sessions/<SESSION_ID>.jsonl`, which makes interrupted runs resumable.
 - **Mutation IDs**: The number in `Mutation 2/51` or `Mutation #2` can be used later with `--mutation-id 2` to re-run that specific mutant.
 
 For survived mutants, Acton prints a diff of the edit plus a short rationale tied to the rule:

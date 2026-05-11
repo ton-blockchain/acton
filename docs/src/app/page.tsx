@@ -256,7 +256,7 @@ function ReleaseAnnouncement() {
 
           <div className="border-y border-white/12 py-12 sm:py-16 md:py-20">
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#9AE7FF]/80">
-              Release is coming
+              Almost ready
             </p>
             <h1 className="mt-5 max-w-4xl text-5xl font-semibold leading-[0.98] text-white sm:text-7xl md:text-[6.5rem]">
               Launching on

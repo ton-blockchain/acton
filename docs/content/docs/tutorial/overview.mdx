@@ -3,8 +3,6 @@ title: "Build a poll dApp on TON"
 description: "A hands-on tutorial: from zero to a live, on-chain poll with a React frontend."
 ---
 
-import { Cards, Card } from "fumadocs-ui/components/card";
-
 The "hello world" of smart contracts on most blockchains is a counter contract. Yet, this contract is not sufficient for overcoming two main struggles of contracts on TON: asynchronicity and account limits, especially data and computation limits. The former prevents contracts from directly impacting the state of each over during computation, only allowing asynchronous message exchange.
 
 As for the latter, one cannot place a large hashmap for individual user data in a single contract and expect it to scale. A single contract cannot hold too much data, and cannot perform too much computations in a single transaction initiated by an incoming message. Instead of trying to use a large hashmap, the common approach is to shard the contract by making the parent contract an entry point and a manager of its subsidiary child contracts, where each child contract holds and modifies individual user data.
@@ -37,7 +35,7 @@ One can think of this poll contract as a decentralized but oversimplified versio
 ## Prerequisites
 
 - **Acton**: run `acton up --stable` or follow [Installation](/docs/installation).
-- [**Node.js**](https://nodejs.org/en/download/) 20 or later: needed only for the last step when adding web frontend to the project.
+- [**Node.js**](https://nodejs.org/en/download/) 22 or later: needed only for the last step when adding web frontend to the project.
 - Funded testnet wallet: needed only for the semi-last step when deploying to testnet; created during the tutorial.
 
 ## Pages

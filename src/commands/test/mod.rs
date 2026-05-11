@@ -204,12 +204,16 @@ impl<'a> TestRunner<'a> {
     fn setup_reporters(
         reporter_manager: &mut ReporterManager,
         config: &TestConfig,
+        project_root: &Path,
         ui_reporter: Option<UiReporter>,
     ) {
         if config.report_formats.is_empty()
             || config.report_formats.contains(&ReportFormat::Console)
         {
-            let console_config = ConsoleConfig { show_output: true };
+            let console_config = ConsoleConfig {
+                show_output: true,
+                project_root: project_root.to_path_buf(),
+            };
             reporter_manager.add_reporter(Box::new(ConsoleReporter::new(console_config)));
         }
 
@@ -538,6 +542,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     if need_to_build() {
         build_cmd(BuildCommandOptions {
             clear_cache: config.clear_cache,
+            quiet_no_contracts: true,
             ..BuildCommandOptions::default()
         })?;
     }
@@ -605,7 +610,14 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let reports_for_ui = ui_reporter.as_ref().map(UiReporter::get_reports_arc);
 
     let mut global_reporter = ReporterManager::new();
-    TestRunner::setup_reporters(&mut global_reporter, &config, ui_reporter);
+    let reporter_project_root =
+        dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+    TestRunner::setup_reporters(
+        &mut global_reporter,
+        &config,
+        &reporter_project_root,
+        ui_reporter,
+    );
     global_reporter.init()?;
     let testing_started_at = Instant::now();
     global_reporter.on_testing_started()?;

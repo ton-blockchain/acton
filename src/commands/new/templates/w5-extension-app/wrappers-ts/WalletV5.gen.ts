@@ -50,16 +50,6 @@ function loadCellRef<T>(s: c.Slice, loadFn_T: LoadCallback<T>): CellRef<T> {
     return { ref: loadFn_T(s_ref) };
 }
 
-function storeTolkBitsN(v: c.Slice, nBits: number, b: c.Builder): void {
-    if (v.remainingBits !== nBits) { throw new Error(`expected ${nBits} bits, got ${v.remainingBits}`); }
-    if (v.remainingRefs !== 0) { throw new Error(`expected 0 refs, got ${v.remainingRefs}`); }
-    b.storeSlice(v);
-}
-
-function loadTolkBitsN(s: c.Slice, nBits: number): c.Slice {
-    return new c.Slice(new c.BitReader(s.loadBits(nBits)), []);
-}
-
 function storeTolkRemaining(v: RemainingBitsAndRefs, b: c.Builder): void {
     b.storeSlice(v);
 }
@@ -148,11 +138,27 @@ class StackReader {
 
 type coins = bigint
 
+type uint8 = bigint
 type uint32 = bigint
 type uint64 = bigint
 type uint256 = bigint
 
-type bits512 = c.Slice
+/**
+ > type AllowedExternalMessageToWalletV5 = ExternalSignedRequest
+ */
+export type AllowedExternalMessageToWalletV5 = ExternalSignedRequest
+
+export const AllowedExternalMessageToWalletV5 = {
+    fromSlice(s: c.Slice): AllowedExternalMessageToWalletV5 {
+        return ExternalSignedRequest.fromSlice(s);
+    },
+    store(self: AllowedExternalMessageToWalletV5, b: c.Builder): void {
+        ExternalSignedRequest.store(self, b);
+    },
+    toCell(self: AllowedExternalMessageToWalletV5): c.Cell {
+        return makeCellFrom<AllowedExternalMessageToWalletV5>(self, AllowedExternalMessageToWalletV5.store);
+    }
+}
 
 /**
  > type OutActionsCell = cell
@@ -168,6 +174,78 @@ export const OutActionsCell = {
     },
     toCell(self: OutActionsCell): c.Cell {
         return makeCellFrom<OutActionsCell>(self, OutActionsCell.store);
+    }
+}
+
+/**
+ > struct (0x0ec3c86d) OutActionWithSendMessageOnly {
+ >     prev: Cell<OutActionWithSendMessageOnlyOrEmpty>
+ >     sendMode: uint8
+ >     outMsg: cell
+ > }
+ */
+export interface OutActionWithSendMessageOnly {
+    readonly $: 'OutActionWithSendMessageOnly'
+    prev: CellRef<OutActionWithSendMessageOnlyOrEmpty>
+    sendMode: uint8
+    outMsg: c.Cell
+}
+
+export const OutActionWithSendMessageOnly = {
+    PREFIX: 0x0ec3c86d,
+
+    create(args: {
+        prev: CellRef<OutActionWithSendMessageOnlyOrEmpty>
+        sendMode: uint8
+        outMsg: c.Cell
+    }): OutActionWithSendMessageOnly {
+        return {
+            $: 'OutActionWithSendMessageOnly',
+            ...args
+        }
+    },
+    fromSlice(s: c.Slice): OutActionWithSendMessageOnly {
+        loadAndCheckPrefix32(s, 0x0ec3c86d, 'OutActionWithSendMessageOnly');
+        return {
+            $: 'OutActionWithSendMessageOnly',
+            prev: loadCellRef<OutActionWithSendMessageOnlyOrEmpty>(s, OutActionWithSendMessageOnlyOrEmpty.fromSlice),
+            sendMode: s.loadUintBig(8),
+            outMsg: s.loadRef(),
+        }
+    },
+    store(self: OutActionWithSendMessageOnly, b: c.Builder): void {
+        b.storeUint(0x0ec3c86d, 32);
+        storeCellRef<OutActionWithSendMessageOnlyOrEmpty>(self.prev, b, OutActionWithSendMessageOnlyOrEmpty.store);
+        b.storeUint(self.sendMode, 8);
+        b.storeRef(self.outMsg);
+    },
+    toCell(self: OutActionWithSendMessageOnly): c.Cell {
+        return makeCellFrom<OutActionWithSendMessageOnly>(self, OutActionWithSendMessageOnly.store);
+    }
+}
+
+/**
+ > type OutActionWithSendMessageOnlyOrEmpty = OutActionWithSendMessageOnly | void
+ */
+export type OutActionWithSendMessageOnlyOrEmpty =
+    | OutActionWithSendMessageOnly
+    | { $: 'void', value: void }
+
+export const OutActionWithSendMessageOnlyOrEmpty = {
+    fromSlice(s: c.Slice): OutActionWithSendMessageOnlyOrEmpty {
+        return (s.remainingBits === 0 && s.remainingRefs === 0) ? { $: 'void', value: void 0 } : OutActionWithSendMessageOnly.fromSlice(s);
+    },
+    store(self: OutActionWithSendMessageOnlyOrEmpty, b: c.Builder): void {
+        switch (self.$) {
+            case 'OutActionWithSendMessageOnly':
+                OutActionWithSendMessageOnly.store(self, b);
+                break;
+            case 'void':
+                break;
+        }
+    },
+    toCell(self: OutActionWithSendMessageOnlyOrEmpty): c.Cell {
+        return makeCellFrom<OutActionWithSendMessageOnlyOrEmpty>(self, OutActionWithSendMessageOnlyOrEmpty.store);
     }
 }
 
@@ -199,7 +277,7 @@ export const SnakedExtraActions = {
 export interface ExtensionActionRequest {
     readonly $: 'ExtensionActionRequest'
     queryId: uint64
-    outActions: OutActionsCell | null
+    outActions: CellRef<OutActionWithSendMessageOnly> | null
     hasExtraActions: boolean
     extraActions: SnakedExtraActions
 }
@@ -209,7 +287,7 @@ export const ExtensionActionRequest = {
 
     create(args: {
         queryId: uint64
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }): ExtensionActionRequest {
@@ -223,7 +301,7 @@ export const ExtensionActionRequest = {
         return {
             $: 'ExtensionActionRequest',
             queryId: s.loadUintBig(64),
-            outActions: s.loadBoolean() ? OutActionsCell.fromSlice(s) : null,
+            outActions: s.loadBoolean() ? loadCellRef<OutActionWithSendMessageOnly>(s, OutActionWithSendMessageOnly.fromSlice) : null,
             hasExtraActions: s.loadBoolean(),
             extraActions: SnakedExtraActions.fromSlice(s),
         }
@@ -231,7 +309,9 @@ export const ExtensionActionRequest = {
     store(self: ExtensionActionRequest, b: c.Builder): void {
         b.storeUint(0x6578746e, 32);
         b.storeUint(self.queryId, 64);
-        storeTolkNullable<OutActionsCell>(self.outActions, b, OutActionsCell.store);
+        storeTolkNullable<CellRef<OutActionWithSendMessageOnly>>(self.outActions, b,
+            (v,b) => storeCellRef<OutActionWithSendMessageOnly>(v, b, OutActionWithSendMessageOnly.store)
+        );
         b.storeBit(self.hasExtraActions);
         SnakedExtraActions.store(self.extraActions, b);
     },
@@ -255,7 +335,7 @@ export interface InternalSignedRequest {
     walletId: uint32
     validUntil: uint32
     seqno: uint32
-    outActions: OutActionsCell | null
+    outActions: CellRef<OutActionWithSendMessageOnly> | null
     hasExtraActions: boolean
     extraActions: SnakedExtraActions
 }
@@ -267,7 +347,7 @@ export const InternalSignedRequest = {
         walletId: uint32
         validUntil: uint32
         seqno: uint32
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }): InternalSignedRequest {
@@ -283,7 +363,7 @@ export const InternalSignedRequest = {
             walletId: s.loadUintBig(32),
             validUntil: s.loadUintBig(32),
             seqno: s.loadUintBig(32),
-            outActions: s.loadBoolean() ? OutActionsCell.fromSlice(s) : null,
+            outActions: s.loadBoolean() ? loadCellRef<OutActionWithSendMessageOnly>(s, OutActionWithSendMessageOnly.fromSlice) : null,
             hasExtraActions: s.loadBoolean(),
             extraActions: SnakedExtraActions.fromSlice(s),
         }
@@ -293,50 +373,14 @@ export const InternalSignedRequest = {
         b.storeUint(self.walletId, 32);
         b.storeUint(self.validUntil, 32);
         b.storeUint(self.seqno, 32);
-        storeTolkNullable<OutActionsCell>(self.outActions, b, OutActionsCell.store);
+        storeTolkNullable<CellRef<OutActionWithSendMessageOnly>>(self.outActions, b,
+            (v,b) => storeCellRef<OutActionWithSendMessageOnly>(v, b, OutActionWithSendMessageOnly.store)
+        );
         b.storeBit(self.hasExtraActions);
         SnakedExtraActions.store(self.extraActions, b);
     },
     toCell(self: InternalSignedRequest): c.Cell {
         return makeCellFrom<InternalSignedRequest>(self, InternalSignedRequest.store);
-    }
-}
-
-/**
- > struct ExternalMsgSchema {
- >     signedData: ExternalSignedRequest
- >     signature: bits512
- > }
- */
-export interface ExternalMsgSchema {
-    readonly $: 'ExternalMsgSchema'
-    signedData: ExternalSignedRequest
-    signature: bits512
-}
-
-export const ExternalMsgSchema = {
-    create(args: {
-        signedData: ExternalSignedRequest
-        signature: bits512
-    }): ExternalMsgSchema {
-        return {
-            $: 'ExternalMsgSchema',
-            ...args
-        }
-    },
-    fromSlice(s: c.Slice): ExternalMsgSchema {
-        return {
-            $: 'ExternalMsgSchema',
-            signedData: ExternalSignedRequest.fromSlice(s),
-            signature: loadTolkBitsN(s, 512),
-        }
-    },
-    store(self: ExternalMsgSchema, b: c.Builder): void {
-        ExternalSignedRequest.store(self.signedData, b);
-        storeTolkBitsN(self.signature, 512, b);
-    },
-    toCell(self: ExternalMsgSchema): c.Cell {
-        return makeCellFrom<ExternalMsgSchema>(self, ExternalMsgSchema.store);
     }
 }
 
@@ -355,7 +399,7 @@ export interface ExternalSignedRequest {
     walletId: uint32
     validUntil: uint32
     seqno: uint32
-    outActions: OutActionsCell | null
+    outActions: CellRef<OutActionWithSendMessageOnly> | null
     hasExtraActions: boolean
     extraActions: SnakedExtraActions
 }
@@ -367,7 +411,7 @@ export const ExternalSignedRequest = {
         walletId: uint32
         validUntil: uint32
         seqno: uint32
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }): ExternalSignedRequest {
@@ -383,7 +427,7 @@ export const ExternalSignedRequest = {
             walletId: s.loadUintBig(32),
             validUntil: s.loadUintBig(32),
             seqno: s.loadUintBig(32),
-            outActions: s.loadBoolean() ? OutActionsCell.fromSlice(s) : null,
+            outActions: s.loadBoolean() ? loadCellRef<OutActionWithSendMessageOnly>(s, OutActionWithSendMessageOnly.fromSlice) : null,
             hasExtraActions: s.loadBoolean(),
             extraActions: SnakedExtraActions.fromSlice(s),
         }
@@ -393,7 +437,9 @@ export const ExternalSignedRequest = {
         b.storeUint(self.walletId, 32);
         b.storeUint(self.validUntil, 32);
         b.storeUint(self.seqno, 32);
-        storeTolkNullable<OutActionsCell>(self.outActions, b, OutActionsCell.store);
+        storeTolkNullable<CellRef<OutActionWithSendMessageOnly>>(self.outActions, b,
+            (v,b) => storeCellRef<OutActionWithSendMessageOnly>(v, b, OutActionWithSendMessageOnly.store)
+        );
         b.storeBit(self.hasExtraActions);
         SnakedExtraActions.store(self.extraActions, b);
     },
@@ -511,7 +557,7 @@ function calculateDeployedAddress(code: c.Cell, data: c.Cell, options: DeployedA
 }
 
 export class WalletV5 implements c.Contract {
-    static CodeCell = c.Cell.fromBase64('te6ccgECEwEAAxkAART/APSkE/S88sgLAQIBIAIDAgFIBAUC4PIggwjXIgGDCNcjINcsI5tLO3Ty4IrTH9Mf0x/0BNIA7UTQ0gDTHyDTH9P/9AUMyM75FkDd+RDy4IcJbhKx8uCEUUS68uCFUFe68uCGAvgjvPLgiPgApMjPg8sfE87J7VT4D3AibpEy4w6Ogts84FsQEQP40CDXLCObS3Okj3Ah10mBAoC+kVvhIYMI1yICgwjXI+1E0NIA0x8g0x/T//QFBsjO+RZAiPkQkl8G4QNuErHy4IQC0x/TH9Mf9ATSAFE3uvLghVBHuvLghgH4I7zy4IgDpMjPg8sfEs7J7VRwIW6RMeMOAo6DAds8kVvi4AYRBwIBIAgJAGhwItc5MI4iINdLwALy4JPAKPLgk9csIHYeQ2zy4JPXTNc5MAGkIccAEuYwhAe78uCTAe1VAfQx1ywjK8OjdI7u+JL6RPgo+kQwWL2RW+DtRNCBAUHXIfQFgwf0Dm+hMZEw4dM/MfQE0gB/I26RM440cCTXOTCOIiDXS8AC8uCTwCjy4JPXLCB2HkNs8uCT10zXOTABpCHHABLmMIQHu/LgkwPtVeIBjoMB2zyRW+LgMBECASAKCwAZvl8PaiaECAoOuQ+gLAIBbgwNAgFIDg8AF63OdqJoaaAY64X/wAAXrx32omhpkBjrhY/AABezJftRNDTADHXCx+AAEbJi+1E0NcKAIAB2cCPXOTCOKSDXS8AC8uCTwCjy4JPXLCB2HkNs8uCT1NcLB3Kw8uCJ1zkwAaQhxwAS5jCEB7vy4JMC7VUBlO2i7fvrIdcsCBSOLfpIMPpE+Cj6RDBYuvLgke1E0IEBQdcY9AXIz4NAM4MH9FPy4IsByM70AMntVOMOIddKwwCTW9sx4QHXTNABEgDs1ywIHI42+kgw+kT4KPpEMFi68uCR7UTQ0gCBAUDXGPQFE4MH9Fvy4IwhlSBu8tCQ3wHIygASzvQAye1UjjfXLAgkk/LAjeEh8uCS7UTQAdcKAAHSACCBAUDXIfQFUSO98uCPIpExlQFu8tCO4gHIygDOye1U4g==');
+    static CodeCell = c.Cell.fromBase64('te6ccgECEwEAAxcAART/APSkE/S88sgLAQIBIAIDAgFIBAUC4PIggwjXIgGDCNcjINcsI5tLO3Ty4IrTH9Mf0x/0BNIA7UTQ0gDTHyDTH9P/9AUMyM75FkDd+RDy4IcJbhKx8uCEUUS68uCFUFe68uCGAvgjvPLgiPgApMjPg8sfE87J7VT4D3AibpEy4w6Ogts84FsQEQP40CDXLCObS3Okj3Ah10mBAoC+kVvhIYMI1yICgwjXI+1E0NIA0x8g0x/T//QFBsjO+RZAiPkQkl8G4QNuErHy4IQC0x/TH9Mf9ATSAFE3uvLghVBHuvLghgH4I7zy4IgDpMjPg8sfEs7J7VRwIW6RMeMOAo6DAds8kVvi4AYRBwIBIAgJAGhwItc5MI4iINdLwALy4JPAKPLgk9csIHYeQ2zy4JPXTNc5MAGkIccAEuYwhAe78uCTAe1VAfQx1ywjK8OjdI7u+JL6RPgo+kQwWL2RW+DtRNCBAUHXIfQFgwf0Dm+hMZEw4dM/MfQE0gB/I26RM440cCTXOTCOIiDXS8AC8uCTwCjy4JPXLCB2HkNs8uCT10zXOTABpCHHABLmMIQHu/LgkwPtVeIBjoMB2zyRW+LgMBECASAKCwAZvl8PaiaECAoOuQ+gLAIBbgwNAgFIDg8AF63OdqJoaaAY64X/wAAXrx32omhpkBjrhY/AABezJftRNDTADHXCx+AAEbJi+1E0NcKAIAB2cCPXOTCOKSDXS8AC8uCTwCjy4JPXLCB2HkNs8uCT1NcLB3Kw8uCJ1zkwAaQhxwAS5jCEB7vy4JMC7VUBkO2i7fvrIdcsCBSOLfpIMPpE+Cj6RDBYuvLgke1E0IEBQdcY9AXIz4NAM4MH9FPy4IsByM70AMntVOMOIddKk1vbMeEB10zQARIA7NcsCByONvpIMPpE+Cj6RDBYuvLgke1E0NIAgQFA1xj0BRODB/Rb8uCMIZUgbvLQkN8ByMoAEs70AMntVI431ywIJJPywI3hIfLgku1E0AHXCgAB0gAggQFA1yH0BVEjvfLgjyKRMZUBbvLQjuIByMoAzsntVOI=');
 
     static Errors = {
         'Errors.SignatureDisabled': 132,
@@ -561,7 +607,7 @@ export class WalletV5 implements c.Contract {
 
     static createCellOfExtensionActionRequest(body: {
         queryId: uint64
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }) {
@@ -572,7 +618,7 @@ export class WalletV5 implements c.Contract {
         walletId: uint32
         validUntil: uint32
         seqno: uint32
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }) {
@@ -589,7 +635,7 @@ export class WalletV5 implements c.Contract {
 
     async sendExtensionActionRequest(provider: ContractProvider, via: Sender, msgValue: coins, body: {
         queryId: uint64
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }, extraOptions?: ExtraSendOptions) {
@@ -604,7 +650,7 @@ export class WalletV5 implements c.Contract {
         walletId: uint32
         validUntil: uint32
         seqno: uint32
-        outActions: OutActionsCell | null
+        outActions: CellRef<OutActionWithSendMessageOnly> | null
         hasExtraActions: boolean
         extraActions: SnakedExtraActions
     }, extraOptions?: ExtraSendOptions) {

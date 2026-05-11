@@ -45,6 +45,9 @@ function renderLeafValue(
     case "null": {
       return <span className={styles.storageNullValue}>null</span>
     }
+    case "void": {
+      return <span className={styles.storageVoidValue}>void</span>
+    }
     case "address": {
       return (
         <ContractChip

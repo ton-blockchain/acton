@@ -108,8 +108,8 @@ The initial `VoterStorage` (with `hasVoted: false`) is baked into the contract's
 Create `contracts/Poll.tolk`:
 
 ```tolk title="contracts/Poll.tolk"
-import "types"
 import "@gen/Voter.code"
+import "types"
 
 type AllowedPollMessage = Vote
 
@@ -139,7 +139,11 @@ fun onInternalMessage(in: InMessage) {
             // If it already exists, the stateInit is ignored; only the body is processed.
             val voterInit = ContractState {
                 code:  voterCompiledCode(),
-                data:  VoterStorage { poll: contract.getAddress(), voter: in.senderAddress, hasVoted: false }.toCell(),
+                data:  VoterStorage {
+                    poll: contract.getAddress(),
+                    voter: in.senderAddress,
+                    hasVoted: false,
+                }.toCell(),
             };
             val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
@@ -199,7 +203,7 @@ Both contracts must be listed. `depends = ["Voter"]` tells Acton to compile Vote
 acton build
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton build
   Compiling contracts
    Finished in 521.83µs
@@ -209,23 +213,21 @@ $ acton build
 acton build --info
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton build --info
   Compiling contracts
    Finished in 498.21µs
 
-Contract: Poll
-  Hash:  C4A1...
-  Cells: 9
-  Bits:  1842
+   Artifacts of Voter
+        Code te6ccgEBAgEASQABFP8A9KQT9Lzy...
+        Hash 0xB1F40644E18B13E0D2C43D6D318CF1355EF16906313B7A9BE34ED96CA8937156
 
-Contract: Voter
-  Hash:  7F3B...
-  Cells: 4
-  Bits:  712
+   Artifacts of Poll
+        Code te6ccgECDQEAAbEAART/APSkE/S88sgL...
+        Hash 0xC5656741E8F39D3C2B6D36B19267E02C185D22F6AA60636EDCD7577884A39BD6
 ```
 
-Poll is larger than Voter because it carries Voter's compiled code inside its own bytecode — that is what `voterCompiledCode()` embeds via the generated `gen/Voter.code.tolk`.
+Poll's code BoC is longer than Voter's because it carries Voter's compiled code inside its own bytecode — that is what `voterCompiledCode()` embeds via the generated `gen/Voter.code.tolk`.
 
 ## Generate wrappers
 

@@ -19,9 +19,7 @@ directories where you want to add `Acton.toml`, standard Acton ignore rules,
 the bundled standard library, and symlinks to global wallet and library
 overlays.
 
-If `Acton.toml` already exists, `acton init` patches in default mappings when
-they are missing instead of creating a fresh scaffold. That patch path rewrites
-the parsed manifest, so TOML comments and unknown keys are not preserved.
+If `Acton.toml` already exists, `acton init` leaves it untouched.
 
 If `Acton.toml` does not exist, the command scans `.tolk` files in the current
 directory tree and auto-registers files that define `onInternalMessage` as
@@ -42,9 +40,7 @@ stdlib version already matches the current Acton version.
 
 `acton init` is safe to run repeatedly.
 
-- it does not delete and recreate an existing `Acton.toml`, but it may rewrite
-  the file when backfilling default mappings
-- it backfills default `import-mappings` only when they are missing
+- it does not read, delete, recreate, or rewrite an existing `Acton.toml`
 - it appends missing `.gitignore` patterns without deleting existing ones
 - it refreshes `.acton/tolk-stdlib`
 - it re-attempts global wallet and library symlinks on each run
@@ -185,9 +181,8 @@ project config and may include:
 - discovered `[contracts]`
 - default `[import-mappings]`
 
-When `Acton.toml` already exists, `acton init` only backfills missing default
-`[import-mappings]` entries. This patch path reloads the file into Acton's typed
-config and writes it back out, so comments and unknown keys are dropped.
+When `Acton.toml` already exists, `acton init` skips project configuration and
+does not read or rewrite the manifest.
 
 When patching `.gitignore`, Acton adds groups for:
 
@@ -231,9 +226,8 @@ symlink creation is restricted.
 
 The default `acton init` flow writes or patches local project files and may
 create local symlinks to global overlay files. It does not modify Git config.
-When it patches an existing `Acton.toml`, it rewrites the parsed manifest and
-may drop TOML comments or unknown keys; `.gitignore` patching remains
-append-only.
+If `Acton.toml` already exists, Acton leaves it untouched; `.gitignore`
+patching remains append-only.
 
 The default flow normally refreshes the bundled standard library under
 `.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic refresh.
@@ -262,7 +256,7 @@ With `--stdlib-only`, `acton init` writes only inside `.acton/`.
    acton init
    ```
 
-2. Regenerate default mappings in an existing `Acton.toml`:
+2. Refresh support files in a project that already has `Acton.toml`:
 
    ```bash
    acton init

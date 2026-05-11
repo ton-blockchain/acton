@@ -8,7 +8,7 @@ There is no dedicated `acton deploy` command. Instead, contracts are deployed us
 
 Local emulation environment in scripts matches that of Acton tests. Each run is isolated, state is not preserved between script executions, transactions are instantaneous, and emulated wallets are used instead of real [configured testnet or mainnet wallets](/docs/wallets). As such, locally emulated deployments are useful for checking contract address derivation, initial state, deployment statuses, and post-deploy getter calls before deploying contracts to a public network.
 
-Without network broadcast, `scripts.wallet()` creates a virtual wallet in the emulator. The emulator treasury issues the wallet, which has a balance of 10,000 Toncoin, and its name is fixed to `"emulated-wallet"`.
+Without network broadcast, `scripts.wallet(name)` creates a virtual wallet in the emulator using the same treasury mechanism as Acton tests. The emulator treasury issues the wallet with a balance of 10,000 Toncoin. If the name comes from `promptWallet(...)`, emulate mode returns the stable placeholder `"emulated-wallet"`.
 
 When deploying to testnet or mainnet, `scripts.wallet()` uses a [configured deployer wallet](/docs/wallets) or a wallet connected through TON Connect.
 
@@ -48,7 +48,7 @@ import "@acton/build"
 import "@acton/prompts"
 import "@acton/testing/assert"
 
-import "@wrappers/Counter"
+import "@wrappers/Counter.gen"
 import "@contracts/types"
 
 fun main() {
@@ -75,7 +75,7 @@ fun main() {
 }
 ```
 
-The same pattern works for more complex contracts. Prepare dictionaries, cells, metadata, and contract code inside the script before calling `.deploy()`.
+The same pattern works for more complex contracts. Prepare dictionaries, cells, metadata, and contract code inside the script before calling the wrapper's deployment helper.
 
 ```tolk title="scripts/deploy.tolk"
 import "@acton/emulation/scripts"

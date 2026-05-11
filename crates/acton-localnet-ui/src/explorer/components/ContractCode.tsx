@@ -2,7 +2,7 @@ import {Buffer} from "node:buffer"
 
 import type React from "react"
 import {useMemo, useState} from "react"
-import type {ContractABI} from "gen-typescript-from-tolk-dev"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Cell as Cell2, runtime, text} from "ton-assembly"
 
 import styles from "./ContractCode.module.css"

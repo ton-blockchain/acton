@@ -4,4 +4,4 @@ Caused by:
   error decoding response body
 
 Caused by:
-  missing field `difficulty` at line 1 column 30
+  missing field `difficulty` at line 1 column 42

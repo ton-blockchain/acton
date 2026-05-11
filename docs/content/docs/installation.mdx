@@ -7,7 +7,6 @@ icon: Download
 import {Tabs, Tab} from "fumadocs-ui/components/tabs";
 import {Accordion, Accordions} from "fumadocs-ui/components/accordion";
 import {Step, Steps} from "fumadocs-ui/components/steps";
-import {Card, Cards} from "fumadocs-ui/components/card";
 import {SiApple, SiLinux} from "react-icons/si";
 
 ## Overview
@@ -15,9 +14,11 @@ import {SiApple, SiLinux} from "react-icons/si";
 Acton ships as a single, dependency-free executable. You can install it via the public installer, by downloading a release asset directly, or by using the published Docker image.
 
 <Callout type="info" title="Support policy">
-    Acton is stable on the latest numbered release. First-class support covers versioned releases on macOS (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is Ubuntu 22 or newer. `trunk` builds, WSL installs, and other source-built targets are beta or best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22 or newer and follow the Linux steps.
+    Acton is stable on the latest major numbered release. First-class support covers versioned releases on macOS (ARM64 and x86_64) and Linux GNU (x86_64 and ARM64). For Linux, the documented baseline is Ubuntu 22 or newer.
 
-    See [platform tiers](#platform-tiers) for the full matrix.
+    `trunk` builds, WSL installs, and other source-built targets are beta or best-effort surfaces. Native Windows is not supported: install Acton inside WSL with Ubuntu 22 or newer and follow the Linux steps.
+
+    See the [platform tiers](#platform-tiers) for the full matrix.
 </Callout>
 
 ## Installation
@@ -59,41 +60,6 @@ acton --version
 ```
 
 The printed line is the Acton version.
-
-If Acton is installed but the shell reports `command not found`, add the installation directory to `PATH` manually:
-
-<Accordions>
-    <Accordion title="Add Acton to the PATH">
-        <Steps>
-            <Step title="Determine which shell is active">
-                ```bash
-                echo $SHELL
-                # /bin/zsh or /bin/bash or /bin/fish
-                ```
-            </Step>
-
-            <Step title="Open the shell configuration file">
-                - For bash: `~/.bashrc`
-                - For zsh: `~/.zshrc`
-                - For fish: `~/.config/fish/config.fish`
-            </Step>
-
-            <Step title="Add the Acton directory to PATH">
-                Add this line to the configuration file:
-
-                ```bash
-                export PATH="PATH_TO_ACTON_BIN:$PATH"
-                ```
-            </Step>
-
-            <Step title="Reload the shell configuration">
-                ```bash
-                source ~/.bashrc # or ~/.zshrc
-                ```
-            </Step>
-        </Steps>
-    </Accordion>
-</Accordions>
 
 ### Shell completions
 
@@ -139,6 +105,47 @@ To download Acton binaries directly, visit the [releases page on GitHub](https:/
         Linux ARM64 binary
     </Card>
 </Cards>
+
+Extract the `acton` binary from the archive:
+
+```bash
+tar xzf acton-arch-os-archive.tar.gz
+```
+
+Place the extracted binary to a common directory in `PATH`, e.g., `~/.local/bin` or `/usr/local/bin`. Alternatively, place it in a different installation directory and manually add it to `PATH`:
+
+<Accordions>
+    <Accordion title="Add Acton to the PATH">
+        <Steps>
+            <Step title="Determine which shell is active">
+                ```bash
+                echo $SHELL
+                # /bin/zsh or /bin/bash or /bin/fish
+                ```
+            </Step>
+
+            <Step title="Open the shell configuration file">
+                - For bash: `~/.bashrc`
+                - For zsh: `~/.zshrc`
+                - For fish: `~/.config/fish/config.fish`
+            </Step>
+
+            <Step title="Add the Acton directory to PATH">
+                Add this line to the configuration file:
+
+                ```bash
+                export PATH="PATH_TO_ACTON_BIN:$PATH"
+                ```
+            </Step>
+
+            <Step title="Reload the shell configuration">
+                ```bash
+                source ~/.bashrc # or ~/.zshrc
+                ```
+            </Step>
+        </Steps>
+    </Accordion>
+</Accordions>
 
 ## Docker image
 
@@ -208,7 +215,7 @@ To uninstall Acton binaries or cache, remove the `~/.acton` directory in the hom
 
 ## Support policy
 
-Acton is stable on the latest numbered release.
+Acton is stable on the latest major numbered release.
 
 ### Platform tiers
 
@@ -223,5 +230,5 @@ Acton is stable on the latest numbered release.
 | Other source-built targets                     | Beta        |
 
 <Callout type="warn">
-  Other source-built targets are outside the official binary matrix; validation is limited and regressions may occur.
+    Other source-built targets are outside of the official binary matrix: their validation is limited, and regressions may occur.
 </Callout>

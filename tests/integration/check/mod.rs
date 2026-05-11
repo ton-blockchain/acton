@@ -16,7 +16,6 @@ mod explicit_return_type_tests;
 mod field_init_can_be_folded_tests;
 mod identical_conditional_branches_tests;
 mod import_path_can_use_mappings_tests;
-mod incoming_messages_duplicate_opcode_tests;
 mod lint_exclude_tests;
 mod lint_exit_code_tests;
 mod lint_output_github_tests;

@@ -22,15 +22,14 @@ pub(super) fn generate_stdlib_docs(
         fs::remove_dir_all(&legacy_nested_tolk_dir)?;
     }
 
-    let mut docs = collect_docs(lib_dir, stdlib_out_dir, SourceKind::Acton)?;
-    docs.extend(collect_docs(
-        tolk_stdlib_dir,
-        tolk_stdlib_out_dir,
-        SourceKind::Tolk,
-    )?);
+    let stdlib_docs = collect_docs(lib_dir, stdlib_out_dir, SourceKind::Acton)?;
+    let tolk_stdlib_docs = collect_docs(tolk_stdlib_dir, tolk_stdlib_out_dir, SourceKind::Tolk)?;
 
-    write_stdlib_index(stdlib_out_dir)?;
-    write_tolk_stdlib_index(tolk_stdlib_out_dir)?;
+    write_stdlib_index(stdlib_out_dir, &stdlib_docs)?;
+    write_tolk_stdlib_index(tolk_stdlib_out_dir, &tolk_stdlib_docs)?;
+
+    let mut docs = stdlib_docs;
+    docs.extend(tolk_stdlib_docs);
 
     let symbol_map = build_symbol_map(&docs);
     let link_regex = Regex::new(r"\[([a-zA-Z0-9_.]+)]")?;
@@ -42,42 +41,48 @@ pub(super) fn generate_stdlib_docs(
     Ok(())
 }
 
-fn write_stdlib_index(stdlib_out_dir: &Path) -> Result<()> {
+fn write_stdlib_index(stdlib_out_dir: &Path, docs: &[FileDoc]) -> Result<()> {
     fs::create_dir_all(stdlib_out_dir)?;
     let index_article = stdlib_out_dir.join("overview.mdx");
+    let cards = render_cards(docs);
+    let body = format!(
+        "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](/docs/tolk_standard_library/overview).\n\n{cards}"
+    );
     fs::write(
         &index_article,
         render_generated_index_page(
             "Overview",
             "All available functions, structs, constants, and other entities available in Acton standard library",
-            "Acton provides a collection of functions for writing scripts and tests in Tolk.\n\nThe Tolk stdlib is documented in [Tolk standard library](/docs/tolk_standard_library/overview).\n",
+            &body,
             Path::new(super::ACTON_STDLIB_SRC),
         ),
     )?;
     let meta_file = stdlib_out_dir.join("meta.json");
     let _ = fs::write(
         &meta_file,
-        "{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
+        "{\n  \"title\": \"Acton standard library\",\n  \"icon\": \"BookOpenText\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
     );
     Ok(())
 }
 
-fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path) -> Result<()> {
+fn write_tolk_stdlib_index(tolk_stdlib_out_dir: &Path, docs: &[FileDoc]) -> Result<()> {
     fs::create_dir_all(tolk_stdlib_out_dir)?;
     let index_article = tolk_stdlib_out_dir.join("overview.mdx");
+    let cards = render_cards(docs);
+    let body = format!("This section contains documentation of Tolk standard library.\n\n{cards}");
     fs::write(
         &index_article,
         render_generated_index_page(
             "Overview",
             "Bundled Tolk stdlib modules used by Acton standard library",
-            "This section contains documentation of Tolk standard library.\n",
+            &body,
             Path::new(super::TOLK_STDLIB_SRC),
         ),
     )?;
     let meta_file = tolk_stdlib_out_dir.join("meta.json");
     let _ = fs::write(
         &meta_file,
-        "{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"FileCode\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
+        "{\n  \"title\": \"Tolk standard library\",\n  \"icon\": \"Braces\",\n  \"pages\": [\n    \"overview\",\n    \"...\"\n  ]\n}\n",
     );
     Ok(())
 }
@@ -258,6 +263,42 @@ fn write_doc_page(
 
     fs::write(output_path, mdx_content)?;
     Ok(())
+}
+
+fn render_cards(docs: &[FileDoc]) -> String {
+    if docs.is_empty() {
+        return String::new();
+    }
+    let mut out = String::from("<Cards>\n");
+    for doc in docs {
+        let first_para = doc
+            .file_header
+            .as_deref()
+            .and_then(|h| h.split("\n\n").next())
+            .map(str::trim)
+            .filter(|s| !s.is_empty());
+        if let Some(desc) = first_para {
+            let sanitized = sanitize_mdx_text(desc);
+            let indented = sanitized
+                .lines()
+                .map(|l| format!("        {l}"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            let _ = writeln!(
+                out,
+                "    <Card href=\"{}\" title=\"{}\">\n{}\n    </Card>",
+                doc.docs_url, doc.title, indented
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "    <Card href=\"{}\" title=\"{}\" />",
+                doc.docs_url, doc.title
+            );
+        }
+    }
+    out.push_str("</Cards>\n");
+    out
 }
 
 fn render_generated_index_page(

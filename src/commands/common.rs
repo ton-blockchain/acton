@@ -345,6 +345,19 @@ pub fn validate_cli_verbosity(level: u8) -> anyhow::Result<u8> {
     }
 }
 
+pub(crate) fn shell_quote(value: &str) -> String {
+    if value.is_empty() {
+        "''".to_owned()
+    } else if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '/' | '.' | '_' | '-' | ':' | ','))
+    {
+        value.to_owned()
+    } else {
+        format!("'{}'", value.replace('\'', r"'\''"))
+    }
+}
+
 pub fn select_wallet(wallet_name: Option<String>, config: &ActonConfig) -> anyhow::Result<String> {
     let wallet_name = if let Some(name) = wallet_name {
         name

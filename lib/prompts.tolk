@@ -10,9 +10,9 @@
 /// - `promptInt(...)`: parses `default` in non-interactive mode
 /// - `promptAddress(...)`: parses `default` in non-interactive mode
 /// - `promptWallet(...)`: returns `"emulated-wallet"` in emulate mode; in
-///   broadcast mode it auto-selects the only configured wallet, but otherwise
-///   fails when no wallet is available or wallet choice cannot be collected
-///   interactively
+///   TON Connect mode it returns `"tonconnect"`; otherwise, in broadcast mode it
+///   auto-selects the only configured wallet, but fails when no wallet is available
+///   or wallet choice cannot be collected interactively
 ///
 /// Examples:
 /// ```tolk
@@ -132,6 +132,7 @@ fun promptAddress(
 /// Prompts the user to select a wallet from the configured wallets.
 ///
 /// Behavior (broadcast mode, i.e. `--net` is set):
+/// - With `--tonconnect`, returns `"tonconnect"`.
 /// - If no wallets are configured, fails with an error suggesting how to create one.
 /// - If only one wallet is configured, returns its name automatically.
 /// - If multiple wallets are configured, shows an interactive selection.

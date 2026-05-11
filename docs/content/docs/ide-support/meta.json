@@ -1,6 +1,6 @@
 {
   "title": "IDE support",
-  "icon": "ToolCase",
+  "icon": "FileCode",
   "pages": [
     "vscode",
     "jetbrains"

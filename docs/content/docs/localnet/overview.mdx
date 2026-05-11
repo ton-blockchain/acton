@@ -17,7 +17,7 @@ It is designed for fast local iteration with a familiar TonCenter API and reprod
 
 The local node serves a bundled explorer UI from the same HTTP server as the API.
 
-- The root path redirects into the explorer UI, and client-side routes such as `/explorer`, `/tokens`, `/nfts`, `/explorer/address/<ADDR>`, and `/explorer/tx/<HASH>` all resolve through the same single-page app shell.
+- The root path serves the explorer UI, and client-side routes such as `/explorer`, `/tokens`, `/nfts`, `/explorer/address/<ADDR>`, and `/explorer/tx/<HASH>` all resolve through the same single-page app shell.
 - The UI reads blockchain data from `/api/v2` and `/api/v3`, and uses `/admin/address-name` plus `/admin/compiler-abi` for local alias and ABI lookups.
 
 ## Learn more

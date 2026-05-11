@@ -18,7 +18,7 @@ The mutation engine makes small, deliberate changes — for example, changing `o
 acton test --mutate --mutate-contract Voter
 ```
 
-```acton-cli-mutate
+```acton-cli-mutate noCopy
 $ acton test --mutate --mutate-contract Voter
 
 Mutation Testing
@@ -133,16 +133,16 @@ Because `option: uint8` already constrains generated values to `0..255`, no extr
 import "@acton/testing/expect"
 
 @test.fuzz
-get fun `fuzz vote option boundary`(option: uint8) {
+get fun `test fuzz vote option boundary`(option: uint8) {
     val (poll, _, alice, _) = setupTest();
 
-    val msg = createMessage({
+    val voteMessage = createMessage({
         bounce: false,
         value: ton("0.1"),
         dest: poll.address,
         body: Vote { option },
     });
-    val res = net.send(alice.address, msg);
+    val res = net.send(alice.address, voteMessage);
 
     if (option == 0 || option == 1) {
         expect(res).toHaveSuccessfulTx({ from: alice.address, to: poll.address });
@@ -160,7 +160,7 @@ get fun `fuzz vote option boundary`(option: uint8) {
 acton test --fuzz-seed 42 -f "fuzz vote option"
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton test --fuzz-seed 42 -f "fuzz vote option"
    Compiling contracts
     Finished in 608.21µs

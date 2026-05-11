@@ -3,6 +3,8 @@ title: "VS Code-based editors"
 description: "Learn about Acton support in VS Code, Cursor, and Windsurf"
 ---
 
+import {LandingVideo} from "@/components/LandingVideo"
+
 The [TON extension for VS Code](https://marketplace.visualstudio.com/items?itemName=ton-core.vscode-ton) supports Acton development, providing intelligent features and toolchain integration.
 
 For installation instructions, see the [official TON documentation](https://docs.ton.org/contract-dev/ide/vscode).
@@ -17,10 +19,26 @@ The extension is compatible with:
 - VSCodium;
 - And other VS Code-based editors.
 
+<LandingVideo
+  className="docs-video rounded-lg border bg-fd-muted"
+  controls
+  controlsList="nodownload noplaybackrate"
+  height={720}
+  playsInline
+  playLabel="Play VS Code support video"
+  preload="metadata"
+  src="https://cdn.tapps.ninja/tolk/vscode.mp4"
+  style={{aspectRatio: "1280 / 720"}}
+  width={1280}
+>
+  Your browser does not support the video tag.
+</LandingVideo>
+
 ## Recommended TOML extension
 
 We recommend installing [Even Better TOML](https://marketplace.visualstudio.com/items?itemName=tamasfe.even-better-toml)
-as well. With it installed, `Acton.toml` gets completion and hover documentation in VS Code-based editors.
+as well. It ensures `Acton.toml` is treated as TOML, while the TON language server provides
+Acton schema completion and hover documentation for the file.
 
 ## `Acton.toml` support
 

@@ -88,7 +88,7 @@ Requires `--test` and conflicts with `--test-output`.
 {{#options}}
 
 {{#option "`--ts`" }}
-Generate a TypeScript wrapper through `gen-typescript-from-tolk`.
+Generate a TypeScript wrapper through `@ton/tolk-abi-to-typescript@0.5.0`.
 
 Conflicts with test stub generation.
 {{/option}}
@@ -116,7 +116,7 @@ If `incomingMessages` is missing, message-sending helpers are not generated. If
 
 ## TypeScript Generation
 
-`acton wrapper --ts` shells out to `npx gen-typescript-from-tolk-dev`.
+`acton wrapper --ts` shells out to `npx @ton/tolk-abi-to-typescript@0.5.0`.
 
 - Node.js, npm, and `npx` must be available in `PATH`
 - existing wrapper files at the target path are overwritten

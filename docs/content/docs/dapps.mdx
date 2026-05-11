@@ -1,0 +1,354 @@
+---
+title: "dApp development"
+description: "Learn how to create dApps with Acton templates, and connect a React frontend to Tolk contracts using Acton's TypeScript wrappers"
+icon: "CodeXml"
+---
+
+Acton can generate TypeScript wrappers from Tolk contract ABIs by running [`acton wrapper --all --ts`](/docs/commands/wrapper). Those wrappers handle address derivation, message encoding, and getter calls, so frontend or other TypeScript code never needs hand-written serialization.
+
+## Scaffold a new project with a frontend
+
+Pass `--app` to `acton new` to scaffold a project that includes both the Tolk contract structure and a React + Vite frontend:
+
+```bash
+acton new my-dapp --template counter --app
+```
+
+This produces the [app layout](/docs/projects#dapp-project-layout): Tolk sources under `contracts/src/`, generated TypeScript wrappers under `wrappers-ts/`, and the React frontend under `app/`.
+
+<Callout type="warn">
+    Node.js, `npm`, and `npx` must be available in the `PATH`.
+</Callout>
+
+Install workspace dependencies and start the dev server:
+
+```bash
+cd my-dapp
+npm ci
+npm run dev
+```
+
+<Callout>
+    The `counter` template ships with `CounterActions` and `CounterValue` components already wired to the generated `wrappers-ts/Counter.gen.ts` wrapper.
+</Callout>
+
+## Add a frontend to an existing project
+
+Run `acton init --create-dapp` inside an existing Acton project to add the React scaffold alongside the contract:
+
+```bash
+acton init --create-dapp
+```
+
+This creates `app/` with a Vite-based React project. It does not modify `Acton.toml` or existing Tolk sources. [Generate TypeScript wrappers](#generate-typescript-wrappers) separately.
+
+## Generate TypeScript wrappers
+
+TypeScript wrappers expose the contract ABI. Generate one before writing UI or other TypeScript code:
+
+```bash
+acton wrapper Counter --ts
+```
+
+This produces `wrappers-ts/Counter.gen.ts`. The generated file provides:
+
+- `Counter.fromStorage(init)` — derives the contract address from initial storage
+- `Counter.fromAddress(addr)` — opens an existing contract by address
+- `Counter.createCellOfIncreaseCounter(params)` — encodes an `IncreaseCounter` message body
+- `counter.getCurrentCounter()` — calls the `getCurrentCounter` get method and returns a typed value
+
+<Callout title="Regenerate after ABI changes">
+    Run `acton wrapper Counter --ts` after any change to storage, incoming messages, or get methods. Do not edit `*.gen.ts` files by hand.
+</Callout>
+
+## Use wrappers and TON packages in a project
+
+### Install frontend packages
+
+Install React Query, TON Connect, and the TON client packages:
+
+```bash
+npm i @tanstack/react-query @tonconnect/ui-react @ton/core @ton/ton buffer
+```
+
+Add the `Buffer` polyfill required by the TON packages for Vite projects:
+
+```ts title="app/src/polyfills.ts"
+import { Buffer } from 'buffer';
+
+const globalWithBuffer = globalThis as typeof globalThis & {
+  Buffer?: typeof Buffer;
+};
+
+if (!globalWithBuffer.Buffer) {
+  globalWithBuffer.Buffer = Buffer;
+}
+```
+
+Import it before other app modules so dependencies that read `globalThis.Buffer` would see the polyfill during initialization:
+
+```tsx title="app/src/main.tsx"
+import './polyfills';
+
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+
+import './styles.css';
+
+import App from './App';
+import { AppProviders } from './providers/AppProviders';
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <AppProviders>
+      <App />
+    </AppProviders>
+  </StrictMode>,
+);
+```
+
+### Initialize TON Connect
+
+Wrap the app in `TonConnectUIProvider` and `QueryClientProvider`. Point `manifestUrl` at the hosted `tonconnect-manifest.json`.
+
+```tsx title="app/src/providers/AppProviders.tsx"
+import type { PropsWithChildren } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { TonConnectUIProvider } from '@tonconnect/ui-react';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
+export function AppProviders({ children }: PropsWithChildren) {
+  return (
+    <TonConnectUIProvider manifestUrl="https://<PUBLIC_HOST>/tonconnect-manifest.json">
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    </TonConnectUIProvider>
+  );
+}
+```
+
+`TonConnectButton`, `useTonAddress()`, and `useTonConnectUI()` work anywhere inside the provider tree.
+
+<Callout>
+    Set `VITE_TONCENTER_MAINNET_API_KEY` and `VITE_TONCENTER_TESTNET_API_KEY` in `.env` to avoid `429` rate-limit errors. Vite inlines `VITE_`-prefixed variables into the browser bundle, so treat these keys as public.
+
+    For stricter key protection, proxy TON Center calls through a server-side endpoint and omit the key from the frontend config.
+</Callout>
+
+### Open the contract and build payloads
+
+Create a helper module that imports the generated wrapper and opens the contract with `TonClient`. Centralizing reads and payload construction here keeps components free of serialization logic.
+
+```ts title="app/src/lib/counter.ts"
+import { Address, beginCell, storeStateInit } from '@ton/core';
+import { TonClient } from '@ton/ton';
+
+import { Counter } from '../../../wrappers-ts/Counter.gen';
+
+const IS_TESTNET = import.meta.env.VITE_TON_NETWORK !== 'mainnet';
+
+export const tonClient = new TonClient({
+  endpoint: IS_TESTNET
+    ? 'https://testnet.toncenter.com/api/v2/jsonRPC'
+    : 'https://toncenter.com/api/v2/jsonRPC',
+  apiKey: IS_TESTNET
+    ? import.meta.env.VITE_TONCENTER_TESTNET_API_KEY
+    : import.meta.env.VITE_TONCENTER_MAINNET_API_KEY,
+});
+
+export function openCounter(address: string) {
+  return tonClient.open(Counter.fromAddress(Address.parse(address)));
+}
+
+export async function readCounterValue(address: string) {
+  const counter = openCounter(address);
+  return counter.getCurrentCounter();
+}
+
+export async function readCounterOwner(address: string) {
+  const counter = openCounter(address);
+  return counter.getOwner();
+}
+
+export function buildIncreasePayload(step: bigint) {
+  return Counter.createCellOfIncreaseCounter({
+    increaseBy: step,
+  })
+    .toBoc()
+    .toString('base64');
+}
+
+export function buildDeployStateInit(counterId: bigint, owner: string) {
+  const contract = Counter.fromStorage({
+    id: counterId,
+    owner: Address.parse(owner),
+    counter: 0n,
+  });
+
+  if (!contract.init) {
+    throw new Error('Contract init is missing.');
+  }
+
+  return {
+    address: contract.address.toString({
+      bounceable: false,
+      testOnly: IS_TESTNET,
+    }),
+    stateInit: beginCell()
+      .store(storeStateInit(contract.init))
+      .endCell()
+      .toBoc()
+      .toString('base64'),
+  };
+}
+```
+
+All message payloads and getter calls go through `wrappers-ts/Counter.gen.ts`, not hand-written serialization. Regenerating the wrapper by running `acton wrapper --all --ts` after an ABI change keeps the frontend in sync.
+
+### Send messages from React
+
+Use the wallet connection supplied by `useTonConnectUI()` to send an internal message whose payload comes from the generated wrapper.
+
+```tsx title="app/src/components/CounterActions.tsx"
+import { useState } from 'react';
+import { toNano } from '@ton/core';
+import { TonConnectButton, useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
+
+import { buildIncreasePayload } from '../lib/counter';
+
+export function CounterActions() {
+  const [tonConnectUI] = useTonConnectUI();
+  const walletAddress = useTonAddress(false);
+  const [status, setStatus] = useState('');
+
+  async function increaseCounter() {
+    if (!walletAddress) {
+      setStatus('Connect a wallet first.');
+      return;
+    }
+
+    try {
+      await tonConnectUI.sendTransaction({
+        validUntil: Math.floor(Date.now() / 1000) + 300,
+        messages: [
+          {
+            address: '<COUNTER_ADDRESS>',
+            amount: toNano('0.02').toString(),
+            payload: buildIncreasePayload(1n),
+          },
+        ],
+      });
+
+      setStatus('Increase message sent.');
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : 'Transaction failed.');
+    }
+  }
+
+  return (
+    <div>
+      <TonConnectButton />
+      <button onClick={increaseCounter}>Increase</button>
+      <p>{status}</p>
+    </div>
+  );
+}
+```
+
+Replace `<COUNTER_ADDRESS>` with the deployed contract address. The wallet signs and broadcasts the transaction; the wrapper encodes the payload.
+
+### Read get methods from React
+
+Getter calls do not require a wallet. Read them through `TonClient` and the generated wrapper, then cache with React Query.
+
+```tsx title="app/src/components/CounterValue.tsx"
+import { useQuery } from '@tanstack/react-query';
+
+import { readCounterOwner, readCounterValue } from '../lib/counter';
+
+export function CounterValue({ address }: { address: string }) {
+  const { data, isLoading, error, refetch } = useQuery({
+    queryKey: ['counter', address],
+    queryFn: async () => {
+      const [value, owner] = await Promise.all([
+        readCounterValue(address),
+        readCounterOwner(address),
+      ]);
+
+      return { value, owner: owner.toString() };
+    },
+    refetchInterval: 10_000,
+  });
+
+  if (isLoading) {
+    return <p>Loading...</p>;
+  }
+
+  if (error) {
+    return (
+      <div>
+        <p>{error instanceof Error ? error.message : 'Read failed.'}</p>
+        <button onClick={() => refetch()}>Try again</button>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <p>Counter: {data?.value.toString()}</p>
+      <p>Owner: {data?.owner}</p>
+    </div>
+  );
+}
+```
+
+### Deploy from the UI
+
+When the app deploys the contract rather than linking to an existing address, derive the address and `stateInit` from `Counter.fromStorage()` and send a plain transfer to that address.
+
+```tsx title="app/src/components/DeployCounter.tsx"
+import { toNano } from '@ton/core';
+import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
+
+import { buildDeployStateInit } from '../lib/counter';
+
+export function DeployCounter() {
+  const [tonConnectUI] = useTonConnectUI();
+  const owner = useTonAddress(false);
+
+  async function deploy() {
+    if (!owner) return;
+
+    const deployment = buildDeployStateInit(1n, owner);
+
+    await tonConnectUI.sendTransaction({
+      validUntil: Math.floor(Date.now() / 1000) + 300,
+      messages: [
+        {
+          address: deployment.address,
+          amount: toNano('0.05').toString(),
+          stateInit: deployment.stateInit,
+        },
+      ],
+    });
+  }
+
+  return <button onClick={deploy}>Deploy counter</button>;
+}
+```
+
+`buildDeployStateInit` in `counter.ts` calls `Counter.fromStorage()` from the generated wrapper. Address derivation stays aligned with the contract ABI.
+
+## See also
+
+- [Project management](/docs/projects)
+- [Deployment](/docs/deploy)
+- [`acton wrapper` command reference](/docs/commands/wrapper)

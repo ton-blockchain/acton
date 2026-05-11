@@ -1,5 +1,5 @@
-import type {ABIStruct, ContractABI, Ty} from "gen-typescript-from-tolk-dev"
-import {SymTable} from "gen-typescript-from-tolk-dev"
+import type {ABIStruct, ContractABI, Ty} from "@ton/tolk-abi-to-typescript"
+import {SymTable} from "@ton/tolk-abi-to-typescript"
 
 import {parseAddress} from "../components/utils"
 

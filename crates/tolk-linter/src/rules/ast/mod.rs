@@ -12,7 +12,6 @@ pub mod explicit_return_type;
 pub mod field_init_can_be_folded;
 pub mod identical_conditional_branches;
 pub mod import_path_can_use_mappings;
-pub mod incoming_messages_duplicate_opcode;
 pub mod message_entity_naming;
 pub mod method_can_be_static;
 pub mod missing_contract_header;

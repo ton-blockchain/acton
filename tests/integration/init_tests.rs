@@ -69,6 +69,58 @@ fn test_init_empty_directory() {
 }
 
 #[test]
+fn test_init_warns_when_current_directory_is_empty() {
+    let project = ProjectBuilder::new("init-truly-empty")
+        .without_acton_toml()
+        .build();
+    fs::remove_dir_all(project.path().join("contracts")).unwrap();
+    fs::remove_dir_all(project.path().join("tests")).unwrap();
+    let log_dir = project.path().parent().unwrap().join("init-empty-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .init()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/init/test_init_warns_when_current_directory_is_empty.stdout.txt",
+        );
+
+    assert!(project.path().join("Acton.toml").exists());
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
+fn test_init_does_not_warn_for_existing_acton_toml_in_otherwise_empty_directory() {
+    let project = ProjectBuilder::new("init-existing-manifest-empty")
+        .without_acton_toml()
+        .build();
+    fs::remove_dir_all(project.path().join("contracts")).unwrap();
+    fs::remove_dir_all(project.path().join("tests")).unwrap();
+    let original_manifest = "[package]\n";
+    fs::write(project.path().join("Acton.toml"), original_manifest).unwrap();
+    let log_dir = project
+        .path()
+        .parent()
+        .unwrap()
+        .join("init-existing-empty-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .init()
+        .run()
+        .success()
+        .assert_not_contains("For new projects, prefer creating from a template");
+
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
+    );
+}
+
+#[test]
 fn test_init_already_initialized() {
     let project = ProjectBuilder::new("init-exists")
         .without_acton_toml()
@@ -83,14 +135,12 @@ fn test_init_already_initialized() {
 }
 
 #[test]
-fn test_init_patches_missing_default_mappings_in_existing_config() {
+fn test_init_leaves_existing_config_with_missing_default_mappings_unchanged() {
     let project = ProjectBuilder::new("init-patch-mappings")
         .without_acton_toml()
         .build();
 
-    fs::write(
-        project.path().join("Acton.toml"),
-        r#"[package]
+    let original_manifest = r#"[package]
 name = "my-acton-project"
 description = "A TON blockchain project"
 version = "0.1.0"
@@ -102,22 +152,19 @@ ignore = []
 
 [import-mappings]
 tests = "custom-tests"
-"#,
-    )
-    .unwrap();
+"#;
+    fs::write(project.path().join("Acton.toml"), original_manifest).unwrap();
 
     let output = project.acton().init().run().success();
 
     output
         .assert_contains("Updated Acton project")
-        .assert_contains("Patched Acton.toml with default mappings");
+        .assert_contains("Skipping Acton.toml project configuration")
+        .assert_not_contains("Patched Acton.toml with default mappings");
 
-    let content = fs::read_to_string(project.path().join("Acton.toml")).unwrap();
-    assertion().eq(
-        normalize_output(content.as_str(), project.path()),
-        snapbox::file!(
-            "snapshots/init/test_init_patches_missing_default_mappings_in_existing_config.toml.gen"
-        ),
+    assert_eq!(
+        fs::read_to_string(project.path().join("Acton.toml")).unwrap(),
+        original_manifest
     );
 }
 

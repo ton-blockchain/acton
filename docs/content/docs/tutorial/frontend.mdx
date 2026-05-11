@@ -3,9 +3,9 @@ title: "9. Build the React frontend"
 description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + React + TON Connect UI, and build a live poll page."
 ---
 
-## Prerequisites for this page
+## Prerequisites
 
-- [Node.js](https://nodejs.org/en/download/) 20 or later
+- [Node.js](https://nodejs.org/en/download/) 22 or later
 - A deployed poll on [testnet](/docs/tutorial/testnet)
 
 ## Scaffold the dApp
@@ -14,7 +14,7 @@ description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + Rea
 acton init --create-dapp app/
 ```
 
-```acton-cli
+```acton-cli noCopy
 $ acton init --create-dapp app/
 ✓ Created TypeScript app scaffold
   Directory: app
@@ -80,10 +80,9 @@ rm app/wrappers-ts/Empty.gen.ts
   edit it manually.
 </Callout>
 
-## Wire up the path aliases
+## Check the path aliases
 
-Add a `@wrappers/*` alias next to the existing `@/*` alias in
-`app/tsconfig.json`:
+The current dApp scaffold already includes both aliases in `app/tsconfig.json`:
 
 ```json title="app/tsconfig.json"
 {
@@ -97,7 +96,7 @@ Add a `@wrappers/*` alias next to the existing `@/*` alias in
 }
 ```
 
-Mirror it in `app/vite.config.ts` so Vite resolves the path at runtime:
+It also mirrors them in `app/vite.config.ts` so Vite resolves the path at runtime:
 
 ```ts title="app/vite.config.ts"
 resolve: {
@@ -118,7 +117,7 @@ TONCENTER_TESTNET_API_KEY=<TONCENTER_API_KEY>
 ```
 
 `<POLL_ADDRESS>` — the testnet address from page 8.
-`<TONCENTER_API_KEY>` — get a free key at [Toncenter TG bot](https://t.me/toncenter).
+`<TONCENTER_API_KEY>` — get a free key in [TON Center Telegram bot](https://t.me/toncenter).
 
 The bundled `vite.config.ts` exposes both `VITE_*` and `TONCENTER_*` prefixes via `envPrefix`, so the same `TONCENTER_TESTNET_API_KEY` works for the Acton CLI and the Vite dev server.
 

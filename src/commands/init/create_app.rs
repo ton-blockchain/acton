@@ -1,3 +1,4 @@
+use crate::commands::common::shell_quote;
 use crate::commands::new::extract_standalone_app_scaffold;
 use acton_config::color::OwoColorize;
 use anyhow::Context;
@@ -38,7 +39,11 @@ fn print_app_created_message(target_dir: &Path) {
     println!("Next steps:");
     println!();
     println!("  {}", "# Install app dependencies".dimmed());
-    println!("  {} {}", "cd".bold(), target_dir.display());
+    println!(
+        "  {} {}",
+        "cd".bold(),
+        shell_quote(&target_dir.display().to_string())
+    );
     println!("  {} ci", "npm".bold());
     println!("  {}", "# Start the TypeScript app".dimmed());
     println!("  {} run dev", "npm".bold());
