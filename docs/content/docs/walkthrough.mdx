@@ -194,10 +194,19 @@ See the [formatting guide](/docs/format) for more.
 
 ## Lint contracts
 
-Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics. On a clean project, it prints the checked targets and exits with status 0:
+Use [`acton check`](/docs/commands/check) to run the Tolk linter across the whole project and report diagnostics:
 
 ```bash
 acton check
+```
+
+On a clean project, it prints the checked targets and exits with status 0:
+
+```acton-cli-check noCopy
+$ acton check
+    Checking Counter
+    Checking contracts/scripts/deploy.tolk
+    Checking contracts/tests/counter.test.tolk
 ```
 
 When issues are found, output looks like this:
