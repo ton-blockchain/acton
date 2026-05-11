@@ -1,4 +1,4 @@
-name: Build and Test
+name: Contracts
 
 on:
   push:
@@ -31,17 +31,23 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: npm
+
       - name: Setup Acton
         uses: ton-blockchain/setup-acton@005f3ac616cd74b0b16d40884502e231e14f5f2d # v0.3.0
 
-      - name: Acton Build
+      - name: Build
         run: acton build
 
-      - name: Acton Formatter
+      - name: Formatter
         run: acton fmt --check
 
-      - name: Acton Linter
+      - name: Linter
         run: acton check --output-format github
 
-      - name: Acton Test
+      - name: Test
         run: acton test
