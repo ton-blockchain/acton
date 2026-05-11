@@ -326,7 +326,7 @@ export function LandingHome() {
             </div>
             <div className="landing-hero-media pointer-events-none absolute top-13 left-8 right-[-12rem] z-0 lg:bottom-[-4.5rem] lg:left-auto lg:right-[-5.5rem] lg:w-[62%] xl:right-[-2rem] xl:w-[60%]">
               <Image
-                src="/landing/hero-ide.png"
+                src="/acton/landing/hero-ide.png"
                 alt=""
                 width={1436}
                 height={1096}
@@ -552,7 +552,7 @@ export function LandingHome() {
                   <div className="relative lg:-translate-y-5 xl:-translate-y-5">
                     <div className="mx-auto max-w-[720px]">
                       <Image
-                        src="/landing/func2tolk-migration.png"
+                        src="/acton/landing/func2tolk-migration.png"
                         alt="FunC to Tolk migration diagram"
                         width={1365}
                         height={766}
