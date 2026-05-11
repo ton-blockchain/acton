@@ -15,7 +15,7 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-permissions: { }
+permissions: {}
 
 jobs:
   build-and-test:
@@ -43,14 +43,14 @@ jobs:
       - name: Acton Build
         run: acton build
 
-      - name: Acton Test
-        run: acton test
+      - name: Acton Formatter
+        run: acton fmt --check
 
       - name: Acton Linter
         run: acton check --output-format github
 
-      - name: Acton Formatter
-        run: acton fmt --check
+      - name: Node Test
+        run: npm run test
 
       - name: Install Node dependencies
         run: npm ci
@@ -63,6 +63,3 @@ jobs:
 
       - name: Node Build
         run: npm run build
-
-      - name: Node Test
-        run: npm run test
