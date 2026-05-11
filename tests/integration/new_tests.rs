@@ -2103,24 +2103,13 @@ fn assert_app_template_npm_quality_checks(test_name: &str, template: &str, cache
         String::from_utf8_lossy(&build_output.stderr)
     );
 
-    if template == "empty" {
-        assert!(
-            !scripts.contains_key("test"),
-            "empty app template is also used by acton init --create-dapp and must not require an Acton project"
-        );
-    } else {
-        assert!(
-            scripts.contains_key("test"),
-            "{template} app template must expose npm run test"
-        );
-        let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
-        assert!(
-            test_output.status.success(),
-            "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
-            String::from_utf8_lossy(&test_output.stdout),
-            String::from_utf8_lossy(&test_output.stderr)
-        );
-    }
+    let test_output = run_npm_command(&project_dir, &path_env, cache_dir, &["run", "test"]);
+    assert!(
+        test_output.status.success(),
+        "npm run test failed for {template} app:\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&test_output.stdout),
+        String::from_utf8_lossy(&test_output.stderr)
+    );
 
     let typecheck_output =
         run_npm_command(&project_dir, &path_env, cache_dir, &["run", "typecheck"]);
