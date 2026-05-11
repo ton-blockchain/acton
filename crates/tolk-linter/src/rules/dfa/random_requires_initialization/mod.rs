@@ -1,6 +1,6 @@
-use crate::Checker;
 use crate::rules::diagnostic::{Annotation, Diagnostic};
 use crate::rules::violation::Violation;
+use crate::{Checker, FixAvailability};
 use rustc_hash::FxHashMap;
 use tolk_macros::ViolationMetadata;
 use tolk_resolver::file_index::{FileId, SymbolId};
@@ -45,6 +45,8 @@ pub mod analysis;
 pub struct RandomRequiresInitialization;
 
 impl Violation for RandomRequiresInitialization {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+
     fn message(&self) -> String {
         "random generator must be initialized before `random.uint256`/`random.range` call"
             .to_owned()
