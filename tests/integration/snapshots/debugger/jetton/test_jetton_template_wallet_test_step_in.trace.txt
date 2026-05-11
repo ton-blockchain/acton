@@ -5684,11 +5684,11 @@ Step 220 (step_in):
 
 Step 221 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
                                    ^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       raw = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
@@ -5699,11 +5699,11 @@ Step 221 (step_in):
 
 Step 222 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       raw = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
@@ -11630,11 +11630,11 @@ Step 440 (step_in):
 
 Step 441 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
                                    ^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       raw = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
@@ -11645,11 +11645,11 @@ Step 441 (step_in):
 
 Step 442 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
       raw = 0:6f78bb3cc12ef3d097d996b7ae8414353e3f22ab5369b2dacdef8aefa23805f9
@@ -11988,11 +11988,11 @@ Step 459 (step_in):
 
 Step 460 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
                                    ^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       raw = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
@@ -12003,11 +12003,11 @@ Step 460 (step_in):
 
 Step 461 (step_in):
   Code:
-    228| /// ```
-    229| fun scripts.isContractDeployed(addr: address): bool {
-    230|     return ffi.isDeployed(addr.toCell());
+    231| /// ```
+    232| fun scripts.isContractDeployed(addr: address): bool {
+    233|     return ffi.isDeployed(addr.toCell());
              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    231| }
+    234| }
   Variables:
     addr: address = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e
       raw = 0:4842954dc4b8fac2b0157a017309e3acbf830379491d0560935c31478612a94e

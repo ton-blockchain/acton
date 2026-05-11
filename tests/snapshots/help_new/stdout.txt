@@ -224,7 +224,7 @@ INTERACTIVE MODE
        entirely.
 
 FILES
-       The generated project always includes:
+       The generated project normally includes:
 
        o  Acton.toml
 

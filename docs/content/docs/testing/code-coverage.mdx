@@ -70,7 +70,7 @@ acton test --coverage --coverage-include-wrappers
 
 With `--coverage`, Acton prints a table after the run:
 
-```
+```text noCopy
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
  File             Covered Lines   Total Lines   % Lines   Covered Branches   Total Branches   % Branches   Score
 ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -92,13 +92,13 @@ With `--coverage`, Acton prints a table after the run:
 
 The text artifact is line-summary-first, but branch detail still appears inline on executable lines:
 
-```text
+```text noCopy
 7 ✓ |                 if (x > 0) {                        | hits:2 branches:true=1 false=1
 ```
 
 When multiple branch sites map to the same source line, Acton keeps them separate:
 
-```text
+```text noCopy
 31 ✓ | return foo != null ? foo : 100; | hits:1 branches:site0 true=0 false=1; site1 true=1 false=0
 ```
 
