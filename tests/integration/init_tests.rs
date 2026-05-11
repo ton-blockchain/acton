@@ -69,6 +69,29 @@ fn test_init_empty_directory() {
 }
 
 #[test]
+fn test_init_warns_when_current_directory_is_empty() {
+    let project = ProjectBuilder::new("init-truly-empty")
+        .without_acton_toml()
+        .build();
+    fs::remove_dir_all(project.path().join("contracts")).unwrap();
+    fs::remove_dir_all(project.path().join("tests")).unwrap();
+    let log_dir = project.path().parent().unwrap().join("init-empty-logs");
+
+    project
+        .acton()
+        .env("ACTON_LOG_DIR", log_dir.to_str().unwrap())
+        .init()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/init/test_init_warns_when_current_directory_is_empty.stdout.txt",
+        );
+
+    assert!(project.path().join("Acton.toml").exists());
+    assert!(project.path().join(".acton/tolk-stdlib").exists());
+}
+
+#[test]
 fn test_init_already_initialized() {
     let project = ProjectBuilder::new("init-exists")
         .without_acton_toml()

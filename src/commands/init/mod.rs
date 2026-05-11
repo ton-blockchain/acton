@@ -41,6 +41,14 @@ pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Re
         return Ok(());
     }
 
+    if current_directory_is_empty()? {
+        println!(
+            "  {} This directory is empty. For new projects, prefer creating from a template with {}",
+            "Warning:".yellow().bold(),
+            "acton new .".cyan().bold()
+        );
+    }
+
     let acton_toml_exists = Path::new("Acton.toml").exists();
 
     if acton_toml_exists {
@@ -119,6 +127,10 @@ pub fn init_cmd(create_app_path: Option<&Path>, stdlib_only: bool) -> anyhow::Re
     }
 
     Ok(())
+}
+
+fn current_directory_is_empty() -> anyhow::Result<bool> {
+    Ok(fs::read_dir(".")?.next().is_none())
 }
 
 fn patch_default_mappings() -> anyhow::Result<bool> {
