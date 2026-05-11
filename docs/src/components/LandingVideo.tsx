@@ -6,6 +6,7 @@ import {useEffect, useRef, useState} from "react"
 import {cn} from "@/lib/cn"
 
 interface LandingVideoProps extends ComponentPropsWithoutRef<"video"> {
+  initialVolume?: number
   playLabel?: string
 }
 
@@ -13,12 +14,27 @@ export function LandingVideo({
   className,
   children,
   controls,
+  initialVolume,
   playLabel = "Play video",
   ...props
 }: LandingVideoProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const shouldFocusAfterStart = useRef(false)
   const [hasStarted, setHasStarted] = useState(false)
+
+  useEffect(() => {
+    if (initialVolume === undefined) {
+      return
+    }
+
+    const video = videoRef.current
+
+    if (!video) {
+      return
+    }
+
+    video.volume = Math.min(Math.max(initialVolume, 0), 1)
+  }, [initialVolume])
 
   useEffect(() => {
     if (!hasStarted || !shouldFocusAfterStart.current) {

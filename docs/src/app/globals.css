@@ -117,12 +117,12 @@ figure.shiki > div[role="region"] {
 }
 
 .feature-video-card {
+  --feature-border-color: rgba(255, 255, 255, 0.1);
+
   border-radius: 1.25rem;
 }
 
 .feature-copy-panel {
-  --feature-border-color: rgba(255, 255, 255, 0.1);
-
   position: relative;
   z-index: 2;
   width: 100%;
@@ -141,6 +141,25 @@ figure.shiki > div[role="region"] {
   .feature-copy-panel {
     border: 0;
     border-radius: 0;
+  }
+
+  .feature-copy-panel::before,
+  .feature-copy-panel::after {
+    position: absolute;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    content: "";
+    pointer-events: none;
+  }
+
+  .feature-copy-panel::before {
+    top: 0;
+  }
+
+  .feature-copy-panel::after {
+    bottom: 0;
   }
 
   .feature-copy-panel > div {
@@ -167,7 +186,6 @@ figure.shiki > div[role="region"] {
   .feature-video-panel .feature-video {
     aspect-ratio: 16 / 10;
     object-fit: contain;
-    transform: scale(1.03);
   }
 }
 
@@ -177,23 +195,17 @@ figure.shiki > div[role="region"] {
   }
 }
 
+@media (max-width: 1023px) {
+  .feature-video-card {
+    border-bottom: 0;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+}
+
 @media (min-width: 1024px) {
-  .feature-copy-panel::before,
-  .feature-copy-panel::after {
-    position: absolute;
-    width: clamp(3rem, 7vw, 6.25rem);
-    height: 1px;
-    background: var(--feature-border-color);
-    content: "";
-    pointer-events: none;
-  }
-
-  .feature-copy-panel::before {
-    top: -1px;
-  }
-
-  .feature-copy-panel::after {
-    bottom: -1px;
+  .feature-video-card {
+    border: 1px solid var(--feature-border-color);
   }
 
   .feature-video-card--video-right {
@@ -206,22 +218,9 @@ figure.shiki > div[role="region"] {
     border-bottom-left-radius: 0;
   }
 
-  .feature-video-card--video-right .feature-copy-panel {
-    border-right: 0;
-  }
-
-  .feature-video-card--video-right .feature-copy-panel::before,
-  .feature-video-card--video-right .feature-copy-panel::after {
-    left: 100%;
-  }
-
-  .feature-video-card--video-left .feature-copy-panel {
-    border-left: 0;
-  }
-
-  .feature-video-card--video-left .feature-copy-panel::before,
-  .feature-video-card--video-left .feature-copy-panel::after {
-    right: 100%;
+  .feature-copy-panel {
+    border: 0;
+    border-radius: 0;
   }
 }
 
@@ -252,7 +251,7 @@ figure.shiki > div[role="region"] {
   display: block;
   width: 100%;
   aspect-ratio: 16 / 9;
-  object-fit: contain;
+  object-fit: cover;
   background: var(--color-fd-background);
 }
 
