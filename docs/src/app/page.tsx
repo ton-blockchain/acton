@@ -32,12 +32,12 @@ const landingUrl = "https://ton-blockchain.github.io/acton"
 const landingOgImage = `${landingUrl}/og/home/image.png`
 
 export const metadata: Metadata = {
-  title: "Acton — a unified toolchain for TON",
+  title: "Acton — the unified toolchain for TON",
   description:
     "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
   metadataBase: new URL(landingUrl),
   openGraph: {
-    title: "Acton — a unified toolchain for TON",
+    title: "Acton — the unified toolchain for TON",
     description:
       "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
     url: landingUrl,
@@ -47,7 +47,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Acton — a unified toolchain for TON",
+    title: "Acton — the unified toolchain for TON",
     description:
       "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
     images: landingOgImage,
@@ -297,7 +297,7 @@ export function LandingHome() {
                     <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                   </Link>
                   <h1 className="text-[2rem] font-semibold leading-[1.08] text-[#f8f8f4] sm:text-[2.8rem] sm:leading-[1.04] lg:text-[3.4rem] xl:text-[4rem]">
-                    A unified toolchain for{" "}
+                    Unified toolchain for{" "}
                     <span className="landing-hero-title-accent text-[#9AE7FF]">
                       TON smart contracts
                     </span>
