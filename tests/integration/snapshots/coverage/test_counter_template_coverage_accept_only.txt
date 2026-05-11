@@ -8,7 +8,7 @@ Annotated Code:
  2   |                                                                                                |
  3   | contract Counter {                                                                             |
  4   |     author: "Acton User"                                                                       |
- 5   |     version: "1.0.0"                                                                           |
+ 5   |     version: "[ACTON_VERSION]"                                                                           |
  6   |     description: "Simple counter contract with owner-controlled updates"                       |
  7   |     storage: Storage                                                                           |
  8   |     incomingMessages: AllowedMessage                                                           |
