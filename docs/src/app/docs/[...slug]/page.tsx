@@ -81,15 +81,34 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
     }
   }
 
+  const image = getPageImage(page)
+
   return {
     title: page.data.title,
     description: page.data.description,
     metadataBase,
+    alternates: {
+      canonical: page.url,
+    },
     openGraph: {
-      images: getPageImage(page).url,
+      title: page.data.title,
+      description: page.data.description,
+      url: page.url,
+      type: "article",
+      images: [
+        {
+          url: image.url,
+          width: 1200,
+          height: 630,
+          alt: page.data.title,
+        },
+      ],
     },
     twitter: {
-      images: getPageImage(page).url,
+      card: "summary_large_image",
+      title: page.data.title,
+      description: page.data.description,
+      images: [image.url],
     },
   }
 }
