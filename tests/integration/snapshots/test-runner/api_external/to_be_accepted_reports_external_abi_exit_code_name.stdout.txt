@@ -14,6 +14,8 @@
         ├─ Reason: External message not accepted by smart contract
         ├─ exit_code=701
         ├─ Compute phase failed: ERR_EXTERNAL_REJECTED
+        ├─ onExternalMessage backtrace:
+        │     onExternalMessage   at contracts/external[LINE]
         └─ at tests/external_api.test[LINE]
               ExternalSendResult.__failExternalSend                   at ../lib/emulation/network[LINE]
               Expectation<ExternalSendResult>.toBeAccepted            at ../lib/emulation/network[LINE]

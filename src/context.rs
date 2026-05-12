@@ -171,6 +171,7 @@ pub struct ExternalSendNotAcceptedFailure {
     pub reason: String,
     pub external_not_accepted: bool,
     pub vm_exit_code: Option<i32>,
+    pub vm_log: Option<String>,
     pub missing_libraries: Vec<String>,
     pub destination: Option<StdAddr>,
     pub location: Option<SourceLocation>,

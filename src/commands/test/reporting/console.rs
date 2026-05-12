@@ -445,7 +445,8 @@ fn process_assert_failure(
             "Reason:".dimmed(),
             failure.reason.yellow()
         ));
-        let backtrace = assertion_backtrace_lines(test, result);
+        let matcher_backtrace = assertion_backtrace_lines(test, result);
+        let contract_backtrace = external_send_contract_backtrace_lines(fmt, test, failure);
         if let Some(exit_code) = failure.vm_exit_code {
             details.push(format!(
                 "{}{}",
@@ -475,12 +476,22 @@ fn process_assert_failure(
                 failure.missing_libraries.join(", ").yellow()
             ));
         }
+        let has_contract_backtrace = !contract_backtrace.is_empty();
         let has_location = failure.location.is_some();
 
         for (idx, detail) in details.iter().enumerate() {
-            let has_next = idx + 1 < details.len() || has_location;
+            let has_next = idx + 1 < details.len() || has_contract_backtrace || has_location;
             let branch = if has_next { "├─" } else { "└─" };
             println!("        {} {}", branch.dimmed(), detail);
+        }
+
+        if has_contract_backtrace {
+            let branch = if has_location { "├─" } else { "└─" };
+            let nested_branch = if has_location { "│" } else { " " };
+            println!("        {} onExternalMessage backtrace:", branch.dimmed());
+            for line in contract_backtrace {
+                println!("        {}     {line}", nested_branch.dimmed());
+            }
         }
 
         if let Some(location) = &failure.location {
@@ -489,7 +500,7 @@ fn process_assert_failure(
                 "└─".dimmed(),
                 location.format().dimmed()
             );
-            for line in backtrace {
+            for line in matcher_backtrace {
                 println!("              {line}");
             }
         }
@@ -676,6 +687,40 @@ fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess)
     retrace::find_exception_info(&result.vm_log, &test.source_map)
         .map(|info| FormatterContext::format_backtrace(&info.backtrace))
         .unwrap_or_default()
+}
+
+fn external_send_contract_backtrace_lines(
+    fmt: &FormatterContext<'_>,
+    test: &TestReport,
+    failure: &crate::context::ExternalSendNotAcceptedFailure,
+) -> Vec<String> {
+    if test.backtrace != Some(BacktraceMode::Full) {
+        return Vec::new();
+    }
+
+    let Some(vm_log) = failure.vm_log.as_deref().filter(|log| !log.is_empty()) else {
+        return Vec::new();
+    };
+    let Some(destination) = failure.destination.as_ref() else {
+        return Vec::new();
+    };
+
+    let code = FormatterContext::account_code(&fmt.accounts, destination);
+    let Some((_, build)) = fmt.build_cache.result_for_code(&code) else {
+        return Vec::new();
+    };
+    let Some(info) = retrace::find_exception_info(vm_log, &build.source_map) else {
+        return Vec::new();
+    };
+
+    let mut lines = FormatterContext::format_backtrace(&info.backtrace);
+    if lines.is_empty() {
+        lines.push(format!(
+            "at {}",
+            FormatterContext::format_location(&info.loc).dimmed()
+        ));
+    }
+    lines
 }
 
 fn process_nonzero_exit_code(

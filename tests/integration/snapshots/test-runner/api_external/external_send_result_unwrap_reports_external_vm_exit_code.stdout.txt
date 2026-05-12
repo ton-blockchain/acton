@@ -14,6 +14,8 @@
         ├─ Reason: External message not accepted by smart contract
         ├─ exit_code=10
         ├─ Compute phase failed: Dictionary error
+        ├─ onExternalMessage backtrace:
+        │     onExternalMessage   at contracts/external[LINE]
         └─ at tests/external_api.test[LINE]
               ExternalSendResult.__failExternalSend                            at ../lib/emulation/network[LINE]
               ExternalSendResult.unwrap                                        at ../lib/emulation/network[LINE]
