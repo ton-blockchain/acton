@@ -44,6 +44,55 @@ Go deeper in:
 - [Transaction matchers](/docs/standard_library/emulation/network#expectationsendresultlisttohavesuccessfultx)
 - [Reading Transaction Chains](/docs/testing/reading-transaction-chains)
 
+## External message matchers
+
+`net.sendExternal(...)` returns an `ExternalSendResult`. When the external-in
+message is accepted, `result.transactions` contains the produced transaction
+trace. When the contract rejects the message before acceptance, the trace is
+`null` and `result.error` contains emulator metadata.
+
+```tolk
+val result = net.sendExternal(msg);
+
+expect(result).toBeAccepted();
+
+val txs = result.unwrap();
+expect(txs).toHaveAllSuccessfulTxs();
+```
+
+Available helpers:
+
+- `isAccepted()`
+- `unwrap()`
+- `at()`
+- `giveName()`
+- `waitForFirstTransaction()`
+- `waitForTrace()`
+- `findExternalOutMessage()`
+
+Available matchers:
+
+- `toBeAccepted()`
+- `toBeNotAccepted()`
+- `toHaveExternalVmExitCode()`
+
+Failed `toBeAccepted()` checks include the external status, emulator reason, VM
+exit code when available, known exit-code description or ABI error name, source
+location, and full backtrace when the test is run with `--backtrace full`.
+
+```tolk
+val result = net.sendExternal(invalidMsg);
+
+expect(result).toBeNotAccepted();
+expect(result).toHaveExternalVmExitCode(10);
+```
+
+Go deeper in:
+
+- [ExternalSendResult](/docs/standard_library/emulation/network#externalsendresult)
+- [net.sendExternal](/docs/standard_library/emulation/network#netsendexternal)
+- [External message matchers](/docs/standard_library/emulation/network#expectationexternalsendresulttobeaccepted)
+
 ## Map expectations
 
 Map helpers are useful for get-method results and in-memory fixtures:

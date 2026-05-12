@@ -447,7 +447,11 @@ fn process_assert_failure(
         ));
         let backtrace = assertion_backtrace_lines(test, result);
         if let Some(exit_code) = failure.vm_exit_code {
-            details.push(format_exit_code_detail(exit_code));
+            details.push(format!(
+                "{}{}",
+                "exit_code=".dimmed(),
+                exit_code.to_string().yellow()
+            ));
             if test.backtrace.is_none() {
                 details.push(format!(
                     "Re-run with {} to get more information",
@@ -652,14 +656,6 @@ fn process_assert_failure(
             println!("            {line}");
         }
     }
-}
-
-fn format_exit_code_detail(exit_code: i32) -> String {
-    format_exit_code_value(&exit_code.to_string())
-}
-
-fn format_exit_code_value(value: &str) -> String {
-    format!("{}{}", "exit_code=".dimmed(), value.yellow())
 }
 
 fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess) -> Vec<String> {
