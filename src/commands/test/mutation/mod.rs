@@ -354,7 +354,10 @@ fn dependent_override_order(
     dependents
 }
 
-fn build_artifacts_dir(acton_config: &ActonConfig, project_root: &Path) -> PathBuf {
+fn build_artifacts_dir(
+    acton_config: &ActonConfig,
+    project_root: &Path,
+) -> anyhow::Result<PathBuf> {
     let out_dir = acton_config
         .build
         .as_ref()
@@ -363,7 +366,10 @@ fn build_artifacts_dir(acton_config: &ActonConfig, project_root: &Path) -> PathB
     resolve_build_output_dir(None, out_dir, "build", project_root)
 }
 
-fn generated_dependencies_dir(acton_config: &ActonConfig, project_root: &Path) -> PathBuf {
+fn generated_dependencies_dir(
+    acton_config: &ActonConfig,
+    project_root: &Path,
+) -> anyhow::Result<PathBuf> {
     let gen_dir = acton_config
         .build
         .as_ref()
@@ -377,7 +383,7 @@ fn load_original_contract_bocs(
     project_root: &Path,
     compilation_order: &[String],
 ) -> anyhow::Result<HashMap<String, String>> {
-    let build_dir = build_artifacts_dir(acton_config, project_root);
+    let build_dir = build_artifacts_dir(acton_config, project_root)?;
     let mut compiled_contracts = HashMap::new();
 
     for contract_id in compilation_order {
@@ -587,7 +593,13 @@ fn mutation_worker_loop(
         }
     };
 
-    let gen_dir = generated_dependencies_dir(context.acton_config, workspace.path());
+    let gen_dir = match generated_dependencies_dir(context.acton_config, workspace.path()) {
+        Ok(gen_dir) => gen_dir,
+        Err(err) => {
+            let _ = result_tx.send(Err(err));
+            return Ok(());
+        }
+    };
 
     while let Ok(mutation) = job_rx.recv() {
         let execution = match run_single_mutation(workspace.path(), &gen_dir, &mutation, &context) {

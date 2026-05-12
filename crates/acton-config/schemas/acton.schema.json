@@ -119,19 +119,19 @@
       "type": "object",
       "properties": {
         "gen-dir": {
-          "description": "Directory where generated dependency files are saved",
+          "description": "Project-relative directory where generated dependency files are saved",
           "type": "string"
         },
         "out-dir": {
-          "description": "Directory where JSON build artifacts are saved",
+          "description": "Project-relative directory where JSON build artifacts are saved",
           "type": "string"
         },
         "output-abi": {
-          "description": "Directory where per-contract ABI JSON files are saved",
+          "description": "Project-relative directory where per-contract ABI JSON files are saved",
           "type": "string"
         },
         "output-fift": {
-          "description": "Directory where per-contract compiled Fift files are saved",
+          "description": "Project-relative directory where per-contract compiled Fift files are saved",
           "type": "string"
         }
       }
@@ -195,7 +195,7 @@
           "type": "string"
         },
         "output": {
-          "description": "Path where the compiled `.boc` should be saved",
+          "description": "Project-relative path where the compiled `.boc` should be saved",
           "type": "string"
         },
         "src": {
@@ -236,7 +236,7 @@
               "type": "string"
             },
             "path": {
-              "description": "Custom output path for the generated code file",
+              "description": "Project-relative custom output path for the generated code file",
               "type": "string"
             }
           }
@@ -842,11 +842,11 @@
           "type": "boolean"
         },
         "output-dir": {
-          "description": "Directory where `acton wrapper` writes generated Tolk wrappers by default",
+          "description": "Project-relative directory where `acton wrapper` writes generated Tolk wrappers by default",
           "type": "string"
         },
         "test-output-dir": {
-          "description": "Directory where generated Tolk test stubs are written by default",
+          "description": "Project-relative directory where generated Tolk test stubs are written by default",
           "type": "string"
         }
       }
@@ -866,7 +866,7 @@
       "type": "object",
       "properties": {
         "output-dir": {
-          "description": "Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default",
+          "description": "Project-relative directory where `acton wrapper --ts` writes generated TypeScript wrappers by default",
           "type": "string"
         }
       }

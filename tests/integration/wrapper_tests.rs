@@ -155,6 +155,108 @@ fn test_wrapper_generation_uses_tolk_config_defaults() {
 }
 
 #[test]
+fn test_wrapper_generation_rejects_config_output_dir_outside_project_root() {
+    let project = ProjectBuilder::new("wrapper_config_output_outside")
+        .contract("my_contract", SIMPLE_CONTRACT)
+        .with_wrappers_tolk_output_dir("../outside-wrappers")
+        .build();
+
+    let outside_dir = project.path().parent().unwrap().join("outside-wrappers");
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[wrappers.tolk].output-dir must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_dir.exists(),
+        "configured wrapper output dir must not be created outside the project"
+    );
+}
+
+#[test]
+fn test_wrapper_generation_rejects_config_test_output_dir_outside_project_root() {
+    let project = ProjectBuilder::new("wrapper_config_test_output_outside")
+        .contract("my_contract", SIMPLE_CONTRACT)
+        .with_wrappers_tolk_generate_test(true)
+        .with_wrappers_tolk_test_output_dir("../outside-wrapper-tests")
+        .build();
+
+    let outside_dir = project
+        .path()
+        .parent()
+        .unwrap()
+        .join("outside-wrapper-tests");
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[wrappers.tolk].test-output-dir must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_dir.exists(),
+        "configured test output dir must not be created outside the project"
+    );
+}
+
+#[test]
+fn test_wrapper_generation_rejects_wrappers_mapping_outside_project_root() {
+    let project = ProjectBuilder::new("wrapper_mapping_output_outside")
+        .contract("my_contract", SIMPLE_CONTRACT)
+        .mapping("wrappers", "../outside-mapped-wrappers")
+        .build();
+
+    let outside_dir = project
+        .path()
+        .parent()
+        .unwrap()
+        .join("outside-mapped-wrappers");
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[import-mappings].wrappers must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_dir.exists(),
+        "configured @wrappers mapping must not create output outside the project"
+    );
+}
+
+#[test]
+fn test_wrapper_output_dir_flag_can_write_outside_project_root() {
+    let project = ProjectBuilder::new("wrapper_cli_output_outside")
+        .contract("my_contract", SIMPLE_CONTRACT)
+        .build();
+
+    let outside_dir = project.path().parent().unwrap().join("explicit-wrappers");
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .wrapper_output_dir("../explicit-wrappers")
+        .run()
+        .success();
+
+    assert!(
+        outside_dir.join("MyContract.gen.tolk").exists(),
+        "explicit CLI output dir should still be allowed outside the project"
+    );
+}
+
+#[test]
 fn test_wrapper_generation_test_output_dir_flag() {
     let project = ProjectBuilder::new("wrapper_test_output_dir_flag")
         .contract("my_contract", SIMPLE_CONTRACT)

@@ -243,6 +243,8 @@ output-fift = "artifacts/fift" # omitted by default
 
 This is useful when CI expects artifacts at a fixed path or when Fift output must be saved on disk. By default, `out-dir` is `build/` and `gen-dir` is `gen/`.
 
+Manifest-configured build output paths are project-relative and must stay inside the project root. Use CLI output flags for one-off explicit paths outside the project.
+
 Note that `gen` in [`[import-mappings]`](#import-mappings) and `gen-dir` in `[build]` are independent settings — keep them aligned when both are configured.
 
 ### Configure wrapper output
@@ -260,6 +262,8 @@ output-dir = "wrappers-ts"
 ```
 
 The `@wrappers` in `import "@wrappers/..."` always resolves to the Tolk wrapper directory, regardless of existence of non-Tolk wrappers.
+
+Manifest-configured wrapper output paths are project-relative and must stay inside the project root. Use CLI output flags for one-off explicit paths outside the project.
 
 See the [`acton wrapper` command reference](/docs/commands/wrapper) for more.
 
@@ -415,7 +419,7 @@ depends = [
 
 ### Set a per-contract BoC output path
 
-Set `output` to place a compiled binary `.boc` file with the contract's code at an exact path:
+Set `output` to place a compiled binary `.boc` file with the contract's code at a project-relative path:
 
 ```toml
 [contracts.Counter]
