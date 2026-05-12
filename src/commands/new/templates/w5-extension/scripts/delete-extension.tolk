@@ -1,6 +1,4 @@
-import "@acton/env"
 import "@acton/io"
-import "@acton/prompts"
 import "@acton/emulation/network"
 import "@acton/emulation/scripts"
 import "@wrappers/SimpleExtension.gen"
@@ -13,8 +11,10 @@ fun main() {
     val deployer = promptW5Wallet("W5_DEPLOYER", "Select Wallet V5");
 
     val wallet = WalletV5 { address: deployer.address };
-    val extensionAddress = env<address>("EXT_ADDRESS") ??
-    promptAddress("Enter the installed extension address to remove");
+    val extensionAddress = promptW5Address(
+        "EXT_ADDRESS",
+        "Enter the installed extension address to remove",
+    );
 
     val extension = SimpleExtension.fromAddress(extensionAddress);
 

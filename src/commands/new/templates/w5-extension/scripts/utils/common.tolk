@@ -3,9 +3,9 @@ import "@acton/prompts"
 import "@acton/emulation/scripts"
 
 fun promptW5Wallet(envName: string, message: string): ActonWallet {
-    val nameFromEnv = env<string>(envName);
-    if (nameFromEnv != null) {
-        return scripts.wallet(nameFromEnv);
-    }
-    return scripts.wallet(promptWallet(message));
+    return scripts.wallet(env<string>(envName) ?? promptWallet(message));
+}
+
+fun promptW5Address(envName: string, message: string): address {
+    return env<address>(envName) ?? promptAddress(message);
 }
