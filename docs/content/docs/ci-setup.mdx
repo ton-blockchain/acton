@@ -185,7 +185,7 @@ jobs:
 - The `acton check --output-format github` command emits workflow annotations directly in the GitHub Actions log and pull request checks.
 - The `acton check` command exits with a non-zero status when it reports at least one error, or when warning count exceeds `max-warnings`. To fail CI on any warning, set:
 
-  ```toml title="Acton.toml"
+  ```acton-toml title="Acton.toml"
   [lint]
   max-warnings = 0
   ```
@@ -229,7 +229,7 @@ jobs:
 
 To fail the job when coverage drops below a threshold, add `--coverage-minimum-percent <PERCENT>` to the test command, where `<PERCENT>` is a number from `0` to `100`. Alternatively, set the default value in the manifest:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [test.coverage]
 minimum-percent = 50
 ```

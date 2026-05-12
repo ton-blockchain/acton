@@ -47,7 +47,7 @@ command prints guidance and exits without compiling anything.
 
 `acton build` reads contracts from `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Wallet]
 display-name = "Wallet Contract"
 src = "contracts/Wallet.tolk"
@@ -57,7 +57,7 @@ depends = ["Child"]
 
 Optional default output paths can be configured in `[build]`:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "build"
 gen-dir = "gen"

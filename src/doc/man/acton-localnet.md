@@ -93,7 +93,7 @@ Localnet server port.
 
 You can store defaults in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [localnet]
 port = 5411
 fork-net = "testnet"

@@ -90,6 +90,20 @@ const tlbGrammar: LanguageRegistration = {
   name: "tlb",
 }
 
+const actonTomlGrammar: LanguageRegistration = {
+  name: "acton-toml",
+  displayName: "Acton.toml",
+  scopeName: "source.acton-toml",
+  aliases: ["Acton.toml"],
+  embeddedLangs: ["toml"],
+  repository: {},
+  patterns: [
+    {
+      include: "source.toml",
+    },
+  ],
+}
+
 const builtinLangs = [
   "bash",
   "fish",
@@ -112,10 +126,12 @@ const customLangs = [
   actonCliMutateGrammar,
   actonCliTraceGrammar,
   actonTraceGrammar,
+  actonTomlGrammar,
   tlbGrammar,
 ] as const
 
-const tonGradientIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
+const tolkFileIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
+const actonTomlIcon = readFileSync("public/logo-acton-file.svg", "utf8")
 
 const transformerNoCopy: ShikiTransformer = {
   name: "acton:no-copy",
@@ -140,7 +156,8 @@ export default defineConfig({
       lazy: false,
       icon: {
         extend: {
-          tolk: tonGradientIcon,
+          "acton-toml": actonTomlIcon,
+          tolk: tolkFileIcon,
         },
       },
       themes: {

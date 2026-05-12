@@ -21,7 +21,7 @@ Two commands drive compilation:
 
 Parent contracts often need child contract code at runtime — to deploy children or verify their code hash. The dependencies are declared in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.JettonMinter]
 src = "contracts/JettonMinter.tolk"
 depends = ["JettonWallet"]

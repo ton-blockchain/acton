@@ -132,7 +132,7 @@ fun onInternalMessage(in: InMessage) {
 
 The command takes a contract name, not a file path. The contract must appear under `[contracts.<Name>]` in `Acton.toml`:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [contracts.Counter]
 display-name = "Counter"
 src = "contracts/Counter.tolk"
@@ -217,7 +217,7 @@ acton wrapper Counter --test --test-output-dir tests/generated
 
 Customize project defaults in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [wrappers.tolk]
 output-dir = "tests/generated-wrappers"
 generate-test = true
