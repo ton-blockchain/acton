@@ -207,9 +207,9 @@ struct ExternalSendError {
 /// `transactions` is `null` and `error` contains emulator metadata such as VM
 /// exit code, logs, elapsed time, and missing libraries.
 ///
-/// In tests, prefer [Expectation<ExternalSendResult>.toBeAccepted],
-/// [Expectation<ExternalSendResult>.toBeNotAccepted], and
-/// [Expectation<ExternalSendResult>.toHaveExternalVmExitCode] for diagnostics.
+/// In tests, prefer `expect(result).toBeAccepted()`,
+/// `expect(result).toBeNotAccepted()`, and
+/// `expect(result).toHaveExternalVmExitCode(...)` for diagnostics.
 /// Use [ExternalSendResult.unwrap] when a trace is required, or
 /// [ExternalSendResult.isAccepted] when the test needs to branch on the result.
 struct ExternalSendResult {
@@ -234,15 +234,21 @@ fun ExternalSendResult.isAccepted(self): bool {
 /// Returns produced transactions, or fails with external-error metadata if the
 /// message was not accepted.
 ///
-/// Failed unwraps are reported like [Expectation<ExternalSendResult>.toBeAccepted]:
+/// Failed unwraps are reported like `expect(result).toBeAccepted()`:
 /// diagnostics include the external status, emulator reason, VM exit code when
 /// available, known exit-code description or ABI error name, source location,
 /// and the full backtrace when the test is run with `--backtrace full`.
-fun ExternalSendResult.unwrap(self): SendResultList {
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.unwrap(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): SendResultList {
     if (self.transactions != null) {
         return self.transactions!;
     }
-    self.__failExternalSend("ExternalSendResult.unwrap()");
+    self.__failExternalSend("ExternalSendResult.unwrap()", location);
 }
 
 fun ExternalSendError.__toFFITuple(self, destination: address?): tuple {
@@ -273,15 +279,29 @@ fun ExternalSendResult.__failExternalSend(self, context: string, location: strin
 
 /// Returns the send result at the given index, or fails with external-error
 /// metadata if the message was not accepted.
-fun ExternalSendResult.at(self, index: int): SendResult {
-    return self.unwrap().at(index);
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.at(
+    self,
+    index: int,
+    location: string = reflect.sourceLocationAsString(),
+): SendResult {
+    return self.unwrap(location).at(index);
 }
 
 /// Give a custom name for a trace chain produced by [net.sendExternal].
 ///
 /// Fails with external-error metadata if the message was not accepted.
-fun ExternalSendResult.giveName(self, nameForUI: string): void {
-    self.unwrap().giveName(nameForUI);
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.giveName(
+    self,
+    nameForUI: string,
+    location: string = reflect.sourceLocationAsString(),
+): void {
+    self.unwrap(location).giveName(nameForUI);
 }
 
 /// Give a custom name for a trace chain produced by [net.send].
@@ -804,7 +824,7 @@ fun net.createExternalMessage<TBody>(
 /// If the external message is not accepted, the destination account does not
 /// exist, or emulation fails before a trace is produced, the returned result has
 /// `transactions = null` and `error` contains all available emulator metadata.
-/// In tests, prefer [Expectation<ExternalSendResult>.toBeAccepted] or
+/// In tests, prefer `expect(result).toBeAccepted()` or
 /// [ExternalSendResult.unwrap] so Acton can render the external status, VM exit
 /// code, ABI error name, source location, and backtrace.
 ///
@@ -1109,15 +1129,16 @@ fun Expectation<ExternalSendResult>.toBeAccepted(self): void {
 
 /// Expect the external-in message to be rejected before acceptance.
 fun Expectation<ExternalSendResult>.toBeNotAccepted(self): void {
-    if (self.value.error != null && self.value.error!.externalNotAccepted) {
+    if (self.value.error != null && self.value.error.externalNotAccepted) {
         return;
     }
     if (self.value.error != null) {
-        val error = self.value.error!;
-        self.fail(format(
-            "expect(<actual>).toBeNotAccepted(): external send failed, but not as an external-not-accepted error: {}",
-            error.message,
-        ));
+        self.fail(
+            format(
+                "expect(<actual>).toBeNotAccepted(): external send failed, but not as an external-not-accepted error: {}",
+                self.value.error.message,
+            ),
+        );
     }
     self.fail("expect(<actual>).toBeNotAccepted(): external message was accepted");
 }
@@ -1128,23 +1149,26 @@ fun Expectation<ExternalSendResult>.toBeNotAccepted(self): void {
 /// external messages, use transaction matchers on the produced [SendResultList].
 fun Expectation<ExternalSendResult>.toHaveExternalVmExitCode(self, exitCode: int): void {
     if (
-        self.value.error != null &&
-        self.value.error!.vmExitCode != null &&
-        self.value.error!.vmExitCode! == exitCode
+        self.value.error != null && self.value.error.vmExitCode != null &&
+        self.value.error.vmExitCode == exitCode
     ) {
         return;
     }
     if (self.value.error != null) {
-        self.fail(format(
-            "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, got {}",
-            exitCode,
-            self.value.error!.vmExitCode,
-        ));
+        self.fail(
+            format(
+                "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, got {}",
+                exitCode,
+                self.value.error.vmExitCode,
+            ),
+        );
     }
-    self.fail(format(
-        "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, but external message was accepted",
-        exitCode,
-    ));
+    self.fail(
+        format(
+            "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, but external message was accepted",
+            exitCode,
+        ),
+    );
 }
 
 /// Expect the transaction list to have a successful deploy transaction.

@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/external_api.test.tolk (1 test)
+  ✗ toHaveExternalVmExitCode reports accepted external result [TIME]
+    └─ Error: expect(actual).toHaveExternalVmExitCode(expected): expected 10, but external message was accepted
+      └─ at tests/external_api.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
