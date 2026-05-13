@@ -25,7 +25,7 @@ function resolveBaseUrl() {
 
 function resolveBasePath() {
   if (isGitHubPagesBuild) {
-    return "acton"
+    return `/${repoName}`
   }
 
   return undefined
