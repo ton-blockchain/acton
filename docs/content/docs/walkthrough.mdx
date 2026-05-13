@@ -83,10 +83,12 @@ Output:
 
 ```acton-cli-trace noCopy
 $ acton run deploy-testnet
-acton script contracts/scripts/deploy.tolk
-N/A -> deployer A
-└── empty 0.005 TON -> Counter B    gas=692
-    └── account created
+acton script contracts/scripts/deploy.tolk --net testnet
+Awaiting trace... [Attempt 1/20]
+Trace settled with 2 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A      gas=4939
+    └── empty 0.005 TON -> EQBoxX..16Bfkg B    gas=692
 
 Deployed counter to kQD...tVe (Counter)
 Counter owner is kQB...iD (deployer)

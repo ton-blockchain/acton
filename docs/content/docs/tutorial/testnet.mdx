@@ -10,18 +10,18 @@ description: "Create a funded testnet wallet, deploy the poll, verify source cod
 ## Create and fund a testnet wallet
 
 ```bash
-acton wallet new --name testnet-deployer --local --airdrop
+acton wallet new --name testnet-deployer --local --airdrop --version w5r1
 ```
 
 ```acton-cli noCopy
-$ acton wallet new --name testnet-deployer --local --airdrop
-✓ Created wallet 'testnet-deployer'
-  Kind:     v5r1
-  Address:  0QB8X7Yq3...
-  Stored:   wallets.toml (mnemonic in system keyring)
+$ acton wallet new --name testnet-deployer --local --airdrop --version w5r1
+✓ Wallet successfully created and added to wallets.toml
+✓ Wallet address is kQCC94LVUO3dVUBgBKKHhw-i3GyXwEIy4BH3rymKB0iamEo9
+→ Requesting airdrop for wallet testnet-deployer kQCC94LVUO3dVUBgBKKHhw-i3GyXwEIy4BH3rymKB0iamEo9
+→ Fetching PoW challenge...
+→ Solving challenge (difficulty: 24 bits)...
 
-Requesting airdrop...
-✓ Airdrop confirmed. Balance: 2.0 TON
+To check wallet balances run acton wallet list --balance.
 ```
 
 `--airdrop` requests test TON from the configured faucet. If the faucet is rate-limited, fund the wallet manually via the [Testnet Giver Bot](https://t.me/testgiver_ton_bot).
@@ -46,13 +46,15 @@ acton script scripts/deploy.tolk --net testnet
 
 ```acton-cli noCopy
 $ acton script scripts/deploy.tolk --net testnet
-   Compiling contracts
-    Finished in 598.71µs
+Awaiting trace... [Attempt 1/20]
+Trace settled with 2 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A     gas=4939
+    └── empty 0.05 TON -> EQBa78..XUMpRe B    gas=625
+        └── account created
 
-Deploying Poll to EQC9R1p...
-  Tx: https://testnet.tonviewer.com/transaction/7a1f...
-Deployed. Address: EQC9R1p...
-Owner: 0QB8X7Yq3...
+Deployed. Address: kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U
+Owner: kQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8c8Y
 Votes: option0=0, option1=0
 ```
 
@@ -67,16 +69,27 @@ acton rpc info <POLL_ADDRESS> --net testnet
 `<POLL_ADDRESS>` — the address printed by the deployment script.
 
 ```acton-cli noCopy
-$ acton rpc info EQC9R1p... --net testnet
-  Contract: EQC9R1p...
-  Balance:  0.095 TON
-  Status:   active
+$ acton rpc info kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U --net testnet
 
-  Storage (decoded):
-    owner:    0QB8X7Yq3...
-    option0:  0
-    option1:  0
-    isClosed: false
+Remote Account
+  Network:           testnet
+  Address:           kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi/U
+  Raw Address:       0:5aefc1b6a77ce035d25e09d3b7285bfa848ecde7953139e822a654a14865d432
+  Status:            active
+  Balance:           0.049958332 TON
+  Last Tx LT:        69241750000003
+  Last Tx Hash:      cfvZg4EhUBUFvNNavnJ6y9Woe0IRPRscrZndA2ShzUw=
+  Code Hash:         0x9e77c11a8c480d325165387def822b80043c61c41144e938a20e9924b1deb486
+  Data Hash:         0x0ed71cf812fb65771b02e9675c0a46aed8bf0b6d81a29082d814c83528935749
+
+Local Match
+  Contract:          Poll (Poll)
+
+Decoded Storage
+  isClosed: false
+  option0: 0
+  option1: 0
+  owner: kQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8c8Y
 ```
 
 ## Verify the source code
@@ -102,11 +115,45 @@ acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
 ```
 
 ```acton-cli noCopy
+$ acton script --net testnet scripts/vote.tolk kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U 0
+Awaiting trace... [Attempt 1/20]
+Trace settled with 3 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A             gas=4939
+    └── 0x694d6f6e 0.1 TON -> EQBa78..XUMpRe B        gas=4111
+        └── 0x694d6f6e 0.05 TON -> EQAHvY..Kbp9gT C   gas=1406
+            └── account created
+
 Results: option0=1, option1=0
-  Tx: https://testnet.tonviewer.com/transaction/3b9c...
 ```
 
-Use `acton retrace` with the contract source to get source-level line mapping:
+Use `acton retrace` with the matching local contract to replay the exact testnet transaction locally:
+
+To inspect the raw on-chain trace first, use `acton rpc trace`:
+
+```acton-cli
+acton rpc trace <TX_HASH> --net testnet
+```
+
+```acton-cli-trace noCopy
+$ acton rpc trace 9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8 --net testnet
+Trace Summary
+  Query Hash:        9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8
+  Trace ID:          XBqC0K8oPX19R7rykhyFQwTwiLyhUulopbdEVMqzFOE=
+  Root Tx Hash:      XBqC0K8oPX19R7rykhyFQwTwiLyhUulopbdEVMqzFOE=
+  Trace Complete:    true
+  Total Txs:         3
+  Total Messages:    3
+
+Trace Tree
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A   gas=4939
+    └── Vote 0.1 TON -> Poll B              gas=4111
+        └── Vote 0.05 TON -> Voter C        gas=1406
+            └── account created
+```
+
+Then use `acton retrace` with the matching local contract to replay the same transaction locally:
 
 ```acton-cli
 acton retrace <TX_HASH> --net testnet --contract Poll
@@ -115,21 +162,53 @@ acton retrace <TX_HASH> --net testnet --contract Poll
 `<TX_HASH>` — the transaction hash printed by the vote script.
 
 ```acton-cli-trace noCopy
-$ acton retrace 3b9c... --net testnet --contract Poll
-  Fetching transaction 3b9c...
+$ acton retrace 9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8 --net testnet --contract Poll
+Network:             testnet
+State Hash OK:       Yes
 
-  Poll.onInternalMessage (contracts/Poll.tolk:14)
-    Vote =>
-      storage.option0 += 1           contracts/Poll.tolk:23  ✓
-      voterInit = ContractState{...}  contracts/Poll.tolk:31  ✓
-      createMessage(...).send(...)    contracts/Poll.tolk:37  ✓
+Transaction Details:
+  Status:         Success (exit code: 0)
+  Account:        UQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMsmb
+  Sender:         UQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8SlX
+  LT:             69241811000003
+  Time:           13.05.2026, 00:23:03
+  Amount In:      0.100000000 TON
 
-  Voter.onInternalMessage (contracts/Voter.tolk:11)
-    Vote =>
-      storage.hasVoted = true         contracts/Voter.tolk:17  ✓
+Fees & Balance:
+  Balance Before: 0.049958332 TON
+  Amount Sent:    0.050000000 TON
+  Total Fee:      0.000326935 TON
+  Gas Fee:        0.000274068 TON
+  Balance After:  0.099525662 TON
+
+Compute Phase:
+  Success:        Yes
+  Exit Code:      0
+  VM Steps:       78
+  Gas Used:       4111
+  Gas Fees:       0.000274068 TON
+
+Action Phase:
+  Success:        Yes
+  Total Actions:  1
+
+Out Actions:
+  1. Send Message
+     Mode:           PAY_FEES_SEPARATELY
+     Destination:    UQAHvYVFogKzuNpQLwqimwGqKM_Ceg757jxn9cPTYSKbp4XW
+     Value:          0.050000000 TON
+     Bounce:         Yes
+     Body Hash:      0xa1234d20a2eb8fca273a9d8aba3c438a253c3984ea880b0fcb9d6f38db55260f
+
+Help: Some fields are shown as hashes. Use --verbose to see full cell content.
+
+Message Data:
+  Opcode:         0x694d6f6e
+
+Help: Use --logs-dir <DIR> to save full VM and executor logs to files.
 ```
 
-`retrace` maps each TVM instruction back to its source line.
+Add `--debug` when you want source-level replay in the editor with the retrace DAP server.
 
 ## Checkpoint
 
