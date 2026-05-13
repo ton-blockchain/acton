@@ -24,6 +24,11 @@ async function validateExternalLinks() {
 }
 
 function whitelist(url: string): boolean {
+  // CDN return 502
+  if (url.startsWith("https://cdn.tapps.ninja")) {
+    return true
+  }
+
   return false
 }
 
