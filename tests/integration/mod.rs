@@ -25,6 +25,7 @@ mod init_tests;
 mod library_tests;
 mod localnet_tests;
 mod logging_tests;
+mod ls_tests;
 mod mappings_tests;
 mod new_tests;
 mod parse_int_tests;

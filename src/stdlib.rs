@@ -21,6 +21,14 @@ pub(crate) fn current_stdlib_version() -> String {
 }
 
 pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
+    ensure_latest_with_output(project_root, true)
+}
+
+pub(crate) fn ensure_latest_quiet(project_root: &Path) -> anyhow::Result<()> {
+    ensure_latest_with_output(project_root, false)
+}
+
+fn ensure_latest_with_output(project_root: &Path, report_progress: bool) -> anyhow::Result<()> {
     if auto_install_disabled() {
         return Ok(());
     }
@@ -30,11 +38,11 @@ pub fn ensure_latest(project_root: &Path) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    install_latest(project_root, false)
+    install_latest(project_root, false, report_progress)
 }
 
 pub fn update_latest(project_root: &Path) -> anyhow::Result<()> {
-    install_latest(project_root, true)
+    install_latest(project_root, true, true)
 }
 
 #[must_use]
@@ -45,7 +53,7 @@ fn auto_install_disabled() -> bool {
     })
 }
 
-fn install_latest(project_root: &Path, force: bool) -> anyhow::Result<()> {
+fn install_latest(project_root: &Path, force: bool, report_progress: bool) -> anyhow::Result<()> {
     let acton_dir = project_root.join(".acton");
     if !acton_dir.exists() {
         fs::create_dir_all(&acton_dir)?;
@@ -62,18 +70,20 @@ fn install_latest(project_root: &Path, force: bool) -> anyhow::Result<()> {
     };
 
     if needs_update {
-        if version_path.exists() {
-            println!(
-                "    {} standard library to v{}",
-                "Updating".green().bold(),
-                current_version
-            );
-        } else {
-            println!(
-                "  {} standard library v{}",
-                "Installing".green().bold(),
-                current_version
-            );
+        if report_progress {
+            if version_path.exists() {
+                println!(
+                    "    {} standard library to v{}",
+                    "Updating".green().bold(),
+                    current_version
+                );
+            } else {
+                println!(
+                    "  {} standard library v{}",
+                    "Installing".green().bold(),
+                    current_version
+                );
+            }
         }
 
         let tolk_stdlib_dir = acton_dir.join("tolk-stdlib");
