@@ -27,20 +27,20 @@ import {HeaderSearchField} from "@/components/HeaderSearchField"
 import {InlineInstallationCommand} from "@/components/InstallationCodeBlock"
 import {LandingVideo} from "@/components/LandingVideo"
 import logoDark from "@/public/logo-dark.svg"
+import {baseUrl} from "@/lib/metadata"
 
-const landingUrl = "https://ton-blockchain.github.io/acton"
-const landingOgImage = `${landingUrl}/og/home/image.png`
+const landingOgImage = `${baseUrl}/og/home/image.png`
 
 export const metadata: Metadata = {
   title: "Acton — a unified toolchain for TON",
   description:
     "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
-  metadataBase: new URL(landingUrl),
+  metadataBase: baseUrl,
   openGraph: {
     title: "Acton — a unified toolchain for TON",
     description:
       "Acton is an all-in-one CLI built around Tolk — from project creation to tests, debugging, dApp integration, deployment, and verification.",
-    url: landingUrl,
+    url: baseUrl,
     images: landingOgImage,
     locale: "en_US",
     type: "website",
@@ -326,7 +326,7 @@ export function LandingHome() {
             </div>
             <div className="landing-hero-media pointer-events-none absolute top-13 left-8 right-[-12rem] z-0 lg:bottom-[-4.5rem] lg:left-auto lg:right-[-5.5rem] lg:w-[62%] xl:right-[-2rem] xl:w-[60%]">
               <Image
-                src="/acton/landing/hero-ide.png"
+                src={`${baseUrl}/landing/hero-ide.png`}
                 alt=""
                 width={1436}
                 height={1096}
@@ -552,7 +552,7 @@ export function LandingHome() {
                   <div className="relative lg:-translate-y-5 xl:-translate-y-5">
                     <div className="mx-auto max-w-[720px]">
                       <Image
-                        src="/acton/landing/func2tolk-migration.png"
+                        src={`${baseUrl}/landing/func2tolk-migration.png`}
                         alt="FunC to Tolk migration diagram"
                         width={1365}
                         height={766}

@@ -1,6 +1,7 @@
 import type {ReactNode} from "react"
 import fs from "node:fs/promises"
 import type {ImageResponseOptions} from "next/server"
+import {baseUrl} from "@/lib/metadata"
 
 export interface GenerateProps {
   title: ReactNode
@@ -14,6 +15,7 @@ const font = fs.readFile("./node_modules/geist/dist/fonts/geist-sans/Geist-Regul
 const fontBold = fs.readFile("./node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.ttf")
 const actonLogo = fs.readFile("./public/logo.png")
 const tonLogo = fs.readFile("./public/resources/logo/ton.svg", "utf8")
+const docsUrlLabel = `${baseUrl}/docs`.replace(/^https?:\/\//, "")
 
 function toDataUri(content: Buffer, type: string) {
   return `data:${type};base64,${content.toString("base64")}`
@@ -54,7 +56,7 @@ export async function generate({
   description,
   logo,
   site = "Docs",
-  siteUrl = "ton-blockchain.github.io/acton/docs",
+  siteUrl = docsUrlLabel,
 }: GenerateProps) {
   const primaryTextColor = "rgb(248, 250, 252)"
   const secondaryTextColor = "rgba(248, 250, 252, 0.82)"

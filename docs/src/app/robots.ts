@@ -1,4 +1,5 @@
 import type {MetadataRoute} from "next"
+import {baseUrl} from "@/lib/metadata"
 
 export const revalidate = false
 
@@ -8,6 +9,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: "*",
       allow: "/",
     },
-    sitemap: "https://ton-blockchain.github.io/acton/sitemap.xml",
+    sitemap: `${baseUrl}/sitemap.xml`,
   }
 }

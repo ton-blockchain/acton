@@ -1,6 +1,6 @@
-export default function Page() {
-  const baseUrl = "https://ton-blockchain.github.io/acton"
+import {baseUrl} from "@/lib/metadata"
 
+export default function Page() {
   return (
     <>
       <meta httpEquiv="refresh" content={`0; url=${baseUrl}/docs/welcome`} />

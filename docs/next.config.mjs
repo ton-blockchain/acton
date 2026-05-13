@@ -19,9 +19,9 @@ const config = {
   },
   ...(isGitHubPagesBuild
     ? {
-        basePath: `/${repoName}`,
-        assetPrefix: `https://ton-blockchain.github.io/${repoName}/`,
-      }
+      basePath: `/${repoName}`,
+      assetPrefix: `https://ton-blockchain.github.io/${repoName}/`,
+    }
     : {}),
 }
 
