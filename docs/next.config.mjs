@@ -2,6 +2,7 @@ import {fileURLToPath} from "node:url"
 import {createMDX} from "fumadocs-mdx/next"
 
 const withMDX = createMDX()
+const docsRoot = fileURLToPath(new URL(".", import.meta.url))
 
 const isGitHubPagesBuild =
   process.env.GITHUB_ACTIONS === "true" || process.env.GITHUB_PAGES === "true"
@@ -10,7 +11,6 @@ const repoUrl = "https://ton-blockchain.github.io"
 const repoName = "acton"
 
 const baseUrl = isGitHubPagesBuild ? `${repoUrl}/${repoName}` : "http://localhost:3000"
-const docsRoot = fileURLToPath(new URL(".", import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const config = {
