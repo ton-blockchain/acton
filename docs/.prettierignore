@@ -7,3 +7,5 @@ build/
 .source/
 !*.ts
 !*.tsx
+!*.mjs
+!*.js

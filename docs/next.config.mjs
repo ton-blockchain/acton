@@ -11,19 +11,37 @@ const repoUrl = "https://ton-blockchain.github.io"
 const repoName = "acton"
 
 function resolveBaseUrl() {
-  const publicUrl = process.env.NEXT_PUBLIC_SITE_URL;
-  if (publicUrl !== undefined && publicUrl !== '') {
-    return publicUrl;
+  const publicUrl = process.env.NEXT_PUBLIC_SITE_URL
+  if (publicUrl !== undefined && publicUrl !== "") {
+    return publicUrl
   }
 
   if (isGitHubPagesBuild) {
     return `${repoUrl}/${repoName}`
   }
 
-  return 'http://localhost:3000';
+  return "http://localhost:3000"
 }
 
-const baseUrl = resolveBaseUrl();
+function resolveBasePath() {
+  if (isGitHubPagesBuild) {
+    return "acton"
+  }
+
+  return undefined
+}
+
+function resolveAssetPrefix() {
+  if (isGitHubPagesBuild) {
+    return `${repoUrl}/${repoName}`
+  }
+
+  return undefined
+}
+
+const baseUrl = resolveBaseUrl()
+const basePath = resolveBasePath()
+const assetPrefix = resolveAssetPrefix()
 
 /** @type {import('next').NextConfig} */
 const config = {
@@ -37,12 +55,8 @@ const config = {
   turbopack: {
     root: docsRoot,
   },
-  ...(isGitHubPagesBuild
-    ? {
-      basePath: `/${repoName}`,
-      assetPrefix: `${repoUrl}/${repoName}/`,
-    }
-    : {}),
+  basePath: basePath,
+  assetPrefix: assetPrefix,
 }
 
 export default withMDX(config)
