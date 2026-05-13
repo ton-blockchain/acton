@@ -7,3 +7,4 @@ ignore = "bash ./scripts/netlify-ignore-build.sh"
 [build.environment]
 BUN_VERSION = "1.3.5"
 NEXT_TELEMETRY_DISABLED = "1"
+NEXT_PUBLIC_SITE_URL = "$DEPLOY_PRIME_URL"

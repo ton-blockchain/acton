@@ -10,7 +10,20 @@ const isGitHubPagesBuild =
 const repoUrl = "https://ton-blockchain.github.io"
 const repoName = "acton"
 
-const baseUrl = isGitHubPagesBuild ? `${repoUrl}/${repoName}` : "http://localhost:3000"
+function resolveBaseUrl() {
+  const publicUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (publicUrl !== undefined && publicUrl !== '') {
+    return publicUrl;
+  }
+
+  if (isGitHubPagesBuild) {
+    return `${repoUrl}/${repoName}`
+  }
+
+  return 'http://localhost:3000';
+}
+
+const baseUrl = resolveBaseUrl();
 
 /** @type {import('next').NextConfig} */
 const config = {
