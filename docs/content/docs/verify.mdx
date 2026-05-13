@@ -104,7 +104,7 @@ Common causes include:
 
 For backend diagnostics, rerun the command with `ACTON_VERIFY_DEBUG=1`:
 
-```bash
+```acton-cli
 ACTON_VERIFY_DEBUG=1 \
 acton verify Counter --address EQDt7LL... --dry-run
 ```
@@ -113,7 +113,7 @@ With debug mode enabled, Acton prints the compiler version, the collected source
 
 To test a specific verifier backend, set `ACTON_VERIFY_BACKEND`:
 
-```bash
+```acton-cli
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
 ACTON_VERIFY_DEBUG=1 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
@@ -121,7 +121,7 @@ acton verify Counter --address EQDt7LL... --net mainnet --dry-run
 
 To replace the signer backend list, set `ACTON_VERIFY_BACKENDS`:
 
-```bash
+```acton-cli
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
 ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
