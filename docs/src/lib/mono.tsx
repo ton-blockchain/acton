@@ -15,7 +15,7 @@ const font = fs.readFile("./node_modules/geist/dist/fonts/geist-sans/Geist-Regul
 const fontBold = fs.readFile("./node_modules/geist/dist/fonts/geist-sans/Geist-SemiBold.ttf")
 const actonLogo = fs.readFile("./public/logo.png")
 const tonLogo = fs.readFile("./public/resources/logo/ton.svg", "utf8")
-const docsUrlLabel = `${baseUrl}/docs`.replace(/^https?:\/\//, "")
+const docsUrlLabel = `${baseUrl}/docs`.replace(/^https?:\/\//, "").replace(/\/+$/, "")
 
 function toDataUri(content: Buffer, type: string) {
   return `data:${type};base64,${content.toString("base64")}`

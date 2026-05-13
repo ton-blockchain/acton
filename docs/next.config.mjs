@@ -5,13 +5,20 @@ const withMDX = createMDX()
 
 const isGitHubPagesBuild =
   process.env.GITHUB_ACTIONS === "true" || process.env.GITHUB_PAGES === "true"
+
+const repoUrl = "https://ton-blockchain.github.io"
 const repoName = "acton"
+
+const baseUrl = isGitHubPagesBuild ? `${repoUrl}/${repoName}` : "http://localhost:3000"
 const docsRoot = fileURLToPath(new URL(".", import.meta.url))
 
 /** @type {import('next').NextConfig} */
 const config = {
   reactStrictMode: true,
   output: "export",
+  env: {
+    NEXT_PUBLIC_BASE_URL: baseUrl,
+  },
   serverExternalPackages: ["typescript", "twoslash"],
   images: {unoptimized: true},
   turbopack: {
@@ -20,7 +27,7 @@ const config = {
   ...(isGitHubPagesBuild
     ? {
       basePath: `/${repoName}`,
-      assetPrefix: `https://ton-blockchain.github.io/${repoName}/`,
+      assetPrefix: `${repoUrl}/${repoName}/`,
     }
     : {}),
 }

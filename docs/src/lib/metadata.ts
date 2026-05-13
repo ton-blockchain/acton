@@ -1,4 +1,1 @@
-export const baseUrl =
-  process.env.GITHUB_ACTIONS === "true" || process.env.GITHUB_PAGES === "true"
-    ? "https://ton-blockchain.github.io/acton"
-    : "http://localhost:3000"
+export const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000"
