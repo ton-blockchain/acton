@@ -8,7 +8,7 @@ This guide covers the full Acton workflow: creating a counter contract from a te
 
 ## Prerequisites
 
-- [Acton](/docs/installation) 1.0.0 or later installed.
+- [Acton](/docs/installation) {{ acton_version }} or later installed.
 - [Node.js](https://nodejs.org/en/download/) 22 or later LTS: required for the TypeScript app scaffold added by `--app`.
 
 To enable Acton support in the IDE, install either of:
@@ -37,7 +37,7 @@ Output:
 
 ```acton-cli noCopy title="terminal"
 $ acton new first_counter --template counter --app
-  Installing standard library v1.0.0
+  Installing standard library v{{ acton_version }}
 > Initialized empty Git repository in /home/you/first_counter/.git/
 ✓ Created new Acton project
   Project name: first_counter
@@ -507,7 +507,7 @@ Acton blocks the selected test until a client attaches. Add the following to `.v
 
 ```json title=".vscode/launch.json"
 {
- "version": "1.0.0",
+ "version": "{{ acton_version }}",
  "configurations": [
    {
      "type": "tolk",

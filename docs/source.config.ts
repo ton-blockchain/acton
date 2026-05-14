@@ -21,6 +21,7 @@ import {remarkMdxFiles} from "fumadocs-core/mdx-plugins"
 import {remarkMdxMermaid} from "fumadocs-core/mdx-plugins/remark-mdx-mermaid"
 import {parseCodeBlockAttributes} from "fumadocs-core/mdx-plugins/codeblock-utils"
 import {z} from "zod"
+import {remarkDocsVariables} from "@/lib/remark-docs-variables"
 
 export const docs = defineDocs({
   dir: "content/docs",
@@ -190,6 +191,6 @@ export default defineConfig({
         }),
       ],
     },
-    remarkPlugins: [remarkMdxFiles, remarkMdxMermaid],
+    remarkPlugins: [remarkDocsVariables, remarkMdxFiles, remarkMdxMermaid],
   },
 })

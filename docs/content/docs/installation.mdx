@@ -168,7 +168,7 @@ Acton is also published as a Docker image at `ghcr.io/ton-blockchain/acton`. Thi
 To verify that the image is available and print the Acton version:
 
 ```bash
-docker run --rm ghcr.io/ton-blockchain/acton:1.0.0 --version
+docker run --rm ghcr.io/ton-blockchain/acton:{{ acton_version }} --version
 ```
 
 To run Acton against the current project from a container:
@@ -177,7 +177,7 @@ To run Acton against the current project from a container:
 docker run --rm \
   -v "$PWD":/workspace \
   -w /workspace \
-  ghcr.io/ton-blockchain/acton:1.0.0 \
+  ghcr.io/ton-blockchain/acton:{{ acton_version }} \
   build
 ```
 
