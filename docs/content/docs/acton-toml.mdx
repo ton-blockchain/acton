@@ -62,7 +62,7 @@ Defines project metadata.
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [package]
 name = "my-awesome-contract"
 description = "A project with Tolk smart contracts"
@@ -77,15 +77,15 @@ Pins project-level tooling versions. Acton checks this section before running
 project commands and exits with an error when the installed CLI version does
 not match the configured version.
 
-| Field   | Type     | Required | Description                                                            |
-|:--------|:---------|:---------|:-----------------------------------------------------------------------|
-| `acton` | `string` | No       | Required Acton CLI version without a leading `v`, for example `1.0.0`. |
+| Field   | Type     | Required | Description                                                                          |
+|:--------|:---------|:---------|:-------------------------------------------------------------------------------------|
+| `acton` | `string` | No       | Required Acton CLI version without a leading `v`, for example `{{ acton_version }}`. |
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [toolchain]
-acton = "1.0.0"
+acton = "{{ acton_version }}"
 ```
 
 `acton up` remains available when the configured version does not match, so the
@@ -97,7 +97,7 @@ This section is a map where each key is a contract name and the value is a contr
 
 | Field          | Type     | Required | Description                                                             |
 |:---------------|:---------|:---------|:------------------------------------------------------------------------|
-| `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.          |
+| `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.     |
 | `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
 | `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
@@ -107,7 +107,7 @@ This section is a map where each key is a contract name and the value is a contr
 Dependencies can be specified in two ways:
 
 1. **Simple format**: Just the name of another contract defined in `Acton.toml`.
-   ```toml
+   ```acton-toml title="Acton.toml"
    depends = ["AnotherContract"]
    ```
 
@@ -121,7 +121,7 @@ Dependency helper naming uses the contract key from `[contracts.<name>]`, not `d
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.MainContract]
 display-name = "Main Contract"
 src = "contracts/MainContract.tolk"
@@ -144,7 +144,7 @@ Configures defaults for `acton build`.
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "build"
 gen-dir = "gen"
@@ -174,7 +174,7 @@ Configures default output locations for `acton wrapper`.
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [wrappers.tolk]
 output-dir = "wrappers"
 generate-test = true
@@ -209,7 +209,7 @@ Import groups are ordered as: `@stdlib`, `@acton`, `@<other>`, plain imports (`i
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [fmt]
 width = 100
 ignore = ["contracts/generated/*.tolk"]
@@ -232,7 +232,7 @@ Configures defaults for `acton localnet`.
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [localnet]
 port = 3010
 fork-net = "testnet"
@@ -317,7 +317,7 @@ All filters compose, and the reported mutation score reflects only the mutants t
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 reporter = ["console", "junit"]
 fail-fast = true
@@ -363,7 +363,7 @@ Use `[lint]` for linter-wide settings and `[lint.rules]` for rule severities. Fo
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [lint]
 exclude = ["contracts/generated/*.tolk", "contracts/legacy.tolk"]
 max-warnings = 0 # fail on any warning
@@ -386,7 +386,7 @@ Specify rules under `[lint.rules]` to apply them to all contracts in the project
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [lint.rules]
 unused-variable = "deny"
 mutable-variable-can-be-immutable = "warn"
@@ -404,7 +404,7 @@ Override lint levels for specific contracts by creating a subsection named after
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Counter]
 display-name = "My Counter"
 src = "contracts/Counter.tolk"
@@ -426,13 +426,13 @@ Defines network settings used by `--net` and `--fork-net`.
 
 | Field      | Type     | Required                                | Description                                                                                                                                                                                                                                                                                     |
 |:-----------|:---------|:----------------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                          |
-| `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                          |
+| `api.v2`   | `string` | Yes for custom, optional for `localnet` | TON Center API v2 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v2`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
+| `api.v3`   | `string` | No                                      | TON Center API v3 URL. For `localnet`, if omitted, Acton uses `http://localhost:<localnet.port>/api/v3`; if `[localnet].port` is not set, it falls back to port `5411`.                                                                                                                         |
 | `explorer` | `string` | No                                      | Base explorer URL for transaction links. Acton appends `/tx/<hash>` automatically (adds `/tx/` if missing). If omitted, Acton derives explorer links from `api.v2` (`<scheme>://<host>/explorer/tx/<hash>`). For default `localnet`, this becomes `http://localhost:<port>/explorer/tx/<hash>`. |
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [networks.localnet]
 explorer = "http://localhost:3006"
 
@@ -453,10 +453,10 @@ Allows defining custom scripts that can be executed via `acton run <name>`.
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [scripts]
 deploy = "acton script scripts/deploy.tolk"
-check = "acton test --filter=.*_check"
+check = "acton test --filter='.*_check'"
 ```
 
 ## `[import-mappings]`
@@ -470,7 +470,7 @@ Allows defining path aliases for the Tolk compiler, similar to `@stdlib`. These 
 
 Example:
 
-```toml
+```acton-toml title="Acton.toml"
 [import-mappings]
 utils = "./libs/utils" # Equivalent to "@utils" and preferred
 "@core" = "./libs/core"

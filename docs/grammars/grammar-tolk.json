@@ -51,7 +51,7 @@
     },
     {
       "name": "keyword.other",
-      "match": "\\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly|string|contract)\\b"
+      "match": "\\b(import|export|true|false|null|redef|mutate|tolk|as|is|!is|private|readonly|string)\\b"
     },
     {
       "name": "keyword.other",
@@ -81,7 +81,21 @@
     },
     {
       "name": "storage.modifier",
-      "match": "\\b(global|const|var|val|fun|get|struct|contract)\\b"
+      "match": "\\b(global|const|var|val|fun|get|struct)\\b"
+    },
+    {
+      "match": "\\b(contract)(\\s+)([A-Z][a-zA-Z0-9]*)(?=\\s*\\{)",
+      "captures": {
+        "1": {"name": "storage.modifier"},
+        "3": {"name": "entity.name.type"}
+      }
+    },
+    {
+      "match": "(@\\w+)(\\.)(\\w+)",
+      "captures": {
+        "1": {"name": "entity.name.type"},
+        "3": {"name": "entity.name.type"}
+      }
     },
     {
       "name": "entity.name.type",

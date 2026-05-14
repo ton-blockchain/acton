@@ -24,13 +24,8 @@ async function validateExternalLinks() {
 }
 
 function whitelist(url: string): boolean {
-  // TODO: remove after opening the repository
-  if (url.startsWith("https://github.com/ton-blockchain/acton/releases/latest")) {
-    return true
-  }
-
-  // TODO: remove after opening the repository
-  if (url.startsWith("https://github.com/ton-blockchain/setup-acton")) {
+  // CDN return 502
+  if (url.startsWith("https://cdn.tapps.ninja")) {
     return true
   }
 
@@ -57,7 +52,22 @@ function toRedirectMode(url: URL): RequestRedirect {
   return "manual"
 }
 
+function checkLocalhostPort(url: URL): ExternalLinkResult {
+  if (url.port === "5173") {
+    return {success: true}
+  }
+
+  return {
+    success: false,
+    message: `port ${url.port} is not allowed for localhost`,
+  }
+}
+
 async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
+  if (url.hostname === "localhost") {
+    return checkLocalhostPort(url)
+  }
+
   const redirectMode = toRedirectMode(url)
   const response = await fetch(url, {
     method: "GET",

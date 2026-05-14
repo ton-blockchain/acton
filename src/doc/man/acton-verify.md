@@ -57,7 +57,7 @@ Defaults to `52258`.
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
-Currently defaults to `1.2.0`.
+Currently defaults to `1.4.0`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
@@ -169,7 +169,7 @@ With `ACTON_VERIFY_DEBUG`, Acton prints:
 
 Example: debug source upload against a custom backend:
 
-```bash
+```acton-cli
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
 ACTON_VERIFY_DEBUG=1 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run
@@ -177,7 +177,7 @@ acton verify Counter --address EQDt7LL... --net mainnet --dry-run
 
 Example: separate source upload from signer backends:
 
-```bash
+```acton-cli
 ACTON_VERIFY_BACKEND=http://127.0.0.1:8080 \
 ACTON_VERIFY_BACKENDS=http://127.0.0.1:8081,http://127.0.0.1:8082 \
 acton verify Counter --address EQDt7LL... --net mainnet --dry-run

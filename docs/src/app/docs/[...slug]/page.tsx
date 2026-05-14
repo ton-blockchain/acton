@@ -3,8 +3,8 @@ import {
   DocsBody,
   DocsDescription,
   DocsPage,
-  PageLastUpdate,
   DocsTitle,
+  PageLastUpdate,
 } from "fumadocs-ui/layouts/docs/page"
 import {getMDXComponents} from "@/lib/mdx-components"
 import type {Metadata} from "next"
@@ -13,12 +13,11 @@ import {LLMCopyButton, ViewOptions} from "@/components/page-actions"
 import {getLLMText} from "@/lib/get-llm-text"
 import {NotFound} from "@/components/layouts/not-found"
 import {getSuggestions} from "./suggestions"
+import {baseUrl} from "@/lib/metadata"
 
 interface PageProps {
   params: Promise<{slug: string[]}>
 }
-
-const metadataBase = new URL("https://ton-blockchain.github.io/acton")
 
 export default async function Page(props: PageProps) {
   const params = await props.params
@@ -45,7 +44,7 @@ export default async function Page(props: PageProps) {
       <div className="flex flex-row flex-wrap gap-2 items-center border-b pb-6">
         <LLMCopyButton content={llmText} />
         <ViewOptions
-          markdownUrl={`/llms.mdx${page.url}.md`}
+          markdownUrl={`${baseUrl}/llms.mdx${page.url}.md`}
           githubUrl={`https://github.com/ton-blockchain/acton/blob/master/docs/content/docs/${page.path}`}
         />
       </div>
@@ -77,7 +76,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   if (!page) {
     return {
       title: "Not Found",
-      metadataBase,
+      metadataBase: baseUrl,
     }
   }
 
@@ -86,7 +85,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   return {
     title: page.data.title,
     description: page.data.description,
-    metadataBase,
+    metadataBase: baseUrl,
     alternates: {
       canonical: page.url,
     },

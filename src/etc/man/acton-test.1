@@ -668,7 +668,8 @@ acton test \-\-verbose \-\-filter "debug.*"
 .sp
 .RS 4
 .nf
-acton test \-\-coverage \-\-coverage\-format lcov \-\-reporter junit \-\-junit\-path test\-results
+acton test \-\-coverage \-\-coverage\-format lcov \-\-reporter junit \(rs
+                                             \-\-junit\-path test\-results
 .fi
 .RE
 .RE
@@ -718,7 +719,8 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff worktree
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \-\-mutation\-levels critical,major
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \(rs
+                                             \-\-mutation\-levels critical,major
 .fi
 .RE
 .RE
@@ -739,7 +741,8 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-id 2
 .sp
 .RS 4
 .nf
-acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wallet\-pr\-42 \-\-mutation\-diff worktree
+acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wallet\-pr\-42 \(rs
+                                             \-\-mutation\-diff worktree
 .fi
 .RE
 .sp
@@ -769,7 +772,9 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-workers 4
 .sp
 .RS 4
 .nf
-acton test tests/wallet.test.tolk \-\-fork\-net testnet \-\-fork\-block\-number 55000000 \-\-save\-test\-trace \-\-ui
+acton test tests/wallet.test.tolk \-\-fork\-net testnet \(rs
+                                  \-\-fork\-block\-number 55000000 \(rs
+                                  \-\-save\-test\-trace \-\-ui
 .fi
 .RE
 .sp
@@ -779,7 +784,8 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \-\-fork\-block\-number 
 .sp
 .RS 4
 .nf
-acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff \-\-reporter console,junit
+acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff \(rs
+                                                       \-\-reporter console,junit
 .fi
 .RE
 .SH "SEE ALSO"

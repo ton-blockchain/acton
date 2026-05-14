@@ -18,7 +18,7 @@ The mutation engine makes small, deliberate changes — for example, changing `o
 acton test --mutate --mutate-contract Voter
 ```
 
-```acton-cli-mutate noCopy
+```acton-cli-mutate noCopy title="terminal"
 $ acton test --mutate --mutate-contract Voter
 
 Mutation Testing
@@ -57,7 +57,8 @@ Survived Mutants
     24 │     assert (!storage.hasVoted) throw Errors.AlreadyVoted;
     25 │     storage.hasVoted = true;
 
-  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities
+  if the condition is not enforced.
 ────────────────────────────────────────────────────────────
 These mutants were not caught by your tests!
 Consider adding more test cases to improve mutation coverage.
@@ -97,7 +98,7 @@ Rerun to confirm the survivor is gone:
 acton test --mutate --mutate-contract Voter
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
     Total mutants        8
   ✓ Killed               8
   ✗ Survived             0
@@ -160,7 +161,7 @@ get fun `test fuzz vote option boundary`(option: uint8) {
 acton test --fuzz-seed 42 -f "fuzz vote option"
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton test --fuzz-seed 42 -f "fuzz vote option"
    Compiling contracts
     Finished in 608.21µs

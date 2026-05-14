@@ -115,7 +115,9 @@ fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = nul
 
 fun Counter.deploy(self, from: address, config: SendParams = {}): SendResultList {
     if (self.stateInit == null) {
-        Assert.fail("Cannot deploy a contract created with 'fromAddress' because it lacks state init for deployment");
+        Assert.fail(
+            "Cannot deploy a contract created with 'fromAddress' because it lacks state init",
+        );
     }
     val msg = createMessage({
         bounce: config.bounce,

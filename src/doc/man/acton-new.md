@@ -217,7 +217,8 @@ The command does not create a commit and does not modify parent directories.
 2. Create a non-interactive counter project with explicit metadata:
 
    ```bash
-   acton new my-project --name "My Project" --description "Cool description" --template counter --license MIT
+   acton new my-project --name "My Project" --description "Cool description" \
+                                            --template counter --license MIT
    ```
 
 3. Create a project with the TypeScript app layout:
@@ -235,7 +236,8 @@ The command does not create a commit and does not modify parent directories.
 5. Create a project in the current directory:
 
    ```bash
-   acton new . --template empty --name "My Project" --description "A TON blockchain project" --license MIT
+   acton new . --template empty --name "My Project" --description "A TON blockchain project" \
+                                                    --license MIT
    ```
 
 ## See Also

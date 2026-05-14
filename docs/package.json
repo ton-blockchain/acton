@@ -14,7 +14,8 @@
     "lint:links:internal": "bun ./scripts/validate-links-internal.ts",
     "lint:links:external": "bun ./scripts/validate-links-external.ts",
     "lint:navigation": "bun ./scripts/validate-navigation.ts",
-    "docs-lint": "touch 1.txt"
+    "lint:code-block-line-length": "bun ./scripts/validate-code-block-line-length.ts",
+    "docs-lint": "bun run lint:links && bun run lint:navigation && bun run lint:code-block-line-length"
   },
   "dependencies": {
     "@orama/orama": "^3.1.18",
@@ -26,6 +27,7 @@
     "geist": "^1.5.1",
     "gsap": "^3.13.0",
     "lucide-react": "^0.555.0",
+    "mermaid": "^11.14.0",
     "next": "16.2.3",
     "ogl": "^1.0.11",
     "react": "19.2.0",

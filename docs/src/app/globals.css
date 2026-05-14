@@ -16,6 +16,12 @@
 :root {
   --headless-color: #2d83ec;
   --ui-color: #2d83ec;
+  --color-fd-background: #ffffff;
+  --color-fd-muted: #fbfbfb;
+  --color-fd-popover: #ffffff;
+  --color-fd-card: #f9f9f9;
+  --color-fd-secondary: #f9f9f9;
+  --color-fd-accent: #f1f1f1;
 
   --color-fd-primary: var(--ui-color);
   --color-fd-idea: oklch(65% 0.2 145);
@@ -24,6 +30,12 @@
 .dark {
   --headless-color: #9ae7ff;
   --ui-color: #9ae7ff;
+  --color-fd-background: #121212;
+  --color-fd-muted: hsl(0, 0%, 12.9%);
+  --color-fd-popover: hsl(0, 0%, 11.6%);
+  --color-fd-card: hsl(0, 0%, 9.8%);
+  --color-fd-secondary: hsl(0, 0%, 12.9%);
+  --color-fd-accent: hsla(0, 0%, 40.9%, 30%);
 }
 
 body {
@@ -57,6 +69,25 @@ figure.shiki > div[role="region"] {
 
 .acton-docs-sidebar {
   background-color: var(--color-fd-background);
+}
+
+.mermaid-diagram svg .edgeLabel,
+.mermaid-diagram svg .edgeLabel p,
+.mermaid-diagram svg .edgeLabel text,
+.mermaid-diagram svg .edgeLabel tspan {
+  font-size: 14px !important;
+}
+
+.mermaid-diagram[data-theme="light"] svg .edgeLabel .background {
+  fill: rgba(255, 255, 255, 0.8) !important;
+  stroke: none;
+  opacity: 1 !important;
+}
+
+.mermaid-diagram[data-theme="dark"] svg .edgeLabel .background {
+  fill: rgba(34, 34, 34, 0.8) !important;
+  stroke: none;
+  opacity: 1 !important;
 }
 
 .home-shell {
@@ -273,7 +304,7 @@ figure.shiki > div[role="region"] {
   padding: 0;
   border: 0;
   background: transparent;
-  color: var(--color-fd-background);
+  color: #121212;
   cursor: pointer;
 }
 
@@ -301,7 +332,7 @@ figure.shiki > div[role="region"] {
 }
 
 .landing-video-play-button:focus-visible .landing-video-play-surface {
-  outline: 2px solid rgba(255, 255, 255, 0.9);
+  outline: 2px solid color-mix(in srgb, var(--ui-color) 60%, white);
   outline-offset: 4px;
 }
 

@@ -73,7 +73,7 @@ convert them before invoking Acton.
 
 `acton fmt` reads defaults from `[fmt]` in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [fmt]
 width = 100
 ignore = ["contracts/generated/*.tolk"]

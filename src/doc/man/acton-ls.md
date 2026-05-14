@@ -64,7 +64,7 @@ Unless `--no-log` is passed, the server configures file logging.
 
 The default log path is:
 
-```text
+```text noCopy
 build/logs/tolk-language-server.log
 ```
 

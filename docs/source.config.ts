@@ -13,12 +13,15 @@ import actonCliWrapperGrammarRaw from "./grammars/grammar-acton-cli-wrapper.json
 import actonCliMutateGrammarRaw from "./grammars/grammar-acton-cli-mutate.json"
 import actonCliTraceGrammarRaw from "./grammars/grammar-acton-cli-trace.json"
 import actonTraceGrammarRaw from "./grammars/grammar-acton-trace.json"
+import actonGasReportGrammarRaw from "./grammars/grammar-acton-gas-report.json"
 import lastModified from "fumadocs-mdx/plugins/last-modified"
 import {tolkTwoslasher} from "@/lib/tolk-twoslash"
 import {pageSchema} from "fumadocs-core/source/schema"
 import {remarkMdxFiles} from "fumadocs-core/mdx-plugins"
+import {remarkMdxMermaid} from "fumadocs-core/mdx-plugins/remark-mdx-mermaid"
 import {parseCodeBlockAttributes} from "fumadocs-core/mdx-plugins/codeblock-utils"
 import {z} from "zod"
+import {remarkDocsVariables} from "@/lib/remark-docs-variables"
 
 export const docs = defineDocs({
   dir: "content/docs",
@@ -32,6 +35,7 @@ export const docs = defineDocs({
   },
 })
 
+// @ts-expect-error Tolk grammar type is wider than LanguageRegistration
 const tolkGrammar: LanguageRegistration = {
   ...tolkGrammarRaw,
   name: "tolk",
@@ -84,10 +88,29 @@ const actonCliTraceGrammar: LanguageRegistration = {
   embeddedLangs: ["acton-cli", "acton-trace"],
 }
 
+const actonGasReportGrammar: LanguageRegistration = {
+  ...actonGasReportGrammarRaw,
+  name: "acton-gas-report",
+}
+
 // @ts-expect-error JSON grammar type is wider than LanguageRegistration
 const tlbGrammar: LanguageRegistration = {
   ...tlbGrammarRaw,
   name: "tlb",
+}
+
+const actonTomlGrammar: LanguageRegistration = {
+  name: "acton-toml",
+  displayName: "Acton.toml",
+  scopeName: "source.acton-toml",
+  aliases: ["Acton.toml"],
+  embeddedLangs: ["toml"],
+  repository: {},
+  patterns: [
+    {
+      include: "source.toml",
+    },
+  ],
 }
 
 const builtinLangs = [
@@ -112,10 +135,14 @@ const customLangs = [
   actonCliMutateGrammar,
   actonCliTraceGrammar,
   actonTraceGrammar,
+  actonGasReportGrammar,
+  actonTomlGrammar,
   tlbGrammar,
 ] as const
 
-const tonGradientIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
+const tolkFileIcon = readFileSync("public/logo-ton-gray.svg", "utf8")
+const actonTomlIcon = readFileSync("public/logo-acton-file.svg", "utf8")
+const terminalIcon = readFileSync("public/logo-terminal.svg", "utf8")
 
 const transformerNoCopy: ShikiTransformer = {
   name: "acton:no-copy",
@@ -140,7 +167,14 @@ export default defineConfig({
       lazy: false,
       icon: {
         extend: {
-          tolk: tonGradientIcon,
+          "acton-cli": terminalIcon,
+          "acton-cli-check": terminalIcon,
+          "acton-cli-wrapper": terminalIcon,
+          "acton-cli-mutate": terminalIcon,
+          "acton-cli-trace": terminalIcon,
+          "acton-gas-report": terminalIcon,
+          "acton-toml": actonTomlIcon,
+          tolk: tolkFileIcon,
         },
       },
       themes: {
@@ -157,6 +191,6 @@ export default defineConfig({
         }),
       ],
     },
-    remarkPlugins: [remarkMdxFiles],
+    remarkPlugins: [remarkDocsVariables, remarkMdxFiles, remarkMdxMermaid],
   },
 })

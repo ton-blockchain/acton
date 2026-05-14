@@ -8,7 +8,7 @@ This guide covers the full Acton workflow: creating a counter contract from a te
 
 ## Prerequisites
 
-- [Acton](/docs/installation) 1.0.0 or later installed.
+- [Acton](/docs/installation) {{ acton_version }} or later installed.
 - [Node.js](https://nodejs.org/en/download/) 22 or later LTS: required for the TypeScript app scaffold added by `--app`.
 
 To enable Acton support in the IDE, install either of:
@@ -35,9 +35,9 @@ acton new first_counter --template counter --app
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton new first_counter --template counter --app
-  Installing standard library v1.0.0
+  Installing standard library v{{ acton_version }}
 > Initialized empty Git repository in /home/you/first_counter/.git/
 ✓ Created new Acton project
   Project name: first_counter
@@ -81,12 +81,14 @@ acton run deploy-testnet
 
 Output:
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton run deploy-testnet
-acton script contracts/scripts/deploy.tolk
-N/A -> deployer A
-└── empty 0.005 TON -> Counter B    gas=692
-    └── account created
+acton script contracts/scripts/deploy.tolk --net testnet
+Awaiting trace... [Attempt 1/20]
+Trace settled with 2 transaction(s)
+N/A -> external
+└── ext-in 0x7369676e -> EQD36X..ur8XSS A      gas=4939
+    └── empty 0.005 TON -> EQBoxX..16Bfkg B    gas=692
 
 Deployed counter to kQD...tVe (Counter)
 Counter owner is kQB...iD (deployer)
@@ -103,7 +105,7 @@ acton build
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build
    Compiling contracts
    Compiling Counter
@@ -138,7 +140,7 @@ acton build --info
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build --info
    Compiling contracts
     Finished in 2.7ms
@@ -160,7 +162,7 @@ acton fmt
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton fmt
 All files are already formatted
 ```
@@ -173,7 +175,7 @@ acton fmt --check
 
 When a file is not formatted correctly, `--check` prints a unified diff and exits with a non-zero status:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton fmt --check
 Diff in contracts/src/Counter.tolk:
 -fun onInternalMessage(in:InMessage){
@@ -202,7 +204,7 @@ acton check
 
 On a clean project, it prints the checked targets and exits with status 0:
 
-```acton-cli-check noCopy
+```acton-cli-check noCopy title="terminal"
 $ acton check
     Checking Counter
     Checking contracts/scripts/deploy.tolk
@@ -211,7 +213,7 @@ $ acton check
 
 When issues are found, output looks like this:
 
-```acton-cli-check noCopy
+```acton-cli-check noCopy title="terminal"
 $ acton check
 warning[E001]: variable `x` is unused
   --> contracts/src/Counter.tolk:12:9
@@ -249,7 +251,7 @@ acton wrapper --all
 
 Output:
 
-```acton-cli-wrapper noCopy
+```acton-cli-wrapper noCopy title="terminal"
 $ acton wrapper --all
    Generated contracts/wrappers/Counter.gen.tolk
 ```
@@ -268,7 +270,7 @@ Pass `--ts` to emit a TypeScript wrapper instead, which the app template consume
 acton wrapper Counter --ts
 ```
 
-```acton-cli-wrapper noCopy
+```acton-cli-wrapper noCopy title="terminal"
 $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.gen.ts
 ```
@@ -285,7 +287,7 @@ acton test
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton test
    Compiling contracts
     Finished in 726.375µs
@@ -358,7 +360,7 @@ acton test --mutate --mutate-contract Counter
 
 Output:
 
-```acton-cli-mutate noCopy
+```acton-cli-mutate noCopy title="terminal"
 $ acton test --mutate --mutate-contract Counter
 
 Mutation Testing
@@ -414,7 +416,7 @@ acton test --backtrace full
 
 The clean counter template passes. The output below shows the kind of source locations Acton prints when a test fails:
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton test --backtrace full
    Compiling contracts
    Compiling Counter
@@ -489,7 +491,7 @@ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug --debug-port 4711
   Compiling contracts
    Finished in 6.2ms
@@ -505,7 +507,7 @@ Acton blocks the selected test until a client attaches. Add the following to `.v
 
 ```json title=".vscode/launch.json"
 {
- "version": "1.0.0",
+ "version": "{{ acton_version }}",
  "configurations": [
    {
      "type": "tolk",
@@ -606,7 +608,7 @@ acton script contracts/scripts/increase.tolk
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton script contracts/scripts/increase.tolk
 Deploy value: 5000000
 Increasing counter by 1
@@ -647,7 +649,7 @@ acton wallet new --name deployer --local --airdrop --version v5r1
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton wallet new --name deployer --local --airdrop --version v5r1
 
 ✓ Wallet successfully created and added to wallets.toml

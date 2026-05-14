@@ -243,15 +243,18 @@ As matchers accumulate, keep them in a dedicated module instead of scattering co
 
 Example layout:
 
-```text noCopy
-my-project/
-├── contracts/
-│   └── ...
-├── tests/
-│   ├── my_contract.test.tolk
-│   └── matchers.tolk
-└── Acton.toml
-```
+<Files>
+  <Folder name="my-project" defaultOpen>
+    <Folder name="contracts" defaultOpen>
+      <File name="..." />
+    </Folder>
+    <Folder name="tests" defaultOpen>
+      <File name="my_contract.test.tolk" />
+      <File name="matchers.tolk" />
+    </Folder>
+    <File name="Acton.toml" />
+  </Folder>
+</Files>
 
 Import the shared module from tests:
 

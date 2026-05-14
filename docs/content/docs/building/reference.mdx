@@ -3,6 +3,8 @@ title: "Reference"
 description: "Complete reference for all build system configuration options, CLI flags, and contract settings"
 ---
 
+import {Tabs, Tab} from "fumadocs-ui/components/tabs";
+
 This page provides a complete reference for all configuration options available in Acton's build system.
 
 ## Path resolution rules
@@ -80,7 +82,7 @@ acton build --output-fift build/fift
 
 Use `[build]` to configure default outputs for `acton build`:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "build"
 gen-dir = "gen"
@@ -109,7 +111,7 @@ Config values in `[build]` are project-root-relative. CLI paths such as `--out-d
 
 Use `[wrappers]` to configure default output locations for `acton wrapper`:
 
-```toml
+```acton-toml title="Acton.toml"
 [wrappers.tolk]
 output-dir = "wrappers"
 generate-test = true
@@ -141,7 +143,7 @@ Configured wrapper paths are project-root-relative. CLI paths such as `--output`
 
 Contracts are defined using `[contracts.*]` sections where `*` is the contract name.
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.MyContract]
 display-name = "MyContract"
 src = "contracts/MyContract.tolk"
@@ -177,7 +179,7 @@ Dependencies can be specified in two formats:
 
 #### Simple format
 
-```toml
+```acton-toml title="Acton.toml"
 depends = ["ChildContract", "AnotherContract"]
 ```
 
@@ -189,9 +191,9 @@ Uses default settings:
 
 #### Detailed format
 
-```toml
+```acton-toml title="Acton.toml"
 depends = [
-  { name = "ChildContract", kind = "library_ref", function = "getChildCode", path = "contracts/gen/child.code.tolk" }
+  { name = "Child", kind = "library_ref", function = "getChildCode", path = "gen/child.code.tolk" }
 ]
 ```
 
@@ -248,7 +250,7 @@ Custom `function` overrides only the function name. Custom `path` overrides only
 
 Embeds the full compiled contract code directly into the parent contract.
 
-```toml
+```acton-toml title="Acton.toml"
 depends = ["Wallet"]
 # or
 depends = [{ name = "Wallet", kind = "embed_code" }]
@@ -267,7 +269,7 @@ fun walletCompiledCode(): cell asm """
 
 Generates a library reference instead of embedding full code. The library must be deployed separately.
 
-```toml
+```acton-toml title="Acton.toml"
 depends = [{ name = "Wallet", kind = "library_ref" }]
 ```
 
@@ -284,7 +286,7 @@ fun walletCompiledCode(): cell asm """
 
 It is possible to use precompiled `.boc` files instead of `.tolk` sources:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Precompiled]
 display-name = "PrecompiledContract"
 src = "contracts/Precompiled.boc"
@@ -303,7 +305,7 @@ This is useful for referencing third-party contracts.
 
 Define additional path aliases for the Tolk compiler in the `[import-mappings]` section. These are useful for importing library code without using complex relative paths.
 
-```toml
+```acton-toml title="Acton.toml"
 [import-mappings]
 core = "./libs/core"
 utils = "./libs/utils"
@@ -343,16 +345,27 @@ acton build --graph deps.dot
 
 To render DOT into SVG manually (optional), use [Graphviz](https://graphviz.org):
 
-```bash
-# macOS
-brew install graphviz
+<Tabs items={["macOS", "Ubuntu/Debian", "Windows"]}>
+    <Tab value="macOS">
 
-# Ubuntu/Debian
-sudo apt-get install graphviz
+        ```bash
+        brew install graphviz
+        ```
 
-# Windows
-# Download from https://graphviz.org/download/
-```
+    </Tab>
+    <Tab value="Ubuntu/Debian">
+
+        ```bash
+        sudo apt-get install graphviz
+        ```
+
+    </Tab>
+    <Tab value="Windows">
+
+        Download from https://graphviz.org/download/
+
+    </Tab>
+</Tabs>
 
 The generated DOT contains:
 - Contract boxes labeled with contract names

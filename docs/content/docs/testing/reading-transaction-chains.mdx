@@ -28,7 +28,7 @@ println(txs);
 
 Example output:
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── FmRoute 0.6 TON -> fm_linear_root B                                gas=1782
     └── FmDelivered 0.1996 TON -> fm_linear_mid C                      gas=435 exit_code=63 aborted
@@ -41,7 +41,7 @@ With `--show-bodies`, Acton adds decoded fields under the transaction line.
 
 Small bodies stay compact:
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── FmKnownAddressBody 0.05 TON -> fm_known_address_sink B               gas=333
     queryId: 0, newAdminAddress: 0QDx... (not_deployer)
@@ -49,7 +49,7 @@ N/A -> sender A
 
 Multi-line bodies use the continuation gutter `│` so they stay visually attached to the transaction header even when child transactions follow:
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── FmWrappedKnownAddressBody 0.05 TON -> fm_wrapped_known_address_sink B gas=1572
     │   internalTransferMsg: {
@@ -80,7 +80,7 @@ N/A -> sender A
 
 ### Bounced messages
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── (!) empty 0.2 TON -> fm_bounce_echo B                                       gas=271
 ```
@@ -89,7 +89,7 @@ N/A -> sender A
 
 ### Compute skipped
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── FmBouncePing 0.2 TON -> EQAAAA..ALrXfh B                          compute phase skipped aborted
 ```
@@ -98,7 +98,7 @@ N/A -> sender A
 
 ### External input and output
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> external
 └── ext-in FmExternalTrigger -> fm_external_root A                              gas=2757
     ├── ext-out FmExternalNoneDest -> none
@@ -113,7 +113,7 @@ N/A -> external
 
 Transactions can print extra lines under the main row:
 
-```acton-trace noCopy
+```acton-trace noCopy title="terminal"
 N/A -> sender A
 └── empty 0.2 TON -> fm_action_fail B                         gas=2347 aborted action_result_code=37
     ├── account created
@@ -121,8 +121,8 @@ N/A -> sender A
     ├── Description: Not enough Toncoin
     ├── Re-run with --backtrace full to get actions location
     └── Executed actions:
-        ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL                             balance: 0.0990612 TON
-        └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3...                          balance: 0 TON
+        ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL             balance: 0.0990612 TON
+        └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3...          balance: 0 TON
 ```
 
 Common extra lines:

@@ -47,7 +47,7 @@ command prints guidance and exits without compiling anything.
 
 `acton build` reads contracts from `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Wallet]
 display-name = "Wallet Contract"
 src = "contracts/Wallet.tolk"
@@ -57,7 +57,7 @@ depends = ["Child"]
 
 Optional default output paths can be configured in `[build]`:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "build"
 gen-dir = "gen"
@@ -149,7 +149,9 @@ refresh for the current process.
 5. Override output locations for a single run:
 
    ```bash
-   acton build --out-dir artifacts --gen-dir artifacts/gen --output-abi artifacts/abi --output-fift artifacts/fift
+   acton build --out-dir artifacts --gen-dir artifacts/gen \
+                                   --output-abi artifacts/abi \
+                                   --output-fift artifacts/fift
    ```
 
 6. Print compiled code and hashes after the build:

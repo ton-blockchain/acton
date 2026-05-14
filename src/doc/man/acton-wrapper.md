@@ -127,7 +127,7 @@ If `incomingMessages` is missing, message-sending helpers are not generated. If
 
 Project-wide defaults can be configured in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [wrappers.tolk]
 output-dir = "wrappers"
 generate-test = true

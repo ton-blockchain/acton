@@ -26,7 +26,7 @@ When both methods are used, the precedence order is:
 
 Add a `[test]` section to `Acton.toml` to set default test behavior:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [package]
 name = "my-ton-project"
 version = "0.1.0"
@@ -89,7 +89,7 @@ acton test --coverage --filter "test deploy" --debug --reporter junit
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 filter = ".*wallet.*"              # Only tests whose names have "wallet" within
 exclude = ["**/integration/**"]    # Skip integration directory
@@ -104,7 +104,7 @@ include = ["**/unit/**"]           # Only include unit test files
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 fail-fast = true
 ```
@@ -132,7 +132,7 @@ Supported reporters:
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 # Use multiple reporters
 reporter = ["console", "junit"]
@@ -160,7 +160,7 @@ reporter = ["console", "teamcity"]
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 debug = false
 debug-port = 12345
@@ -183,7 +183,7 @@ acton test --verbose --filter "debug.*"
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test.coverage]
 enabled = true
 format = "lcov"
@@ -206,7 +206,7 @@ See the [fuzz testing](/docs/testing/fuzz-testing) guide for annotation syntax, 
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test.fuzz]
 runs = 512
 max-test-rejects = 4096
@@ -224,7 +224,7 @@ seed = 42
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 fail-on-diff = true
 ```
@@ -242,7 +242,7 @@ acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 # Custom JUnit output directory
 junit-path = "custom-reports"
@@ -258,7 +258,7 @@ junit-merge = true
 
 Examples:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 fork-net = "mainnet"
 ```
@@ -267,7 +267,7 @@ Use `TONCENTER_TESTNET_API_KEY` or `TONCENTER_MAINNET_API_KEY` to supply fork ta
 
 Using a custom network:
 
-```toml
+```acton-toml title="Acton.toml"
 [networks.my-local-node]
 api = { v2 = "http://localhost:8081/api/v2/jsonRPC" }
 

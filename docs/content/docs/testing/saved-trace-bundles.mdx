@@ -19,15 +19,19 @@ acton test --save-test-trace
 
 ## Directory layout
 
-```text noCopy
-build/traces/
-  test-default-trace_trace.json
-  test-custom-trace-names_trace.json
-  contracts/
-    simple.json
-    forwarder.json
-    receiver.json
-```
+<Files>
+  <Folder name="build" defaultOpen>
+    <Folder name="traces" defaultOpen>
+      <File name="test-default-trace_trace.json" />
+      <File name="test-custom-trace-names_trace.json" />
+      <Folder name="contracts" defaultOpen>
+        <File name="simple.json" />
+        <File name="forwarder.json" />
+        <File name="receiver.json" />
+      </Folder>
+    </Folder>
+  </Folder>
+</Files>
 
 - Each executed test normally writes one `<test-name>_trace.json` file.
 - Contract metadata is stored once per output directory under `contracts/<contract-name>.json`, even when multiple tests reuse the same contract.

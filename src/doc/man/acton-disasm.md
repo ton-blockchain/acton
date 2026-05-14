@@ -197,7 +197,8 @@ If `--output` is also provided, the output file contains the same plain
 5. Inspect deployed code together with hashes:
 
    ```bash
-   acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes --net testnet
+   acton disasm --address UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --show-hashes \
+                                                                           --net testnet
    ```
 
 6. Write disassembly to a nested output path:

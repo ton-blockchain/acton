@@ -3,8 +3,6 @@ title: "1. Create an empty project"
 description: "Scaffold a new Acton project from the empty template, explore its structure, and run the first build."
 ---
 
-import { File, Folder, Files } from "fumadocs-ui/components/files";
-
 ## Scaffold the project
 
 ```bash
@@ -13,7 +11,7 @@ acton new poll --template empty
 
 Expected output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton new poll --template empty
 ✓ Created new Acton project
   Project name: poll
@@ -33,28 +31,28 @@ cd poll
 ## Explore the project structure
 
 <Files>
-  <Folder name="contracts" defaultOpen>
-    <File name="Empty.tolk" />
-    <File name="types.tolk" />
+  <Folder name="contracts" description="Tolk source files" defaultOpen>
+    <File name="Empty.tolk" description="Contract entry point" />
+    <File name="types.tolk" description="Storage, messages, and errors" />
   </Folder>
-  <Folder name="scripts" defaultOpen>
-    <File name="deploy.tolk" />
+  <Folder name="scripts" description="Deployment and utility scripts" defaultOpen>
+    <File name="deploy.tolk" description="Deployment script" />
   </Folder>
-  <Folder name="tests" defaultOpen>
-    <File name="contract.test.tolk" />
+  <Folder name="tests" description="Test files" defaultOpen>
+    <File name="contract.test.tolk" description="Contract tests" />
   </Folder>
-  <Folder name="wrappers" defaultOpen>
-    <File name="Empty.gen.tolk" />
+  <Folder name="wrappers" description="Generated Tolk wrappers" defaultOpen>
+    <File name="Empty.gen.tolk" description="Generated contract wrapper" />
   </Folder>
-  <Folder name=".acton">
-    <File name="(standard library — do not edit)" />
+  <Folder name=".acton" description="Acton-managed internal state and libraries">
+    <File name="tolk-stdlib/" description="Bundled standard library — do not edit" />
   </Folder>
-  <File name="Acton.toml" />
+  <File name="Acton.toml" description="Project manifest" />
 </Files>
 
 `Acton.toml` declares which `.tolk` files are contract entry points, where tests live, and any script aliases to run with `acton run`:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [package]
 name = "poll"
 description = "A TON blockchain project"
@@ -150,7 +148,7 @@ The hex literal in `struct (0x2ce05111) ChangeOwner` is the **opcode** — a 32-
 acton build
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build
   Compiling contracts
    Finished in 312.41µs
@@ -171,7 +169,7 @@ Run with `--info` for a size summary:
 acton build --info
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build --info
   Compiling contracts
    Finished in 298.17µs
@@ -187,7 +185,7 @@ $ acton build --info
 acton check
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton check
     Checking Empty
     Checking scripts/deploy.tolk
@@ -198,7 +196,7 @@ $ acton check
 acton fmt --check
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton fmt --check
 All files are properly formatted
 ```

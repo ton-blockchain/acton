@@ -26,7 +26,7 @@ fun add(a: int, b: int): int {
 
 Register it in `Acton.toml`:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [contracts.Math]
 display-name = "Math on-chain library"
 src = "contracts/Math.tolk"
@@ -54,12 +54,12 @@ The CLI walks through:
 
 Upon success, the output includes the **library hash** used to reference the library from other contracts.
 
-```text noCopy
+```text noCopy title="terminal"
 ...
 > Enter amount in TON (at least 0.1124 TON for 1 year):
 > Send 0.1124 TON to publish library? Note that any extra TON will be refunded. Yes
-  ✓ Transaction sent successfully
-  → Library should be available soon at hash: b993c68...
+✓ Transaction sent successfully
+→ Library should be available soon at hash: b993c68...
 ```
 
 ### Advanced options

@@ -55,16 +55,18 @@ More fundamentally: **TON itself shards**. Different contracts run in parallel o
 
 The canonical solution on TON is per-user contracts. Instead of one large map, deploy a tiny `Voter` contract per wallet address. The parent `Poll` counts votes — it never stores who voted. Each `Voter` tracks whether its owner has already voted. This pattern is called **sharding** and appears everywhere on TON — Jetton wallets, NFT items, and more.
 
-```
-        Wallet A                   Wallet B
-           │   Vote(option=0)         │   Vote(option=1)
-           ▼                          ▼
-       ┌──────┐                  ┌──────┐
-       │ Poll │ ─── deploy ────► │Voter │ (one per wallet)
-       │      │                  │ (A)  │ hasVoted: false → true
-       │ opt0 │                  └──────┘
-       │ opt1 │
-       └──────┘
+```mermaid
+flowchart LR
+    walletA["Wallet A"]
+    walletB["Wallet B"]
+    poll["Poll<br/>option0<br/>option1"]
+    voterA["Voter (A)<br/>hasVoted: false → true"]
+    voterB["Voter (B)<br/>hasVoted: false → true"]
+
+    walletA -->|"Vote(option=0)"| poll
+    walletB -->|"Vote(option=1)"| poll
+    poll -->|"deploy/message"| voterA
+    poll -->|"deploy/message"| voterB
 ```
 
 - `Poll` holds two counters only: `option0` and `option1`

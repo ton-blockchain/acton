@@ -96,38 +96,41 @@ acton new acton-project
 
 Directory overview:
 
-```text noCopy
-acton-project/
-├── Acton.toml  # Project manifest — edit directly
-├── .env        # Local secrets — not committed
-├── .acton/     # Acton-managed internal state and Tolk libraries
-├── contracts/  # Tolk source files
-├── wrappers/   # Generated Tolk wrappers (.gen.tolk)
-├── tests/      # Test files (.test.tolk)
-├── scripts/    # Deployment and utility Tolk scripts
-├── build/      # Compiled output (.boc, .fif)
-└── gen/        # Generated dependency helpers (.code.tolk)
-```
+<Files>
+  <Folder name="acton-project" defaultOpen>
+    <File name="Acton.toml" description="Project manifest — edit directly" />
+    <File name=".env" description="Local secrets — not committed" />
+    <Folder name=".acton" description="Acton-managed internal state and Tolk libraries" />
+    <Folder name="contracts" description="Tolk source files" />
+    <Folder name="wrappers" description="Generated Tolk wrappers (.gen.tolk)" />
+    <Folder name="tests" description="Test files (.test.tolk)" />
+    <Folder name="scripts" description="Deployment and utility Tolk scripts" />
+    <Folder name="build" description="Compiled output (.boc, .fif)" />
+    <Folder name="gen" description="Generated dependency helpers (.code.tolk)" />
+  </Folder>
+</Files>
 
 ### dApp project layout
 
 Pass `--app` to `acton new` to add a React + Vite frontend. The dApp layout nests contract files under `contracts/` subdirectories and creates `app/` and `wrappers-ts/`:
 
-```files
-acton-project/
-├── Acton.toml
-├── .env
-├── .acton/
-├── app/             — React + Vite frontend
-├── wrappers-ts/     — Generated TypeScript wrappers
-├── contracts/
-│   ├── src/         — Tolk source files
-│   ├── wrappers/    — Generated Tolk wrappers
-│   ├── tests/       — Test files
-│   └── scripts/     — Deployment and utility Tolk scripts
-├── build/
-└── gen/
-```
+<Files>
+  <Folder name="acton-project" defaultOpen>
+    <File name="Acton.toml" />
+    <File name=".env" />
+    <Folder name=".acton" />
+    <Folder name="app" description="React + Vite frontend" />
+    <Folder name="wrappers-ts" description="Generated TypeScript wrappers" />
+    <Folder name="contracts" defaultOpen>
+      <Folder name="src" description="Tolk source files" />
+      <Folder name="wrappers" description="Generated Tolk wrappers" />
+      <Folder name="tests" description="Test files" />
+      <Folder name="scripts" description="Deployment and utility Tolk scripts" />
+    </Folder>
+    <Folder name="build" />
+    <Folder name="gen" />
+  </Folder>
+</Files>
 
 <Callout type="warn">
     Node.js, `npm`, and `npx` must be available in the `PATH`.
@@ -139,7 +142,7 @@ See the [dApps development guide](/docs/dapps) for more information on features 
 
 Acton uses `[import-mappings]` to control the project structure and provide path aliases:
 
-```toml
+```acton-toml title="Acton.toml"
 [import-mappings]
 acton = ".acton"
 contracts = "contracts"
@@ -199,7 +202,7 @@ The Tolk wrappers and the `wrappers/` folder are created by the [`acton wrapper`
 
 Edit the `[package]` section to update the project name, description, version, repository, and license:
 
-```toml
+```acton-toml title="Acton.toml"
 [package]
 name = "my-acton-project"
 description = "A TON blockchain project"
@@ -234,7 +237,7 @@ Set `ACTON_USE_PROXY=1` to route Acton's HTTP requests through `HTTP_PROXY`, `HT
 
 Use the `[build]` section to redirect the default output directories:
 
-```toml
+```acton-toml title="Acton.toml"
 [build]
 out-dir = "artifacts" # defaults to build/
 gen-dir = "artifacts/gen" # defaults to gen/
@@ -249,7 +252,7 @@ Note that `gen` in [`[import-mappings]`](#import-mappings) and `gen-dir` in `[bu
 
 Use the `[wrappers]` section to fix the output location for generated wrappers and avoid repeating `--output-dir` on every `acton wrapper` run:
 
-```toml
+```acton-toml title="Acton.toml"
 [wrappers.tolk]
 output-dir = "wrappers"
 generate-test = true
@@ -267,10 +270,10 @@ See the [`acton wrapper` command reference](/docs/commands/wrapper) for more.
 
 Use the `[scripts]` section to store repeated commands in the manifest:
 
-```toml
+```acton-toml title="Acton.toml"
 [scripts]
 deploy = "acton script scripts/deploy.tolk"
-check = "acton test --filter=.*_check"
+check = "acton test --filter='.*_check'"
 ```
 
 Run a named script with [`acton run`](/docs/commands/run):
@@ -294,7 +297,7 @@ To add a contract to an existing project:
 1. Create the `.tolk` source file with a top-level `onInternalMessage()` function.
 2. Register it under `[contracts]` section in `Acton.toml`:
 
-   ```toml
+   ```acton-toml title="Acton.toml"
    [contracts.Counter]
    src = "contracts/Counter.tolk"
    depends = []
@@ -306,7 +309,7 @@ The contract ID must be a valid TOML bare key (`A-Za-z0-9_-`): only ASCII letter
 
 Use short names in `PascalCase`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.DnsCollection]
 src = "dns/contracts/DnsCollection.tolk"
 depends = []
@@ -318,7 +321,7 @@ Keep the contract ID stable once scripts, tests, CI pipelines, or other contract
 
 To display a different name for the contract, set the optional `display-name` key:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.DnsCollection]
 src = "dns/contracts/DnsCollection.tolk"
 depends = []
@@ -331,7 +334,7 @@ The `display-name` does not affect command-line usage, only the presentation. Fo
 
 Set `depends` when a parent contract depends on the compiled code of other contracts, such that it can deploy them as its children:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.NftCollection]
 src = "contracts/NftCollection.tolk"
 depends = ["NftItem"]
@@ -405,7 +408,7 @@ To supply the code in deployments and store it in the contract's data storage in
 
 By default, `depends` uses the `embed_code` kind. Use the detailed form to customize the generated function name or generate it as a [library reference](/docs/libraries) instead:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Parent]
 src = "contracts/Parent.tolk"
 depends = [
@@ -417,7 +420,7 @@ depends = [
 
 Set `output` to place a compiled binary `.boc` file with the contract's code at an exact path:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Counter]
 src = "contracts/Wallet.tolk"
 output = "artifacts/Counter.boc"
@@ -430,7 +433,7 @@ Per-contract `output` is independent of `[build].out-dir`. Both can coexist.
 
 When a contract source file moves, update `src` in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [contracts.Counter]
 src = "contracts/src/counter.tolk"
 ```

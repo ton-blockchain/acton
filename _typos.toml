@@ -26,5 +26,6 @@ extend-ignore-re = [
   "\\bTrUe\\b",
   "\\balse\\b",
   "\\b(?:test-)?ba-stdlib-[A-Za-z0-9-]+\\b",
-  "[dD]arcula"
+  "[dD]arcula",
+  "Ba"
 ]

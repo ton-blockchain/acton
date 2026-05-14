@@ -40,6 +40,9 @@
       "include": "#keyValue"
     },
     {
+      "include": "#envAssignments"
+    },
+    {
       "include": "#diagnostics"
     },
     {
@@ -350,6 +353,28 @@
     "statusLines": {
       "patterns": [
         {
+          "match": "^(\\s*)(View at:)(\\s+)(https?://\\S+)$",
+          "captures": {
+            "2": {
+              "name": "entity.name.function.acton-cli"
+            },
+            "4": {
+              "name": "markup.underline.link.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "^(\\s*)(Tx:)(\\s+)(https?://\\S+)$",
+          "captures": {
+            "2": {
+              "name": "support.type.acton-cli"
+            },
+            "4": {
+              "name": "markup.underline.link.acton-cli"
+            }
+          }
+        },
+        {
           "match": "^(\\s*)(\\u2713)(\\s+)(.+)$",
           "captures": {
             "2": {
@@ -440,6 +465,25 @@
         }
       ]
     },
+    "envAssignments": {
+      "patterns": [
+        {
+          "match": "\\b([A-Z][A-Z0-9_]*)(=)([^\\\\\\s]+)",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-cli"
+            },
+            "3": {
+              "name": "string.unquoted.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "\\\\$",
+          "name": "support.type.acton-cli"
+        }
+      ]
+    },
     "diagnostics": {
       "patterns": [
         {
@@ -505,11 +549,19 @@
         },
         {
           "match": "--[A-Za-z0-9-]+\\b",
-          "name": "keyword.control.acton-cli"
+          "name": "constant.numeric.acton-cli"
         },
         {
-          "match": "\\b(?:new|test|build|script|run|wallet|compile|check|verify|wrapper|doc|fmt|doctor|library|retrace|localnet|init)\\b",
-          "name": "keyword.control.acton-cli"
+          "match": "(?<![A-Za-z0-9])-([A-Za-z])(?![A-Za-z0-9-])",
+          "captures": {
+            "1": {
+              "name": "constant.numeric.acton-cli"
+            }
+          }
+        },
+        {
+          "match": "\\b(?:new|test|build|script|run|wallet|compile|check|verify|wrapper|doc|fmt|doctor|library|retrace|localnet|init)\\b(?!\\.)",
+          "name": "string.unquoted.acton-cli"
         },
         {
           "match": "\\b(?:Acton\\.toml|LICENSE|\\.gitignore|\\.env|\\.editorconfig|\\.acton(?:/[^\\s]*)?)\\b",

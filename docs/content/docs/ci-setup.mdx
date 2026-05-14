@@ -113,10 +113,10 @@ Acton offers a GitHub action to set itself up. [`setup-acton`](https://github.co
   id: setup-acton
   with:
     # (optional) Acton version to install.
-    # Supported values include 'latest', a release tag such as 'v1.0.0',
-    # or a bare semantic version such as '1.0.0'.
+    # Supported values include 'latest', a release tag such as 'v{{ acton_version }}',
+    # or a bare semantic version such as '{{ acton_version }}'.
     # Defaults to 'latest'.
-    version: '1.0.0'
+    version: '{{ acton_version }}'
 
     # (optional) Target architecture.
     # Supported values: x86_64, aarch64.
@@ -185,7 +185,7 @@ jobs:
 - The `acton check --output-format github` command emits workflow annotations directly in the GitHub Actions log and pull request checks.
 - The `acton check` command exits with a non-zero status when it reports at least one error, or when warning count exceeds `max-warnings`. To fail CI on any warning, set:
 
-  ```toml title="Acton.toml"
+  ```acton-toml title="Acton.toml"
   [lint]
   max-warnings = 0
   ```
@@ -229,7 +229,7 @@ jobs:
 
 To fail the job when coverage drops below a threshold, add `--coverage-minimum-percent <PERCENT>` to the test command, where `<PERCENT>` is a number from `0` to `100`. Alternatively, set the default value in the manifest:
 
-```toml title="Acton.toml"
+```acton-toml title="Acton.toml"
 [test.coverage]
 minimum-percent = 50
 ```
@@ -295,7 +295,7 @@ jobs:
 
 ## Set up GitLab CI
 
-For GitLab, run Acton from the published Docker image. Replace `<ACTON_VERSION>` with the version used in the project, for example `1.0.0` or `latest`.
+For GitLab, run Acton from the published Docker image. Replace `<ACTON_VERSION>` with the version used in the project, for example `{{ acton_version }}` or `latest`.
 
 ```yaml title=".gitlab-ci.yml"
 image: ghcr.io/ton-blockchain/acton:<ACTON_VERSION>

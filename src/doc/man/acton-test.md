@@ -424,7 +424,7 @@ summary so the failing test remains visible near the progress output.
 
 Defaults can be configured in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [test]
 reporter = ["console"]
 filter = ".*jetton.*"
@@ -515,7 +515,8 @@ CLI flags override config values for the current invocation.
 4. Generate coverage and JUnit output:
 
    ```bash
-   acton test --coverage --coverage-format lcov --reporter junit --junit-path test-results
+   acton test --coverage --coverage-format lcov --reporter junit \
+                                                --junit-path test-results
    ```
 
 5. Fail the run when line coverage drops below 85%:
@@ -545,7 +546,8 @@ CLI flags override config values for the current invocation.
 9. Run mutation testing for selected levels on the current branch:
 
    ```bash
-   acton test --mutate --mutate-contract Wallet --mutation-diff branch --mutation-levels critical,major
+   acton test --mutate --mutate-contract Wallet --mutation-diff branch \
+                                                --mutation-levels critical,major
    ```
 
 10. Re-run one specific mutant from a previous report:
@@ -557,7 +559,8 @@ CLI flags override config values for the current invocation.
 11. Resume an unfinished mutation session:
 
    ```bash
-   acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 --mutation-diff worktree
+   acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 \
+                                                --mutation-diff worktree
    ```
 
 12. Fail the run when mutation score drops below 85%:
@@ -575,13 +578,16 @@ CLI flags override config values for the current invocation.
 14. Debug a forked-state failure with traces and the UI:
 
    ```bash
-   acton test tests/wallet.test.tolk --fork-net testnet --fork-block-number 55000000 --save-test-trace --ui
+   acton test tests/wallet.test.tolk --fork-net testnet \
+                                     --fork-block-number 55000000 \
+                                     --save-test-trace --ui
    ```
 
 15. Enforce a gas baseline in CI:
 
    ```bash
-   acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff --reporter console,junit
+   acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff \
+                                                          --reporter console,junit
    ```
 
 ## See Also

@@ -1,0 +1,114 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "acton-gas-report",
+  "scopeName": "source.acton-gas-report",
+  "patterns": [
+    {
+      "include": "#sectionHeaders"
+    },
+    {
+      "include": "#baseline"
+    },
+    {
+      "include": "#table"
+    },
+    {
+      "include": "#diffs"
+    },
+    {
+      "include": "#amounts"
+    }
+  ],
+  "repository": {
+    "sectionHeaders": {
+      "patterns": [
+        {
+          "match": "^( GAS USAGE(?: COMPARISON)?| CHAIN GAS & FEES SUMMARY(?: COMPARISON)?| CHAIN GAS & FEES · .+)$",
+          "captures": {
+            "1": {
+              "name": "entity.name.function.acton-gas-report"
+            }
+          }
+        }
+      ]
+    },
+    "baseline": {
+      "patterns": [
+        {
+          "match": "^(Baseline:)(\\s+)([^\\s]+)(\\s+)(\\(.+\\))$",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-gas-report"
+            },
+            "3": {
+              "name": "string.unquoted.acton-gas-report"
+            },
+            "5": {
+              "name": "comment.line.acton-gas-report"
+            }
+          }
+        }
+      ]
+    },
+    "table": {
+      "patterns": [
+        {
+          "match": "^[\\u2500]+$",
+          "name": "comment.line.acton-gas-report"
+        },
+        {
+          "match": "^( Opcode\\s+Baseline\\s+Current\\s+Diff\\s+% Change| Opcode\\s+Min Gas\\s+Max Gas\\s+Avg Gas| Trace\\s+Tx Count\\s+Gas Used\\s+Gas Fee\\s+Fwd Fee\\s+Total Fee| Test\\s+Traces\\s+Tx\\s+Gas Used\\s+Gas Fee\\s+Forward Fee\\s+Total Fee| Test\\s+Traces\\s+Tx\\s+Gas Used\\s+Gas Fee\\s+Total Fee)$",
+          "captures": {
+            "1": {
+              "name": "comment.line.acton-gas-report"
+            }
+          }
+        }
+      ]
+    },
+    "diffs": {
+      "patterns": [
+        {
+          "match": "-\\d+(?:\\.\\d+)?%",
+          "name": "markup.inserted.acton-gas-report"
+        },
+        {
+          "match": "\\+\\d+(?:\\.\\d+)?%",
+          "name": "markup.deleted.acton-gas-report"
+        },
+        {
+          "match": "-\\d+(?:\\.\\d+)?\\s+TON",
+          "name": "markup.inserted.acton-gas-report"
+        },
+        {
+          "match": "\\+\\d+(?:\\.\\d+)?\\s+TON",
+          "name": "markup.deleted.acton-gas-report"
+        },
+        {
+          "match": "-\\d+(?:\\.\\d+)?",
+          "name": "markup.inserted.acton-gas-report"
+        },
+        {
+          "match": "\\+\\d+(?:\\.\\d+)?",
+          "name": "markup.deleted.acton-gas-report"
+        }
+      ]
+    },
+    "amounts": {
+      "patterns": [
+        {
+          "match": "\\b\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "name": "constant.numeric.acton-gas-report"
+        },
+        {
+          "match": "\\b\\d+(?:\\.\\d+)?%\\b",
+          "name": "constant.numeric.acton-gas-report"
+        },
+        {
+          "match": "\\b0x[0-9A-Fa-f]+\\b",
+          "name": "comment.line.acton-gas-report"
+        }
+      ]
+    }
+  }
+}

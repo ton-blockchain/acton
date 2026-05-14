@@ -701,10 +701,10 @@ pub(super) fn print_coverage_summary(coverage: &Coverage) {
         .set_content_arrangement(ContentArrangement::Dynamic)
         .set_header(vec![
             "File",
-            "Covered Lines",
+            "Covered",
             "Total Lines",
             "% Lines",
-            "Covered Branches",
+            "Covered",
             "Total Branches",
             "% Branches",
             "Score",

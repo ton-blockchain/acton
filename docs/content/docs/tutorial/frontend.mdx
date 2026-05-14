@@ -14,7 +14,7 @@ description: "Generate a TypeScript wrapper, scaffold a TON dApp with Vite + Rea
 acton init --create-dapp app/
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton init --create-dapp app/
 ✓ Created TypeScript app scaffold
   Directory: app
@@ -38,15 +38,18 @@ The scaffold is a standalone Vite project preconfigured with:
 
 The directory layout matters for the next steps:
 
-```text noCopy
-app/                  # dApp project root (package.json, vite.config.ts)
-├── app/              # Vite source root
-│   └── src/
-│       ├── App.tsx
-│       ├── lib/      # ton.ts, router.ts, utils.ts
-│       └── ...
-└── wrappers-ts/      # placeholder, will be replaced
-```
+<Files>
+  <Folder name="app" description="dApp project root (package.json, vite.config.ts)" defaultOpen>
+    <Folder name="app" description="Vite source root" defaultOpen>
+      <Folder name="src" defaultOpen>
+        <File name="App.tsx" />
+        <Folder name="lib" description="ton.ts, router.ts, utils.ts" />
+        <File name="..." />
+      </Folder>
+    </Folder>
+    <Folder name="wrappers-ts" description="placeholder, will be replaced" />
+  </Folder>
+</Files>
 
 ```bash
 cd app/
@@ -330,7 +333,7 @@ The scaffold defaults to mainnet. For testnet, append `?testnet=true` to the URL
 npm run dev
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
   VITE v6.x.x  ready in 312 ms
   ➜  Local:   http://localhost:5173/
 ```

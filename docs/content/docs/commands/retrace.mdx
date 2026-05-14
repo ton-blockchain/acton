@@ -333,25 +333,31 @@ When `--logs-dir` is set, Acton creates the target directory and writes
 2. Force mainnet and use an API key from the environment:
 
    ```bash
-   TONCENTER_MAINNET_API_KEY=your-key acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --net mainnet
+   TONCENTER_MAINNET_API_KEY=your-key acton retrace \
+   3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --net mainnet
    ```
 
 3. Save logs and show full outgoing cell bodies:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --verbose --logs-dir build/retrace
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
+                                                        --logs-dir build/retrace \
+                                                        --verbose
    ```
 
 4. Prepare a source-level retrace for a project contract:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
+                                                          --contract JettonMinter
    ```
 
 5. Start a local DAP server for editor debugging:
 
    ```bash
-   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 --contract JettonMinter --debug --debug-port 4711
+   acton retrace 3c1b02a33390e596d83b306eab57b3f7271bc90e2e527ea4cafccfde25139d41 \
+                                                          --contract JettonMinter \
+                                                          --debug --debug-port 4711
    ```
 
 ## See Also

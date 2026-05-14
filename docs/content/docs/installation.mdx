@@ -145,23 +145,39 @@ Place the extracted binary to a common directory in `PATH`, e.g., `~/.local/bin`
     </Accordion>
 </Accordions>
 
+## Trunk releases
+
+Acton publishes a `trunk` build for the preview channel. It includes changes before they land in the next stable numbered release.
+
+To switch to the latest `trunk` build:
+
+```bash noCopy title="terminal"
+# Switch to trunk
+acton up --trunk
+
+# Switch back to stable
+acton up --stable
+```
+
+Use `trunk` to try a new feature or verify a fix before it reaches stable. `trunk` builds may include regressions or incomplete work, so if something breaks there, check whether it also reproduces on the latest stable release.
+
 ## Docker image
 
 Acton is also published as a Docker image at `ghcr.io/ton-blockchain/acton`. This is useful for CI pipelines, ephemeral environments, or local workflows where you do not want to install the binary on the host machine.
 
 To verify that the image is available and print the Acton version:
 
-```acton-cli
-docker run --rm ghcr.io/ton-blockchain/acton:<version> --version
+```bash
+docker run --rm ghcr.io/ton-blockchain/acton:{{ acton_version }} --version
 ```
 
 To run Acton against the current project from a container:
 
-```acton-cli
+```bash
 docker run --rm \
   -v "$PWD":/workspace \
   -w /workspace \
-  ghcr.io/ton-blockchain/acton:<version> \
+  ghcr.io/ton-blockchain/acton:{{ acton_version }} \
   build
 ```
 
@@ -197,14 +213,6 @@ To install a specific version:
 
 ```acton-cli
 acton up <VERSION_NUMBER>
-```
-
-### Switch to trunk
-
-To install the trunk build (changes land here before stable releases):
-
-```bash
-acton up --trunk
 ```
 
 ## Uninstall

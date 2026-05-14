@@ -44,7 +44,7 @@ Arguments appended to the configured script command.
 
 Scripts are defined in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [scripts]
 deploy = "acton script scripts/deploy.tolk --net testnet"
 test-unit = "acton test tests/unit"

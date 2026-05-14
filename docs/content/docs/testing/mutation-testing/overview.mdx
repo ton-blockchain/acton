@@ -107,13 +107,15 @@ acton test --mutate --mutate-contract Wallet --mutation-levels critical,major
 Use `--mutation-disable-rules` to exclude noisy or intentionally ignored rules:
 
 ```bash
-acton test --mutate --mutate-contract Wallet --mutation-disable-rules replace_plus_with_minus --mutation-disable-rules replace_minus_with_plus
+acton test --mutate --mutate-contract Wallet --mutation-disable-rules replace_plus_with_minus \
+                                             --mutation-disable-rules replace_minus_with_plus
 ```
 
 All mutation filters compose. For example, this command runs only `critical` mutations on lines changed in the current worktree and skips one specific rule:
 
 ```bash
-acton test --mutate --mutate-contract Wallet --mutation-diff worktree --mutation-levels critical --mutation-disable-rules remove_logical_not
+acton test --mutate --mutate-contract Wallet --mutation-diff worktree --mutation-levels critical \
+                                             --mutation-disable-rules remove_logical_not
 ```
 
 The reported mutation score always reflects only the mutants that remain after all filters are applied.
@@ -167,7 +169,8 @@ Use `--mutation-session-id` to keep that ID stable and append to the same log on
 
 ```bash
 # Start or resume a session for the current worktree changes
-acton test --mutate --mutate-contract Wallet --mutation-diff worktree --mutation-session-id wallet-worktree
+acton test --mutate --mutate-contract Wallet --mutation-diff worktree \
+                                             --mutation-session-id wallet-worktree
 ```
 
 To resume successfully, keep the same contract and the same mutation filters. Acton validates the stored session metadata before reusing the file.
@@ -206,7 +209,7 @@ Compile errors are reported separately and excluded from that score.
 
 You can store the same filters in `Acton.toml`:
 
-```toml
+```acton-toml title="Acton.toml"
 [test.mutation]
 diff = "branch"
 diff-ref = "origin/main"
@@ -239,7 +242,7 @@ Acton includes many built-in [mutation rules](/docs/testing/mutation-testing/rul
 
 After a mutation run, the console shows a summary of the results:
 
-```text noCopy
+```acton-cli-mutate noCopy title="terminal"
 Mutation Testing
 ────────────────────────────────────────────────────────────
 Session:  4949ed3b0ae13461
@@ -267,7 +270,7 @@ Mutants:  51
 
 For survived mutants, Acton prints a diff of the edit plus a short rationale tied to the rule:
 
-```text noCopy
+```acton-cli-mutate noCopy title="terminal"
   ✗ Mutation #2
   Rule:  Remove assert statements [remove_assert]
   Level: critical
@@ -281,5 +284,6 @@ For survived mutants, Acton prints a diff of the edit plus a short rationale tie
     49 │
     50 │             var respondOwnerAddress: Cell<address>? = msg.includeOwnerAddress
 
-  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities if the condition is not enforced.
+  Why it's bad: This assertion is not covered by tests. This could lead to security vulnerabilities
+  if the condition is not enforced.
 ```
