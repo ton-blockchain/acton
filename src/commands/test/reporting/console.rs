@@ -444,15 +444,8 @@ fn process_assert_failure(
         let mut matcher_backtrace = assertion_backtrace_lines(test, result);
         matcher_backtrace.retain(|line| !line.contains("ExternalSendResult.__failExternalSend"));
         let contract_backtrace = external_send_contract_backtrace_lines(fmt, test, failure);
-        if let Some(exit_code) = failure.vm_exit_code {
-            let description = fmt
-                .format_compute_phase_failure_description(failure.destination.as_ref(), exit_code);
-            let compute_failure = description.unwrap_or_else(|| format!("exit code {exit_code}"));
-            details.push(format!(
-                "{} {}",
-                "Compute phase failed:",
-                compute_failure.yellow()
-            ));
+        if let Some((label, description)) = fmt.format_external_not_accepted_vm_result(failure) {
+            details.push(format!("{} {}", label, description.yellow()));
             if test.backtrace.is_none() {
                 details.push(format!(
                     "Re-run with {} to get more information",
