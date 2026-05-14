@@ -504,6 +504,20 @@ fn fail_external_send_not_accepted_impl(
     message: String,
     location: String,
 ) -> anyhow::Result<()> {
+    let diagnostic_id = tuple_optional_int(&error, 3).and_then(|value| value.to_u64());
+    let missing_libraries = diagnostic_id
+        .and_then(|id| ctx.chain.emulations.find_failed_message(id))
+        .map(|message| {
+            let mut libraries = message
+                .missing_libraries
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>();
+            libraries.sort_unstable();
+            libraries
+        })
+        .unwrap_or_default();
+
     *ctx.asserts.assert_failure = Some(AssertFailure::ExternalSendNotAccepted(
         ExternalSendNotAcceptedFailure {
             message,
@@ -511,9 +525,9 @@ fn fail_external_send_not_accepted_impl(
                 .unwrap_or_else(|| "External message not accepted by smart contract".to_owned()),
             external_not_accepted: tuple_bool(&error, 1).unwrap_or(false),
             vm_exit_code: tuple_optional_int(&error, 2).and_then(|value| value.to_i32()),
-            diagnostic_id: tuple_optional_int(&error, 5).and_then(|value| value.to_u64()),
-            missing_libraries: tuple_string_vec(&error, 4).unwrap_or_default(),
-            destination: tuple_optional_std_addr(&error, 6),
+            diagnostic_id,
+            missing_libraries,
+            destination: tuple_optional_std_addr(&error, 4),
             location: SourceLocation::parse(&location)?,
         },
     ));
@@ -536,10 +550,6 @@ fn tuple_optional_int(tuple: &Tuple, index: usize) -> Option<BigInt> {
     Option::<BigInt>::from_item(tuple_item(tuple, index))
         .ok()
         .flatten()
-}
-
-fn tuple_string_vec(tuple: &Tuple, index: usize) -> Option<Vec<String>> {
-    Vec::<String>::from_item(tuple_item(tuple, index)).ok()
 }
 
 fn tuple_optional_std_addr(tuple: &Tuple, index: usize) -> Option<StdAddr> {

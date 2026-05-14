@@ -190,11 +190,7 @@ struct ExternalSendError {
     externalNotAccepted: bool
     /// VM exit code reported by the emulator, if available.
     vmExitCode: int?
-    /// Emulator elapsed time in nanoseconds, if available.
-    elapsedTimeNs: int?
-    /// Hashes of libraries that were requested but not found during emulation.
-    missingLibraries: array<string>
-    /// Opaque diagnostic id.
+    /// Opaque diagnostic id used by Acton to retrieve full emulator metadata.
     diagnosticId: int?
 }
 
@@ -203,11 +199,11 @@ struct ExternalSendError {
 /// If the external-in message is accepted, `transactions` contains the produced
 /// trace. If it is rejected before acceptance or cannot be emulated,
 /// `transactions` is `null` and `error` contains emulator metadata such as VM
-/// exit code, elapsed time, missing libraries, and an opaque diagnostic id.
+/// exit code and an opaque diagnostic id.
 ///
 /// In tests, prefer `expect(result).toBeAccepted()`,
 /// `expect(result).toBeNotAccepted()`, and
-/// `expect(result).toEndWithExitCode(...)` for diagnostics.
+/// `expect(result).toHaveExternalVmExitCode(...)` for diagnostics.
 /// Use [ExternalSendResult.unwrap] when a trace is required, or
 /// [ExternalSendResult.isAccepted] when the test needs to branch on the result.
 struct ExternalSendResult {
@@ -254,8 +250,6 @@ fun ExternalSendError.__toFFITuple(self, destination: address?): tuple {
         self.message,
         self.externalNotAccepted,
         self.vmExitCode,
-        self.elapsedTimeNs,
-        self.missingLibraries,
         self.diagnosticId,
         destination,
     ];
@@ -1144,7 +1138,7 @@ fun Expectation<ExternalSendResult>.toBeNotAccepted(self): void {
 ///
 /// This matcher is intended for rejected external-in messages. For accepted
 /// external messages, use transaction matchers on the produced [SendResultList].
-fun Expectation<ExternalSendResult>.toEndWithExitCode(self, exitCode: int): void {
+fun Expectation<ExternalSendResult>.toHaveExternalVmExitCode(self, exitCode: int): void {
     if (
         self.value.error != null && self.value.error.vmExitCode != null &&
         self.value.error.vmExitCode == exitCode
@@ -1154,7 +1148,7 @@ fun Expectation<ExternalSendResult>.toEndWithExitCode(self, exitCode: int): void
     if (self.value.error != null) {
         self.fail(
             format(
-                "expect(<actual>).toEndWithExitCode(<expected>): expected {}, got {}",
+                "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, got {}",
                 exitCode,
                 self.value.error.vmExitCode,
             ),
@@ -1162,7 +1156,7 @@ fun Expectation<ExternalSendResult>.toEndWithExitCode(self, exitCode: int): void
     }
     self.fail(
         format(
-            "expect(<actual>).toEndWithExitCode(<expected>): expected {}, but external message was accepted",
+            "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, but external message was accepted",
             exitCode,
         ),
     );

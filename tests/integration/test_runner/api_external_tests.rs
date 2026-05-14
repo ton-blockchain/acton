@@ -76,6 +76,7 @@ import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
+import "@stdlib/exotic-cells"
 
 struct (0x70000001) TriggerExternal {
     id: uint32
@@ -447,7 +448,6 @@ get fun `test send external low balance rejected`() {
     expect(result.error).toBeNotNull();
     expect(result.error!.externalNotAccepted).toBeTrue();
     expect(result.error!.message).toNotEqual("");
-    expect(result.error!.missingLibraries).toHaveLength(0);
 }
 "#,
         "send external low balance rejected",
@@ -509,7 +509,7 @@ get fun `test external send result helpers cover rejected trace`() {
     );
 
     expect(result).toBeNotAccepted();
-    expect(result).toEndWithExitCode(10);
+    expect(result).toHaveExternalVmExitCode(10);
     expect(result.isAccepted()).toBeFalse();
     expect(result.transactions).toBeNull();
     expect(result.error).toBeNotNull();
@@ -640,14 +640,14 @@ get fun `test toBeNotAccepted reports accepted external result`() {
 fn to_have_external_vm_exit_code_reports_mismatch() {
     let source = with_prelude(
         r"
-get fun `test toEndWithExitCode reports mismatch`() {
+get fun `test toHaveExternalVmExitCode reports mismatch`() {
     val (harness, _) = deployHarness();
 
     val result = net.sendExternal(
         net.createExternalMessage(harness.address, createEmptyCell()),
     );
 
-    expect(result).toEndWithExitCode(11);
+    expect(result).toHaveExternalVmExitCode(11);
 }
 ",
     );
@@ -671,14 +671,14 @@ fn to_have_external_vm_exit_code_reports_accepted_external_result() {
     run_failure_snapshot_case(
         "o-lib-api-send-external-vm-exit-code-accepted",
         r"
-get fun `test toEndWithExitCode reports accepted external result`() {
+get fun `test toHaveExternalVmExitCode reports accepted external result`() {
     val (harness, _) = deployHarness();
 
     val result = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 13 }),
     );
 
-    expect(result).toEndWithExitCode(10);
+    expect(result).toHaveExternalVmExitCode(10);
 }
 ",
         "integration/snapshots/test-runner/api_external/to_have_external_vm_exit_code_reports_accepted_external_result.stdout.txt",
@@ -752,7 +752,6 @@ fn to_be_accepted_reports_external_error_without_vm_exit_code() {
         r#"
 get fun `test toBeAccepted reports external error without vm exit code`() {
     val (harness, _) = deployHarness();
-    val missingLibraries: array<string> = [];
     val result = ExternalSendResult {
         transactions: null,
         destination: harness.address,
@@ -760,8 +759,6 @@ get fun `test toBeAccepted reports external error without vm exit code`() {
             message: "custom external failure without vm code",
             externalNotAccepted: true,
             vmExitCode: null,
-            elapsedTimeNs: null,
-            missingLibraries,
             diagnosticId: null,
         },
     };
@@ -792,7 +789,6 @@ fn to_be_accepted_reports_external_send_failure_status() {
         r#"
 get fun `test toBeAccepted reports external send failure status`() {
     val (harness, _) = deployHarness();
-    val missingLibraries: array<string> = [];
     val result = ExternalSendResult {
         transactions: null,
         destination: harness.address,
@@ -800,8 +796,6 @@ get fun `test toBeAccepted reports external send failure status`() {
             message: "external send failed before contract acceptance",
             externalNotAccepted: false,
             vmExitCode: null,
-            elapsedTimeNs: null,
-            missingLibraries,
             diagnosticId: null,
         },
     };
@@ -828,23 +822,44 @@ get fun `test toBeAccepted reports external send failure status`() {
 
 #[test]
 fn to_be_accepted_reports_external_missing_libraries() {
+    // `library_ref` dependencies are auto-registered by the test runner, so this
+    // patches a real deployed contract into an unresolved library reference.
     let source = with_prelude(
         r#"
 get fun `test toBeAccepted reports external missing libraries`() {
     val (harness, _) = deployHarness();
-    val missingLibraries: array<string> = ["lib-alpha", "lib-beta"];
-    val result = ExternalSendResult {
-        transactions: null,
-        destination: harness.address,
-        error: ExternalSendError {
-            message: "external failed because libraries are unavailable",
-            externalNotAccepted: true,
-            vmExitCode: 41,
-            elapsedTimeNs: null,
-            missingLibraries,
-            diagnosticId: null,
-        },
-    };
+    val shard = testing.getShardAccount(harness.address);
+    expect(shard).toBeNotNull();
+
+    val account = shard!.account.load();
+    expect(account is TlbAccountInfo).toBeTrue();
+    if (account is TlbAccountInfo && account.storage.state is TlbAccountStateActive) {
+        val stateInit = account.storage.state.stateInit;
+        val patchedAccount = TlbAccountInfo {
+            addr: account.addr,
+            storageStat: account.storageStat,
+            storage: {
+                lastTransLt: account.storage.lastTransLt,
+                balance: account.storage.balance,
+                state: TlbAccountStateActive {
+                    stateInit: StateInit {
+                        fixedPrefixLength: stateInit.fixedPrefixLength,
+                        special: stateInit.special,
+                        code: build("external").toLibraryReference(),
+                        data: stateInit.data,
+                        library: stateInit.library,
+                    },
+                },
+            },
+        };
+        var patchedShard = shard!;
+        patchedShard.account = (patchedAccount as TlbAccount).toCell();
+        testing.setShardAccount(harness.address, patchedShard);
+    }
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 1 }),
+    );
 
     expect(result).toBeAccepted();
 }

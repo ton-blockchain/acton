@@ -11,10 +11,10 @@
   ✗ toBeAccepted reports external missing libraries [TIME]
     └─ Error: expect(actual).toBeAccepted()
         ├─ Status: external message was not accepted
-        ├─ Reason: external failed because libraries are unavailable
-        ├─ Compute phase failed: [EXIT_STATUS] 41
+        ├─ Reason: External message not accepted by smart contract
+        ├─ Compute phase failed: Cell underflow
         ├─ Re-run with --backtrace full to get more information
-        ├─ Missing libraries: lib-alpha, lib-beta
+        ├─ Missing libraries: 9FC935981A3422BE192C7179DEA59E0534C34563683FF3DF959415742D48DAC3
         └─ at tests/external_api.test[LINE]
 
  ✗ 1 failed in 1 file

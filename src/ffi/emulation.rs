@@ -463,13 +463,18 @@ fn send_external_message_impl(
         .chain
         .emulations
         .save_message(&ctx.env.running_id, emulations);
-    let error = ctx
+    let first_failed_message = ctx
         .chain
         .emulations
         .results_of(&ctx.env.running_id)
         .and_then(|emulations| emulations.failed_messages.get(trace_index))
         .and_then(|failed_messages| failed_messages.first());
-    let transactions = if transaction_cells.is_empty() && error.is_some() {
+    let error = if transaction_cells.is_empty() {
+        first_failed_message
+    } else {
+        None
+    };
+    let transactions = if error.is_some() {
         TupleItem::Null
     } else {
         TupleItem::big_array_from_items(transaction_cells)
@@ -518,21 +523,10 @@ fn external_send_result_tuple(
 }
 
 fn external_send_error_tuple(error: &FailedSendMessageResult) -> TupleItem {
-    let mut libraries = error.missing_libraries.iter().collect::<Vec<_>>();
-    libraries.sort();
-    let missing_libraries = Tuple(
-        libraries
-            .into_iter()
-            .map(|library| string_tuple_item(library))
-            .collect(),
-    );
-
     TupleItem::Tuple(Tuple(vec![
         string_tuple_item(&error.error),
         bool_tuple_item(error.external_not_accepted),
         optional_int_tuple_item(error.vm_exit_code),
-        optional_elapsed_time_ns(error.elapsed_time),
-        TupleItem::Tuple(missing_libraries),
         u64_tuple_item(error.diagnostic_id),
     ]))
 }
@@ -555,17 +549,6 @@ fn u64_tuple_item(value: u64) -> TupleItem {
 
 fn optional_int_tuple_item(value: Option<i64>) -> TupleItem {
     value.map_or(TupleItem::Null, |value| TupleItem::Int(BigInt::from(value)))
-}
-
-fn optional_elapsed_time_ns(value: Option<f64>) -> TupleItem {
-    let Some(value) = value else {
-        return TupleItem::Null;
-    };
-    if !value.is_finite() || value < 0.0 {
-        return TupleItem::Null;
-    }
-
-    TupleItem::Int(BigInt::from((value * 1_000_000_000.0).round() as i64))
 }
 
 extension!(run_tick_tock in (Context) with (is_tock: BigInt, on_account: StdAddr) using run_tick_tock_impl);

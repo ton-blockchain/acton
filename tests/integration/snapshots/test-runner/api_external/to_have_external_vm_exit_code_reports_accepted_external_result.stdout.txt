@@ -8,8 +8,8 @@
  TEST  [ROOT]
 
  > tests/external_api.test.tolk (1 test)
-  ✗ toEndWithExitCode reports accepted external result [TIME]
-    └─ Error: expect(actual).toEndWithExitCode(expected): expected 10, but external message was accepted
+  ✗ toHaveExternalVmExitCode reports accepted external result [TIME]
+    └─ Error: expect(actual).toHaveExternalVmExitCode(expected): expected 10, but external message was accepted
       └─ at tests/external_api.test[LINE]
 
  ✗ 1 failed in 1 file
