@@ -13,7 +13,7 @@
   display: none;
 }
 
-[data-rmiz-content='found'] img {
+[data-rmiz-content="found"] img {
   cursor: zoom-in;
 }
 
@@ -43,11 +43,11 @@
   inset: 0;
 }
 
-[data-rmiz-modal-overlay='visible'] {
+[data-rmiz-modal-overlay="visible"] {
   background-color: var(--color-fd-background);
 }
 
-[data-rmiz-modal-overlay='hidden'] {
+[data-rmiz-modal-overlay="hidden"] {
   background-color: transparent;
 }
 

@@ -59,7 +59,7 @@ export function Mermaid({chart}: MermaidProps) {
       startOnLoad: false,
       securityLevel: "loose",
       theme: "base",
-      fontFamily: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif',
+      fontFamily: "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
       themeVariables: {
         darkMode: themeMode === "dark",
         background,
