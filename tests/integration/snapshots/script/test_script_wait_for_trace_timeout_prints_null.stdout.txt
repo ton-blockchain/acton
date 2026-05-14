@@ -1,4 +1,4 @@
   Installing standard library [ACTON_VERSION]
 Awaiting trace... [Attempt 1/1]
 Trace was not found after 1 attempt(s); the transaction may not be indexed yet.
-[]
+null

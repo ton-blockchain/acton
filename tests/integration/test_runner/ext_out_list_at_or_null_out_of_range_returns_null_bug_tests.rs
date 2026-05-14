@@ -108,7 +108,7 @@ get fun `test ct ext out list atornull out of range`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(externalAddress, CtTriggerExternal { queryId: 2 }),
-    )!;
+    ).unwrap();
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
@@ -132,7 +132,7 @@ get fun `test ct ext out list atornull negative index`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(externalAddress, CtTriggerExternal { queryId: 3 }),
-    )!;
+    ).unwrap();
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
@@ -156,7 +156,7 @@ get fun `test ct ext out list atornull opcode mismatch`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(externalAddress, CtTriggerExternal { queryId: 4 }),
-    )!;
+    ).unwrap();
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;
@@ -180,7 +180,7 @@ get fun `test ct ext out list atornull valid index`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(externalAddress, CtTriggerExternal { queryId: 5 }),
-    )!;
+    ).unwrap();
     expect(txs).toHaveLength(1);
 
     val externals = txs.at(0).externals;

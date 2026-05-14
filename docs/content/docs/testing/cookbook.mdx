@@ -155,6 +155,34 @@ get fun `test something`() {
 }
 ```
 
+## Asserting external-in sends
+
+Use `ExternalSendResult` matchers for messages sent with `net.sendExternal(...)`
+or generated `sendExternal*` wrapper methods:
+
+```tolk
+get fun `test external trigger`() {
+    val result = contract.sendExternalTrigger(1);
+
+    expect(result).toBeAccepted();
+    result.giveName("external-trigger");
+
+    val txs = result.unwrap();
+    expect(txs).toHaveAllSuccessfulTxs();
+}
+```
+
+For rejection paths, assert on the external status and VM exit code directly:
+
+```tolk
+get fun `test external trigger rejects invalid payload`() {
+    val result = net.sendExternal(invalidExternalMessage);
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(10);
+}
+```
+
 ## Asserting gas consumption
 
 ```tolk

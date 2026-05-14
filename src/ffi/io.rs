@@ -565,7 +565,7 @@ fn format_send_result_list(
     };
     match item {
         TupleItem::Tuple(items) => formatter.format_transaction_list(items),
-        TupleItem::Null => "[]".to_owned(),
+        TupleItem::Null => "null".to_owned(),
         _ => "not a TVM tuple".to_owned(),
     }
 }

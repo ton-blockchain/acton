@@ -33,7 +33,7 @@ get fun `test extension: installs into wallet v5`() {
 get fun `test extension: collects payment from installed wallet`() {
     val (wallet, _, extension) = setupInstalledExtension();
 
-    val receipt = collectPayment(extension, 7)!;
+    val receipt = collectPayment(extension, 7).unwrap();
 
     expect(receipt).toHaveSuccessfulTx<W5ExtensionActionRequest>({
         from: extension.address,
@@ -52,18 +52,18 @@ get fun `test extension: collects payment from installed wallet`() {
 get fun `test extension: enforces payment interval`() {
     val (_, _, extension) = setupInstalledExtension();
 
-    val firstReceipt = collectPayment(extension, 1)!;
+    val firstReceipt = collectPayment(extension, 1).unwrap();
     expect(firstReceipt).toHaveSuccessfulTx<ReceivePaymentFromWallet>({
         to: extension.address,
         value: SUBSCRIPTION_AMOUNT,
     });
 
     val blockedReceipt = collectPayment(extension, 2);
-    expect(blockedReceipt).toBeNull();
+    expect(blockedReceipt).toBeNotAccepted();
 
     testing.setNow(TEST_START_TIME + PAYMENT_INTERVAL + 1);
 
-    val allowedReceipt = collectPayment(extension, 3)!;
+    val allowedReceipt = collectPayment(extension, 3).unwrap();
     expect(allowedReceipt).toHaveSuccessfulTx<ReceivePaymentFromWallet>({
         to: extension.address,
         value: SUBSCRIPTION_AMOUNT,
@@ -114,6 +114,6 @@ fun setupInstalledExtension(): (WalletV5, Treasury, SimpleExtension) {
     return (wallet, admin, extension);
 }
 
-fun collectPayment(extension: SimpleExtension, queryId: uint64): SendResultList? {
+fun collectPayment(extension: SimpleExtension, queryId: uint64): ExternalSendResult {
     return extension.sendExternalCollectPaymentFromWallet(queryId);
 }

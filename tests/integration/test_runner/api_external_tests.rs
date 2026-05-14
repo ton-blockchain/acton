@@ -45,6 +45,65 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
+const REJECTING_EXTERNAL_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+fun onExternalMessage() {
+    throw 10;
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const ABI_REJECTING_EXTERNAL_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+const ERR_EXTERNAL_REJECTED = 701;
+
+fun onExternalMessage() {
+    throw ERR_EXTERNAL_REJECTED;
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const NO_ACCEPT_EXTERNAL_CONTRACT: &str = r"
+fun onExternalMessage() {}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const ACCEPT_THEN_THROW_EXTERNAL_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+fun onExternalMessage() {
+    acceptExternalMessage();
+    throw 10;
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const ACTION_FAILING_EXTERNAL_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+
+fun onExternalMessage() {
+    acceptExternalMessage();
+
+    createExternalLogMessage({
+        dest: createAddressNone(),
+        body: createEmptyCell(),
+    }).send(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 const EXTERNAL_API_TEST_PRELUDE: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build"
@@ -52,6 +111,8 @@ import "../../lib/emulation/network"
 import "../../lib/emulation/testing"
 import "../../lib/types/message"
 import "../../lib/types/transaction"
+import "../../lib/tlb/maybe"
+import "@stdlib/exotic-cells"
 
 struct (0x70000001) TriggerExternal {
     id: uint32
@@ -77,6 +138,53 @@ fun ExternalHarness.create() {
     };
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
     return ExternalHarness { address, init };
+}
+
+fun externalStateInit(data: cell): StateInit {
+    return StateInit {
+        fixedPrefixLength: null,
+        special: null,
+        code: build("external"),
+        data,
+        library: null,
+    };
+}
+
+fun matchingExternalStateInit(): StateInit {
+    return externalStateInit(createEmptyCell());
+}
+
+fun mismatchedExternalStateInit(): StateInit {
+    return externalStateInit(beginCell().storeUint(1, 1).endCell());
+}
+
+fun copyAccountBalance(target: address, source: address): void {
+    val targetShard = testing.getShardAccount(target);
+    val sourceShard = testing.getShardAccount(source);
+
+    expect(targetShard).toBeNotNull();
+    expect(sourceShard).toBeNotNull();
+
+    val targetAcc = targetShard!.account.load();
+    val sourceAcc = sourceShard!.account.load();
+
+    expect(targetAcc is TlbAccountInfo).toBeTrue();
+    expect(sourceAcc is TlbAccountInfo).toBeTrue();
+
+    if (targetAcc is TlbAccountInfo && sourceAcc is TlbAccountInfo) {
+        val patchedAccount = TlbAccountInfo {
+            addr: target,
+            storageStat: targetAcc.storageStat,
+            storage: {
+                lastTransLt: targetAcc.storage.lastTransLt,
+                balance: sourceAcc.storage.balance,
+                state: targetAcc.storage.state,
+            },
+        };
+        var patchedShard = targetShard!;
+        patchedShard.account = (patchedAccount as TlbAccount).toCell();
+        testing.setShardAccount(target, patchedShard);
+    }
 }
 
 fun deployHarness() {
@@ -139,6 +247,39 @@ fn run_failure_case(project_name: &str, test_body: &str, test_name: &str) {
         .assert_contains(test_name);
 }
 
+fn run_failure_snapshot_case(project_name: &str, test_body: &str, snapshot_path: &str) {
+    let source = with_prelude(test_body);
+    ProjectBuilder::new(project_name)
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
+fn run_failure_snapshot_case_with_full_backtrace(
+    project_name: &str,
+    test_body: &str,
+    snapshot_path: &str,
+) {
+    let source = with_prelude(test_body);
+    ProjectBuilder::new(project_name)
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 fn run_snapshot_case(project_name: &str, test_body: &str, snapshot_path: &str) {
     let source = with_prelude(test_body);
     ProjectBuilder::new(project_name)
@@ -163,7 +304,7 @@ get fun `test send external collects externals`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 1 }),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0);
@@ -197,7 +338,7 @@ get fun `test send external stays local with broadcast flag in tests`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 9 }),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0).tx.load();
@@ -221,7 +362,7 @@ get fun `test broadcast wait helpers stay local in tests`() {
     net.enableBroadcast();
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 10 }),
-    )!;
+    ).unwrap();
 
     expect(txs.waitForFirstTransaction(true, 1, 1)).toBeNull();
     expect(txs.waitForTrace(true, 1, 1)).toBeNull();
@@ -264,7 +405,7 @@ get fun `test transaction load body decodes external inbound body`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 7 }),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0).tx.load();
@@ -286,7 +427,7 @@ get fun `test transaction load in msg decodes external inbound message`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 8 }),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     val tx = txs.at(0).tx.load();
@@ -318,7 +459,7 @@ get fun `test create external message with external src`() {
             null,
             externalDest(),
         ),
-    )!;
+    ).unwrap();
 
     expect(txs).toHaveLength(1);
     expect(txs.at(0).externals).toHaveLength(2);
@@ -341,10 +482,10 @@ get fun `test send external repeatable`() {
 
     val first = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 3 }),
-    )!;
+    ).unwrap();
     val second = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 4 }),
-    )!;
+    ).unwrap();
 
     expect(first).toHaveLength(1);
     expect(second).toHaveLength(1);
@@ -362,7 +503,7 @@ get fun `test send external repeatable`() {
 }
 
 #[test]
-fn send_external_returns_null_when_deployed_contract_has_too_low_balance() {
+fn send_external_returns_not_accepted_result_when_deployed_contract_has_too_low_balance() {
     run_success_case(
         "o-lib-api-send-external-low-balance-rejected",
         r#"
@@ -371,44 +512,502 @@ get fun `test send external low balance rejected`() {
 
     val tinyBalanceSource = randomAddress("o_external_tiny_balance_source");
     testing.topUp(tinyBalanceSource, 1);
-
-    val harnessShard = testing.getShardAccount(harness.address);
-    val tinyBalanceShard = testing.getShardAccount(tinyBalanceSource);
-
-    expect(harnessShard).toBeNotNull();
-    expect(tinyBalanceShard).toBeNotNull();
-
-    val harnessAcc = harnessShard!.account.load();
-    val tinyBalanceAcc = tinyBalanceShard!.account.load();
-
-    expect(harnessAcc is TlbAccountInfo).toBeTrue();
-    expect(tinyBalanceAcc is TlbAccountInfo).toBeTrue();
-
-    if (harnessAcc is TlbAccountInfo && tinyBalanceAcc is TlbAccountInfo) {
-        val lowBalanceAcc = TlbAccountInfo {
-            addr: harness.address,
-            storageStat: harnessAcc.storageStat,
-            storage: {
-                lastTransLt: harnessAcc.storage.lastTransLt,
-                balance: tinyBalanceAcc.storage.balance,
-                state: harnessAcc.storage.state,
-            },
-        };
-        var lowBalanceShard = harnessShard!;
-        lowBalanceShard.account = (lowBalanceAcc as TlbAccount).toCell();
-        testing.setShardAccount(harness.address, lowBalanceShard);
-    }
+    copyAccountBalance(harness.address, tinyBalanceSource);
 
     expect(testing.getAccountBalance(harness.address)).toEqual(1);
 
-    val txs = net.sendExternal(
+    val result = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 6 }),
     );
-    expect(txs == null).toBeTrue();
+    expect(result).toBeNotAccepted();
+    expect(result.transactions).toBeNull();
+    expect(result.error).toBeNotNull();
+    expect(result.error!.externalNotAccepted).toBeTrue();
+    expect(result.error!.message).toNotEqual("");
 }
 "#,
         "send external low balance rejected",
     );
+}
+
+#[test]
+fn send_external_returns_not_accepted_when_contract_finishes_without_accept() {
+    let source = with_prelude(
+        r"
+get fun `test send external no accept rejected`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 14 }),
+    );
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(0);
+    expect(result.isAccepted()).toBeFalse();
+    expect(result.transactions).toBeNull();
+    expect(result.error).toBeNotNull();
+    expect(result.error!.externalNotAccepted).toBeTrue();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-no-accept-rejected")
+        .contract("external", NO_ACCEPT_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/send_external_returns_not_accepted_when_contract_finishes_without_accept.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_no_accept_without_throw() {
+    let source = with_prelude(
+        r"
+get fun `test toBeAccepted reports external no accept`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 23 }),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-no-accept")
+        .contract("external", NO_ACCEPT_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_no_accept_without_throw.stdout.txt",
+        );
+}
+
+#[test]
+fn junit_reporter_preserves_external_send_failure_message() {
+    let source = with_prelude(
+        r"
+get fun `test junit reports external not accepted message`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-junit-message")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .run()
+        .failure()
+        .assert_file_snapshot_matches(
+            "test-results/TEST-external_api.test.tolk.xml",
+            "integration/snapshots/test-runner/api_external/junit_reporter_preserves_external_send_failure_message.xml.gen",
+        );
+}
+
+#[test]
+fn send_external_returns_trace_when_compute_fails_after_accept() {
+    let source = with_prelude(
+        r"
+get fun `test send external accepted compute failure returns trace`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 15 }),
+    );
+
+    expect(result).toBeAccepted();
+    expect(result.isAccepted()).toBeTrue();
+    expect(result.error).toBeNull();
+
+    val txs = result.unwrap();
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val descr = tx.description.load();
+    expect(descr is TlbTransOrd).toBeTrue();
+    if (descr is TlbTransOrd) {
+        expect(descr.aborted).toBeTrue();
+        expect(descr.computePh is TlbTrComputeVm).toBeTrue();
+        if (descr.computePh is TlbTrComputeVm) {
+            expect(descr.computePh.data.load().exitCode).toEqual(10);
+        }
+    }
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-accepted-compute-failure")
+        .contract("external", ACCEPT_THEN_THROW_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/send_external_returns_trace_when_compute_fails_after_accept.stdout.txt",
+        );
+}
+
+#[test]
+fn send_external_returns_trace_when_action_phase_fails_after_accept() {
+    let source = with_prelude(
+        r"
+get fun `test send external accepted action failure returns trace`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 16 }),
+    );
+
+    expect(result).toBeAccepted();
+    expect(result.error).toBeNull();
+
+    val txs = result.unwrap();
+    expect(txs).toHaveLength(1);
+    val tx = txs.at(0).tx.load();
+    val descr = tx.description.load();
+    expect(descr is TlbTransOrd).toBeTrue();
+    if (descr is TlbTransOrd) {
+        expect(descr.aborted).toBeTrue();
+        expect(descr.action is TlbNone).toBeFalse();
+        expect(descr.action.unwrap().load().resultCode).toEqual(34);
+    }
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-accepted-action-failure")
+        .contract("external", ACTION_FAILING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/send_external_returns_trace_when_action_phase_fails_after_accept.stdout.txt",
+        );
+}
+
+#[test]
+fn send_external_deploys_prefunded_uninit_account_with_state_init() {
+    run_snapshot_case(
+        "o-lib-api-send-external-deploys-prefunded-uninit",
+        r#"
+get fun `test send external deploys prefunded uninit account`() {
+    val harness = ExternalHarness.create();
+    testing.topUp(harness.address, ton("1"));
+
+    expect(testing.isDeployed(harness.address)).toBeFalse();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(
+            harness.address,
+            TriggerExternal { id: 17 },
+            matchingExternalStateInit(),
+        ),
+    );
+
+    expect(result).toBeAccepted();
+
+    val txs = result.unwrap();
+    expect(txs).toHaveLength(1);
+    expect(txs.at(0).externals).toHaveLength(2);
+    expect(testing.isDeployed(harness.address)).toBeTrue();
+}
+"#,
+        "integration/snapshots/test-runner/api_external/send_external_deploys_prefunded_uninit_account_with_state_init.stdout.txt",
+    );
+}
+
+#[test]
+fn send_external_rejects_prefunded_uninit_without_state_init() {
+    run_snapshot_case(
+        "o-lib-api-send-external-prefunded-uninit-no-state",
+        r#"
+get fun `test send external prefunded uninit without state init rejected`() {
+    val target = randomAddress("external_prefunded_uninit_without_state_init");
+    testing.topUp(target, ton("1"));
+
+    expect(testing.isDeployed(target)).toBeFalse();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(target, TriggerExternal { id: 18 }),
+    );
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(0);
+    expect(result.transactions).toBeNull();
+    expect(testing.isDeployed(target)).toBeFalse();
+}
+"#,
+        "integration/snapshots/test-runner/api_external/send_external_rejects_prefunded_uninit_without_state_init.stdout.txt",
+    );
+}
+
+#[test]
+fn send_external_rejects_prefunded_uninit_with_mismatched_state_init() {
+    run_snapshot_case(
+        "o-lib-api-send-external-prefunded-uninit-bad-state",
+        r#"
+get fun `test send external prefunded uninit bad state rejected`() {
+    val harness = ExternalHarness.create();
+    testing.topUp(harness.address, ton("1"));
+
+    val result = net.sendExternal(
+        net.createExternalMessage(
+            harness.address,
+            TriggerExternal { id: 19 },
+            mismatchedExternalStateInit(),
+        ),
+    );
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(0);
+    expect(result.transactions).toBeNull();
+    expect(testing.isDeployed(harness.address)).toBeFalse();
+}
+"#,
+        "integration/snapshots/test-runner/api_external/send_external_rejects_prefunded_uninit_with_mismatched_state_init.stdout.txt",
+    );
+}
+
+#[test]
+fn send_external_rejects_active_account_with_mismatched_state_init() {
+    run_snapshot_case(
+        "o-lib-api-send-external-active-bad-state",
+        r"
+get fun `test send external active bad state rejected`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(
+            harness.address,
+            TriggerExternal { id: 20 },
+            mismatchedExternalStateInit(),
+        ),
+    );
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(0);
+    expect(result.transactions).toBeNull();
+    expect(testing.isDeployed(harness.address)).toBeTrue();
+}
+",
+        "integration/snapshots/test-runner/api_external/send_external_rejects_active_account_with_mismatched_state_init.stdout.txt",
+    );
+}
+
+#[test]
+fn to_be_accepted_reports_external_compute_skipped_no_state() {
+    run_failure_snapshot_case_with_full_backtrace(
+        "o-lib-api-send-external-to-be-accepted-no-state",
+        r#"
+get fun `test toBeAccepted reports external no state`() {
+    val target = randomAddress("external_to_be_accepted_no_state");
+    testing.topUp(target, ton("1"));
+
+    val result = net.sendExternal(
+        net.createExternalMessage(target, TriggerExternal { id: 24 }),
+    );
+
+    expect(result).toBeAccepted();
+}
+"#,
+        "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_compute_skipped_no_state.stdout.txt",
+    );
+}
+
+#[test]
+fn to_be_accepted_reports_external_compute_skipped_bad_state() {
+    run_failure_snapshot_case_with_full_backtrace(
+        "o-lib-api-send-external-to-be-accepted-bad-state",
+        r#"
+get fun `test toBeAccepted reports external bad state`() {
+    val harness = ExternalHarness.create();
+    testing.topUp(harness.address, ton("1"));
+
+    val result = net.sendExternal(
+        net.createExternalMessage(
+            harness.address,
+            TriggerExternal { id: 25 },
+            mismatchedExternalStateInit(),
+        ),
+    );
+
+    expect(result).toBeAccepted();
+}
+"#,
+        "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_compute_skipped_bad_state.stdout.txt",
+    );
+}
+
+#[test]
+fn external_send_result_helpers_cover_accepted_trace() {
+    run_snapshot_case(
+        "o-lib-api-external-send-result-helpers-accepted",
+        r#"
+get fun `test external send result helpers cover accepted trace`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 11 }),
+    );
+
+    expect(result).toBeAccepted();
+    expect(result.isAccepted()).toBeTrue();
+    expect(result.error).toBeNull();
+    expect(result.transactions).toBeNotNull();
+
+    result.giveName("external-helper-trace");
+
+    val txs = result.unwrap();
+    expect(txs).toHaveLength(1);
+    expect(result.at(0).lt).toEqual(txs.at(0).lt);
+
+    val first = result.waitForFirstTransaction(true, 1, 1);
+    expect(first).toBeNotNull();
+    expect(first!.lt).toEqual(result.at(0).lt);
+
+    val trace = result.waitForTrace(true, 1, 1);
+    expect(trace).toBeNotNull();
+    expect(trace!.at(0).lt).toEqual(result.at(0).lt);
+
+    val found = result.findExternalOutMessage<ExternalAlpha>({
+        from: harness.address,
+        to: createAddressNone(),
+    });
+    expect(found).toBeNotNull();
+    expect(found!.loadBody()).toEqual(ExternalAlpha { value: 111 });
+}
+"#,
+        "integration/snapshots/test-runner/api_external/external_send_result_helpers_cover_accepted_trace.stdout.txt",
+    );
+}
+
+#[test]
+fn external_send_result_helpers_cover_rejected_trace() {
+    let source = with_prelude(
+        r"
+get fun `test external send result helpers cover rejected trace`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeNotAccepted();
+    expect(result).toHaveExternalVmExitCode(10);
+    expect(result.isAccepted()).toBeFalse();
+    expect(result.transactions).toBeNull();
+    expect(result.error).toBeNotNull();
+    expect(result.error!.externalNotAccepted).toBeTrue();
+    expect(result.waitForFirstTransaction(true, 1, 1)).toBeNull();
+    expect(result.waitForTrace(true, 1, 1)).toBeNull();
+    expect(result.findExternalOutMessage<ExternalAlpha>({})).toBeNull();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-external-send-result-helpers-rejected")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/external_send_result_helpers_cover_rejected_trace.stdout.txt",
+        );
+}
+
+#[test]
+fn external_send_result_at_reports_external_vm_exit_code() {
+    let source = with_prelude(
+        r"
+get fun `test external send result at reports external vm exit code`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    result.at(0);
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-external-send-result-at-exit-code")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/external_send_result_at_reports_external_vm_exit_code.stdout.txt",
+        );
+}
+
+#[test]
+fn external_send_result_give_name_reports_external_vm_exit_code() {
+    let source = with_prelude(
+        r#"
+get fun `test external send result giveName reports external vm exit code`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    result.giveName("rejected-external");
+}
+"#,
+    );
+
+    ProjectBuilder::new("o-lib-api-external-send-result-give-name-exit-code")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/external_send_result_give_name_reports_external_vm_exit_code.stdout.txt",
+        );
 }
 
 #[test]
@@ -432,6 +1031,331 @@ get fun `test create external message rejects internal src`() {
 }
 
 #[test]
+fn external_send_result_unwrap_reports_external_vm_exit_code() {
+    let source = with_prelude(
+        r"
+get fun `test external send result unwrap reports external vm exit code`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    result.unwrap();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-external-send-result-unwrap-exit-code")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/external_send_result_unwrap_reports_external_vm_exit_code.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_vm_exit_code() {
+    let source = with_prelude(
+        r"
+get fun `test toBeAccepted reports external vm exit code`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-exit-code")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_vm_exit_code.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_not_accepted_reports_accepted_external_result() {
+    run_failure_snapshot_case(
+        "o-lib-api-send-external-to-be-not-accepted-accepted",
+        r"
+get fun `test toBeNotAccepted reports accepted external result`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 12 }),
+    );
+
+    expect(result).toBeNotAccepted();
+}
+",
+        "integration/snapshots/test-runner/api_external/to_be_not_accepted_reports_accepted_external_result.stdout.txt",
+    );
+}
+
+#[test]
+fn to_have_external_vm_exit_code_reports_mismatch() {
+    let source = with_prelude(
+        r"
+get fun `test toHaveExternalVmExitCode reports mismatch`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toHaveExternalVmExitCode(11);
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-vm-exit-code-mismatch")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_have_external_vm_exit_code_reports_mismatch.stdout.txt",
+        );
+}
+
+#[test]
+fn to_have_external_vm_exit_code_reports_accepted_external_result() {
+    run_failure_snapshot_case(
+        "o-lib-api-send-external-vm-exit-code-accepted",
+        r"
+get fun `test toHaveExternalVmExitCode reports accepted external result`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 13 }),
+    );
+
+    expect(result).toHaveExternalVmExitCode(10);
+}
+",
+        "integration/snapshots/test-runner/api_external/to_have_external_vm_exit_code_reports_accepted_external_result.stdout.txt",
+    );
+}
+
+#[test]
+fn to_be_accepted_without_backtrace_suggests_backtrace_full() {
+    let source = with_prelude(
+        r"
+get fun `test toBeAccepted suggests backtrace full`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-backtrace-hint")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_without_backtrace_suggests_backtrace_full.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_abi_exit_code_name() {
+    let source = with_prelude(
+        r"
+get fun `test toBeAccepted reports external abi exit code name`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-abi-exit-code")
+        .contract("external", ABI_REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_abi_exit_code_name.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_error_without_vm_exit_code() {
+    let source = with_prelude(
+        r#"
+get fun `test toBeAccepted reports external error without vm exit code`() {
+    val (harness, _) = deployHarness();
+    val result = ExternalSendResult {
+        transactions: null,
+        destination: harness.address,
+        error: ExternalSendError {
+            message: "custom external failure without vm code",
+            externalNotAccepted: true,
+            vmExitCode: null,
+            diagnosticId: null,
+        },
+    };
+
+    expect(result).toBeAccepted();
+}
+"#,
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-no-vm-code")
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_error_without_vm_exit_code.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_send_failure_status() {
+    let source = with_prelude(
+        r#"
+get fun `test toBeAccepted reports external send failure status`() {
+    val (harness, _) = deployHarness();
+    val result = ExternalSendResult {
+        transactions: null,
+        destination: harness.address,
+        error: ExternalSendError {
+            message: "external send failed before contract acceptance",
+            externalNotAccepted: false,
+            vmExitCode: null,
+            diagnosticId: null,
+        },
+    };
+
+    expect(result).toBeAccepted();
+}
+"#,
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-send-failure-status")
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_backtrace("full")
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_send_failure_status.stdout.txt",
+        );
+}
+
+#[test]
+fn to_be_accepted_reports_external_missing_libraries() {
+    // `library_ref` dependencies are auto-registered by the test runner, so this
+    // patches a real deployed contract into an unresolved library reference.
+    let source = with_prelude(
+        r#"
+get fun `test toBeAccepted reports external missing libraries`() {
+    val (harness, _) = deployHarness();
+    val shard = testing.getShardAccount(harness.address);
+    expect(shard).toBeNotNull();
+
+    val account = shard!.account.load();
+    expect(account is TlbAccountInfo).toBeTrue();
+    if (account is TlbAccountInfo && account.storage.state is TlbAccountStateActive) {
+        val stateInit = account.storage.state.stateInit;
+        val patchedAccount = TlbAccountInfo {
+            addr: account.addr,
+            storageStat: account.storageStat,
+            storage: {
+                lastTransLt: account.storage.lastTransLt,
+                balance: account.storage.balance,
+                state: TlbAccountStateActive {
+                    stateInit: StateInit {
+                        fixedPrefixLength: stateInit.fixedPrefixLength,
+                        special: stateInit.special,
+                        code: build("external").toLibraryReference(),
+                        data: stateInit.data,
+                        library: stateInit.library,
+                    },
+                },
+            },
+        };
+        var patchedShard = shard!;
+        patchedShard.account = (patchedAccount as TlbAccount).toCell();
+        testing.setShardAccount(harness.address, patchedShard);
+    }
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, TriggerExternal { id: 1 }),
+    );
+
+    expect(result).toBeAccepted();
+}
+"#,
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-to-be-accepted-missing-libraries")
+        .contract("external", EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/api_external/to_be_accepted_reports_external_missing_libraries.stdout.txt",
+        );
+}
+
+#[test]
 fn find_external_out_message_has_generic_compilation_bug() {
     run_success_case(
         "o-lib-api-find-external-out-generic-bug",
@@ -441,9 +1365,9 @@ get fun `test find external out message bug`() {
 
     val txs = net.sendExternal(
         net.createExternalMessage(harness.address, TriggerExternal { id: 5 }),
-    );
+    ).unwrap();
 
-    val found = txs!.findExternalOutMessage<ExternalAlpha>({
+    val found = txs.findExternalOutMessage<ExternalAlpha>({
         from: harness.address,
         to: createAddressNone(),
     });

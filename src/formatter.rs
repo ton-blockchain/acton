@@ -3,8 +3,8 @@ use crate::commands::test::trace::TransactionInfo;
 use crate::context;
 use crate::context::{
     AssertFailure, BuildCache, DisplayParam, EmulationsState, ExternalMessageNotFoundFailure,
-    GetMethodAssertFailure, KnownAddresses, TransactionGenericAssertFailure, WalletNotFoundFailure,
-    to_cell,
+    ExternalSendNotAcceptedFailure, GetMethodAssertFailure, KnownAddresses,
+    TransactionGenericAssertFailure, WalletNotFoundFailure, to_cell,
 };
 use crate::ffi::assert::{rendered_values_equal, union_case_payload};
 use crate::retrace::{
@@ -207,6 +207,16 @@ impl<'a> FormatterContext<'a> {
         Self::find_custom_exit_code_info(code, build.abi.as_deref())
     }
 
+    fn find_address_custom_exit_code_info(
+        &self,
+        addr: &StdAddr,
+        code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        let code_cell = Self::account_code(&self.accounts, addr);
+        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
+        Self::find_custom_exit_code_info(code, build.abi.as_deref())
+    }
+
     fn find_code_custom_exit_code_info(
         &self,
         code_boc64: &str,
@@ -215,6 +225,63 @@ impl<'a> FormatterContext<'a> {
         let code_cell = Boc::decode_base64(code_boc64).ok();
         let (_, build) = self.build_cache.result_for_code(&code_cell)?;
         Self::find_custom_exit_code_info(exit_code, build.abi.as_deref())
+    }
+
+    pub(crate) fn format_external_not_accepted_vm_result(
+        &self,
+        failure: &ExternalSendNotAcceptedFailure,
+    ) -> Option<(&'static str, String)> {
+        if let Some(reason) = self.external_not_accepted_compute_skip_reason(failure.diagnostic_id)
+        {
+            return Some(("Compute phase skipped:", reason.to_owned()));
+        }
+
+        let exit_code = failure.vm_exit_code?;
+        if matches!(exit_code, 0 | 1) {
+            return Some(("VM exit code:", exit_code.to_string()));
+        }
+        if let Some(info) =
+            exit_codes::find_for_phase(exit_code, exit_codes::ExitCodePhase::Compute)
+        {
+            return Some(("Compute phase failed:", info.description.to_owned()));
+        }
+
+        if let Some(info) = failure
+            .destination
+            .as_ref()
+            .and_then(|addr| self.find_address_custom_exit_code_info(addr, exit_code))
+        {
+            return Some(("Compute phase failed:", info.description));
+        }
+
+        Some(("Compute phase failed:", format!("exit code {exit_code}")))
+    }
+
+    fn external_not_accepted_compute_skip_reason(
+        &self,
+        diagnostic_id: Option<u64>,
+    ) -> Option<&'static str> {
+        let logs = diagnostic_id
+            .and_then(|id| self.emulations.find_failed_message(id))
+            .and_then(|message| message.executor_logs.as_deref())?;
+
+        if logs.contains("address is suspended, skipping compute phase") {
+            return Some("Suspended");
+        }
+        if logs.contains("no state, cannot perform transactions") {
+            return Some("No state");
+        }
+        if logs.contains("in_msg_state hash mismatch")
+            || logs.contains("cannot unpack in_msg_state")
+            || logs.contains("bad fixed_prefix_length")
+        {
+            return Some("Bad state");
+        }
+        if logs.contains("no gas") {
+            return Some("No gas");
+        }
+
+        None
     }
 
     #[must_use]
@@ -3280,6 +3347,34 @@ impl FormatterContext<'_> {
                     for param in params {
                         writeln!(result, "  {param}").ok();
                     }
+                }
+            }
+            AssertFailure::ExternalSendNotAccepted(external_failure) => {
+                writeln!(
+                    result,
+                    "Error: {}",
+                    Self::highlight_actual_expected(&external_failure.message)
+                )
+                .ok();
+                let status = if external_failure.external_not_accepted {
+                    "external message was not accepted"
+                } else {
+                    "external send failed before producing transactions"
+                };
+                writeln!(result, "Status: {status}").ok();
+                writeln!(result, "Reason: {}", external_failure.reason).ok();
+                if let Some((label, description)) =
+                    self.format_external_not_accepted_vm_result(external_failure)
+                {
+                    writeln!(result, "{label} {description}").ok();
+                }
+                if !external_failure.missing_libraries.is_empty() {
+                    writeln!(
+                        result,
+                        "Missing libraries: {}",
+                        external_failure.missing_libraries.join(", ")
+                    )
+                    .ok();
                 }
             }
             AssertFailure::WalletNotFound(failure) => {

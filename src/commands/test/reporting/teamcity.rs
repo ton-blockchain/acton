@@ -109,6 +109,9 @@ impl TeamCityReporter {
                 AssertFailure::ExternalMessageNotFound(failure) => {
                     message = format!("External message '{}' not found", failure.message_name);
                 }
+                AssertFailure::ExternalSendNotAccepted(_) => {
+                    message = "External message was not accepted".to_string();
+                }
                 AssertFailure::WalletNotFound(failure) => {
                     message = format!("Wallet '{}' not found", failure.wallet_name);
                     if let Some(formatter) = &formatter {

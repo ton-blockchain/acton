@@ -181,9 +181,118 @@ fun SendResult.allOutActions(self): OutActionList {
 /// To get a single send result, use [SendResultList.at] method.
 type SendResultList = BigArray<SendResult>
 
+/// Metadata returned when an external-in message fails before producing an
+/// accepted transaction trace.
+struct ExternalSendError {
+    /// Error message returned by the emulator.
+    message: string
+    /// Whether the external-in message was not accepted by the smart contract.
+    externalNotAccepted: bool
+    /// VM exit code reported by the emulator, if available.
+    vmExitCode: int?
+    /// Opaque diagnostic id used by Acton to retrieve full emulator metadata.
+    diagnosticId: int?
+}
+
+/// Result returned by [net.sendExternal].
+///
+/// If the external-in message is accepted, `transactions` contains the produced
+/// trace. If it is rejected before acceptance or cannot be emulated,
+/// `transactions` is `null` and `error` contains emulator metadata such as VM
+/// exit code and an opaque diagnostic id.
+///
+/// In tests, prefer `expect(result).toBeAccepted()`,
+/// `expect(result).toBeNotAccepted()`, and
+/// `expect(result).toHaveExternalVmExitCode(...)` for diagnostics.
+/// Use [ExternalSendResult.unwrap] when a trace is required, or
+/// [ExternalSendResult.isAccepted] when the test needs to branch on the result.
+struct ExternalSendResult {
+    /// Produced transaction trace, or `null` if the external-in message was not accepted.
+    transactions: SendResultList?
+    /// Failure metadata, or `null` when the external-in message was accepted.
+    error: ExternalSendError?
+    /// Destination account extracted from the original external-in message.
+    destination: address
+}
+
 /// Returns the send result at the given index.
 fun SendResultList.at(self, index: int): SendResult {
     return self.get(index);
+}
+
+/// Returns `true` when the external-in message produced a transaction trace.
+fun ExternalSendResult.isAccepted(self): bool {
+    return self.transactions != null;
+}
+
+/// Returns produced transactions, or fails with external-error metadata if the
+/// message was not accepted.
+///
+/// Failed unwraps are reported like `expect(result).toBeAccepted()`:
+/// diagnostics include the external status, emulator reason, VM exit code when
+/// available, known exit-code description or ABI error name, source location,
+/// and the full backtrace when the test is run with `--backtrace full`.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.unwrap(
+    self,
+    location: string = reflect.sourceLocationAsString(),
+): SendResultList {
+    if (self.transactions != null) {
+        return self.transactions!;
+    }
+    self.__failExternalSend("ExternalSendResult.unwrap()", location);
+}
+
+fun ExternalSendError.__toFFITuple(self, destination: address?): tuple {
+    return [
+        self.message,
+        self.externalNotAccepted,
+        self.vmExitCode,
+        self.diagnosticId,
+        destination,
+    ];
+}
+
+fun ExternalSendResult.__failExternalSend(self, context: string, location: string = ""): never {
+    if (self.error != null) {
+        ffi.failExternalSendNotAccepted(
+            location,
+            context,
+            self.error!.__toFFITuple(self.destination),
+        );
+        throw ASSERTION_FAILED;
+    }
+
+    Assert.fail(format("{}: external message was not accepted", context), location);
+}
+
+/// Returns the send result at the given index, or fails with external-error
+/// metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.at(
+    self,
+    index: int,
+    location: string = reflect.sourceLocationAsString(),
+): SendResult {
+    return self.unwrap(location).at(index);
+}
+
+/// Give a custom name for a trace chain produced by [net.sendExternal].
+///
+/// Fails with external-error metadata if the message was not accepted.
+///
+/// The `location` parameter is filled automatically and is only used for
+/// diagnostics; user code should normally omit it.
+fun ExternalSendResult.giveName(
+    self,
+    nameForUI: string,
+    location: string = reflect.sourceLocationAsString(),
+): void {
+    self.unwrap(location).giveName(nameForUI);
 }
 
 /// Give a custom name for a trace chain produced by [net.send].
@@ -295,6 +404,32 @@ fun SendResultList.waitForTrace(
         attempts,
         sleepDuration,
     );
+}
+
+/// Wait for the first transaction produced by [net.sendExternal].
+fun ExternalSendResult.waitForFirstTransaction(
+    self,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 1000,
+): SendResult? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.waitForFirstTransaction(quiet, attempts, sleepDuration);
+}
+
+/// Wait for the full trace produced by [net.sendExternal].
+fun ExternalSendResult.waitForTrace(
+    self,
+    quiet: bool = false,
+    attempts: int = 20,
+    sleepDuration: int = 1000,
+): SendResultList? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.waitForTrace(quiet, attempts, sleepDuration);
 }
 
 /// Represents a set of parameters to search for a transaction in the transaction list.
@@ -526,6 +661,17 @@ fun SendResultList.findExternalOutMessage<TBody = unknown>(
     return null;
 }
 
+/// Find an external-out message in the trace produced by [net.sendExternal].
+fun ExternalSendResult.findExternalOutMessage<TBody = unknown>(
+    self,
+    params: ExternalOutSearchParams = {},
+): TlbMessage<TBody, TlbExternalOutMessageInfo>? {
+    if (self.transactions == null) {
+        return null;
+    }
+    return self.transactions!.findExternalOutMessage<TBody>(params);
+}
+
 /// Find a transaction in the send result list by specified parameters.
 ///
 /// Example:
@@ -596,10 +742,14 @@ fun net.send(from: address, message: OutMessage): SendResultList {
     return rawRes;
 }
 
-/// The response from `net.createExternalMessage`.
-/// It's an already composed message cell, ready to be sent by `net.sendExternal`.
+/// The response from [net.createExternalMessage].
+/// It stores an already composed message cell and the destination address used
+/// by [net.sendExternal] diagnostics.
 struct ExternalInMessage {
+    /// Encoded external-in message cell.
     messageCell: cell
+    /// Destination account address.
+    dest: address
 }
 
 /// Creates an external-in message.
@@ -643,6 +793,7 @@ fun net.createExternalMessage<TBody>(
             init,
             body: TlbEither<TBody, Cell<TBody>>.right(body.__asPayload()),
         }.toCell(),
+        dest,
     };
 }
 
@@ -658,14 +809,32 @@ fun net.createExternalMessage<TBody>(
 /// `--tonconnect`, `net.sendExternal` is rejected; use [net.send] with an
 /// internal wallet message so the connected wallet can approve it.
 ///
-/// Returns `null` if the external message was not accepted or the destination
-/// account does not exist.
-fun net.sendExternal(msg: ExternalInMessage): SendResultList? {
-    // from and mode fields do not affect anything in case of an ExtIn message
-    return ffi.sendMessageFrom(
-        msg.messageCell,
-        address("-1:0000000000000000000000000000000000000000000000000000000000000000").toCell(),
-    );
+/// If the external message is accepted, the returned [ExternalSendResult]
+/// contains the full transaction trace in `transactions`.
+///
+/// If the external message is not accepted, the destination account does not
+/// exist, or emulation fails before a trace is produced, the returned result has
+/// `transactions = null` and `error` contains all available emulator metadata.
+/// In tests, prefer `expect(result).toBeAccepted()` or
+/// [ExternalSendResult.unwrap] so Acton can render the external status, VM exit
+/// code, ABI error name, source location, and backtrace.
+///
+/// Example:
+/// ```tolk
+/// val result = net.sendExternal(msg);
+/// expect(result).toBeAccepted();
+///
+/// val txs = result.unwrap();
+/// expect(txs).toHaveAllSuccessfulTxs();
+/// ```
+fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
+    val result = ffi.sendExternalMessage(msg.messageCell);
+    val error = result.get(1);
+    return ExternalSendResult {
+        transactions: result.get(0) as SendResultList?,
+        error: error == null ? null : error as ExternalSendError,
+        destination: msg.dest,
+    };
 }
 
 /// Transform the out message to a bounced message. Essentially, it sets the `bounced` flag to true.
@@ -935,6 +1104,62 @@ fun Cell<T>.__asPayload(self): Cell<T> {
 
 fun cell.__asPayload(self): Cell<cell> {
     return self as Cell<cell>;
+}
+
+/// Expect the external-in message to be accepted and produce a transaction trace.
+///
+/// On failure, Acton reports the external status, emulator reason, VM exit code
+/// when available, a known exit-code description or ABI error name, source
+/// location, and the full backtrace when the test is run with `--backtrace full`.
+fun Expectation<ExternalSendResult>.toBeAccepted(self): void {
+    if (self.value.transactions != null) {
+        return;
+    }
+    self.value.__failExternalSend("expect(<actual>).toBeAccepted()", self.location);
+}
+
+/// Expect the external-in message to be rejected before acceptance.
+fun Expectation<ExternalSendResult>.toBeNotAccepted(self): void {
+    if (self.value.error != null && self.value.error.externalNotAccepted) {
+        return;
+    }
+    if (self.value.error != null) {
+        self.fail(
+            format(
+                "expect(<actual>).toBeNotAccepted(): external send failed, but not as an external-not-accepted error: {}",
+                self.value.error.message,
+            ),
+        );
+    }
+    self.fail("expect(<actual>).toBeNotAccepted(): external message was accepted");
+}
+
+/// Expect the external send error to have a specific VM exit code.
+///
+/// This matcher is intended for rejected external-in messages. For accepted
+/// external messages, use transaction matchers on the produced [SendResultList].
+fun Expectation<ExternalSendResult>.toHaveExternalVmExitCode(self, exitCode: int): void {
+    if (
+        self.value.error != null && self.value.error.vmExitCode != null &&
+        self.value.error.vmExitCode == exitCode
+    ) {
+        return;
+    }
+    if (self.value.error != null) {
+        self.fail(
+            format(
+                "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, got {}",
+                exitCode,
+                self.value.error.vmExitCode,
+            ),
+        );
+    }
+    self.fail(
+        format(
+            "expect(<actual>).toHaveExternalVmExitCode(<expected>): expected {}, but external message was accepted",
+            exitCode,
+        ),
+    );
 }
 
 /// Expect the transaction list to have a successful deploy transaction.
@@ -1244,6 +1469,9 @@ fun impl.findNoTransactionOrFail(
 fun ffi.sendMessageFrom(msg: cell, from: cell): SendResultList?
     asm "9 EXTCALL"
 
+fun ffi.sendExternalMessage(msg: cell): tuple
+    asm "56 EXTCALL"
+
 fun ffi.runGetMethod(
     addr: cell,
     code: cell,
@@ -1295,6 +1523,13 @@ fun ffi.failToFindExternalMessage(
     opcode: int,
 ): tuple?
     asm "108 EXTCALL"
+
+fun ffi.failExternalSendNotAccepted(
+    location: string,
+    message: string,
+    error: tuple,
+): tuple?
+    asm "109 EXTCALL"
 
 fun ffi.loadLibrary(hash: string): cell?
     asm "21 EXTCALL"

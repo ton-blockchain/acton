@@ -864,12 +864,12 @@ fn generate_send_external_method(
     if params.is_empty() {
         let _ = writeln!(
             code,
-            "fun {contract_name}.{method_name}(self): SendResultList? {{"
+            "fun {contract_name}.{method_name}(self): ExternalSendResult {{"
         );
     } else {
         let _ = writeln!(
             code,
-            "fun {contract_name}.{method_name}(self, {params}): SendResultList? {{"
+            "fun {contract_name}.{method_name}(self, {params}): ExternalSendResult {{"
         );
     }
 
@@ -941,7 +941,7 @@ fn generate_send_any_external_method(contract_name: &str) -> String {
     code.push_str("/// Send an external-in message to the contract with a custom body cell\n");
     let _ = writeln!(
         code,
-        "fun {contract_name}.sendAnyExternal(self, body: cell): SendResultList? {{"
+        "fun {contract_name}.sendAnyExternal(self, body: cell): ExternalSendResult {{"
     );
     code.push_str("    val msg = net.createExternalMessage(self.address, body);\n");
     code.push_str("    return net.sendExternal(msg)\n");

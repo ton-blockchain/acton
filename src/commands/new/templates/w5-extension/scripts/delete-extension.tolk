@@ -42,7 +42,7 @@ fun main() {
     );
 
     val extResult = wallet.sendAnyExternal(signedBody.toCell());
-    if (extResult == null) {
+    if (!extResult.isAccepted()) {
         println("External message was not accepted");
         return;
     }

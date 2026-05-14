@@ -67,14 +67,14 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
     return net.send(from, genericMsg);
 }
 
-fun MyContract.sendExternalExtPing(self, queryId: uint64): SendResultList? {
+fun MyContract.sendExternalExtPing(self, queryId: uint64): ExternalSendResult {
     val body = ExtPing { queryId };
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }
 
 /// Send an external-in message to the contract with a custom body cell
-fun MyContract.sendAnyExternal(self, body: cell): SendResultList? {
+fun MyContract.sendAnyExternal(self, body: cell): ExternalSendResult {
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }

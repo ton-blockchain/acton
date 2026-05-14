@@ -35,13 +35,16 @@ The generated file provides:
 
 - `Counter.fromStorage(storage)` — initializes contract state from a storage struct instance and calculates the deployment address.
 - `counter.deploy(from, config)` — deploys the contract.
-- `counter.send{MessageName}(from, ...)` — one method per incoming message type declared in `contract { incomingMessages: ... }`.
+- `counter.send{MessageName}(from, ...)` — one method per internal incoming message type declared in `contract { incomingMessages: ... }`.
+- `counter.sendExternal{MessageName}(...)` — one method per external incoming message type declared in `contract { incomingExternal: ... }`; these methods return `ExternalSendResult`.
+- `counter.sendAnyExternal(body)` — sends a custom external-in body when the contract declares external incoming messages.
 - `counter.{getMethodName}()` — one method per declared get method.
 
 Fine tune wrapper generation with the `contract { ... }` header in the contract entrypoint file:
 
 - `storage: ...` enables the typed `fromStorage()` initializer; without it, the initializer falls back to an untyped form.
 - `incomingMessages: ...` enables `send{MessageName}` helpers; without it, no message-sending methods are generated.
+- `incomingExternal: ...` enables `sendExternal{MessageName}` helpers and `sendAnyExternal()`.
 
 ### Use a wrapper in a Tolk test
 

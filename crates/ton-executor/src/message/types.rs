@@ -34,6 +34,9 @@ pub struct RunTransactionResultSuccess {
 pub struct RunTransactionResultError {
     /// Error message.
     pub error: String,
+    /// Whether the external-in message was rejected before acceptance.
+    #[serde(default)]
+    pub external_not_accepted: bool,
     /// Virtual Machine execution logs (if available).
     pub vm_log: Option<String>,
     /// VM exit code (if available).

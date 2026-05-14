@@ -1,0 +1,22 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling external
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/external_api.test.tolk (1 test)
+  ✗ toBeAccepted reports external no state [TIME]
+    └─ Error: expect(actual).toBeAccepted()
+        ├─ Status: external message was not accepted
+        ├─ Reason: External message not accepted by smart contract
+        ├─ VM [EXIT_STATUS]: 0
+        └─ at tests/external_api.test[LINE]
+              Expectation<ExternalSendResult>.toBeAccepted   at ../lib/emulation/network[LINE]
+              test toBeAccepted reports external no state    at tests/external_api.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

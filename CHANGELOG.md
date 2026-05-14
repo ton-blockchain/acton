@@ -4,9 +4,44 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Breaking Changes and Migration
+
+- Regenerate generated wrappers after upgrading. External incoming message
+  wrapper methods now return `ExternalSendResult` from `net.sendExternal(...)`,
+  so checked-in Tolk wrappers should be refreshed with `acton wrapper <contract>`
+  to expose accepted/rejected metadata and the new external-in helpers and
+  matchers.
+
 ### Added
 
-- No unreleased entries yet.
+- Added first-class test-runner support for external-in messages.
+  `net.sendExternal(...)` now returns `ExternalSendResult`, a wrapper that keeps
+  the produced `SendResultList` when the message is accepted and preserves
+  emulator failure metadata when the external-in message is rejected before an
+  accepted transaction trace is produced.
+- `ExternalSendResult` exposes the accepted trace through `transactions` and the
+  rejected-send metadata through `error`, including the emulator message,
+  whether the message was not accepted, the VM exit code when available, and an
+  internal diagnostic id used by Acton to retrieve richer emulator details.
+- Added external-in helpers for tests:
+  `ExternalSendResult.isAccepted()`, `unwrap()`, `at()`, `giveName()`,
+  `waitForFirstTransaction()`, `waitForTrace()`, and
+  `findExternalOutMessage()`. These helpers let tests branch on accepted vs.
+  rejected external-in messages, unwrap accepted traces with good diagnostics,
+  reuse trace helpers directly on external sends, and search external-out
+  messages without manually checking `transactions`.
+- Added external-in matchers for tests:
+  `expect(result).toBeAccepted()`,
+  `expect(result).toBeNotAccepted()`, and
+  `expect(result).toHaveExternalVmExitCode(...)`. Failed acceptance checks now
+  render the external status, emulator reason, compute/action failure details,
+  known TVM exit-code descriptions or ABI error names when available, source
+  location, and `onExternalMessage` backtrace details with `--backtrace full`.
+- External-in diagnostics now cover rejected messages without
+  `acceptExternalMessage()`, missing or invalid account state, mismatched
+  `StateInit`, missing libraries, explicit VM throws before acceptance,
+  accepted compute/action failures, and external send failures that happen
+  before any transaction trace is produced.
 
 ## [1.0.0] - 11.05.2026
 
@@ -204,7 +239,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   acton test -v
   acton script scripts/deploy.tolk -v
-
+  
   # after
   acton test --verbose
   acton script scripts/deploy.tolk --verbose
@@ -224,7 +259,7 @@ linter, formatter, docs, templates, and editor integrations.
   if (!ok) {
       return;
   }
-
+  
   // after
   val applied = txs.waitForFirstTransaction();
   if (applied == null) {
@@ -254,7 +289,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   [wrappers.typescript]
   output-dir = "app/src/wrapper-ts"
-
+  
   # after
   [wrappers.typescript]
   output-dir = "app/src/wrappers-ts"
@@ -653,7 +688,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```bash
   # before
   acton script scripts/deploy.tolk --broadcast --net testnet
-
+  
   # after
   acton script scripts/deploy.tolk --net testnet
   ```
@@ -671,7 +706,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test --fork-net testnet --api-key YOUR_API_KEY
   acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
-
+  
   # after
   TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
   TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
@@ -691,7 +726,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [litenode]
   port = 3010
   fork-net = "testnet"
-
+  
   # after
   [localnet]
   port = 3010
@@ -726,7 +761,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [contracts.counter]
   name = "Counter"
   src = "contracts/counter.tolk"
-
+  
   # after
   [contracts.Counter]
   display-name = "Counter"
@@ -750,7 +785,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [wrappers.tolk]
   output-dir = "tests/wrappers"
   test-output-dir = "tests"
-
+  
   [import-mappings]
   wrappers = "tests/wrappers"
   ```
@@ -772,7 +807,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```text
   # before
   gen/jetton-wallet_code.tolk
-
+  
   # after
   gen/JettonWallet.code.tolk
   ```
@@ -790,7 +825,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   @test({ fail_with: 42 })
   @test({ gas_limit: 1000 })
   @test({ fuzz: { runs: 64, seed: 42 } })
-
+  
   // after
   @test.skip
   @test.todo("later")
@@ -811,7 +846,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test
   acton script scripts/debug.tolk
-
+  
   # after, to keep the old debug-log-heavy output
   acton test -v
   acton script scripts/debug.tolk --verbose
@@ -827,7 +862,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```tolk
   // before
   // acton-disable-next-line unused-variable
-
+  
   // after
   // check-disable-next-line unused-variable
   ```

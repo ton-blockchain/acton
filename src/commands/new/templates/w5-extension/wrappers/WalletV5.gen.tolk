@@ -116,7 +116,7 @@ fun WalletV5.sendExternalExternalSignedRequest(
     outActions: Cell<OutActionWithSendMessageOnly>?,
     hasExtraActions: bool,
     extraActions: SnakedExtraActions,
-): SendResultList? {
+): ExternalSendResult {
     // build body cell manually, because some fields have @abi.clientType
     val bodyB = beginCell()
         .storeUint(0x7369676e, 32)
@@ -132,7 +132,7 @@ fun WalletV5.sendExternalExternalSignedRequest(
 }
 
 /// Send an external-in message to the contract with a custom body cell
-fun WalletV5.sendAnyExternal(self, body: cell): SendResultList? {
+fun WalletV5.sendAnyExternal(self, body: cell): ExternalSendResult {
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }

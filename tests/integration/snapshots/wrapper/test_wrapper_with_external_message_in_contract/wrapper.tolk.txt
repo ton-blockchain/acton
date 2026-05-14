@@ -52,14 +52,14 @@ fun MyContract.sendAny(self, from: address, body: cell, config: SendParams = {})
     return net.send(from, genericMsg);
 }
 
-fun MyContract.sendExternalExtTrigger(self, queryId: uint64): SendResultList? {
+fun MyContract.sendExternalExtTrigger(self, queryId: uint64): ExternalSendResult {
     val body = ExtTrigger { queryId };
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }
 
 /// Send an external-in message to the contract with a custom body cell
-fun MyContract.sendAnyExternal(self, body: cell): SendResultList? {
+fun MyContract.sendAnyExternal(self, body: cell): ExternalSendResult {
     val msg = net.createExternalMessage(self.address, body);
     return net.sendExternal(msg);
 }

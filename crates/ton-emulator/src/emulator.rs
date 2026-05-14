@@ -78,6 +78,7 @@ pub struct PreparedSendTransaction {
     pub run_args: RunTransactionArgs,
     /// Resolved destination code cell, if known.
     pub code: Option<Cell>,
+    is_external: bool,
     destination: StdAddr,
     shard_account_before: ShardAccount,
 }
@@ -183,9 +184,9 @@ impl Emulator {
             .parse::<Message<'_>>()
             .context("Failed to parse message")?;
 
-        let dst = match &msg.info {
-            MsgInfo::Int(addr) => addr.dst.clone(),
-            MsgInfo::ExtIn(addr) => addr.dst.clone(),
+        let (dst, is_external) = match &msg.info {
+            MsgInfo::Int(addr) => (addr.dst.clone(), false),
+            MsgInfo::ExtIn(addr) => (addr.dst.clone(), true),
             MsgInfo::ExtOut(_) => {
                 anyhow::bail!("Send transaction only support internal and external-in messages")
             }
@@ -214,6 +215,7 @@ impl Emulator {
             message_b64: msg_b64,
             run_args,
             code,
+            is_external,
             destination: dst,
             shard_account_before,
         })
@@ -230,6 +232,7 @@ impl Emulator {
         let PreparedSendTransaction {
             code,
             destination,
+            is_external,
             shard_account_before,
             ..
         } = prepared;
@@ -241,9 +244,12 @@ impl Emulator {
                 result
             }
             EmulationResult::Error(mut err) => {
+                let external_not_accepted = err.external_not_accepted
+                    || (is_external && is_external_not_accepted_error(&err.error));
                 err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
+                    external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs,
@@ -392,6 +398,7 @@ impl Emulator {
                 err.missing_libraries = missing_libraries.take().unwrap_or_default();
                 return Ok(vec![SendMessageResult::Error(RunTransactionResultError {
                     error: err.error,
+                    external_not_accepted: err.external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
                     executor_logs: Some(executor_logs),
@@ -614,6 +621,12 @@ impl Emulator {
             }
         }
     }
+}
+
+fn is_external_not_accepted_error(error: &str) -> bool {
+    error.contains("external_not_accepted")
+        || error.contains("External message not accepted")
+        || error.contains("inbound external message rejected")
 }
 
 /// The result of a message emulation.
