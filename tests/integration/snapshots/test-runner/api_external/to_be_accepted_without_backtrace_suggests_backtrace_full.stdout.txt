@@ -12,9 +12,8 @@
     └─ Error: expect(actual).toBeAccepted()
         ├─ Status: external message was not accepted
         ├─ Reason: External message not accepted by smart contract
-        ├─ exit_code=10
-        ├─ Re-run with --backtrace full to get more information
         ├─ Compute phase failed: Dictionary error
+        ├─ Re-run with --backtrace full to get more information
         └─ at tests/external_api.test[LINE]
 
  ✗ 1 failed in 1 file

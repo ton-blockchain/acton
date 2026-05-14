@@ -439,33 +439,23 @@ fn process_assert_failure(
         } else {
             "external send failed before producing transactions"
         };
-        details.push(format!("{} {}", "Status:".dimmed(), status.yellow()));
-        details.push(format!(
-            "{} {}",
-            "Reason:".dimmed(),
-            failure.reason.yellow()
-        ));
+        details.push(format!("{} {}", "Status:", status.yellow()));
+        details.push(format!("{} {}", "Reason:", failure.reason.yellow()));
         let matcher_backtrace = assertion_backtrace_lines(test, result);
         let contract_backtrace = external_send_contract_backtrace_lines(fmt, test, failure);
         if let Some(exit_code) = failure.vm_exit_code {
+            let description = fmt
+                .format_compute_phase_failure_description(failure.destination.as_ref(), exit_code);
+            let compute_failure = description.unwrap_or_else(|| format!("exit code {exit_code}"));
             details.push(format!(
-                "{}{}",
-                "exit_code=".dimmed(),
-                exit_code.to_string().yellow()
+                "{} {}",
+                "Compute phase failed:",
+                compute_failure.yellow()
             ));
             if test.backtrace.is_none() {
                 details.push(format!(
                     "Re-run with {} to get more information",
                     "--backtrace full".yellow()
-                ));
-            }
-            if let Some(description) = fmt
-                .format_compute_phase_failure_description(failure.destination.as_ref(), exit_code)
-            {
-                details.push(format!(
-                    "{} {}",
-                    "Compute phase failed:".dimmed(),
-                    description.yellow()
                 ));
             }
         }
@@ -480,27 +470,31 @@ fn process_assert_failure(
         let has_location = failure.location.is_some();
 
         for (idx, detail) in details.iter().enumerate() {
-            let has_next = idx + 1 < details.len() || has_contract_backtrace || has_location;
+            let has_next = idx + 1 < details.len() || has_location || has_contract_backtrace;
             let branch = if has_next { "├─" } else { "└─" };
             println!("        {} {}", branch.dimmed(), detail);
         }
 
-        if has_contract_backtrace {
-            let branch = if has_location { "├─" } else { "└─" };
-            let nested_branch = if has_location { "│" } else { " " };
-            println!("        {} onExternalMessage backtrace:", branch.dimmed());
-            for line in contract_backtrace {
+        if let Some(location) = &failure.location {
+            let branch = if has_contract_backtrace {
+                "├─"
+            } else {
+                "└─"
+            };
+            let nested_branch = if has_contract_backtrace { "│" } else { " " };
+            println!(
+                "        {} at {}",
+                branch.dimmed(),
+                location.format().dimmed()
+            );
+            for line in matcher_backtrace {
                 println!("        {}     {line}", nested_branch.dimmed());
             }
         }
 
-        if let Some(location) = &failure.location {
-            println!(
-                "        {} at {}",
-                "└─".dimmed(),
-                location.format().dimmed()
-            );
-            for line in matcher_backtrace {
+        if has_contract_backtrace {
+            println!("        {} onExternalMessage backtrace:", "└─".dimmed());
+            for line in contract_backtrace {
                 println!("              {line}");
             }
         }
@@ -686,6 +680,12 @@ fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess)
 
     retrace::find_exception_info(&result.vm_log, &test.source_map)
         .map(|info| FormatterContext::format_backtrace(&info.backtrace))
+        .map(|lines| {
+            lines
+                .into_iter()
+                .filter(|line| !line.contains("ExternalSendResult.__failExternalSend"))
+                .collect()
+        })
         .unwrap_or_default()
 }
 

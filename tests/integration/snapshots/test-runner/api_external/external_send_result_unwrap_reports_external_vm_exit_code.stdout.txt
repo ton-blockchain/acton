@@ -12,14 +12,12 @@
     └─ Error: ExternalSendResult.unwrap()
         ├─ Status: external message was not accepted
         ├─ Reason: External message not accepted by smart contract
-        ├─ exit_code=10
         ├─ Compute phase failed: Dictionary error
-        ├─ onExternalMessage backtrace:
-        │     onExternalMessage   at contracts/external[LINE]
-        └─ at tests/external_api.test[LINE]
-              ExternalSendResult.__failExternalSend                            at ../lib/emulation/network[LINE]
-              ExternalSendResult.unwrap                                        at ../lib/emulation/network[LINE]
-              test external send result unwrap reports external vm [EXIT_STATUS]   at tests/external_api.test[LINE]
+        ├─ at tests/external_api.test[LINE]
+        │     ExternalSendResult.unwrap                                        at ../lib/emulation/network[LINE]
+        │     test external send result unwrap reports external vm [EXIT_STATUS]   at tests/external_api.test[LINE]
+        └─ onExternalMessage backtrace:
+              onExternalMessage   at contracts/external[LINE]
 
  ✗ 1 failed in 1 file
 

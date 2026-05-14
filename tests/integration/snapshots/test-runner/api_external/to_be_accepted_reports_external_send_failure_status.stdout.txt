@@ -13,7 +13,6 @@
         ├─ Status: external send failed before producing transactions
         ├─ Reason: external send failed before contract acceptance
         └─ at tests/external_api.test[LINE]
-              ExternalSendResult.__failExternalSend                    at ../lib/emulation/network[LINE]
               Expectation<ExternalSendResult>.toBeAccepted             at ../lib/emulation/network[LINE]
               test toBeAccepted reports external send failure status   at tests/external_api.test[LINE]
 

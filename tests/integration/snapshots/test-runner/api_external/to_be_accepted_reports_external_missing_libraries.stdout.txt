@@ -12,7 +12,7 @@
     └─ Error: expect(actual).toBeAccepted()
         ├─ Status: external message was not accepted
         ├─ Reason: external failed because libraries are unavailable
-        ├─ exit_code=41
+        ├─ Compute phase failed: [EXIT_STATUS] 41
         ├─ Re-run with --backtrace full to get more information
         ├─ Missing libraries: lib-alpha, lib-beta
         └─ at tests/external_api.test[LINE]

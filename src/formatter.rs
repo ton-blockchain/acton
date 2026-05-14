@@ -3323,13 +3323,13 @@ impl FormatterContext<'_> {
                 writeln!(result, "Status: {status}").ok();
                 writeln!(result, "Reason: {}", external_failure.reason).ok();
                 if let Some(exit_code) = external_failure.vm_exit_code {
-                    writeln!(result, "exit_code={exit_code}").ok();
-                    if let Some(description) = self.format_compute_phase_failure_description(
-                        external_failure.destination.as_ref(),
-                        exit_code,
-                    ) {
-                        writeln!(result, "Compute phase failed: {description}").ok();
-                    }
+                    let compute_failure = self
+                        .format_compute_phase_failure_description(
+                            external_failure.destination.as_ref(),
+                            exit_code,
+                        )
+                        .unwrap_or_else(|| format!("exit code {exit_code}"));
+                    writeln!(result, "Compute phase failed: {compute_failure}").ok();
                 }
                 if !external_failure.missing_libraries.is_empty() {
                     writeln!(

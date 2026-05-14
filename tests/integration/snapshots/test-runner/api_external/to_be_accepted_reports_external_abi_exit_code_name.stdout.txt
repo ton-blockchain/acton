@@ -12,14 +12,12 @@
     └─ Error: expect(actual).toBeAccepted()
         ├─ Status: external message was not accepted
         ├─ Reason: External message not accepted by smart contract
-        ├─ exit_code=701
         ├─ Compute phase failed: ERR_EXTERNAL_REJECTED
-        ├─ onExternalMessage backtrace:
-        │     onExternalMessage   at contracts/external[LINE]
-        └─ at tests/external_api.test[LINE]
-              ExternalSendResult.__failExternalSend                   at ../lib/emulation/network[LINE]
-              Expectation<ExternalSendResult>.toBeAccepted            at ../lib/emulation/network[LINE]
-              test toBeAccepted reports external abi [EXIT_STATUS] name   at tests/external_api.test[LINE]
+        ├─ at tests/external_api.test[LINE]
+        │     Expectation<ExternalSendResult>.toBeAccepted            at ../lib/emulation/network[LINE]
+        │     test toBeAccepted reports external abi [EXIT_STATUS] name   at tests/external_api.test[LINE]
+        └─ onExternalMessage backtrace:
+              onExternalMessage   at contracts/external[LINE]
 
  ✗ 1 failed in 1 file
 

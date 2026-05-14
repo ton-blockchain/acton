@@ -12,14 +12,12 @@
     └─ Error: expect(actual).toBeAccepted()
         ├─ Status: external message was not accepted
         ├─ Reason: External message not accepted by smart contract
-        ├─ exit_code=10
         ├─ Compute phase failed: Dictionary error
-        ├─ onExternalMessage backtrace:
-        │     onExternalMessage   at contracts/external[LINE]
-        └─ at tests/external_api.test[LINE]
-              ExternalSendResult.__failExternalSend             at ../lib/emulation/network[LINE]
-              Expectation<ExternalSendResult>.toBeAccepted      at ../lib/emulation/network[LINE]
-              test toBeAccepted reports external vm [EXIT_STATUS]   at tests/external_api.test[LINE]
+        ├─ at tests/external_api.test[LINE]
+        │     Expectation<ExternalSendResult>.toBeAccepted      at ../lib/emulation/network[LINE]
+        │     test toBeAccepted reports external vm [EXIT_STATUS]   at tests/external_api.test[LINE]
+        └─ onExternalMessage backtrace:
+              onExternalMessage   at contracts/external[LINE]
 
  ✗ 1 failed in 1 file
 
