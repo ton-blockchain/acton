@@ -441,7 +441,8 @@ fn process_assert_failure(
         };
         details.push(format!("{} {}", "Status:", status.yellow()));
         details.push(format!("{} {}", "Reason:", failure.reason.yellow()));
-        let matcher_backtrace = assertion_backtrace_lines(test, result);
+        let mut matcher_backtrace = assertion_backtrace_lines(test, result);
+        matcher_backtrace.retain(|line| !line.contains("ExternalSendResult.__failExternalSend"));
         let contract_backtrace = external_send_contract_backtrace_lines(fmt, test, failure);
         if let Some(exit_code) = failure.vm_exit_code {
             let description = fmt
@@ -680,12 +681,6 @@ fn assertion_backtrace_lines(test: &TestReport, result: &GetMethodResultSuccess)
 
     retrace::find_exception_info(&result.vm_log, &test.source_map)
         .map(|info| FormatterContext::format_backtrace(&info.backtrace))
-        .map(|lines| {
-            lines
-                .into_iter()
-                .filter(|line| !line.contains("ExternalSendResult.__failExternalSend"))
-                .collect()
-        })
         .unwrap_or_default()
 }
 
