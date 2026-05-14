@@ -1,8 +1,8 @@
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, CompilationResult, Context, DebugStopRequested, GetMethodAssertFailure,
-    KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep, SearchField, Wallet,
-    code_lookup_hash, compile_project_contract_with_cache, to_cell,
+    AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
+    GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
+    SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache, to_cell,
 };
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
@@ -39,7 +39,6 @@ use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
-use ton_executor::message::RunTransactionResultError;
 use ton_executor::message::step::StepExecutor;
 use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use tvm_ffi::serde::serialize_tuple;
@@ -452,10 +451,6 @@ fn send_external_message_impl(
     }
     .context("Cannot send external message")?;
 
-    let error = emulations.iter().find_map(|emulation| match emulation {
-        SendMessageResult::Success(_) => None,
-        SendMessageResult::Error(error) => Some(error),
-    });
     let transaction_cells = emulations
         .iter()
         .filter_map(|emulation| match emulation {
@@ -464,6 +459,16 @@ fn send_external_message_impl(
         })
         .filter_map(emulation_to_send_result)
         .collect::<Vec<_>>();
+    let trace_index = ctx
+        .chain
+        .emulations
+        .save_message(&ctx.env.running_id, emulations);
+    let error = ctx
+        .chain
+        .emulations
+        .results_of(&ctx.env.running_id)
+        .and_then(|emulations| emulations.failed_messages.get(trace_index))
+        .and_then(|failed_messages| failed_messages.first());
     let transactions = if transaction_cells.is_empty() && error.is_some() {
         TupleItem::Null
     } else {
@@ -471,9 +476,6 @@ fn send_external_message_impl(
     };
 
     let result = external_send_result_tuple(transactions, error);
-    ctx.chain
-        .emulations
-        .save_message(&ctx.env.running_id, emulations);
     stack.push(result);
     Ok(())
 }
@@ -507,7 +509,7 @@ fn broadcast_external_message(ctx: &mut Context, msg: Cell) -> anyhow::Result<Tu
 
 fn external_send_result_tuple(
     transactions: TupleItem,
-    error: Option<&RunTransactionResultError>,
+    error: Option<&FailedSendMessageResult>,
 ) -> TupleItem {
     TupleItem::Tuple(Tuple(vec![
         transactions,
@@ -515,7 +517,7 @@ fn external_send_result_tuple(
     ]))
 }
 
-fn external_send_error_tuple(error: &RunTransactionResultError) -> TupleItem {
+fn external_send_error_tuple(error: &FailedSendMessageResult) -> TupleItem {
     let mut libraries = error.missing_libraries.iter().collect::<Vec<_>>();
     libraries.sort();
     let missing_libraries = Tuple(
@@ -529,10 +531,9 @@ fn external_send_error_tuple(error: &RunTransactionResultError) -> TupleItem {
         string_tuple_item(&error.error),
         bool_tuple_item(error.external_not_accepted),
         optional_int_tuple_item(error.vm_exit_code),
-        optional_string_tuple_item(error.vm_log.as_deref()),
-        optional_string_tuple_item(error.executor_logs.as_deref()),
         optional_elapsed_time_ns(error.elapsed_time),
         TupleItem::Tuple(missing_libraries),
+        u64_tuple_item(error.diagnostic_id),
     ]))
 }
 
@@ -542,14 +543,14 @@ fn string_tuple_item(value: &str) -> TupleItem {
     tuple.0.pop().expect("push_string must add one tuple item")
 }
 
-fn optional_string_tuple_item(value: Option<&str>) -> TupleItem {
-    value.map_or(TupleItem::Null, string_tuple_item)
-}
-
 fn bool_tuple_item(value: bool) -> TupleItem {
     let mut tuple = Tuple::default();
     tuple.push_bool(value);
     tuple.0.pop().expect("push_bool must add one tuple item")
+}
+
+fn u64_tuple_item(value: u64) -> TupleItem {
+    TupleItem::Int(BigInt::from(value))
 }
 
 fn optional_int_tuple_item(value: Option<i64>) -> TupleItem {
@@ -3417,7 +3418,7 @@ mod tests {
     }
 
     fn test_error(message: &str) -> SendMessageResult {
-        SendMessageResult::Error(RunTransactionResultError {
+        SendMessageResult::Error(ton_executor::message::RunTransactionResultError {
             error: message.to_string(),
             external_not_accepted: false,
             vm_log: None,

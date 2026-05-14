@@ -760,10 +760,9 @@ get fun `test toBeAccepted reports external error without vm exit code`() {
             message: "custom external failure without vm code",
             externalNotAccepted: true,
             vmExitCode: null,
-            vmLog: null,
-            executorLogs: null,
             elapsedTimeNs: null,
             missingLibraries,
+            diagnosticId: null,
         },
     };
 
@@ -801,10 +800,9 @@ get fun `test toBeAccepted reports external send failure status`() {
             message: "external send failed before contract acceptance",
             externalNotAccepted: false,
             vmExitCode: null,
-            vmLog: null,
-            executorLogs: null,
             elapsedTimeNs: null,
             missingLibraries,
+            diagnosticId: null,
         },
     };
 
@@ -842,10 +840,9 @@ get fun `test toBeAccepted reports external missing libraries`() {
             message: "external failed because libraries are unavailable",
             externalNotAccepted: true,
             vmExitCode: 41,
-            vmLog: null,
-            executorLogs: null,
             elapsedTimeNs: null,
             missingLibraries,
+            diagnosticId: null,
         },
     };
 

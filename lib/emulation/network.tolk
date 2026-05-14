@@ -190,14 +190,12 @@ struct ExternalSendError {
     externalNotAccepted: bool
     /// VM exit code reported by the emulator, if available.
     vmExitCode: int?
-    /// VM log reported by the emulator, if available.
-    vmLog: string?
-    /// Executor log reported by Acton, if available.
-    executorLogs: string?
     /// Emulator elapsed time in nanoseconds, if available.
     elapsedTimeNs: int?
     /// Hashes of libraries that were requested but not found during emulation.
     missingLibraries: array<string>
+    /// Opaque diagnostic id.
+    diagnosticId: int?
 }
 
 /// Result returned by [net.sendExternal].
@@ -205,7 +203,7 @@ struct ExternalSendError {
 /// If the external-in message is accepted, `transactions` contains the produced
 /// trace. If it is rejected before acceptance or cannot be emulated,
 /// `transactions` is `null` and `error` contains emulator metadata such as VM
-/// exit code, logs, elapsed time, and missing libraries.
+/// exit code, elapsed time, missing libraries, and an opaque diagnostic id.
 ///
 /// In tests, prefer `expect(result).toBeAccepted()`,
 /// `expect(result).toBeNotAccepted()`, and
@@ -256,10 +254,9 @@ fun ExternalSendError.__toFFITuple(self, destination: address?): tuple {
         self.message,
         self.externalNotAccepted,
         self.vmExitCode,
-        self.vmLog,
-        self.executorLogs,
         self.elapsedTimeNs,
         self.missingLibraries,
+        self.diagnosticId,
         destination,
     ];
 }

@@ -511,9 +511,9 @@ fn fail_external_send_not_accepted_impl(
                 .unwrap_or_else(|| "External message not accepted by smart contract".to_owned()),
             external_not_accepted: tuple_bool(&error, 1).unwrap_or(false),
             vm_exit_code: tuple_optional_int(&error, 2).and_then(|value| value.to_i32()),
-            vm_log: tuple_optional_string(&error, 3),
-            missing_libraries: tuple_string_vec(&error, 6).unwrap_or_default(),
-            destination: tuple_optional_std_addr(&error, 7),
+            diagnostic_id: tuple_optional_int(&error, 5).and_then(|value| value.to_u64()),
+            missing_libraries: tuple_string_vec(&error, 4).unwrap_or_default(),
+            destination: tuple_optional_std_addr(&error, 6),
             location: SourceLocation::parse(&location)?,
         },
     ));
@@ -530,10 +530,6 @@ fn tuple_string(tuple: &Tuple, index: usize) -> Option<String> {
 
 fn tuple_bool(tuple: &Tuple, index: usize) -> Option<bool> {
     bool::from_item(tuple_item(tuple, index)).ok()
-}
-
-fn tuple_optional_string(tuple: &Tuple, index: usize) -> Option<String> {
-    Option::<String>::from_item(tuple_item(tuple, index)).ok()?
 }
 
 fn tuple_optional_int(tuple: &Tuple, index: usize) -> Option<BigInt> {

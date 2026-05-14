@@ -171,7 +171,7 @@ pub struct ExternalSendNotAcceptedFailure {
     pub reason: String,
     pub external_not_accepted: bool,
     pub vm_exit_code: Option<i32>,
-    pub vm_log: Option<String>,
+    pub diagnostic_id: Option<u64>,
     pub missing_libraries: Vec<String>,
     pub destination: Option<StdAddr>,
     pub location: Option<SourceLocation>,
@@ -410,6 +410,7 @@ pub struct TracePosition {
 
 #[derive(Clone, Debug)]
 pub struct FailedSendMessageResult {
+    pub diagnostic_id: u64,
     pub error: String,
     pub external_not_accepted: bool,
     pub vm_log: Option<String>,
@@ -430,6 +431,7 @@ impl Emulations {
 #[derive(Clone, Debug)]
 pub struct EmulationsState {
     pub results: FxHashMap<String, Emulations>,
+    next_failed_message_id: u64,
 }
 
 impl Default for EmulationsState {
@@ -443,6 +445,7 @@ impl EmulationsState {
     pub fn new() -> Self {
         Self {
             results: FxHashMap::default(),
+            next_failed_message_id: 1,
         }
     }
 
@@ -463,7 +466,8 @@ impl EmulationsState {
     }
 
     pub fn save_message(&mut self, env_name: &str, message: Vec<SendMessageResult>) -> usize {
-        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let (successful_messages, failed_messages) =
+            split_send_message_results(&message, &mut self.next_failed_message_id);
         let emulations = self.emulations_mut(env_name);
         emulations.messages.push(successful_messages);
         emulations.failed_messages.push(failed_messages);
@@ -482,7 +486,8 @@ impl EmulationsState {
         trace_index: usize,
         message: Vec<SendMessageResult>,
     ) -> usize {
-        let (successful_messages, failed_messages) = split_send_message_results(&message);
+        let (successful_messages, failed_messages) =
+            split_send_message_results(&message, &mut self.next_failed_message_id);
         let emulations = self.emulations_mut(env_name);
 
         if trace_index >= emulations.messages.len()
@@ -592,6 +597,14 @@ impl EmulationsState {
         self.find_tx_by_lt(lt).map(|res| &res.missing_libraries)
     }
 
+    #[must_use]
+    pub fn find_failed_message(&self, diagnostic_id: u64) -> Option<&FailedSendMessageResult> {
+        self.results
+            .values()
+            .flat_map(|result| result.failed_messages.iter().flatten())
+            .find(|message| message.diagnostic_id == diagnostic_id)
+    }
+
     fn emulations_mut(&mut self, env_name: &str) -> &mut Emulations {
         self.results
             .entry(env_name.to_owned())
@@ -608,6 +621,7 @@ impl EmulationsState {
 
 fn split_send_message_results(
     message: &[SendMessageResult],
+    next_failed_message_id: &mut u64,
 ) -> (Vec<SendMessageResultSuccess>, Vec<FailedSendMessageResult>) {
     let successful_messages = message
         .iter()
@@ -621,15 +635,20 @@ fn split_send_message_results(
         .iter()
         .filter_map(|m| match m {
             SendMessageResult::Success(_) => None,
-            SendMessageResult::Error(error) => Some(FailedSendMessageResult {
-                error: error.error.clone(),
-                external_not_accepted: error.external_not_accepted,
-                vm_log: error.vm_log.clone(),
-                vm_exit_code: error.vm_exit_code,
-                elapsed_time: error.elapsed_time,
-                executor_logs: error.executor_logs.clone(),
-                missing_libraries: error.missing_libraries.clone(),
-            }),
+            SendMessageResult::Error(error) => {
+                let diagnostic_id = *next_failed_message_id;
+                *next_failed_message_id = diagnostic_id.saturating_add(1);
+                Some(FailedSendMessageResult {
+                    diagnostic_id,
+                    error: error.error.clone(),
+                    external_not_accepted: error.external_not_accepted,
+                    vm_log: error.vm_log.clone(),
+                    vm_exit_code: error.vm_exit_code,
+                    elapsed_time: error.elapsed_time,
+                    executor_logs: error.executor_logs.clone(),
+                    missing_libraries: error.missing_libraries.clone(),
+                })
+            }
         })
         .collect::<Vec<_>>();
 

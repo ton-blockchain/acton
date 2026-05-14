@@ -698,7 +698,11 @@ fn external_send_contract_backtrace_lines(
         return Vec::new();
     }
 
-    let Some(vm_log) = failure.vm_log.as_deref().filter(|log| !log.is_empty()) else {
+    let vm_log = failure
+        .diagnostic_id
+        .and_then(|diagnostic_id| fmt.emulations.find_failed_message(diagnostic_id))
+        .and_then(|message| message.vm_log.as_deref());
+    let Some(vm_log) = vm_log.filter(|log| !log.is_empty()) else {
         return Vec::new();
     };
     let Some(destination) = failure.destination.as_ref() else {
