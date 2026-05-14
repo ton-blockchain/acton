@@ -69,12 +69,12 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const NO_ACCEPT_EXTERNAL_CONTRACT: &str = r#"
+const NO_ACCEPT_EXTERNAL_CONTRACT: &str = r"
 fun onExternalMessage() {}
 
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
-"#;
+";
 
 const ACCEPT_THEN_THROW_EXTERNAL_CONTRACT: &str = r#"
 import "@stdlib/gas-payments"
@@ -801,7 +801,7 @@ get fun `test send external prefunded uninit bad state rejected`() {
 fn send_external_rejects_active_account_with_mismatched_state_init() {
     run_snapshot_case(
         "o-lib-api-send-external-active-bad-state",
-        r#"
+        r"
 get fun `test send external active bad state rejected`() {
     val (harness, _) = deployHarness();
 
@@ -818,7 +818,7 @@ get fun `test send external active bad state rejected`() {
     expect(result.transactions).toBeNull();
     expect(testing.isDeployed(harness.address)).toBeTrue();
 }
-"#,
+",
         "integration/snapshots/test-runner/api_external/send_external_rejects_active_account_with_mismatched_state_init.stdout.txt",
     );
 }
