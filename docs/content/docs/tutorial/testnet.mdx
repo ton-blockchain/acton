@@ -13,7 +13,7 @@ description: "Create a funded testnet wallet, deploy the poll, verify source cod
 acton wallet new --name testnet-deployer --local --airdrop --version w5r1
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton wallet new --name testnet-deployer --local --airdrop --version w5r1
 ✓ Wallet successfully created and added to wallets.toml
 ✓ Wallet address is kQCC94LVUO3dVUBgBKKHhw-i3GyXwEIy4BH3rymKB0iamEo9
@@ -44,7 +44,7 @@ acton script scripts/deploy.tolk --net testnet
   The deploy script calls `scripts.wallet("deployer")`. Pass `WALLET=testnet-deployer` as an environment variable, or update the script to use `scripts.wallet("testnet-deployer")` for testnet runs.
 </Callout>
 
-```acton-cli noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton script scripts/deploy.tolk --net testnet
 Awaiting trace... [Attempt 1/20]
 Trace settled with 2 transaction(s)
@@ -68,7 +68,7 @@ acton rpc info <POLL_ADDRESS> --net testnet
 
 `<POLL_ADDRESS>` — the address printed by the deployment script.
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton rpc info kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U --net testnet
 
 Remote Account
@@ -100,7 +100,7 @@ Source verification proves the deployed bytecode was compiled from specific sour
 acton verify Poll --address <POLL_ADDRESS> --net testnet
 ```
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton verify Poll --address EQC9R1p... --net testnet
 ✓ Contract verification completed!
 View at: https://verifier.ton.org/EQC9R1p...?testnet
@@ -114,7 +114,7 @@ When `--dry-run` is not used, the final verification transaction sends `0.1 TON`
 acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
 ```
 
-```acton-cli noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton script --net testnet scripts/vote.tolk kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U 0
 Awaiting trace... [Attempt 1/20]
 Trace settled with 3 transaction(s)
@@ -135,7 +135,7 @@ To inspect the raw on-chain trace first, use `acton rpc trace`:
 acton rpc trace <TX_HASH> --net testnet
 ```
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton rpc trace 9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8 --net testnet
 Trace Summary
   Query Hash:        9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8
@@ -161,7 +161,7 @@ acton retrace <TX_HASH> --net testnet --contract Poll
 
 `<TX_HASH>` — the transaction hash printed by the vote script.
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton retrace 9e2fd109fc5f7eb7340d4b108e861b710523641ae37f0e810ca13e513e8b7ec8 --net testnet --contract Poll
 Network:             testnet
 State Hash OK:       Yes

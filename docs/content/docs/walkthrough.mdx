@@ -35,7 +35,7 @@ acton new first_counter --template counter --app
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton new first_counter --template counter --app
   Installing standard library v1.0.0
 > Initialized empty Git repository in /home/you/first_counter/.git/
@@ -81,7 +81,7 @@ acton run deploy-testnet
 
 Output:
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton run deploy-testnet
 acton script contracts/scripts/deploy.tolk --net testnet
 Awaiting trace... [Attempt 1/20]
@@ -105,7 +105,7 @@ acton build
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build
    Compiling contracts
    Compiling Counter
@@ -140,7 +140,7 @@ acton build --info
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton build --info
    Compiling contracts
     Finished in 2.7ms
@@ -162,7 +162,7 @@ acton fmt
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton fmt
 All files are already formatted
 ```
@@ -175,7 +175,7 @@ acton fmt --check
 
 When a file is not formatted correctly, `--check` prints a unified diff and exits with a non-zero status:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton fmt --check
 Diff in contracts/src/Counter.tolk:
 -fun onInternalMessage(in:InMessage){
@@ -204,7 +204,7 @@ acton check
 
 On a clean project, it prints the checked targets and exits with status 0:
 
-```acton-cli-check noCopy
+```acton-cli-check noCopy title="terminal"
 $ acton check
     Checking Counter
     Checking contracts/scripts/deploy.tolk
@@ -213,7 +213,7 @@ $ acton check
 
 When issues are found, output looks like this:
 
-```acton-cli-check noCopy
+```acton-cli-check noCopy title="terminal"
 $ acton check
 warning[E001]: variable `x` is unused
   --> contracts/src/Counter.tolk:12:9
@@ -251,7 +251,7 @@ acton wrapper --all
 
 Output:
 
-```acton-cli-wrapper noCopy
+```acton-cli-wrapper noCopy title="terminal"
 $ acton wrapper --all
    Generated contracts/wrappers/Counter.gen.tolk
 ```
@@ -270,7 +270,7 @@ Pass `--ts` to emit a TypeScript wrapper instead, which the app template consume
 acton wrapper Counter --ts
 ```
 
-```acton-cli-wrapper noCopy
+```acton-cli-wrapper noCopy title="terminal"
 $ acton wrapper Counter --ts
    Generated wrappers-ts/Counter.gen.ts
 ```
@@ -287,7 +287,7 @@ acton test
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton test
    Compiling contracts
     Finished in 726.375µs
@@ -360,7 +360,7 @@ acton test --mutate --mutate-contract Counter
 
 Output:
 
-```acton-cli-mutate noCopy
+```acton-cli-mutate noCopy title="terminal"
 $ acton test --mutate --mutate-contract Counter
 
 Mutation Testing
@@ -416,7 +416,7 @@ acton test --backtrace full
 
 The clean counter template passes. The output below shows the kind of source locations Acton prints when a test fails:
 
-```acton-cli-trace noCopy
+```acton-cli-trace noCopy title="terminal"
 $ acton test --backtrace full
    Compiling contracts
    Compiling Counter
@@ -491,7 +491,7 @@ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton test contracts/tests/counter.test.tolk --filter "increase counter" --debug --debug-port 4711
   Compiling contracts
    Finished in 6.2ms
@@ -608,7 +608,7 @@ acton script contracts/scripts/increase.tolk
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton script contracts/scripts/increase.tolk
 Deploy value: 5000000
 Increasing counter by 1
@@ -649,7 +649,7 @@ acton wallet new --name deployer --local --airdrop --version v5r1
 
 Output:
 
-```acton-cli noCopy
+```acton-cli noCopy title="terminal"
 $ acton wallet new --name deployer --local --airdrop --version v5r1
 
 ✓ Wallet successfully created and added to wallets.toml

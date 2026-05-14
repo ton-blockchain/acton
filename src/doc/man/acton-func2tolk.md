@@ -75,7 +75,7 @@ That means converter downloads are not reused across runs.
 
 Acton runs:
 
-```text noCopy
+```text noCopy title="terminal"
 npx --yes @ton/convert-func-to-tolk@<version> ...
 ```
 
