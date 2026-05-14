@@ -49,7 +49,8 @@ Go deeper in:
 `net.sendExternal(...)` returns an `ExternalSendResult`. When the external-in
 message is accepted, `result.transactions` contains the produced transaction
 trace. When the contract rejects the message before acceptance, the trace is
-`null` and `result.error` contains emulator metadata.
+`null` and `result.error` contains emulator metadata such as
+`externalNotAccepted`, `message` and `vmExitCode`.
 
 ```tolk
 val result = net.sendExternal(msg);
@@ -58,23 +59,32 @@ expect(result).toBeAccepted();
 
 val txs = result.unwrap();
 expect(txs).toHaveAllSuccessfulTxs();
+
+val tx = result.at(0);
+result.giveName("external vote");
 ```
 
 Available helpers:
 
-- `isAccepted()`
-- `unwrap()`
-- `at()`
-- `giveName()`
-- `waitForFirstTransaction()`
-- `waitForTrace()`
-- `findExternalOutMessage()`
+- `isAccepted()` returns whether the external-in message produced a trace.
+- `unwrap()` returns the produced `SendResultList` or fails with the same
+  external diagnostics as `toBeAccepted()`.
+- `at(index)` unwraps the trace and returns one `SendResult`.
+- `giveName(name)` names the external trace for the Test UI and gas/fee reports.
+- `waitForFirstTransaction()` waits for the root on-chain transaction, or
+  returns `null` when the external message was not accepted.
+- `waitForTrace()` waits for the full on-chain trace, or returns `null` when the
+  external message was not accepted.
+- `findExternalOutMessage<T>()` searches external-out messages in the accepted
+  trace, or returns `null` for rejected external-in messages.
 
 Available matchers:
 
-- `toBeAccepted()`
-- `toBeNotAccepted()`
-- `toHaveExternalVmExitCode()`
+- `toBeAccepted()` expects an accepted external-in message and a produced trace.
+- `toBeNotAccepted()` expects rejection before acceptance.
+- `toHaveExternalVmExitCode(exitCode)` checks the VM exit code reported for a
+  rejected external-in message. For accepted messages, use transaction matchers
+  on `result.unwrap()`.
 
 Failed `toBeAccepted()` checks include the external status, emulator reason, VM
 exit code when available, known exit-code description or ABI error name, source
@@ -86,6 +96,9 @@ val result = net.sendExternal(invalidMsg);
 expect(result).toBeNotAccepted();
 expect(result).toHaveExternalVmExitCode(10);
 ```
+
+Rejected external-in diagnostics include the matcher location and, with
+`--backtrace full`, the contract-side `onExternalMessage` backtrace.
 
 Go deeper in:
 
