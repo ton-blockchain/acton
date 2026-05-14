@@ -16,6 +16,7 @@
 :root {
   --headless-color: #2d83ec;
   --ui-color: #2d83ec;
+  --color-fd-background: #ffffff;
 
   --color-fd-primary: var(--ui-color);
   --color-fd-idea: oklch(65% 0.2 145);
@@ -24,6 +25,7 @@
 .dark {
   --headless-color: #9ae7ff;
   --ui-color: #9ae7ff;
+  --color-fd-background: #121212;
 }
 
 body {
