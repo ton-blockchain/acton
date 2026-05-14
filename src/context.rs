@@ -204,9 +204,14 @@ impl AssertFailure {
             AssertFailure::Bin(arg) => arg.message.clone(),
             AssertFailure::Decimal(arg) => arg.message.clone(),
             AssertFailure::Fail(arg) | AssertFailure::Assume(arg) => arg.message.clone(),
-            AssertFailure::GetMethod(_)
-            | AssertFailure::ExternalSendNotAccepted(_)
-            | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
+            AssertFailure::GetMethod(_) | AssertFailure::WalletNotFound(_) => None, // Formatted in FormatterContext
+            AssertFailure::ExternalSendNotAccepted(arg) => {
+                if arg.external_not_accepted {
+                    Some("External message was not accepted".to_owned())
+                } else {
+                    Some("External send failed before producing transactions".to_owned())
+                }
+            }
             AssertFailure::TransactionNotFound(arg) | AssertFailure::TransactionIsFound(arg) => {
                 arg.message.clone()
             }

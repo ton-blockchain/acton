@@ -597,6 +597,37 @@ get fun `test toBeAccepted reports external no accept`() {
 }
 
 #[test]
+fn junit_reporter_preserves_external_send_failure_message() {
+    let source = with_prelude(
+        r"
+get fun `test junit reports external not accepted message`() {
+    val (harness, _) = deployHarness();
+
+    val result = net.sendExternal(
+        net.createExternalMessage(harness.address, createEmptyCell()),
+    );
+
+    expect(result).toBeAccepted();
+}
+",
+    );
+
+    ProjectBuilder::new("o-lib-api-send-external-junit-message")
+        .contract("external", REJECTING_EXTERNAL_CONTRACT)
+        .test_file("external_api", &source)
+        .build()
+        .acton()
+        .test()
+        .with_reporter("junit")
+        .run()
+        .failure()
+        .assert_file_snapshot_matches(
+            "test-results/TEST-external_api.test.tolk.xml",
+            "integration/snapshots/test-runner/api_external/junit_reporter_preserves_external_send_failure_message.xml.gen",
+        );
+}
+
+#[test]
 fn send_external_returns_trace_when_compute_fails_after_accept() {
     let source = with_prelude(
         r"
