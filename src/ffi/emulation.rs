@@ -3406,7 +3406,6 @@ mod tests {
             external_not_accepted: false,
             vm_log: None,
             vm_exit_code: None,
-            elapsed_time: None,
             executor_logs: None,
             missing_libraries: FxHashSet::default(),
         })

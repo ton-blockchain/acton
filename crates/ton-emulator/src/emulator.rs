@@ -252,7 +252,6 @@ impl Emulator {
                     external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
-                    elapsed_time: err.elapsed_time,
                     executor_logs,
                     missing_libraries: err.missing_libraries,
                 }));
@@ -402,7 +401,6 @@ impl Emulator {
                     external_not_accepted: err.external_not_accepted,
                     vm_log: err.vm_log,
                     vm_exit_code: err.vm_exit_code,
-                    elapsed_time: err.elapsed_time,
                     executor_logs: Some(executor_logs),
                     missing_libraries: err.missing_libraries,
                 })]);

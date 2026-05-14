@@ -41,8 +41,6 @@ pub struct RunTransactionResultError {
     pub vm_log: Option<String>,
     /// VM exit code (if available).
     pub vm_exit_code: Option<i64>,
-    /// Emulator-reported elapsed time in seconds (if available).
-    pub elapsed_time: Option<f64>,
     /// Set by executor.
     pub executor_logs: Option<Arc<str>>,
     /// Hashes of missing libraries observed during this emulator run.

@@ -415,7 +415,6 @@ pub struct FailedSendMessageResult {
     pub external_not_accepted: bool,
     pub vm_log: Option<String>,
     pub vm_exit_code: Option<i64>,
-    pub elapsed_time: Option<f64>,
     pub executor_logs: Option<Arc<str>>,
     pub missing_libraries: FxHashSet<String>,
 }
@@ -644,7 +643,6 @@ fn split_send_message_results(
                     external_not_accepted: error.external_not_accepted,
                     vm_log: error.vm_log.clone(),
                     vm_exit_code: error.vm_exit_code,
-                    elapsed_time: error.elapsed_time,
                     executor_logs: error.executor_logs.clone(),
                     missing_libraries: error.missing_libraries.clone(),
                 })
