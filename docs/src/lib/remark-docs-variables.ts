@@ -1,21 +1,41 @@
 import type {Code, InlineCode, Root, Text} from "mdast"
 import type {MdxFlowExpression, MdxTextExpression} from "mdast-util-mdx-expression"
+import {readFileSync} from "node:fs"
 import type {Node, Parent} from "unist"
 import {visit} from "unist-util-visit"
 
-export const docsVariables = {
-  acton_version: "1.0.0",
+type DocsVariables = Record<string, string | undefined>
+
+function parseDocsVariables(source: string): DocsVariables {
+  const variables: DocsVariables = {}
+
+  for (const line of source.split("\n")) {
+    const trimmedLine = line.trim()
+    if (trimmedLine.length === 0) {
+      continue
+    }
+
+    const separatorIndex = trimmedLine.indexOf("=")
+    if (separatorIndex === -1) {
+      continue
+    }
+
+    const name = trimmedLine.slice(0, separatorIndex).trim()
+    const value = trimmedLine.slice(separatorIndex + 1).trim()
+    if (name.length > 0) {
+      variables[name] = value
+    }
+  }
+
+  return variables
 }
 
-type DocsVariableName = keyof typeof docsVariables
+export const docsVariables = parseDocsVariables(readFileSync(".versions", "utf8"))
+
 type DocsValueNode = Code | InlineCode | Text
 type DocsExpressionNode = MdxFlowExpression | MdxTextExpression
 
 const variablePattern = /(?<!\$)\{\{\s*([A-Za-z][A-Za-z0-9_]*)\s*\}\}/g
-
-function isDocsVariable(name: string): name is DocsVariableName {
-  return Object.hasOwn(docsVariables, name)
-}
 
 function isDocsValueNode(node: Node): node is DocsValueNode {
   return node.type === "code" || node.type === "inlineCode" || node.type === "text"
@@ -30,13 +50,14 @@ function isTextNode(node: Node | undefined): node is Text {
 }
 
 function replaceDocsVariables(value: string) {
-  return value.replace(variablePattern, (match, name: string) =>
-    isDocsVariable(name) ? docsVariables[name] : match,
-  )
+  return value.replace(variablePattern, (match, name: string) => {
+    const variable = docsVariables[name]
+    return variable ?? match
+  })
 }
 
 function isEscapedExpression(parent: Parent | undefined, index: number | undefined) {
-  if (!parent?.children || index === undefined || index === 0) {
+  if (parent?.children === undefined || index === undefined || index === 0) {
     return false
   }
 
@@ -45,7 +66,7 @@ function isEscapedExpression(parent: Parent | undefined, index: number | undefin
 }
 
 function replaceNodeWithText(parent: Parent | undefined, index: number | undefined, value: string) {
-  if (!parent || index === undefined) {
+  if (parent === undefined || index === undefined) {
     return
   }
 

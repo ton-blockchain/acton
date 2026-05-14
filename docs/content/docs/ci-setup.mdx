@@ -33,7 +33,7 @@ These commands should exit with status `0`.
   docker run --rm \
     -v "$PWD":/workspace \
     -w /workspace \
-    ghcr.io/ton-blockchain/acton:latest \
+    ghcr.io/ton-blockchain/acton:{{ acton_version }} \
     build
   ```
 
