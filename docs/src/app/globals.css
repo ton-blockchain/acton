@@ -17,6 +17,11 @@
   --headless-color: #2d83ec;
   --ui-color: #2d83ec;
   --color-fd-background: #ffffff;
+  --color-fd-muted: #fbfbfb;
+  --color-fd-popover: #ffffff;
+  --color-fd-card: #f9f9f9;
+  --color-fd-secondary: #f9f9f9;
+  --color-fd-accent: #f1f1f1;
 
   --color-fd-primary: var(--ui-color);
   --color-fd-idea: oklch(65% 0.2 145);
@@ -26,6 +31,11 @@
   --headless-color: #9ae7ff;
   --ui-color: #9ae7ff;
   --color-fd-background: #121212;
+  --color-fd-muted: hsl(0, 0%, 12.9%);
+  --color-fd-popover: hsl(0, 0%, 11.6%);
+  --color-fd-card: hsl(0, 0%, 9.8%);
+  --color-fd-secondary: hsl(0, 0%, 12.9%);
+  --color-fd-accent: hsla(0, 0%, 40.9%, 30%);
 }
 
 body {
