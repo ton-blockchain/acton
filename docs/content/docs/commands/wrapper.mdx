@@ -277,6 +277,9 @@ output-dir = "wrappers-ts"
 ```
 
 CLI flags override config values for the current invocation.
+Manifest-configured wrapper output paths are project-relative and must stay
+inside the project root; CLI output flags remain explicit paths for the current
+run.
 
 ## Exit Status
 

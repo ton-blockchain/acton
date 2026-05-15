@@ -251,6 +251,8 @@ output-fift = "build/fift"
 CLI flags override config values for the current invocation.
 For dependency helpers, a per-dependency `depends[].path` still overrides the
 resolved `gen-dir` for that helper file.
+Manifest-configured output paths are project-relative and must stay inside the
+project root; CLI output flags remain explicit paths for the current run.
 
 ## Outputs
 
@@ -289,9 +291,11 @@ contract and its transitive dependencies.
 
 ## Side Effects
 
-`acton build` writes artifacts, cache entries, and optional graph output under
-the resolved project root. If one contract fails after earlier contracts were
-built successfully, the successful artifacts remain on disk.
+`acton build` writes cache entries under the resolved project root. Manifest
+output paths are confined to that root, while explicit CLI output flags and the
+optional graph output may point elsewhere for the current run. If one contract
+fails after earlier contracts were built successfully, the successful artifacts
+remain on disk.
 
 Before compiling, `acton build` normally refreshes the bundled standard library
 under `.acton/`. Set `ACTON_DISABLE_AUTO_STDLIB=1` to skip that automatic

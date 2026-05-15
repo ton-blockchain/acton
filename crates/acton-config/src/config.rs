@@ -106,7 +106,7 @@ pub enum ContractDependency {
         kind: DependencyKind,
         /// Custom name for the generated code function
         function: Option<String>,
-        /// Custom output path for the generated code file
+        /// Project-relative custom output path for the generated code file
         path: Option<String>,
     },
 }
@@ -437,13 +437,13 @@ const fn default_fmt_separate_import_groups() -> Option<bool> {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct BuildSettings {
-    /// Directory where JSON build artifacts are saved
+    /// Project-relative directory where JSON build artifacts are saved
     pub out_dir: Option<String>,
-    /// Directory where generated dependency files are saved
+    /// Project-relative directory where generated dependency files are saved
     pub gen_dir: Option<String>,
-    /// Directory where per-contract ABI JSON files are saved
+    /// Project-relative directory where per-contract ABI JSON files are saved
     pub output_abi: Option<String>,
-    /// Directory where per-contract compiled Fift files are saved
+    /// Project-relative directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
 }
 
@@ -460,11 +460,11 @@ pub struct WrappersConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct TolkWrapperSettings {
-    /// Directory where `acton wrapper` writes generated Tolk wrappers by default
+    /// Project-relative directory where `acton wrapper` writes generated Tolk wrappers by default
     pub output_dir: Option<String>,
     /// Generate a Tolk test stub by default for `acton wrapper`
     pub generate_test: Option<bool>,
-    /// Directory where generated Tolk test stubs are written by default
+    /// Project-relative directory where generated Tolk test stubs are written by default
     pub test_output_dir: Option<String>,
 }
 
@@ -472,7 +472,7 @@ pub struct TolkWrapperSettings {
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct TypescriptWrapperSettings {
-    /// Directory where `acton wrapper --ts` writes generated TypeScript wrappers by default
+    /// Project-relative directory where `acton wrapper --ts` writes generated TypeScript wrappers by default
     pub output_dir: Option<String>,
 }
 
@@ -605,7 +605,7 @@ pub struct ContractConfig {
     pub src: String,
     /// Dependencies of this contract
     pub depends: Option<Vec<ContractDependency>>,
-    /// Path where the compiled `.boc` should be saved
+    /// Project-relative path where the compiled `.boc` should be saved
     pub output: Option<String>,
 }
 

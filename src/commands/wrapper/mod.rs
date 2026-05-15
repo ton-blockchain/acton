@@ -1,4 +1,5 @@
 use crate::commands::common::error_fmt;
+use crate::paths::resolve_manifest_write_path;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root};
 use anyhow::{Context, anyhow};
@@ -116,9 +117,15 @@ fn build_model(
         .map(ToOwned::to_owned);
     let configured_tolk_test_output_dir =
         config.tolk_wrapper_test_output_dir().map(ToOwned::to_owned);
-    let mapped_wrapper_output_dir = mappings
+    let mapped_wrapper_output_dir = config
+        .mappings
         .as_ref()
-        .and_then(|mappings| mappings.get("@wrappers").cloned());
+        .and_then(|mappings| {
+            mappings
+                .get("wrappers")
+                .or_else(|| mappings.get("@wrappers"))
+                .cloned()
+        });
     let storage = abi.resolve_storage_struct()?;
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let incoming_external_messages = abi.resolve_incoming_external_message_structs()?;
@@ -140,14 +147,14 @@ fn build_model(
         configured_typescript_output_dir,
         mapped_wrapper_output_dir,
         generate_typescript,
-    );
+    )?;
     let test_path = resolve_test_path(
         &project_root,
         contract_id,
         test_output,
         test_output_dir,
         configured_tolk_test_output_dir,
-    );
+    )?;
 
     let message_paths = message_paths.into_iter().collect();
 
@@ -348,39 +355,51 @@ fn resolve_wrapper_path(
     configured_ts_output_dir: Option<String>,
     mapped_wrapper_output_dir: Option<String>,
     generate_typescript: bool,
-) -> PathBuf {
+) -> anyhow::Result<PathBuf> {
     if let Some(wrapper_output) = non_empty_path(wrapper_output) {
-        return PathBuf::from(wrapper_output);
+        return Ok(PathBuf::from(wrapper_output));
     }
 
     let file_name = wrapper_file_name(contract_name, generate_typescript);
 
     if let Some(wrapper_output_dir) = non_empty_path(wrapper_output_dir) {
-        return PathBuf::from(wrapper_output_dir).join(&file_name);
+        return Ok(PathBuf::from(wrapper_output_dir).join(&file_name));
     }
 
     if generate_typescript {
         if let Some(configured_ts_output_dir) = non_empty_path(configured_ts_output_dir) {
-            return resolve_project_config_path(project_root, &configured_ts_output_dir)
-                .join(&file_name);
+            return Ok(resolve_manifest_write_path(
+                project_root,
+                &configured_ts_output_dir,
+                "[wrappers.typescript].output-dir",
+            )?
+            .join(&file_name));
         }
 
-        return project_root
+        return Ok(project_root
             .join(DEFAULT_TYPESCRIPT_WRAPPER_DIR)
-            .join(&file_name);
+            .join(&file_name));
     }
 
     if let Some(configured_tolk_output_dir) = non_empty_path(configured_tolk_output_dir) {
-        return resolve_project_config_path(project_root, &configured_tolk_output_dir)
-            .join(&file_name);
+        return Ok(resolve_manifest_write_path(
+            project_root,
+            &configured_tolk_output_dir,
+            "[wrappers.tolk].output-dir",
+        )?
+        .join(&file_name));
     }
 
     if let Some(mapped_wrapper_output_dir) = non_empty_path(mapped_wrapper_output_dir) {
-        return resolve_project_config_path(project_root, &mapped_wrapper_output_dir)
-            .join(&file_name);
+        return Ok(resolve_manifest_write_path(
+            project_root,
+            &mapped_wrapper_output_dir,
+            "[import-mappings].wrappers",
+        )?
+        .join(&file_name));
     }
 
-    project_root.join(DEFAULT_TOLK_WRAPPER_DIR).join(&file_name)
+    Ok(project_root.join(DEFAULT_TOLK_WRAPPER_DIR).join(&file_name))
 }
 
 fn resolve_test_path(
@@ -389,23 +408,27 @@ fn resolve_test_path(
     test_output: Option<String>,
     test_output_dir: Option<String>,
     configured_tolk_test_output_dir: Option<String>,
-) -> PathBuf {
+) -> anyhow::Result<PathBuf> {
     if let Some(test_output) = non_empty_path(test_output) {
-        return PathBuf::from(test_output);
+        return Ok(PathBuf::from(test_output));
     }
 
     let file_name = format!("{contract_id}.test.tolk");
 
     if let Some(test_output_dir) = non_empty_path(test_output_dir) {
-        return PathBuf::from(test_output_dir).join(&file_name);
+        return Ok(PathBuf::from(test_output_dir).join(&file_name));
     }
 
     if let Some(configured_tolk_test_output_dir) = non_empty_path(configured_tolk_test_output_dir) {
-        return resolve_project_config_path(project_root, &configured_tolk_test_output_dir)
-            .join(&file_name);
+        return Ok(resolve_manifest_write_path(
+            project_root,
+            &configured_tolk_test_output_dir,
+            "[wrappers.tolk].test-output-dir",
+        )?
+        .join(&file_name));
     }
 
-    project_root.join("tests").join(&file_name)
+    Ok(project_root.join("tests").join(&file_name))
 }
 
 fn wrapper_file_name(contract_name: &str, generate_typescript: bool) -> String {
@@ -429,15 +452,6 @@ fn non_empty_path(path: Option<String>) -> Option<String> {
 
 fn has_non_empty_path(path: Option<&str>) -> bool {
     path.is_some_and(|path| !path.trim().is_empty())
-}
-
-fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        project_root.join(path)
-    }
 }
 
 fn generate_typescript_wrapper(model: &WrapperModel) -> anyhow::Result<String> {

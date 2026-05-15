@@ -12,6 +12,7 @@ This page provides a complete reference for all configuration options available 
 Acton uses two different path-resolution models:
 
 - Relative paths from `Acton.toml` are resolved from project root.
+- Manifest-configured output paths for build and wrapper generation must stay inside the project root.
 - Relative CLI path flags stay relative to the current working directory unless absolute.
 - `--manifest-path` only chooses which manifest to load. It does not rebase unrelated CLI path flags to the manifest directory.
 
@@ -105,7 +106,7 @@ acton build --output-abi artifacts/abi
 acton build --output-fift artifacts/fift
 ```
 
-Config values in `[build]` are project-root-relative. CLI paths such as `--out-dir`, `--gen-dir`, `--output-abi`, `--output-fift`, and `--graph` remain cwd-relative unless absolute.
+Config values in `[build]` are project-root-relative and must stay inside the project root. CLI paths such as `--out-dir`, `--gen-dir`, `--output-abi`, `--output-fift`, and `--graph` remain cwd-relative unless absolute.
 
 ### Wrappers section
 
@@ -125,10 +126,10 @@ Available fields:
 
 | Field                              | Type    | Default | Description                                                          |
 |------------------------------------|---------|---------|----------------------------------------------------------------------|
-| `[wrappers.tolk].output-dir`       | string  | -       | Default directory for generated Tolk wrappers                        |
+| `[wrappers.tolk].output-dir`       | string  | -       | Project-relative default directory for generated Tolk wrappers       |
 | `[wrappers.tolk].generate-test`    | boolean | `false` | Generate a Tolk test stub by default for non-TypeScript wrapper runs |
-| `[wrappers.tolk].test-output-dir`  | string  | -       | Default directory for generated Tolk test stubs                      |
-| `[wrappers.typescript].output-dir` | string  | -       | Default directory for generated TypeScript wrappers                  |
+| `[wrappers.tolk].test-output-dir`  | string  | -       | Project-relative default directory for generated Tolk test stubs     |
+| `[wrappers.typescript].output-dir` | string  | -       | Project-relative default directory for generated TypeScript wrappers |
 
 Override rules:
 
@@ -137,7 +138,7 @@ Override rules:
 - Test stub path: `--test-output` -> `--test-output-dir` -> `[wrappers.tolk].test-output-dir` -> wrapper command built-in default.
 - `[wrappers.tolk].generate-test` only affects non-TypeScript runs. `acton wrapper --ts` still rejects test-stub options.
 
-Configured wrapper paths are project-root-relative. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` remain cwd-relative unless absolute.
+Configured wrapper paths are project-root-relative and must stay inside the project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` remain cwd-relative unless absolute.
 
 ### Contracts section
 
@@ -157,7 +158,7 @@ depends = []
 |----------------|--------|----------|--------------------------------------------------------------------------------------------------------------------|
 | `display-name` | string | No       | Overrides full name (e.g. `Wallet` instead of `JettonWallet`) in console messages and UI.                          |
 | `src`          | string | Yes      | Path to the contract source file. Can be a `.tolk` file for compilation or a `.boc` file for precompiled contracts |
-| `output`       | string | No       | Path where the compiled `.boc` file should be saved. If omitted, the compiled contract is only cached              |
+| `output`       | string | No       | Project-relative path where the compiled `.boc` file should be saved. If omitted, the compiled contract is only cached |
 | `depends`      | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
 
 #### Contract names
@@ -202,7 +203,7 @@ depends = [
 | `name`     | string | Yes      | -                            | Contract name to depend on. Must match a `[contracts.*]` name                                                      |
 | `kind`     | string | No       | `"embed_code"`               | Dependency type: `"embed_code"` or `"library_ref"`. Omitting it in the detailed form still means `"embed_code"`    |
 | `function` | string | No       | Auto-generated               | Custom name for the generated function. If omitted, Acton derives it from the dependency key using the rules below |
-| `path`     | string | No       | `{gen-dir}/{name}.code.tolk` | Custom output path for the generated file. Relative manifest paths are resolved from the project root              |
+| `path`     | string | No       | `{gen-dir}/{name}.code.tolk` | Project-relative custom output path for the generated file                                                        |
 
 #### Dependency helper generation rules
 
@@ -219,7 +220,7 @@ Helper file placement uses this precedence:
 
 Path resolution follows the normal config-vs-CLI rules:
 
-- `depends[].path` and `[build].gen-dir` are project-root-relative unless absolute
+- `depends[].path` and `[build].gen-dir` are project-root-relative and must stay inside the project root
 - `--gen-dir` is cwd-relative unless absolute
 - if `depends[].path` is set, it fully replaces the default helper location
 

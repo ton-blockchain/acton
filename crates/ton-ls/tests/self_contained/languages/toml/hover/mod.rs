@@ -165,7 +165,7 @@ fn test_hover_contracts_depends_nested_objects() {
             contracts.wallet.depends[0].path
             ```
 
-            Custom output path for the generated code file
+            Project-relative custom output path for the generated code file
 
             - Type: `string`
 

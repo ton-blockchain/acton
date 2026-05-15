@@ -22,6 +22,7 @@ This matters for all relative paths from config sections, e.g., `[contracts].src
 Relative CLI path flags are a separate rule:
 
 - Relative paths written inside `Acton.toml` are resolved from project root.
+- Manifest-configured output paths for build and wrapper generation must stay inside the project root.
 - Relative CLI path flags stay relative to the current working directory unless they are absolute.
 - `--manifest-path` chooses which manifest to load, but it does not rebase unrelated CLI path flags to the manifest directory.
 
@@ -100,7 +101,7 @@ This section is a map where each key is a contract name and the value is a contr
 | `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.     |
 | `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
-| `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+| `output`       | `string` | No       | Project-relative path where the compiled `.boc` should be saved.        |
 
 ### Contract dependencies
 
@@ -115,9 +116,9 @@ Dependencies can be specified in two ways:
    - `name`: Name of the contract to depend on.
    - `kind`: Dependency type. Either `embed_code` (default) or `library_ref`.
    - `function`: Custom name for the generated code function.
-   - `path`: Custom output path for the generated code file.
+   - `path`: Project-relative custom output path for the generated code file.
 
-Dependency helper naming uses the contract key from `[contracts.<name>]`, not `display-name`. Relative dependency `path` values are resolved from the project root.
+Dependency helper naming uses the contract key from `[contracts.<name>]`, not `display-name`. Dependency `path` values are resolved from the project root and must stay inside it.
 
 Example:
 
@@ -137,10 +138,10 @@ Configures defaults for `acton build`.
 
 | Field         | Type     | Required | Description                                                                              |
 |:--------------|:---------|:---------|:-----------------------------------------------------------------------------------------|
-| `out-dir`     | `string` | No       | Directory where build JSON artifacts are written (default: `build`).                     |
-| `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
-| `output-abi`  | `string` | No       | Directory where contract ABI JSON files are written (default: `build/abi`).              |
-| `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
+| `out-dir`     | `string` | No       | Project-relative directory where build JSON artifacts are written (default: `build`).                     |
+| `gen-dir`     | `string` | No       | Project-relative directory where generated dependency files are written (default: `gen`).                 |
+| `output-abi`  | `string` | No       | Project-relative directory where contract ABI JSON files are written (default: `build/abi`).              |
+| `output-fift` | `string` | No       | Project-relative directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
 
 Example:
 
@@ -152,7 +153,7 @@ output-abi = "build/abi"
 output-fift = "build/fift"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Arbitrary `.boc` contracts are skipped in ABI and Fift output.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative and must stay inside the project root. The CLI flags stay relative to the current working directory unless absolute paths are passed. Arbitrary `.boc` contracts are skipped in ABI and Fift output.
 
 ## `[wrappers]`
 
@@ -162,15 +163,15 @@ Configures default output locations for `acton wrapper`.
 
 | Field             | Type      | Default | Description                                                           |
 |:------------------|:----------|:--------|:----------------------------------------------------------------------|
-| `output-dir`      | `string`  | -       | Default directory for generated Tolk wrappers.                        |
+| `output-dir`      | `string`  | -       | Project-relative default directory for generated Tolk wrappers.       |
 | `generate-test`   | `boolean` | `false` | Generate a Tolk test stub by default for non-TypeScript wrapper runs. |
-| `test-output-dir` | `string`  | -       | Default directory for generated Tolk test stubs.                      |
+| `test-output-dir` | `string`  | -       | Project-relative default directory for generated Tolk test stubs.     |
 
 ### `[wrappers.typescript]`
 
 | Field        | Type     | Default | Description                                          |
 |:-------------|:---------|:--------|:-----------------------------------------------------|
-| `output-dir` | `string` | -       | Default directory for generated TypeScript wrappers. |
+| `output-dir` | `string` | -       | Project-relative default directory for generated TypeScript wrappers. |
 
 Example:
 
@@ -191,7 +192,7 @@ Override rules:
 - For Tolk test stubs, `--test-output` has highest priority, then `--test-output-dir`, then `[wrappers.tolk].test-output-dir`, then the wrapper command's built-in default test location.
 - `[wrappers.tolk].generate-test` affects only non-TypeScript wrapper generation. `acton wrapper --ts` still cannot be combined with test-stub generation.
 
-Configured wrapper paths are resolved from project root. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
+Configured wrapper paths are resolved from project root and must stay inside it. CLI paths such as `--output`, `--output-dir`, `--test-output`, and `--test-output-dir` stay relative to the current working directory unless absolute.
 
 For full CLI behavior, see [`acton wrapper`](/docs/commands/wrapper).
 

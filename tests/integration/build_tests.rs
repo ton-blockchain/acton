@@ -13,6 +13,10 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+fn toml_string(value: &Path) -> String {
+    format!("\"{}\"", value.display().to_string().replace('\\', "\\\\"))
+}
+
 #[test]
 fn test_build_simple_contract() {
     let project = ProjectBuilder::new("build-simple")
@@ -1654,6 +1658,139 @@ fn test_build_with_out_dir_cli_overrides_config() {
     assert!(
         !project.path().join("config-artifacts/simple.json").exists(),
         "config-artifacts/simple.json should not be created when CLI override is used"
+    );
+}
+
+#[test]
+fn test_build_rejects_config_out_dir_outside_project_root() {
+    let project = ProjectBuilder::new("build-config-out-dir-outside")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let outside_dir = project.path().parent().unwrap().join("outside-build");
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str("\n[build]\nout-dir = \"../outside-build\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[build].out-dir must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_dir.exists(),
+        "config out-dir must not create directories outside the project"
+    );
+}
+
+#[test]
+fn test_build_rejects_absolute_config_out_dir() {
+    let project = ProjectBuilder::new("build-config-out-dir-absolute")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let outside_dir = project.path().parent().unwrap().join("absolute-build");
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml = fs::read_to_string(&acton_toml_path).expect("Should read Acton.toml");
+    acton_toml.push_str(&format!(
+        "\n[build]\nout-dir = {}\n",
+        toml_string(&outside_dir)
+    ));
+    fs::write(&acton_toml_path, acton_toml).expect("Should write Acton.toml");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[build].out-dir must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_dir.exists(),
+        "absolute config out-dir must not create directories outside the project"
+    );
+}
+
+#[test]
+fn test_build_rejects_contract_output_outside_project_root() {
+    let project = ProjectBuilder::new("build-contract-output-outside")
+        .contract_with_output("simple", SIMPLE_CONTRACT, "../outside-simple.boc")
+        .build();
+
+    let outside_file = project.path().parent().unwrap().join("outside-simple.boc");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "[contracts.<name>].output must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_file.exists(),
+        "contract output must not write outside the project"
+    );
+}
+
+#[test]
+fn test_build_rejects_dependency_output_path_outside_project_root() {
+    let project = ProjectBuilder::new("build-dependency-output-outside")
+        .contract("child", SIMPLE_CONTRACT)
+        .contract_with_detailed_deps(
+            "parent",
+            SIMPLE_CONTRACT,
+            vec![("child", None, None, Some("../outside-child.code.tolk"))],
+        )
+        .build();
+
+    let outside_file = project
+        .path()
+        .parent()
+        .unwrap()
+        .join("outside-child.code.tolk");
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_contains(
+            "depends[].path must be a project-relative path inside the project root",
+        );
+
+    assert!(
+        !outside_file.exists(),
+        "dependency output path must not write outside the project"
+    );
+}
+
+#[test]
+fn test_build_cli_out_dir_can_write_outside_project_root() {
+    let project = ProjectBuilder::new("build-cli-out-dir-outside")
+        .contract("simple", SIMPLE_CONTRACT)
+        .build();
+
+    let outside_dir = project.path().parent().unwrap().join("explicit-build");
+
+    project
+        .acton()
+        .build()
+        .with_out_dir("../explicit-build")
+        .run()
+        .success();
+
+    assert!(
+        outside_dir.join("simple.json").exists(),
+        "explicit CLI out-dir should still be allowed outside the project"
     );
 }
 

@@ -1,5 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::file_build_cache::FileBuildCache;
+use crate::paths::resolve_manifest_write_path;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
 use acton_config::config::{
@@ -67,7 +68,7 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
     println!("   {} contracts", "Compiling".green().bold());
 
     let config = ActonConfig::load()?;
-    let out_dir = resolve_build_output_dir(
+    let out_dir = resolve_build_output_dir_with_field(
         out_dir,
         config
             .build
@@ -75,8 +76,9 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
             .and_then(|build| non_empty_path(build.out_dir.clone())),
         "build",
         project_root,
-    );
-    let gen_dir = resolve_build_output_dir(
+        "[build].out-dir",
+    )?;
+    let gen_dir = resolve_build_output_dir_with_field(
         gen_dir,
         config
             .build
@@ -84,8 +86,9 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
             .and_then(|build| non_empty_path(build.gen_dir.clone())),
         "gen",
         project_root,
-    );
-    let output_abi_dir = resolve_build_output_dir(
+        "[build].gen-dir",
+    )?;
+    let output_abi_dir = resolve_build_output_dir_with_field(
         output_abi,
         config
             .build
@@ -93,7 +96,8 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
             .and_then(|build| non_empty_path(build.output_abi.clone())),
         "build/abi",
         project_root,
-    );
+        "[build].output-abi",
+    )?;
     let output_fift_dir = resolve_optional_build_output_dir(
         output_fift,
         config
@@ -101,7 +105,8 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
             .as_ref()
             .and_then(|build| non_empty_path(build.output_fift.clone())),
         project_root,
-    );
+        "[build].output-fift",
+    )?;
 
     if !out_dir.exists() {
         fs::create_dir_all(&out_dir)?;
@@ -464,7 +469,11 @@ fn save_boc_file(
         .as_deref()
         .filter(|path| !path.is_empty())
     {
-        let output_path = resolve_project_config_path(project_root, config_output_path);
+        let output_path = resolve_manifest_write_path(
+            project_root,
+            config_output_path,
+            "[contracts.<name>].output",
+        )?;
         let display_parent_dir = Path::new(config_output_path)
             .parent()
             .or_else(|| output_path.parent());
@@ -707,7 +716,7 @@ fn generate_single_dependency_file(
     );
 
     let output_path = if let Some(output_path) = dependency.compiled_code_out_path() {
-        resolve_project_config_path(project_root, output_path)
+        resolve_manifest_write_path(project_root, output_path, "depends[].path")?
     } else {
         gen_dir.join(format!("{dependency_contract}.code.tolk"))
     };
@@ -755,34 +764,49 @@ pub(crate) fn resolve_build_output_dir(
     config_path: Option<String>,
     default_dir: &str,
     project_root: &Path,
-) -> PathBuf {
+) -> anyhow::Result<PathBuf> {
+    resolve_build_output_dir_with_field(
+        cli_path,
+        config_path,
+        default_dir,
+        project_root,
+        "build output path",
+    )
+}
+
+pub(crate) fn resolve_build_output_dir_with_field(
+    cli_path: Option<String>,
+    config_path: Option<String>,
+    default_dir: &str,
+    project_root: &Path,
+    field_name: &str,
+) -> anyhow::Result<PathBuf> {
     if let Some(cli_path) = non_empty_path(cli_path) {
-        return PathBuf::from(cli_path);
+        return Ok(PathBuf::from(cli_path));
     }
     if let Some(config_path) = non_empty_path(config_path) {
-        return resolve_project_config_path(project_root, &config_path);
+        return resolve_manifest_write_path(project_root, &config_path, field_name);
     }
-    project_root.join(default_dir)
+    Ok(project_root.join(default_dir))
 }
 
 fn resolve_optional_build_output_dir(
     cli_path: Option<String>,
     config_path: Option<String>,
     project_root: &Path,
-) -> Option<PathBuf> {
+    field_name: &str,
+) -> anyhow::Result<Option<PathBuf>> {
     if let Some(cli_path) = non_empty_path(cli_path) {
-        return Some(PathBuf::from(cli_path));
+        return Ok(Some(PathBuf::from(cli_path)));
     }
-    non_empty_path(config_path)
-        .map(|config_path| resolve_project_config_path(project_root, &config_path))
-}
-
-fn resolve_project_config_path(project_root: &Path, path: &str) -> PathBuf {
-    let path = Path::new(path);
-    if path.is_absolute() {
-        path.to_path_buf()
+    if let Some(config_path) = non_empty_path(config_path) {
+        Ok(Some(resolve_manifest_write_path(
+            project_root,
+            &config_path,
+            field_name,
+        )?))
     } else {
-        project_root.join(path)
+        Ok(None)
     }
 }
 
