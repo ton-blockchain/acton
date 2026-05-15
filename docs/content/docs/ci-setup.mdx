@@ -143,22 +143,36 @@ Acton offers a GitHub action to set itself up. [`setup-acton`](https://github.co
     echo "Version: ${{ steps.setup-acton.outputs.acton-version }}"
 ```
 
-For a contract-only repository, create `.github/workflows/ci.yml`:
+For a contract-only repository, create `.github/workflows/contracts.yml`:
 
-```yaml title=".github/workflows/ci.yml"
-name: CI
+```yaml title=".github/workflows/contracts.yml"
+name: Contracts
 
 on:
+  push:
+    # Keep the primary protected branch:
+    branches:
+      - main
+      - master
   pull_request:
     branches:
-      # Keep the primary protected branch:
       - main
       - master
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
 jobs:
-  validate:
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -172,14 +186,14 @@ jobs:
       - name: Build
         run: acton build
 
-      - name: Test
-        run: acton test
+      - name: Formatter
+        run: acton fmt --check
 
-      - name: Lint
+      - name: Linter
         run: acton check --output-format github
 
-      - name: Format
-        run: acton fmt --check
+      - name: Test
+        run: acton test
 ```
 
 - The `acton check --output-format github` command emits workflow annotations directly in the GitHub Actions log and pull request checks.
@@ -238,20 +252,34 @@ minimum-percent = 50
 
 If the repository also contains a frontend created with `acton new --app` or a custom one, add Node.js setup and frontend validation steps:
 
-```yaml title=".github/workflows/ci.yml"
-name: CI
+```yaml title=".github/workflows/dapp.yml"
+name: dApp
 
 on:
+  push:
+    # Keep the primary protected branch:
+    branches:
+      - main
+      - master
   pull_request:
     branches:
-      # Keep the primary protected branch:
       - main
       - master
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
 jobs:
-  validate:
+  build-and-test:
+    name: Build and Test
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
@@ -265,32 +293,20 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Setup Acton
-        uses: ton-blockchain/setup-acton@2d38fd579e1bf8753a3e0cff9ad695612b98a676 # v1.0.0
-
-      - name: Install Node dependencies
+      - name: Install dependencies
         run: npm ci
 
-      - name: Frontend tests
-        run: npm run test
+      - name: Formatter
+        run: npm run fmt:check
 
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Acton build
-        run: acton build
-
-      - name: Frontend build
+      - name: Build
         run: npm run build
 
-      - name: Acton lint
-        run: acton check --output-format github
-
-      - name: Acton format
-        run: acton fmt --check
-
-      - name: Prettier # or other formatting tool such as Biome
-        run: npm run fmt:check
+      - name: Test
+        run: npm run test
 ```
 
 ## Set up GitLab CI
