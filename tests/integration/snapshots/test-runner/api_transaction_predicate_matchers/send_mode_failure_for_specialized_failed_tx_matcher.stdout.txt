@@ -1,0 +1,28 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✗ send mode failed tx mismatch [TIME]
+    └─ Error: expect(actual).toHaveFailedTx(expected)
+        N/A -> sender A
+        └── Ping 0.5 TON -> harness B                                                   gas=2171
+            └── Ping 0.1 TON -> harness B                                               gas=583 exit_code=701 aborted
+                └── Compute phase failed: ERR_FAIL
+        
+        Cannot find transaction from harness B EQCLlS..c1L6Hl to harness B EQCLlS..c1L6Hl
+        with:
+          opcode=0xae110001 Ping
+          success=false
+          exit_code=701
+          send_mode=SEND_MODE_PAY_FEES_SEPARATELY
+      └─ at tests/predicate_matchers.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

@@ -477,6 +477,8 @@ struct SearchParams {
     /// });
     /// ```
     state_init: (Cell<StateInit?> -> bool) | Cell<StateInit?> | null = null
+    /// Send mode of the parent action that produced this transaction.
+    sendMode: (uint32 -> bool) | uint32 | null = null
 }
 
 /// Bind first argument to a 2-arg function, producing a 1-arg function.
@@ -526,7 +528,8 @@ fun SearchParams.hasPredicates(self): bool {
     impl.isPredicate(self.actionExitCode) |
     impl.isPredicate(self.computePhaseSkipped) |
     impl.isPredicate(self.body) |
-    impl.isPredicate(self.state_init);
+    impl.isPredicate(self.state_init) |
+    impl.isPredicate(self.sendMode);
 }
 
 /// Convert SearchParams to a tuple of plain nullable scalar values for the fast FFI path.
@@ -546,6 +549,7 @@ fun SearchParams.toScalarFFITuple(self): tuple {
         impl.unwrapScalar(self.computePhaseSkipped),
         impl.unwrapScalar(self.body),
         impl.unwrapScalar(self.state_init),
+        impl.unwrapScalar(self.sendMode),
     ];
 }
 
@@ -566,6 +570,7 @@ fun SearchParams.toPredicateFFITuple(self): tuple {
         impl.toPredicate(self.computePhaseSkipped),
         impl.toPredicate(self.body),
         impl.toPredicate(self.state_init),
+        impl.toPredicate(self.sendMode),
     ];
 }
 

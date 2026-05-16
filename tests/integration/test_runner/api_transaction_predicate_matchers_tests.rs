@@ -51,6 +51,76 @@ fun onBouncedMessage(_: InMessageBounced) {
 }
 "#;
 
+const SEND_MODE_CONTRACT: &str = r#"
+import "@stdlib/gas-payments"
+import "messages"
+
+const ERR_FAIL = 701;
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy Ping.fromSlice(in.body);
+
+    if (msg.queryId == 10) {
+        throw ERR_FAIL;
+    }
+
+    if (msg.queryId == 20) {
+        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        return;
+    }
+
+    if (msg.queryId == 40) {
+        createMessage({
+            bounce: false,
+            value: ton("0.1"),
+            dest: in.senderAddress,
+            body: BounceNotice { queryId: msg.queryId },
+        }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+        return;
+    }
+
+    if (msg.queryId == 50) {
+        createExternalLogMessage({
+            dest: createAddressNone(),
+            body: BounceNotice { queryId: 49 },
+        }).send(SEND_MODE_IGNORE_ERRORS);
+
+        createMessage({
+            bounce: false,
+            value: ton("0.1"),
+            dest: in.senderAddress,
+            body: BounceNotice { queryId: 50 },
+        }).send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
+
+        createMessage({
+            bounce: false,
+            value: ton("0.1"),
+            dest: in.senderAddress,
+            body: BounceNotice { queryId: 51 },
+        }).send(SEND_MODE_REGULAR);
+        return;
+    }
+
+    if (msg.queryId == 60) {
+        createMessage({
+            bounce: false,
+            value: ton("0.1"),
+            dest: contract.getAddress(),
+            body: Ping { queryId: 10 },
+        }).send(SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS);
+        return;
+    }
+}
+
+fun onBouncedMessage(_: InMessageBounced) {
+    throw 777;
+}
+"#;
+
 const TEST_PRELUDE: &str = r#"
 import "../../lib/build"
 import "../../lib/emulation/network"
@@ -140,11 +210,16 @@ fn with_prelude(test_body: &str) -> String {
     format!("{TEST_PRELUDE}\n{test_body}\n")
 }
 
-fn run_success_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+fn run_success_case_with_contract(
+    project_name: &str,
+    contract: &str,
+    test_body: &str,
+    snapshot_name: &str,
+) {
     let source = with_prelude(test_body);
     ProjectBuilder::new(project_name)
         .file("contracts/messages", PREDICATE_MESSAGES)
-        .contract("harness", PREDICATE_CONTRACT)
+        .contract("harness", contract)
         .test_file("predicate_matchers", &source)
         .build()
         .acton()
@@ -155,11 +230,16 @@ fn run_success_case(project_name: &str, test_body: &str, snapshot_name: &str) {
         .assert_snapshot_matches(&format!("{SNAPSHOT_DIR}/{snapshot_name}.stdout.txt"));
 }
 
-fn run_failure_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+fn run_failure_case_with_contract(
+    project_name: &str,
+    contract: &str,
+    test_body: &str,
+    snapshot_name: &str,
+) {
     let source = with_prelude(test_body);
     ProjectBuilder::new(project_name)
         .file("contracts/messages", PREDICATE_MESSAGES)
-        .contract("harness", PREDICATE_CONTRACT)
+        .contract("harness", contract)
         .test_file("predicate_matchers", &source)
         .build()
         .acton()
@@ -168,6 +248,22 @@ fn run_failure_case(project_name: &str, test_body: &str, snapshot_name: &str) {
         .failure()
         .assert_failed(1)
         .assert_snapshot_matches(&format!("{SNAPSHOT_DIR}/{snapshot_name}.stdout.txt"));
+}
+
+fn run_success_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+    run_success_case_with_contract(project_name, PREDICATE_CONTRACT, test_body, snapshot_name);
+}
+
+fn run_failure_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+    run_failure_case_with_contract(project_name, PREDICATE_CONTRACT, test_body, snapshot_name);
+}
+
+fn run_send_mode_success_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+    run_success_case_with_contract(project_name, SEND_MODE_CONTRACT, test_body, snapshot_name);
+}
+
+fn run_send_mode_failure_case(project_name: &str, test_body: &str, snapshot_name: &str) {
+    run_failure_case_with_contract(project_name, SEND_MODE_CONTRACT, test_body, snapshot_name);
 }
 
 #[test]
@@ -233,6 +329,229 @@ get fun `test predicate regular transaction fields`() {
 }
 "#,
         "predicate_matchers_cover_regular_transaction_fields",
+    );
+}
+
+#[test]
+fn send_mode_filter_matches_scalar_and_predicate_paths() {
+    run_send_mode_success_case(
+        "ae-predicate-send-mode-filter",
+        r#"
+get fun `test send mode filter`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 40);
+
+    expect(res).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    });
+    expect(res).toNotHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_REGULAR,
+    });
+    expect(res).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: fun(mode: uint32): bool {
+            println("sendMode={}", mode);
+            return mode == SEND_MODE_PAY_FEES_SEPARATELY;
+        },
+    });
+}
+"#,
+        "send_mode_filter_matches_scalar_and_predicate_paths",
+    );
+}
+
+#[test]
+fn send_mode_mismatch_formats_expected_constants() {
+    run_send_mode_failure_case(
+        "ae-predicate-send-mode-mismatch-format",
+        r"
+get fun `test send mode mismatch format`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 40);
+
+    expect(res).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE | SEND_MODE_BOUNCE_ON_ACTION_FAIL,
+    });
+}
+",
+        "send_mode_mismatch_formats_expected_constants",
+    );
+}
+
+#[test]
+fn send_mode_covers_matcher_variants_and_edge_cases() {
+    run_send_mode_success_case(
+        "ae-predicate-send-mode-matcher-variants",
+        r"
+get fun `test send mode matcher variants and edge cases`() {
+    val (sender, harness, deployRes) = deployHarness();
+
+    expect(deployRes).toNotHaveTx({
+        to: harness.address,
+        deploy: true,
+        sendMode: SEND_MODE_REGULAR,
+    });
+    val deployWithMode = deployRes.findTransaction({
+        to: harness.address,
+        deploy: true,
+        sendMode: fun(mode: uint32): bool {
+            throw 998;
+        },
+    });
+    expect(deployWithMode).toBeNull();
+
+    val oneChild = sendPing(sender, harness, 40);
+    expect(oneChild.findTransaction<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    })).toBeNotNull();
+    expect(oneChild.findTransaction<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_REGULAR,
+    })).toBeNull();
+    expect(oneChild).toHaveSuccessfulTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    });
+
+    val multiChild = sendPing(sender, harness, 50);
+    val firstNotice = BounceNotice { queryId: 50 }.toCell();
+    val secondNotice = BounceNotice { queryId: 51 }.toCell();
+
+    expect(multiChild).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        body: firstNotice,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS,
+    });
+    expect(multiChild).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        body: secondNotice,
+        sendMode: SEND_MODE_REGULAR,
+    });
+    expect(multiChild.findTransaction<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        body: firstNotice,
+        sendMode: SEND_MODE_REGULAR,
+    })).toBeNull();
+    expect(multiChild.findTransaction<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        body: secondNotice,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS,
+    })).toBeNull();
+
+    val failedChild = sendPing(sender, harness, 60);
+    expect(failedChild).toHaveFailedTx<Ping>({
+        from: harness.address,
+        to: harness.address,
+        exitCode: ERR_FAIL,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY | SEND_MODE_IGNORE_ERRORS,
+    });
+    expect(failedChild).toNotHaveTx<Ping>({
+        from: harness.address,
+        to: harness.address,
+        exitCode: ERR_FAIL,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    });
+}
+",
+        "send_mode_covers_matcher_variants_and_edge_cases",
+    );
+}
+
+#[test]
+fn send_mode_failure_for_root_transaction_without_parent_action() {
+    run_send_mode_failure_case(
+        "ae-predicate-send-mode-root-missing",
+        r"
+get fun `test send mode root transaction missing parent action`() {
+    val (_sender, harness, deployRes) = deployHarness();
+
+    expect(deployRes).toHaveTx({
+        to: harness.address,
+        deploy: true,
+        sendMode: SEND_MODE_REGULAR,
+    });
+}
+",
+        "send_mode_failure_for_root_transaction_without_parent_action",
+    );
+}
+
+#[test]
+fn send_mode_failure_for_specialized_failed_tx_matcher() {
+    run_send_mode_failure_case(
+        "ae-predicate-send-mode-failed-tx-mismatch",
+        r"
+get fun `test send mode failed tx mismatch`() {
+    val (sender, harness, _) = deployHarness();
+    val failedChild = sendPing(sender, harness, 60);
+
+    expect(failedChild).toHaveFailedTx<Ping>({
+        from: harness.address,
+        to: harness.address,
+        exitCode: ERR_FAIL,
+        sendMode: SEND_MODE_PAY_FEES_SEPARATELY,
+    });
+}
+",
+        "send_mode_failure_for_specialized_failed_tx_matcher",
+    );
+}
+
+#[test]
+fn send_mode_failure_for_specialized_successful_tx_matcher() {
+    run_send_mode_failure_case(
+        "ae-predicate-send-mode-successful-tx-mismatch",
+        r"
+get fun `test send mode successful tx mismatch`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 40);
+
+    expect(res).toHaveSuccessfulTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: SEND_MODE_REGULAR,
+    });
+}
+",
+        "send_mode_failure_for_specialized_successful_tx_matcher",
+    );
+}
+
+#[test]
+fn send_mode_predicate_failure_shows_function_marker() {
+    run_send_mode_failure_case(
+        "ae-predicate-send-mode-function-mismatch",
+        r#"
+get fun `test send mode predicate mismatch`() {
+    val (sender, harness, _) = deployHarness();
+    val res = sendPing(sender, harness, 40);
+
+    expect(res).toHaveTx<BounceNotice>({
+        from: harness.address,
+        to: sender.address,
+        sendMode: fun(mode: uint32): bool {
+            println("sendMode.predicate={}", mode);
+            return false;
+        },
+    });
+}
+"#,
+        "send_mode_predicate_failure_shows_function_marker",
     );
 }
 

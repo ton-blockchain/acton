@@ -1,3 +1,4 @@
+use super::SearchParamIndex;
 use crate::context::{
     AssertBinFailure, AssertDecimalFailure, AssertFailure, Context, ExternalMessageNotFoundFailure,
     ExternalSendNotAcceptedFailure, FailAssertFailure, TransactionGenericAssertFailure,
@@ -391,18 +392,6 @@ fn fail_to_find_transaction_by_params_impl(
     message: String,
     location: String,
 ) -> anyhow::Result<()> {
-    // struct SearchParams {
-    //     to: address,
-    //     from: address? = null,
-    //     exit_code: int32? = null,
-    //     deploy: bool? = null,
-    //     bounced: bool? = null,
-    //     opcode: int32? = null,
-    //     action_exit_code: int32? = null,
-    //     compute_phase_skipped: bool? = null,
-    //     body: cell? = null,
-    // }
-
     let Some((params, parsed_txs)) = process_txs_and_search_params(&txs, &params) else {
         return Ok(());
     };
@@ -428,18 +417,6 @@ fn fail_to_not_find_transaction_by_params_impl(
     message: String,
     location: String,
 ) -> anyhow::Result<()> {
-    // struct SearchParams {
-    //     to: address,
-    //     from: address? = null,
-    //     exit_code: int32? = null,
-    //     deploy: bool? = null,
-    //     bounced: bool? = null,
-    //     opcode: int32? = null,
-    //     action_exit_code: int32? = null,
-    //     compute_phase_skipped: bool? = null,
-    //     body: cell? = null,
-    // }
-
     let Some((params, parsed_txs)) = process_txs_and_search_params(&txs, &params) else {
         return Ok(());
     };
@@ -610,13 +587,7 @@ use crate::context::DisplayParam;
 
 #[must_use]
 pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> {
-    let item_from_end = |idx_from_end: usize| {
-        params
-            .0
-            .len()
-            .checked_sub(idx_from_end + 1)
-            .and_then(|idx| params.0.get(idx))
-    };
+    let item_at = |idx: SearchParamIndex| params.0.get(idx.as_usize());
 
     let mut result = TransactionNotFoundParams {
         to: Default::default(),
@@ -630,6 +601,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
         bounced: None,
         opcode: None,
         action_exit_code: None,
+        send_mode: None,
         compute_phase_skipped: None,
         body: None,
         state_init: None,
@@ -640,7 +612,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
     // For tag=2 (value-as-predicate) → extract original value from sub[2] for display.
     macro_rules! parse_field {
         (addr $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else if let Some(orig) = data.original.and_then(read_optional_address_value) {
@@ -651,7 +623,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
             }
         };
         (bigint $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else if let Some(num) = data.original.and_then(read_int_like_param) {
@@ -662,7 +634,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
             }
         };
         (u32 $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else {
@@ -675,7 +647,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
             }
         };
         (i32 $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else if let Some(num) = data.original.and_then(read_int_like_param) {
@@ -686,7 +658,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
             }
         };
         (bool $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else if let Some(b) = data.original.and_then(read_bool_like_param) {
@@ -697,7 +669,7 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
             }
         };
         (cell $field:ident, $idx:expr) => {
-            if let Some(data) = read_subtuple(item_from_end($idx)) {
+            if let Some(data) = read_subtuple(item_at($idx)) {
                 result.$field = if data.tag == 1 {
                     Some(DisplayParam::Function)
                 } else if let Some(TupleItem::Cell(cell)) = data.original {
@@ -709,20 +681,24 @@ pub fn parse_search_params(params: &Tuple) -> Option<TransactionNotFoundParams> 
         };
     }
 
-    parse_field!(addr to, 13);
-    parse_field!(addr from, 12);
-    parse_field!(bigint value, 11);
-    parse_field!(u32 exit_code, 10);
-    parse_field!(bool success, 9);
-    parse_field!(bool aborted, 8);
-    parse_field!(bool deploy, 7);
-    parse_field!(bool bounce, 6);
-    parse_field!(bool bounced, 5);
-    parse_field!(u32 opcode, 4);
-    parse_field!(i32 action_exit_code, 3);
-    parse_field!(bool compute_phase_skipped, 2);
-    parse_field!(cell body, 1);
-    parse_field!(cell state_init, 0);
+    parse_field!(addr to, SearchParamIndex::To);
+    parse_field!(addr from, SearchParamIndex::From);
+    parse_field!(bigint value, SearchParamIndex::Value);
+    parse_field!(u32 exit_code, SearchParamIndex::ExitCode);
+    parse_field!(bool success, SearchParamIndex::Success);
+    parse_field!(bool aborted, SearchParamIndex::Aborted);
+    parse_field!(bool deploy, SearchParamIndex::Deploy);
+    parse_field!(bool bounce, SearchParamIndex::Bounce);
+    parse_field!(bool bounced, SearchParamIndex::Bounced);
+    parse_field!(u32 opcode, SearchParamIndex::Opcode);
+    parse_field!(i32 action_exit_code, SearchParamIndex::ActionExitCode);
+    parse_field!(
+        bool compute_phase_skipped,
+        SearchParamIndex::ComputePhaseSkipped
+    );
+    parse_field!(cell body, SearchParamIndex::Body);
+    parse_field!(cell state_init, SearchParamIndex::StateInit);
+    parse_field!(u32 send_mode, SearchParamIndex::SendMode);
 
     Some(result)
 }

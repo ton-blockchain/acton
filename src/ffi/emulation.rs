@@ -1,3 +1,4 @@
+use super::SearchParamIndex;
 use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
@@ -50,9 +51,9 @@ use tycho_types::models::{
     AccountState, AccountStatus, AccountStatusChange, ActionPhase, ComputePhase,
     ComputePhaseSkipReason, CurrencyCollection, ExtInMsgInfo, ExtOutMsgInfo,
     ExtraCurrencyCollection, HashUpdate, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
-    OptionalAccount, OrdinaryTxInfo, RelaxedMessage, RelaxedMsgInfo, ShardAccount,
-    SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase, StorageUsedShort,
-    Transaction, TxInfo,
+    OptionalAccount, OrdinaryTxInfo, OutAction, OutActionsRevIter, RelaxedMessage, RelaxedMsgInfo,
+    ShardAccount, SkippedComputePhase, StateInit, StdAddr, StdAddrFormat, StoragePhase,
+    StorageUsedShort, Transaction, TxInfo,
 };
 use tycho_types::num::{Tokens, Uint15};
 
@@ -924,6 +925,47 @@ fn emulation_to_send_result(emulation: &SendMessageResultSuccess) -> Option<Tupl
     ))
 }
 
+fn send_action_modes(result: &SendMessageResultSuccess) -> Vec<u32> {
+    let Some(actions_b64) = &result.actions else {
+        return Vec::new();
+    };
+    let Ok(actions_cell) = Boc::decode_base64(actions_b64.as_ref()) else {
+        return Vec::new();
+    };
+    let Ok(slice) = actions_cell.as_slice() else {
+        return Vec::new();
+    };
+
+    let mut modes = OutActionsRevIter::new(slice)
+        .filter_map(Result::ok)
+        .filter_map(|action| match action {
+            OutAction::SendMsg { mode, .. } => Some(u32::from(mode.bits())),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    modes.reverse();
+    modes
+}
+
+fn internal_child_send_modes(result: &SendMessageResultSuccess) -> Vec<u32> {
+    let mut modes = Vec::new();
+
+    for (out_msg, send_mode) in result
+        .transaction
+        .iter_out_msgs()
+        .zip(send_action_modes(result))
+    {
+        let Ok(out_msg) = out_msg else {
+            continue;
+        };
+        if let MsgInfo::Int(_) = out_msg.info {
+            modes.push(send_mode);
+        }
+    }
+
+    modes
+}
+
 #[allow(clippy::large_enum_variant)]
 enum IterationStop {
     Steps(usize),
@@ -1047,6 +1089,10 @@ where
     let mut executed = 0usize;
     let mut matched = false;
     let mut results = Vec::new();
+    let track_child_send_modes = matches!(
+        &stop,
+        IterationStop::UntilMatch(predicates, _) if predicates.send_mode.is_some()
+    );
 
     loop {
         match &stop {
@@ -1076,12 +1122,16 @@ where
             step.parent_transaction = pending.parent_lt;
             let tx_lt = step.transaction.lt;
             let mut externals = Vec::new();
+            let mut send_action_modes =
+                track_child_send_modes.then(|| send_action_modes(step).into_iter());
 
             let out_msgs = step
                 .transaction
                 .iter_out_msgs()
                 .zip(step.transaction.out_msgs.raw_values());
             for (out_msg, raw_out_msg) in out_msgs {
+                let send_mode = send_action_modes.as_mut().and_then(Iterator::next);
+
                 let Ok(out_msg) = out_msg else {
                     continue;
                 };
@@ -1099,7 +1149,12 @@ where
                         let Ok(out_msg_cell) = raw_out_msg.load_reference_cloned() else {
                             continue;
                         };
-                        let _ = message_iters.push_child_message(cursor_id, out_msg_cell, tx_lt);
+                        let _ = message_iters.push_child_message(
+                            cursor_id,
+                            out_msg_cell,
+                            tx_lt,
+                            send_mode,
+                        );
                     }
                     MsgInfo::ExtIn(_) => {}
                 }
@@ -1108,7 +1163,12 @@ where
             step.externals = externals;
 
             if let IterationStop::UntilMatch(predicates, executor) = &stop
-                && transaction_matches_predicates(&step.transaction, predicates, executor)?
+                && transaction_matches_predicates(
+                    &step.transaction,
+                    pending.send_mode,
+                    predicates,
+                    executor,
+                )?
             {
                 matched = true;
             }
@@ -1597,9 +1657,8 @@ fn call_predicate(executor: &GetExecutor, cont: &ContData, arg: TupleItem) -> an
 /// Parse `SearchParams` tuple into `ParsedSearchParams`.
 /// Each field is a sub-tuple [tag, value] where tag: 0=null, 1=user predicate, 2=value-as-predicate.
 fn parse_search_params_tuple(params: &Tuple) -> ParsedSearchParams {
-    let extract_field = |idx_from_end: usize| -> Option<SearchField> {
-        let idx = params.0.len().checked_sub(idx_from_end + 1)?;
-        let item = params.0.get(idx)?;
+    let extract_field = |idx: SearchParamIndex| -> Option<SearchField> {
+        let item = params.0.get(idx.as_usize())?;
         let TupleItem::Tuple(sub) = item else {
             return None;
         };
@@ -1624,20 +1683,21 @@ fn parse_search_params_tuple(params: &Tuple) -> ParsedSearchParams {
     };
 
     ParsedSearchParams {
-        state_init: extract_field(0),
-        body: extract_field(1),
-        compute_phase_skipped: extract_field(2),
-        action_exit_code: extract_field(3),
-        opcode: extract_field(4),
-        bounced: extract_field(5),
-        bounce: extract_field(6),
-        deploy: extract_field(7),
-        aborted: extract_field(8),
-        success: extract_field(9),
-        exit_code: extract_field(10),
-        value: extract_field(11),
-        from: extract_field(12),
-        to: extract_field(13),
+        to: extract_field(SearchParamIndex::To),
+        from: extract_field(SearchParamIndex::From),
+        value: extract_field(SearchParamIndex::Value),
+        exit_code: extract_field(SearchParamIndex::ExitCode),
+        success: extract_field(SearchParamIndex::Success),
+        aborted: extract_field(SearchParamIndex::Aborted),
+        deploy: extract_field(SearchParamIndex::Deploy),
+        bounce: extract_field(SearchParamIndex::Bounce),
+        bounced: extract_field(SearchParamIndex::Bounced),
+        opcode: extract_field(SearchParamIndex::Opcode),
+        action_exit_code: extract_field(SearchParamIndex::ActionExitCode),
+        compute_phase_skipped: extract_field(SearchParamIndex::ComputePhaseSkipped),
+        body: extract_field(SearchParamIndex::Body),
+        state_init: extract_field(SearchParamIndex::StateInit),
+        send_mode: extract_field(SearchParamIndex::SendMode),
     }
 }
 
@@ -1654,6 +1714,7 @@ struct ScalarSearchParams {
     bounced: Option<bool>,
     opcode: Option<u32>,
     action_exit_code: Option<i32>,
+    send_mode: Option<u32>,
     compute_phase_skipped: Option<bool>,
     body: Option<Cell>,
     state_init: Option<Option<StateInit>>,
@@ -1703,127 +1764,77 @@ fn read_optional_address_param(item: Option<&TupleItem>) -> Option<Option<IntAdd
     }
 }
 
+fn read_optional_u32_param(item: Option<&TupleItem>) -> Option<u32> {
+    match item {
+        Some(TupleItem::Null) | None => None,
+        Some(item) => read_int_like_param(item).and_then(ToPrimitive::to_u32),
+    }
+}
+
+fn read_optional_i32_param(item: Option<&TupleItem>) -> Option<i32> {
+    match item {
+        Some(TupleItem::Null) | None => None,
+        Some(item) => read_int_like_param(item).map(|num| num.to_i32().unwrap_or(0)),
+    }
+}
+
+fn read_optional_bool_param(item: Option<&TupleItem>) -> Option<bool> {
+    match item {
+        Some(TupleItem::Null) | None => None,
+        Some(item) => read_bool_like_param(item),
+    }
+}
+
+fn read_optional_bigint_param(item: Option<&TupleItem>) -> Option<BigInt> {
+    let Some(TupleItem::Int(num)) = item else {
+        return None;
+    };
+    Some(num.clone())
+}
+
+fn read_optional_cell_param(item: Option<&TupleItem>) -> Option<Cell> {
+    let Some(TupleItem::Cell(cell)) = item else {
+        return None;
+    };
+    Some(cell.clone())
+}
+
+fn read_optional_state_init_param(item: Option<&TupleItem>) -> Option<Option<Option<StateInit>>> {
+    let Some(TupleItem::Cell(cell)) = item else {
+        return Some(None);
+    };
+    Some(Some(cell.parse::<Option<StateInit>>().ok()?))
+}
+
 fn parse_scalar_search_params_tuple(params: &Tuple) -> Option<ScalarSearchParams> {
-    let item_from_end = |idx_from_end: usize| {
-        params
-            .0
-            .len()
-            .checked_sub(idx_from_end + 1)
-            .and_then(|idx| params.0.get(idx))
-    };
-    let raw_state_init = item_from_end(0);
-    let raw_body = item_from_end(1);
-    let raw_compute_phase_skipped = item_from_end(2);
-    let raw_action_exit_code = item_from_end(3);
-    let raw_opcode = item_from_end(4);
-    let raw_bounced = item_from_end(5);
-    let raw_bounce = item_from_end(6);
-    let raw_deploy = item_from_end(7);
-    let raw_aborted = item_from_end(8);
-    let raw_success = item_from_end(9);
-    let raw_exit_code = item_from_end(10);
-    let raw_msg_value = item_from_end(11);
-    let raw_from = item_from_end(12);
-    let raw_to = item_from_end(13);
+    let item_at = |idx: SearchParamIndex| params.0.get(idx.as_usize());
 
-    let mut params = ScalarSearchParams {
-        to: read_optional_address_param(raw_to)?,
-        from: read_optional_address_param(raw_from)?,
-        ..Default::default()
-    };
-
-    if let Some(raw_opcode) = raw_opcode {
-        if raw_opcode == &TupleItem::Null {
-            params.opcode = None;
-        } else if let Some(num) = read_int_like_param(raw_opcode) {
-            params.opcode = num.to_u32();
-        }
-    }
-    if let Some(raw_bounced) = raw_bounced {
-        if raw_bounced == &TupleItem::Null {
-            params.bounced = None;
-        } else if let Some(value) = read_bool_like_param(raw_bounced) {
-            params.bounced = Some(value);
-        }
-    }
-    if let Some(raw_bounce) = raw_bounce {
-        if raw_bounce == &TupleItem::Null {
-            params.bounce = None;
-        } else if let Some(value) = read_bool_like_param(raw_bounce) {
-            params.bounce = Some(value);
-        }
-    }
-    if let Some(raw_deploy) = raw_deploy {
-        if raw_deploy == &TupleItem::Null {
-            params.deploy = None;
-        } else if let Some(value) = read_bool_like_param(raw_deploy) {
-            params.deploy = Some(value);
-        }
-    }
-    if let Some(raw_exit_code) = raw_exit_code {
-        if raw_exit_code == &TupleItem::Null {
-            params.exit_code = None;
-        } else if let Some(num) = read_int_like_param(raw_exit_code) {
-            params.exit_code = num.to_u32();
-        }
-    }
-    if let Some(raw_success) = raw_success {
-        if raw_success == &TupleItem::Null {
-            params.success = None;
-        } else if let Some(value) = read_bool_like_param(raw_success) {
-            params.success = Some(value);
-        }
-    }
-    if let Some(raw_aborted) = raw_aborted {
-        if raw_aborted == &TupleItem::Null {
-            params.aborted = None;
-        } else if let Some(value) = read_bool_like_param(raw_aborted) {
-            params.aborted = Some(value);
-        }
-    }
-    if let Some(raw_msg_value) = raw_msg_value {
-        if raw_msg_value == &TupleItem::Null {
-            params.value = None;
-        } else if let TupleItem::Int(num) = raw_msg_value {
-            params.value = Some(num.clone());
-        }
-    }
-    if let Some(raw_action_exit_code) = raw_action_exit_code {
-        if raw_action_exit_code == &TupleItem::Null {
-            params.action_exit_code = None;
-        } else if let Some(num) = read_int_like_param(raw_action_exit_code) {
-            params.action_exit_code = Some(num.to_i32().unwrap_or(0));
-        }
-    }
-    if let Some(raw_compute_phase_skipped) = raw_compute_phase_skipped {
-        if raw_compute_phase_skipped == &TupleItem::Null {
-            params.compute_phase_skipped = None;
-        } else if let Some(value) = read_bool_like_param(raw_compute_phase_skipped) {
-            params.compute_phase_skipped = Some(value);
-        }
-    }
-    if let Some(raw_body) = raw_body {
-        if raw_body == &TupleItem::Null {
-            params.body = None;
-        } else if let TupleItem::Cell(cell) = raw_body {
-            params.body = Some(cell.clone());
-        }
-    }
-    if let Some(raw_state_init) = raw_state_init {
-        if raw_state_init == &TupleItem::Null {
-            params.state_init = None;
-        } else if let TupleItem::Cell(cell) = raw_state_init {
-            params.state_init = Some(cell.parse::<Option<StateInit>>().ok()?);
-        }
-    }
-
-    Some(params)
+    Some(ScalarSearchParams {
+        to: read_optional_address_param(item_at(SearchParamIndex::To))?,
+        from: read_optional_address_param(item_at(SearchParamIndex::From))?,
+        value: read_optional_bigint_param(item_at(SearchParamIndex::Value)),
+        exit_code: read_optional_u32_param(item_at(SearchParamIndex::ExitCode)),
+        success: read_optional_bool_param(item_at(SearchParamIndex::Success)),
+        aborted: read_optional_bool_param(item_at(SearchParamIndex::Aborted)),
+        deploy: read_optional_bool_param(item_at(SearchParamIndex::Deploy)),
+        bounce: read_optional_bool_param(item_at(SearchParamIndex::Bounce)),
+        bounced: read_optional_bool_param(item_at(SearchParamIndex::Bounced)),
+        opcode: read_optional_u32_param(item_at(SearchParamIndex::Opcode)),
+        action_exit_code: read_optional_i32_param(item_at(SearchParamIndex::ActionExitCode)),
+        compute_phase_skipped: read_optional_bool_param(item_at(
+            SearchParamIndex::ComputePhaseSkipped,
+        )),
+        body: read_optional_cell_param(item_at(SearchParamIndex::Body)),
+        state_init: read_optional_state_init_param(item_at(SearchParamIndex::StateInit))?,
+        send_mode: read_optional_u32_param(item_at(SearchParamIndex::SendMode)),
+    })
 }
 
 /// Check if a transaction matches all predicate search params by calling each predicate via `run_continuation`.
 #[allow(clippy::collapsible_if)]
 fn transaction_matches_predicates(
     tx: &Transaction,
+    send_mode: Option<u32>,
     predicates: &ParsedSearchParams,
     executor: &GetExecutor,
 ) -> anyhow::Result<bool> {
@@ -1850,6 +1861,14 @@ fn transaction_matches_predicates(
     let requires_in_msg = requires_internal_in_msg || predicates.state_init.is_some();
 
     check!(predicates.deploy, bool_item(transaction_is_deploy(tx)));
+    if let Some(ref field) = predicates.send_mode {
+        let Some(send_mode) = send_mode else {
+            return Ok(false);
+        };
+        if !call_predicate(executor, &field.predicate, int_item(i64::from(send_mode)))? {
+            return Ok(false);
+        }
+    }
 
     let in_msg = tx.load_in_msg();
     if let Ok(Some(in_msg)) = &in_msg {
@@ -1945,7 +1964,11 @@ fn transaction_matches_predicates(
 }
 
 #[allow(clippy::collapsible_if)]
-fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchParams) -> bool {
+fn transaction_matches_scalar_params(
+    tx: &Transaction,
+    send_mode: Option<u32>,
+    params: &ScalarSearchParams,
+) -> bool {
     let requires_internal_in_msg = params.opcode.is_some()
         || params.bounced.is_some()
         || params.bounce.is_some()
@@ -1959,6 +1982,12 @@ fn transaction_matches_scalar_params(tx: &Transaction, params: &ScalarSearchPara
         if expected_deploy != transaction_is_deploy(tx) {
             return false;
         }
+    }
+
+    if let Some(expected_send_mode) = params.send_mode
+        && send_mode != Some(expected_send_mode)
+    {
+        return false;
     }
 
     let in_msg = tx.load_in_msg();
@@ -2150,18 +2179,51 @@ fn find_saved_trace_segment_by_tx_lt_range<'a>(
     )
 }
 
+fn find_saved_tx_by_lt<'a>(ctx: &'a Context<'_>, lt: u64) -> Option<&'a SendMessageResultSuccess> {
+    ctx.chain
+        .emulations
+        .results_of(&ctx.env.running_id)?
+        .messages
+        .iter()
+        .flatten()
+        .find(|result| result.transaction.lt == lt)
+}
+
+fn saved_transaction_send_mode(
+    ctx: &Context<'_>,
+    result: &SendMessageResultSuccess,
+    send_modes_by_parent: &mut HashMap<u64, Vec<u32>>,
+) -> Option<u32> {
+    let parent_lt = result.parent_transaction?;
+    let parent = find_saved_tx_by_lt(ctx, parent_lt)?;
+    let child_index = parent
+        .child_transactions
+        .iter()
+        .position(|lt| *lt == result.transaction.lt)?;
+    send_modes_by_parent
+        .entry(parent_lt)
+        .or_insert_with(|| internal_child_send_modes(parent))
+        .get(child_index)
+        .copied()
+}
+
 fn find_transaction_in_saved_trace(
     ctx: &Context<'_>,
     first_tx_lt: u64,
     last_tx_lt: u64,
-    mut matches: impl FnMut(&Transaction) -> anyhow::Result<bool>,
+    needs_send_mode: bool,
+    mut matches: impl FnMut(&Transaction, Option<u32>) -> anyhow::Result<bool>,
 ) -> anyhow::Result<Option<Cell>> {
     let Some(trace) = find_saved_trace_segment_by_tx_lt_range(ctx, first_tx_lt, last_tx_lt) else {
         return Ok(None);
     };
+    let mut send_modes_by_parent = needs_send_mode.then(HashMap::<u64, Vec<u32>>::new);
 
     for result in trace {
-        if matches(&result.transaction)? {
+        let send_mode = send_modes_by_parent
+            .as_mut()
+            .and_then(|cache| saved_transaction_send_mode(ctx, result, cache));
+        if matches(&result.transaction, send_mode)? {
             return Ok(Some(to_cell(&result.transaction)));
         }
     }
@@ -2187,9 +2249,13 @@ fn find_transaction_by_params_impl(
         return Ok(());
     };
 
-    match find_transaction_in_saved_trace(ctx, first_tx_lt, last_tx_lt, |tx| {
-        Ok(transaction_matches_scalar_params(tx, &params))
-    })? {
+    match find_transaction_in_saved_trace(
+        ctx,
+        first_tx_lt,
+        last_tx_lt,
+        params.send_mode.is_some(),
+        |tx, send_mode| Ok(transaction_matches_scalar_params(tx, send_mode, &params)),
+    )? {
         Some(cell) => stack.push(TupleItem::Cell(cell)),
         None => stack.push(TupleItem::Null),
     }
@@ -2212,9 +2278,13 @@ fn find_transaction_by_predicate_params_impl(
     let predicates = parse_search_params_tuple(&params);
     let executor = make_predicate_executor(ctx)?;
 
-    match find_transaction_in_saved_trace(ctx, first_tx_lt, last_tx_lt, |tx| {
-        transaction_matches_predicates(tx, &predicates, &executor)
-    })? {
+    match find_transaction_in_saved_trace(
+        ctx,
+        first_tx_lt,
+        last_tx_lt,
+        predicates.send_mode.is_some(),
+        |tx, send_mode| transaction_matches_predicates(tx, send_mode, &predicates, &executor),
+    )? {
         Some(cell) => stack.push(TupleItem::Cell(cell)),
         None => stack.push(TupleItem::Null),
     }
@@ -3485,10 +3555,10 @@ mod tests {
             .advance(cursor_id)
             .expect("root step must be consumed");
         message_iters
-            .push_child_message(cursor_id, Cell::default(), 100)
+            .push_child_message(cursor_id, Cell::default(), 100, None)
             .expect("first child must be queued");
         message_iters
-            .push_child_message(cursor_id, Cell::default(), 100)
+            .push_child_message(cursor_id, Cell::default(), 100, None)
             .expect("second child must be queued");
 
         let mut calls = 0usize;
@@ -3523,10 +3593,10 @@ mod tests {
             .expect("root step must be consumed");
         let second_child = Cell::default();
         message_iters
-            .push_child_message(cursor_id, Cell::default(), 200)
+            .push_child_message(cursor_id, Cell::default(), 200, None)
             .expect("first child must be queued");
         message_iters
-            .push_child_message(cursor_id, second_child.clone(), 200)
+            .push_child_message(cursor_id, second_child.clone(), 200, None)
             .expect("second child must be queued");
 
         let mut calls = 0usize;

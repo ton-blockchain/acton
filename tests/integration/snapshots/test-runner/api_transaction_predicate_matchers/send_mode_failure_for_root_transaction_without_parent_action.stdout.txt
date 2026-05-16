@@ -1,0 +1,25 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✗ send mode root transaction missing parent action [TIME]
+    └─ Error: expect(actual).toHaveTx(expected)
+        N/A -> sender A
+        └── empty 1 TON -> harness B                                                    gas=351
+            └── account created
+        
+        Cannot find transaction from <any> to harness B EQCLlS..c1L6Hl
+        with:
+          deploy=true
+          send_mode=SEND_MODE_REGULAR
+      └─ at tests/predicate_matchers.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

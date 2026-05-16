@@ -2782,32 +2782,48 @@ impl FormatterContext<'_> {
 
     #[must_use]
     pub fn format_send_msg_flags(flags: SendMsgFlags) -> String {
-        let mut flag_names = Vec::new();
+        Self::format_send_mode_parts(u32::from(flags.bits()), "", false)
+    }
 
-        if flags.contains(SendMsgFlags::PAY_FEE_SEPARATELY) {
-            flag_names.push("PAY_FEES_SEPARATELY");
+    fn format_send_mode_parts(mode: u32, prefix: &str, include_estimate_fee_only: bool) -> String {
+        let mut flag_names = Vec::new();
+        let mut push_flag = |flag: SendMsgFlags, name: &str| {
+            if mode & u32::from(flag.bits()) != 0 {
+                flag_names.push(format!("{prefix}{name}"));
+            }
+        };
+
+        push_flag(SendMsgFlags::PAY_FEE_SEPARATELY, "PAY_FEES_SEPARATELY");
+        push_flag(SendMsgFlags::IGNORE_ERROR, "IGNORE_ERRORS");
+        push_flag(SendMsgFlags::BOUNCE_ON_ERROR, "BOUNCE_ON_ACTION_FAIL");
+        push_flag(SendMsgFlags::DELETE_IF_EMPTY, "DESTROY");
+        push_flag(
+            SendMsgFlags::WITH_REMAINING_BALANCE,
+            "CARRY_ALL_REMAINING_MESSAGE_VALUE",
+        );
+        push_flag(SendMsgFlags::ALL_BALANCE, "CARRY_ALL_BALANCE");
+
+        if include_estimate_fee_only && mode & 1024 != 0 {
+            flag_names.push(format!("{prefix}ESTIMATE_FEE_ONLY"));
         }
-        if flags.contains(SendMsgFlags::IGNORE_ERROR) {
-            flag_names.push("IGNORE_ERRORS");
-        }
-        if flags.contains(SendMsgFlags::BOUNCE_ON_ERROR) {
-            flag_names.push("BOUNCE_ON_ACTION_FAIL");
-        }
-        if flags.contains(SendMsgFlags::DELETE_IF_EMPTY) {
-            flag_names.push("DESTROY");
-        }
-        if flags.contains(SendMsgFlags::WITH_REMAINING_BALANCE) {
-            flag_names.push("CARRY_ALL_REMAINING_MESSAGE_VALUE");
-        }
-        if flags.contains(SendMsgFlags::ALL_BALANCE) {
-            flag_names.push("CARRY_ALL_BALANCE");
+
+        let known = u32::from(SendMsgFlags::all().bits())
+            | if include_estimate_fee_only { 1024 } else { 0 };
+        let unknown = mode & !known;
+        if unknown != 0 {
+            flag_names.push(format!("0x{unknown:x}"));
         }
 
         if flag_names.is_empty() {
-            "REGULAR".to_string()
+            format!("{prefix}REGULAR")
         } else {
             flag_names.join(" | ")
         }
+    }
+
+    #[must_use]
+    pub fn format_send_mode_constants(mode: u32) -> String {
+        Self::format_send_mode_parts(mode, "SEND_MODE_", true)
     }
 
     #[must_use]
@@ -2933,6 +2949,18 @@ impl FormatterContext<'_> {
         push_param!(bool "aborted", assert_failure.params.aborted);
         push_param!(int "exit_code", assert_failure.params.exit_code);
         push_param!(int "action_exit_code", assert_failure.params.action_exit_code);
+        match &assert_failure.params.send_mode {
+            Some(DisplayParam::Value(mode)) => {
+                params.push(format!(
+                    "  send_mode={}",
+                    Self::format_send_mode_constants(*mode).green()
+                ));
+            }
+            Some(DisplayParam::Function) => {
+                params.push(format!("  send_mode={}", "<function>".cyan()));
+            }
+            None => {}
+        }
         push_param!(bool "compute_phase_skipped", assert_failure.params.compute_phase_skipped);
         match &assert_failure.params.body {
             Some(DisplayParam::Value(body)) => {

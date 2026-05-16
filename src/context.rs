@@ -113,6 +113,7 @@ pub struct TransactionNotFoundParams {
     pub bounced: Option<DisplayParam<bool>>,
     pub opcode: Option<DisplayParam<u32>>,
     pub action_exit_code: Option<DisplayParam<i32>>,
+    pub send_mode: Option<DisplayParam<u32>>,
     pub compute_phase_skipped: Option<DisplayParam<bool>>,
     pub body: Option<DisplayParam<Cell>>,
     pub state_init: Option<DisplayParam<Cell>>,
@@ -142,6 +143,7 @@ pub struct ParsedSearchParams {
     pub bounced: Option<SearchField>,
     pub opcode: Option<SearchField>,
     pub action_exit_code: Option<SearchField>,
+    pub send_mode: Option<SearchField>,
     pub compute_phase_skipped: Option<SearchField>,
     pub body: Option<SearchField>,
     pub state_init: Option<SearchField>,
@@ -694,6 +696,7 @@ pub struct PendingMessageStep {
     pub message: Cell,
     pub from: Option<IntAddr>,
     pub parent_lt: Option<u64>,
+    pub send_mode: Option<u32>,
 }
 
 pub struct MessageCursor {
@@ -739,6 +742,7 @@ impl MessageIterState {
                     message,
                     from,
                     parent_lt: None,
+                    send_mode: None,
                 }]),
                 libs_owner,
                 trace_index: None,
@@ -773,12 +777,19 @@ impl MessageIterState {
         Some(())
     }
 
-    pub fn push_child_message(&mut self, id: u64, message: Cell, parent_lt: u64) -> Option<()> {
+    pub fn push_child_message(
+        &mut self,
+        id: u64,
+        message: Cell,
+        parent_lt: u64,
+        send_mode: Option<u32>,
+    ) -> Option<()> {
         let cursor = self.cursors.get_mut(&id)?;
         cursor.pending.push_back(PendingMessageStep {
             message,
             from: None,
             parent_lt: Some(parent_lt),
+            send_mode,
         });
         Some(())
     }
@@ -1172,7 +1183,7 @@ mod tests {
         assert!(state.is_done(cursor_id));
 
         state
-            .push_child_message(cursor_id, child.clone(), 777)
+            .push_child_message(cursor_id, child.clone(), 777, Some(1))
             .expect("cursor should accept child messages while still open");
 
         let (pending, owner) = state
@@ -1180,6 +1191,7 @@ mod tests {
             .expect("child must become pending");
         assert_eq!(owner, dummy_hash(3));
         assert_eq!(pending.parent_lt, Some(777));
+        assert_eq!(pending.send_mode, Some(1));
         assert_eq!(pending.message, child);
         assert!(!state.is_done(cursor_id));
     }

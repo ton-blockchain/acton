@@ -42,6 +42,11 @@ All notable changes to this project will be documented in this file.
   `StateInit`, missing libraries, explicit VM throws before acceptance,
   accepted compute/action failures, and external send failures that happen
   before any transaction trace is produced.
+- Transaction search parameters now support `sendMode`, so
+  `findTransaction(...)`, `toHaveTx(...)`, `toNotHaveTx(...)`,
+  `toHaveSuccessfulTx(...)`, `toHaveFailedTx(...)`, and `executeTill(...)` can
+  filter child transactions by the parent `SEND_MODE_*` action that produced
+  them. Mismatch diagnostics render expected send modes as named constants.
 
 ## [1.0.0] - 11.05.2026
 
@@ -239,7 +244,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   acton test -v
   acton script scripts/deploy.tolk -v
-  
+
   # after
   acton test --verbose
   acton script scripts/deploy.tolk --verbose
@@ -259,7 +264,7 @@ linter, formatter, docs, templates, and editor integrations.
   if (!ok) {
       return;
   }
-  
+
   // after
   val applied = txs.waitForFirstTransaction();
   if (applied == null) {
@@ -289,7 +294,7 @@ linter, formatter, docs, templates, and editor integrations.
   # before
   [wrappers.typescript]
   output-dir = "app/src/wrapper-ts"
-  
+
   # after
   [wrappers.typescript]
   output-dir = "app/src/wrappers-ts"
@@ -688,7 +693,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```bash
   # before
   acton script scripts/deploy.tolk --broadcast --net testnet
-  
+
   # after
   acton script scripts/deploy.tolk --net testnet
   ```
@@ -706,7 +711,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test --fork-net testnet --api-key YOUR_API_KEY
   acton script scripts/deploy.tolk --net mainnet --api-key YOUR_API_KEY
-  
+
   # after
   TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton test --fork-net testnet
   TONCENTER_MAINNET_API_KEY=YOUR_API_KEY acton script scripts/deploy.tolk --net mainnet
@@ -726,7 +731,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [litenode]
   port = 3010
   fork-net = "testnet"
-  
+
   # after
   [localnet]
   port = 3010
@@ -761,7 +766,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [contracts.counter]
   name = "Counter"
   src = "contracts/counter.tolk"
-  
+
   # after
   [contracts.Counter]
   display-name = "Counter"
@@ -785,7 +790,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   [wrappers.tolk]
   output-dir = "tests/wrappers"
   test-output-dir = "tests"
-  
+
   [import-mappings]
   wrappers = "tests/wrappers"
   ```
@@ -807,7 +812,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```text
   # before
   gen/jetton-wallet_code.tolk
-  
+
   # after
   gen/JettonWallet.code.tolk
   ```
@@ -825,7 +830,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   @test({ fail_with: 42 })
   @test({ gas_limit: 1000 })
   @test({ fuzz: { runs: 64, seed: 42 } })
-  
+
   // after
   @test.skip
   @test.todo("later")
@@ -846,7 +851,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   # before
   acton test
   acton script scripts/debug.tolk
-  
+
   # after, to keep the old debug-log-heavy output
   acton test -v
   acton script scripts/debug.tolk --verbose
@@ -862,7 +867,7 @@ test-runner performance, Tolk 1.4 support, and a new NFT starter template.
   ```tolk
   // before
   // acton-disable-next-line unused-variable
-  
+
   // after
   // check-disable-next-line unused-variable
   ```

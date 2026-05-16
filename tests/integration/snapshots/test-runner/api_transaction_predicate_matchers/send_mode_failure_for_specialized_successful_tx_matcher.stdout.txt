@@ -1,0 +1,27 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling harness
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/predicate_matchers.test.tolk (1 test)
+  ✗ send mode successful tx mismatch [TIME]
+    └─ Error: expect(actual).toHaveSuccessfulTx(expected)
+        N/A -> sender A
+        └── Ping 0.5 TON -> harness B                                                   gas=1978
+            └── BounceNotice 0.1 TON -> sender A                                        gas=309
+        
+        Cannot find transaction from harness B EQCLlS..c1L6Hl to sender A EQAXTu..1D6wLK
+        with:
+          opcode=0xae110002 unknown
+          success=true
+          exit_code=0
+          send_mode=SEND_MODE_REGULAR
+      └─ at tests/predicate_matchers.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.
