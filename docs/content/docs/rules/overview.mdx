@@ -14,6 +14,10 @@ Use `acton check --explain <CODE>` to read a detailed explanation for any specif
 
 Lifecycle states currently used in the catalog are mainly `Stable` and `Preview`. The generator also supports future `Deprecated` and `Removed` statuses when rules eventually transition.
 
+Rule code prefixes are not CLI severity. Most linter rules emit warnings by default; `acton-import-in-contract` emits an error, and compiler/parse diagnostics are errors outside per-rule lint processing.
+
+Preview status does not necessarily mean enabled by default. `unauthorized-access` and `throw-requires-documented-error-value` are currently disabled (`allow`) by default unless you enable them in `[lint.rules]`; for focused runs, use `acton check --enable-only E013` or `acton check --enable-only E030`.
+
 For setup, configuration, and CI usage, start with [Linting](/docs/lint).
 
 | Code | Rule | Status | Quick fix | What it does |
@@ -25,7 +29,7 @@ For setup, configuration, and CI usage, start with [Linting](/docs/lint).
 | [E004](/docs/rules/e004-write-only-variable) | [`write-only-variable`](/docs/rules/e004-write-only-variable) | Stable since `v0.0.1` | not available | Checks for variables that are written to but never read. |
 | [E005](/docs/rules/e005-unused-import) | [`unused-import`](/docs/rules/e005-unused-import) | Stable since `v0.0.1` | sometimes available | Checks for imports that are never used in the file. |
 | [E006](/docs/rules/e006-pure-function-call-unused) | [`pure-function-call-unused`](/docs/rules/e006-pure-function-call-unused) | Stable since `v0.0.1` | not available | Checks for calls to `@pure` functions where the result is not used. |
-| [E007](/docs/rules/e007-no-bounce-handler) | [`no-bounce-handler`](/docs/rules/e007-no-bounce-handler) | Stable since `v0.0.1` | not available | No description provided. |
+| [E007](/docs/rules/e007-no-bounce-handler) | [`no-bounce-handler`](/docs/rules/e007-no-bounce-handler) | Stable since `v0.0.1` | not available | Reports `createMessage({ bounce: BounceMode.<...> })` calls reachable from `onInternalMessage` when the contract file does not declare `onBouncedMessage`. |
 | [E008](/docs/rules/e008-used-ignored-identifier) | [`used-ignored-identifier`](/docs/rules/e008-used-ignored-identifier) | Stable since `v0.0.1` | always available | Checks for usages of identifiers explicitly marked as unused with a leading underscore. |
 | [E009](/docs/rules/e009-mutable-parameter-can-be-immutable) | [`mutable-parameter-can-be-immutable`](/docs/rules/e009-mutable-parameter-can-be-immutable) | Stable since `v0.0.1` | always available | Checks for parameters that are declared as mutable (`mutate`) but are never mutated. |
 | [E010](/docs/rules/e010-acton-import-in-contract) | [`acton-import-in-contract`](/docs/rules/e010-acton-import-in-contract) | Stable since `v0.0.1` | not available | Forbids importing files from `.acton` in contract dependency trees. |
@@ -52,7 +56,7 @@ For setup, configuration, and CI usage, start with [Linting](/docs/lint).
 | [S002](/docs/rules/s002-explicit-return-type) | [`explicit-return-type`](/docs/rules/s002-explicit-return-type) | Stable since `v0.0.1` | sometimes available | Requires explicit return types for function declarations. |
 | [S003](/docs/rules/s003-field-init-can-be-folded) | [`field-init-can-be-folded`](/docs/rules/s003-field-init-can-be-folded) | Stable since `v0.0.1` | always available | Checks for struct initialization where the field name and the variable used to initialize it are the same. |
 | [S004](/docs/rules/s004-method-can-be-static) | [`method-can-be-static`](/docs/rules/s004-method-can-be-static) | Stable since `v0.0.1` | not available | Checks for instance methods where `self` is unnecessary. |
-| [S005](/docs/rules/s005-message-should-be-named) | [`message-should-be-named`](/docs/rules/s005-message-should-be-named) | Stable since `v0.0.1` | not available | Checks for messages created with `createMessage(...)` but named as generic `msg`. |
+| [S005](/docs/rules/s005-message-should-be-named) | [`message-should-be-named`](/docs/rules/s005-message-should-be-named) | Stable since `v0.0.1` | not available | Checks for messages created with `createMessage(...)` but named as generic `msg` or `message`. |
 | [S006](/docs/rules/s006-create-message-inline-send) | [`create-message-inline-send`](/docs/rules/s006-create-message-inline-send) | Stable since `v0.0.1` | not available | Checks for inline sending of newly created messages: `createMessage(...).send(...)`. |
 | [S007](/docs/rules/s007-import-path-can-use-mappings) | [`import-path-can-use-mappings`](/docs/rules/s007-import-path-can-use-mappings) | Stable since `v0.0.1` | sometimes available | Warns when a relative import path can be replaced with a configured `@mapping/...` path. |
 | [S008](/docs/rules/s008-negated-is-type-can-use-not-is) | [`negated-is-type-can-use-not-is`](/docs/rules/s008-negated-is-type-can-use-not-is) | Stable since `v0.0.1` | always available | Detects negated type checks written as `!(a is T)`. |

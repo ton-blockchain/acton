@@ -23,6 +23,18 @@ Symbolic exit codes become part of the contract interface. Without a short
 note on the enum value, callers and tests can see the name but not the exact
 failure condition it represents.
 
+### Behavior notes
+- This preview rule is disabled (`allow`) by default. Enable it in config:
+
+```toml
+[lint.rules]
+throw-requires-documented-error-value = "warn"
+```
+
+- Or run only this rule with `acton check --enable-only E030`.
+- The documentation must be a non-empty `///` doc comment immediately above
+  the enum value.
+
 ### Example
 ```tolk
 enum Errors {
@@ -48,4 +60,4 @@ fun onInternalMessage(in: InMessage) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/throw_requires_documented_error_value.rs#L44" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/throw_requires_documented_error_value.rs#L56" />

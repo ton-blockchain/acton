@@ -15,6 +15,19 @@ pub mod analysis;
 /// State-changing operations that are not guarded by admin authorization may allow
 /// arbitrary inbound senders to mutate contract storage.
 ///
+/// ### Behavior notes
+/// - This preview rule is disabled (`allow`) by default. Enable it in config:
+///
+/// ```toml
+/// [lint.rules]
+/// unauthorized-access = "warn"
+/// ```
+///
+/// - Or run only this rule with `acton check --enable-only E013`.
+/// - The analysis currently checks `onInternalMessage` and treats an
+///   `assert`-style `in.senderAddress == *.adminAddress` guard as the admin
+///   sender check.
+///
 /// ### Example
 /// ```tolk twoslash
 /// fun onInternalMessage(in: InMessage) {

@@ -7,6 +7,56 @@ use tolk_resolver::{AstNodeSpanExt, FileId, SymbolId};
 use tolk_syntax::{Call, Expr, HasName, InstanceArg};
 use tree_sitter::Node;
 
+/// ### What it does
+/// Reports `createMessage({ bounce: BounceMode.<...> })` calls reachable from
+/// `onInternalMessage` when the contract file does not declare
+/// `onBouncedMessage`.
+///
+/// ### Why is this bad?
+/// If an outgoing internal message can bounce, the bounced transaction returns
+/// to `onBouncedMessage`. Without that handler, the contract cannot restore
+/// state, refund accounting, or observe the failure.
+///
+/// ### Example
+/// ```tolk
+/// fun onInternalMessage(in: InMessage) {
+///     sendRefund(in.senderAddress);
+/// }
+///
+/// fun sendRefund(dest: address) {
+///     val refundMessage = createMessage({
+///         bounce: BounceMode.Only256BitsOfBody,
+///         //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E007: contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist
+///         value: ton("0.1"),
+///         dest,
+///     });
+///     refundMessage.send(SEND_MODE_REGULAR);
+/// }
+/// ```
+///
+/// Use instead:
+/// ```tolk
+/// fun onBouncedMessage(in: InMessageBounced) {
+///     // handle bounced refund message
+/// }
+/// ```
+///
+/// Or send explicitly without bounce handling:
+/// ```tolk
+/// val refundMessage = createMessage({
+///     bounce: BounceMode.NoBounce,
+///     value: ton("0.1"),
+///     dest,
+///     body: beginCell().endCell(),
+/// });
+/// ```
+///
+/// ### Behavior notes
+/// - `BounceMode.NoBounce` is ignored by this rule.
+/// - Legacy boolean `bounce` values are not currently matched; the check looks
+///   for `BounceMode` field access.
+/// - The handler must be declared as `onBouncedMessage` in the same file as the
+///   `onInternalMessage` entrypoint.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct NoBounceHandler;

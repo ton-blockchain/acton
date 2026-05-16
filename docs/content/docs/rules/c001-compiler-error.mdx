@@ -21,6 +21,7 @@ Reports compiler and parse errors.
 ### Behavior notes
 - This diagnostic is emitted outside per-rule lint processing.
   Inline suppressions and `[lint.rules]` settings do not disable it.
-- In machine-readable output, compiler errors use code `C001`.
+- In machine-readable output, compiler errors use code `C001`; parse errors
+  are grouped under `compiler-error` but currently have no `code` field.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/compiler_error.rs#L12" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/compiler_error.rs#L13" />

@@ -22,6 +22,12 @@ Forbids importing files from `.acton` in contract dependency trees.
 Contract sources should not depend on Acton internals from `.acton`.
 Such imports are environment-dependent and make contracts less portable.
 
+### Behavior notes
+This rule's default diagnostic severity is error, unlike most linter rules.
+`[lint.rules]` can still lower or allow it. When `acton check` is run on a
+single `.tolk` file, command settings currently allow this rule for
+test-file workflows.
+
 ### Example
 ```tolk twoslash
 import "@acton/tlb/maybe";
@@ -33,4 +39,4 @@ Use instead:
 import "@stdlib/gas-payments";
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/acton_import_in_contract.rs#L24" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-linter/src/rules/ast/acton_import_in_contract.rs#L30" />

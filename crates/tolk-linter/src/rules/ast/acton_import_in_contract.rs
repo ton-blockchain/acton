@@ -11,6 +11,12 @@ use tolk_resolver::file_index::{FileId, Span};
 /// Contract sources should not depend on Acton internals from `.acton`.
 /// Such imports are environment-dependent and make contracts less portable.
 ///
+/// ### Behavior notes
+/// This rule's default diagnostic severity is error, unlike most linter rules.
+/// `[lint.rules]` can still lower or allow it. When `acton check` is run on a
+/// single `.tolk` file, command settings currently allow this rule for
+/// test-file workflows.
+///
 /// ### Example
 /// ```tolk twoslash
 /// import "@acton/tlb/maybe";

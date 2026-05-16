@@ -8,7 +8,8 @@ use tolk_macros::ViolationMetadata;
 /// ### Behavior notes
 /// - This diagnostic is emitted outside per-rule lint processing.
 ///   Inline suppressions and `[lint.rules]` settings do not disable it.
-/// - In machine-readable output, compiler errors use code `C001`.
+/// - In machine-readable output, compiler errors use code `C001`; parse errors
+///   are grouped under `compiler-error` but currently have no `code` field.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.1")]
 pub struct CompilerError;
