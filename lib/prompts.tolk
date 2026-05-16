@@ -17,7 +17,7 @@
 /// Examples:
 /// ```tolk
 /// // Simple text input
-/// val name = prompt("Enter your name:", "Guest");
+/// val name = prompt("Enter your name:", "", "Guest");
 ///
 /// // Confirmation
 /// if (confirm("Do you want to deploy to mainnet?", false, "This will cost real TON.")) {
@@ -55,9 +55,8 @@ fun prompt(message: string, placeholder: string = "", default: string = ""): str
 /// Prompts the user to select an option from a list of variants.
 ///
 /// Input and fallback behavior:
-/// - `variants` is expected to be a tuple of strings.
-/// - If `variants` is not a tuple, returns `""`.
-/// - Non-string tuple items are silently ignored.
+/// - `variants` is an array of strings.
+/// - If `variants` is empty, returns `""`.
 /// - `defaultIndex` positions the cursor on the given option when the prompt
 ///   opens, so the user can accept it by pressing Enter. Out-of-range values
 ///   are clamped to a valid index (defaults to `0`).

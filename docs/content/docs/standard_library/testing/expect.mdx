@@ -27,7 +27,7 @@ expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
 
 // Map check
 expect(balances).toContainKey(userAddress);
-expect(balances.get(userAddress)).toEqual(ton("50"));
+expect(balances.mustGet(userAddress)).toEqual(ton("50"));
 ```
 
 ## Definitions

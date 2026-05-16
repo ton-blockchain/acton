@@ -27,7 +27,7 @@ Deterministic fallback matrix:
 Examples:
 ```tolk
 // Simple text input
-val name = prompt("Enter your name:", "Guest");
+val name = prompt("Enter your name:", "", "Guest");
 
 // Confirmation
 if (confirm("Do you want to deploy to mainnet?", false, "This will cost real TON.")) {
@@ -75,9 +75,8 @@ fun select(message: string, variants: array<string>, defaultIndex: int = 0): str
 Prompts the user to select an option from a list of variants.
 
 Input and fallback behavior:
-- `variants` is expected to be a tuple of strings.
-- If `variants` is not a tuple, returns `""`.
-- Non-string tuple items are silently ignored.
+- `variants` is an array of strings.
+- If `variants` is empty, returns `""`.
 - `defaultIndex` positions the cursor on the given option when the prompt
   opens, so the user can accept it by pressing Enter. Out-of-range values
   are clamped to a valid index (defaults to `0`).
@@ -90,7 +89,7 @@ val name = select("What is your name?", ["John", "Jane", "Jim"], 1);
 println("Hello {}", name);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L72" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L71" />
 
 ## `confirm`
 
@@ -113,7 +112,7 @@ if (answer) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L90" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L89" />
 
 ## `promptInt`
 
@@ -133,7 +132,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   integer parser error as `parseInt(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L105" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L104" />
 
 ## `promptAddress`
 
@@ -157,7 +156,7 @@ Non-interactive behavior:
 - If the selected value is empty or invalid, execution fails with the same
   address parser error as `parseAddress(...)`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L120" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L119" />
 
 ## `promptWallet`
 
@@ -184,5 +183,5 @@ Example:
 val walletName = promptWallet("Select a wallet:");
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L150" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/prompts.tolk#L149" />
 

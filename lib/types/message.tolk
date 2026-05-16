@@ -11,13 +11,13 @@
 ///     val msg = action.loadMessage<Transfer>();
 ///     val body = msg.loadBody();
 ///     println("Transfer amount: {:ton}", body.amount);
-/// }
 ///
-/// // Parsing a generic message to check opcode
-/// val genericMsg = action.loadGenericMessage();
-/// val opcode = genericMsg.loadOpcode();
-/// if (opcode == 0x12345678) {
-///     // handle specific opcode...
+///     // Parsing a generic message to check opcode
+///     val genericMsg = action.loadGenericMessage();
+///     val opcode = genericMsg.loadOpcode();
+///     if (opcode == 0x12345678) {
+///         // handle specific opcode...
+///     }
 /// }
 /// ```
 

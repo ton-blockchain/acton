@@ -100,7 +100,7 @@ fun parseInt(x: string): int
 Parse a decimal string into an int value.
 
 Leading and trailing whitespace is ignored before parsing.
-After trimming, accepts optional leading `-` sign followed by decimal digits.
+After trimming, accepts an optional leading sign followed by decimal digits.
 Invalid input (non-numeric characters, empty string, whitespace-only string)
 fails with an error.
 
@@ -126,7 +126,7 @@ Accepted forms include raw addresses (`0:...`) and user-friendly TON addresses
 `<address> (<name>)` are also accepted; the symbolic suffix is ignored.
 The returned value is normalized as an internal address; rendered formatting may
 differ from input flags, while representing the same account.
-Invalid input fails with an error like `Failed to convert address from <input>`.
+Invalid input fails with an error like `Cannot parse address: <input>`.
 
 Example:
 ```tolk

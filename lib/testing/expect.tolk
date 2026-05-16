@@ -17,7 +17,7 @@
 ///
 /// // Map check
 /// expect(balances).toContainKey(userAddress);
-/// expect(balances.get(userAddress)).toEqual(ton("50"));
+/// expect(balances.mustGet(userAddress)).toEqual(ton("50"));
 /// ```
 
 import "@stdlib/reflection"

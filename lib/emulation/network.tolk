@@ -611,7 +611,7 @@ fun TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches<TBody>(
     return true;
 }
 
-/// Find a external-out message in the send result list by specified parameters.
+/// Find an external-out message in the send result list by specified parameters.
 ///
 /// Example:
 /// ```tolk
@@ -622,13 +622,13 @@ fun TlbMessage<RemainingBitsAndRefs, TlbExternalOutMessageInfo>.matches<TBody>(
 /// ```
 ///
 /// You can specify an optional type argument, specifying the message type to search for;
-/// the function will also check that the opcode of the tx message matches the opcode of the
-/// given message.
+/// the function will also check that the opcode of the external-out message body
+/// matches the opcode of the given message.
 ///
 /// Example:
 /// ```tolk
-/// tx.findExternalOutMessage<IncrementEvent>({ from: counter.address });
-/// //                        ^^^^^^^^^^^^^^ search for message with IncrementEvent opcode
+/// txs.findExternalOutMessage<IncrementEvent>({ from: counter.address });
+/// //                         ^^^^^^^^^^^^^^ search for message with IncrementEvent opcode
 /// ```
 ///
 /// If the message is not found, returns `null`.

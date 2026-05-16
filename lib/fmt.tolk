@@ -41,7 +41,7 @@
 ///
 /// // Multiple arguments
 /// val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1_000_000_000);
-/// 
+///
 /// // Parse an integer from a string
 /// val num = parseInt("42");
 /// ```
@@ -92,7 +92,7 @@ fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
 /// Parse a decimal string into an int value.
 ///
 /// Leading and trailing whitespace is ignored before parsing.
-/// After trimming, accepts optional leading `-` sign followed by decimal digits.
+/// After trimming, accepts an optional leading sign followed by decimal digits.
 /// Invalid input (non-numeric characters, empty string, whitespace-only string)
 /// fails with an error.
 ///
@@ -115,7 +115,7 @@ fun parseInt(x: string): int {
 /// `<address> (<name>)` are also accepted; the symbolic suffix is ignored.
 /// The returned value is normalized as an internal address; rendered formatting may
 /// differ from input flags, while representing the same account.
-/// Invalid input fails with an error like `Failed to convert address from <input>`.
+/// Invalid input fails with an error like `Cannot parse address: <input>`.
 ///
 /// Example:
 /// ```tolk
