@@ -327,12 +327,11 @@ just check-security
 - Rust dependencies with `cargo deny check`
 - RustSec advisories for `Cargo.lock` with `cargo audit`
 - root/UI workspace dependencies with `bun audit`
-- `docs/`, `crates/tree-sitter-*`, and `crates/ton-ls/editors/code` with
-  `yarn npm audit`
-- `src/commands/new/templates/counter-app` with `npm audit`
+- `crates/tree-sitter-*` and `crates/ton-ls/editors/code` with `yarn npm audit`
 
 Run this check when your PR changes lockfiles, dependency manifests, or package
-versions anywhere in the repository.
+versions for the Rust, root/UI, tree-sitter, or VS Code extension dependency
+surfaces listed above.
 
 ## Coverage
 
@@ -366,13 +365,15 @@ bun install
 bun run dev
 ```
 
-Build docs:
+Validate docs from the repository root:
 
 ```bash
-cd docs
-bun ci
-bun run build
+just check-docs
 ```
+
+This runs the docs dependency install, Fumadocs generated-source refresh,
+format check, internal link validation, navigation validation, and static
+export build.
 
 Regenerate auto-generated MDX documentation from Acton sources:
 
@@ -420,12 +421,10 @@ generated documentation changes is required. This includes:
 For docs-site-only pages under `docs/content/docs/` that are not generated,
 edit them directly and keep nearby `meta.json` in sync.
 
-After doc updates (manual or generated), validate docs build:
+After doc updates (manual or generated), validate docs from the repository root:
 
 ```bash
-cd docs
-bun ci
-bun run build
+just check-docs
 ```
 
 ## Schema workflow
@@ -503,15 +502,15 @@ cache-pruning helpers and should not be used casually.
 
 Use this as a quick local matrix before pushing:
 
-| Change type                                                                                                               | Required local checks                                                                                     |
-|---------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------|
-| Rust-only code                                                                                                            | `just check`                                                                                              |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                                        | `just check` + `just build-ui` + `just check-ui`                                                          |
-| Dependency or lockfile changes (`Cargo.lock`, `bun.lock`, `docs/`, tree-sitter/code extension/template package manifests) | `just check-security`                                                                                     |
-| Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)                | `just check` + `acton docgen` and  commit generated docs                                                  |
-| Docs site content/config (`docs/`)                                                                                        | `cd docs && bun ci && bun run build`                                                                       |
-| Tree-sitter grammar (`crates/tree-sitter-*`)                                                                              | `just check` +`just test-tree-sitter-all` (and `just update-test-tree-sitter` when Tolk snapshots change) |
-| Release preparation (maintainers)                                                                                         | Follow [RELEASING.md](RELEASING.md)                                                                       |
+| Change type                                                                                                  | Required local checks                                                                                           |
+|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| Rust-only code                                                                                               | `just check`                                                                                                    |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`                                                                |
+| Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
+| Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)   | `just check` + `acton docgen` and commit generated docs                                                         |
+| Docs site content/config/dependencies (`docs/`)                                                              | `just check-docs`                                                                                               |
+| Tree-sitter grammar (`crates/tree-sitter-*`)                                                                 | `just check` + `just test-tree-sitter-all` (and `just update-test-tree-sitter-tolk` when Tolk snapshots change) |
+| Release preparation (maintainers)                                                                            | Follow [RELEASING.md](RELEASING.md)                                                                             |
 
 ## PR requirements
 

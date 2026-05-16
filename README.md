@@ -18,7 +18,7 @@ Documentation: https://ton-blockchain.github.io/acton/docs/welcome
 - Native speed (Rust-based toolchain and test runtime).
 - Tolk-first workflow with built-in wrappers, testing utilities, and scripts.
 - Ready for dApp development with project templates and automatically generated TypeScript wrappers.
-- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzzing testing and nice UI.
+- Fast test runner with fork mode, gas snapshots, coverage, mutation, fuzz testing, and the browser Test UI.
 - Browser test UI for failed tests, traces, logs, and coverage inspection.
 
 ## Install
@@ -86,7 +86,7 @@ cd first_counter
 acton build
 acton test
 
-# Create and fund a local testnet wallet
+# Create and fund a locally stored testnet wallet
 acton wallet new --name deployer --local --airdrop --version v5r1
 
 # Deploy to TON testnet
