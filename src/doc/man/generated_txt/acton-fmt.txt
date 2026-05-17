@@ -13,6 +13,10 @@ DESCRIPTION
        pre-commit validation. If no _paths_ are provided, Acton scans the
        resolved project root recursively.
 
+       For editor integrations, acton fmt --stdin reads one Tolk source buffer
+       from standard input and writes only the formatted source to standard
+       output.
+
 OPTIONS
    Format Options
        paths…
@@ -24,6 +28,21 @@ OPTIONS
            Check formatting without rewriting files.
 
            In this mode Acton prints diffs for mismatches and exits non-zero.
+
+       --stdin
+           Read Tolk source from standard input and write formatted source to
+           standard output.
+
+           This mode is intended for editor and IDE integrations. It does not
+           rewrite files and, unless combined with --check, does not print
+           status messages to standard output.
+
+       --stdin-filepath PATH
+           Virtual file path to use for diagnostics when formatting source from
+           standard input.
+
+           This option is accepted only with --stdin. Acton does not read or
+           write this path.
 
        --range startLine:startChar-endLine:endChar
            Format only the specified zero-based source range.
@@ -71,10 +90,17 @@ BEHAVIOR
        o  --check prints a unified diff with three lines of context for each
           changed file
 
+       o  --stdin writes only formatted source to stdout; diagnostics and
+          errors go to stderr
+
+       o  --stdin --check compares stdin with formatted output and prints a
+          unified diff if formatting would change
+
        o  --range keeps nodes outside the specified range unchanged and
           disables import reordering for that invocation
 
-       o  --range can only be used with one explicit .tolk file path
+       o  --range can only be used with one explicit .tolk file path, unless
+          --stdin is used
 
 CONFIGURATION
        acton fmt reads defaults from [fmt] in Acton.toml:
@@ -140,6 +166,10 @@ EXAMPLES
        6. Format only a selected source range:
 
               acton fmt contracts/main.tolk --range 2:4-5:1
+
+       7. Format an editor buffer through stdin/stdout:
+
+              acton fmt --stdin --stdin-filepath contracts/main.tolk < contracts/main.tolk
 
 SEE ALSO
        o  acton help check

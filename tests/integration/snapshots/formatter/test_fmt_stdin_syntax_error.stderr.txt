@@ -1,0 +1,7 @@
+error[C001]: syntax error: unexpected `(`. Expected: ;, ->, :, |, asm, const, enum, fun, ….
+  --> contracts/stdin-buffer[LINE]
+  |
+1 | fun main( {
+  |         ^
+
+Error: Failed to format stdin due to syntax error

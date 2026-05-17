@@ -9,12 +9,19 @@ use globset::{Glob, GlobSetBuilder};
 use path_absolutize::Absolutize;
 use similar::{ChangeTag, TextDiff};
 use std::fs;
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 use tolk_fmt::{FormatPosition, FormatRange};
 use tree_sitter::Point;
 use walkdir::WalkDir;
 
-pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result<()> {
+pub fn fmt_cmd(
+    paths: Vec<String>,
+    check: bool,
+    stdin: bool,
+    stdin_filepath: Option<String>,
+    range: Option<String>,
+) -> Result<()> {
     let config = ActonConfig::load()
         .map_err(|e| {
             eprintln!("  {} Failed to load Acton.toml: {e:#}", "⚠".yellow().bold());
@@ -31,8 +38,27 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result
         .unwrap_or(false);
     let range = range.as_deref().map(parse_range).transpose()?;
     let has_range = range.is_some();
+    if stdin {
+        if !paths.is_empty() {
+            anyhow::bail!(
+                "{} cannot be used with file or directory paths",
+                "--stdin".yellow()
+            );
+        }
+        return format_stdin(width, separate_import_groups, range, check, stdin_filepath);
+    }
+    if stdin_filepath.is_some() {
+        anyhow::bail!(
+            "{} can only be used with {}",
+            "--stdin-filepath".yellow(),
+            "--stdin".yellow()
+        );
+    }
     if has_range && paths.len() != 1 {
-        anyhow::bail!("--range can only be used with a single .tolk file");
+        anyhow::bail!(
+            "{} can only be used with a single .tolk file",
+            "--range".yellow()
+        );
     }
 
     let mut ignore_builder = GlobSetBuilder::new();
@@ -74,7 +100,10 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result
             }
         } else if path.is_dir() {
             if has_range {
-                anyhow::bail!("--range can only be used with a single .tolk file");
+                anyhow::bail!(
+                    "{} can only be used with a single .tolk file",
+                    "--range".yellow()
+                );
             }
 
             let iter = WalkDir::new(&path)
@@ -130,28 +159,7 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result
                     if check {
                         unformatted_files.push(file_path.clone());
 
-                        let diff = TextDiff::from_lines(&content, &formatted);
-                        println!("Diff in {}:", display_path.display().bold());
-
-                        for hunk in diff.unified_diff().context_radius(3).iter_hunks() {
-                            for change in hunk.iter_changes() {
-                                let (sign, value) = match change.tag() {
-                                    ChangeTag::Delete => {
-                                        ("-".red().to_string(), change.value().red().to_string())
-                                    }
-                                    ChangeTag::Insert => (
-                                        "+".green().to_string(),
-                                        change.value().green().to_string(),
-                                    ),
-                                    ChangeTag::Equal => (
-                                        " ".dimmed().to_string(),
-                                        change.value().dimmed().to_string(),
-                                    ),
-                                };
-                                print!("{sign}{value}");
-                            }
-                        }
-                        println!();
+                        print_format_diff(&display_path, &content, &formatted);
                     } else {
                         fs::write(&file_path, formatted)
                             .with_context(|| format!("Failed to write {}", file_path.display()))?;
@@ -197,6 +205,71 @@ pub fn fmt_cmd(paths: Vec<String>, check: bool, range: Option<String>) -> Result
     }
 
     Ok(())
+}
+
+fn format_stdin(
+    width: usize,
+    separate_import_groups: bool,
+    range: Option<FormatRange>,
+    check: bool,
+    stdin_filepath: Option<String>,
+) -> Result<()> {
+    let mut content = String::new();
+    io::stdin()
+        .read_to_string(&mut content)
+        .context("Failed to read source from stdin")?;
+
+    let display_path = stdin_filepath.map_or_else(|| PathBuf::from("<stdin>"), PathBuf::from);
+
+    match tolk_fmt::format_source(
+        &content,
+        tolk_fmt::FormatOptions {
+            width,
+            separate_import_groups,
+            range,
+        },
+    ) {
+        Ok(formatted) => {
+            if check {
+                if content != formatted {
+                    print_format_diff(&display_path, &content, &formatted);
+                    anyhow::bail!("Input is not formatted");
+                }
+                return Ok(());
+            }
+
+            io::stdout()
+                .write_all(formatted.as_bytes())
+                .context("Failed to write formatted source to stdout")?;
+            Ok(())
+        }
+        Err(err) => {
+            if emit_parse_errors_if_any(&display_path, &content)? {
+                anyhow::bail!("Failed to format stdin due to syntax error");
+            }
+            anyhow::bail!("Failed to format stdin: {err}");
+        }
+    }
+}
+
+fn print_format_diff(display_path: &Path, content: &str, formatted: &str) {
+    let diff = TextDiff::from_lines(content, formatted);
+    println!("Diff in {}:", display_path.display().bold());
+
+    for hunk in diff.unified_diff().context_radius(3).iter_hunks() {
+        for change in hunk.iter_changes() {
+            let (sign, value) = match change.tag() {
+                ChangeTag::Delete => ("-".red().to_string(), change.value().red().to_string()),
+                ChangeTag::Insert => ("+".green().to_string(), change.value().green().to_string()),
+                ChangeTag::Equal => (
+                    " ".dimmed().to_string(),
+                    change.value().dimmed().to_string(),
+                ),
+            };
+            print!("{sign}{value}");
+        }
+    }
+    println!();
 }
 
 fn parse_range(raw: &str) -> Result<FormatRange> {

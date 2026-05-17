@@ -153,6 +153,163 @@ fn test_fmt_range_formats_only_selected_statement() {
 }
 
 #[test]
+fn test_fmt_stdin_outputs_formatted_source() {
+    ProjectBuilder::new("fmt-stdin")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .stdin(UNFORMATTED_TOLK)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/formatter/test_fmt_stdin.stdout.txt");
+}
+
+#[test]
+fn test_fmt_stdin_range_outputs_selected_range() {
+    ProjectBuilder::new("fmt-stdin-range")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .arg("--range")
+        .arg("2:4-2:24")
+        .stdin(RANGE_UNFORMATTED_TOLK)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/formatter/test_fmt_stdin_range.stdout.txt");
+}
+
+#[test]
+fn test_fmt_stdin_check_success_has_no_output() {
+    ProjectBuilder::new("fmt-stdin-check-success")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .arg("--check")
+        .stdin(FORMATTED_TOLK)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_check_success.stdout.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_check_failure_prints_diff() {
+    ProjectBuilder::new("fmt-stdin-check-failure")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .arg("--check")
+        .arg("--stdin-filepath")
+        .arg("contracts/stdin-buffer.tolk")
+        .stdin(UNFORMATTED_TOLK)
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_check_failure.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_check_failure.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_syntax_error_uses_stdin_filepath_in_diagnostic() {
+    ProjectBuilder::new("fmt-stdin-syntax-error")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .arg("--stdin-filepath")
+        .arg("contracts/stdin-buffer.tolk")
+        .stdin("fun main( {\n")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_syntax_error.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_rejects_paths() {
+    ProjectBuilder::new("fmt-stdin-with-path")
+        .contract("simple", UNFORMATTED_TOLK)
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin")
+        .arg("contracts/simple.tolk")
+        .stdin(UNFORMATTED_TOLK)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_rejects_paths.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_rejects_paths_with_color_flag() {
+    ProjectBuilder::new("fmt-stdin-with-path-color")
+        .contract("simple", UNFORMATTED_TOLK)
+        .build()
+        .acton()
+        .arg("--color")
+        .arg("always")
+        .fmt()
+        .arg("--stdin")
+        .arg("contracts/simple.tolk")
+        .stdin(UNFORMATTED_TOLK)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_rejects_paths.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_filepath_requires_stdin() {
+    ProjectBuilder::new("fmt-stdin-filepath-without-stdin")
+        .build()
+        .acton()
+        .fmt()
+        .arg("--stdin-filepath")
+        .arg("contracts/stdin-buffer.tolk")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/formatter/test_fmt_stdin_filepath_requires_stdin.stderr.txt",
+        );
+}
+
+#[test]
+fn test_fmt_stdin_filepath_requires_stdin_colors_flags_in_error() {
+    let output = ProjectBuilder::new("fmt-stdin-filepath-without-stdin-color")
+        .build()
+        .acton()
+        .arg("--color")
+        .arg("always")
+        .fmt()
+        .arg("--stdin-filepath")
+        .arg("contracts/stdin-buffer.tolk")
+        .run()
+        .failure();
+
+    let stderr = output.get_stderr();
+    assert!(
+        stderr.contains('\u{1b}'),
+        "Expected ANSI escape sequences in formatter error, got:\n{stderr}"
+    );
+
+    output.assert_stderr_svg_snapshot_matches(
+        "integration/snapshots/formatter/test_fmt_stdin_filepath_requires_stdin_color.stderr.svg",
+    );
+}
+
+#[test]
 fn test_fmt_range_check_failure_prints_range_diff() {
     let project = ProjectBuilder::new("fmt-range-check")
         .contract("ranged", RANGE_UNFORMATTED_TOLK)

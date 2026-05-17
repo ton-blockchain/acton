@@ -1302,6 +1302,11 @@ impl ActonCommand {
         self
     }
 
+    pub(crate) fn stdin(mut self, stream: impl snapbox::IntoData) -> Self {
+        self.cmd = self.cmd.stdin(stream);
+        self
+    }
+
     /// Keep process color-related environment variables unchanged.
     ///
     /// By default, tests force `NO_COLOR=1` for stable snapshots.

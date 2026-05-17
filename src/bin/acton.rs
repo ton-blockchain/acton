@@ -898,10 +898,25 @@ enum Commands {
         after_help = detailed_help_pointer("fmt")
     )]
     Fmt {
-        #[arg(help = "Files or directories to format (defaults to project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
+        #[arg(
+            help = "Files or directories to format (defaults to project root)",
+            conflicts_with = "stdin",
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
         paths: Vec<String>,
         #[arg(long, help = "Check if files are formatted without overwriting them")]
         check: bool,
+        #[arg(
+            long,
+            help = "Read Tolk source from stdin and write formatted source to stdout"
+        )]
+        stdin: bool,
+        #[arg(
+            long,
+            value_name = "PATH",
+            help = "Virtual file path to show in stdin diagnostics"
+        )]
+        stdin_filepath: Option<String>,
         #[arg(
             long,
             value_name = "startLine:startChar-endLine:endChar",
@@ -2214,8 +2229,10 @@ fn main() {
         Commands::Fmt {
             paths,
             check,
+            stdin,
+            stdin_filepath,
             range,
-        } => fmt_cmd(paths, check, range),
+        } => fmt_cmd(paths, check, stdin, stdin_filepath, range),
         Commands::Doc { command } => match command {
             DocCommand::Tvm {
                 instruction,

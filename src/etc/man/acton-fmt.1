@@ -13,6 +13,9 @@ Format \fB\&.tolk\fR files using the built\-in Tolk formatter.
 The command can rewrite files in place or run in \fB\-\-check\fR mode for CI and
 pre\-commit validation. If no \fB_paths_\fR are provided, Acton scans the resolved
 project root recursively.
+.sp
+For editor integrations, \fBacton fmt \-\-stdin\fR reads one Tolk source buffer from
+standard input and writes only the formatted source to standard output.
 .SH "OPTIONS"
 .SS "Format Options"
 .sp
@@ -28,6 +31,25 @@ If omitted, Acton scans the project root.
 Check formatting without rewriting files.
 .sp
 In this mode Acton prints diffs for mismatches and exits non\-zero.
+.RE
+.sp
+\fB\-\-stdin\fR
+.RS 4
+Read Tolk source from standard input and write formatted source to standard
+output.
+.sp
+This mode is intended for editor and IDE integrations. It does not rewrite files
+and, unless combined with \fB\-\-check\fR, does not print status messages to standard
+output.
+.RE
+.sp
+\fB\-\-stdin\-filepath\fR \fIPATH\fR
+.RS 4
+Virtual file path to use for diagnostics when formatting source from standard
+input.
+.sp
+This option is accepted only with \fB\-\-stdin\fR\&. Acton does not read or write this
+path.
 .RE
 .sp
 \fB\-\-range\fR \fIstartLine:startChar\-endLine:endChar\fR
@@ -98,12 +120,23 @@ file
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-stdin\fR writes only formatted source to stdout; diagnostics and errors go to
+stderr
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-stdin \-\-check\fR compares stdin with formatted output and prints a unified
+diff if formatting would change
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-range\fR keeps nodes outside the specified range unchanged and disables
 import reordering for that invocation
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB\-\-range\fR can only be used with one explicit \fB\&.tolk\fR file path
+\h'-04'\(bu\h'+03'\fB\-\-range\fR can only be used with one explicit \fB\&.tolk\fR file path, unless
+\fB\-\-stdin\fR is used
 .RE
 .SH "CONFIGURATION"
 \fBacton fmt\fR reads defaults from \fB[fmt]\fR in \fBActon.toml\fR:
@@ -227,6 +260,16 @@ acton fmt contracts/main.tolk \-\-check
 .RS 4
 .nf
 acton fmt contracts/main.tolk \-\-range 2:4\-5:1
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Format an editor buffer through stdin/stdout:
+.sp
+.RS 4
+.nf
+acton fmt \-\-stdin \-\-stdin\-filepath contracts/main.tolk < contracts/main.tolk
 .fi
 .RE
 .RE

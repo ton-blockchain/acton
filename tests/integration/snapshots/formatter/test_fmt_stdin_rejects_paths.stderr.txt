@@ -1,0 +1,5 @@
+error: the argument '--stdin' cannot be used with '[PATHS]...'
+
+Usage: acton fmt --stdin [PATHS]...
+
+For more information, try '--help'.
