@@ -16,6 +16,21 @@ export const source = loader({
       return createElement(icons[icon as keyof typeof icons])
     }
   },
+  pageTree: {
+    transformers: [
+      {
+        file(node, filePath) {
+          if (!filePath) return node
+          const file = this.storage.read(filePath)
+          if (file?.format !== "page") return node
+          const {sidebarTitle} = file.data as {sidebarTitle?: string}
+          if (!sidebarTitle) return node
+          node.name = sidebarTitle
+          return node
+        },
+      },
+    ],
+  },
 })
 
 export const llmSource = loader({

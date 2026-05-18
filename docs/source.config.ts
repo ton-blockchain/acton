@@ -28,6 +28,7 @@ export const docs = defineDocs({
   docs: {
     schema: pageSchema.extend({
       description: z.string(),
+      sidebarTitle: z.string().optional(),
     }),
     postprocess: {
       includeProcessedMarkdown: true,
