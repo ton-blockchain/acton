@@ -11,7 +11,7 @@ A poll needs to:
 2. Check whether that wallet has voted before
 3. If not, count the vote and record the wallet
 
-The first instinct is to keep everything in one contract, using a dictionary stored in the contract's persistent data:
+The first instinct is to keep everything in one contract, using a dictionary (hashmap) stored in the contract's persistent data:
 
 ```tolk
 struct PollStorage {
@@ -22,17 +22,16 @@ struct PollStorage {
 }
 ```
 
-On each `Vote`, look up the sender in the dict. If absent, add them and increment the count:
+On each `Vote`, look up the sender in the map. If absent, add them and increment the count:
 
 ```tolk
-// TODO: paste complete example, not a snippet
-// Inside onInternalMessage — Vote branch (not runnable, partial sketch)
 var storage = lazy PollStorage.load();
+assert (msg.option == 0 || msg.option == 1) throw Errors.InvalidOption;
 
-val alreadyVoted = storage.voters.uget(in.senderAddress) ?? false;
+val alreadyVoted = storage.voters.exists(in.senderAddress);
 assert (!alreadyVoted) throw Errors.AlreadyVoted;
 
-storage.voters.uset(in.senderAddress, true);
+storage.voters.set(in.senderAddress, true);
 if (msg.option == 0) {
     storage.option0 += 1;
 } else {
@@ -41,9 +40,7 @@ if (msg.option == 0) {
 storage.save();
 ```
 
-TODO: give a simple test to run and confirm that things work.
-
-With a small number of voters in a test, it works correctly.
+With a small number of voters it works correctly.
 
 ## The wall
 
