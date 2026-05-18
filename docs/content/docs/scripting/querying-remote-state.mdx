@@ -1,0 +1,143 @@
+---
+title: "Querying remote state"
+description: "Read testnet, mainnet, localnet, or custom network state from Tolk scripts"
+---
+
+Scripts can read contract state from the local emulator or from a remote
+network. Use this for operational queries, post-deploy checks, and scripts that
+compare local behavior against deployed contracts.
+
+## Local reads
+
+Without `--net` or `--fork-net`, reads use the local emulator state created
+during the current script run:
+
+```tolk
+val value = net.runGetMethod<int>(counter.address, "currentCounter");
+```
+
+If the account was not deployed or registered locally in the same run, the read
+fails with an undeployed-contract error.
+
+## Remote reads without broadcasting
+
+Use `--fork-net` to read remote account state while keeping sends local:
+
+```bash
+acton script scripts/query.tolk --fork-net testnet
+acton script scripts/query.tolk --fork-net mainnet
+```
+
+This is useful for read-only scripts and for checking how local emulated
+messages would behave against deployed account state.
+
+Pin remote reads to a specific block sequence number with
+`--fork-block-number`:
+
+```bash
+acton script scripts/query.tolk --fork-net mainnet --fork-block-number 54321000
+```
+
+## Remote reads while broadcasting
+
+When a script runs with `--net`, the selected broadcast network is also used for
+remote reads. You do not need to pass `--fork-net` for the common
+deploy-and-query flow:
+
+```bash
+acton script scripts/deploy.tolk --net testnet
+```
+
+Inside the script, wrapper getters and `net.runGetMethod(...)` read from
+testnet after the transaction is confirmed:
+
+```tolk
+val result = counter.deploy(deployer.address, { value: ton("0.05") });
+if (result.waitForFirstTransaction() == null) {
+    return;
+}
+
+println("Counter value: {}", counter.currentCounter());
+```
+
+`--net` and `--fork-net` can be combined only when they point to the same
+network. Passing different networks is rejected to avoid reading one network
+while sending to another.
+
+## Custom networks
+
+Define custom networks under `[networks]` in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[networks.archive-rpc]
+api = { v2 = "https://your-rpc.example/api/v2/jsonRPC" }
+```
+
+Then select it with `custom:<name>`:
+
+```bash
+acton script scripts/query.tolk --fork-net custom:archive-rpc
+acton script scripts/deploy.tolk --net custom:archive-rpc
+```
+
+## API keys
+
+Built-in `mainnet` and `testnet` requests read these environment variables:
+
+- `TONCENTER_MAINNET_API_KEY`
+- `TONCENTER_TESTNET_API_KEY`
+
+For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
+names are uppercased and non-alphanumeric characters are replaced with `_`, so
+`custom:archive-rpc` uses `ARCHIVE_RPC_API_KEY`.
+
+Acton loads `.env` automatically during project commands:
+
+```text title=".env"
+TONCENTER_TESTNET_API_KEY=...
+ARCHIVE_RPC_API_KEY=...
+```
+
+## Read helpers
+
+Use wrapper getters when you have a generated Tolk wrapper:
+
+```tolk
+val counter = Counter.fromAddress(address("EQ..."));
+println("Counter: {}", counter.currentCounter());
+```
+
+Use `net.runGetMethod(...)` for direct get-method calls:
+
+```tolk
+val value = net.runGetMethod<int>(
+    address("EQ..."),
+    "currentCounter",
+);
+```
+
+The `@acton/emulation/scripts` module also provides convenience helpers for
+account-level queries:
+
+- [`scripts.fetchAccountState(addr)`](/docs/standard_library/emulation/scripts#scriptsfetchaccountstate)
+- [`scripts.fetchShardAccount(addr)`](/docs/standard_library/emulation/scripts#scriptsfetchshardaccount)
+- [`scripts.fetchAccountBalance(addr)`](/docs/standard_library/emulation/scripts#scriptsfetchaccountbalance)
+- [`scripts.fetchAccountStorageFee(addr, seconds)`](/docs/standard_library/emulation/scripts#scriptsfetchaccountstoragefee)
+- [`scripts.fetchConfig()`](/docs/standard_library/emulation/scripts#scriptsfetchconfig)
+- [`scripts.isContractDeployed(addr)`](/docs/standard_library/emulation/scripts#scriptsiscontractdeployed)
+
+```tolk
+import "@acton/emulation/scripts"
+
+fun main(owner: address) {
+    val balance = scripts.fetchAccountBalance(owner);
+    println("Balance: {:ton}", balance);
+}
+```
+
+## See also
+
+- [Interacting with the real blockchain](/docs/scripting/blockchain-interaction)
+- [Fork testing](/docs/testing/fork-testing)
+- [`net.runGetMethod` reference](/docs/standard_library/emulation/network#netrungetmethod)
+- [`scripts` module reference](/docs/standard_library/emulation/scripts)

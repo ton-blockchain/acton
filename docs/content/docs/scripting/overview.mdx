@@ -6,13 +6,26 @@ description: "Learn how to run Tolk files as standalone scripts for local experi
 
 Acton provides the ability to run individual Tolk files as standalone scripts through the `script` command. Such scripts can be used both for learning the Tolk language, local experiments, and for real tasks like contract deployment or sending messages to the real blockchain.
 
-Scripts can use all the functions that are used in tests, which means that within scripts it is possible to deploy a contract to a local blockchain, send messages, and call get methods. In the default emulation mode, state is not preserved between script runs. With `--net`, sent transactions affect the selected public network.
+Scripts can use the same emulation helpers as tests, which means that within scripts it is possible to deploy a contract to a local blockchain, send messages, and call get methods. In the default emulation mode, state is not preserved between script runs. With `--net`, wallet-backed sends affect the selected public network.
 
 The main difference between scripts and tests is that scripts define a `main()` function which becomes the entry point. The `main()` function can optionally accept arguments passed from the command line, and those arguments are parsed against the ABI for `main()`.
 
 Each script is a regular smart contract, so, for example, sending a message through `msg.send()` will update the `c5` register.
 
-Scripts terminate with an exit code equal to the `exit_code` of the `main` get method execution. The maximum exit code is 255 due to the standard Unix/Linux operating system limitation, where exit codes are stored in an 8-bit unsigned integer. Any `exit_code` value larger than 255 will be wrapped using modulo 256 (`x % 256`).
+The CLI exits with code `0` when `main()` finishes with VM exit code `0`. If `main()` finishes with any non-zero VM exit code, Acton prints the script failure details and exits with code `1`. Host-side failures such as compilation errors, invalid arguments, wallet setup errors, or remote network errors also exit with code `1`.
+
+## Runtime model
+
+An `acton script` run is a single isolated execution:
+
+- the script file is compiled and its `main()` function is executed
+- local emulator state is discarded when the command exits
+- without `--net`, `scripts.wallet(name)` creates an emulated wallet
+- with `--net`, `scripts.wallet(name)` resolves configured wallets or a TON Connect wallet
+- with `--fork-net`, reads can use remote account state while sends stay local
+- with `--net`, remote reads use the selected broadcast network by default
+
+This makes the usual workflow: run locally first, then run the same script with `--net testnet`, and only then consider `--net mainnet`.
 
 The following script shows the simplest Hello World written in Tolk:
 
@@ -59,6 +72,8 @@ acton script scripts/storageFeeCalculator.tolk b5ee9c72010101010006000008000003e
 ## Next steps
 
 - Learn how to [pass arguments](/docs/scripting/passing-arguments) to Tolk scripts
+- Understand [wallets and broadcasting](/docs/scripting/wallets-and-broadcasting)
+- Query [remote blockchain state](/docs/scripting/querying-remote-state) from scripts
 - Read the [script command reference](/docs/commands/script) for all available options
 - Learn how to [set up wallets](/docs/wallets) for real blockchain interactions
 - Explore [blockchain interaction](/docs/scripting/blockchain-interaction) to deploy contracts and send transactions

@@ -1,0 +1,135 @@
+---
+title: "Wallets and broadcasting"
+description: "Understand how scripts resolve wallets and when net.send broadcasts real transactions"
+---
+
+Scripts use `scripts.wallet(name)` to choose the sender for wallet-backed
+operations. The same script can run locally in the emulator or broadcast to a
+real network.
+
+## Wallet resolution
+
+Without `--net`, `scripts.wallet(name)` creates an emulated wallet. It behaves
+like a test treasury wallet and does not require a real wallet configuration.
+
+With `--net`, Acton opens configured wallets from the project `wallets.toml`
+and the global wallet configuration. Project-local wallet entries override
+global entries with the same name.
+
+```tolk title="scripts/deploy.tolk"
+import "@acton/emulation/scripts"
+
+fun main() {
+    val deployer = scripts.wallet("deployer");
+    println("Using {}", deployer.address);
+}
+```
+
+```bash
+# Emulated wallet
+acton script scripts/deploy.tolk
+
+# Real configured wallet
+acton script scripts/deploy.tolk --net testnet
+```
+
+For interactive scripts, combine `scripts.wallet(...)` with `promptWallet(...)`:
+
+```tolk
+import "@acton/prompts"
+import "@acton/emulation/scripts"
+
+fun main() {
+    val deployer = scripts.wallet(promptWallet("Select deployer wallet:"));
+}
+```
+
+In local emulation, `promptWallet(...)` returns a stable placeholder and
+`scripts.wallet(...)` still creates an emulated wallet. In broadcast mode, the
+prompt selects a real configured wallet.
+
+## TON Connect
+
+Pass `--tonconnect` with `--net mainnet` or `--net testnet` to use an external
+wallet such as Tonkeeper:
+
+```bash
+acton script scripts/deploy.tolk --net testnet --tonconnect
+```
+
+With TON Connect, `scripts.wallet("name")` resolves to the connected wallet
+address. The wallet approves `net.send(...)` calls instead of Acton signing with
+a local mnemonic.
+
+<Callout type="warn">
+  TON Connect is not supported for `localnet` or custom networks.
+</Callout>
+
+## When `net.send` broadcasts
+
+In broadcast mode, `net.send(from, message)` sends a real transaction only when
+`from` matches a wallet opened at script startup:
+
+- a configured wallet opened from `wallets.toml` or global wallets
+- the connected TON Connect wallet when `--tonconnect` is used
+
+If `from` does not match an opened wallet address, the call runs in the local
+emulator instead. This lets scripts mix local checks with broadcast operations,
+but it also means the sender address should usually come from `scripts.wallet(...)`.
+
+```tolk
+val deployer = scripts.wallet("deployer");
+
+val increaseMessage = createMessage({
+    bounce: true,
+    value: ton("0.05"),
+    dest: contract.address,
+    body: IncreaseCounter { increaseBy: 1 },
+});
+
+val result = net.send(deployer.address, increaseMessage);
+```
+
+`net.enableBroadcast()` and `net.disableBroadcast()` only toggle the runtime
+broadcast flag. They do not open wallets after startup. To make real sends
+available, launch the script with `--net`.
+
+## External messages
+
+Use `net.sendExternal(...)` when you need to send an already composed
+external-in message:
+
+```tolk
+val msg = net.createExternalMessage(contract.address, SomeExternalMessage {});
+val result = net.sendExternal(msg);
+```
+
+In local mode, Acton emulates the external-in message. In broadcast mode, Acton
+sends the external-in message directly to the selected network.
+
+`net.sendExternal(...)` is rejected with `--tonconnect`, because connected
+wallets approve wallet messages. Use `net.send(wallet.address, createMessage(...))`
+instead.
+
+## Recommended flow
+
+For scripts that can move real funds:
+
+1. Run `acton build`
+2. Run `acton test`
+3. Run the script without `--net`
+4. Run it on testnet
+5. Run it on mainnet only after reviewing the wallet, value, and target address
+
+```bash
+acton script scripts/deploy.tolk
+acton script scripts/deploy.tolk --net testnet
+acton script scripts/deploy.tolk --net mainnet
+```
+
+## See also
+
+- [Wallet management](/docs/wallets)
+- [Interacting with the real blockchain](/docs/scripting/blockchain-interaction)
+- [`scripts.wallet` reference](/docs/standard_library/emulation/scripts#scriptswallet)
+- [`net.send` reference](/docs/standard_library/emulation/network#netsend)

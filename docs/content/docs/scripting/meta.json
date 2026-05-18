@@ -4,6 +4,8 @@
   "pages": [
     "overview",
     "passing-arguments",
+    "wallets-and-broadcasting",
+    "querying-remote-state",
     "blockchain-interaction"
   ]
 }

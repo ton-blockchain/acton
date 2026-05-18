@@ -5,6 +5,8 @@ description: "Learn how to use scripts to deploy contracts and send transactions
 
 Acton scripts can interact with the real TON blockchain, enabling contract deployment, transaction sending, and state querying. By using `--net <network>`, Tolk scripts can execute real operations using configured wallets.
 
+For wallet resolution and broadcast routing details, see [Wallets and broadcasting](/docs/scripting/wallets-and-broadcasting). For remote reads without broadcasting, see [Querying remote state](/docs/scripting/querying-remote-state).
+
 ## Prerequisites
 
 Before interacting with the real blockchain, configure a wallet. Follow the [wallet management](/docs/wallets) guide to either set up a funded wallet or connect one through TON Connect via passing `--tonconnect` on the CLI:
@@ -215,6 +217,22 @@ fun main() {
     **Recommendation:** Use smaller values like `ton("0.05")` or `ton("0.1")` for most operations.
 </Callout>
 
+### Broadcast routing
+
+In broadcast mode, `net.send(from, message)` sends a real transaction only when
+`from` matches a wallet opened at script startup. With local wallet files, Acton
+signs and sends through that wallet. With `--tonconnect`, the send is routed to
+the connected wallet for approval.
+
+If `from` does not match an opened wallet address, `net.send()` falls back to
+local emulator execution even when `net.isBroadcasting()` is `true`. Use
+`scripts.wallet(...)` for the sender address in broadcast scripts so the routing
+is explicit.
+
+`net.sendExternal()` sends a raw external-in message directly in broadcast mode.
+It is rejected with `--tonconnect`; connected wallets must approve internal
+wallet messages through `net.send(...)`.
+
 ## Waiting for transactions
 
 The `SendResultList.waitForFirstTransaction()` polls until the first transaction from the result list is confirmed, while `SendResultList.waitForTrace()` waits for the complete descendant trace:
@@ -279,6 +297,20 @@ if (net.isBroadcasting()) {
 }
 ```
 
+For read-after-send flows, wait before reading contract state from the network:
+
+```tolk
+val result = counter.sendIncreaseCounter(deployer.address, 5, { value: ton("0.05") });
+if (result.waitForTrace() == null) {
+    return;
+}
+
+println("Counter is now {}", counter.currentCounter());
+```
+
+The wait helpers poll the selected network in `--net` mode. Without a wait, a
+getter can run before the transaction is applied or indexed.
+
 ## Querying blockchain state
 
 Scripts can read contract state using `net.runGetMethod()`:
@@ -306,7 +338,7 @@ acton script query.tolk --fork-net mainnet
 TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
-When `--fork-net` is enabled, Acton automatically fetches account state from the real blockchain and caches it locally for the script execution. This allows to:
+When `--fork-net` is enabled, Acton can fetch account state from the real blockchain for the script execution. This allows to:
 
 - Query real contract state
 - Test interactions with deployed contracts
@@ -314,7 +346,7 @@ When `--fork-net` is enabled, Acton automatically fetches account state from the
 
 When the script runs with `--net`, the selected network already becomes the default remote read network. This means deploy scripts can send a transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper getters against the same chain without passing `--fork-net`.
 
-See the [fork testing](/docs/testing/fork-testing) guide for more.
+See [Querying remote state](/docs/scripting/querying-remote-state) for `--fork-net`, custom networks, API keys, and script read helpers.
 
 ### Combining with `--net`
 
