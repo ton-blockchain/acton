@@ -36,6 +36,22 @@ The cursor owns the pending tail of that message chain. Every `execute...()` cal
 - mutates the same emulated blockchain state;
 - returns only the newly executed segment as `SendResultList`.
 
+```mermaid
+sequenceDiagram
+    participant Test
+    participant Cursor as TxCursor
+    participant World as Emulated world
+
+    Test->>Cursor: createTraceIterationCursor(from, message)
+    Test->>Cursor: executeN(1)
+    Cursor->>World: execute first transaction
+    Cursor-->>Test: SendResultList for the first segment
+    Note over Cursor: child messages stay queued
+    Test->>Cursor: executeTill(...) or executeAllRemaining()
+    Cursor->>World: execute queued transactions
+    Cursor-->>Test: SendResultList for the next segment
+```
+
 The main cursor methods are:
 
 - [`executeN(n)`](/docs/standard_library/emulation/testing#txcursorexecuten) — execute up to `n` transactions
@@ -168,6 +184,22 @@ expect(beginTail).toHaveSuccessfulTx<Finish>({
     to: raceAddress,
 });
 expect(beginTail.at(0).parentLt).toEqual(beginFirst.at(0).tx.load().lt);
+```
+
+In the example above, `beginIter.executeN(1)` sets `stage`, then `attackIter.executeAllRemaining()` runs against that updated state and sets `attacked`. When `beginIter` resumes, both changes are already visible:
+
+```mermaid
+sequenceDiagram
+    participant Begin as beginIter
+    participant World as Shared world state
+    participant Attack as attackIter
+
+    Begin->>World: executeN(1)
+    Note over World: stage = 1
+    Attack->>World: executeAllRemaining()
+    Note over World: attacked = 1
+    Begin->>World: executeAllRemaining()
+    Note over World: Finish message observes attacked state
 ```
 
 This pattern is useful for race conditions, ordering-sensitive flows, and "message in the middle" scenarios.
