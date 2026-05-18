@@ -76,12 +76,26 @@ api = { v2 = "https://your-rpc.example/api/v2/jsonRPC" }
 fork-net = "custom:archive-rpc"
 ```
 
+With this default in `Acton.toml`, run tests normally and Acton will fork from
+`archive-rpc`:
+
+```bash
+acton test
+```
+
+You can also select the custom fork network explicitly for a single run:
+
+```bash
+acton test --fork-net custom:archive-rpc
+acton test tests/wallet.test.tolk --fork-net custom:archive-rpc
+```
+
 ## Execution model
 
 When fork testing is enabled and a test touches an account:
 
 1. The system first checks if the account was already loaded in the local cache.
-2. If not cached and `--fork-net` is specified, it queries TON Center API.
+2. If not cached and `--fork-net` is specified, it queries the configured Ton API endpoint.
 3. Account state, i.e., balance, code, data, status, is downloaded and deserialized.
 4. The state is cached for subsequent accesses during the test run.
 5. Tests execute using this real state in the local emulator.
@@ -92,18 +106,31 @@ When fork testing is enabled and a test touches an account:
 
 ## Cache scope and refresh behavior
 
-Forked account snapshots are cached only in memory for the current `acton test` invocation:
+Fork testing uses two layers of account state:
+
+- Local account changes are scoped to the current test.
+- The remote snapshot cache is shared by tests in the same `acton test` run.
+
+The shared remote cache stores only fetched remote snapshots:
 
 - The cache key is the tuple of fork network, optional pinned block number, and account address.
-- The cache is shared across tests in the same run, so the second test that touches the same account does not re-fetch it.
+- The second test that touches the same remote account reuses the cached remote snapshot instead of re-fetching it.
 - The cache is not persisted to disk. A fresh `acton test --fork-net ...` run starts with an empty remote snapshot cache.
 - Failed lookups are not cached. If a request errors, the next access can try the network again.
 
-To refetch remote snapshots, rerun `acton test --fork-net ...`. Local emulator mutations do not invalidate or re-download the cached remote snapshot.
+Local changes are scoped to the current test. If a test fetches a remote account
+and then changes it locally, later reads in that same test use the changed local
+account. Other tests do not inherit that local mutation; they start from a fresh
+local state and, if they touch the same account, reuse the shared remote snapshot
+that was fetched earlier in the run.
 
-Accounts deployed or changed during the test are not replaced by remote snapshots. Fork testing only loads accounts that are not already present in the local emulated environment.
+To refetch remote snapshots from the same network and block, rerun
+`acton test --fork-net ...`. Changing `--fork-net` or `--fork-block-number` also
+uses a different cache key.
 
-That precedence also applies after an account is fetched once. Once the account exists in the emulated blockchain state, later reads and message execution use the local copy from that blockchain state rather than querying the network again.
+Fork testing only loads accounts that are not already present in the current
+test's local account state. Accounts deployed or changed during a test are not
+replaced by remote snapshots.
 
 ## Library lookup precedence
 
