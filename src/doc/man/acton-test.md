@@ -237,19 +237,6 @@ is not configured explicitly, including when UI is enabled through `[test].ui`.
 
 {{/options}}
 
-## TonCenter API Keys
-
-When tests fork from the built-in `mainnet`/`testnet` backends, authenticated
-requests read `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY`.
-
-When tests fork from `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`.
-Custom network names are uppercased and non-alphanumeric characters are
-replaced with `_`, so `custom:mock-remote` becomes `MOCK_REMOTE_API_KEY`.
-
-Acton loads `.env` automatically, so the simplest setup during project work is
-usually to keep these keys there and use shell environment variables only for
-one-off overrides or CI.
-
 ### Mutation Testing Options
 
 {{#options}}
@@ -343,6 +330,19 @@ May be passed multiple times.
 ### Project Options
 
 {{> options-project-resolved }}
+
+## TonCenter API Keys
+
+When tests fork from the built-in `mainnet`/`testnet` backends, authenticated
+requests read `TONCENTER_MAINNET_API_KEY` or `TONCENTER_TESTNET_API_KEY`.
+
+When tests fork from `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`.
+Custom network names are uppercased and non-alphanumeric characters are
+replaced with `_`, so `custom:mock-remote` becomes `MOCK_REMOTE_API_KEY`.
+
+Acton loads `.env` automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one-off overrides or CI.
 
 ## Discovery
 

@@ -217,17 +217,6 @@ Relative paths are resolved from the project root.
 The Test UI also enables the default \fBbuild/traces\fR directory when trace export
 is not configured explicitly, including when UI is enabled through \fB[test].ui\fR\&.
 .RE
-.SH "TONCENTER API KEYS"
-When tests fork from the built\-in \fBmainnet\fR/\fBtestnet\fR backends, authenticated
-requests read \fBTONCENTER_MAINNET_API_KEY\fR or \fBTONCENTER_TESTNET_API_KEY\fR\&.
-.sp
-When tests fork from \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&.
-Custom network names are uppercased and non\-alphanumeric characters are
-replaced with \fB_\fR, so \fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
-.sp
-Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
-usually to keep these keys there and use shell environment variables only for
-one\-off overrides or CI.
 .SS "Mutation Testing Options"
 .sp
 \fB\-\-mutate\fR
@@ -353,6 +342,17 @@ defaults.
 .sp
 This conflicts with \fB\-\-manifest\-path\fR\&.
 .RE
+.SH "TONCENTER API KEYS"
+When tests fork from the built\-in \fBmainnet\fR/\fBtestnet\fR backends, authenticated
+requests read \fBTONCENTER_MAINNET_API_KEY\fR or \fBTONCENTER_TESTNET_API_KEY\fR\&.
+.sp
+When tests fork from \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&.
+Custom network names are uppercased and non\-alphanumeric characters are
+replaced with \fB_\fR, so \fBcustom:mock\-remote\fR becomes \fBMOCK_REMOTE_API_KEY\fR\&.
+.sp
+Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
+usually to keep these keys there and use shell environment variables only for
+one\-off overrides or CI.
 .SH "DISCOVERY"
 Acton discovers tests by finding files that end with \fB\&.test.tolk\fR\&.
 .sp

@@ -163,20 +163,6 @@ OPTIONS
            trace export is not configured explicitly, including when UI is
            enabled through [test].ui.
 
-TONCENTER API KEYS
-       When tests fork from the built-in mainnet/testnet backends,
-       authenticated requests read TONCENTER_MAINNET_API_KEY or
-       TONCENTER_TESTNET_API_KEY.
-
-       When tests fork from custom:<name>, Acton reads
-       <NORMALIZED_NAME>_API_KEY. Custom network names are uppercased and
-       non-alphanumeric characters are replaced with _, so custom:mock-remote
-       becomes MOCK_REMOTE_API_KEY.
-
-       Acton loads .env automatically, so the simplest setup during project
-       work is usually to keep these keys there and use shell environment
-       variables only for one-off overrides or CI.
-
    Mutation Testing Options
        --mutate
            Run tests in mutation testing mode.
@@ -270,6 +256,20 @@ TONCENTER API KEYS
            relative defaults.
 
            This conflicts with --manifest-path.
+
+TONCENTER API KEYS
+       When tests fork from the built-in mainnet/testnet backends,
+       authenticated requests read TONCENTER_MAINNET_API_KEY or
+       TONCENTER_TESTNET_API_KEY.
+
+       When tests fork from custom:<name>, Acton reads
+       <NORMALIZED_NAME>_API_KEY. Custom network names are uppercased and
+       non-alphanumeric characters are replaced with _, so custom:mock-remote
+       becomes MOCK_REMOTE_API_KEY.
+
+       Acton loads .env automatically, so the simplest setup during project
+       work is usually to keep these keys there and use shell environment
+       variables only for one-off overrides or CI.
 
 DISCOVERY
        Acton discovers tests by finding files that end with .test.tolk.
