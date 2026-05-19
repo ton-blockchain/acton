@@ -20,8 +20,9 @@ $ acton new poll --template empty
   License: MIT
 
 Created Acton.toml with project configuration
-Created .acton/ directory with standard library
-Created .acton/tolk-stdlib directory with Tolk standard library
+
+Next steps:
+...
 ```
 
 ```bash
@@ -31,6 +32,9 @@ cd poll
 ## Explore the project structure
 
 <Files>
+  <Folder name=".acton" description="Acton-managed internal state and libraries">
+    <File name="tolk-stdlib/" description="Bundled standard library — do not edit" />
+  </Folder>
   <Folder name="contracts" description="Tolk source files" defaultOpen>
     <File name="Empty.tolk" description="Contract entry point" />
     <File name="types.tolk" description="Storage, messages, and errors" />
@@ -43,9 +47,6 @@ cd poll
   </Folder>
   <Folder name="wrappers" description="Generated Tolk wrappers" defaultOpen>
     <File name="Empty.gen.tolk" description="Generated contract wrapper" />
-  </Folder>
-  <Folder name=".acton" description="Acton-managed internal state and libraries">
-    <File name="tolk-stdlib/" description="Bundled standard library — do not edit" />
   </Folder>
   <File name="Acton.toml" description="Project manifest" />
 </Files>
@@ -115,7 +116,7 @@ The shape to remember:
 
 ```tolk title="contracts/types.tolk"
 enum Errors {
-    NotOwner       = 100
+    NotOwner = 100
     InvalidMessage = 0xFFFF
 }
 
@@ -150,8 +151,10 @@ acton build
 
 ```acton-cli noCopy title="terminal"
 $ acton build
-  Compiling contracts
-   Finished in 312.41µs
+   Compiling contracts
+   Compiling Empty
+    Finished in 13.567916ms
+    Finished in 15.653666ms
 ```
 
 The compiled bytecode lands in `build/Empty.json`:
@@ -163,7 +166,7 @@ The compiled bytecode lands in `build/Empty.json`:
 }
 ```
 
-Run with `--info` for a size summary:
+Run with `--info` for artifacts overview right in output:
 
 ```bash
 acton build --info
@@ -174,9 +177,9 @@ $ acton build --info
   Compiling contracts
    Finished in 298.17µs
 
-   Artifacts of Empty
-        Code te6ccgEBBAEATwABFP8A9KQT9Lzy...
-        Hash 0x469C66F1F6F75827610074DD67EBF392486301F438BDCF02FFFEF95E17761DA8
+  Artifacts of Empty
+       Code te6ccgEBBAEATwABFP8A9KQT9Lzy...
+       Hash 0x469C66F1F6F75827610074DD67EBF392486301F438BDCF02FFFEF95E17761DA8
 ```
 
 ## Lint and format

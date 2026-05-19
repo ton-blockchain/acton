@@ -52,18 +52,18 @@ get fun `test alice votes option 0`() {
 ```
 
 ```bash
-acton test -f "alice votes option 0"
+acton test --filter "alice votes option 0"
 ```
 
 ```acton-cli noCopy title="terminal"
-$ acton test -f "alice votes option 0"
+$ acton test --filter "alice votes option 0"
    Compiling contracts
     Finished in 612.44µs
      Running tests
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (1 test)
+ > tests/poll.test.tolk (1 test)
   ✓ alice votes option 0  18ms
 
  ✓ 1 passed in 1 file
@@ -100,7 +100,8 @@ $ acton test --ui
   Test UI started at http://localhost:12344
 ```
 
-Open that URL, then click the "alice votes option 0" test and expand its trace. Two transactions appear:
+The command will automatically open the UI in your default browser. Open the transactions tab.
+The first three transactions are wallet deployments, the fourth transaction is Poll deployment, and the last one is our voting logic:
 
 1. `alice → Poll` with `Vote(option=0)` — Poll increments `option0` and sends to Voter
 2. `Poll → Voter` with the same `Vote(option=0)` — Voter sets `hasVoted = true`
@@ -138,7 +139,7 @@ $ acton test
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (3 tests)
+ > tests/poll.test.tolk (3 tests)
   ✓ alice votes option 0  18ms
   ✓ alice and bob vote for different options  22ms
   ✗ alice cannot vote twice  16ms
@@ -152,14 +153,30 @@ $ acton test
  ✗ 1 failed in 1 file
 ```
 
-The third test fails as expected. Poll increments `option0` to 2 even though Voter correctly rejected the second vote. The bounce signal from Voter never triggers Poll's `onBouncedMessage` because that handler currently does nothing.
+The third test fails as expected. Poll increments `option0` to 2 even though Voter correctly rejected the second vote. The bounce signal from Voter triggers Poll's `onBouncedMessage` but the handler currently does nothing.
 
 <Callout type="tip">
-  Open the Test UI again and click the failing test. The trace shows a red bounce arrow from Voter back to Poll that Poll ignores.
+  Open the Test UI again and click the failing test. In the transactions tab, select the last
+  transaction. The trace shows that the Vote transaction failed with exit code 101, and the Poll
+  transaction received a bounced message, which is marked with a dotted line and is currently
+  ignored by Poll contract.
 </Callout>
+
+<figure className="theme-image my-6">
+  <img
+    src="../test-ui-duplicate-vote-trace.png"
+    alt="Test UI transactions tab showing the failed duplicate vote trace and bounced message in light theme"
+    className="theme-image-light rounded-lg border shadow-sm"
+  />
+  <img
+    src="../test-ui-duplicate-vote-trace_dark.png"
+    alt="Test UI transactions tab showing the failed duplicate vote trace and bounced message in dark theme"
+    className="theme-image-dark rounded-lg border shadow-sm"
+  />
+</figure>
 
 ## Checkpoint
 
 Three tests exist: two passing, one deliberately failing. Leave the failing test in place — it passes once the bounce handler is added on the next page.
 
-**Commands introduced:** `acton test`, `acton test -f`, `acton test --ui`
+**Commands introduced:** `acton test`, `acton test --filter`, `acton test --ui`

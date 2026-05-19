@@ -87,7 +87,7 @@ get fun `test voter exits with AlreadyVoted on duplicate`() {
     expect(res2).toHaveFailedTx({
         from: poll.address,
         to: voter.address,
-        exitCode: Errors.AlreadyVoted as int,
+        exitCode: Errors.AlreadyVoted,
     });
 }
 ```
@@ -131,8 +131,6 @@ A fuzz test in Acton is a parameterized `get fun` annotated with `@test.fuzz`. T
 Because `option: uint8` already constrains generated values to `0..255`, no extra bounds are needed:
 
 ```tolk title="tests/poll.test.tolk"
-import "@acton/testing/expect"
-
 @test.fuzz
 get fun `test fuzz vote option boundary`(option: uint8) {
     val (poll, _, alice, _) = setupTest();
@@ -151,7 +149,7 @@ get fun `test fuzz vote option boundary`(option: uint8) {
         expect(res).toHaveFailedTx({
             from: alice.address,
             to: poll.address,
-            exitCode: Errors.InvalidOption as int,
+            exitCode: Errors.InvalidOption,
         });
     }
 }
@@ -169,7 +167,7 @@ $ acton test --fuzz-seed 42 -f "fuzz vote option"
 
  TEST  <root>/poll
 
- > ./tests/poll.test.tolk (1 test)
+ > tests/poll.test.tolk (1 test)
   ✓ fuzz vote option boundary  145ms (256 runs, seed 42)
 
  ✓ 1 passed in 1 file

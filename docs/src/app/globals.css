@@ -90,6 +90,22 @@ figure.shiki > div[role="region"] {
   opacity: 1 !important;
 }
 
+.theme-image-light {
+  display: block;
+}
+
+.theme-image-dark {
+  display: none;
+}
+
+html.dark .theme-image-light {
+  display: none;
+}
+
+html.dark .theme-image-dark {
+  display: block;
+}
+
 .home-shell {
   --color-fd-background: #121212;
   --color-fd-card: #121212;

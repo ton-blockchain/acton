@@ -165,7 +165,7 @@ get fun `test non-owner cannot close poll`() {
     expect(res).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,
-        exitCode: Errors.NotOwner as int,
+        exitCode: Errors.NotOwner,
     });
 
     expect(poll.isClosed()).toEqual(false);
@@ -193,7 +193,7 @@ get fun `test vote rejected after close`() {
     expect(voteRes).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,
-        exitCode: Errors.PollClosed as int,
+        exitCode: Errors.PollClosed,
     });
 }
 ```
@@ -215,10 +215,10 @@ acton test --snapshot baseline.json
 Commit `baseline.json`. From now on, detect regressions with:
 
 ```bash
-acton test --baseline-snapshot baseline.json
+acton test --baseline-snapshot baseline.json --fail-on-diff
 ```
 
-If any test uses significantly more gas than the baseline, the command exits with an error.
+If any test uses more gas than the baseline, the command exits with an error.
 
 <Callout type="info">
   Re-capture the baseline after intentional changes that affect gas — for example, adding a field to storage.
