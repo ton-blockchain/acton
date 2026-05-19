@@ -55,7 +55,7 @@ import "@contracts/types"
 import "@wrappers/Poll.gen"
 
 fun main() {
-    val deployer = scripts.wallet("deployer");
+    val deployer = scripts.wallet("testnet-deployer");
 
     val poll = Poll.fromStorage(PollStorage {
         owner: deployer.address,
