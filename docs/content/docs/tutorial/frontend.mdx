@@ -71,17 +71,24 @@ The generated `app/wrappers-ts/Poll.gen.ts` exposes typed helpers built from the
 - `Poll.createCellOfClosePoll({})` — build a `ClosePoll` message body
 - `getResults()`, `getOwner()`, `getIsClosed()` — typed getter calls
 
-The placeholder wrapper from the scaffold is no longer needed:
+<Callout type="info">
+  Re-run `acton wrapper Poll --ts --output-dir app/wrappers-ts` whenever messages or getters change.
+  The file is regenerated from scratch every time — do not edit it manually.
+</Callout>
 
-```bash
-rm app/wrappers-ts/Empty.gen.ts
+To avoid repeating `--output-dir app/wrappers-ts`, add the TypeScript wrapper
+output directory to `Acton.toml`:
+
+```toml title="Acton.toml"
+[wrappers.typescript]
+output-dir = "app/wrappers-ts"
 ```
 
-<Callout type="info">
-  Re-run `acton wrapper Poll --ts --output-dir app/wrappers-ts` whenever messages
-  or getters change. The file is regenerated from scratch every time — do not
-  edit it manually.
-</Callout>
+After that, regenerate the wrapper with:
+
+```bash
+acton wrapper Poll --ts
+```
 
 ## Check the path aliases
 
@@ -320,9 +327,9 @@ The `Button` primitive, Tailwind theme tokens (`bg-secondary`, `bg-primary`,
 the scaffold. `App.tsx` only contains poll-specific logic.
 
 <Callout type="info">
-  The scaffold ships a default TON Connect manifest URL pointing at a generic
-  Acton-hosted manifest. For a production app, host your own at a stable URL
-  and update `manifestUrl` in `app/app/src/providers/AppProviders.tsx`.
+  The scaffold ships a default TON Connect manifest URL pointing at a generic Acton-hosted manifest.
+  For a production app, host your own at a stable URL and update `manifestUrl` in
+  `app/app/src/providers/AppProviders.tsx`.
 </Callout>
 
 ## Run the app

@@ -137,6 +137,30 @@ When `--dry-run` is not used, the final verification transaction sends `0.1 TON`
 
 ## Send a vote and retrace the transaction
 
+Create `scripts/vote.tolk`:
+
+```tolk title="scripts/vote.tolk"
+import "@acton/io"
+import "@acton/prompts"
+import "@acton/emulation/network"
+import "@acton/emulation/scripts"
+
+import "@wrappers/Poll.gen"
+
+fun main(pollAddress: address, option: uint8) {
+    val voter = scripts.wallet(promptWallet("Select voter address"));
+    val poll = Poll.fromAddress(pollAddress);
+
+    val res = poll.sendVote(voter.address, option, { value: ton("0.1") });
+    println(res.waitForTrace());
+
+    val (option0, option1) = poll.results();
+    println("Results: option0={}, option1={}", option0, option1);
+}
+```
+
+The two command-line arguments become `pollAddress` and `option`:
+
 ```acton-cli
 acton script scripts/vote.tolk --net testnet <POLL_ADDRESS> 0
 ```
