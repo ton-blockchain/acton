@@ -241,7 +241,17 @@ pub fn wrapper_cmd(
             .contracts()
             .filter(|c| !c.is_empty())
             .ok_or_else(|| anyhow!("No contracts defined in Acton.toml"))?;
-        for contract_id in contracts.keys() {
+        let project_root = project_root();
+        for (contract_id, contract) in contracts {
+            let source_path = contract.absolute_source_path(project_root);
+            if source_path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("boc"))
+            {
+                continue;
+            }
+
             generate_for_contract(
                 &config,
                 contract_id,

@@ -125,6 +125,56 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
+fn test_wrapper_all_skips_boc_contracts() {
+    let project = ProjectBuilder::new("wrapper_all_skips_boc")
+        .contract_from_boc("precompiled", vec![0xFF, 0xFF, 0xFF, 0xFF])
+        .contract("source", SIMPLE_CONTRACT)
+        .build();
+
+    let output = project
+        .acton()
+        .arg("wrapper")
+        .arg("--all")
+        .current_dir(project.path())
+        .run()
+        .success();
+
+    output
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_all_skips_boc_contracts/output.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/Source.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_all_skips_boc_contracts/wrapper.tolk.txt",
+        );
+
+    let mut generated_wrappers = fs::read_dir(project.path().join("wrappers"))
+        .expect("failed to read wrappers directory")
+        .map(|entry| {
+            entry
+                .expect("failed to read wrappers directory entry")
+                .file_name()
+                .to_string_lossy()
+                .into_owned()
+        })
+        .collect::<Vec<_>>();
+    generated_wrappers.sort();
+
+    let mut snapshot_path = env::current_dir().expect("failed to get current directory");
+    snapshot_path.push(
+        "tests/integration/snapshots/wrapper/test_wrapper_all_skips_boc_contracts/wrappers.txt",
+    );
+    crate::common::assertion().eq(
+        format!("{}\n", generated_wrappers.join("\n")),
+        snapbox::Data::read_from(&snapshot_path, None),
+    );
+}
+
+#[test]
 fn test_wrapper_generation_uses_tolk_config_defaults() {
     let project = ProjectBuilder::new("wrapper_tolk_config_defaults")
         .contract("my_contract", SIMPLE_CONTRACT)
