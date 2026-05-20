@@ -825,6 +825,64 @@ fn test_script_shows_transaction_bodies_with_show_bodies_flag() {
         );
 }
 
+const PRECOMPILED_SCRIPT_REMOTE_CONTRACT: &str = r"
+struct (0xF8200002) PrecompiledRemotePing {
+    queryId: uint64
+}
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract PrecompiledRemoteSink {
+    incomingMessages: PrecompiledRemotePing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy PrecompiledRemotePing.fromSlice(in.body);
+    throw Errors.NotOwner;
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const PRECOMPILED_SCRIPT_REMOTE_TYPES: &str = r"
+struct (0xF8200002) PrecompiledRemotePing {
+    queryId: uint64
+}
+
+enum Errors: int32 {
+    NotOwner = 73
+}
+
+contract PrecompiledRemoteSink {
+    incomingMessages: PrecompiledRemotePing
+}
+";
+
+fn compiled_precompiled_script_remote_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("script-boc-send-result-abi-source")
+        .contract_with_output(
+            "precompiled_remote_sink",
+            PRECOMPILED_SCRIPT_REMOTE_CONTRACT,
+            "contracts/precompiled_remote_sink.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(
+        source_project
+            .path()
+            .join("contracts/precompiled_remote_sink.boc"),
+    )
+    .expect("must read compiled precompiled script remote boc bytes")
+}
+
 #[test]
 fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract() {
     let project = ProjectBuilder::new("script-send-result-abi-from-address")
@@ -947,6 +1005,110 @@ fun main(sinkAddress: address) {
         .assert_snapshot_matches(
             "integration/snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
         );
+}
+
+#[test]
+fn test_script_formats_send_result_abi_for_snapshot_loaded_from_address_boc_contract_with_types() {
+    let boc_bytes = compiled_precompiled_script_remote_boc_bytes();
+    let project = ProjectBuilder::new("script-send-result-abi-from-address-boc")
+        .mapping("@acton", "../lib")
+        .contract_from_boc_with_types(
+            "precompiled_remote_sink",
+            boc_bytes,
+            "contracts/precompiled_remote_sink.types.tolk",
+        )
+        .raw_file(
+            "contracts/precompiled_remote_sink.types.tolk",
+            PRECOMPILED_SCRIPT_REMOTE_TYPES,
+        )
+        .script_file(
+            "prepare_remote",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val sender = testing.treasury("remote_boc_prepare_sender");
+    val init = ContractState {
+        code: build("precompiled_remote_sink"),
+        data: createEmptyCell(),
+    };
+    val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    if (!testing.saveSnapshot("world-state.json")) {
+        println("SAVE_FAILED");
+        return;
+    }
+
+    println("REMOTE_SINK={}", sinkAddress);
+}
+"#,
+        )
+        .script_file(
+            "send_remote",
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../wrappers/PrecompiledRemoteSink.gen"
+
+fun main(sinkAddress: address) {
+    if (!testing.loadSnapshot("world-state.json")) {
+        println("LOAD_FAILED");
+        return;
+    }
+
+    val sender = testing.treasury("remote_boc_call_sender");
+    val sink = PrecompiledRemoteSink.fromAddress(sinkAddress);
+    val txs = sink.sendPrecompiledRemotePing(sender.address, 7, { value: ton("0.1") });
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("precompiled_remote_sink")
+        .run()
+        .success();
+
+    let prepare_output = project
+        .acton()
+        .script("scripts/prepare_remote.tolk")
+        .run()
+        .success();
+    let remote_address = prepare_output
+        .get_stdout()
+        .lines()
+        .find_map(|line| {
+            line.strip_prefix("REMOTE_SINK=")
+                .and_then(|value| value.split_whitespace().next())
+                .map(str::to_owned)
+        })
+        .expect("prepare script must print remote sink address");
+
+    let send_output = project
+        .acton()
+        .script("scripts/send_remote.tolk")
+        .arg(&remote_address)
+        .run()
+        .success();
+    crate::common::assertion().eq(
+        format!("{}\n", send_output.get_stdout().trim_end()),
+        snapbox::file!(
+            "snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_boc_contract_with_types.stdout.txt"
+        ),
+    );
 }
 
 #[test]

@@ -25,6 +25,23 @@ contract Precompiled {
 }
 ";
 
+const PRECOMPILED_RUNTIME_CONTRACT: &str = r"
+struct (0x00000001) Increment {
+    value: int32
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+
+contract Precompiled {
+    incomingMessages: Increment
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
 const INVALID_PRECOMPILED_TYPES: &str = r"
 contract Precompiled {
     incomingMessages: MissingMessage
@@ -101,6 +118,21 @@ fn point_precompiled_contract_to_uppercase_boc(project: &crate::support::project
         manifest.replace("contracts/precompiled.boc", "contracts/precompiled.BOC"),
     )
     .expect("should update Acton.toml");
+}
+
+fn compiled_precompiled_wrapper_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("wrapper-boc-with-types-source")
+        .contract_with_output(
+            "precompiled",
+            PRECOMPILED_RUNTIME_CONTRACT,
+            "contracts/precompiled.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(source_project.path().join("contracts/precompiled.boc"))
+        .expect("must read compiled precompiled wrapper boc bytes")
 }
 
 #[test]
@@ -249,8 +281,9 @@ fn test_wrapper_all_skips_boc_contracts() {
 
 #[test]
 fn test_wrapper_generation_from_boc_contract_with_types() {
-    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+    let boc_bytes = compiled_precompiled_wrapper_boc_bytes();
     let project = ProjectBuilder::new("wrapper_boc_with_types")
+        .mapping("acton", ".acton")
         .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
         .raw_file("contracts/precompiled.types.tolk", PRECOMPILED_TYPES)
         .build();
@@ -279,6 +312,16 @@ fn test_wrapper_generation_from_boc_contract_with_types() {
                 .to_str()
                 .expect(""),
             "integration/snapshots/wrapper/test_wrapper_generation_from_boc_contract_with_types/test.tolk.txt",
+        );
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_from_boc_contract_with_types/test_stdout.txt",
         );
 }
 

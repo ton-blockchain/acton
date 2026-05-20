@@ -5,7 +5,9 @@ use crate::context::{
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
     SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache, to_cell,
 };
-use crate::contract_interface::{compile_optional_contract_interface, is_boc_path};
+use crate::contract_interface::{
+    compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
+};
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
 use crate::retrace;
@@ -371,7 +373,51 @@ pub(crate) fn compilation_result_for_code(
         let path = contract.absolute_source_path(&ctx.env.project_root);
         let path_display = path.display().to_string();
         if is_boc_path(&path) {
-            continue;
+            let precompiled = match read_precompiled_boc(&path, contract.src.as_str()) {
+                Ok(precompiled) => precompiled,
+                Err(err) => {
+                    warn!("Failed to read {path_display} while resolving debug source map: {err}");
+                    continue;
+                }
+            };
+
+            if precompiled.code_hash != target_hash {
+                continue;
+            }
+
+            let interface = match compile_optional_contract_interface(
+                ctx.env.config,
+                &ctx.env.project_root,
+                contract_id,
+                contract,
+            ) {
+                Ok(interface) => interface,
+                Err(err) => {
+                    warn!(
+                        "Failed to compile types for {path_display} while resolving debug source map: {err}"
+                    );
+                    continue;
+                }
+            };
+            let (source_map, abi) = match interface {
+                Some(interface) => (
+                    Arc::new(interface.source_map),
+                    Some(Arc::new(interface.abi)),
+                ),
+                None => (Arc::new(SourceMap::without_debug_info()), None),
+            };
+
+            return Some((
+                path,
+                CompilationResult {
+                    name: contract_id.clone(),
+                    display_name: contract.display_name(contract_id).to_owned(),
+                    code_boc64: precompiled.code_boc64,
+                    code_hash: precompiled.code_hash,
+                    source_map,
+                    abi,
+                },
+            ));
         }
 
         let result = match compile_project_contract_with_cache(

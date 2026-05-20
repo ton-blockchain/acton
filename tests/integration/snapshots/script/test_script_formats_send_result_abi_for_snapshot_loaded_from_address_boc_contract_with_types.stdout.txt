@@ -1,0 +1,2 @@
+N/A -> remote_boc_call_sender A
+└── PrecompiledRemotePing 0.1 TON -> precompiled_remote_sink B                  gas=412 exit_code=73 aborted
