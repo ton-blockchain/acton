@@ -220,27 +220,23 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         let code_boc64 = Boc::encode_base64(&cell);
         let code_hash = *cell.repr_hash();
 
-        let interface = contract_config
-            .as_ref()
-            .map(|contract_config| {
-                compile_optional_contract_interface(
-                    ctx.env.config,
-                    &ctx.env.project_root,
-                    &id,
-                    contract_config,
-                )
-            })
-            .transpose()?
-            .flatten();
-        let (source_map, abi) = interface.map_or_else(
-            || (Arc::new(SourceMap::without_debug_info()), None),
-            |interface| {
-                (
-                    Arc::new(interface.source_map),
-                    Some(Arc::new(interface.abi)),
-                )
-            },
-        );
+        let interface = if let Some(contract_config) = &contract_config {
+            compile_optional_contract_interface(
+                ctx.env.config,
+                &ctx.env.project_root,
+                &id,
+                contract_config,
+            )?
+        } else {
+            None
+        };
+        let (source_map, abi) = match interface {
+            Some(interface) => (
+                Arc::new(interface.source_map),
+                Some(Arc::new(interface.abi)),
+            ),
+            None => (Arc::new(SourceMap::without_debug_info()), None),
+        };
         ctx.build.build_cache.memoize(
             &id,
             &display_name,
