@@ -219,6 +219,13 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
             fs::read(&path).with_context(|| format!("Cannot read BoC file {path_display}"))?;
         let cell = Boc::decode(binary_data.as_slice())
             .with_context(|| anyhow::anyhow!("Failed to decode code BoC for {path_display}"))?;
+
+        if !name_only {
+            // Explicit BoC paths are code-only and must stay independent of manifest metadata.
+            stk.push(TupleItem::Cell(cell));
+            return Ok(());
+        }
+
         let code_boc64 = Boc::encode_base64(&cell);
         let code_hash = *cell.repr_hash();
 

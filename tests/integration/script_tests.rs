@@ -864,6 +864,21 @@ contract PrecompiledRemoteSink {
 }
 ";
 
+const EXPLICIT_BOC_PATH_RUNTIME_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+get fun ping(): int {
+    return 7;
+}
+";
+
+const INVALID_EXPLICIT_BOC_PATH_TYPES: &str = r"
+contract Precompiled {
+    incomingMessages: MissingMessage
+}
+";
+
 fn compiled_precompiled_script_remote_boc_bytes() -> Vec<u8> {
     let source_project = ProjectBuilder::new("script-boc-send-result-abi-source")
         .contract_with_output(
@@ -881,6 +896,49 @@ fn compiled_precompiled_script_remote_boc_bytes() -> Vec<u8> {
             .join("contracts/precompiled_remote_sink.boc"),
     )
     .expect("must read compiled precompiled script remote boc bytes")
+}
+
+fn compiled_explicit_boc_path_runtime_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("script-explicit-boc-path-source")
+        .contract_with_output(
+            "precompiled",
+            EXPLICIT_BOC_PATH_RUNTIME_CONTRACT,
+            "contracts/precompiled.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(source_project.path().join("contracts/precompiled.boc"))
+        .expect("must read compiled explicit BoC path runtime bytes")
+}
+
+fn explicit_boc_path_script() -> &'static str {
+    r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+
+fun main() {
+    val code = build("precompiled", "contracts/precompiled.boc");
+
+    val sender = testing.treasury("deployer");
+    val init = ContractState {
+        code,
+        data: createEmptyCell(),
+    };
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: { stateInit: init },
+    }));
+
+    println("PING={}", net.runGetMethod<int>(address, "ping"));
+}
+"#
 }
 
 #[test]
@@ -1004,6 +1062,46 @@ fun main(sinkAddress: address) {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/script/test_script_formats_send_result_abi_for_snapshot_loaded_from_address_contract.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_explicit_boc_path_ignores_missing_manifest_types() {
+    let boc_bytes = compiled_explicit_boc_path_runtime_boc_bytes();
+    let project = ProjectBuilder::new("script-explicit-boc-missing-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/missing.types.tolk")
+        .script_file("explicit_boc_path", explicit_boc_path_script())
+        .build();
+
+    project
+        .acton()
+        .script("scripts/explicit_boc_path.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_explicit_boc_path_ignores_missing_manifest_types.stdout.txt",
+        );
+}
+
+#[test]
+fn test_script_explicit_boc_path_ignores_invalid_manifest_types() {
+    let boc_bytes = compiled_explicit_boc_path_runtime_boc_bytes();
+    let project = ProjectBuilder::new("script-explicit-boc-invalid-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+        .raw_file(
+            "contracts/precompiled.types.tolk",
+            INVALID_EXPLICIT_BOC_PATH_TYPES,
+        )
+        .script_file("explicit_boc_path", explicit_boc_path_script())
+        .build();
+
+    project
+        .acton()
+        .script("scripts/explicit_boc_path.tolk")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_explicit_boc_path_ignores_invalid_manifest_types.stdout.txt",
         );
 }
 
