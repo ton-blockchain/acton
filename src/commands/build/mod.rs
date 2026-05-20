@@ -1,4 +1,7 @@
 use crate::commands::common::error_fmt;
+use crate::contract_interface::{
+    compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
+};
 use crate::file_build_cache::FileBuildCache;
 use crate::stdlib;
 use acton_config::color::OwoColorize;
@@ -204,6 +207,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             &contract_source_key,
             &contract_path,
             &config,
+            project_root,
             output_fift_dir.is_some(),
             force_recompile,
         ) {
@@ -380,20 +384,25 @@ fn process_contract(
     contract_cache_key: &str,
     contract_path: &Path,
     acton_config: &ActonConfig,
+    project_root: &Path,
     with_fift: bool,
     force_recompile: bool,
 ) -> anyhow::Result<ProcessedContract> {
-    if contract_src_display.ends_with(".boc") {
+    if is_boc_path(contract_path) {
         debug!("Loading BoC file: {}", contract_path.display());
-        let boc_data = fs::read(contract_path)
-            .map_err(|e| anyhow!("Failed to read BoC file {contract_src_display}: {e}"))?;
-        let boc = Boc::decode(&boc_data)
-            .map_err(|e| anyhow!("Failed to decode BoC file {contract_src_display}: {e}"))?;
+        let precompiled = read_precompiled_boc(contract_path, contract_src_display)?;
+        let abi = compile_optional_contract_interface(
+            acton_config,
+            project_root,
+            contract_id,
+            contract_config,
+        )?
+        .map(|interface| interface.abi);
         return Ok(ProcessedContract {
-            code_boc64: Boc::encode_base64(&boc),
-            code_hash: boc.repr_hash().to_string(),
+            code_boc64: precompiled.code_boc64,
+            code_hash: precompiled.code_hash.to_string(),
             fift_code: None,
-            abi: None,
+            abi,
             compiled_from_source: false,
         });
     }

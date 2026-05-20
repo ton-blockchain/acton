@@ -37,6 +37,7 @@ pub(crate) struct ProjectBuilder {
 struct ContractDef {
     name: String,
     code: ContractSource,
+    types: Option<String>,
     depends: Vec<DependencyDef>,
     output: Option<String>,
     dir: Option<String>,
@@ -433,6 +434,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -454,6 +456,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: Some(directory.to_string()),
@@ -471,6 +474,30 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Boc(boc_data),
+            types: None,
+            depends: Vec::new(),
+            output: None,
+            dir: None,
+        });
+        self
+    }
+
+    /// Add a contract from a `BoC` file with a Tolk interface file for ABI and wrappers.
+    ///
+    /// # Examples
+    /// ```
+    /// .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+    /// ```
+    pub(crate) fn contract_from_boc_with_types(
+        mut self,
+        name: &str,
+        boc_data: Vec<u8>,
+        types: &str,
+    ) -> Self {
+        self.contracts.push(ContractDef {
+            name: name.to_string(),
+            code: ContractSource::Boc(boc_data),
+            types: Some(types.to_string()),
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -489,6 +516,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: depends
                 .iter()
                 .map(|s| DependencyDef {
@@ -523,6 +551,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: depends
                 .iter()
                 .map(|(dep_name, kind, function, path)| DependencyDef {
@@ -548,6 +577,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code.to_string()),
+            types: None,
             depends: Vec::new(),
             output: Some(output.to_string()),
             dir: None,
@@ -585,6 +615,7 @@ impl ProjectBuilder {
         self.contracts.push(ContractDef {
             name: name.to_string(),
             code: ContractSource::Tolk(code),
+            types: None,
             depends: Vec::new(),
             output: None,
             dir: None,
@@ -828,6 +859,10 @@ version = "0.1.0"
                 contract_path,
             )
             .ok();
+
+            if let Some(types) = &contract.types {
+                let _ = writeln!(toml_content, "types = \"{types}\"");
+            }
 
             // Generate dependencies
             if contract.depends.is_empty() {

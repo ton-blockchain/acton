@@ -171,6 +171,17 @@ fun main() {
     println("COUNTER_ADDRESS={}", counterAddress);
 }
 "#;
+const PRECOMPILED_COUNTER_TYPES: &str = r"
+struct Storage {
+    id: uint32
+    owner: address
+    counter: uint32
+}
+
+contract Precompiled {
+    storage: Storage
+}
+";
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
@@ -281,6 +292,77 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_info_decodes_storage.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_info_decodes_storage_for_boc_contract_with_types() {
+    let source_project = ProjectBuilder::new("rpc-info-boc-types-source")
+        .file_from_path(
+            "contracts/types",
+            "src/commands/new/templates/counter/contracts/types.tolk",
+        )
+        .contract_from_path(
+            "counter",
+            "src/commands/new/templates/counter/contracts/Counter.tolk",
+        )
+        .build();
+    source_project
+        .acton()
+        .build()
+        .contract("counter")
+        .run()
+        .success();
+
+    let artifact_path = source_project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+    let code = Boc::decode_base64(code_boc64).expect("code BoC base64 must decode");
+
+    let project = ProjectBuilder::new("rpc-info-boc-types")
+        .contract_from_boc_with_types(
+            "precompiled",
+            Boc::encode(code),
+            "contracts/precompiled.types.tolk",
+        )
+        .raw_file(
+            "contracts/precompiled.types.tolk",
+            PRECOMPILED_COUNTER_TYPES,
+        )
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    let (mock_url, mock_handle, _) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_info_decodes_storage_for_boc_contract_with_types.stdout.txt",
         );
 
     mock_handle.join().expect("mock server thread must finish");

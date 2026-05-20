@@ -10,6 +10,9 @@ Two commands drive compilation:
 - [`acton compile`](/docs/commands/compile) targets a single `.tolk` file — useful for quick inspection of compiler output or producing standalone `.boc` and `.fif` files outside a project build.
 
 <Cards>
+  <Card href="/docs/building/precompiled-boc" title="Precompiled BoC contracts">
+    Use external BoC artifacts while keeping ABI, wrappers, and storage decoding available
+  </Card>
   <Card href="/docs/building/wrappers" title="Tolk wrappers">
     Generate typed Tolk wrappers and use them to deploy and interact with contracts
   </Card>
@@ -74,6 +77,7 @@ acton build --clear-cache
 
 ## See also
 
+- [Precompiled BoC contracts](/docs/building/precompiled-boc)
 - [Tolk wrappers](/docs/building/wrappers)
 - [Build system reference](/docs/building/reference)
 - [`acton build` command reference](/docs/commands/build)

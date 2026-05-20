@@ -4,6 +4,7 @@
   "pages": [
     "overview",
     "wrappers",
+    "precompiled-boc",
     "reference"
   ]
 }

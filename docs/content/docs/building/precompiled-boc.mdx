@@ -1,0 +1,180 @@
+---
+title: "Precompiled BoC contracts"
+description: "Use a precompiled .boc file as a contract source while keeping ABI, wrappers, and storage decoding available"
+---
+
+Precompiled BoC contracts are useful when contract code is produced outside the
+current project: for example by another build pipeline, from a released artifact,
+or from a third-party contract whose source is not part of your repository.
+
+Acton can use the BoC as deployable code and, optionally, compile a separate
+Tolk interface file to recover ABI information for wrappers and storage
+decoding.
+
+## Configure the contract
+
+Point `src` to the `.boc` file in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+depends = []
+```
+
+This is enough for `acton build`, tests, scripts, and dependencies that only
+need the contract code. Acton reads the BoC directly and does not run the Tolk
+compiler on that code.
+
+Add `types` when you need ABI-backed features:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+```
+
+Both paths are resolved from the project root. The contract ID
+(`Precompiled` here) is still the name used by dependency declarations,
+`build("Precompiled")`, build artifacts, wrappers, and command arguments.
+
+## Write the interface file
+
+The `types` file is a Tolk source that describes the public ABI surface of the
+precompiled code. It can contain imports, structs, enums, aliases, a contract
+header, storage declarations, incoming message declarations, external message
+declarations, and get methods.
+
+It does not need runtime entrypoints such as `onInternalMessage()` or
+`onBouncedMessage()`. Acton compiles this file in interface-only mode and
+discards the produced code. The file still must be valid Tolk, so get methods
+need bodies even when those bodies are only stubs.
+
+```tolk title="contracts/Precompiled.types.tolk"
+struct Storage {
+    id: uint32
+    owner: address
+    counter: uint32
+}
+
+struct (0x7e8764ef) IncreaseCounter {
+    increaseBy: uint32
+}
+
+contract Precompiled {
+    storage: Storage
+    incomingMessages: IncreaseCounter
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+```
+
+Keep this file minimal and ABI-compatible with the actual BoC. If a message
+prefix, field type, storage layout, or get-method signature does not match the
+precompiled contract, generated wrappers and decoded storage will also be wrong.
+
+<Callout type="warn">
+  The `types` file does not replace the BoC code. Acton always deploys and
+  embeds code from `src`; `types` is only used for ABI and source-map metadata.
+</Callout>
+
+## Build behavior
+
+`acton build` always emits the regular JSON artifact for a valid BoC contract:
+
+```bash
+acton build Precompiled
+```
+
+The artifact contains `code_boc64` and `hash` for the BoC code. If `types` is
+configured, Acton also writes an ABI JSON file to the ABI output directory
+(`build/abi/` by default).
+
+Precompiled BoC contracts have a few differences from `.tolk` contracts:
+
+- Contract code is loaded from the BoC and is not recompiled.
+- `--output-fift` does not produce a `.fif` file for BoC contracts.
+- `output = "path/to/file.boc"` can still write the normalized BoC output.
+- If `types` is configured, Acton compiles that file as interface metadata.
+- If `types` points to a missing or invalid file, the command reports an error.
+- If `types` is omitted, build succeeds but no ABI file is written for that BoC.
+
+## Generate wrappers
+
+Wrappers require ABI metadata, so BoC contracts need `types`:
+
+```bash
+acton wrapper Precompiled
+acton wrapper Precompiled --ts
+```
+
+`acton wrapper --all` includes BoC contracts that have `types` configured and
+skips BoC contracts without it. Running `acton wrapper Precompiled` directly for
+a BoC contract without `types` reports an actionable error.
+
+The generated wrapper deploys and interacts with the real BoC code while using
+the `types` file for typed helpers:
+
+```tolk title="tests/Precompiled.test.tolk"
+import "@wrappers/Precompiled.gen"
+import "@contracts/Precompiled.types"
+import "@acton/emulation/testing"
+import "@acton/testing/expect"
+
+get fun `test increase`() {
+    val deployer = testing.treasury("deployer");
+
+    val contract = Precompiled.fromStorage({
+        id: 0,
+        owner: deployer.address,
+        counter: 0,
+    });
+    val deployResult = contract.deploy(deployer.address, { value: ton("0.05") });
+    expect(deployResult).toHaveSuccessfulDeploy({ to: contract.address });
+
+    val result = contract.sendIncreaseCounter(deployer.address, 1);
+    expect(result).toHaveTransaction({ success: true });
+}
+```
+
+## Use in dependencies
+
+A BoC contract can be referenced by another contract through `depends`:
+
+```acton-toml title="Acton.toml"
+[contracts.Parent]
+src = "contracts/Parent.tolk"
+depends = ["Precompiled"]
+
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+```
+
+Acton generates the usual dependency helper in `gen/` from the BoC code. The
+parent can import that helper and call `precompiledCompiledCode()` just like it
+would for a Tolk-built child contract.
+
+## Decode remote storage
+
+`acton rpc info` can use local BoC contract entries as ABI candidates. When the
+remote account code hash matches a local `src = "*.boc"` contract and that
+contract has `types`, Acton uses the `types` ABI to decode storage:
+
+```bash
+acton rpc info <ADDRESS> --net testnet
+```
+
+Without `types`, Acton can still match the code hash, but it cannot decode
+typed storage.
+
+## See also
+
+- [Build system overview](/docs/building/overview)
+- [Tolk wrappers](/docs/building/wrappers)
+- [Build reference](/docs/building/reference#using-precompiled-contracts)
+- [`acton build` command reference](/docs/commands/build)
+- [`acton wrapper` command reference](/docs/commands/wrapper)

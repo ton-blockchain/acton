@@ -99,8 +99,21 @@ This section is a map where each key is a contract name and the value is a contr
 |:---------------|:---------|:---------|:------------------------------------------------------------------------|
 | `display-name` | `string` | No       | Human-readable name of the contract. Defaults to the contract name.     |
 | `src`          | `string` | **Yes**  | Path to the contract source file (`.tolk`) or a precompiled `.boc`.     |
+| `types`        | `string` | No       | Tolk interface file used to produce ABI for a precompiled `.boc`.       |
 | `depends`      | `array`  | No       | List of contract dependencies. Can be simple names or detailed objects. |
 | `output`       | `string` | No       | Custom path where the compiled `.boc` should be saved.                  |
+
+For precompiled `.boc` contracts, `types` can point to a Tolk file that contains
+the contract header, message/storage types, and getters. Acton still loads code
+from `src`, but uses the `types` file to produce ABI and generate wrappers.
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+display-name = "Precompiled"
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+```
 
 ### Contract dependencies
 
@@ -152,7 +165,7 @@ output-abi = "build/abi"
 output-fift = "build/fift"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Arbitrary `.boc` contracts are skipped in ABI and Fift output.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Precompiled `.boc` contracts emit ABI only when their contract config sets `types`; they never emit Fift output.
 
 ## `[wrappers]`
 

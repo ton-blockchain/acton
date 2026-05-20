@@ -1,0 +1,89 @@
+{
+  "abi_schema_version": "1.0",
+  "alias_instantiations": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.0",
+  "contract_name": "Precompiled",
+  "declarations": [
+    {
+      "fields": [
+        {
+          "name": "value",
+          "ty_idx": 8
+        }
+      ],
+      "kind": "struct",
+      "name": "Increment",
+      "prefix": {
+        "prefix_len": 32,
+        "prefix_num": 1
+      },
+      "ty_idx": 12
+    }
+  ],
+  "emitted_events": [],
+  "get_methods": [
+    {
+      "name": "currentCounter",
+      "parameters": [],
+      "return_ty_idx": 1,
+      "tvm_method_id": 117456
+    }
+  ],
+  "incoming_external": [],
+  "incoming_messages": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "outgoing_messages": [],
+  "storage": {},
+  "struct_instantiations": [],
+  "thrown_errors": [],
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "Increment"
+    }
+  ]
+}

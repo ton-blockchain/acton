@@ -201,6 +201,10 @@
         "src": {
           "description": "Path to the contract source (`.tolk`) or precompiled (`.boc`) file",
           "type": "string"
+        },
+        "types": {
+          "description": "Optional Tolk interface file used to produce ABI for precompiled `.boc` contracts",
+          "type": "string"
         }
       }
     },

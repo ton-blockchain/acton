@@ -20,13 +20,16 @@ By default, `acton build` compiles every configured contract. If you pass a
 dependencies.
 
 For each successful build, Acton writes a JSON artifact to the build output
-directory and a contract ABI JSON file to the ABI output directory. When the contract config has an
-`output` path, Acton also writes the compiled `.boc` file there. Dependency
-helper files are emitted into the generated-code directory, and optional Fift
-output can be written separately.
+directory. When compiler ABI is available, Acton also writes a contract ABI JSON
+file to the ABI output directory. When the contract config has an `output` path,
+Acton writes the compiled `.boc` file there. Dependency helper files are emitted
+into the generated-code directory, and optional Fift output can be written
+separately.
 
 Contracts with `.boc` sources are treated as precompiled inputs: Acton loads
-their code, includes them in dependency resolution, and skips recompilation.
+their code, includes them in dependency resolution, and skips code
+recompilation. If such a contract has `types`, Acton compiles that interface
+file only to obtain ABI metadata.
 
 If the project has no `[contracts]` section or the section is empty, the
 command prints guidance and exits without compiling anything.
@@ -254,6 +257,16 @@ output = "Wallet.boc"
 depends = ["Child"]
 ```
 
+For a precompiled contract, keep `src` pointed at the BoC and add `types` when
+you want Acton to emit ABI:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+```
+
 Optional default output paths can be configured in `[build]`:
 
 ```acton-toml title="Acton.toml"
@@ -273,8 +286,8 @@ resolved `gen-dir` for that helper file.
 Depending on command flags and project configuration, `acton build` may write:
 
 - `<out-dir>/<contract-name>.json` with `code_boc64` and `hash`
-- `<output-abi>/<contract-name>.json` with the compiler ABI for `.tolk`
-  contracts that declare ABI metadata
+- `<output-abi>/<contract-name>.json` with ABI from a `.tolk` contract or from
+  `types` on a precompiled `.boc` contract
 - the configured contract `output` `.boc` file
 - `<gen-dir>/<dependency>.code.tolk` helper files for dependencies by default
   (or a dependency-specific custom path when `depends[].path` is configured)

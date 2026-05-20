@@ -1,0 +1,4 @@
+Error: In precompiled:
+
+Types file for precompiled not found: [ROOT]/contracts/missing.types.tolk (specified in Acton.toml as contracts/missing.types.tolk)
+Build failed with 1 error

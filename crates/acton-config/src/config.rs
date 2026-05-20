@@ -603,6 +603,8 @@ pub struct ContractConfig {
     pub name: Option<String>,
     /// Path to the contract source (`.tolk`) or precompiled (`.boc`) file
     pub src: String,
+    /// Optional Tolk interface file used to produce ABI for precompiled `.boc` contracts
+    pub types: Option<String>,
     /// Dependencies of this contract
     pub depends: Option<Vec<ContractDependency>>,
     /// Path where the compiled `.boc` should be saved
@@ -713,6 +715,20 @@ impl ContractConfig {
             Ok(path) => path.into_owned(),
             Err(_) => Path::new(self.src.as_str()).to_path_buf(),
         }
+    }
+
+    /// Returns the optional contract interface file resolved relative to the project root.
+    /// If `types` is already absolute, it is returned as-is.
+    #[must_use]
+    pub fn absolute_types_path(&self, project_root: &Path) -> Option<PathBuf> {
+        let types = self
+            .types
+            .as_deref()
+            .filter(|types| !types.trim().is_empty())?;
+        Some(match Path::new(types).absolutize_from(project_root) {
+            Ok(path) => path.into_owned(),
+            Err(_) => Path::new(types).to_path_buf(),
+        })
     }
 }
 
@@ -1649,6 +1665,7 @@ rules-file = "mutation-rules.json"
                     ContractConfig {
                         name: Some("Counter Contract".to_string()),
                         src: "counter.tolk".to_string(),
+                        types: None,
                         depends: Some(vec![]),
                         output: None,
                     },

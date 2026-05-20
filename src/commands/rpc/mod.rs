@@ -1,11 +1,13 @@
 use crate::commands::common::{error_fmt, format_nanotons};
+use crate::contract_interface::{
+    compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
+};
 use crate::file_build_cache::FileBuildCache;
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, ContractConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
-use std::fs;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -313,20 +315,28 @@ fn load_local_contract_candidate(
     mut file_cache: Option<&mut FileBuildCache>,
 ) -> anyhow::Result<LocalContractCandidate> {
     let contract_path = contract.absolute_source_path(configured_project_root());
-    if contract_path.extension().is_some_and(|ext| ext == "boc") {
-        let boc = fs::read(&contract_path)
-            .with_context(|| format!("Failed to read {}", contract_path.display()))?;
-        let code = Boc::decode(boc)
-            .with_context(|| format!("Failed to decode {}", contract_path.display()))?;
-        let code_boc64 = Boc::encode_base64(&code);
+    if is_boc_path(&contract_path) {
+        let precompiled = read_precompiled_boc(&contract_path, &contract.src)?;
+        let interface = compile_optional_contract_interface(
+            config,
+            configured_project_root(),
+            contract_id,
+            contract,
+        )?;
+        let (abi, source_map) = interface.map_or((None, None), |interface| {
+            (
+                Some(Arc::new(interface.abi)),
+                Some(Arc::new(interface.source_map)),
+            )
+        });
         return Ok(LocalContractCandidate {
             contract_path,
             contract_id: contract_id.to_owned(),
             contract_name: contract.display_name(contract_id).to_owned(),
-            code_boc64,
-            code_hash: *code.repr_hash(),
-            abi: None,
-            source_map: None,
+            code_boc64: precompiled.code_boc64,
+            code_hash: precompiled.code_hash,
+            abi,
+            source_map,
         });
     }
 

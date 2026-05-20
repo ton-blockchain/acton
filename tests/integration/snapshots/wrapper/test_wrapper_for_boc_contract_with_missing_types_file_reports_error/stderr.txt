@@ -1,0 +1,1 @@
+Error: Types file for precompiled not found: [ROOT]/contracts/missing.types.tolk (specified in Acton.toml as contracts/missing.types.tolk)

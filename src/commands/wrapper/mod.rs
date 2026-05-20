@@ -1,4 +1,7 @@
 use crate::commands::common::error_fmt;
+use crate::contract_interface::{
+    compile_required_contract_interface, is_boc_path, read_precompiled_boc,
+};
 use acton_config::color::OwoColorize;
 use acton_config::config::{ActonConfig, project_root};
 use anyhow::{Context, anyhow};
@@ -83,26 +86,37 @@ fn build_model(
     }
 
     let mappings = config.mappings();
-    let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-    let (abi, code_boc64, source_map) = match compiler.compile(&contract_path, false) {
-        CompilerResult::Success(result) => (
-            result.abi.ok_or_else(|| {
-                anyhow!("Compiler did not produce ABI for {}", contract_id.yellow())
-            })?,
-            result.code_boc64,
-            result.source_map.ok_or_else(|| {
-                anyhow!(
-                    "Compiler did not produce symbol types for {}",
-                    contract_id.yellow()
-                )
-            })?,
-        ),
-        CompilerResult::Error(error) => {
-            anyhow::bail!(
-                "Failed to compile contract {} for wrapper generation: {}",
-                contract_id.yellow(),
-                error.message
-            );
+    let (abi, code_boc64, source_map) = if is_boc_path(&contract_path) {
+        let interface = compile_required_contract_interface(
+            config,
+            &project_root,
+            contract_id,
+            contract_config,
+        )?;
+        let precompiled = read_precompiled_boc(&contract_path, &contract_config.src)?;
+        (interface.abi, precompiled.code_boc64, interface.source_map)
+    } else {
+        let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
+        match compiler.compile(&contract_path, false) {
+            CompilerResult::Success(result) => (
+                result.abi.ok_or_else(|| {
+                    anyhow!("Compiler did not produce ABI for {}", contract_id.yellow())
+                })?,
+                result.code_boc64,
+                result.source_map.ok_or_else(|| {
+                    anyhow!(
+                        "Compiler did not produce symbol types for {}",
+                        contract_id.yellow()
+                    )
+                })?,
+            ),
+            CompilerResult::Error(error) => {
+                anyhow::bail!(
+                    "Failed to compile contract {} for wrapper generation: {}",
+                    contract_id.yellow(),
+                    error.message
+                );
+            }
         }
     };
 
@@ -111,7 +125,11 @@ fn build_model(
         .and_then(|s| s.to_str())
         .unwrap_or(contract_id);
 
-    let contract_name = to_pascal_case(file_stem);
+    let contract_name = if abi.contract_name.is_empty() {
+        to_pascal_case(file_stem)
+    } else {
+        abi.contract_name.clone()
+    };
     let configured_tolk_output_dir = config.tolk_wrapper_output_dir().map(ToOwned::to_owned);
     let configured_typescript_output_dir = config
         .typescript_wrapper_output_dir()
@@ -244,11 +262,7 @@ pub fn wrapper_cmd(
         let project_root = project_root();
         for (contract_id, contract) in contracts {
             let source_path = contract.absolute_source_path(project_root);
-            if source_path
-                .extension()
-                .and_then(|extension| extension.to_str())
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("boc"))
-            {
+            if is_boc_path(&source_path) && contract.absolute_types_path(project_root).is_none() {
                 continue;
             }
 

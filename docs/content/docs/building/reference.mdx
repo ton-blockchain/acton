@@ -25,7 +25,7 @@ Examples:
 
 Compile all contracts defined in `Acton.toml` or a specific contract with its dependencies.
 
-For each compiled contract, Acton generates a JSON artifact in the output directory (default: `build/`) containing the compiled base64-encoded code and its hash. For `.tolk` contracts, Acton writes compiler ABI JSON files to the ABI output directory (default: `build/abi/`).
+For each successfully built contract, Acton generates a JSON artifact in the output directory (default: `build/`) containing the base64-encoded code and its hash. Acton writes compiler ABI JSON files to the ABI output directory (default: `build/abi/`) for `.tolk` contracts and for precompiled `.boc` contracts that set `types`.
 
 ```bash
 acton build [OPTIONS] [CONTRACT]
@@ -161,6 +161,7 @@ depends = []
 |----------------|--------|----------|--------------------------------------------------------------------------------------------------------------------|
 | `display-name` | string | No       | Overrides full name (e.g. `Wallet` instead of `JettonWallet`) in console messages and UI.                          |
 | `src`          | string | Yes      | Path to the contract source file. Can be a `.tolk` file for compilation or a `.boc` file for precompiled contracts |
+| `types`        | string | No       | Tolk interface file used to produce ABI for a precompiled `.boc` contract                                          |
 | `output`       | string | No       | Optional path where the compiled binary `.boc` file should be saved in addition to the normal JSON build artifact  |
 | `depends`      | array  | No       | Array of contract dependencies. Can be simple strings or detailed dependency objects                               |
 
@@ -295,16 +296,22 @@ It is possible to use precompiled `.boc` files instead of `.tolk` sources:
 [contracts.Precompiled]
 display-name = "PrecompiledContract"
 src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
 depends = []
 ```
 
 When using `.boc` files:
 
-- No compilation is performed
-- The BoC is loaded directly without running the Tolk compiler
+- Contract code is not compiled
+- The BoC code is loaded directly without running the Tolk compiler on that code
+- If `types` is set, Acton compiles that Tolk file as an interface-only source
+  to emit ABI and generate wrappers
 - Dependencies can still reference this contract
 
 This is useful for referencing third-party contracts.
+
+For the full workflow, including interface files, wrapper generation, and RPC
+storage decoding, see [Precompiled BoC contracts](/docs/building/precompiled-boc).
 
 This build mode is separate from TON network precompiled contracts configured
 through Param 45. During local emulation and tests, Acton honors Param 45

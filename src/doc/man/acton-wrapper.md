@@ -18,15 +18,17 @@ Generate a wrapper for the contract identified by `_contract-name_` from
 Use `--all` to generate wrappers for every contract defined in `Acton.toml`
 without picking a single one.
 
-Wrapper generation uses the ABI emitted by the Tolk compiler. In practice, the
-contract header is the source of truth for typed storage accessors, incoming
-message helpers, and generated get-method bindings.
+Wrapper generation uses ABI emitted by the Tolk compiler from the contract source
+or from a configured `types` interface file. In practice, the contract header is
+the source of truth for typed storage accessors, incoming message helpers, and
+generated get-method bindings.
 
 The command can also generate a stub test file or emit a TypeScript wrapper for
 frontend and tooling integrations.
 
-`acton wrapper` compiles the selected contract directly. A prior `acton build`
-run is not required.
+For `.tolk` contracts, `acton wrapper` compiles the selected source directly.
+For precompiled `.boc` contracts, it reads code from the BoC and compiles the
+configured `types` interface file. A prior `acton build` run is not required.
 
 ## Options
 
@@ -142,6 +144,16 @@ output-dir = "wrappers-ts"
 ```
 
 CLI flags override config values for the current invocation.
+
+For a precompiled `.boc` contract, configure `types` next to `src` so wrapper
+generation can read ABI from the Tolk interface file:
+
+```acton-toml title="Acton.toml"
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+```
 
 ## Exit Status
 

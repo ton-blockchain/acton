@@ -244,6 +244,7 @@ fn discover_contracts() -> BTreeMap<String, ContractConfig> {
         let contract_config = ContractConfig {
             name: Some(contract_name),
             src: relative_path,
+            types: None,
             depends: Some(vec![]),
             output: None,
         };

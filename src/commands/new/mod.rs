@@ -253,6 +253,7 @@ pub fn new_cmd(
             ContractConfig {
                 name: Some(contract.name.to_owned()),
                 src: scaffold.contract_src(contract),
+                types: None,
                 depends: Some(
                     contract
                         .depends

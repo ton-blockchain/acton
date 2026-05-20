@@ -1,6 +1,7 @@
 pub mod build_info;
 pub mod commands;
 pub mod context;
+mod contract_interface;
 pub mod crash;
 pub mod external_send;
 pub mod ffi;

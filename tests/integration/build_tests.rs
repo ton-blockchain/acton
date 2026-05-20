@@ -13,6 +13,42 @@ fun onInternalMessage(in: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const PRECOMPILED_TYPES: &str = r"
+struct (0x00000001) Increment {
+    value: int32
+}
+
+get fun currentCounter(): int {
+    return 0;
+}
+
+contract Precompiled {
+    incomingMessages: Increment
+}
+";
+
+const INVALID_PRECOMPILED_TYPES: &str = r"
+contract Precompiled {
+    incomingMessages: MissingMessage
+}
+";
+
+fn point_precompiled_contract_to_uppercase_boc(project: &crate::support::project::Project) {
+    fs::rename(
+        project.path().join("contracts/precompiled.boc"),
+        project.path().join("contracts/precompiled.BOC"),
+    )
+    .expect("should rename BoC fixture");
+
+    let manifest_path = project.path().join("Acton.toml");
+    let manifest = fs::read_to_string(&manifest_path).expect("should read Acton.toml");
+    fs::write(
+        &manifest_path,
+        manifest.replace("contracts/precompiled.boc", "contracts/precompiled.BOC"),
+    )
+    .expect("should update Acton.toml");
+}
+
 #[test]
 fn test_build_simple_contract() {
     let project = ProjectBuilder::new("build-simple")
@@ -875,6 +911,137 @@ fn test_build_contract_from_boc() {
         acton_toml.contains("src = \"contracts/precompiled.boc\""),
         "Should reference .boc file"
     );
+}
+
+#[test]
+fn test_build_contract_from_boc_with_types_writes_abi() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("boc-source-with-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+        .raw_file("contracts/precompiled.types.tolk", PRECOMPILED_TYPES)
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/build/test_build_contract_from_boc_with_types_writes_abi/stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("build/abi/precompiled.json")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/build/test_build_contract_from_boc_with_types_writes_abi/abi.json",
+        );
+}
+
+#[test]
+fn test_build_contract_from_uppercase_boc_with_types_writes_abi() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("boc-source-uppercase-with-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+        .raw_file("contracts/precompiled.types.tolk", PRECOMPILED_TYPES)
+        .build();
+    point_precompiled_contract_to_uppercase_boc(&project);
+
+    project
+        .acton()
+        .build()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/build/test_build_contract_from_uppercase_boc_with_types_writes_abi/stdout.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("build/abi/precompiled.json")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/build/test_build_contract_from_uppercase_boc_with_types_writes_abi/abi.json",
+        );
+}
+
+#[test]
+fn test_build_contract_from_boc_with_empty_types_skips_abi() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("boc-source-empty-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "")
+        .build();
+
+    project.acton().build().run().success().assert_snapshot_matches(
+        "integration/snapshots/build/test_build_contract_from_boc_with_empty_types_skips_abi/stdout.txt",
+    );
+
+    let abi_listing = if project.path().join("build/abi").exists() {
+        let mut entries = fs::read_dir(project.path().join("build/abi"))
+            .expect("failed to read build/abi")
+            .map(|entry| {
+                entry
+                    .expect("failed to read build/abi entry")
+                    .file_name()
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect::<Vec<_>>();
+        entries.sort();
+        format!("{}\n", entries.join("\n"))
+    } else {
+        "build/abi missing\n".to_string()
+    };
+    assertion().eq(
+        abi_listing,
+        snapbox::file!(
+            "snapshots/build/test_build_contract_from_boc_with_empty_types_skips_abi/abi_listing.txt"
+        ),
+    );
+}
+
+#[test]
+fn test_build_contract_from_boc_with_missing_types_file_reports_error() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("boc-source-missing-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/missing.types.tolk")
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/build/test_build_contract_from_boc_with_missing_types_file_reports_error/stderr.txt",
+        );
+}
+
+#[test]
+fn test_build_contract_from_boc_with_invalid_types_file_reports_error() {
+    let boc_bytes = fs::read("tests/integration/testdata/child.boc").unwrap();
+
+    let project = ProjectBuilder::new("boc-source-invalid-types")
+        .contract_from_boc_with_types("precompiled", boc_bytes, "contracts/precompiled.types.tolk")
+        .raw_file(
+            "contracts/precompiled.types.tolk",
+            INVALID_PRECOMPILED_TYPES,
+        )
+        .build();
+
+    project
+        .acton()
+        .build()
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/build/test_build_contract_from_boc_with_invalid_types_file_reports_error/stderr.txt",
+        );
 }
 
 #[test]

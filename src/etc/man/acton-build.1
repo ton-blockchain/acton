@@ -16,13 +16,16 @@ By default, \fBacton build\fR compiles every configured contract. If you pass a
 dependencies.
 .sp
 For each successful build, Acton writes a JSON artifact to the build output
-directory and a contract ABI JSON file to the ABI output directory. When the contract config has an
-\fBoutput\fR path, Acton also writes the compiled \fB\&.boc\fR file there. Dependency
-helper files are emitted into the generated\-code directory, and optional Fift
-output can be written separately.
+directory. When compiler ABI is available, Acton also writes a contract ABI JSON
+file to the ABI output directory. When the contract config has an \fBoutput\fR path,
+Acton writes the compiled \fB\&.boc\fR file there. Dependency helper files are emitted
+into the generated\-code directory, and optional Fift output can be written
+separately.
 .sp
 Contracts with \fB\&.boc\fR sources are treated as precompiled inputs: Acton loads
-their code, includes them in dependency resolution, and skips recompilation.
+their code, includes them in dependency resolution, and skips code
+recompilation. If such a contract has \fBtypes\fR, Acton compiles that interface
+file only to obtain ABI metadata.
 .sp
 If the project has no \fB[contracts]\fR section or the section is empty, the
 command prints guidance and exits without compiling anything.
@@ -118,6 +121,18 @@ depends = ["Child"]
 .fi
 .RE
 .sp
+For a precompiled contract, keep \fBsrc\fR pointed at the BoC and add \fBtypes\fR when
+you want Acton to emit ABI:
+.sp
+.RS 4
+.nf
+[contracts.Precompiled]
+src = "contracts/Precompiled.boc"
+types = "contracts/Precompiled.types.tolk"
+depends = []
+.fi
+.RE
+.sp
 Optional default output paths can be configured in \fB[build]\fR:
 .sp
 .RS 4
@@ -141,8 +156,8 @@ Depending on command flags and project configuration, \fBacton build\fR may writ
 .RE
 .sp
 .RS 4
-\h'-04'\(bu\h'+03'\fB<output\-abi>/<contract\-name>.json\fR with the compiler ABI for \fB\&.tolk\fR
-contracts that declare ABI metadata
+\h'-04'\(bu\h'+03'\fB<output\-abi>/<contract\-name>.json\fR with ABI from a \fB\&.tolk\fR contract or from
+\fBtypes\fR on a precompiled \fB\&.boc\fR contract
 .RE
 .sp
 .RS 4
