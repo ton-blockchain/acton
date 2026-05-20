@@ -166,7 +166,7 @@ fn test_wrapper_generation_keeps_source_file_stem_for_wrapper_name() {
     let project = ProjectBuilder::new("wrapper_file_stem_name")
         .contract(
             "configured_file",
-            r#"
+            r"
                 struct (0x00000001) Ping {}
 
                 contract DifferentHeader {
@@ -175,7 +175,7 @@ fn test_wrapper_generation_keeps_source_file_stem_for_wrapper_name() {
 
                 fun onInternalMessage(in: InMessage) {}
                 fun onBouncedMessage(_: InMessageBounced) {}
-            "#,
+            ",
         )
         .build();
 
