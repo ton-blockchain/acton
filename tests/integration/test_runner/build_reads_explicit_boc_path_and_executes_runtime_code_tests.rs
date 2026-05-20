@@ -23,6 +23,22 @@ fn compiled_runtime_boc_bytes() -> Vec<u8> {
         .expect("must read compiled boc bytes")
 }
 
+fn point_precompiled_contract_to_uppercase_boc(project: &crate::support::project::Project) {
+    fs::rename(
+        project.path().join("contracts/precompiled.boc"),
+        project.path().join("contracts/precompiled.BOC"),
+    )
+    .expect("should rename BoC fixture");
+
+    let manifest_path = project.path().join("Acton.toml");
+    let manifest = fs::read_to_string(&manifest_path).expect("should read Acton.toml");
+    fs::write(
+        &manifest_path,
+        manifest.replace("contracts/precompiled.boc", "contracts/precompiled.BOC"),
+    )
+    .expect("should update Acton.toml");
+}
+
 #[test]
 fn build_reads_explicit_boc_path_and_executes_runtime_code() {
     let project = ProjectBuilder::new("aw-stdlib-build-boc-path-runtime")
@@ -121,6 +137,57 @@ fn build_reads_name_based_precompiled_boc_contract_and_executes_runtime_code() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/build_reads_explicit_boc_path_and_executes_runtime_code/build_reads_name_based_precompiled_boc_contract_and_executes_runtime_code.stdout.txt",
+        );
+}
+
+#[test]
+fn build_reads_uppercase_precompiled_boc_contract_and_executes_runtime_code() {
+    let boc_bytes = compiled_runtime_boc_bytes();
+    let project = ProjectBuilder::new("aw-stdlib-build-uppercase-precompiled-boc-runtime")
+        .contract_from_boc("precompiled", boc_bytes)
+        .test_file(
+            "build_uppercase_precompiled_boc_runtime",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/testing/expect"
+
+            get fun `test aw build uppercase precompiled boc runtime`() {
+                val fromName = build("precompiled");
+                val fromBocPath = build("precompiled", "contracts/precompiled.BOC");
+                expect(fromBocPath).toEqual(fromName);
+
+                val sender = testing.treasury("deployer");
+                val init = ContractState {
+                    code: fromName,
+                    data: createEmptyCell(),
+                };
+                val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                val deployMsg = createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                });
+                expect(net.send(sender.address, deployMsg)).toHaveSuccessfulDeploy({ to: address });
+                expect(net.runGetMethod<int>(address, "ping")).toEqual(7);
+            }
+        "#,
+        )
+        .build();
+    point_precompiled_contract_to_uppercase_boc(&project);
+
+    project
+        .acton()
+        .test()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/build_reads_explicit_boc_path_and_executes_runtime_code/build_reads_uppercase_precompiled_boc_contract_and_executes_runtime_code.stdout.txt",
         );
 }
 

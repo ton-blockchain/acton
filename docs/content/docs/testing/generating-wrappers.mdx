@@ -1,9 +1,11 @@
 ---
 title: "Generating wrappers"
-description: "Learn how to automatically generate wrappers for Tolk contracts"
+description: "Learn how to automatically generate wrappers for contracts"
 ---
 
-Integration tests often need utility wrapper files to interact with smart contracts: send messages and call get-methods. The [`acton wrapper`](/docs/commands/wrapper) command generates those wrappers from Tolk contracts.
+Integration tests often need utility wrapper files to interact with smart contracts: send messages and call get-methods. The [`acton wrapper`](/docs/commands/wrapper) command generates those wrappers from contract ABI.
+
+For precompiled `.boc` contracts, add a `types` interface file first. See [Precompiled BoC contracts](/docs/building/precompiled-boc).
 
 ## Generate a wrapper
 

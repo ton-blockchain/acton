@@ -125,11 +125,7 @@ fn build_model(
         .and_then(|s| s.to_str())
         .unwrap_or(contract_id);
 
-    let contract_name = if abi.contract_name.is_empty() {
-        to_pascal_case(file_stem)
-    } else {
-        abi.contract_name.clone()
-    };
+    let contract_name = to_pascal_case(file_stem);
     let configured_tolk_output_dir = config.tolk_wrapper_output_dir().map(ToOwned::to_owned);
     let configured_typescript_output_dir = config
         .typescript_wrapper_output_dir()

@@ -5,6 +5,7 @@ use crate::context::{
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
     SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache, to_cell,
 };
+use crate::contract_interface::is_boc_path;
 use crate::external_send::{SendBocContext, format_send_boc_error};
 use crate::paths;
 use crate::retrace;
@@ -198,7 +199,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
 
     let path_display = path.display().to_string();
 
-    if path_display.ends_with(".boc") {
+    if is_boc_path(&path) {
         // For BoC source we just return it as a Cell
         let binary_data =
             fs::read(&path).with_context(|| format!("Cannot read BoC file {path_display}"))?;
@@ -340,7 +341,7 @@ pub(crate) fn compilation_result_for_code(
     for (contract_id, contract) in contracts {
         let path = contract.absolute_source_path(&ctx.env.project_root);
         let path_display = path.display().to_string();
-        if path_display.ends_with(".boc") {
+        if is_boc_path(&path) {
             continue;
         }
 

@@ -6,7 +6,7 @@ description: "How Acton's build system manages smart contract compilation, depen
 
 Two commands drive compilation:
 
-- [`acton build`](/docs/commands/build) runs the full project pipeline: it compiles Tolk contracts registered in `Acton.toml`, resolves the [dependency graph](#contract-dependencies), and [writes artifacts](#best-effort-builds) to be consumed by [tests](/docs/testing/overview), [wrappers](/docs/building/wrappers), and [scripts](/docs/scripting/overview).
+- [`acton build`](/docs/commands/build) runs the full project pipeline: it builds contracts registered in `Acton.toml`, compiles Tolk sources, loads precompiled BoC sources, resolves the [dependency graph](#contract-dependencies), and [writes artifacts](#best-effort-builds) to be consumed by [tests](/docs/testing/overview), [wrappers](/docs/building/wrappers), and [scripts](/docs/scripting/overview).
 - [`acton compile`](/docs/commands/compile) targets a single `.tolk` file — useful for quick inspection of compiler output or producing standalone `.boc` and `.fif` files outside a project build.
 
 <Cards>
@@ -49,7 +49,10 @@ Dependency-graph failures such as missing contracts or cycles happen before the 
 
 ## Best-effort builds
 
-When compiled with `acton build`, each successful contract build produces: a JSON file with Base64-encoded contract code and the code hash in `build/`, a JSON file with compiler ABI in `build/abi/`, and dependency helper files in `gen/` for contracts with declared dependencies.
+When built with `acton build`, each successful contract produces a JSON file
+with Base64-encoded contract code and the code hash in `build/`. When ABI is
+available, Acton also writes it to `build/abi/`. Dependency helper files are
+written to `gen/` for contracts with declared dependencies.
 
 Once dependency resolution succeeds, Acton builds eligible contracts, discarding those failed to compile and not aborting the build immediately. Same goes for artifact-writing failures. Further, artifacts produced from successful builds in the current run remain on disk.
 

@@ -1,5 +1,6 @@
 use crate::commands::common::{error_fmt, select_contract, select_wallet};
 use crate::context::Wallet;
+use crate::contract_interface::is_boc_path;
 use crate::tonconnect::TonConnectSession;
 use crate::wallets::open_wallets;
 use acton_config::color::OwoColorize;
@@ -71,7 +72,7 @@ pub fn verify_cmd(
 
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
 
-    if contract_path.extension() == Some("boc".as_ref()) {
+    if is_boc_path(&contract_path) {
         anyhow::bail!(
             "Cannot verify precompiled {} files. Please specify a {} source file.",
             ".boc".yellow(),

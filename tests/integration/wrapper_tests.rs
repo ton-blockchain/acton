@@ -162,6 +162,42 @@ fn test_wrapper_generation_without_test_stub() {
 }
 
 #[test]
+fn test_wrapper_generation_keeps_source_file_stem_for_wrapper_name() {
+    let project = ProjectBuilder::new("wrapper_file_stem_name")
+        .contract(
+            "configured_file",
+            r#"
+                struct (0x00000001) Ping {}
+
+                contract DifferentHeader {
+                    incomingMessages: Ping
+                }
+
+                fun onInternalMessage(in: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("configured_file")
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/wrapper/test_wrapper_generation_keeps_source_file_stem_for_wrapper_name/output.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/ConfiguredFile.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_keeps_source_file_stem_for_wrapper_name/wrapper.tolk.txt",
+        );
+}
+
+#[test]
 fn test_wrapper_all_skips_boc_contracts() {
     let project = ProjectBuilder::new("wrapper_all_skips_boc")
         .contract_from_boc("precompiled", vec![0xFF, 0xFF, 0xFF, 0xFF])

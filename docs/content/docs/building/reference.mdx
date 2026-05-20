@@ -25,7 +25,7 @@ Examples:
 
 Compile all contracts defined in `Acton.toml` or a specific contract with its dependencies.
 
-For each successfully built contract, Acton generates a JSON artifact in the output directory (default: `build/`) containing the base64-encoded code and its hash. Acton writes compiler ABI JSON files to the ABI output directory (default: `build/abi/`) for `.tolk` contracts and for precompiled `.boc` contracts that set `types`.
+For each successfully built contract, Acton generates a JSON artifact in the output directory (default: `build/`) containing the base64-encoded code and its hash. When ABI is available, Acton writes compiler ABI JSON files to the ABI output directory (default: `build/abi/`). Precompiled `.boc` contracts get ABI only when they set `types`.
 
 ```bash
 acton build [OPTIONS] [CONTRACT]
@@ -309,10 +309,10 @@ When using `.boc` files:
 - `depends` on the BoC contract itself has no effect on its code because the BoC
   is already compiled
 - `acton build` always writes the regular JSON artifact for a valid BoC contract.
-If `types` is configured, it also writes ABI JSON to the ABI output directory.
-`output = "path/to/file.boc"` can still write the normalized BoC output.
+  If `types` is configured, it also writes ABI JSON to the ABI output directory.
+  `output = "path/to/file.boc"` can still write the normalized BoC output.
 - `--output-fift` only applies to compiled `.tolk` contracts. BoC contracts are
-already compiled, so Acton does not produce Fift for them.
+  already compiled, so Acton does not produce Fift for them.
 
 This is useful for referencing third-party contracts.
 
