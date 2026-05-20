@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_behavior.test.tolk (1 test)
+  ✗ ad stdlib numeric type mismatch diff [TIME]
+    └─ Error: expect(actual).toEqual(expected)
+        (
+            1,
+            2
+        )
+      └─ at tests/expect_behavior.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

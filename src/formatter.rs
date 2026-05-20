@@ -2339,6 +2339,20 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         matches!(source_map.ty_by_idx(ty_idx), Some(Ty::String))
     }
 
+    fn is_number_like_ty_idx(source_map: &SourceMap, ty_idx: TyIdx) -> bool {
+        matches!(
+            source_map.ty_by_idx(ty_idx),
+            Some(
+                Ty::Int
+                    | Ty::IntN { .. }
+                    | Ty::UintN { .. }
+                    | Ty::VarintN { .. }
+                    | Ty::VaruintN { .. }
+                    | Ty::Coins
+            )
+        )
+    }
+
     fn strip_top_level_string_quotes(formatted: String) -> String {
         if formatted.len() >= 2 && formatted.starts_with('"') && formatted.ends_with('"') {
             formatted[1..formatted.len() - 1].to_owned()
@@ -2427,7 +2441,10 @@ impl FormatterContext<'_> {
         let left_is_string = Self::is_string_like_ty_idx(source_map, left_ty_idx);
         let right_is_string = Self::is_string_like_ty_idx(source_map, right_ty_idx);
 
-        if left_ty_idx != right_ty_idx {
+        if left_ty_idx != right_ty_idx
+            && !(Self::is_number_like_ty_idx(source_map, left_ty_idx)
+                && Self::is_number_like_ty_idx(source_map, right_ty_idx))
+        {
             return format!(
                 "{} != {}",
                 self.format_rendered_assert_value(&left_rendered, left_is_string),

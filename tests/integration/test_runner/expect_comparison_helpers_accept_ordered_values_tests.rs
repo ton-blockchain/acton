@@ -19,6 +19,19 @@ fn run_expect_success(project_name: &str, test_body: &str, snapshot_path: &str) 
         .assert_snapshot_matches(snapshot_path);
 }
 
+fn run_expect_failure(project_name: &str, test_body: &str, snapshot_path: &str) {
+    let source = format!("{EXPECT_IMPORTS}\n{test_body}\n");
+    ProjectBuilder::new(project_name)
+        .test_file("expect_behavior", &source)
+        .build()
+        .acton()
+        .test()
+        .run()
+        .failure()
+        .assert_failed(1)
+        .assert_snapshot_matches(snapshot_path);
+}
+
 #[test]
 fn expect_comparison_helpers_accept_ordered_values() {
     run_expect_success(
@@ -33,6 +46,22 @@ get fun `test ad stdlib comparison helpers`() {
 }
 ",
         "integration/snapshots/test-runner/expect_comparison_helpers_accept_ordered_values/expect_comparison_helpers_accept_ordered_values.stdout.txt",
+    );
+}
+
+#[test]
+fn expect_to_equal_reports_numeric_type_mismatch_diff() {
+    run_expect_failure(
+        "ad-stdlib-expect-numeric-type-mismatch-diff",
+        r"
+get fun `test ad stdlib numeric type mismatch diff`() {
+    val actual: uint32 = 1;
+    val expected: int = 2;
+
+    expect(actual).toEqual(expected);
+}
+",
+        "integration/snapshots/test-runner/expect_comparison_helpers_accept_ordered_values/expect_to_equal_reports_numeric_type_mismatch_diff.stdout.txt",
     );
 }
 
