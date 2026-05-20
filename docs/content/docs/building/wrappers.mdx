@@ -30,14 +30,13 @@ points `types` to a Tolk interface file:
 [contracts.Precompiled]
 src = "contracts/Precompiled.boc"
 types = "contracts/Precompiled.types.tolk"
-depends = []
 ```
 
 Acton reads deployable code from the BoC and reads the ABI from
 `Precompiled.types.tolk`. A BoC contract without `types` is skipped by
 `acton wrapper --all`, and `acton wrapper Precompiled` reports that `types` is
 required. See [Precompiled BoC contracts](/docs/building/precompiled-boc) for
-the full build, wrapper, and RPC storage-decoding workflow.
+the build and wrapper workflow.
 
 Pass `--test` to also emit a runnable test stub alongside the wrapper:
 

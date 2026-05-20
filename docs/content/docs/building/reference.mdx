@@ -297,7 +297,6 @@ It is possible to use precompiled `.boc` files instead of `.tolk` sources:
 display-name = "PrecompiledContract"
 src = "contracts/Precompiled.boc"
 types = "contracts/Precompiled.types.tolk"
-depends = []
 ```
 
 When using `.boc` files:
@@ -306,12 +305,19 @@ When using `.boc` files:
 - The BoC code is loaded directly without running the Tolk compiler on that code
 - If `types` is set, Acton compiles that Tolk file as an interface-only source
   to emit ABI and generate wrappers
-- Dependencies can still reference this contract
+- Other contracts can still reference this contract in their `depends`
+- `depends` on the BoC contract itself has no effect on its code because the BoC
+  is already compiled
+- `acton build` always writes the regular JSON artifact for a valid BoC contract.
+If `types` is configured, it also writes ABI JSON to the ABI output directory.
+`output = "path/to/file.boc"` can still write the normalized BoC output.
+- `--output-fift` only applies to compiled `.tolk` contracts. BoC contracts are
+already compiled, so Acton does not produce Fift for them.
 
 This is useful for referencing third-party contracts.
 
-For the full workflow, including interface files, wrapper generation, and RPC
-storage decoding, see [Precompiled BoC contracts](/docs/building/precompiled-boc).
+For the user-facing workflow, including interface files and wrapper generation,
+see [Precompiled BoC contracts](/docs/building/precompiled-boc).
 
 This build mode is separate from TON network precompiled contracts configured
 through Param 45. During local emulation and tests, Acton honors Param 45

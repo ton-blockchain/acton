@@ -129,9 +129,12 @@ you want Acton to emit ABI:
 [contracts.Precompiled]
 src = "contracts/Precompiled.boc"
 types = "contracts/Precompiled.types.tolk"
-depends = []
 .fi
 .RE
+.sp
+Do not put dependencies on the BoC contract itself: it is already compiled.
+Instead, put \fBdepends = ["Precompiled"]\fR on the \fB\&.tolk\fR contract that needs the
+BoC code.
 .sp
 Optional default output paths can be configured in \fB[build]\fR:
 .sp

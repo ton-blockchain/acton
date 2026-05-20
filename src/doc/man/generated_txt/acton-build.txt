@@ -104,7 +104,10 @@ CONFIGURATION
            [contracts.Precompiled]
            src = "contracts/Precompiled.boc"
            types = "contracts/Precompiled.types.tolk"
-           depends = []
+
+       Do not put dependencies on the BoC contract itself: it is already
+       compiled. Instead, put depends = ["Precompiled"] on the .tolk contract
+       that needs the BoC code.
 
        Optional default output paths can be configured in [build]:
 
