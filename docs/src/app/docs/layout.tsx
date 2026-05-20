@@ -10,6 +10,7 @@ export default function Layout({children}: {children: ReactNode}) {
       githubUrl={"https://github.com/ton-blockchain/acton"}
       sidebar={{
         className: "acton-docs-sidebar",
+        prefetch: false,
       }}
       containerProps={{
         style: {
