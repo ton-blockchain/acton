@@ -100,8 +100,9 @@ $ acton test --ui
   Test UI started at http://localhost:12344
 ```
 
-The command will automatically open the UI in your default browser. Open the transactions tab.
-The first three transactions are wallet deployments, the fourth transaction is Poll deployment, and the last one is our voting logic:
+The command will automatically open the UI in your default browser.
+
+On the transactions tab, the first three transactions are wallet deployments, the fourth is the Poll deployment, and the last is the voting logic:
 
 1. `alice → Poll` with `Vote(option=0)` — Poll increments `option0` and sends to Voter
 2. `Poll → Voter` with the same `Vote(option=0)` — Voter sets `hasVoted = true`
@@ -156,10 +157,7 @@ $ acton test
 The third test fails as expected. Poll increments `option0` to 2 even though Voter correctly rejected the second vote. The bounce signal from Voter triggers Poll's `onBouncedMessage` but the handler currently does nothing.
 
 <Callout type="tip">
-  Open the Test UI again and click the failing test. In the transactions tab, select the last
-  transaction. The trace shows that the Vote transaction failed with exit code 101, and the Poll
-  transaction received a bounced message, which is marked with a dotted line and is currently
-  ignored by Poll contract.
+  Reopen the Test UI and select the failing test. In the transactions tab, choose the latest transaction. The trace would show that the `Vote` transaction failed with exit code 101, and the `Poll` transaction received a bounced message, which is marked by a dotted line and ignored by the Poll contract.
 </Callout>
 
 <figure className="theme-image my-6">

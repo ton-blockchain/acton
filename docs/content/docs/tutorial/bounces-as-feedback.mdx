@@ -13,7 +13,7 @@ When a bounceable message fails on the recipient:
 
 The 256-bit limit matters: the `Vote` struct is 40 bits (32-bit opcode + 8-bit option), so it fits entirely in the bounce payload. That is why `BounceMode.Only256BitsOfBody` is used when Poll forwards a `Vote` to Voter.
 
-## Implement onBouncedMessage in Poll
+## Implement `onBouncedMessage` in Poll
 
 In `contracts/Poll.tolk`, replace the empty `onBouncedMessage` with:
 
@@ -142,7 +142,7 @@ get fun `test voter rejects direct vote`() {
 }
 ```
 
-And add import for Voter contract wrapper:
+And add an import for the Voter contract wrapper on top:
 
 ```tolk title="tests/poll.test.tolk"
 import "@wrappers/Voter.gen"

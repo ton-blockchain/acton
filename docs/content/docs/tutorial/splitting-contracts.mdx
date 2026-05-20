@@ -97,11 +97,11 @@ fun onInternalMessage(in: InMessage) {
 fun onBouncedMessage(_in: InMessageBounced) {}
 ```
 
-`assert (in.senderAddress == storage.poll) throw Errors.NotFromPoll` — Voter only accepts votes forwarded by its own Poll contract, blocking anyone from faking a vote directly to a Voter.
+- `assert (in.senderAddress == storage.poll) throw Errors.NotFromPoll` — Voter only accepts votes forwarded by its own Poll contract, blocking anyone from faking a vote directly to a Voter.
 
-`assert (!storage.hasVoted) throw Errors.AlreadyVoted` — on a duplicate vote, this throws a TVM exception. The TVM bounces the message back to the sender (Poll). Page 5 adds the bounce handler to Poll.
+- `assert (!storage.hasVoted) throw Errors.AlreadyVoted` — on a duplicate vote, this throws a TVM exception. The TVM bounces the message back to the sender (Poll). Page 5 adds the bounce handler to Poll.
 
-The initial `VoterStorage` (with `hasVoted: false`) is baked into the contract's stateInit when Poll deploys it. The first time Voter receives a `Vote` message, `hasVoted` is `false` and the assert passes.
+- The initial `VoterStorage` (with `hasVoted: false`) is baked into the contract's stateInit when Poll deploys it. The first time Voter receives a `Vote` message, `hasVoted` is `false` and the assert passes.
 
 ## Write Poll
 
@@ -186,7 +186,7 @@ get fun calcVoterAddress(voter: address): address {
 }
 ```
 
-- `import "@gen/Voter.code"` — imports the generated dependency helper. Later we will register the contract and `[contracts.Poll]` will describe its dependency via `depends = ["Voter"]` in `Acton.toml`, `acton build` compiles Voter first and writes `gen/Voter.code.tolk`, which exposes a `voterCompiledCode()` function that returns Voter's compiled code as a cell.
+- `import "@gen/Voter.code"` — imports the generated dependency helper. Later, we will register the contract and `[contracts.Poll]` will describe its dependency via `depends = ["Voter"]` in `Acton.toml`, `acton build` compiles Voter first and writes `gen/Voter.code.tolk`, which exposes a `voterCompiledCode()` function that returns Voter's compiled code as a cell.
 
 - `VoterStorage { poll: ..., voter: in.senderAddress, ... }` — the `voter` field makes each sender's stateInit unique. Because a contract's address is derived from its stateInit (code + initial data), there is exactly one possible address for each `(poll, voter)` pair, and it can also be calculated off-chain.
 

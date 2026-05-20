@@ -33,6 +33,8 @@ export interface CalloutContainerProps extends ComponentProps<"div"> {
 
 function resolveAlias(type: CalloutType) {
   if (type === "warn") return "warning"
+  if ((type as unknown) === "caution") return "warning"
+  if ((type as unknown) === "note") return "info"
   if ((type as unknown) === "tip") return "idea"
   return type
 }
