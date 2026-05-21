@@ -54,6 +54,7 @@ interface DashboardPageProps {
   readonly client: TonClient
   readonly theme: string
   readonly setTheme: (theme: string) => void
+  readonly children?: React.ReactNode
 }
 
 interface HomeState {
@@ -119,7 +120,7 @@ function collectRecentAccounts(transactions: readonly V3TransactionListItem[]): 
   return accounts
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({client, theme, setTheme}) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, theme, setTheme}) => {
   const location = useLocation()
   const navigate = useNavigate()
   const {showToast} = useToast()
@@ -346,8 +347,24 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({client, theme, setT
   return (
     <div className={styles.page}>
       <aside className={styles.sidebar}>
+        <div className={styles.sidebarHeader}>
+          <div className={styles.workspaceHeader}>
+            <span className={styles.workspaceMark} />
+            <span className={styles.workspaceBody}>
+              <span className={styles.workspaceName}>TON Localnet</span>
+              <span className={styles.workspaceMeta}>by Acton</span>
+            </span>
+          </div>
+        </div>
+
         <div className={styles.topControls}>
-          <button type="button" className={styles.searchButton}>
+          <button
+            type="button"
+            className={styles.searchButton}
+            onClick={() => {
+              void navigate("/explorer")
+            }}
+          >
             <div className={styles.searchButtonValue}>
               <Search size={16} />
               <span>Find...</span>
@@ -433,7 +450,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({client, theme, setT
       </aside>
 
       <section className={styles.contentArea}>
-        <main className={styles.content}>
+        <main className={`${styles.content} ${children ? styles.contentEmbedded : ""}`}>
+          {children ? <div className={styles.embeddedPage}>{children}</div> : undefined}
+
           {isHomePage ? (
             <>
               <section className={styles.hero}>

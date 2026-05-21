@@ -19,6 +19,60 @@
   overflow: hidden;
 }
 
+.sidebarHeader {
+  flex: 0 0 auto;
+}
+
+.workspaceHeader {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 8px;
+  color: #18181b;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  box-sizing: border-box;
+}
+
+.workspaceMark {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(24, 24, 27, 0.1);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.25) 0 1px, transparent 1px 100%),
+    linear-gradient(135deg, #18181b, #71717a);
+  background-size:
+    4px 4px,
+    auto;
+  flex: 0 0 auto;
+}
+
+.workspaceBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+}
+
+.workspaceName {
+  min-width: 0;
+  color: #18181b;
+  font-size: 0.92rem;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceMeta {
+  color: #71717a;
+  font-size: 0.76rem;
+  font-weight: 500;
+  line-height: 1;
+}
+
 .topControls {
   display: flex;
   flex-direction: column;
@@ -205,6 +259,19 @@
   gap: 24px;
   box-sizing: border-box;
   overflow-y: auto;
+}
+
+.contentEmbedded {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.embeddedPage {
+  min-width: 0;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: auto;
 }
 
 .homeLayout {
