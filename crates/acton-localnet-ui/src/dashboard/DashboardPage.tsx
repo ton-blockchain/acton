@@ -97,6 +97,13 @@ interface SearchResult {
   readonly fallbackImage?: string
 }
 
+interface SearchOriginStyle {
+  readonly "--search-origin-left"?: string
+  readonly "--search-origin-top"?: string
+  readonly "--search-origin-width"?: string
+  readonly "--search-origin-height"?: string
+}
+
 function parseTonAmount(value: string): number | undefined {
   const trimmed = value.trim()
   if (!trimmed || !/^\d+(\.\d{0,9})?$/.test(trimmed)) {
@@ -193,6 +200,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
   const [isSearchMounted, setIsSearchMounted] = React.useState(false)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
+  const [searchOriginStyle, setSearchOriginStyle] = React.useState<SearchOriginStyle>({})
+  const searchButtonRef = React.useRef<HTMLButtonElement>(null)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const searchAnimationRef = React.useRef<number | undefined>(undefined)
   const [homeState, setHomeState] = React.useState<HomeState>({
@@ -353,7 +362,22 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
     return results
   }, [nftsState.items, quickSearchResults, searchAssetsState.nfts, searchAssetsState.tokens, searchQuery, tokensState.items])
 
+  const measureSearchOrigin = React.useCallback(() => {
+    const rect = searchButtonRef.current?.getBoundingClientRect()
+    if (!rect) {
+      return
+    }
+
+    setSearchOriginStyle({
+      "--search-origin-left": `${rect.left}px`,
+      "--search-origin-top": `${rect.top}px`,
+      "--search-origin-width": `${rect.width}px`,
+      "--search-origin-height": `${rect.height}px`,
+    })
+  }, [])
+
   const openSearch = React.useCallback(() => {
+    measureSearchOrigin()
     setIsSearchMounted(true)
     if (searchAnimationRef.current !== undefined) {
       cancelAnimationFrame(searchAnimationRef.current)
@@ -361,7 +385,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
     searchAnimationRef.current = requestAnimationFrame(() => {
       setIsSearchOpen(true)
     })
-  }, [])
+  }, [measureSearchOrigin])
 
   const closeSearch = React.useCallback(() => {
     setIsSearchOpen(false)
@@ -406,13 +430,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
   }, [isSearchMounted, isSearchOpen])
 
   React.useEffect(() => {
+    if (!isSearchMounted) {
+      return
+    }
+
+    const handleResize = () => measureSearchOrigin()
+    window.addEventListener("resize", handleResize)
+    return () => {
+      window.removeEventListener("resize", handleResize)
+    }
+  }, [isSearchMounted, measureSearchOrigin])
+
+  React.useEffect(() => {
     if (!isSearchMounted || isSearchOpen) {
       return
     }
 
     const timeout = globalThis.setTimeout(() => {
       setIsSearchMounted(false)
-    }, 180)
+    }, 300)
 
     return () => {
       globalThis.clearTimeout(timeout)
@@ -675,8 +711,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
 
         <div className={styles.topControls}>
           <button
+            ref={searchButtonRef}
             type="button"
-            className={styles.searchButton}
+            className={`${styles.searchButton} ${isSearchMounted ? styles.searchButtonMorphing : ""}`}
             onClick={openSearch}
           >
             <div className={styles.searchButtonValue}>
@@ -767,6 +804,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
         <div
           className={`${styles.searchOverlay} ${isSearchOpen ? styles.searchOverlayOpen : ""}`}
           aria-hidden={!isSearchOpen}
+          style={searchOriginStyle as React.CSSProperties}
         >
           <button
             type="button"
@@ -788,8 +826,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
                 onChange={event => setSearchQuery(event.target.value)}
                 onKeyDown={handleSearchKeyDown}
               />
-              <button type="button" className={styles.searchEscButton} onClick={closeSearch}>
-                Esc
+              <button
+                type="button"
+                className={styles.searchEscButton}
+                aria-label="Close search"
+                onClick={closeSearch}
+              >
+                <span className={styles.searchEscShortcut}>F</span>
+                <span className={styles.searchEscLabel}>Esc</span>
               </button>
             </div>
 

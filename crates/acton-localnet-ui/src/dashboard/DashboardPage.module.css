@@ -89,8 +89,9 @@
 
 .searchButton {
   width: 100%;
-  min-height: 40px;
+  height: 40px;
   padding: 0 10px;
+  box-sizing: border-box;
   border-radius: 12px;
   border: 1px solid rgba(24, 24, 27, 0.12);
   background: #ffffff;
@@ -98,7 +99,13 @@
   align-items: center;
   justify-content: space-between;
   color: #8c8c92;
+  font-family: inherit;
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.searchButtonMorphing {
+  opacity: 0;
+  pointer-events: none;
 }
 
 .searchButtonValue {
@@ -148,56 +155,96 @@
 
 .searchPanel {
   position: absolute;
-  top: 74px;
-  left: 4px;
-  width: min(386px, calc(100vw - 8px));
-  max-height: min(620px, calc(100vh - 92px));
+  top: var(--search-origin-top, 74px);
+  left: var(--search-origin-left, 4px);
+  width: var(--search-origin-width, min(386px, calc(100vw - 8px)));
+  max-height: var(--search-origin-height, 40px);
   box-sizing: border-box;
   border: 1px solid rgba(24, 24, 27, 0.1);
-  border-radius: 14px;
+  border-radius: 12px;
   background: #ffffff;
-  box-shadow:
-    0 30px 80px rgba(15, 23, 42, 0.16),
-    0 1px 2px rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  opacity: 0;
-  transform: scale(0.94);
-  transform-origin: top left;
   transition:
-    opacity 180ms ease,
-    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+    top 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    max-height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    border-radius 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms ease;
 }
 
 .searchOverlayOpen .searchPanel {
-  opacity: 1;
-  transform: scale(1);
+  top: var(--search-origin-top, 74px);
+  left: 4px;
+  width: min(386px, calc(100vw - 8px));
+  max-height: min(620px, calc(100vh - 92px));
+  border-radius: 14px;
+  box-shadow:
+    0 30px 80px rgba(15, 23, 42, 0.16),
+    0 1px 2px rgba(15, 23, 42, 0.08);
 }
 
 .searchInputRow {
-  min-height: 49px;
-  padding: 0 13px 0 17px;
-  border-bottom: 1px solid rgba(24, 24, 27, 0.08);
+  min-height: var(--search-origin-height, 40px);
+  padding: 0 10px;
+  border-bottom: 1px solid transparent;
   display: flex;
   align-items: center;
+  gap: 8px;
+  transition:
+    min-height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    gap 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.searchOverlayOpen .searchInputRow {
+  min-height: 49px;
+  padding: 0 13px 0 17px;
+  border-bottom-color: rgba(24, 24, 27, 0.08);
   gap: 11px;
 }
 
 .searchInputIcon {
-  color: #3f3f46;
+  width: 16px;
+  height: 16px;
+  margin-top: -2px;
+  color: #8c8c92;
   flex: 0 0 auto;
+  transition:
+    width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.searchOverlayOpen .searchInputIcon {
+  width: 17px;
+  height: 17px;
+  margin-top: 0;
+  color: #3f3f46;
 }
 
 .searchInput {
   min-width: 0;
   flex: 1 1 auto;
   border: none;
+  padding: 0;
+  margin: 0;
   outline: none;
   background: transparent;
   color: #18181b;
-  font-size: 0.82rem;
+  font-family: inherit;
+  font-weight: 400;
+  font-size: 0.88rem;
   line-height: 1;
+  transform: translateY(-1px);
+  transition: font-size 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.searchOverlayOpen .searchInput {
+  font-size: 0.82rem;
+  transform: none;
 }
 
 .searchInput::placeholder {
@@ -205,16 +252,63 @@
 }
 
 .searchEscButton {
-  min-width: 40px;
-  height: 31px;
-  padding: 0 9px;
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  box-sizing: content-box;
+  margin-top: -1px;
   border: 1px solid rgba(24, 24, 27, 0.1);
   border-radius: 8px;
   background: #ffffff;
+  color: #3f3f46;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  transition:
+    width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    min-width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    padding 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    font-size 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.searchOverlayOpen .searchEscButton {
+  width: 40px;
+  min-width: 40px;
+  height: 31px;
+  padding: 0 9px;
+  margin-top: 0;
   color: #18181b;
   font-size: 0.78rem;
-  box-shadow: 0 1px 1px rgba(24, 24, 27, 0.03);
-  cursor: pointer;
+}
+
+.searchEscShortcut,
+.searchEscLabel {
+  grid-area: 1 / 1;
+  line-height: 1;
+  transition: opacity 120ms ease;
+}
+
+.searchEscShortcut {
+  opacity: 1;
+}
+
+.searchEscLabel {
+  opacity: 0;
+}
+
+.searchOverlayOpen .searchEscShortcut {
+  opacity: 0;
+}
+
+.searchOverlayOpen .searchEscLabel {
+  opacity: 1;
+  transition-delay: 80ms;
 }
 
 .searchEscButton:hover {
@@ -224,6 +318,13 @@
 .searchResultBody {
   padding: 6px;
   overflow-y: auto;
+  opacity: 0;
+  transition: opacity 140ms ease;
+}
+
+.searchOverlayOpen .searchResultBody {
+  opacity: 1;
+  transition-delay: 80ms;
 }
 
 .searchResultList {
