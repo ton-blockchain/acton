@@ -5,10 +5,10 @@
   "type": "module",
   "scripts": {
     "build": "acton build",
-    "test": "bun run test:tolk && bun run test:ts && bun run test:node",
-    "test:node": "acton test --node tests-node/counter.node.test.ts",
-    "test:node:failing": "acton test --node tests-node/counter.node.failing.test.ts",
-    "test:tolk": "acton test",
+    "test": "acton test",
+    "test:node": "acton test tests-node/counter.node.test.ts",
+    "test:node:failing": "acton test tests-node/counter.node.failing.test.ts",
+    "test:tolk": "acton test tests",
     "test:ts": "bun test tests-ts",
     "wrapper:ts": "acton wrapper Counter --ts"
   },

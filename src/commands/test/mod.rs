@@ -81,6 +81,21 @@ pub(crate) const INTERNAL_REQUIRE_TESTS_ENV: &str = "ACTON_INTERNAL_REQUIRE_TEST
 pub(crate) use self::fuzz::FuzzConfig;
 use self::fuzz::{FuzzParameter, attach_test_parameter_metadata, validate_test_configuration};
 
+#[derive(Debug, Clone)]
+enum SelectedTestFile {
+    Node(PathBuf),
+    Tolk(String),
+}
+
+impl SelectedTestFile {
+    fn display_path(&self) -> String {
+        match self {
+            Self::Node(path) => path.to_string_lossy().to_string(),
+            Self::Tolk(path) => path.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 struct EvaluatedTestCase {
     passed: bool,
@@ -571,15 +586,9 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         }
     };
     let test_files = if metadata.is_file() {
-        if !path.ends_with(".test.tolk") {
-            anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
-        }
-        vec![
-            dunce::canonicalize(&path)
-                .unwrap_or_else(|_| PathBuf::from(&path))
-                .to_string_lossy()
-                .to_string(),
-        ]
+        vec![selected_test_file_from_path(
+            dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path)),
+        )?]
     } else if metadata.is_dir() {
         let search_root = dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
         let project_root_abs =
@@ -591,8 +600,8 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
             &config.include_patterns,
         )?
         .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect()
+        .map(selected_test_file_from_path)
+        .collect::<anyhow::Result<Vec<_>>>()?
     } else {
         anyhow::bail!("Path '{path}' is neither a file nor a directory");
     };
@@ -647,8 +656,18 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         build_overrides_for_mutations(&config)?,
     )?;
 
+    let mut node_worker = None;
     for (index, file) in test_files.iter().enumerate() {
-        let result = run_tests_for_file(&mut runner, file);
+        let result = match file {
+            SelectedTestFile::Tolk(file) => run_tests_for_file(&mut runner, file),
+            SelectedTestFile::Node(file) => {
+                let worker = match &node_worker {
+                    Some(worker) => worker,
+                    None => node_worker.insert(node::resolve_node_worker(project_root)?),
+                };
+                node::run_node_tests_for_file(&mut runner, worker, file)
+            }
+        };
         match result {
             Ok(stats) => {
                 total_passed += stats.passed;
@@ -689,7 +708,11 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     };
     runner.reporter_manager.on_testing_finished(&global_stats)?;
 
-    if let Some(message) = empty_test_selection_message(&test_files, &config, total_tests) {
+    let test_file_paths = test_files
+        .iter()
+        .map(SelectedTestFile::display_path)
+        .collect::<Vec<_>>();
+    if let Some(message) = empty_test_selection_message(&test_file_paths, &config, total_tests) {
         runner.reporter_manager.finalize()?;
         println!("\n{message}");
         process::exit(1);
@@ -845,7 +868,7 @@ fn empty_test_selection_message(
 
     if test_files.is_empty() {
         let hint = if config.include_patterns.is_empty() && config.exclude_patterns.is_empty() {
-            "Check the test path or add a *.test.tolk file."
+            "Check the test path or add a *.test.tolk or *.test.ts file."
         } else {
             "Check the test path or --include/--exclude patterns."
         };
@@ -887,6 +910,22 @@ fn resolve_project_relative_path(project_root: &Path, path: &str) -> String {
     } else {
         project_root.join(path).to_string_lossy().to_string()
     }
+}
+
+fn selected_test_file_from_path(path: PathBuf) -> anyhow::Result<SelectedTestFile> {
+    let path_str = path.to_string_lossy();
+    if path_str.ends_with(".test.tolk") {
+        return Ok(SelectedTestFile::Tolk(path_str.to_string()));
+    }
+    if path_str.ends_with(".test.ts") {
+        return Ok(SelectedTestFile::Node(path));
+    }
+
+    anyhow::bail!(
+        "Test file must end with {} or {}",
+        ".test.tolk".yellow(),
+        ".test.ts".yellow()
+    );
 }
 
 fn build_overrides_for_mutations(config: &TestConfig) -> anyhow::Result<BTreeMap<String, Cell>> {
@@ -970,11 +1009,15 @@ pub fn find_test_files_recursively(
 
             let rel = path.strip_prefix(project_root).unwrap_or(path);
 
-            if let Some(name) = rel.file_name().and_then(|s| s.to_str()) {
-                if !name.ends_with(".test.tolk") {
-                    continue;
-                }
-            } else {
+            let Some(name) = rel.file_name().and_then(|s| s.to_str()) else {
+                continue;
+            };
+
+            let is_tolk_test = name.ends_with(".test.tolk");
+            let is_node_test = name.ends_with(".test.ts")
+                && !name.ends_with(".failing.test.ts")
+                && is_acton_node_test_file(path);
+            if !is_tolk_test && !is_node_test {
                 continue;
             }
 
@@ -994,6 +1037,16 @@ pub fn find_test_files_recursively(
 
     out.sort_unstable();
     Ok(out)
+}
+
+fn is_acton_node_test_file(path: &Path) -> bool {
+    let Ok(content) = fs::read_to_string(path) else {
+        return false;
+    };
+
+    content.contains("@ton/acton/test")
+        || content.contains("../src/test")
+        || content.contains("./src/test")
 }
 
 #[derive(Debug)]

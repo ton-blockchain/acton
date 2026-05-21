@@ -36,7 +36,11 @@ import {registerAfterAll, registerAfterEach} from "./test-lifecycle.js"
 import type {
   AccountInfoResult,
   CloseLocalnetOptions,
+  EmulateTraceResult,
+  LocalnetCoverageRecord,
   LocalnetNodeInfo,
+  LocalnetTraceRecord,
+  LocalnetTreasuryRecord,
   LocalnetOptions,
   RawTransaction,
   RunGetMethodResult,
@@ -57,6 +61,9 @@ export class Localnet {
   readonly endpoint: string
 
   private readonly child?: ChildProcess
+  private readonly coverageRecords: LocalnetCoverageRecord[] = []
+  private readonly traceRecords: LocalnetTraceRecord[] = []
+  private readonly treasuryRecords = new Map<string, LocalnetTreasuryRecord>()
   private readonly http: LocalnetHttpClient
   private unregisterAutoClose?: () => void
   private unregisterAutoReset?: () => void
@@ -112,7 +119,12 @@ export class Localnet {
   }
 
   treasury(name: string, workchain = 0): LocalnetSender {
-    return this.sender(addressFromSeed(name, workchain))
+    const address = addressFromSeed(name, workchain)
+    this.treasuryRecords.set(`${workchain}:${name}`, {
+      address: formatAddress(address),
+      name,
+    })
+    return this.sender(address)
   }
 
   async nodeInfo(): Promise<LocalnetNodeInfo> {
@@ -175,6 +187,10 @@ export class Localnet {
         : Buffer.isBuffer(boc)
           ? boc.toString("base64")
           : boc.toBoc().toString("base64")
+
+    if (this.collectCoverage() || this.collectTraces()) {
+      await this.captureMessageDiagnostics(encoded)
+    }
 
     return this.http.postJson<SendBocResult>("/api/v2/sendBocReturnHash", {boc: encoded})
   }
@@ -272,6 +288,7 @@ export class Localnet {
     name: string | number,
     args: readonly TupleItem[],
   ): Promise<ContractGetMethodResult> {
+    const coverageState = this.collectCoverage() ? await this.getAccountState(address) : undefined
     const result = await this.http.postJson<RunGetMethodResult>("/api/v2/runGetMethod", {
       address: formatAddress(address),
       method: name,
@@ -282,10 +299,60 @@ export class Localnet {
       throw new ActonError(`Get method ${String(name)} failed with exit code ${result.exit_code}`)
     }
 
+    if (coverageState?.state.type === "active" && coverageState.state.code && result.vm_log) {
+      this.coverageRecords.push({
+        code: coverageState.state.code.toString("base64"),
+        vmLog: result.vm_log,
+      })
+    }
+
     return {
       stack: new TupleReader(result.stack.map(item => legacyJsonToTupleItem(item))),
       gasUsed: result.gas_used === undefined ? undefined : BigInt(result.gas_used),
       logs: result.vm_log,
+    }
+  }
+
+  consumeCoverageRecords(): readonly LocalnetCoverageRecord[] {
+    const records = [...this.coverageRecords]
+    this.coverageRecords.length = 0
+    return records
+  }
+
+  consumeTraceRecords(): readonly LocalnetTraceRecord[] {
+    const records = [...this.traceRecords]
+    this.traceRecords.length = 0
+    return records
+  }
+
+  consumeTreasuryRecords(): readonly LocalnetTreasuryRecord[] {
+    const records = [...this.treasuryRecords.values()]
+    this.treasuryRecords.clear()
+    return records
+  }
+
+  private collectCoverage(): boolean {
+    return process.env.ACTON_NODE_COVERAGE === "1"
+  }
+
+  private collectTraces(): boolean {
+    return process.env.ACTON_NODE_TRACE === "1"
+  }
+
+  private async captureMessageDiagnostics(boc: string): Promise<void> {
+    const result = await this.http.postRawJson<EmulateTraceResult>("/api/emulate/v1/emulateTrace", {
+      boc,
+      include_code_data: true,
+    })
+
+    if (this.collectTraces()) {
+      this.traceRecords.push(...(result.acton_trace_records ?? []))
+    }
+
+    if (this.collectCoverage() && result.vm_log) {
+      for (const code of Object.values(result.code_cells ?? {})) {
+        this.coverageRecords.push({code, vmLog: result.vm_log})
+      }
     }
   }
 

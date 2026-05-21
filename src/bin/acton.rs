@@ -203,7 +203,7 @@ enum Commands {
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
+        #[arg(help = "Tolk or TypeScript test file, or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         path: Option<String>,
         #[arg(
             long,

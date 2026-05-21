@@ -259,6 +259,19 @@ pub struct EmulateTraceResult {
     pub trace: TraceNode,
     pub code_cells: HashMap<Hash256, BocBytes>,
     pub data_cells: HashMap<Hash256, BocBytes>,
+    pub vm_log: String,
+    pub trace_records: Vec<EmulateTraceRecord>,
+}
+
+#[derive(Clone, Debug)]
+pub struct EmulateTraceRecord {
+    pub raw_transaction: BocBytes,
+    pub shard_account_before: BocBytes,
+    pub shard_account: BocBytes,
+    pub code: Option<BocBytes>,
+    pub vm_log: String,
+    pub executor_logs: String,
+    pub actions: Option<String>,
 }
 
 impl TraceNode {

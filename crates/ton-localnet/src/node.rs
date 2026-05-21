@@ -1522,8 +1522,26 @@ impl Node {
             &mut code_cells,
             &mut data_cells,
         );
+        let code = code_cells.values().next().cloned();
+        let shard_account_after = exec_result
+            .new_account_boc
+            .clone()
+            .unwrap_or_else(|| shard_account_boc.clone());
+        let trace_records = vec![storage::EmulateTraceRecord {
+            raw_transaction: exec_result.tx_boc.clone(),
+            shard_account_before: shard_account_boc,
+            shard_account: shard_account_after,
+            code,
+            vm_log: exec_result.vm_log.to_string(),
+            executor_logs: exec_result.executor_logs.to_string(),
+            actions: exec_result
+                .actions
+                .clone()
+                .map(|actions| actions.to_string()),
+        }];
 
         Ok(storage::EmulateTraceResult {
+            vm_log: exec_result.vm_log.to_string(),
             trace: TraceNode {
                 transaction: TransactionInfo {
                     meta: tx_meta,
@@ -1539,6 +1557,7 @@ impl Node {
             },
             code_cells,
             data_cells,
+            trace_records,
         })
     }
 

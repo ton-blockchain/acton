@@ -2,6 +2,7 @@ use crate::types::{BocBytes, Lt};
 use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
+use std::sync::Arc;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
 use tycho_types::boc::Boc;
@@ -22,6 +23,9 @@ pub struct ExecResult {
     pub tx_boc: BocBytes,
     pub new_account_boc: Option<BocBytes>,
     pub out_msgs_boc: Vec<BocBytes>,
+    pub vm_log: Arc<str>,
+    pub executor_logs: Arc<str>,
+    pub actions: Option<Arc<str>>,
 }
 
 impl ExecResult {
@@ -65,8 +69,19 @@ pub struct TvmEmulatorAdapter {
 
 impl TvmEmulatorAdapter {
     pub fn new() -> anyhow::Result<Self> {
-        let inner = Executor::new(ExecutorVerbosity::Short, None)?;
+        let inner = Executor::new(localnet_executor_verbosity(), None)?;
         Ok(Self { inner })
+    }
+}
+
+pub(crate) fn localnet_executor_verbosity() -> ExecutorVerbosity {
+    if std::env::var("ACTON_NODE_COVERAGE")
+        .map(|value| value.trim() == "1")
+        .unwrap_or(false)
+    {
+        ExecutorVerbosity::FullLocationStack
+    } else {
+        ExecutorVerbosity::Short
     }
 }
 
@@ -100,7 +115,7 @@ impl TvmExecutor for TvmEmulatorAdapter {
         };
 
         // 2. Run
-        let (res, _logs) = self
+        let (res, logs) = self
             .inner
             .run_transaction(&in_msg_b64, &args)
             .context("Emulator run failed")?;
@@ -128,10 +143,13 @@ impl TvmExecutor for TvmEmulatorAdapter {
                     .collect::<anyhow::Result<Vec<_>>>()?;
 
                 Ok(ExecResult {
+                    actions: s.actions,
+                    executor_logs: logs,
                     tx,
                     tx_boc,
                     new_account_boc,
                     out_msgs_boc,
+                    vm_log: s.vm_log,
                 })
             }
             EmulationResult::Error(e) => {

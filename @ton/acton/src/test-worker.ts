@@ -34,6 +34,21 @@ type WorkerEvent =
       readonly stack?: string
       readonly assertion?: SerializedAssertion
     }
+  | {
+      readonly type: "coverage"
+      readonly id: number
+      readonly records: readonly SerializedCoverageRecord[]
+    }
+  | {
+      readonly type: "trace"
+      readonly id: number
+      readonly records: readonly SerializedTraceRecord[]
+    }
+  | {
+      readonly type: "treasury"
+      readonly id: number
+      readonly records: readonly SerializedTreasuryRecord[]
+    }
   | {readonly type: "fatal"; readonly message: string; readonly stack?: string}
 
 type SerializedAssertion = {
@@ -52,6 +67,26 @@ type SerializedTransactionMatch = {
   readonly deploy?: boolean
   readonly exitCode?: number
   readonly success?: boolean
+}
+
+type SerializedCoverageRecord = {
+  readonly code: string
+  readonly vmLog: string
+}
+
+type SerializedTraceRecord = {
+  readonly rawTransaction: string
+  readonly shardAccountBefore: string
+  readonly shardAccount: string
+  readonly code?: string
+  readonly vmLog: string
+  readonly executorLogs?: string
+  readonly actions?: string
+}
+
+type SerializedTreasuryRecord = {
+  readonly address: string
+  readonly name: string
 }
 
 const testFile = process.argv[2]
@@ -95,6 +130,7 @@ try {
     const startedAt = performance.now()
     try {
       await registered.fn({localnet})
+      emitDiagnosticRecords(registered.id, localnet)
       emit({
         durationMs: performance.now() - startedAt,
         id: registered.id,
@@ -103,6 +139,7 @@ try {
       })
     } catch (error) {
       failed += 1
+      emitDiagnosticRecords(registered.id, localnet)
       emit({
         assertion: serializeAssertion(error),
         durationMs: performance.now() - startedAt,
@@ -132,6 +169,23 @@ try {
 
 if (failed > 0) {
   process.exit(1)
+}
+
+function emitDiagnosticRecords(id: number, localnet: Localnet): void {
+  const coverageRecords = localnet.consumeCoverageRecords()
+  if (coverageRecords.length > 0) {
+    emit({id, records: coverageRecords, type: "coverage"})
+  }
+
+  const traceRecords = localnet.consumeTraceRecords()
+  if (traceRecords.length > 0) {
+    emit({id, records: traceRecords, type: "trace"})
+  }
+
+  const treasuryRecords = localnet.consumeTreasuryRecords()
+  if (treasuryRecords.length > 0) {
+    emit({id, records: treasuryRecords, type: "treasury"})
+  }
 }
 
 function filterTests(allTests: readonly RegisteredTest[]): readonly RegisteredTest[] {

@@ -1,4 +1,4 @@
-use crate::executor::TvmEmulatorAdapter;
+use crate::executor::{TvmEmulatorAdapter, localnet_executor_verbosity};
 use crate::node::{Node, StateSource};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, EMPTY_CELL_BASE64, MsgMeta, TransactionInfo};
@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
-use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use tvm_ffi::json_stack::json_to_legacy_item;
 use tvm_ffi::stack::Tuple;
@@ -1401,7 +1400,7 @@ fn handle_run_get_method(
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
         gas_limit: "10000000".to_owned(),
         debug_enabled: false,
-        verbosity: ExecutorVerbosity::Short,
+        verbosity: localnet_executor_verbosity(),
         libs: String::new(),
         extra_currencies: Default::default(),
         prev_blocks_info: None,

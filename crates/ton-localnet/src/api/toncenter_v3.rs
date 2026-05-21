@@ -656,6 +656,28 @@ pub fn map_emulate_trace_response(
 
     response.insert("rand_seed".to_string(), serde_json::json!(""));
     response.insert(
+        "vm_log".to_string(),
+        serde_json::json!(emulation.vm_log.as_str()),
+    );
+    response.insert(
+        "acton_trace_records".to_string(),
+        serde_json::json!(
+            emulation
+                .trace_records
+                .iter()
+                .map(|record| serde_json::json!({
+                    "rawTransaction": record.raw_transaction.to_base64(),
+                    "shardAccountBefore": record.shard_account_before.to_base64(),
+                    "shardAccount": record.shard_account.to_base64(),
+                    "code": record.code.as_ref().map(crate::types::BocBytes::to_base64),
+                    "vmLog": record.vm_log,
+                    "executorLogs": record.executor_logs,
+                    "actions": record.actions,
+                }))
+                .collect::<Vec<_>>()
+        ),
+    );
+    response.insert(
         "is_incomplete".to_string(),
         trace_entry
             .get("is_incomplete")

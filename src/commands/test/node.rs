@@ -9,8 +9,8 @@ use super::{
 use crate::commands::build::{BuildCommandOptions, build_cmd};
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, BuildCache, DisplayParam, EmulationsState, KnownAddresses,
-    TransactionGenericAssertFailure, TransactionNotFoundParams,
+    AssertFailure, DisplayParam, KnownAddress, TransactionGenericAssertFailure,
+    TransactionNotFoundParams,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -19,7 +19,7 @@ use acton_config::config::{ActonConfig, project_root as configured_project_root}
 use acton_config::test::TestConfig;
 use anyhow::{Context, anyhow};
 use num_bigint::BigInt;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::Deserialize;
 use std::borrow::Cow;
 use std::fs;
@@ -28,11 +28,12 @@ use std::process::{Command, Stdio};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tolk_compiler::SourceMap;
+use ton_emulator::emulator::{SendMessageResult, SendMessageResultSuccess};
 use ton_executor::get::{GetMethodResult, GetMethodResultSuccess};
 use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, HashBytes};
+use tycho_types::cell::Cell;
 use tycho_types::models::{IntAddr, ShardAccount, StdAddr, StdAddrFormat, Transaction};
 use walkdir::WalkDir;
 
@@ -123,7 +124,7 @@ pub fn test_node_cmd(path: String, config: &TestConfig) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn run_node_tests_for_file(
+pub(super) fn run_node_tests_for_file(
     runner: &mut TestRunner<'_>,
     worker: &Path,
     file: &Path,
@@ -136,6 +137,18 @@ fn run_node_tests_for_file(
         .env(
             "ACTON_TEST_FAIL_FAST",
             if runner.config.fail_fast { "1" } else { "0" },
+        )
+        .env(
+            "ACTON_NODE_COVERAGE",
+            if runner.config.coverage { "1" } else { "0" },
+        )
+        .env(
+            "ACTON_NODE_TRACE",
+            if runner.config.save_test_trace.is_some() {
+                "1"
+            } else {
+                "0"
+            },
         )
         .envs(
             runner
@@ -194,6 +207,7 @@ fn run_reported_node_events(
     };
     let source_map = Arc::new(SourceMap::default());
     let file = dunce::canonicalize(file).unwrap_or_else(|_| file.to_path_buf());
+    ensure_node_contract_metadata(runner)?;
 
     for event in events {
         match event {
@@ -219,6 +233,19 @@ fn run_reported_node_events(
                     .collect::<Vec<_>>();
                 runner.reporter_manager.on_suite_started(&file, &tests)?;
             }
+            NodeEvent::Coverage { id, records } => {
+                if let Some(test) = tests.iter().find(|test| test.id == id) {
+                    save_node_coverage_records(runner, &test.name, records);
+                }
+            }
+            NodeEvent::Trace { id, records } => {
+                if let Some(test) = tests.iter().find(|test| test.id == id) {
+                    save_node_trace_records(runner, &test.name, records)?;
+                }
+            }
+            NodeEvent::Treasury { records, .. } => {
+                save_node_treasury_records(runner, records)?;
+            }
             NodeEvent::TestStarted { id } => {
                 if let Some(test) = tests.iter().find(|test| test.id == id) {
                     let report = base_report(test, &file, source_map.clone());
@@ -237,6 +264,9 @@ fn run_reported_node_events(
                     continue;
                 };
                 let mut report = base_report(test, &file, source_map.clone());
+                if runner.config.save_test_trace.is_some() {
+                    report.trace_path = Some(super::trace::trace_file_name(&test.name));
+                }
                 report.duration = Duration::from_secs_f64(duration_ms / 1000.0);
 
                 match status {
@@ -258,6 +288,7 @@ fn run_reported_node_events(
                         )?;
                     }
                 }
+                dump_node_trace_if_available(runner, test)?;
                 runner.reporter_manager.on_test_finished(&report)?;
             }
             NodeEvent::Fatal { message, stack } => {
@@ -373,8 +404,8 @@ fn empty_failure_context(runner: &TestRunner<'_>) -> TestFailureExecutionContext
             .as_ref()
             .map(|wallets| wallets.wallets.keys().cloned().collect())
             .unwrap_or_default(),
-        build_cache: BuildCache::new(),
-        emulations: EmulationsState::new(),
+        build_cache: runner.build_cache.clone(),
+        emulations: runner.emulations.clone(),
         fork_net: runner.config.fork_net.clone(),
         get_result: GetMethodResult::Success(GetMethodResultSuccess {
             code: Arc::from(""),
@@ -386,10 +417,145 @@ fn empty_failure_context(runner: &TestRunner<'_>) -> TestFailureExecutionContext
             vm_log: Arc::from(""),
         }),
         has_wallets_config: runner.acton_config.wallets.is_some(),
-        known_addresses: KnownAddresses::new(),
-        known_code_cells: FxHashMap::<HashBytes, String>::default(),
+        known_addresses: runner.known_addresses.clone(),
+        known_code_cells: runner.known_code_cells.clone(),
         network: runner.config.fork_net.clone(),
     }
+}
+
+fn ensure_node_contract_metadata(runner: &mut TestRunner<'_>) -> anyhow::Result<()> {
+    let project_root = configured_project_root().to_path_buf();
+    super::coverage::compile_project_contracts_for_coverage(
+        &mut runner.build_cache,
+        runner.file_build_cache,
+        &runner.acton_config,
+        &project_root,
+    )
+}
+
+fn save_node_coverage_records(
+    runner: &mut TestRunner<'_>,
+    test_name: &str,
+    records: Vec<NodeCoverageRecord>,
+) {
+    for record in records {
+        if record.vm_log.is_empty() {
+            continue;
+        }
+
+        runner.emulations.save_get_method(
+            test_name,
+            GetMethodResultSuccess {
+                code: Arc::from(record.code),
+                gas_used: "0".to_string(),
+                missing_library: None,
+                stack: Arc::from(""),
+                success: true,
+                vm_exit_code: 0,
+                vm_log: Arc::from(record.vm_log),
+            },
+        );
+    }
+}
+
+fn save_node_trace_records(
+    runner: &mut TestRunner<'_>,
+    test_name: &str,
+    records: Vec<NodeTraceRecord>,
+) -> anyhow::Result<()> {
+    for record in records {
+        runner.emulations.save_message(
+            test_name,
+            vec![SendMessageResult::Success(
+                node_trace_record_to_send_result(record)?,
+            )],
+        );
+    }
+
+    Ok(())
+}
+
+fn node_trace_record_to_send_result(
+    record: NodeTraceRecord,
+) -> anyhow::Result<SendMessageResultSuccess> {
+    let tx_cell = Boc::decode_base64(&record.raw_transaction)
+        .with_context(|| "Failed to decode node trace transaction BoC")?;
+    let transaction = tx_cell
+        .parse::<Transaction>()
+        .with_context(|| "Failed to parse node trace transaction")?;
+    let shard_account_before = parse_node_trace_shard_account(&record.shard_account_before)?;
+    let shard_account = parse_node_trace_shard_account(&record.shard_account)?;
+    let code = record.code.as_deref().map(Boc::decode_base64).transpose()?;
+
+    Ok(SendMessageResultSuccess {
+        actions: record.actions.map(Arc::from),
+        child_transactions: Vec::new(),
+        code,
+        executor_logs: Arc::from(record.executor_logs.unwrap_or_default()),
+        externals: Vec::new(),
+        missing_libraries: FxHashSet::default(),
+        parent_transaction: None,
+        raw_transaction: Arc::from(record.raw_transaction),
+        shard_account,
+        shard_account_before,
+        transaction,
+        vm_log: Arc::from(record.vm_log),
+    })
+}
+
+fn parse_node_trace_shard_account(raw: &str) -> anyhow::Result<ShardAccount> {
+    let cell =
+        Boc::decode_base64(raw).with_context(|| "Failed to decode node trace shard account BoC")?;
+    cell.parse::<ShardAccount>()
+        .with_context(|| "Failed to parse node trace shard account")
+}
+
+fn save_node_treasury_records(
+    runner: &mut TestRunner<'_>,
+    records: Vec<NodeTreasuryRecord>,
+) -> anyhow::Result<()> {
+    for record in records {
+        let (address, _) = StdAddr::from_str_ext(&record.address, StdAddrFormat::any())
+            .with_context(|| {
+                format!(
+                    "Invalid treasury address from node test: {}",
+                    record.address
+                )
+            })?;
+        runner
+            .known_addresses
+            .addresses
+            .insert(address, KnownAddress { name: record.name });
+    }
+
+    Ok(())
+}
+
+fn dump_node_trace_if_available(
+    runner: &TestRunner<'_>,
+    test: &TestDescriptor,
+) -> anyhow::Result<()> {
+    let Some(trace_dir) = &runner.config.save_test_trace else {
+        return Ok(());
+    };
+
+    let Some(emulations) = runner.emulations.results_of(&test.name) else {
+        eprintln!(
+            "Warning: trace export is enabled for test '{}', but no emulated transactions were recorded; {} will not be written to {}",
+            test.name,
+            super::trace::trace_file_name(&test.name),
+            trace_dir,
+        );
+        return Ok(());
+    };
+
+    super::trace::dump_test_transactions(
+        test,
+        &runner.build_cache,
+        &runner.known_addresses,
+        emulations,
+        trace_dir,
+    )
 }
 
 fn formatter_for_context<'a>(
@@ -555,7 +721,7 @@ fn resolve_node_test_files(path: &str) -> anyhow::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn resolve_node_worker(project_root: &Path) -> anyhow::Result<PathBuf> {
+pub(super) fn resolve_node_worker(project_root: &Path) -> anyhow::Result<PathBuf> {
     let package_root = project_root.join("node_modules").join("@ton").join("acton");
     let candidates = [
         package_root.join("src").join("test-worker.ts"),
@@ -582,6 +748,22 @@ fn test_files_as_strings(test_files: &[PathBuf]) -> Vec<String> {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 enum NodeEvent {
+    #[serde(rename = "coverage")]
+    Coverage {
+        id: i32,
+        records: Vec<NodeCoverageRecord>,
+    },
+    #[serde(rename = "trace")]
+    Trace {
+        id: i32,
+        records: Vec<NodeTraceRecord>,
+    },
+    #[serde(rename = "treasury")]
+    Treasury {
+        #[allow(dead_code)]
+        id: i32,
+        records: Vec<NodeTreasuryRecord>,
+    },
     #[serde(rename = "fatal")]
     Fatal {
         message: String,
@@ -613,6 +795,32 @@ struct NodeTest {
     id: i32,
     name: String,
     row: usize,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NodeCoverageRecord {
+    code: String,
+    vm_log: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NodeTraceRecord {
+    actions: Option<String>,
+    code: Option<String>,
+    executor_logs: Option<String>,
+    raw_transaction: String,
+    shard_account: String,
+    shard_account_before: String,
+    vm_log: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct NodeTreasuryRecord {
+    address: String,
+    name: String,
 }
 
 #[derive(Debug, Deserialize)]
