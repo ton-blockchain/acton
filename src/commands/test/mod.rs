@@ -70,6 +70,7 @@ mod annotations;
 mod coverage;
 mod fuzz;
 pub mod mutation;
+pub mod node;
 mod profiling;
 pub mod reporting;
 pub mod trace;

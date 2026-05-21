@@ -205,6 +205,13 @@ enum Commands {
     Test {
         #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
         path: Option<String>,
+        #[arg(
+            long,
+            value_name = "FILE_OR_DIR",
+            help = "Run TypeScript node tests through the Acton test reporter",
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
+        node: Option<String>,
         // Filtering
         #[arg(
             short,
@@ -1864,6 +1871,7 @@ fn main() {
         ),
         Commands::Test {
             path,
+            node,
             filter,
             reporter,
             show_bodies,
@@ -1952,7 +1960,19 @@ fn main() {
                     ui_port,
                 ) {
                     Ok(config) => {
-                        if mutate {
+                        if let Some(node_path) = node {
+                            if path.is_some() {
+                                Err(anyhow::anyhow!(
+                                    "`acton test --node` does not accept the positional test path; pass the TypeScript path as the --node value"
+                                ))
+                            } else if mutate {
+                                Err(anyhow::anyhow!(
+                                    "`acton test --node` does not support mutation testing yet"
+                                ))
+                            } else {
+                                commands::test::node::test_node_cmd(node_path, &config)
+                            }
+                        } else if mutate {
                             mutation::test_mutate_cmd(path.as_deref(), &config)
                         } else {
                             test_cmd(path, &config)

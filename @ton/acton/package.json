@@ -15,7 +15,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./test": {
+      "types": "./dist/test.d.ts",
+      "import": "./dist/test.js"
     }
+  },
+  "bin": {
+    "acton-test-worker": "./dist/test-worker.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

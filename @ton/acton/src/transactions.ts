@@ -18,6 +18,21 @@ export type FailedTransactionMatch = TransactionEndpointsMatch & {
   readonly exitCode?: number
 }
 
+export class TransactionAssertionError extends ActonError {
+  constructor(
+    readonly label: string,
+    readonly transactions: readonly Transaction[],
+    readonly match: TransactionMatch,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
+export function isTransactionAssertionError(error: unknown): error is TransactionAssertionError {
+  return error instanceof TransactionAssertionError
+}
+
 export function findTransaction(
   transactions: readonly Transaction[],
   match: TransactionMatch = {},
@@ -31,7 +46,7 @@ export function expectSuccessfulDeploy(
 ): Transaction {
   return expectMatchingTransaction(
     transactions,
-    {...match, deploy: true, success: true},
+    {...match, deploy: true, exitCode: 0, success: true},
     "successful deploy transaction",
   )
 }
@@ -42,7 +57,7 @@ export function expectSuccessfulTx(
 ): Transaction {
   return expectMatchingTransaction(
     transactions,
-    {...match, success: true},
+    {...match, exitCode: 0, success: true},
     "successful transaction",
   )
 }
@@ -87,9 +102,10 @@ function expectMatchingTransaction(
     return transaction
   }
 
-  throw new ActonError(
-    `Expected ${label} matching ${describeMatch(match)}, got ${describeTransactions(transactions)}`,
-  )
+  const message = `Expected ${label} matching ${describeMatch(match)}, got ${describeTransactions(
+    transactions,
+  )}`
+  throw new TransactionAssertionError(label, transactions, match, message)
 }
 
 function matchesTransaction(transaction: Transaction, match: TransactionMatch): boolean {

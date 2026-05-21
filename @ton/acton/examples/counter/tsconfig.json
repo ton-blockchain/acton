@@ -8,5 +8,5 @@
     "strict": true,
     "target": "ES2022"
   },
-  "include": ["tests-ts", "wrappers-ts"]
+  "include": ["tests-node", "tests-ts", "wrappers-ts"]
 }

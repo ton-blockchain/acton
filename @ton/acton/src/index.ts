@@ -8,7 +8,9 @@ export {
   expectSuccessfulDeploy,
   expectSuccessfulTx,
   findTransaction,
+  isTransactionAssertionError,
   transactionExitCode,
+  TransactionAssertionError,
   transactionSucceeded,
 } from "./transactions.js"
 export type {
