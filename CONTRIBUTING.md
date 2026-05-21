@@ -85,7 +85,7 @@ Optional CLI tools:
   ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install typos-cli --version 1.45.1 --locked
+  cargo install typos-cli --version 1.46.1 --locked
   ```
 - `cargo-llvm-cov` (optional, for coverage)
   ```bash
