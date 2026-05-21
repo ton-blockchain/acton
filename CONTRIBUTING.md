@@ -77,7 +77,7 @@ Optional CLI tools:
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
-  cargo install cargo-deny --version 0.19.4 --locked
+  cargo install cargo-deny --version 0.19.6 --locked
   ```
 - `cargo-audit` (RustSec advisory checks for `just check-audit` / `just check-security`)
   ```bash
