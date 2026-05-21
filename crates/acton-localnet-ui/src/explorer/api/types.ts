@@ -128,6 +128,48 @@ export interface V3TracesResponse {
   readonly traces: readonly V3Trace[]
 }
 
+export interface V3TransactionsResponse {
+  readonly address_book: Record<string, unknown>
+  readonly transactions: readonly V3TransactionListItem[]
+}
+
+export interface V3TransactionListItem {
+  readonly account: string
+  readonly hash: string
+  readonly lt: string
+  readonly now: number
+  readonly total_fees: string
+  readonly description: {
+    readonly type: string
+    readonly aborted: boolean
+    readonly compute_ph: {
+      readonly skipped: boolean
+      readonly success: boolean
+      readonly exit_code: number
+    }
+    readonly action: {
+      readonly success: boolean
+      readonly result_code: number
+    }
+  }
+  readonly in_msg?: V3Message | null
+  readonly out_msgs: readonly V3Message[]
+  readonly block_ref: {
+    readonly workchain: number
+    readonly shard: string
+    readonly seqno: number
+  }
+  readonly mc_block_seqno: number
+}
+
+export interface LocalnetNodeInfo {
+  readonly uptime_seconds: number
+  readonly last_block_seqno: number
+  readonly state_source: string
+  readonly fork_network?: string | null
+  readonly fork_block_number?: number | null
+}
+
 export interface V3Trace {
   readonly trace_id: string
   readonly external_hash: string
@@ -154,7 +196,7 @@ export interface V3Trace {
 export interface V3TraceNode {
   readonly tx_hash: string
   readonly in_msg_hash: string
-  readonly in_msg?: V3Message
+  readonly in_msg?: V3Message | null
   readonly transaction: V3Transaction
   readonly children: readonly V3TraceNode[]
 }
@@ -175,14 +217,41 @@ export interface V3Transaction {
     readonly compute_ph: {
       readonly skipped: boolean
       readonly success: boolean
+      readonly msg_state_used?: boolean
+      readonly account_activated?: boolean
+      readonly gas_fees?: string
+      readonly gas_used?: string
+      readonly gas_limit?: string
+      readonly gas_credit?: string
+      readonly mode?: number
       readonly exit_code: number
+      readonly exit_arg?: number
+      readonly vm_steps?: number
+      readonly vm_init_state_hash?: string
+      readonly vm_final_state_hash?: string
     }
     readonly action: {
       readonly success: boolean
+      readonly valid?: boolean
+      readonly no_funds?: boolean
       readonly result_code: number
+      readonly result_arg?: number
+      readonly tot_actions?: number
+      readonly spec_actions?: number
+      readonly skipped_actions?: number
+      readonly msgs_created?: number
+      readonly total_fwd_fees?: string
+      readonly total_action_fees?: string
+      readonly action_list_hash?: string
+      readonly tot_msg_size?: {
+        readonly cells?: string
+        readonly bits?: string
+      }
     }
+    readonly credit_first?: boolean
+    readonly destroyed?: boolean
   }
-  readonly in_msg?: V3Message
+  readonly in_msg?: V3Message | null
   readonly out_msgs: readonly V3Message[]
   readonly block_ref: {
     readonly workchain: number
@@ -190,7 +259,6 @@ export interface V3Transaction {
     readonly seqno: number
   }
   readonly mc_block_seqno: number
-  readonly raw_transaction: string
   readonly child_transactions: readonly string[]
 }
 
@@ -204,9 +272,14 @@ export interface V3Message {
   readonly import_fee: string
   readonly created_lt: string
   readonly created_at: string
+  readonly ihr_disabled?: boolean
   readonly bounce: boolean
   readonly bounced: boolean
   readonly message_content: {
+    readonly hash: string
+    readonly body: string
+  }
+  readonly init_state?: {
     readonly hash: string
     readonly body: string
   }

@@ -156,3 +156,10 @@
   max-width: 1200px;
   margin: 0 auto;
 }
+
+.mainDashboard {
+  max-width: none;
+  margin: 0;
+  height: calc(100vh - 65px);
+  overflow: hidden;
+}

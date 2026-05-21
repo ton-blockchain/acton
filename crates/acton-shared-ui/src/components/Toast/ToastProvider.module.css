@@ -1,0 +1,129 @@
+.viewport {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1000;
+  width: min(24rem, calc(100vw - 2rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  border-radius: 0.875rem;
+  border: 1px solid rgba(24, 24, 27, 0.1);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow:
+    0 10px 30px rgba(24, 24, 27, 0.08),
+    0 2px 8px rgba(24, 24, 27, 0.06);
+  padding: 0.875rem 0.875rem 0.875rem 1rem;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  animation: toast-enter 180ms ease-out;
+}
+
+.toastInfo {
+  border-color: rgba(24, 24, 27, 0.1);
+}
+
+.toastSuccess {
+  border-color: rgba(24, 24, 27, 0.1);
+}
+
+.toastError {
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
+.toastExiting {
+  animation: toast-exit 180ms ease-in forwards;
+}
+
+.toastBody {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.toastTitle {
+  margin-bottom: 0.25rem;
+  color: #18181b;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.toastDescription {
+  color: #52525b;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.dismissButton {
+  position: relative;
+  width: 1.75rem;
+  height: 1.75rem;
+  flex: 0 0 auto;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #71717a;
+  cursor: pointer;
+}
+
+.dismissButton:hover {
+  background: rgba(24, 24, 27, 0.06);
+}
+
+.dismissBar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0.75rem;
+  height: 1.5px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.dismissBar:first-child {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.dismissBar:last-child {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+@keyframes toast-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes toast-exit {
+  from {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0) scale(0.98);
+  }
+}
+
+@media (max-width: 640px) {
+  .viewport {
+    right: 0.75rem;
+    left: 0.75rem;
+    bottom: 0.75rem;
+    width: auto;
+  }
+}

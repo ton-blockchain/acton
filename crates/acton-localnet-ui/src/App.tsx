@@ -1,12 +1,14 @@
 import * as React from "react"
 import {useEffect, useMemo, useState} from "react"
 import {BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate} from "react-router-dom"
+import {ToastProvider} from "@acton/shared-ui"
 
 import {Moon, Sun} from "lucide-react"
 
 import {TonClient} from "./explorer/api/client"
 import {hashToHex, toTestnetAddress} from "./explorer/components/utils"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
+import {DashboardPage} from "./dashboard/DashboardPage"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {NftsPage} from "./explorer/pages/NftsPage"
@@ -43,9 +45,11 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <AddressBookProvider client={client}>
-        <AppContent client={client} theme={theme} setTheme={setTheme} />
-      </AddressBookProvider>
+      <ToastProvider>
+        <AddressBookProvider client={client}>
+          <AppContent client={client} theme={theme} setTheme={setTheme} />
+        </AddressBookProvider>
+      </ToastProvider>
     </BrowserRouter>
   )
 }
@@ -59,6 +63,7 @@ interface AppContentProps {
 const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
   const navigate = useNavigate()
   const location = useLocation()
+  const isDashboardRoute = location.pathname.startsWith("/dashboard")
 
   return (
     <div className={styles.app}>
@@ -85,6 +90,17 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
               </svg>
             </button>
             <nav className={styles.nav}>
+              <button
+                type="button"
+                className={`${styles.navItem} ${
+                  location.pathname.startsWith("/dashboard") ? styles.navItemActive : ""
+                }`}
+                onClick={() => {
+                  void navigate("/dashboard")
+                }}
+              >
+                Dashboard
+              </button>
               <button
                 type="button"
                 className={`${styles.navItem} ${
@@ -144,15 +160,17 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
           </div>
         </div>
       </header>
-      <main className={styles.main}>
+      <main className={`${styles.main} ${isDashboardRoute ? styles.mainDashboard : ""}`}>
         <Routes>
-          <Route path="/" element={<Navigate to="/explorer" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage client={client} />} />
+          <Route path="/dashboard/faucet" element={<DashboardPage client={client} />} />
           <Route path="/explorer" element={<ExplorerIndexPage />} />
           <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
           <Route path="/tokens" element={<TokensPage client={client} />} />
           <Route path="/nfts" element={<NftsPage client={client} />} />
           <Route path="/explorer/tx/:hash" element={<TransactionPage client={client} />} />
-          <Route path="*" element={<Navigate to="/explorer" replace />} />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
     </div>

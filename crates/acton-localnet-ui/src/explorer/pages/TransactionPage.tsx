@@ -1,9 +1,7 @@
 import {
-  type BackendTransaction,
   ContractChip,
   type ContractData,
   fmt,
-  processTransactions,
   TransactionDetails,
   type TransactionInfo,
   TransactionTree,
@@ -25,6 +23,7 @@ import {useEffect, useState} from "react"
 import {useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
+import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import type {V3Transaction} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {Breadcrumbs} from "../components/Breadcrumbs"
@@ -45,30 +44,6 @@ interface ValueFlowItem {
   readonly after: bigint
   readonly change: bigint
   readonly fee: bigint
-}
-
-const buildBackendTransactions = (
-  transactionsMap: Record<string, V3Transaction>,
-): BackendTransaction[] => {
-  const findParentLt = (targetLt: string): string | undefined => {
-    for (const tx of Object.values(transactionsMap)) {
-      if (tx.child_transactions?.includes(targetLt)) {
-        return tx.lt
-      }
-    }
-    return undefined
-  }
-
-  return Object.values(transactionsMap).map(tx => ({
-    lt: tx.lt,
-    raw_transaction: tx.raw_transaction || "",
-    parent_transaction: findParentLt(tx.lt),
-    child_transactions: tx.child_transactions,
-    shard_account_before: "",
-    shard_account: "",
-    vm_log_diff: "",
-    executor_logs: "",
-  }))
 }
 
 const buildTransactionsHexIndex = (
@@ -138,9 +113,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const transactionsMap = trace.transactions
           const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
 
-          const backendTransactions = buildBackendTransactions(transactionsMap)
-
-          const processed = processTransactions(backendTransactions)
+          const processed = buildTraceTransactionInfos(transactionsMap)
           if (!isActive) return
           setTraces(processed)
 
