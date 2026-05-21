@@ -1,5 +1,5 @@
 .historyHeaderRow {
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: none !important;
 }
 
 .historyContent {
@@ -28,38 +28,53 @@
 }
 
 .tableCard {
+  --border-color: var(--tonscan-border);
+
   background-color: var(--tonscan-card-bg) !important;
   border: 1px solid var(--tonscan-border) !important;
+  border-radius: 16px !important;
+}
+
+.tableCard thead {
+  border-bottom: 1px solid var(--tonscan-border);
 }
 
 .tabs {
   display: flex;
-  gap: var(--spacing-lg);
-  padding: 0 var(--spacing-lg);
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
   border-bottom: 1px solid var(--tonscan-border);
 }
 
 .tab {
-  padding: var(--spacing-md) 0 calc(var(--spacing-md) - 2px);
+  min-height: 34px;
+  padding: 0 10px;
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border: none;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: none;
-  border-top: none;
-  border-left: none;
-  border-right: none;
+  gap: 8px;
+  text-transform: none;
+  letter-spacing: 0;
+  background: transparent;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.tab:hover {
+  background: var(--litenode-control-hover);
+  color: var(--tonscan-text-primary);
 }
 
 .tabActive {
-  color: var(--tonscan-accent);
-  border-bottom-color: var(--tonscan-accent);
+  color: var(--tonscan-text-primary);
+  background: var(--litenode-surface-active);
 }
 
 .tableHeader {
@@ -123,6 +138,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--tonscan-text-primary);
+  font-weight: 500;
   min-width: 0;
   max-width: 100%;
 }
@@ -141,26 +157,31 @@
 }
 
 .address {
-  color: var(--tonscan-accent);
-  font-family: var(--font-mono);
+  color: var(--tonscan-text-primary);
+  font-family: inherit;
   font-size: var(--font-size-sm);
+  font-weight: 500;
   cursor: pointer;
   text-decoration: none;
   padding: 2px 6px;
-  border-radius: 4px;
-  transition: all var(--transition-duration-fast);
+  border-radius: 7px;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
   display: inline-block;
   background: none;
   border: none;
 }
 
 .address:hover {
-  text-decoration: underline;
-  background-color: var(--litenode-accent-bg);
+  color: var(--tonscan-link);
+  text-decoration: none;
+  background-color: var(--litenode-link-chip-bg);
 }
 
 .addressHighlighted {
-  background-color: var(--litenode-accent-bg-strong);
+  color: var(--tonscan-link);
+  background-color: var(--litenode-link-chip-bg-active);
 }
 
 .opcode {
@@ -222,10 +243,10 @@ th.valueContainer {
 
 .paginationButton {
   background: transparent;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--litenode-border-control);
   color: var(--tonscan-text-primary);
   padding: var(--spacing-xs);
-  border-radius: var(--border-radius-sm);
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -234,7 +255,7 @@ th.valueContainer {
 }
 
 .paginationButton:hover:not(:disabled) {
-  background-color: var(--tonscan-row-hover);
+  background-color: var(--litenode-control-hover);
 }
 
 .paginationButton:disabled {

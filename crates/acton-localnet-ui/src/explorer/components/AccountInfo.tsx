@@ -1,7 +1,7 @@
 import {Card, CardContent, CardHeader} from "@acton/shared-ui"
-import {Check, Copy, Edit2, X} from "lucide-react"
+import {Check, Copy, Edit2} from "lucide-react"
 import type React from "react"
-import {useEffect, useState} from "react"
+import {useEffect, useRef, useState} from "react"
 
 import type {FullAccountState, JettonMaster, JettonWallet} from "../api/types"
 import {TonClient} from "../api/client"
@@ -31,6 +31,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   const [customName, setCustomName] = useState<string | undefined>()
   const [editValue, setEditValue] = useState("")
   const [loading, setLoading] = useState(false)
+  const editInputRef = useRef<HTMLInputElement>(null)
   const {setAddressName} = useAddressBook()
   const resolvedName = useAddressName(address)
 
@@ -59,16 +60,23 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
     setCustomName(resolvedName || undefined)
   }, [resolvedName])
 
+  useEffect(() => {
+    if (!isEditing) return
+    editInputRef.current?.focus()
+    editInputRef.current?.select()
+  }, [isEditing])
+
   const handleStartEdit = () => {
     setEditValue(customName || "")
     setIsEditing(true)
   }
 
   const handleSave = async () => {
+    const nextName = editValue.trim()
     setLoading(true)
     try {
-      await setAddressName(address, editValue || "")
-      setCustomName(editValue || undefined)
+      await setAddressName(address, nextName)
+      setCustomName(nextName || undefined)
       setIsEditing(false)
     } catch (error) {
       console.error("Failed to save name:", error)
@@ -78,11 +86,6 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   }
 
   const tonBalance = formatNano(state.balance)
-  const usdRate = 1.33 // Mock rate for UI matching
-  const usdBalance = ((Number(state.balance) / 1e9) * usdRate).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })
 
   const copyToClipboard = () => {
     void navigator.clipboard.writeText(address)
@@ -90,45 +93,53 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   }
 
   const contractTypeLabel = getContractTypeLabel(contractInterfaces)
+  const isNameUnchanged = editValue.trim() === (customName || "")
 
   return (
     <Card className={styles.card}>
-      <CardHeader>
+      <CardHeader className={styles.header}>
         <div className={styles.addressTitle}>Address</div>
         <div className={styles.addressHeader}>
           {isEditing ? (
-            <div className={styles.editContainer}>
-              <input
-                type="text"
-                className={styles.editInput}
-                value={editValue}
-                onChange={e => setEditValue(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter") {
+            <div className={styles.renamePanel}>
+              <div className={styles.renameRow}>
+                <input
+                  ref={editInputRef}
+                  type="text"
+                  className={styles.editInput}
+                  value={editValue}
+                  autoComplete="off"
+                  spellCheck="false"
+                  aria-label="Custom address name"
+                  onChange={e => setEditValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" && !isNameUnchanged) {
+                      void handleSave()
+                    } else if (e.key === "Escape") {
+                      setIsEditing(false)
+                    }
+                  }}
+                  placeholder="Name this address"
+                />
+                <button
+                  type="button"
+                  className={styles.renameSaveButton}
+                  onClick={() => {
                     void handleSave()
-                  } else if (e.key === "Escape") {
-                    setIsEditing(false)
-                  }
-                }}
-                placeholder="Enter custom name"
-              />
-              <button
-                type="button"
-                className={styles.iconButton}
-                onClick={() => {
-                  void handleSave()
-                }}
-                disabled={loading}
-              >
-                <Check size={18} className={styles.saveIcon} />
-              </button>
-              <button
-                type="button"
-                className={styles.iconButton}
-                onClick={() => setIsEditing(false)}
-              >
-                <X size={18} className={styles.cancelIcon} />
-              </button>
+                  }}
+                  disabled={loading || isNameUnchanged}
+                >
+                  {loading ? "Saving..." : "Save"}
+                </button>
+                <button
+                  type="button"
+                  className={styles.renameCancelButton}
+                  onClick={() => setIsEditing(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+              <div className={styles.renameMeta}>{formatAddress(address, false)}</div>
             </div>
           ) : (
             <div className={styles.addressRow}>
@@ -142,10 +153,22 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                   formatAddress(address, false)
                 )}
               </div>
-              <button type="button" className={styles.iconButton} onClick={handleStartEdit}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={handleStartEdit}
+                title="Rename address"
+                aria-label="Rename address"
+              >
                 <Edit2 size={16} />
               </button>
-              <button type="button" className={styles.iconButton} onClick={copyToClipboard}>
+              <button
+                type="button"
+                className={styles.iconButton}
+                onClick={copyToClipboard}
+                title={copied ? "Copied" : "Copy address"}
+                aria-label={copied ? "Copied" : "Copy address"}
+              >
                 {copied ? <Check size={16} className={styles.saveIcon} /> : <Copy size={16} />}
               </button>
             </div>
@@ -155,9 +178,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
       <CardContent className={styles.grid}>
         <div className={styles.section}>
           <div className={styles.label}>Balance</div>
-          <div className={styles.value}>
-            {tonBalance} TON <span className={styles.subValue}>≈ $ {usdBalance}</span>
-          </div>
+          <div className={styles.value}>{tonBalance} TON</div>
         </div>
         <div className={styles.section}>
           <div className={styles.label}>Assets</div>

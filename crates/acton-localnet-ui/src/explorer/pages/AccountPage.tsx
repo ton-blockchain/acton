@@ -174,7 +174,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
                   <div className={styles.jettonRow}>
                     <span className={styles.jettonLabel}>Admin</span>
                     <span
-                      className={styles.jettonValue}
+                      className={`${styles.jettonValue} ${styles.jettonLink}`}
                       onClick={() => {
                         if (jettonMaster) handleSearch(jettonMaster.admin_address)
                       }}

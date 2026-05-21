@@ -9,6 +9,8 @@
   --litenode-surface: #ffffff;
   --litenode-surface-subtle: #fafafa;
   --litenode-surface-hover: #f4f4f5;
+  --litenode-row-hover: #f0f0f1;
+  --litenode-control-hover: #ececef;
   --litenode-surface-active: #f2f2f3;
   --litenode-surface-raised: #fdfdfd;
   --litenode-border: rgba(24, 24, 27, 0.09);
@@ -32,6 +34,8 @@
   --litenode-accent-bg-strong: rgba(0, 136, 204, 0.2);
   --litenode-accent-border: rgba(0, 136, 204, 0.35);
   --litenode-accent-ring: rgba(0, 136, 204, 0.16);
+  --litenode-link-chip-bg: #eef6ff;
+  --litenode-link-chip-bg-active: #dff0ff;
   --litenode-success-bg: rgba(48, 209, 88, 0.1);
   --litenode-neutral-bg: rgba(160, 160, 160, 0.1);
   --litenode-focus: rgba(24, 24, 27, 0.14);
@@ -62,11 +66,11 @@
   --tonscan-text: var(--litenode-text);
   --tonscan-text-primary: var(--litenode-text);
   --tonscan-text-secondary: var(--litenode-text-muted);
-  --tonscan-accent: #0088cc;
+  --tonscan-accent: #0070f3;
   --tonscan-link: var(--tonscan-accent);
   --tonscan-success: #22c55e;
   --tonscan-error: #ef4444;
-  --tonscan-row-hover: var(--litenode-surface-hover);
+  --tonscan-row-hover: var(--litenode-row-hover);
   --tonscan-header-bg: var(--litenode-surface);
 
   --tooltip-bg: #1a1a1a;
@@ -81,6 +85,8 @@
   --litenode-surface: #09090b;
   --litenode-surface-subtle: #18181b;
   --litenode-surface-hover: #27272a;
+  --litenode-row-hover: #18181b;
+  --litenode-control-hover: #27272a;
   --litenode-surface-active: #27272a;
   --litenode-surface-raised: #18181b;
   --litenode-border: #27272a;
@@ -104,6 +110,8 @@
   --litenode-accent-bg-strong: rgba(56, 189, 248, 0.2);
   --litenode-accent-border: rgba(56, 189, 248, 0.32);
   --litenode-accent-ring: rgba(56, 189, 248, 0.18);
+  --litenode-link-chip-bg: rgba(56, 189, 248, 0.12);
+  --litenode-link-chip-bg-active: rgba(56, 189, 248, 0.18);
   --litenode-success-bg: rgba(20, 83, 45, 0.32);
   --litenode-neutral-bg: rgba(63, 63, 70, 0.5);
   --litenode-focus: rgba(244, 244, 245, 0.16);
@@ -125,7 +133,7 @@
   --litenode-workspace-to: #71717a;
   --litenode-workspace-dot: rgba(9, 9, 11, 0.36);
 
-  --tonscan-accent: #0088cc;
+  --tonscan-accent: #38bdf8;
   --tonscan-success: #22c55e;
   --tonscan-error: #ef4444;
 
