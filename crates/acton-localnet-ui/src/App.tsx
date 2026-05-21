@@ -6,6 +6,10 @@ import {ToastProvider} from "@acton/shared-ui"
 import {TonClient} from "./explorer/api/client"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {DashboardPage} from "./dashboard/DashboardPage"
+import {FaucetPage} from "./dashboard/pages/FaucetPage"
+import {HomePage} from "./dashboard/pages/HomePage"
+import {NftsPage} from "./dashboard/pages/NftsPage"
+import {TokensPage} from "./dashboard/pages/TokensPage"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
@@ -61,14 +65,45 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
       <main className={styles.main}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
-          <Route path="/dashboard/faucet" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
-          <Route path="/dashboard/tokens" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
-          <Route path="/dashboard/nfts" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
+          <Route
+            path="/dashboard"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <HomePage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/faucet"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <FaucetPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/tokens"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <TokensPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/nfts"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <NftsPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route path="/dashboard/faucet" element={<Navigate to="/faucet" replace />} />
+          <Route path="/dashboard/tokens" element={<Navigate to="/tokens" replace />} />
+          <Route path="/dashboard/nfts" element={<Navigate to="/nfts" replace />} />
           <Route
             path="/explorer"
             element={
-              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
                 <ExplorerIndexPage />
               </DashboardPage>
             }
@@ -76,7 +111,7 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
           <Route
             path="/explorer/address/:address"
             element={
-              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
                 <AccountPage client={client} />
               </DashboardPage>
             }
@@ -84,7 +119,7 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
           <Route
             path="/explorer/tx/:hash"
             element={
-              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
                 <TransactionPage client={client} />
               </DashboardPage>
             }
