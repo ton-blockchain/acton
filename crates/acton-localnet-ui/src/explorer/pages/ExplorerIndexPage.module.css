@@ -1,6 +1,8 @@
 .inputPage {
   padding: var(--spacing-lg);
-  min-height: 100vh;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   background-color: var(--tonscan-bg);
@@ -13,8 +15,8 @@
   align-items: center;
   justify-content: center;
   flex: 1;
-  padding: 0 var(--spacing-lg) var(--spacing-2xl);
-  margin-top: -100px;
+  min-height: 0;
+  padding: 0 var(--spacing-lg);
 }
 
 .logoSection {
@@ -41,23 +43,28 @@
 .inputWrapper {
   display: flex;
   align-items: center;
-  background-color: var(--tonscan-card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  padding: 0 var(--spacing-sm);
+  gap: 12px;
+  height: 52px;
+  background-color: var(--litenode-surface);
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  padding: 0 16px;
   transition:
     background-color var(--transition-duration-fast) ease,
     border-color var(--transition-duration-fast) ease,
-    box-shadow var(--transition-duration-fast) ease,
-    transform var(--transition-duration-fast) ease;
+    box-shadow var(--transition-duration-fast) ease;
   position: relative;
-  box-shadow: var(--litenode-shadow-lg);
+  box-shadow: var(--litenode-shadow-sm);
+}
+
+.inputWrapper:hover {
+  border-color: var(--litenode-border-strong);
 }
 
 .inputWrapper.focused {
-  border-color: var(--tonscan-accent);
-  background-color: var(--litenode-surface-raised);
-  box-shadow: var(--litenode-shadow-input-focus);
+  border-color: var(--litenode-border-strong);
+  background-color: var(--litenode-surface);
+  box-shadow: 0 0 0 2px var(--litenode-focus);
 }
 
 .inputWrapper.inputError {
@@ -65,34 +72,38 @@
 }
 
 .inputWrapper.inputError.focused {
-  box-shadow: 0 0 0 3px var(--litenode-danger-ring);
+  box-shadow: 0 0 0 2px var(--litenode-danger-ring);
 }
 
 .searchIcon {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 999px;
-  color: var(--text-secondary);
-  background-color: var(--tonscan-row-hover);
+  width: 20px;
+  height: 20px;
+  color: var(--litenode-text-muted);
   flex-shrink: 0;
+}
+
+.searchIcon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .input {
   flex-grow: 1;
+  height: 100%;
   border: none;
   background-color: transparent;
   font-size: var(--font-size-base);
-  color: var(--text-primary);
+  color: var(--litenode-text);
   outline: none;
   min-width: 0;
-  padding: 1rem var(--spacing-sm);
+  padding: 0;
 }
 
 .input::placeholder {
-  color: var(--text-muted);
+  color: var(--litenode-text-soft);
 }
 
 .errorMessage {
@@ -114,15 +125,15 @@
   padding: var(--spacing-xs);
   margin: var(--spacing-sm) 0 0 0;
   position: absolute;
-  width: 99%;
-  background-color: var(--tonscan-card-bg);
-  border: 1px solid var(--border-color);
-  border-radius: 20px;
-  box-shadow: var(--litenode-shadow-xl);
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--litenode-surface);
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  box-shadow: var(--litenode-shadow-popover);
   z-index: 1000;
   max-height: 250px;
   overflow-y: auto;
-  backdrop-filter: blur(12px);
 }
 
 .historyItem {
@@ -130,7 +141,7 @@
   align-items: center;
   transition: background-color var(--transition-duration-fast);
   width: 100%;
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
 .historyItemButton {
@@ -138,16 +149,18 @@
   align-items: center;
   flex-grow: 1;
   min-width: 0;
-  padding: 0.875rem var(--spacing-md);
+  padding: 0.625rem var(--spacing-sm);
   cursor: pointer;
   background: none;
   border: none;
+  color: inherit;
+  font: inherit;
   text-align: left;
   width: 100%;
-  border-radius: 14px;
+  border-radius: 8px;
 }
 
-.historyItem:hover:hover {
+.historyItem:hover {
   background-color: var(--hover-bg);
 }
 
@@ -198,23 +211,8 @@
   opacity: 1;
 }
 
-.footer {
-  padding: var(--spacing-2xl) 0;
-  display: flex;
-  justify-content: center;
-}
-
-.createBy {
-  color: var(--text-secondary);
-  font-size: var(--font-size-sm);
-}
-
 @media (max-width: 768px) {
   .logoTitle {
     font-size: var(--font-size-xl);
-  }
-
-  .centeredInputContainer {
-    margin-top: 0;
   }
 }

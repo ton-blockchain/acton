@@ -143,9 +143,6 @@ export const ExplorerIndexPage: React.FC = () => {
         </section>
       </div>
 
-      <footer className={styles.footer}>
-        <span className={styles.createBy}>Powered by TON Localnet</span>
-      </footer>
     </div>
   )
 }
