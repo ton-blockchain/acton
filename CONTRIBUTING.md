@@ -77,7 +77,7 @@ Optional CLI tools:
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
-  cargo install cargo-deny --version 0.19.4 --locked
+  cargo install cargo-deny --version 0.19.6 --locked
   ```
 - `cargo-audit` (RustSec advisory checks for `just check-audit` / `just check-security`)
   ```bash
@@ -85,7 +85,7 @@ Optional CLI tools:
   ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install typos-cli --version 1.45.1 --locked
+  cargo install typos-cli --version 1.46.1 --locked
   ```
 - `cargo-llvm-cov` (optional, for coverage)
   ```bash
