@@ -5,38 +5,135 @@
   --muted-foreground: var(--text-secondary);
   --border: var(--border-color);
 
-  /* Tonscan colors - Light Theme (Default) */
-  --tonscan-bg: #f5f5f7;
-  --tonscan-card-bg: #ffffff;
-  --tonscan-border: #e8e8e8;
-  --tonscan-text-primary: #000000;
-  --tonscan-text-secondary: #707070;
+  --litenode-bg: #f7f7f8;
+  --litenode-surface: #ffffff;
+  --litenode-surface-subtle: #fafafa;
+  --litenode-surface-hover: #f4f4f5;
+  --litenode-surface-active: #f2f2f3;
+  --litenode-surface-raised: #fdfdfd;
+  --litenode-border: rgba(24, 24, 27, 0.09);
+  --litenode-border-subtle: rgba(24, 24, 27, 0.08);
+  --litenode-border-control: rgba(24, 24, 27, 0.12);
+  --litenode-border-strong: rgba(24, 24, 27, 0.16);
+  --litenode-text: #18181b;
+  --litenode-text-strong: #171717;
+  --litenode-text-muted: #71717a;
+  --litenode-text-subtle: #52525b;
+  --litenode-text-faint: #8c8c92;
+  --litenode-text-soft: #a1a1aa;
+  --litenode-primary: #18181b;
+  --litenode-primary-hover: #27272a;
+  --litenode-primary-foreground: #fafafa;
+  --litenode-danger: #991b1b;
+  --litenode-danger-bg: #fef2f2;
+  --litenode-danger-bg-soft: rgba(239, 68, 68, 0.1);
+  --litenode-danger-ring: rgba(239, 68, 68, 0.2);
+  --litenode-accent-bg: rgba(0, 136, 204, 0.1);
+  --litenode-accent-bg-strong: rgba(0, 136, 204, 0.2);
+  --litenode-accent-border: rgba(0, 136, 204, 0.35);
+  --litenode-accent-ring: rgba(0, 136, 204, 0.16);
+  --litenode-success-bg: rgba(48, 209, 88, 0.1);
+  --litenode-neutral-bg: rgba(160, 160, 160, 0.1);
+  --litenode-focus: rgba(24, 24, 27, 0.14);
+  --litenode-focus-strong: rgba(24, 24, 27, 0.15);
+  --litenode-overlay: rgba(250, 250, 250, 0.68);
+  --litenode-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04);
+  --litenode-shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.08);
+  --litenode-shadow-xl: 0 18px 48px rgba(15, 23, 42, 0.12);
+  --litenode-shadow-input-focus:
+    0 0 0 3px var(--litenode-accent-ring),
+    0 20px 44px rgba(15, 23, 42, 0.1);
+  --litenode-shadow-popover:
+    0 30px 80px rgba(15, 23, 42, 0.16),
+    0 1px 2px rgba(15, 23, 42, 0.08);
+  --litenode-shadow-tooltip: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --litenode-shadow-color-soft: rgba(0, 0, 0, 0.1);
+  --litenode-shadow-nft-hover: 0 10px 24px rgba(0, 0, 0, 0.18);
+  --litenode-subtle-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+  --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+  --litenode-workspace-from: #18181b;
+  --litenode-workspace-to: #71717a;
+  --litenode-workspace-dot: rgba(255, 255, 255, 0.25);
+
+  --tonscan-bg: var(--litenode-bg);
+  --tonscan-bg-secondary: var(--litenode-surface-subtle);
+  --tonscan-card-bg: var(--litenode-surface);
+  --tonscan-border: var(--litenode-border);
+  --tonscan-text: var(--litenode-text);
+  --tonscan-text-primary: var(--litenode-text);
+  --tonscan-text-secondary: var(--litenode-text-muted);
   --tonscan-accent: #0088cc;
+  --tonscan-link: var(--tonscan-accent);
   --tonscan-success: #22c55e;
   --tonscan-error: #ef4444;
-  --tonscan-row-hover: #f9f9f9;
-  --tonscan-header-bg: #ffffff;
+  --tonscan-row-hover: var(--litenode-surface-hover);
+  --tonscan-header-bg: var(--litenode-surface);
 
-  /* Tooltip specific */
   --tooltip-bg: #1a1a1a;
   --tooltip-text: #ffffff;
+  --shadow-popover: var(--litenode-shadow-popover);
+  --shadow-tooltip: var(--litenode-shadow-tooltip);
+  --shadow-color-soft: var(--litenode-shadow-color-soft);
 }
 
 :root.dark-theme {
-  /* Tonscan colors - Dark Theme */
-  --tonscan-bg: #000000;
-  --tonscan-card-bg: #121212;
-  --tonscan-border: #262626;
-  --tonscan-text-primary: #ffffff;
-  --tonscan-text-secondary: #a0a0a0;
-  --tonscan-accent: #0088cc;
-  --tonscan-success: #30d158;
-  --tonscan-error: #ff453a;
-  --tonscan-row-hover: #1a1a1a;
-  --tonscan-header-bg: #000000;
+  --litenode-bg: #09090b;
+  --litenode-surface: #09090b;
+  --litenode-surface-subtle: #18181b;
+  --litenode-surface-hover: #27272a;
+  --litenode-surface-active: #27272a;
+  --litenode-surface-raised: #18181b;
+  --litenode-border: #27272a;
+  --litenode-border-subtle: #27272a;
+  --litenode-border-control: #27272a;
+  --litenode-border-strong: #3f3f46;
+  --litenode-text: #fafafa;
+  --litenode-text-strong: #fafafa;
+  --litenode-text-muted: #a1a1aa;
+  --litenode-text-subtle: #d4d4d8;
+  --litenode-text-faint: #a1a1aa;
+  --litenode-text-soft: #71717a;
+  --litenode-primary: #fafafa;
+  --litenode-primary-hover: #e4e4e7;
+  --litenode-primary-foreground: #09090b;
+  --litenode-danger: #fca5a5;
+  --litenode-danger-bg: rgba(127, 29, 29, 0.28);
+  --litenode-danger-bg-soft: rgba(127, 29, 29, 0.32);
+  --litenode-danger-ring: rgba(239, 68, 68, 0.24);
+  --litenode-accent-bg: rgba(56, 189, 248, 0.12);
+  --litenode-accent-bg-strong: rgba(56, 189, 248, 0.2);
+  --litenode-accent-border: rgba(56, 189, 248, 0.32);
+  --litenode-accent-ring: rgba(56, 189, 248, 0.18);
+  --litenode-success-bg: rgba(20, 83, 45, 0.32);
+  --litenode-neutral-bg: rgba(63, 63, 70, 0.5);
+  --litenode-focus: rgba(244, 244, 245, 0.16);
+  --litenode-focus-strong: rgba(244, 244, 245, 0.18);
+  --litenode-overlay: rgba(9, 9, 11, 0.72);
+  --litenode-shadow-sm: none;
+  --litenode-shadow-lg: none;
+  --litenode-shadow-xl: none;
+  --litenode-shadow-input-focus: 0 0 0 3px var(--litenode-accent-ring);
+  --litenode-shadow-popover:
+    0 30px 80px rgba(0, 0, 0, 0.42),
+    0 1px 0 rgba(255, 255, 255, 0.04);
+  --litenode-shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.36);
+  --litenode-shadow-color-soft: rgba(0, 0, 0, 0.24);
+  --litenode-shadow-nft-hover: none;
+  --litenode-subtle-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --litenode-workspace-from: #fafafa;
+  --litenode-workspace-to: #71717a;
+  --litenode-workspace-dot: rgba(9, 9, 11, 0.36);
 
-  --tooltip-bg: #333333;
-  --tooltip-text: #ffffff;
+  --tonscan-accent: #0088cc;
+  --tonscan-success: #22c55e;
+  --tonscan-error: #ef4444;
+
+  --tooltip-bg: #fafafa;
+  --tooltip-text: #09090b;
+  --shadow-popover: var(--litenode-shadow-popover);
+  --shadow-tooltip: var(--litenode-shadow-tooltip);
+  --shadow-color-soft: var(--litenode-shadow-color-soft);
 }
 
 body {

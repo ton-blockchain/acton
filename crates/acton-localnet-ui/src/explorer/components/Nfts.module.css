@@ -20,13 +20,12 @@
     box-shadow var(--transition-duration-fast);
   border: 1px solid var(--tonscan-border);
   border-radius: var(--border-radius-md);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
-    var(--tonscan-card-bg);
+  background: var(--litenode-subtle-gradient), var(--tonscan-card-bg);
 }
 
 .nftItem:hover {
   border-color: var(--tonscan-accent);
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--litenode-shadow-nft-hover);
 }
 
 .cardHeader {
@@ -77,8 +76,8 @@
   align-items: center;
   width: fit-content;
   color: var(--tonscan-accent);
-  border: 1px solid rgba(0, 136, 204, 0.35);
-  background: rgba(0, 136, 204, 0.1);
+  border: 1px solid var(--litenode-accent-border);
+  background: var(--litenode-accent-bg);
   border-radius: 999px;
   padding: 2px 8px;
   font-size: 0.72rem;

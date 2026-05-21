@@ -156,11 +156,11 @@
 
 .address:hover {
   text-decoration: underline;
-  background-color: rgba(0, 136, 204, 0.1);
+  background-color: var(--litenode-accent-bg);
 }
 
 .addressHighlighted {
-  background-color: rgba(0, 136, 204, 0.2);
+  background-color: var(--litenode-accent-bg-strong);
 }
 
 .opcode {

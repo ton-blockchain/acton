@@ -88,7 +88,7 @@
 .tooltip {
   background-color: var(--bg-color);
   border-radius: var(--border-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-tooltip);
   padding: var(--spacing-md);
   font-size: var(--font-size-sm);
   min-width: 200px;
@@ -108,7 +108,7 @@
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-top: 8px solid var(--bg-color);
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.1));
+  filter: drop-shadow(0 2px 1px var(--shadow-color-soft));
 }
 
 .tooltipContent {

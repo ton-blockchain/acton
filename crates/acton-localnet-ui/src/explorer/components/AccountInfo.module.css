@@ -7,7 +7,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background-color: #22c55e;
+  background-color: var(--tonscan-success);
 }
 
 .assetIconImage {
@@ -104,16 +104,16 @@
 }
 
 .iconButton:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--tonscan-row-hover);
   color: var(--tonscan-text);
 }
 
 .saveIcon {
-  color: #22c55e;
+  color: var(--tonscan-success);
 }
 
 .cancelIcon {
-  color: #ef4444;
+  color: var(--tonscan-error);
 }
 
 .customName {
@@ -172,12 +172,12 @@
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-transform: capitalize;
-  background-color: rgba(48, 209, 88, 0.1);
+  background-color: var(--litenode-success-bg);
   color: var(--tonscan-success);
 }
 
 .statusUninitialized {
-  background-color: rgba(160, 160, 160, 0.1);
+  background-color: var(--litenode-neutral-bg);
   color: var(--tonscan-text-secondary);
 }
 
@@ -190,7 +190,7 @@
 .tag {
   display: inline-flex;
   align-items: center;
-  background-color: rgba(160, 160, 160, 0.1);
+  background-color: var(--litenode-neutral-bg);
   color: var(--tonscan-text-secondary);
   padding: var(--spacing-xss) var(--spacing-sm);
   border-radius: var(--border-radius-sm);
@@ -210,7 +210,7 @@
   line-height: 1;
   min-width: unset;
   width: max-content;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--litenode-shadow-tooltip);
   display: flex;
   align-items: center;
   justify-content: center;

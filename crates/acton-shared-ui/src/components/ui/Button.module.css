@@ -22,9 +22,7 @@
 
 .button:focus-visible {
   outline: none;
-  box-shadow:
-    0 0 0 1px rgba(9, 9, 11, 0.16),
-    0 0 0 4px rgba(9, 9, 11, 0.08);
+  box-shadow: 0 0 0 2px var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
 }
 
 .button:disabled {
@@ -37,40 +35,40 @@
 }
 
 .variantDefault {
-  background: #18181b;
-  color: #fafafa;
+  background: var(--litenode-primary, var(--text-primary));
+  color: var(--litenode-primary-foreground, var(--bg-color));
 }
 
 .variantDefault:hover:not(:disabled) {
-  background: #27272a;
+  background: var(--litenode-primary-hover, var(--text-secondary));
 }
 
 .variantOutline {
-  border-color: rgba(24, 24, 27, 0.12);
-  background: #ffffff;
-  color: #18181b;
+  border-color: var(--litenode-border-control, var(--border-color));
+  background: var(--litenode-surface, var(--bg-color));
+  color: var(--litenode-text, var(--text-primary));
 }
 
 .variantOutline:hover:not(:disabled) {
-  background: #f4f4f5;
+  background: var(--litenode-surface-hover, var(--hover-bg));
 }
 
 .variantSecondary {
-  background: #f4f4f5;
-  color: #18181b;
+  background: var(--litenode-surface-hover, var(--bg-secondary-color));
+  color: var(--litenode-text, var(--text-primary));
 }
 
 .variantSecondary:hover:not(:disabled) {
-  background: #e4e4e7;
+  background: var(--litenode-surface-active, var(--bg-selection-color));
 }
 
 .variantGhost {
   background: transparent;
-  color: #18181b;
+  color: var(--litenode-text, var(--text-primary));
 }
 
 .variantGhost:hover:not(:disabled) {
-  background: #f4f4f5;
+  background: var(--litenode-surface-hover, var(--hover-bg));
 }
 
 .sizeDefault {

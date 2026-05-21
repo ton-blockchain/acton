@@ -155,6 +155,15 @@ function collectRecentAccounts(transactions: readonly V3TransactionListItem[]): 
   return accounts
 }
 
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  const tagName = target.tagName.toLowerCase()
+  return tagName === "input" || tagName === "textarea" || target.isContentEditable
+}
+
 const HomeAddressLabel: React.FC<{
   readonly address?: string
   readonly fallback?: string
@@ -391,6 +400,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
     setIsSearchOpen(false)
   }, [])
 
+  const handleGlobalKeyDown = React.useCallback(
+    (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) {
+        return
+      }
+
+      if (event.key === "Escape" && isSearchMounted) {
+        event.preventDefault()
+        closeSearch()
+        return
+      }
+
+      if (event.key.toLocaleLowerCase() !== "f" || isTextEntryTarget(event.target)) {
+        return
+      }
+
+      event.preventDefault()
+      openSearch()
+    },
+    [closeSearch, isSearchMounted, openSearch],
+  )
+
   const selectSearchResult = React.useCallback(
     (result: SearchResult) => {
       closeSearch()
@@ -422,6 +453,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
       }
     }
   }, [])
+
+  React.useEffect(() => {
+    globalThis.addEventListener("keydown", handleGlobalKeyDown)
+    return () => {
+      globalThis.removeEventListener("keydown", handleGlobalKeyDown)
+    }
+  }, [handleGlobalKeyDown])
 
   React.useEffect(() => {
     if (isSearchMounted && isSearchOpen) {

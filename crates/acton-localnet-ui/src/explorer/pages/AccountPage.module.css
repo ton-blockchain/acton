@@ -12,7 +12,7 @@
 }
 
 .error {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--litenode-danger-bg-soft);
   border: 1px solid var(--tonscan-error);
   color: var(--tonscan-error);
   padding: var(--spacing-md);

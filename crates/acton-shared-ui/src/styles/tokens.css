@@ -2,6 +2,7 @@
   --bg-color: #ffffff;
   --bg-secondary-color: #f4f4f5;
   --bg-selection-color: #f4f4f5;
+  --bg-tertiary-color: #e4e4e7;
   --text-primary: #09090b;
   --text-secondary: #71717a;
   --text-muted: #a1a1aa;
@@ -25,6 +26,9 @@
   --link-color: #3b82f6;
   --border-color: #e4e4e7;
   --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-popover: 0 8px 24px rgb(0 0 0 / 10%);
+  --shadow-tooltip: 0 8px 24px rgb(0 0 0 / 15%);
+  --shadow-color-soft: rgba(0, 0, 0, 0.1);
 
   --hover-bg: #f4f4f5;
 
@@ -67,37 +71,41 @@
 }
 
 :root.dark-theme {
-  --bg-color: hsl(30, 0%, 6%);
-  --bg-secondary-color: hsl(240, 5%, 10%);
-  --bg-selection-color: hsl(30, 0%, 15%);
-  --text-primary: hsl(240, 5%, 80%);
-  --text-secondary: hsl(247, 4%, 70%);
-  --text-muted: hsl(247, 4%, 50%);
+  --bg-color: #09090b;
+  --bg-secondary-color: #18181b;
+  --bg-selection-color: #27272a;
+  --bg-tertiary-color: #27272a;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
 
-  --color-passed: #30d158;
-  --color-passed-icon: hsl(126, 50%, 55%);
-  --color-passed-bg: #1c3e26;
-  --color-passed-text: #7cd996;
+  --color-passed: #22c55e;
+  --color-passed-icon: #22c55e;
+  --color-passed-bg: rgba(20, 83, 45, 0.32);
+  --color-passed-text: #86efac;
 
-  --color-failed: #ff453a;
-  --color-failed-bg: #4d1a16;
-  --color-failed-text: #ff8f87;
+  --color-failed: #ef4444;
+  --color-failed-bg: rgba(127, 29, 29, 0.32);
+  --color-failed-text: #fca5a5;
 
-  --color-skipped: #ffd60a;
-  --color-skipped-bg: #4d3800;
-  --color-skipped-text: #ffe580;
+  --color-skipped: #f59e0b;
+  --color-skipped-bg: rgba(120, 53, 15, 0.32);
+  --color-skipped-text: #fcd34d;
 
-  --color-todo: #0a84ff;
-  --color-todo-bg: #003366;
-  --color-todo-text: #66b3ff;
+  --color-todo: #3b82f6;
+  --color-todo-bg: rgba(30, 64, 175, 0.32);
+  --color-todo-text: #93c5fd;
 
-  --link-color: #0a84ff;
-  --border-color: hsl(240, 5%, 14%);
-  --shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+  --link-color: #60a5fa;
+  --border-color: #27272a;
+  --shadow: none;
+  --shadow-popover: 0 30px 80px rgba(0, 0, 0, 0.42);
+  --shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.36);
+  --shadow-color-soft: rgba(0, 0, 0, 0.24);
 
-  --hover-bg: rgba(255, 255, 255, 0.06);
+  --hover-bg: #27272a;
 
-  --color-background-primary: #1c1c1e;
+  --color-background-primary: #09090b;
 }
 
 .variables {
