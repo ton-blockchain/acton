@@ -346,10 +346,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
                         if (currentNftItem.owner_address) handleSearch(currentNftItem.owner_address)
                       }}
                       onKeyDown={e => {
-                        if (
-                          (e.key === "Enter" || e.key === " ") &&
-                          currentNftItem.owner_address
-                        ) {
+                        if ((e.key === "Enter" || e.key === " ") && currentNftItem.owner_address) {
                           handleSearch(currentNftItem.owner_address)
                         }
                       }}
@@ -474,7 +471,10 @@ function tokenInfoString(info: AccountStateTokenInfo | undefined, key: string): 
   return typeof value === "string" && value.length > 0 ? value : undefined
 }
 
-function contentString(content: Record<string, unknown> | undefined, key: string): string | undefined {
+function contentString(
+  content: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
 }

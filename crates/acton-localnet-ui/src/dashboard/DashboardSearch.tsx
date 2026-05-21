@@ -1,11 +1,4 @@
-import {
-  Boxes,
-  ChartNoAxesColumn,
-  CircleUserRound,
-  Image,
-  Search,
-  Wallet,
-} from "lucide-react"
+import {Boxes, ChartNoAxesColumn, CircleUserRound, Image, Search, Wallet} from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import * as React from "react"
 import {useNavigate} from "react-router-dom"
@@ -385,7 +378,12 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
             aria-label="Close search"
             onClick={closeSearch}
           />
-          <section className={styles.searchPanel} role="dialog" aria-modal="true" aria-label="Search">
+          <section
+            className={styles.searchPanel}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Search"
+          >
             <div className={styles.searchInputRow}>
               <Search size={17} className={styles.searchInputIcon} />
               <input
@@ -436,7 +434,10 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
                               alt=""
                               onError={event => {
                                 const fallbackImage = result.fallbackImage
-                                if (fallbackImage && !event.currentTarget.src.endsWith(fallbackImage)) {
+                                if (
+                                  fallbackImage &&
+                                  !event.currentTarget.src.endsWith(fallbackImage)
+                                ) {
                                   event.currentTarget.src = fallbackImage
                                 }
                               }}
@@ -447,7 +448,9 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
                         </span>
                         <span className={styles.searchResultText}>
                           <span className={styles.searchResultTitle}>{result.title}</span>
-                          <span className={styles.searchResultDescription}>{result.description}</span>
+                          <span className={styles.searchResultDescription}>
+                            {result.description}
+                          </span>
                         </span>
                       </button>
                     )

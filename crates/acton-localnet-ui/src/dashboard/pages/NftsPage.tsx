@@ -85,7 +85,8 @@ export const NftsPage: React.FC<NftsPageProps> = ({client}) => {
           nftsState.items.map(item => {
             const name = contentString(item.content, "name") || "NFT Item"
             const image = contentString(item.content, "image") || NFT_PLACEHOLDER_IMAGE
-            const collectionName = contentString(item.collection?.collection_content, "name") || "Standalone"
+            const collectionName =
+              contentString(item.collection?.collection_content, "name") || "Standalone"
             const href = `/explorer/address/${encodeURIComponent(item.address)}`
 
             return (
@@ -133,7 +134,9 @@ export const NftsPage: React.FC<NftsPageProps> = ({client}) => {
                     </div>
                     <div>
                       <span className={styles.assetMetaLabel}>Sale</span>
-                      <span className={styles.assetMetaValue}>{item.on_sale ? "Listed" : "Not listed"}</span>
+                      <span className={styles.assetMetaValue}>
+                        {item.on_sale ? "Listed" : "Not listed"}
+                      </span>
                     </div>
                   </div>
                 </CardContent>

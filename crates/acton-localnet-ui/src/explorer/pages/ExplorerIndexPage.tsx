@@ -149,7 +149,6 @@ export const ExplorerIndexPage: React.FC = () => {
           )}
         </section>
       </div>
-
     </div>
   )
 }

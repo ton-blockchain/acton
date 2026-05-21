@@ -16,7 +16,10 @@ export function parseTonAmount(value: string): number | undefined {
   return Number(nano)
 }
 
-export function contentString(content: Record<string, unknown> | undefined, key: string): string | undefined {
+export function contentString(
+  content: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
   const value = content?.[key]
   return typeof value === "string" && value.length > 0 ? value : undefined
 }

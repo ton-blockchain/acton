@@ -38,7 +38,10 @@ export const HomeAddressLabel: React.FC<HomeAddressLabelProps> = ({
   }
 
   return (
-    <span className={`${styles.addressDisplay} ${className ?? ""}`} title={`${name} (${fullAddress})`}>
+    <span
+      className={`${styles.addressDisplay} ${className ?? ""}`}
+      title={`${name} (${fullAddress})`}
+    >
       <span className={styles.addressDisplayName}>{name}</span>
       <span className={styles.addressDisplaySeparator}>·</span>
       <span className={styles.addressDisplayAddress}>{shortAddress}</span>

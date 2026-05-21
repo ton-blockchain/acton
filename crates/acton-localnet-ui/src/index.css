@@ -44,16 +44,17 @@
   --litenode-shadow-sm: 0 1px 2px rgba(24, 24, 27, 0.04);
   --litenode-shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.08);
   --litenode-shadow-xl: 0 18px 48px rgba(15, 23, 42, 0.12);
-  --litenode-shadow-input-focus:
-    0 0 0 3px var(--litenode-accent-ring),
+  --litenode-shadow-input-focus: 0 0 0 3px var(--litenode-accent-ring),
     0 20px 44px rgba(15, 23, 42, 0.1);
-  --litenode-shadow-popover:
-    0 30px 80px rgba(15, 23, 42, 0.16),
-    0 1px 2px rgba(15, 23, 42, 0.08);
+  --litenode-shadow-popover: 0 30px 80px rgba(15, 23, 42, 0.16), 0 1px 2px rgba(15, 23, 42, 0.08);
   --litenode-shadow-tooltip: 0 4px 12px rgba(0, 0, 0, 0.5);
   --litenode-shadow-color-soft: rgba(0, 0, 0, 0.1);
   --litenode-shadow-nft-hover: 0 10px 24px rgba(0, 0, 0, 0.18);
-  --litenode-subtle-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+  --litenode-subtle-gradient: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.03),
+    rgba(255, 255, 255, 0)
+  );
   --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
   --litenode-workspace-from: #18181b;
   --litenode-workspace-to: #71717a;
@@ -121,13 +122,15 @@
   --litenode-shadow-lg: none;
   --litenode-shadow-xl: none;
   --litenode-shadow-input-focus: 0 0 0 3px var(--litenode-accent-ring);
-  --litenode-shadow-popover:
-    0 30px 80px rgba(0, 0, 0, 0.42),
-    0 1px 0 rgba(255, 255, 255, 0.04);
+  --litenode-shadow-popover: 0 30px 80px rgba(0, 0, 0, 0.42), 0 1px 0 rgba(255, 255, 255, 0.04);
   --litenode-shadow-tooltip: 0 8px 24px rgba(0, 0, 0, 0.36);
   --litenode-shadow-color-soft: rgba(0, 0, 0, 0.24);
   --litenode-shadow-nft-hover: none;
-  --litenode-subtle-gradient: linear-gradient(160deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0));
+  --litenode-subtle-gradient: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.04),
+    rgba(255, 255, 255, 0)
+  );
   --litenode-inset-highlight: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
   --litenode-workspace-from: #fafafa;
   --litenode-workspace-to: #71717a;

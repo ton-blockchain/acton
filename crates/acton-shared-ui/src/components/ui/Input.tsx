@@ -7,13 +7,7 @@ export type InputProps = Readonly<React.InputHTMLAttributes<HTMLInputElement>>
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
-    {
-      autoComplete = "off",
-      autoCorrect = "off",
-      className,
-      spellCheck = false,
-      ...properties
-    },
+    {autoComplete = "off", autoCorrect = "off", className, spellCheck = false, ...properties},
     reference,
   ) => (
     <input

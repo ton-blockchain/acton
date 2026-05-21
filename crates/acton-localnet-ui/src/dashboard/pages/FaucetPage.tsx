@@ -67,7 +67,9 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>Send test TON</h1>
-          <p className={styles.subtitle}>Top up any wallet address with test TON in a few seconds.</p>
+          <p className={styles.subtitle}>
+            Top up any wallet address with test TON in a few seconds.
+          </p>
         </div>
       </section>
 
@@ -80,7 +82,9 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
               </div>
               <div>
                 <h2 className={styles.cardTitle}>Wallet top up</h2>
-                <p className={styles.cardDescription}>Enter an address, choose an amount, and send funds.</p>
+                <p className={styles.cardDescription}>
+                  Enter an address, choose an amount, and send funds.
+                </p>
               </div>
             </div>
           </div>

@@ -3,10 +3,12 @@ import {clsx} from "clsx"
 
 import styles from "./Button.module.css"
 
-export type ButtonProps = Readonly<React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  readonly variant?: "default" | "outline" | "secondary" | "ghost"
-  readonly size?: "default" | "sm" | "lg" | "icon"
-}>
+export type ButtonProps = Readonly<
+  React.ButtonHTMLAttributes<HTMLButtonElement> & {
+    readonly variant?: "default" | "outline" | "secondary" | "ghost"
+    readonly size?: "default" | "sm" | "lg" | "icon"
+  }
+>
 
 export const Button: React.FC<ButtonProps> = ({
   className,
@@ -25,7 +27,13 @@ export const Button: React.FC<ButtonProps> = ({
           : styles.variantDefault
 
   const sizeClassName =
-    size === "sm" ? styles.sizeSm : size === "lg" ? styles.sizeLg : size === "icon" ? styles.sizeIcon : styles.sizeDefault
+    size === "sm"
+      ? styles.sizeSm
+      : size === "lg"
+        ? styles.sizeLg
+        : size === "icon"
+          ? styles.sizeIcon
+          : styles.sizeDefault
 
   return (
     <button

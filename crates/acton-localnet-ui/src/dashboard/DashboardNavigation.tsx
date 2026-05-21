@@ -42,11 +42,19 @@ const mainItems: SidebarItem[] = [
 ]
 
 const footerItems: SidebarItem[] = [
-  {label: "Documentation", icon: BookOpen, href: "https://ton-blockchain.github.io/acton/docs/welcome"},
+  {
+    label: "Documentation",
+    icon: BookOpen,
+    href: "https://ton-blockchain.github.io/acton/docs/welcome",
+  },
   {label: "GitHub", icon: Github, href: "https://github.com/ton-blockchain/acton"},
 ]
 
-export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({client, theme, setTheme}) => {
+export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
+  client,
+  theme,
+  setTheme,
+}) => {
   const location = useLocation()
   const navigate = useNavigate()
   const [explorerPath, setExplorerPath] = React.useState(() => readExplorerLastPath())

@@ -22,7 +22,8 @@
 
 .button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
+  box-shadow: 0 0 0 2px
+    var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
 }
 
 .button:disabled {

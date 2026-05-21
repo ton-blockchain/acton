@@ -46,7 +46,10 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
       ].filter(endpoint => endpoint.value.length > 0),
     [endpoints],
   )
-  const recentAccounts = React.useMemo(() => collectRecentAccounts(homeState.transactions), [homeState.transactions])
+  const recentAccounts = React.useMemo(
+    () => collectRecentAccounts(homeState.transactions),
+    [homeState.transactions],
+  )
 
   React.useEffect(() => {
     let cancelled = false
@@ -112,7 +115,9 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>Home</h1>
-          <p className={styles.subtitle}>A quick snapshot of your local node and recent activity.</p>
+          <p className={styles.subtitle}>
+            A quick snapshot of your local node and recent activity.
+          </p>
         </div>
       </section>
 
@@ -227,7 +232,9 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
                             <HomeAddressLabel address={account} />
                           </span>
                           <span className={styles.accountBalance}>
-                            {balance === undefined ? "Balance unavailable" : `${formatNano(balance)} TON`}
+                            {balance === undefined
+                              ? "Balance unavailable"
+                              : `${formatNano(balance)} TON`}
                           </span>
                         </span>
                         <ArrowUpRight size={14} className={styles.accountArrow} />
