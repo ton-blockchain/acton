@@ -95,7 +95,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
 
   const handleContractClick = (address: string) => {
     const formattedAddr = normalizeAddress(address)
-    window.open(`/explorer/address/${formattedAddr}`)
+    void navigate(`/explorer/address/${encodeURIComponent(formattedAddr)}`)
   }
 
   useEffect(() => {

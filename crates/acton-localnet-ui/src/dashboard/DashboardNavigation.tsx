@@ -15,6 +15,7 @@ import * as React from "react"
 import {useLocation, useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../explorer/api/client"
+import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
 
 import {DashboardSearch} from "./DashboardSearch"
 import styles from "./DashboardPage.module.css"
@@ -48,6 +49,17 @@ const footerItems: SidebarItem[] = [
 export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({client, theme, setTheme}) => {
   const location = useLocation()
   const navigate = useNavigate()
+  const [explorerPath, setExplorerPath] = React.useState(() => readExplorerLastPath())
+
+  React.useEffect(() => {
+    if (!location.pathname.startsWith("/explorer")) {
+      return
+    }
+
+    const nextPath = `${location.pathname}${location.search}${location.hash}`
+    writeExplorerLastPath(nextPath)
+    setExplorerPath(nextPath)
+  }, [location.hash, location.pathname, location.search])
 
   return (
     <aside className={styles.sidebar}>
@@ -70,6 +82,7 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({client,
           <div className={styles.navSection}>
             {mainItems.map(item => {
               const Icon = item.icon
+              const targetPath = item.path === "/explorer" ? explorerPath : item.path
               const isActive =
                 item.path === "/explorer"
                   ? location.pathname.startsWith("/explorer")
@@ -81,8 +94,8 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({client,
                   key={item.label}
                   className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
                   onClick={() => {
-                    if (item.path) {
-                      void navigate(item.path)
+                    if (targetPath) {
+                      void navigate(targetPath)
                     }
                   }}
                 >

@@ -4,12 +4,16 @@ import * as React from "react"
 import {useCallback, useEffect, useState} from "react"
 import {useNavigate} from "react-router-dom"
 
+import {
+  EXPLORER_HISTORY_STORAGE_KEY,
+  readExplorerInput,
+  writeExplorerInput,
+} from "../explorerResume"
+
 import styles from "./ExplorerIndexPage.module.css"
 
-const STORAGE_KEY = "explorer_history"
-
 export const ExplorerIndexPage: React.FC = () => {
-  const [input, setInput] = useState("")
+  const [input, setInput] = useState(() => readExplorerInput())
   const [history, setHistory] = useState<string[]>([])
   const [isFocused, setIsFocused] = useState(false)
   const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
@@ -17,7 +21,7 @@ export const ExplorerIndexPage: React.FC = () => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const savedHistory = localStorage.getItem(STORAGE_KEY)
+    const savedHistory = localStorage.getItem(EXPLORER_HISTORY_STORAGE_KEY)
     if (savedHistory) {
       try {
         setHistory(JSON.parse(savedHistory) as string[])
@@ -31,7 +35,7 @@ export const ExplorerIndexPage: React.FC = () => {
     (address: string) => {
       const newHistory = [address, ...history.filter(a => a !== address)].slice(0, 5)
       setHistory(newHistory)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+      localStorage.setItem(EXPLORER_HISTORY_STORAGE_KEY, JSON.stringify(newHistory))
     },
     [history],
   )
@@ -41,7 +45,7 @@ export const ExplorerIndexPage: React.FC = () => {
       e.stopPropagation()
       const newHistory = history.filter(a => a !== address)
       setHistory(newHistory)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(newHistory))
+      localStorage.setItem(EXPLORER_HISTORY_STORAGE_KEY, JSON.stringify(newHistory))
       setShowHistoryDropdown(newHistory.length > 0)
     },
     [history],
@@ -55,6 +59,7 @@ export const ExplorerIndexPage: React.FC = () => {
       try {
         Address.parse(trimmed)
         setError(undefined)
+        writeExplorerInput(trimmed)
         addToHistory(trimmed)
         setShowHistoryDropdown(false)
         void navigate(`/explorer/address/${trimmed}`)
@@ -86,7 +91,9 @@ export const ExplorerIndexPage: React.FC = () => {
               placeholder="Search by address or hash"
               value={input}
               onChange={e => {
-                setInput(e.target.value)
+                const nextInput = e.target.value
+                setInput(nextInput)
+                writeExplorerInput(nextInput)
                 if (error) setError(undefined)
               }}
               onKeyDown={e => e.key === "Enter" && handleSearch(input)}
