@@ -22,6 +22,27 @@
         "typescript-eslint": "^8.30.1",
       },
     },
+    "@ton/acton": {
+      "name": "@ton/acton",
+      "version": "0.0.0",
+      "dependencies": {
+        "@ton/core": "0.62.0",
+      },
+      "devDependencies": {
+        "@types/node": "^25.0.3",
+        "typescript": "^5.9.3",
+      },
+    },
+    "@ton/acton/examples/counter": {
+      "name": "@ton/acton-counter-example",
+      "version": "0.1.0",
+      "dependencies": {
+        "@ton/acton": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+      },
+    },
     "crates/acton-localnet-ui": {
       "name": "acton-localnet-ui",
       "version": "1.0.0",
@@ -316,6 +337,10 @@
     "@shikijs/types": ["@shikijs/types@3.23.0", "", { "dependencies": { "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.4" } }, "sha512-3JZ5HXOZfYjsYSk0yPwBrkupyYSLpAE26Qc0HLghhZNGTZg/SKxXIIgoxOpmmeQP0RRSDJTk1/vPfw9tbw+jSQ=="],
 
     "@shikijs/vscode-textmate": ["@shikijs/vscode-textmate@10.0.2", "", {}, "sha512-83yeghZ2xxin3Nj8z1NMd/NCuca+gsYXswywDy5bHvwlWL8tpTQmzGeUuHd9FC3E/SBEMvzJRwWEOz5gGes9Qg=="],
+
+    "@ton/acton": ["@ton/acton@workspace:@ton/acton"],
+
+    "@ton/acton-counter-example": ["@ton/acton-counter-example@workspace:@ton/acton/examples/counter"],
 
     "@ton/core": ["@ton/core@0.62.0", "", { "dependencies": { "symbol.inspect": "1.0.1" }, "peerDependencies": { "@ton/crypto": ">=3.2.0" } }, "sha512-GCYlzzx11rSESKkiHvNy9tL8zWth+ZtUbvV29WH478FvBp8xTw24AyoigwXWNV+OLCAcnwlGhZpTpxjD3wzCwA=="],
 

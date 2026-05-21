@@ -6,6 +6,8 @@
   "author": "TON Core",
   "type": "module",
   "workspaces": [
+    "@ton/*",
+    "@ton/acton/examples/counter",
     "crates/acton-localnet-ui",
     "crates/acton-shared-ui",
     "crates/acton-test-ui"

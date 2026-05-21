@@ -1,0 +1,19 @@
+{
+  "name": "@ton/acton-counter-example",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "acton build",
+    "test": "bun run test:tolk && bun run test:ts",
+    "test:tolk": "acton test",
+    "test:ts": "bun test tests-ts",
+    "wrapper:ts": "acton wrapper Counter --ts"
+  },
+  "dependencies": {
+    "@ton/acton": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

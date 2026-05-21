@@ -1,0 +1,11 @@
+dist
+examples/counter/.acton
+examples/counter/.github
+examples/counter/Acton.toml
+examples/counter/build
+examples/counter/LICENSE
+examples/counter/contracts
+examples/counter/scripts
+examples/counter/tests
+examples/counter/wrappers
+examples/counter/wrappers-ts

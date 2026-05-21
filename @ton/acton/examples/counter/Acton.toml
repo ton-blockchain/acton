@@ -1,0 +1,36 @@
+[package]
+name = "ton-acton-counter-example"
+description = "Counter example for @ton/acton"
+version = "0.1.0"
+license = "MIT"
+
+[toolchain]
+acton = "1.0.0"
+
+[contracts.Counter]
+display-name = "Counter"
+src = "contracts/Counter.tolk"
+depends = []
+
+[test]
+
+[wrappers.typescript]
+output-dir = "wrappers-ts"
+
+[fmt]
+width = 100
+ignore = []
+
+[scripts]
+deploy-emulation = "acton script scripts/deploy.tolk"
+deploy-testnet = "acton script scripts/deploy.tolk --net testnet"
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+gen = "gen"
+tests = "tests"
+wrappers = "wrappers"
+
+# Check full Acton.toml reference and all available keys:
+# https://ton-blockchain.github.io/acton/docs/acton-toml
