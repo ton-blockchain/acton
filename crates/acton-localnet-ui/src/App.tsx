@@ -165,6 +165,8 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<DashboardPage client={client} />} />
           <Route path="/dashboard/faucet" element={<DashboardPage client={client} />} />
+          <Route path="/dashboard/tokens" element={<DashboardPage client={client} />} />
+          <Route path="/dashboard/nfts" element={<DashboardPage client={client} />} />
           <Route path="/explorer" element={<ExplorerIndexPage />} />
           <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
           <Route path="/tokens" element={<TokensPage client={client} />} />

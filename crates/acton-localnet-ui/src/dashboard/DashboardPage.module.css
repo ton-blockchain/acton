@@ -98,18 +98,37 @@
   min-height: 36px;
   padding: 0 8px;
   border-radius: 10px;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   color: #4b4b52;
   text-align: left;
+  text-decoration: none;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-.navItem:disabled {
-  cursor: default;
+.navItem:hover {
+  background: #f4f4f5;
+  color: #18181b;
+  text-decoration: none;
+}
+
+.navItem:focus {
+  text-decoration: none;
+}
+
+.navItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.14);
 }
 
 .navItemMain {
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -117,13 +136,21 @@
   font-weight: 500;
 }
 
+.navItemMain span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.navItem > svg {
+  flex: 0 0 auto;
+}
+
 .navItemActive {
   background: #f2f2f3;
   color: #171717;
-}
-
-.navItemDisabled {
-  color: #bbbbc1;
 }
 
 .contentArea {
@@ -144,11 +171,19 @@
   overflow-y: auto;
 }
 
-.homeGrid {
+.homeLayout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   gap: 18px;
   align-items: start;
+}
+
+.homeMainColumn,
+.homeSideColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 .dashboardCard {
@@ -188,14 +223,70 @@
   line-height: 1.5;
 }
 
-.homeCardWide {
-  grid-column: 1 / -1;
+.resourceGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 320px));
+  gap: 18px;
+  align-items: start;
+  justify-content: start;
 }
 
 .metricValue {
   margin-top: 6px;
   font-size: 2rem;
   line-height: 1;
+}
+
+.assetCard {
+  cursor: pointer;
+  outline: none;
+  width: 100%;
+  max-width: 320px;
+}
+
+.assetCard:hover {
+  border-color: rgba(24, 24, 27, 0.16);
+  background: #fdfdfd;
+}
+
+.assetCard:focus-visible {
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.15);
+}
+
+.assetImage {
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: #fafafa;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.assetMetaGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.assetMetaLabel,
+.assetMetaValue {
+  display: block;
+}
+
+.assetMetaLabel {
+  color: #71717a;
+  font-size: 0.78rem;
+}
+
+.assetMetaValue {
+  margin-top: 4px;
+  color: #18181b;
+  font-size: 0.88rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .metricMeta {
@@ -245,28 +336,27 @@
   gap: 14px;
   text-align: left;
   cursor: pointer;
-}
-
-.listRowButton {
   border: 1px solid rgba(24, 24, 27, 0.08);
   border-radius: 12px;
   background: #fafafa;
   padding: 12px 14px;
   align-items: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    box-shadow 120ms ease;
 }
 
-.listRowButton:hover {
+.listRowButton:hover,
+.accountItem:hover {
+  border-color: rgba(24, 24, 27, 0.14);
   background: #f4f4f5;
 }
 
-.accountItem {
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(24, 24, 27, 0.08);
-}
-
-.accountItem:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
+.listRowButton:focus-visible,
+.accountItem:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.14);
 }
 
 .rowPrimary {
@@ -310,11 +400,6 @@
   white-space: nowrap;
 }
 
-.statusSuccess {
-  background: #f4f4f5;
-  color: #27272a;
-}
-
 .statusError {
   background: #fef2f2;
   color: #991b1b;
@@ -335,11 +420,43 @@
   justify-content: flex-start;
 }
 
-.accountDot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #18181b;
+.accountIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(24, 24, 27, 0.08);
+  background: #ffffff;
+  color: #52525b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.accountText {
+  min-width: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.accountName {
+  color: #18181b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountBalance {
+  color: #71717a;
+  font-size: 0.78rem;
+}
+
+.accountArrow {
+  color: #71717a;
   flex: 0 0 auto;
 }
 
@@ -490,7 +607,7 @@
     grid-template-columns: 280px minmax(0, 1fr);
   }
 
-  .homeGrid {
+  .homeLayout {
     grid-template-columns: 1fr;
   }
 }
@@ -516,6 +633,14 @@
     height: auto;
     padding: 20px;
     overflow: visible;
+  }
+
+  .resourceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .assetCard {
+    max-width: none;
   }
 
   .hero,
