@@ -64,7 +64,20 @@ export const Tokens: React.FC<TokensProps> = ({wallets, client, onAddressClick})
       <div className={styles.list}>
         {walletsWithMasters.map(w => {
           const decimals = Number(w.master?.jetton_content?.decimals || 9)
-          const balance = Number(w.balance) / Math.pow(10, decimals)
+          const rawBalance = Number(w.balance)
+          const rawSupply = Number(w.master?.total_supply || "0")
+          const balance = rawBalance / Math.pow(10, decimals)
+          const supplyShare = rawSupply > 0 ? rawBalance / rawSupply : undefined
+          const supplyShareLabel =
+            supplyShare === undefined
+              ? "Unknown"
+              : supplyShare === 0
+                ? "0%"
+                : supplyShare < 0.0001
+                  ? "<0.01%"
+                  : `${(supplyShare * 100).toLocaleString(undefined, {
+                      maximumFractionDigits: supplyShare < 0.01 ? 2 : 1,
+                    })}%`
           const symbol = w.master?.jetton_content?.symbol || "UNKNOWN"
 
           if (w.master?.jetton_content?.name == undefined) {
@@ -105,9 +118,9 @@ export const Tokens: React.FC<TokensProps> = ({wallets, client, onAddressClick})
                   <span className={styles.jettonSymbol}>{symbol}</span>
                 </div>
               </div>
-              <div className={styles.priceInfo}>
-                <div className={styles.priceValue}>$0.00</div>
-                <div className={styles.totalValue}>$0.00</div>
+              <div className={styles.supplyInfo}>
+                <div className={styles.supplyShareValue}>{supplyShareLabel}</div>
+                <div className={styles.supplyShareLabel}>of supply</div>
               </div>
             </div>
           )

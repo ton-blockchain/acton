@@ -105,6 +105,18 @@ export class TonClient {
     const addresses = owner_address || jetton_address || []
     const paramName = owner_address ? "owner_address" : "jetton_address"
 
+    return this.fetchJettonWallets(paramName, addresses)
+  }
+
+  async getJettonWalletsByAddress(address: string[]): Promise<JettonWallet[]> {
+    if (address.length === 0) return []
+    return this.fetchJettonWallets("address", address)
+  }
+
+  private async fetchJettonWallets(
+    paramName: "address" | "owner_address" | "jetton_address",
+    addresses: string[],
+  ): Promise<JettonWallet[]> {
     const results = await Promise.all(
       addresses.map(async addr => {
         const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")

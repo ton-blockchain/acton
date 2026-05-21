@@ -1,4 +1,8 @@
 .historyHeaderRow {
+  border-bottom: 1px solid var(--tonscan-border) !important;
+}
+
+.historyHeaderGroup {
   border-bottom: none !important;
 }
 
@@ -33,10 +37,6 @@
   background-color: var(--tonscan-card-bg) !important;
   border: 1px solid var(--tonscan-border) !important;
   border-radius: 16px !important;
-}
-
-.tableCard thead {
-  border-bottom: 1px solid var(--tonscan-border);
 }
 
 .tabs {
@@ -236,34 +236,73 @@ th.valueContainer {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: 12px;
+  padding: 10px 12px;
   border-top: 1px solid var(--tonscan-border);
 }
 
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .paginationButton {
-  background: transparent;
+  min-height: 32px;
+  background: var(--tonscan-card-bg);
   border: 1px solid var(--litenode-border-control);
   color: var(--tonscan-text-primary);
-  padding: var(--spacing-xs);
+  padding: 0 10px;
   border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--transition-duration-fast);
+  gap: 6px;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
 }
 
 .paginationButton:hover:not(:disabled) {
   background-color: var(--litenode-control-hover);
+  border-color: var(--litenode-border-strong);
 }
 
 .paginationButton:disabled {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.paginationInfo {
-  font-size: var(--font-size-sm);
+.paginationPage {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.paginationPage:hover {
+  background: var(--litenode-control-hover);
+  color: var(--tonscan-text-primary);
+}
+
+.paginationPageActive {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-surface-active);
+  color: var(--tonscan-text-primary);
 }

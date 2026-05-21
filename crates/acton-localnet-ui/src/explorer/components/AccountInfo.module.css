@@ -58,9 +58,9 @@
 .addressValue {
   min-width: 0;
   flex: 1 1 auto;
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: 1.35;
   color: var(--tonscan-text-primary);
   word-break: break-all;
 }
@@ -201,7 +201,7 @@
 .realAddress {
   color: var(--tonscan-text-secondary);
   font-weight: 400;
-  font-size: var(--font-size-sm);
+  font-size: 0.95rem;
   margin-left: var(--spacing-xs);
 }
 

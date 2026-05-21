@@ -719,8 +719,36 @@
 
 .endpointRow {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast);
+}
+
+.endpointRow:hover {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-control-hover);
+}
+
+.endpointRow:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
+}
+
+.endpointText {
+  min-width: 0;
+  display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .endpointLabel,
@@ -731,8 +759,30 @@
 
 .endpointValue {
   color: var(--litenode-text);
-  font-size: 0.84rem;
-  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.endpointAction {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 10px;
+  color: var(--litenode-text-muted);
+  background: var(--litenode-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.endpointRow:hover .endpointAction {
+  color: var(--litenode-text);
+  border-color: var(--litenode-border-control);
 }
 
 .listTable {

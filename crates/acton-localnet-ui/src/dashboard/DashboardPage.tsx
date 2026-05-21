@@ -22,7 +22,14 @@ import {useLocation, useNavigate} from "react-router-dom"
 import type {TonClient} from "../explorer/api/client"
 import type {JettonMaster, LocalnetNodeInfo, NftItem, V3TransactionListItem} from "../explorer/api/types"
 
-import {formatAddress, formatNano, formatTimeAgo, hashToHex, parseAddress} from "../explorer/components/utils"
+import {
+  formatAddress,
+  formatDuration,
+  formatNano,
+  formatTimeAgo,
+  hashToHex,
+  parseAddress,
+} from "../explorer/components/utils"
 import {useAddressName} from "../explorer/hooks/useAddressBook"
 
 import styles from "./DashboardPage.module.css"
@@ -1088,7 +1095,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
                         {homeState.nodeInfo ? `#${homeState.nodeInfo.last_block_seqno}` : "—"}
                       </div>
                       <div className={styles.metricMeta}>
-                        {homeState.nodeInfo ? `${homeState.nodeInfo.uptime_seconds}s uptime` : "Waiting for node info"}
+                        {homeState.nodeInfo
+                          ? `${formatDuration(homeState.nodeInfo.uptime_seconds)} uptime`
+                          : "Waiting for node info"}
                       </div>
                     </CardContent>
                   </Card>
@@ -1109,10 +1118,21 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({children, client, t
                     </CardHeader>
                     <CardContent className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
                       {endpointRows.map(endpoint => (
-                        <div key={endpoint.label} className={styles.endpointRow}>
-                          <span className={styles.endpointLabel}>{endpoint.label}</span>
-                          <code className={styles.endpointValue}>{endpoint.value}</code>
-                        </div>
+                        <a
+                          key={endpoint.label}
+                          className={styles.endpointRow}
+                          href={endpoint.value}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <span className={styles.endpointText}>
+                            <span className={styles.endpointLabel}>{endpoint.label}</span>
+                            <span className={styles.endpointValue}>{endpoint.value}</span>
+                          </span>
+                          <span className={styles.endpointAction}>
+                            <ArrowUpRight size={14} />
+                          </span>
+                        </a>
                       ))}
                     </CardContent>
                   </Card>

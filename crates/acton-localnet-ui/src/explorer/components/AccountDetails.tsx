@@ -217,9 +217,18 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
 
-  const totalPages = Math.ceil(transactions.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
+  const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE))
+  const safeCurrentPage = Math.min(currentPage, totalPages)
+  const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [ownerAddress])
+
+  useEffect(() => {
+    setCurrentPage(page => Math.min(page, totalPages))
+  }, [totalPages])
 
   const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
   const messageNamesByAddress = useMemo(() => {
@@ -289,7 +298,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       {activeTab === "history" ? (
         <CardContent className={styles.historyContent}>
           <Table>
-            <TableHeader>
+            <TableHeader className={styles.historyHeaderGroup}>
               <TableRow className={styles.historyHeaderRow}>
                 <TableHead className={`${styles.tableHeader} ${styles.timeColumn}`}>Time</TableHead>
                 <TableHead className={`${styles.tableHeader} ${styles.actionColumn}`}>
@@ -397,25 +406,45 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 
           {totalPages > 1 && (
             <div className={styles.pagination}>
-              <button
-                type="button"
-                className={styles.paginationButton}
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className={styles.paginationInfo}>
-                Page {currentPage} of {totalPages}
-              </span>
-              <button
-                type="button"
-                className={styles.paginationButton}
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-              >
-                <ChevronRight size={16} />
-              </button>
+              <div className={styles.paginationControls}>
+                <button
+                  type="button"
+                  className={styles.paginationButton}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage === 1}
+                  aria-label="Previous page"
+                >
+                  <ChevronLeft size={16} />
+                  Previous
+                </button>
+                {Array.from({length: totalPages}, (_, index) => {
+                  const page = index + 1
+
+                  return (
+                    <button
+                      key={page}
+                      type="button"
+                      className={`${styles.paginationPage} ${
+                        page === safeCurrentPage ? styles.paginationPageActive : ""
+                      }`}
+                      onClick={() => setCurrentPage(page)}
+                      aria-current={page === safeCurrentPage ? "page" : undefined}
+                    >
+                      {page}
+                    </button>
+                  )
+                })}
+                <button
+                  type="button"
+                  className={styles.paginationButton}
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  aria-label="Next page"
+                >
+                  Next
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </CardContent>
@@ -430,7 +459,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       ) : activeTab === "holders" ? (
         <CardContent className={styles.historyContent}>
           <Table>
-            <TableHeader>
+            <TableHeader className={styles.historyHeaderGroup}>
               <TableRow className={styles.historyHeaderRow}>
                 <TableHead className={styles.tableHeader}>Owner</TableHead>
                 <TableHead className={styles.tableHeader}>Wallet</TableHead>
@@ -446,12 +475,19 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                 const symbol = jettonMaster?.jetton_content?.symbol || ""
 
                 return (
-                  <TableRow key={holder.address} className={styles.row}>
+                  <TableRow
+                    key={holder.address}
+                    className={`${styles.row} ${styles.clickableRow}`}
+                    onClick={() => onAddressClick?.(holder.owner)}
+                  >
                     <TableCell>
                       <button
                         type="button"
                         className={styles.address}
-                        onClick={() => onAddressClick?.(holder.owner)}
+                        onClick={e => {
+                          e.stopPropagation()
+                          onAddressClick?.(holder.owner)
+                        }}
                       >
                         <AddressLabel address={holder.owner} />
                       </button>
@@ -460,7 +496,10 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                       <button
                         type="button"
                         className={styles.address}
-                        onClick={() => onAddressClick?.(holder.address)}
+                        onClick={e => {
+                          e.stopPropagation()
+                          onAddressClick?.(holder.address)
+                        }}
                       >
                         <AddressLabel address={holder.address} />
                       </button>
