@@ -21,11 +21,12 @@ permissions: { }
 
 jobs:
   zizmor:
-    name: zizmor
+    name: Check Zizmor
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
       contents: read
+      security-events: write # upload SARIF report
 
     steps:
       - name: Checkout repository
