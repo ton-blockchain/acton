@@ -268,6 +268,7 @@ pub struct EmulateTraceRecord {
     pub raw_transaction: BocBytes,
     pub shard_account_before: BocBytes,
     pub shard_account: BocBytes,
+    pub parent_transaction: Option<u64>,
     pub code: Option<BocBytes>,
     pub vm_log: String,
     pub executor_logs: String,

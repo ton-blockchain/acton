@@ -27,7 +27,7 @@ import {addressFromSeed, formatAddress, isContract, parseAddress} from "./addres
 import {createContractHandle, type ContractHandle} from "./contract.js"
 import {ActonError, LocalnetApiError, errorMessage} from "./errors.js"
 import {LocalnetHttpClient} from "./http.js"
-import {startLocalnetProcess, waitForChildExit} from "./process.js"
+import {startLocalnetProcess} from "./process.js"
 import {LocalnetContractProvider} from "./provider.js"
 import {LocalnetSender} from "./sender.js"
 import {toContractState} from "./state.js"
@@ -168,16 +168,7 @@ export class Localnet {
     }
 
     const timeoutMs = options.timeoutMs ?? DEFAULT_CLOSE_TIMEOUT_MS
-    child.kill(options.signal ?? "SIGTERM")
-
-    await Promise.race([
-      waitForChildExit(child),
-      delay(timeoutMs).then(() => {
-        if (child.exitCode === null) {
-          child.kill("SIGKILL")
-        }
-      }),
-    ])
+    await terminateChild(child, options.signal ?? "SIGTERM", timeoutMs)
   }
 
   async sendBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
@@ -412,6 +403,43 @@ function registerAutoClose(child: ChildProcess): () => void {
   process.once("beforeExit", killChild)
   process.once("exit", killChild)
   return unregister
+}
+
+function terminateChild(
+  child: ChildProcess,
+  signal: NodeJS.Signals,
+  timeoutMs: number,
+): Promise<void> {
+  if (child.exitCode !== null) {
+    return Promise.resolve()
+  }
+
+  return new Promise(resolve => {
+    let settled = false
+    const timeout = setTimeout(() => {
+      if (child.exitCode === null) {
+        child.kill("SIGKILL")
+      }
+      finish()
+    }, timeoutMs)
+
+    const finish = (): void => {
+      if (settled) {
+        return
+      }
+      settled = true
+      clearTimeout(timeout)
+      child.off("exit", finish)
+      resolve()
+    }
+
+    timeout.unref()
+    child.once("exit", finish)
+    child.kill(signal)
+    if (child.exitCode !== null) {
+      finish()
+    }
+  })
 }
 
 function createStateSnapshotPath(): {readonly path: string; readonly cleanup: () => void} {

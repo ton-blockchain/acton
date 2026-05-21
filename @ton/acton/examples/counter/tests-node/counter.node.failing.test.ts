@@ -1,4 +1,5 @@
 import {
+  expect,
   expectFailedTx,
   expectSuccessfulDeploy,
   expectSuccessfulTx,
@@ -39,6 +40,13 @@ test("prints exit code mismatch for successful transaction", async ({localnet}) 
     to: contract.address,
     exitCode: Counter.Errors["Errors.NotOwner"],
   })
+})
+
+test("prints structured value assertion and captured output", () => {
+  console.log("stdout before value assertion")
+  console.error("stderr before value assertion")
+
+  expect({counter: 1n}).toEqual({counter: 2n})
 })
 
 async function setupTest({localnet}: ActonTestContext) {

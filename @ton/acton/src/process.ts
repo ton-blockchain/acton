@@ -55,14 +55,6 @@ export function buildStartArgs(port: number, options: StartLocalnetOptions): str
   return args
 }
 
-export function waitForChildExit(child: ChildProcess): Promise<void> {
-  return new Promise(resolve => {
-    child.once("exit", () => {
-      resolve()
-    })
-  })
-}
-
 async function findAvailablePort(): Promise<number> {
   return new Promise((resolve, reject) => {
     const server = createServer()

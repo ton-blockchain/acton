@@ -33,6 +33,17 @@ export type RegisteredTest = {
   readonly column: number
 }
 
+export class ActonAssertionError extends Error {
+  constructor(
+    readonly matcher: string,
+    readonly actual: unknown,
+    readonly expected: unknown,
+    message: string,
+  ) {
+    super(message)
+  }
+}
+
 const tests: RegisteredTest[] = []
 
 export function test(name: string, fn: ActonTestFunction): void {
@@ -56,15 +67,29 @@ export function expect<T>(actual: T): {
   return {
     toBe(expected: T): void {
       if (!Object.is(actual, expected)) {
-        throw new Error(`Expected ${formatValue(actual)} to be ${formatValue(expected)}`)
+        throw new ActonAssertionError(
+          "toBe",
+          actual,
+          expected,
+          `expect(<actual>).toBe(<expected>)`,
+        )
       }
     },
     toEqual(expected: T): void {
       if (!deepEqual(actual, expected)) {
-        throw new Error(`Expected ${formatValue(actual)} to equal ${formatValue(expected)}`)
+        throw new ActonAssertionError(
+          "toEqual",
+          actual,
+          expected,
+          `expect(<actual>).toEqual(<expected>)`,
+        )
       }
     },
   }
+}
+
+export function isActonAssertionError(error: unknown): error is ActonAssertionError {
+  return error instanceof ActonAssertionError
 }
 
 function locationFromStack(): {readonly row: number} {
@@ -75,15 +100,29 @@ function locationFromStack(): {readonly row: number} {
 }
 
 function deepEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(left) === JSON.stringify(right)
+  return formatValue(left) === formatValue(right)
 }
 
-function formatValue(value: unknown): string {
+export function formatValue(value: unknown): string {
   if (typeof value === "string") {
     return JSON.stringify(value)
   }
   if (typeof value === "bigint") {
     return `${value}n`
   }
+  if (value instanceof Error) {
+    return `${value.name}: ${value.message}`
+  }
+  if (typeof value === "object" && value !== null) {
+    try {
+      return JSON.stringify(value, jsonValueReplacer, 2)
+    } catch {
+      return Object.prototype.toString.call(value)
+    }
+  }
   return String(value)
+}
+
+function jsonValueReplacer(_key: string, nested: unknown): unknown {
+  return typeof nested === "bigint" ? `${nested}n` : nested
 }

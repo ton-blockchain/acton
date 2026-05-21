@@ -9,8 +9,8 @@ use super::{
 use crate::commands::build::{BuildCommandOptions, build_cmd};
 use crate::commands::common::error_fmt;
 use crate::context::{
-    AssertFailure, DisplayParam, KnownAddress, TransactionGenericAssertFailure,
-    TransactionNotFoundParams,
+    AssertDecimalFailure, AssertFailure, DisplayParam, KnownAddress,
+    TransactionGenericAssertFailure, TransactionNotFoundParams,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::formatter::FormatterContext;
@@ -129,6 +129,9 @@ pub(super) fn run_node_tests_for_file(
     worker: &Path,
     file: &Path,
 ) -> anyhow::Result<TestStats> {
+    let collect_node_traces = runner.config.save_test_trace.is_some()
+        || runner.config.snapshot.is_some()
+        || runner.config.baseline_snapshot.is_some();
     let output = Command::new("bun")
         .arg(worker)
         .arg(file)
@@ -144,11 +147,7 @@ pub(super) fn run_node_tests_for_file(
         )
         .env(
             "ACTON_NODE_TRACE",
-            if runner.config.save_test_trace.is_some() {
-                "1"
-            } else {
-                "0"
-            },
+            if collect_node_traces { "1" } else { "0" },
         )
         .envs(
             runner
@@ -258,12 +257,15 @@ fn run_reported_node_events(
                 id,
                 message,
                 stack,
+                stderr,
                 status,
+                stdout,
             } => {
                 let Some(test) = tests.iter().find(|test| test.id == id) else {
                     continue;
                 };
                 let mut report = base_report(test, &file, source_map.clone());
+                apply_node_report_config(runner, &mut report);
                 if runner.config.save_test_trace.is_some() {
                     report.trace_path = Some(super::trace::trace_file_name(&test.name));
                 }
@@ -273,6 +275,7 @@ fn run_reported_node_events(
                     NodeStatus::Passed => {
                         report.status = TestStatus::Passed;
                         stats.passed += 1;
+                        fill_passed_report_output(&mut report, stdout, stderr);
                     }
                     NodeStatus::Failed => {
                         report.status = TestStatus::Failed;
@@ -280,11 +283,11 @@ fn run_reported_node_events(
                         fill_failed_report(
                             runner,
                             &mut report,
-                            assertion,
+                            assertion.map(|assertion| *assertion),
                             message,
                             stack,
-                            raw_stdout.clone(),
-                            raw_stderr.clone(),
+                            stdout.unwrap_or_else(|| raw_stdout.clone()),
+                            stderr.unwrap_or_else(|| raw_stderr.clone()),
                         )?;
                     }
                 }
@@ -342,6 +345,34 @@ fn base_report(test: &TestDescriptor, file: &Path, source_map: Arc<SourceMap>) -
     }
 }
 
+const fn apply_node_report_config(runner: &TestRunner<'_>, report: &mut TestReport) {
+    report.backtrace = runner.config.backtrace;
+    report.show_bodies = runner.config.show_bodies;
+}
+
+fn fill_passed_report_output(
+    report: &mut TestReport,
+    stdout: Option<String>,
+    stderr: Option<String>,
+) {
+    let stdout = stdout.unwrap_or_default();
+    let stderr = stderr.unwrap_or_default();
+    if stdout.trim().is_empty() && stderr.trim().is_empty() {
+        return;
+    }
+
+    report.execution = Some(TestExecutionContext {
+        assert_failure: None,
+        expected_exit_code: 0,
+        failure: None,
+        fuzz: None,
+        gas_used: 0,
+        stderr,
+        stdout,
+        vm_log: None,
+    });
+}
+
 fn fill_failed_report(
     runner: &TestRunner<'_>,
     report: &mut TestReport,
@@ -353,31 +384,60 @@ fn fill_failed_report(
 ) -> anyhow::Result<()> {
     let context = empty_failure_context(runner);
 
-    if let Some(NodeAssertion::Transaction(assertion)) = assertion {
-        let failure =
-            transaction_assert_failure(assertion, &report.file_path, report.row, report.column)?;
-        let formatter = formatter_for_context(runner, &context);
-        report.message = failure.message();
-        report.details = failure.location().map(|l| l.format_full());
-        report.location = failure.location();
-        let detailed = formatter.format_detailed_assert_failure(&failure);
-        report.detailed_message = Some(FormatterContext::strip_ansi_text(&detailed));
-        if let AssertFailure::TransactionNotFound(tx_failure) = &failure {
-            report.failed_transactions = Some(formatter.parse_failed_transactions(&tx_failure.txs));
-            report.failed_transaction_context =
-                Some(formatter.get_failed_transaction_context(tx_failure));
+    match assertion {
+        Some(NodeAssertion::Transaction(assertion)) => {
+            let failure = transaction_assert_failure(
+                assertion,
+                &report.file_path,
+                report.row,
+                report.column,
+            )?;
+            let formatter = formatter_for_context(runner, &context);
+            report.message = failure.message();
+            report.details = failure.location().map(|l| l.format_full());
+            report.location = failure.location();
+            let detailed = formatter.format_detailed_assert_failure(&failure);
+            report.detailed_message = Some(FormatterContext::strip_ansi_text(&detailed));
+            if let AssertFailure::TransactionNotFound(tx_failure) = &failure {
+                report.failed_transactions =
+                    Some(formatter.parse_failed_transactions(&tx_failure.txs));
+                report.failed_transaction_context =
+                    Some(formatter.get_failed_transaction_context(tx_failure));
+            }
+            report.execution = Some(TestExecutionContext {
+                assert_failure: Some(failure),
+                expected_exit_code: 0,
+                failure: Some(context),
+                fuzz: None,
+                gas_used: 0,
+                stderr,
+                stdout,
+                vm_log: None,
+            });
+            return Ok(());
         }
-        report.execution = Some(TestExecutionContext {
-            assert_failure: Some(failure),
-            expected_exit_code: 0,
-            failure: Some(context),
-            fuzz: None,
-            gas_used: 0,
-            stderr,
-            stdout,
-            vm_log: None,
-        });
-        return Ok(());
+        Some(NodeAssertion::Value(assertion)) => {
+            let failure =
+                value_assert_failure(assertion, &report.file_path, report.row, report.column);
+            let formatter = formatter_for_context(runner, &context);
+            report.message = failure.message();
+            report.details = failure.location().map(|l| l.format_full());
+            report.location = failure.location();
+            let detailed = formatter.format_detailed_assert_failure(&failure);
+            report.detailed_message = Some(FormatterContext::strip_ansi_text(&detailed));
+            report.execution = Some(TestExecutionContext {
+                assert_failure: Some(failure),
+                expected_exit_code: 0,
+                failure: Some(context),
+                fuzz: None,
+                gas_used: 0,
+                stderr,
+                stdout,
+                vm_log: None,
+            });
+            return Ok(());
+        }
+        None => {}
     }
 
     report.message = message.or_else(|| Some("Node test failed".to_string()));
@@ -463,16 +523,52 @@ fn save_node_trace_records(
     test_name: &str,
     records: Vec<NodeTraceRecord>,
 ) -> anyhow::Result<()> {
+    let mut current_trace = Vec::new();
     for record in records {
-        runner.emulations.save_message(
-            test_name,
-            vec![SendMessageResult::Success(
-                node_trace_record_to_send_result(record)?,
-            )],
-        );
+        if record.parent_transaction.is_none() && !current_trace.is_empty() {
+            save_node_trace(runner, test_name, std::mem::take(&mut current_trace));
+        }
+        current_trace.push(node_trace_record_to_send_result(record)?);
+    }
+
+    if !current_trace.is_empty() {
+        save_node_trace(runner, test_name, current_trace);
     }
 
     Ok(())
+}
+
+fn save_node_trace(
+    runner: &mut TestRunner<'_>,
+    test_name: &str,
+    mut trace: Vec<SendMessageResultSuccess>,
+) {
+    link_node_trace_transactions(&mut trace);
+    runner.emulations.save_message(
+        test_name,
+        trace
+            .into_iter()
+            .map(SendMessageResult::Success)
+            .collect::<Vec<_>>(),
+    );
+}
+
+fn link_node_trace_transactions(trace: &mut [SendMessageResultSuccess]) {
+    let mut children_by_parent = FxHashMap::<u64, Vec<u64>>::default();
+    for result in trace.iter() {
+        if let Some(parent_lt) = result.parent_transaction {
+            children_by_parent
+                .entry(parent_lt)
+                .or_default()
+                .push(result.transaction.lt);
+        }
+    }
+
+    for result in trace.iter_mut() {
+        result.child_transactions = children_by_parent
+            .remove(&result.transaction.lt)
+            .unwrap_or_default();
+    }
 }
 
 fn node_trace_record_to_send_result(
@@ -494,7 +590,7 @@ fn node_trace_record_to_send_result(
         executor_logs: Arc::from(record.executor_logs.unwrap_or_default()),
         externals: Vec::new(),
         missing_libraries: FxHashSet::default(),
-        parent_transaction: None,
+        parent_transaction: record.parent_transaction,
         raw_transaction: Arc::from(record.raw_transaction),
         shard_account,
         shard_account_before,
@@ -598,14 +694,55 @@ fn transaction_assert_failure(
     ))
 }
 
+fn value_assert_failure(
+    assertion: NodeValueAssertion,
+    file: &Path,
+    fallback_row: usize,
+    fallback_column: usize,
+) -> AssertFailure {
+    let message = if assertion.message.is_empty() {
+        format!("expect(<actual>).{}(<expected>)", assertion.matcher)
+    } else {
+        assertion.message
+    };
+    AssertFailure::Decimal(AssertDecimalFailure {
+        left: assertion.actual,
+        right: assertion.expected,
+        message: Some(message),
+        location: node_location(
+            assertion.row,
+            assertion.column,
+            file,
+            fallback_row,
+            fallback_column,
+        ),
+    })
+}
+
 fn node_assertion_location(
     assertion: &NodeTransactionAssertion,
     file: &Path,
     fallback_row: usize,
     fallback_column: usize,
 ) -> Option<SourceLocation> {
-    let line = assertion.row.unwrap_or(fallback_row) as i64;
-    let column = assertion.column.unwrap_or(fallback_column) as i64;
+    node_location(
+        assertion.row,
+        assertion.column,
+        file,
+        fallback_row,
+        fallback_column,
+    )
+}
+
+fn node_location(
+    row: Option<usize>,
+    column: Option<usize>,
+    file: &Path,
+    fallback_row: usize,
+    fallback_column: usize,
+) -> Option<SourceLocation> {
+    let line = row.unwrap_or(fallback_row) as i64;
+    let column = column.unwrap_or(fallback_column) as i64;
     Some(SourceLocation {
         column,
         end_column: column,
@@ -771,13 +908,15 @@ enum NodeEvent {
     },
     #[serde(rename = "testFinished")]
     TestFinished {
-        assertion: Option<NodeAssertion>,
+        assertion: Option<Box<NodeAssertion>>,
         #[serde(rename = "durationMs")]
         duration_ms: f64,
         id: i32,
         message: Option<String>,
         stack: Option<String>,
+        stderr: Option<String>,
         status: NodeStatus,
+        stdout: Option<String>,
     },
     #[serde(rename = "testStarted")]
     TestStarted { id: i32 },
@@ -810,6 +949,7 @@ struct NodeTraceRecord {
     actions: Option<String>,
     code: Option<String>,
     executor_logs: Option<String>,
+    parent_transaction: Option<u64>,
     raw_transaction: String,
     shard_account: String,
     shard_account_before: String,
@@ -835,6 +975,8 @@ enum NodeStatus {
 enum NodeAssertion {
     #[serde(rename = "transaction")]
     Transaction(NodeTransactionAssertion),
+    #[serde(rename = "value")]
+    Value(NodeValueAssertion),
 }
 
 #[derive(Debug, Deserialize)]
@@ -846,6 +988,16 @@ struct NodeTransactionAssertion {
     message: String,
     row: Option<usize>,
     transactions: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct NodeValueAssertion {
+    actual: String,
+    column: Option<usize>,
+    expected: String,
+    matcher: String,
+    message: String,
+    row: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]

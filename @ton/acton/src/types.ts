@@ -97,6 +97,7 @@ export type LocalnetTraceRecord = {
   readonly rawTransaction: string
   readonly shardAccountBefore: string
   readonly shardAccount: string
+  readonly parentTransaction?: number
   readonly code?: string
   readonly vmLog: string
   readonly executorLogs?: string

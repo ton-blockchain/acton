@@ -8,7 +8,13 @@ import {pathToFileURL} from "node:url"
 import {Address, type Transaction} from "@ton/core"
 
 import {Localnet} from "./localnet.js"
-import {getRegisteredTests, isTransactionAssertionError, type RegisteredTest} from "./test.js"
+import {
+  formatValue,
+  getRegisteredTests,
+  isActonAssertionError,
+  isTransactionAssertionError,
+  type RegisteredTest,
+} from "./test.js"
 import type {TransactionMatch} from "./transactions.js"
 
 const EVENT_PREFIX = "__ACTON_NODE_EVENT__"
@@ -32,6 +38,8 @@ type WorkerEvent =
       readonly durationMs: number
       readonly message?: string
       readonly stack?: string
+      readonly stdout?: string
+      readonly stderr?: string
       readonly assertion?: SerializedAssertion
     }
   | {
@@ -51,15 +59,25 @@ type WorkerEvent =
     }
   | {readonly type: "fatal"; readonly message: string; readonly stack?: string}
 
-type SerializedAssertion = {
-  readonly type: "transaction"
-  readonly label: string
-  readonly transactions: readonly string[]
-  readonly match: SerializedTransactionMatch
-  readonly message: string
-  readonly row?: number
-  readonly column?: number
-}
+type SerializedAssertion =
+  | {
+      readonly type: "transaction"
+      readonly label: string
+      readonly transactions: readonly string[]
+      readonly match: SerializedTransactionMatch
+      readonly message: string
+      readonly row?: number
+      readonly column?: number
+    }
+  | {
+      readonly type: "value"
+      readonly matcher: string
+      readonly actual: string
+      readonly expected: string
+      readonly message: string
+      readonly row?: number
+      readonly column?: number
+    }
 
 type SerializedTransactionMatch = {
   readonly from?: string
@@ -78,6 +96,7 @@ type SerializedTraceRecord = {
   readonly rawTransaction: string
   readonly shardAccountBefore: string
   readonly shardAccount: string
+  readonly parentTransaction?: number
   readonly code?: string
   readonly vmLog: string
   readonly executorLogs?: string
@@ -90,6 +109,7 @@ type SerializedTreasuryRecord = {
 }
 
 const testFile = process.argv[2]
+const outputCapture = installOutputCapture()
 
 if (!testFile) {
   emit({message: "Missing test file path", type: "fatal"})
@@ -128,25 +148,32 @@ try {
 
     emit({id: registered.id, type: "testStarted"})
     const startedAt = performance.now()
+    const output = outputCapture.start()
     try {
       await registered.fn({localnet})
       emitDiagnosticRecords(registered.id, localnet)
+      const captured = output.stop()
       emit({
         durationMs: performance.now() - startedAt,
         id: registered.id,
+        stderr: captured.stderr,
         status: "passed",
+        stdout: captured.stdout,
         type: "testFinished",
       })
     } catch (error) {
       failed += 1
       emitDiagnosticRecords(registered.id, localnet)
+      const captured = output.stop()
       emit({
         assertion: serializeAssertion(error),
         durationMs: performance.now() - startedAt,
         id: registered.id,
         message: errorMessage(error),
         stack: errorStack(error),
+        stderr: captured.stderr,
         status: "failed",
+        stdout: captured.stdout,
         type: "testFinished",
       })
 
@@ -198,22 +225,33 @@ function filterTests(allTests: readonly RegisteredTest[]): readonly RegisteredTe
 }
 
 function emit(event: WorkerEvent): void {
-  process.stdout.write(`${EVENT_PREFIX}${JSON.stringify(event)}\n`)
+  outputCapture.writeEvent(`${EVENT_PREFIX}${JSON.stringify(event)}\n`)
 }
 
 function serializeAssertion(error: unknown): SerializedAssertion | undefined {
-  if (!isTransactionAssertionError(error)) {
-    return undefined
+  if (isActonAssertionError(error)) {
+    return {
+      actual: formatValue(error.actual),
+      expected: formatValue(error.expected),
+      matcher: error.matcher,
+      message: error.message,
+      ...locationFromStack(error.stack),
+      type: "value",
+    }
   }
 
-  return {
-    label: error.label,
-    match: serializeMatch(error.match),
-    message: error.message,
-    ...locationFromStack(error.stack),
-    transactions: error.transactions.map(transaction => serializeTransaction(transaction)),
-    type: "transaction",
+  if (isTransactionAssertionError(error)) {
+    return {
+      label: error.label,
+      match: serializeMatch(error.match),
+      message: error.message,
+      ...locationFromStack(error.stack),
+      transactions: error.transactions.map(transaction => serializeTransaction(transaction)),
+      type: "transaction",
+    }
   }
+
+  return undefined
 }
 
 function locationFromStack(stack: string | undefined): {
@@ -256,6 +294,105 @@ function serializeAddress(address: Address | string | undefined): string | undef
   return typeof address === "string"
     ? address
     : address.toString({bounceable: true, testOnly: false, urlSafe: true})
+}
+
+function installOutputCapture(): {
+  readonly start: () => {readonly stop: () => {readonly stdout: string; readonly stderr: string}}
+  readonly writeEvent: (line: string) => void
+} {
+  const originalStdoutWrite = process.stdout.write.bind(process.stdout)
+  const originalStderrWrite = process.stderr.write.bind(process.stderr)
+  const originalConsoleLog = console.log.bind(console)
+  const originalConsoleInfo = console.info.bind(console)
+  const originalConsoleWarn = console.warn.bind(console)
+  const originalConsoleError = console.error.bind(console)
+  let active: {stdout: string; stderr: string} | undefined
+
+  process.stdout.write = ((chunk: unknown, encoding?: unknown, callback?: unknown): boolean => {
+    if (active) {
+      active.stdout += chunkToString(chunk, encoding)
+      callWriteCallback(encoding, callback)
+      return true
+    }
+    return originalStdoutWrite(chunk as never, encoding as never, callback as never)
+  }) as typeof process.stdout.write
+
+  process.stderr.write = ((chunk: unknown, encoding?: unknown, callback?: unknown): boolean => {
+    if (active) {
+      active.stderr += chunkToString(chunk, encoding)
+      callWriteCallback(encoding, callback)
+      return true
+    }
+    return originalStderrWrite(chunk as never, encoding as never, callback as never)
+  }) as typeof process.stderr.write
+
+  console.log = (...args: unknown[]) => {
+    if (active) {
+      active.stdout += `${formatConsoleArgs(args)}\n`
+    } else {
+      originalConsoleLog(...args)
+    }
+  }
+  console.info = (...args: unknown[]) => {
+    if (active) {
+      active.stdout += `${formatConsoleArgs(args)}\n`
+    } else {
+      originalConsoleInfo(...args)
+    }
+  }
+  console.warn = (...args: unknown[]) => {
+    if (active) {
+      active.stderr += `${formatConsoleArgs(args)}\n`
+    } else {
+      originalConsoleWarn(...args)
+    }
+  }
+  console.error = (...args: unknown[]) => {
+    if (active) {
+      active.stderr += `${formatConsoleArgs(args)}\n`
+    } else {
+      originalConsoleError(...args)
+    }
+  }
+
+  return {
+    start() {
+      const capture = {stderr: "", stdout: ""}
+      active = capture
+      return {
+        stop() {
+          if (active === capture) {
+            active = undefined
+          }
+          return capture
+        },
+      }
+    },
+    writeEvent(line: string): void {
+      originalStdoutWrite(line)
+    },
+  }
+}
+
+function formatConsoleArgs(args: readonly unknown[]): string {
+  return args.map(arg => (typeof arg === "string" ? arg : formatValue(arg))).join(" ")
+}
+
+function chunkToString(chunk: unknown, encoding: unknown): string {
+  if (Buffer.isBuffer(chunk)) {
+    return chunk.toString(typeof encoding === "string" ? (encoding as BufferEncoding) : undefined)
+  }
+  return String(chunk)
+}
+
+function callWriteCallback(encoding: unknown, callback: unknown): void {
+  const cb = typeof encoding === "function" ? encoding : callback
+  if (typeof cb === "function") {
+    const writeCallback = cb as () => void
+    queueMicrotask(() => {
+      writeCallback()
+    })
+  }
 }
 
 function errorMessage(error: unknown): string {
