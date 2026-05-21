@@ -1806,6 +1806,48 @@ fn test_wrapper_output_dir_places_wrapper_in_directory() {
 }
 
 #[test]
+fn test_wrapper_output_dir_skips_implicit_stdlib_common_import() {
+    let project = ProjectBuilder::new("wrapper_output_dir_stdlib_common")
+        .contract(
+            "config",
+            r#"
+                import "storage"
+
+                contract Config {
+                    storage: ConfigStorage
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .file(
+            "contracts/storage",
+            r"
+                struct ConfigStorage {
+                    raw: dict
+                }
+            ",
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("config")
+        .wrapper_output_dir("config/wrappers")
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("config/wrappers/Config.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_output_dir_skips_implicit_stdlib_common_import/wrapper.tolk.txt",
+        );
+}
+
+#[test]
 fn test_wrapper_custom_output2() {
     let project = ProjectBuilder::new("wrapper_custom")
         .contract("my_contract", SIMPLE_CONTRACT)

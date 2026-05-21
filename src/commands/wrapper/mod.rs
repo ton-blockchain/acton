@@ -613,7 +613,10 @@ fn collect_wrapper_import_paths(
         }
     }
 
-    paths.into_iter().collect()
+    paths
+        .into_iter()
+        .filter(|path| !is_implicit_stdlib_common_path(path))
+        .collect()
 }
 
 fn collect_rendered_type_dependencies(
@@ -1289,11 +1292,29 @@ fn get_import_path(
     what: &Path,
     mappings: Option<&BTreeMap<String, String>>,
 ) -> PathBuf {
+    if is_stdlib_import_path(what) {
+        return what.to_path_buf();
+    }
+
     if let Some(mapped_import) = resolve_mapped_import(project_root, what, mappings) {
         return mapped_import;
     }
 
     get_relative_import(project_root, where_, what)
+}
+
+fn is_implicit_stdlib_common_path(path: &Path) -> bool {
+    let path = path.to_string_lossy().replace('\\', "/");
+    path == "@stdlib/common"
+        || path == "@stdlib/common.tolk"
+        || path.ends_with("/tolk-stdlib/common.tolk")
+}
+
+fn is_stdlib_import_path(path: &Path) -> bool {
+    path.components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .is_some_and(|component| component == "@stdlib")
 }
 
 fn resolve_mapped_import(
