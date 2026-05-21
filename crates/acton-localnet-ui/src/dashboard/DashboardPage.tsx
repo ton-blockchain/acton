@@ -8,8 +8,10 @@ import {
   Image,
   Link2,
   LayoutGrid,
+  Moon,
   Search,
   SquareStack,
+  Sun,
   Wallet,
 } from "lucide-react"
 import * as React from "react"
@@ -50,6 +52,8 @@ const nftPlaceholderImage = tokenPlaceholderImage
 
 interface DashboardPageProps {
   readonly client: TonClient
+  readonly theme: string
+  readonly setTheme: (theme: string) => void
 }
 
 interface HomeState {
@@ -115,7 +119,7 @@ function collectRecentAccounts(transactions: readonly V3TransactionListItem[]): 
   return accounts
 }
 
-export const DashboardPage: React.FC<DashboardPageProps> = ({client}) => {
+export const DashboardPage: React.FC<DashboardPageProps> = ({client, theme, setTheme}) => {
   const location = useLocation()
   const navigate = useNavigate()
   const {showToast} = useToast()
@@ -384,26 +388,45 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({client}) => {
 
             <div className={styles.navDivider} />
 
-            <div className={styles.navSection}>
-              {footerItems.map(item => {
-                const Icon = item.icon
+            <div className={styles.navFooter}>
+              <div className={styles.navSection}>
+                {footerItems.map(item => {
+                  const Icon = item.icon
 
-                return (
-                  <a
-                    key={item.label}
-                    className={styles.navItem}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <span className={styles.navItemMain}>
-                      <Icon size={18} />
-                      <span>{item.label}</span>
-                    </span>
-                    <ArrowUpRight size={14} />
-                  </a>
-                )
-              })}
+                  return (
+                    <a
+                      key={item.label}
+                      className={styles.navItem}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span className={styles.navItemMain}>
+                        <Icon size={18} />
+                        <span>{item.label}</span>
+                      </span>
+                      <ArrowUpRight size={14} />
+                    </a>
+                  )
+                })}
+              </div>
+
+              <button
+                type="button"
+                className={styles.themeSwitch}
+                aria-label="Toggle Theme"
+                data-theme-toggle=""
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+              >
+                <Sun
+                  fill="currentColor"
+                  className={`${styles.themeSwitchItem} ${theme === "light" ? styles.themeSwitchItemActive : ""}`}
+                />
+                <Moon
+                  fill="currentColor"
+                  className={`${styles.themeSwitchItem} ${theme === "dark" ? styles.themeSwitchItemActive : ""}`}
+                />
+              </button>
             </div>
           </nav>
         </div>

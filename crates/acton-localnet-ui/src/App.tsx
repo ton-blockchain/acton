@@ -139,34 +139,36 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
 
           <HeaderSearch />
 
-          <div className={styles.themeSection}>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-              className={styles.themeButton}
-              aria-label="Toggle theme"
-            >
-              <div className={styles.themeIconWrapper}>
-                <Sun
-                  className={`${styles.themeIcon} ${theme === "light" ? styles.active : ""}`}
-                  size={18}
-                />
-                <Moon
-                  className={`${styles.themeIcon} ${theme === "dark" ? styles.active : ""}`}
-                  size={18}
-                />
-              </div>
-            </button>
-          </div>
+          {isDashboardRoute ? undefined : (
+            <div className={styles.themeSection}>
+              <button
+                type="button"
+                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
+                className={styles.themeButton}
+                aria-label="Toggle theme"
+              >
+                <div className={styles.themeIconWrapper}>
+                  <Sun
+                    className={`${styles.themeIcon} ${theme === "light" ? styles.active : ""}`}
+                    size={18}
+                  />
+                  <Moon
+                    className={`${styles.themeIcon} ${theme === "dark" ? styles.active : ""}`}
+                    size={18}
+                  />
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </header>
       <main className={`${styles.main} ${isDashboardRoute ? styles.mainDashboard : ""}`}>
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          <Route path="/dashboard" element={<DashboardPage client={client} />} />
-          <Route path="/dashboard/faucet" element={<DashboardPage client={client} />} />
-          <Route path="/dashboard/tokens" element={<DashboardPage client={client} />} />
-          <Route path="/dashboard/nfts" element={<DashboardPage client={client} />} />
+          <Route path="/dashboard" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
+          <Route path="/dashboard/faucet" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
+          <Route path="/dashboard/tokens" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
+          <Route path="/dashboard/nfts" element={<DashboardPage client={client} theme={theme} setTheme={setTheme} />} />
           <Route path="/explorer" element={<ExplorerIndexPage />} />
           <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
           <Route path="/tokens" element={<TokensPage client={client} />} />
