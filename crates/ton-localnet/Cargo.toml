@@ -31,7 +31,11 @@ tracing = { workspace = true }
 rusqlite = { workspace = true }
 ton-indexer = { workspace = true }
 url = { workspace = true }
-include_dir = { workspace = true }
+include_dir = { workspace = true, optional = true }
+
+[features]
+default = ["ui"]
+ui = ["dep:include_dir"]
 
 [lints]
 workspace = true
