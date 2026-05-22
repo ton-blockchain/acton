@@ -17,6 +17,7 @@ import {useLocation, useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
+import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
 
 import {DashboardSearch} from "./DashboardSearch"
 import styles from "./DashboardPage.module.css"
@@ -59,7 +60,9 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
 }) => {
   const location = useLocation()
   const navigate = useNavigate()
+  const {forkNetwork} = useNetworkInfo()
   const [explorerPath, setExplorerPath] = React.useState(() => readExplorerLastPath())
+  const forkBadgeLabel = React.useMemo(() => formatForkNetworkLabel(forkNetwork), [forkNetwork])
 
   React.useEffect(() => {
     if (!location.pathname.startsWith("/explorer")) {
@@ -77,7 +80,12 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
         <div className={styles.workspaceHeader}>
           <span className={styles.workspaceMark} />
           <span className={styles.workspaceBody}>
-            <span className={styles.workspaceName}>TON Localnet</span>
+            <span className={styles.workspaceTitleRow}>
+              <span className={styles.workspaceName}>TON Localnet</span>
+              {forkBadgeLabel && (
+                <span className={styles.workspaceForkBadge}>{forkBadgeLabel}</span>
+              )}
+            </span>
             <span className={styles.workspaceMeta}>by Acton</span>
           </span>
         </div>
@@ -164,4 +172,13 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
       </div>
     </aside>
   )
+}
+
+function formatForkNetworkLabel(forkNetwork?: string): string | undefined {
+  const normalizedForkNetwork = forkNetwork?.trim()
+  if (!normalizedForkNetwork) {
+    return undefined
+  }
+
+  return `${normalizedForkNetwork.toLocaleLowerCase()} fork`
 }

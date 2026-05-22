@@ -1,6 +1,7 @@
 import type React from "react"
 
 import {useAddressName} from "../hooks/useAddressBook"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import {formatAddress} from "./utils"
 
@@ -17,12 +18,13 @@ export const AddressLabel: React.FC<AddressLabelProps> = ({
   fallback = "Unknown",
   className,
 }) => {
+  const addressFormat = useAddressFormat()
   const name = useAddressName(address)
 
   if (!address) {
     return <span className={className}>{fallback}</span>
   }
 
-  const label = name || formatAddress(address, shorten)
+  const label = name || formatAddress(address, shorten, addressFormat)
   return <span className={className}>{label}</span>
 }

@@ -17,6 +17,7 @@ import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {AccountDetails} from "../components/AccountDetails"
 import {normalizeAddress} from "../components/utils"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountPage.module.css"
 
@@ -30,6 +31,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const {address = ""} = useParams<{address: string}>()
   const navigate = useNavigate()
   const location = useLocation()
+  const addressFormat = useAddressFormat()
   const [accountState, setAccountState] = useState<FullAccountState | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -45,7 +47,10 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | undefined>()
 
-  const formattedAddress = useMemo(() => normalizeAddress(address), [address])
+  const formattedAddress = useMemo(
+    () => normalizeAddress(address, addressFormat),
+    [address, addressFormat],
+  )
 
   useEffect(() => {
     let isActive = true
@@ -148,7 +153,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   }, [client, formattedAddress])
 
   const handleSearch = (addr: string) => {
-    const finalAddr = addr ? normalizeAddress(addr) : ""
+    const finalAddr = addr ? normalizeAddress(addr, addressFormat) : ""
     if (finalAddr) {
       void navigate(`/explorer/address/${finalAddr}`)
     } else {

@@ -4,6 +4,7 @@ import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {ToastProvider} from "@acton/shared-ui"
 
 import {TonClient} from "./explorer/api/client"
+import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {DashboardPage} from "./dashboard/DashboardPage"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
@@ -46,9 +47,11 @@ export const App: React.FC = () => {
   return (
     <BrowserRouter>
       <ToastProvider>
-        <AddressBookProvider client={client}>
-          <AppContent client={client} theme={theme} setTheme={setTheme} />
-        </AddressBookProvider>
+        <NetworkInfoProvider client={client}>
+          <AddressBookProvider client={client}>
+            <AppContent client={client} theme={theme} setTheme={setTheme} />
+          </AddressBookProvider>
+        </NetworkInfoProvider>
       </ToastProvider>
     </BrowserRouter>
   )

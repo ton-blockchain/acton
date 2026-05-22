@@ -32,7 +32,8 @@ import {Link} from "react-router-dom"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {StartupWallet} from "../../explorer/api/types"
-import {formatAddress} from "../../explorer/components/utils"
+import {formatAddress, normalizeAddress} from "../../explorer/components/utils"
+import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {addStartupWalletToKit, createWalletKit, getWalletNetworkLabel} from "../../wallet/kit"
 import type {RuntimeWallet, StartupWalletRecord} from "../../wallet/types"
 import {isSupportedWalletVersion} from "../../wallet/types"
@@ -58,6 +59,7 @@ type WalletBalanceResult =
 
 export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
   const {showToast} = useToast()
+  const addressFormat = useAddressFormat()
   const [startupWallets, setStartupWallets] = React.useState<StartupWallet[]>([])
   const [walletKit, setWalletKit] = React.useState<ReturnType<typeof createWalletKit>>()
   const [runtimeWallets, setRuntimeWallets] = React.useState<RuntimeWallet[]>([])
@@ -674,6 +676,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                 <div className={styles.walletList}>
                   {runtimeWallets.map(wallet => {
                     const balanceState = walletBalances[wallet.id]
+                    const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
 
                     return (
                       <article key={wallet.id} className={styles.walletRow}>
@@ -690,30 +693,30 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                             <span className={styles.walletDetailsLine}>
                               <span className={styles.walletAddressCluster}>
                                 <span className={styles.walletAddress}>
-                                  {formatAddress(wallet.record.address)}
+                                  {formatAddress(walletAddress, true, addressFormat)}
                                 </span>
                                 <button
                                   type="button"
                                   className={`${styles.walletInlineAction} ${
-                                    copiedAddress === wallet.record.address
+                                    copiedAddress === walletAddress
                                       ? styles.walletInlineActionActive
                                       : ""
                                   }`}
-                                  onClick={() => void handleCopyAddress(wallet.record.address)}
+                                  onClick={() => void handleCopyAddress(walletAddress)}
                                   aria-label={
-                                    copiedAddress === wallet.record.address
+                                    copiedAddress === walletAddress
                                       ? "Address copied"
                                       : "Copy address"
                                   }
                                 >
-                                  {copiedAddress === wallet.record.address ? (
+                                  {copiedAddress === walletAddress ? (
                                     <Check size={13} />
                                   ) : (
                                     <Copy size={13} />
                                   )}
                                 </button>
                                 <Link
-                                  to={`/explorer/address/${wallet.record.address}`}
+                                  to={`/explorer/address/${walletAddress}`}
                                   className={styles.walletInlineAction}
                                   aria-label={`Open ${wallet.record.name} in Explorer`}
                                 >
@@ -878,6 +881,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
             <span className={styles.label}>Connect with</span>
             {runtimeWallets.map(wallet => {
               const isSelected = wallet.id === selectedConnectWallet?.id
+              const walletAddress = normalizeAddress(wallet.record.address, addressFormat)
               return (
                 <button
                   key={wallet.id}
@@ -888,7 +892,8 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                   <span>
                     <span className={styles.pickerTitle}>{wallet.record.name}</span>
                     <span className={styles.pickerSubtitle}>
-                      {formatAddress(wallet.record.address)} · {getWalletNetworkLabel()}
+                      {formatAddress(walletAddress, true, addressFormat)} ·{" "}
+                      {getWalletNetworkLabel()}
                     </span>
                   </span>
                   <span className={styles.radio}>{isSelected && <Check size={14} />}</span>
@@ -946,7 +951,7 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                 <span className={styles.messageIndex}>#{index + 1}</span>
                 <div>
                   <CopyableAddress
-                    address={message.address}
+                    address={normalizeAddress(message.address, addressFormat)}
                     copiedAddress={copiedAddress}
                     onCopy={handleCopyAddress}
                   />

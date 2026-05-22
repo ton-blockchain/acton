@@ -27,8 +27,13 @@ import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import type {V3Transaction} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {hashToHex, normalizeAddress} from "../components/utils"
+import {
+  formatAddress as formatDisplayAddress,
+  hashToHex,
+  normalizeAddress,
+} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./TransactionPage.module.css"
 
@@ -92,9 +97,10 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const [loadingFlow, setLoadingFlow] = useState(false)
   const {fetchName} = useAddressBook()
+  const addressFormat = useAddressFormat()
 
   const handleContractClick = (address: string) => {
-    const formattedAddr = normalizeAddress(address)
+    const formattedAddr = normalizeAddress(address, addressFormat)
     void navigate(`/explorer/address/${encodeURIComponent(formattedAddr)}`)
   }
 
@@ -156,11 +162,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           await Promise.all(
             requestedAddresses.map(async addr => {
               const letter = String.fromCodePoint(nextLetterCode++)
-              const displayAddr = normalizeAddress(addr)
+              const displayAddr = normalizeAddress(addr, addressFormat)
               const customName = await fetchName(addr)
               const abi = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
               contractsMap.set(addr, {
-                displayName: customName || fmt.formatAddress(displayAddr),
+                displayName: customName || formatDisplayAddress(displayAddr, true, addressFormat),
                 address: Address.parse(addr),
                 letter,
                 abi,
@@ -225,7 +231,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [client, fetchName, hash])
+  }, [addressFormat, client, fetchName, hash])
 
   if (loading) {
     return (
@@ -250,7 +256,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
 
   const firstTrace = traces[0]
   const traceAddress = firstTrace?.address?.toString() ?? ""
-  const traceAddressDisplay = normalizeAddress(traceAddress)
+  const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
 
   return (
     <div className={styles.container}>

@@ -45,13 +45,34 @@ export function parseAddress(address: string): Address | undefined {
   }
 }
 
-export function toTestnetAddress(address: string): string | undefined {
-  const parsed = parseAddress(address)
-  return parsed ? parsed.toString({testOnly: true}) : undefined
+export interface AddressFormatOptions {
+  readonly testOnly?: boolean
 }
 
-export function normalizeAddress(address: string): string {
-  return toTestnetAddress(address) ?? address
+const defaultAddressFormat: Required<AddressFormatOptions> = {
+  testOnly: true,
+}
+
+function getAddressFormatOptions(options?: AddressFormatOptions): Required<AddressFormatOptions> {
+  return {
+    testOnly: options?.testOnly ?? defaultAddressFormat.testOnly,
+  }
+}
+
+export function toDisplayAddress(
+  address: string,
+  options?: AddressFormatOptions,
+): string | undefined {
+  const parsed = parseAddress(address)
+  return parsed ? parsed.toString(getAddressFormatOptions(options)) : undefined
+}
+
+export function toTestnetAddress(address: string): string | undefined {
+  return toDisplayAddress(address, {testOnly: true})
+}
+
+export function normalizeAddress(address: string, options?: AddressFormatOptions): string {
+  return toDisplayAddress(address, options) ?? address
 }
 
 export function isSameAddress(a: string, b: string): boolean {
@@ -97,12 +118,16 @@ export function formatDuration(seconds: number): string {
   return `${Math.floor(seconds / 86_400)}d`
 }
 
-export function formatAddress(address: string, shorten: boolean = true): string {
+export function formatAddress(
+  address: string,
+  shorten: boolean = true,
+  options?: AddressFormatOptions,
+): string {
   if (!address) return "Unknown"
 
   let displayAddress = address
   try {
-    displayAddress = Address.parse(address).toString({testOnly: true})
+    displayAddress = Address.parse(address).toString(getAddressFormatOptions(options))
   } catch {
     // If parsing fails, use original address
   }

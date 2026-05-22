@@ -59,6 +59,13 @@
   flex: 1 1 auto;
 }
 
+.workspaceTitleRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .workspaceName {
   min-width: 0;
   color: var(--litenode-text);
@@ -67,6 +74,27 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspaceForkBadge {
+  max-width: 116px;
+  height: 18px;
+  padding: 0 7px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 999px;
+  color: var(--litenode-text-muted);
+  background: var(--litenode-surface-raised);
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.66rem;
+  font-weight: 650;
+  line-height: 1;
 }
 
 .workspaceMeta {

@@ -6,6 +6,7 @@ import {useNavigate} from "react-router-dom"
 import type {TonClient} from "../explorer/api/client"
 import type {JettonMaster, NftItem} from "../explorer/api/types"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
+import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import {NFT_PLACEHOLDER_IMAGE, TOKEN_PLACEHOLDER_IMAGE} from "./constants"
 import {contentString, matchesQuery, shortHash, isTextEntryTarget} from "./dashboardUtils"
@@ -82,6 +83,7 @@ const quickSearchResults: readonly SearchResult[] = [
 
 export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
   const navigate = useNavigate()
+  const addressFormat = useAddressFormat()
   const [isSearchMounted, setIsSearchMounted] = React.useState(false)
   const [isSearchOpen, setIsSearchOpen] = React.useState(false)
   const [searchQuery, setSearchQuery] = React.useState("")
@@ -115,12 +117,12 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
       })
     }
 
-    const address = parseAddress(trimmed)?.toString({testOnly: true})
+    const address = parseAddress(trimmed)?.toString(addressFormat)
     if (address) {
       results.push({
         id: `address-${address}`,
         title: "Open address",
-        description: formatAddress(address, false),
+        description: formatAddress(address, false, addressFormat),
         href: `/explorer/address/${encodeURIComponent(address)}`,
         icon: CircleUserRound,
       })
@@ -173,7 +175,7 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
     }
 
     return results
-  }, [searchAssetsState.nfts, searchAssetsState.tokens, searchQuery])
+  }, [addressFormat, searchAssetsState.nfts, searchAssetsState.tokens, searchQuery])
 
   const measureSearchOrigin = React.useCallback(() => {
     const rect = searchButtonRef.current?.getBoundingClientRect()

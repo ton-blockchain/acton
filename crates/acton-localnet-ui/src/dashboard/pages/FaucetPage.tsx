@@ -4,6 +4,7 @@ import {Button, Input, useToast} from "@acton/shared-ui"
 
 import type {TonClient} from "../../explorer/api/client"
 import {formatAddress, parseAddress} from "../../explorer/components/utils"
+import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {QUICK_AMOUNTS} from "../constants"
 import {parseTonAmount} from "../dashboardUtils"
 
@@ -15,6 +16,7 @@ interface FaucetPageProps {
 
 export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
   const {showToast} = useToast()
+  const addressFormat = useAddressFormat()
   const [address, setAddress] = React.useState("")
   const [amount, setAmount] = React.useState("1")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -41,7 +43,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       return
     }
 
-    const normalized = parsedAddress.toString({testOnly: true})
+    const normalized = parsedAddress.toString(addressFormat)
     setIsSubmitting(true)
 
     try {
@@ -49,7 +51,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       showToast({
         variant: "success",
         title: "Transfer sent",
-        description: `Sent ${amount.trim()} TON to ${formatAddress(normalized)}.`,
+        description: `Sent ${amount.trim()} TON to ${formatAddress(normalized, true, addressFormat)}.`,
       })
     } catch (submitError) {
       showToast({

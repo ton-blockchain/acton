@@ -1,7 +1,8 @@
 import * as React from "react"
 
-import {formatAddress, parseAddress} from "../explorer/components/utils"
+import {formatAddress, normalizeAddress, parseAddress} from "../explorer/components/utils"
 import {useAddressName} from "../explorer/hooks/useAddressBook"
+import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
 import styles from "./DashboardPage.module.css"
 
@@ -16,18 +17,27 @@ export const HomeAddressLabel: React.FC<HomeAddressLabelProps> = ({
   fallback = "Unknown",
   className,
 }) => {
+  const addressFormat = useAddressFormat()
   const normalizedAddress = React.useMemo(() => {
-    const parsed = address ? parseAddress(address) : undefined
-    return parsed?.toString({testOnly: true})
-  }, [address])
+    if (!address) {
+      return
+    }
+
+    const parsed = parseAddress(address)
+    if (!parsed) {
+      return
+    }
+
+    return normalizeAddress(address, addressFormat)
+  }, [address, addressFormat])
   const name = useAddressName(normalizedAddress ?? "")
 
   if (!normalizedAddress) {
     return <span className={className}>{fallback}</span>
   }
 
-  const shortAddress = formatAddress(normalizedAddress)
-  const fullAddress = formatAddress(normalizedAddress, false)
+  const shortAddress = formatAddress(normalizedAddress, true, addressFormat)
+  const fullAddress = formatAddress(normalizedAddress, false, addressFormat)
 
   if (!name) {
     return (

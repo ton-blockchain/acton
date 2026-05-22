@@ -6,9 +6,10 @@ import {useEffect, useRef, useState} from "react"
 import type {FullAccountState, JettonMaster, JettonWallet} from "../api/types"
 import {TonClient} from "../api/client"
 import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
-import {formatAddress, formatNano} from "./utils"
+import {formatAddress, formatNano, normalizeAddress} from "./utils"
 
 interface AccountInfoProps {
   readonly address: string
@@ -34,6 +35,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   const editInputRef = useRef<HTMLInputElement>(null)
   const {setAddressName} = useAddressBook()
   const resolvedName = useAddressName(address)
+  const addressFormat = useAddressFormat()
+  const displayAddress = normalizeAddress(address, addressFormat)
 
   const [firstMaster, setFirstMaster] = useState<JettonMaster | undefined>()
 
@@ -88,7 +91,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   const tonBalance = formatNano(state.balance)
 
   const copyToClipboard = () => {
-    void navigator.clipboard.writeText(address)
+    void navigator.clipboard.writeText(displayAddress)
     setCopied(true)
   }
 
@@ -139,7 +142,9 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                   Cancel
                 </button>
               </div>
-              <div className={styles.renameMeta}>{formatAddress(address, false)}</div>
+              <div className={styles.renameMeta}>
+                {formatAddress(displayAddress, false, addressFormat)}
+              </div>
             </div>
           ) : (
             <div className={styles.addressRow}>
@@ -147,10 +152,12 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                 {customName ? (
                   <span className={styles.customName}>
                     {customName}{" "}
-                    <span className={styles.realAddress}>({formatAddress(address, true)})</span>
+                    <span className={styles.realAddress}>
+                      ({formatAddress(displayAddress, true, addressFormat)})
+                    </span>
                   </span>
                 ) : (
-                  formatAddress(address, false)
+                  formatAddress(displayAddress, false, addressFormat)
                 )}
               </div>
               <button

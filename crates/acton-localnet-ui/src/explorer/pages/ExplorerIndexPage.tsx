@@ -1,18 +1,20 @@
-import {Address} from "@ton/core"
 import {AlertCircle, History, Search, X} from "lucide-react"
 import * as React from "react"
 import {useCallback, useEffect, useState} from "react"
 import {useNavigate} from "react-router-dom"
 
+import {normalizeAddress, parseAddress} from "../components/utils"
 import {
   EXPLORER_HISTORY_STORAGE_KEY,
   readExplorerInput,
   writeExplorerInput,
 } from "../explorerResume"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./ExplorerIndexPage.module.css"
 
 export const ExplorerIndexPage: React.FC = () => {
+  const addressFormat = useAddressFormat()
   const [input, setInput] = useState(() => readExplorerInput())
   const [history, setHistory] = useState<string[]>([])
   const [isFocused, setIsFocused] = useState(false)
@@ -56,18 +58,20 @@ export const ExplorerIndexPage: React.FC = () => {
       const trimmed = address.trim()
       if (!trimmed) return
 
-      try {
-        Address.parse(trimmed)
-        setError(undefined)
-        writeExplorerInput(trimmed)
-        addToHistory(trimmed)
-        setShowHistoryDropdown(false)
-        void navigate(`/explorer/address/${trimmed}`)
-      } catch {
+      const parsedAddress = parseAddress(trimmed)
+      if (!parsedAddress) {
         setError("Invalid address, only standard internal address is allowed")
+        return
       }
+
+      const displayAddress = normalizeAddress(trimmed, addressFormat)
+      setError(undefined)
+      writeExplorerInput(displayAddress)
+      addToHistory(displayAddress)
+      setShowHistoryDropdown(false)
+      void navigate(`/explorer/address/${displayAddress}`)
     },
-    [addToHistory, navigate],
+    [addToHistory, addressFormat, navigate],
   )
 
   return (
@@ -125,7 +129,9 @@ export const ExplorerIndexPage: React.FC = () => {
                     onClick={() => handleSearch(addr)}
                   >
                     <History size={16} className={styles.historyItemIcon} aria-hidden="true" />
-                    <span className={styles.historyAddr}>{addr}</span>
+                    <span className={styles.historyAddr}>
+                      {normalizeAddress(addr, addressFormat)}
+                    </span>
                   </button>
                   <button
                     type="button"
