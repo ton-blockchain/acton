@@ -10,8 +10,8 @@ use super::handlers::{
     get_traces, get_transactions, get_transactions_by_message_v3, get_transactions_std,
     get_transactions_v3, json_rpc, load_state, lookup_block, pack_address, register_compiler_abis,
     run_get_method, run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash,
-    send_message_v3, set_address_name, set_shard_account, set_state_source, try_locate_result_tx,
-    try_locate_source_tx, try_locate_tx, unpack_address,
+    send_internal_message, send_message_v3, set_address_name, set_shard_account, set_state_source,
+    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::ServerState;
 use axum::{
@@ -112,6 +112,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/acton_getStateSource", get(get_state_source))
         .route("/acton_setStateSource", post(set_state_source))
         .route("/acton_setShardAccount", post(set_shard_account))
+        .route("/acton_sendInternalMessage", post(send_internal_message))
         .route("/acton_getStartupWallets", get(get_startup_wallets))
         .route("/acton_nodeInfo", get(get_status));
 

@@ -1,0 +1,46 @@
+{
+  "acton_send": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "@type": "ok",
+      "hash": "[HASH]"
+    }
+  },
+  "json_rpc_send_boc": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "sendBoc accepts only external-in messages",
+    "id": "send",
+    "jsonrpc": "2.0",
+    "ok": false
+  },
+  "json_rpc_send_boc_return_hash": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "sendBoc accepts only external-in messages",
+    "id": "send-return-hash",
+    "jsonrpc": "2.0",
+    "ok": false
+  },
+  "json_rpc_send_boc_return_hash_status": 500,
+  "json_rpc_send_boc_status": 500,
+  "message": {
+    "code": 500,
+    "error": "sendBoc accepts only external-in messages"
+  },
+  "message_status": 500,
+  "send_boc": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "sendBoc accepts only external-in messages",
+    "ok": false
+  },
+  "send_boc_return_hash": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "sendBoc accepts only external-in messages",
+    "ok": false
+  },
+  "target_balance": "50000000"
+}

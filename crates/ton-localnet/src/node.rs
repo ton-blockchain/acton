@@ -271,25 +271,56 @@ impl Node {
         &mut self,
         boc: BocBytes,
     ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
-        // 1. Validate & Store
+        self.send_boc_to_queue(
+            boc,
+            MessageKind::ExternalIn,
+            "sendBoc accepts only external-in messages",
+        )
+    }
+
+    pub fn send_internal_boc(
+        &mut self,
+        boc: BocBytes,
+    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+        self.send_boc_to_queue(
+            boc,
+            MessageKind::Internal,
+            "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    fn send_boc_to_queue(
+        &mut self,
+        boc: BocBytes,
+        expected_kind: MessageKind,
+        kind_error: &'static str,
+    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+        // 1. Validate
         let hash = compute_boc_hash(&boc)?;
         tracing::info!(
             "send_boc: msg_hash={}, current_queue={}",
             hash.to_hex(),
             self.pool.external.len() + self.pool.internal.len()
         );
-        if self.cas.get(&hash).is_none() {
-            self.cas.put(boc.clone(), hash);
+        let (msg_meta, kind) = parse_msg_meta_with_kind(&boc, hash)?;
+        if kind != expected_kind {
+            anyhow::bail!(kind_error);
         }
 
-        // 2. Parse minimal meta
-        let msg_meta = parse_msg_meta(&boc, hash)?;
+        // 2. Store
+        if self.cas.get(&hash).is_none() {
+            self.cas.put(boc, hash);
+        }
 
         // 3. Register MsgMeta
         self.history.msg_by_hash.insert(hash, msg_meta);
 
         // 4. Enqueue
-        self.pool.push_external(hash);
+        match kind {
+            MessageKind::ExternalIn => self.pool.push_external(hash),
+            MessageKind::Internal => self.pool.push_internal(hash),
+            MessageKind::ExternalOut => unreachable!("external-out messages are rejected above"),
+        }
 
         // 5. Mine one
         let (block_meta, tx_meta) = self.mine_one()?;
@@ -1867,12 +1898,24 @@ fn collect_code_data_cells(
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MessageKind {
+    Internal,
+    ExternalIn,
+    ExternalOut,
+}
+
 fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
+    Ok(parse_msg_meta_with_kind(boc, hash)?.0)
+}
+
+fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let cell = Boc::decode(boc)?;
     let msg = cell.parse::<Message<'_>>()?;
 
-    let (src, dst, value, bounce, created_lt, created_at) = match msg.info {
+    let (kind, src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
+            MessageKind::Internal,
             Some(convert_addr(&info.src)),
             Some(convert_addr(&info.dst)),
             Some(info.value.tokens.into()),
@@ -1880,8 +1923,17 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
             Some(info.created_lt),
             Some(info.created_at),
         ),
-        MsgInfo::ExtIn(info) => (None, Some(convert_addr(&info.dst)), None, None, None, None),
+        MsgInfo::ExtIn(info) => (
+            MessageKind::ExternalIn,
+            None,
+            Some(convert_addr(&info.dst)),
+            None,
+            None,
+            None,
+            None,
+        ),
         MsgInfo::ExtOut(info) => (
+            MessageKind::ExternalOut,
             Some(convert_addr(&info.src)),
             None,
             None,
@@ -1891,16 +1943,19 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
         ),
     };
 
-    Ok(MsgMeta {
-        msg_hash: hash,
-        msg_boc_hash: hash,
-        src,
-        dst,
-        value,
-        bounce,
-        created_lt,
-        created_at,
-    })
+    Ok((
+        MsgMeta {
+            msg_hash: hash,
+            msg_boc_hash: hash,
+            src,
+            dst,
+            value,
+            bounce,
+            created_lt,
+            created_at,
+        },
+        kind,
+    ))
 }
 
 const fn convert_addr(addr: &IntAddr) -> Addr {

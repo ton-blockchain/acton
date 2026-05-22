@@ -1,10 +1,11 @@
 use super::utils::handle_result;
+use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
 use crate::node;
 use crate::server::StartupWallet;
 use crate::server::models::{
     FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
-    SetAddressNameRequest, SetShardAccountRequest, StatePathRequest,
+    SendBocRequest, SetAddressNameRequest, SetShardAccountRequest, StatePathRequest,
 };
 use crate::types::Hash256;
 use axum::{Json, extract::State};
@@ -103,6 +104,17 @@ pub async fn set_shard_account(
     handle_result(
         node.set_shard_account(payload.address, payload.shard_account),
         |()| Value::Null,
+    )
+    .await
+}
+
+pub async fn send_internal_message(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<SendBocRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.send_internal_boc(payload.boc),
+        v2::map_send_boc_return_hash,
     )
     .await
 }

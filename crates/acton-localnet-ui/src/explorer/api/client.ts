@@ -322,6 +322,15 @@ export class TonClient {
     })
   }
 
+  async sendInternalMessage(boc: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_sendInternalMessage")
+    await this.request<unknown>(url, "Failed to send internal message", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({boc}),
+    })
+  }
+
   getEndpoints(): {readonly apiV2: string; readonly apiV3: string; readonly admin: string} {
     return {
       apiV2: this.buildUrl(this.v2BaseUrl, "").toString().replace(/\/$/, ""),

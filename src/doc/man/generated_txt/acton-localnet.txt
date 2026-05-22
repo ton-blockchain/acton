@@ -143,6 +143,18 @@ CONTROL ENDPOINTS
        o  POST /acton_loadState with {"path":"snapshots/localnet.json"}
           replaces the current node state with a JSON state snapshot
 
+       o  POST /acton_setShardAccount with
+          {"address":"<ADDR>","shard_account":"<BASE64_BOC>"} replaces the
+          selected account state with a base64-encoded ShardAccount BOC
+
+       o  POST /acton_sendInternalMessage with {"boc":"<BASE64_BOC>"} sends a
+          base64-encoded internal message BOC through the local internal queue
+
+       TonCenter-compatible message endpoints such as /api/v2/sendBoc and
+       /api/v3/message accept external-in messages only. Use
+       /acton_sendInternalMessage when local tooling needs to inject a raw
+       internal message.
+
        Control endpoints are not authenticated and are intended only for local
        development. Do not expose the localnet server publicly.
 

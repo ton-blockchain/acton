@@ -177,6 +177,10 @@ pub(crate) enum Request {
         boc: BocBytes,
         resp: oneshot::Sender<anyhow::Result<LocalnetBlockTransactions>>,
     },
+    SendInternalBoc {
+        boc: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<LocalnetBlockTransactions>>,
+    },
     GetAddressInformation {
         address: Addr,
         seqno: Option<u32>,
@@ -391,6 +395,19 @@ impl Localnet {
             .into();
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendBoc { boc, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn send_internal_boc(
+        &self,
+        boc_str: String,
+    ) -> anyhow::Result<LocalnetBlockTransactions> {
+        let boc = base64::engine::general_purpose::STANDARD
+            .decode(&boc_str)
+            .context("Invalid BOC base64")?
+            .into();
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
     }
 
@@ -952,6 +969,10 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_send_boc(node, boc);
             let _ = resp.send(res);
         }
+        Request::SendInternalBoc { boc, resp } => {
+            let res = handle_send_internal_boc(node, boc);
+            let _ = resp.send(res);
+        }
         Request::GetAddressInformation {
             address,
             seqno,
@@ -1194,7 +1215,24 @@ fn process_loop_request(node: &mut Node, req: Request) {
 fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {
     let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?;
     let (msg_hash, tx_hash, seqno, _) = node.send_boc(boc)?;
+    build_send_boc_response(node, msg_hash, msg_hash_norm, tx_hash, seqno)
+}
 
+fn handle_send_internal_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetBlockTransactions> {
+    let (msg_hash, tx_hash, seqno, _) = node.send_internal_boc(boc)?;
+    build_send_boc_response(node, msg_hash, None, tx_hash, seqno)
+}
+
+fn build_send_boc_response(
+    node: &Node,
+    msg_hash: Hash256,
+    msg_hash_norm: Option<Hash256>,
+    tx_hash: Hash256,
+    seqno: Seqno,
+) -> anyhow::Result<LocalnetBlockTransactions> {
     let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
         anyhow::bail!("Transaction not found after mining")
     };
