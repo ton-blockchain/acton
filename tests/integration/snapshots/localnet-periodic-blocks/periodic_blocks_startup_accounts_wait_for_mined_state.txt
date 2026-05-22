@@ -1,0 +1,4 @@
+{
+  "has_mined_blocks": true,
+  "startup_wallet_count": 1
+}

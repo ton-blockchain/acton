@@ -279,7 +279,18 @@ impl Node {
                 .insert(key, tx_meta.tx_hash);
             self.indexes
                 .tx_by_block
-                .insert(tx_meta.block_seqno, tx_meta.tx_hash);
+                .entry(tx_meta.block_seqno)
+                .or_default()
+                .push(tx_meta.tx_hash);
+        }
+
+        for tx_hashes in self.indexes.tx_by_block.values_mut() {
+            tx_hashes.sort_by_key(|hash| {
+                self.history
+                    .tx_by_hash
+                    .get(hash)
+                    .map_or(0, |tx_meta| tx_meta.lt)
+            });
         }
     }
 }

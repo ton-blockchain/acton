@@ -47,6 +47,18 @@ Path to a SQLite database for persistent node state.
 Maximum \fB/api\fR requests per second to simulate provider rate limits.
 .RE
 .sp
+\fB\-\-periodic\-blocks\fR
+.RS 4
+Produce blocks on a timer instead of immediately after every transaction.
+.RE
+.sp
+\fB\-\-block\-interval\fR \fIduration\fR
+.RS 4
+Interval for timed block production. Bare numbers are milliseconds; \fBms\fR, \fBs\fR,
+and \fBm\fR suffixes are supported. Supplying this option also enables periodic
+block production.
+.RE
+.sp
 \fB\-\-load\-state\fR \fIpath\fR
 .RS 4
 Load Localnet state from a JSON snapshot before startup.
@@ -165,6 +177,21 @@ fallback is \fB5411\fR
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-rate\-limit\fR applies to \fB/api/*\fR endpoints, not admin endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'by default, Localnet uses instant block production and mines a block when a
+transaction is accepted
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-periodic\-blocks\fR switches Localnet to timed block production, closer to a
+real node: accepted messages wait in the queue, empty blocks can be produced,
+and one block can include multiple transactions
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'the default periodic block interval is \fB500ms\fR
 .RE
 .sp
 .RS 4
@@ -315,7 +342,17 @@ acton localnet start \-\-accounts deployer,user \-\-db\-path build/localnet.db
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Inspect a running localnet:
+\h'-04' 6.\h'+01'Start with timed block production:
+.sp
+.RS 4
+.nf
+acton localnet start \-\-periodic\-blocks \-\-block\-interval 500ms
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Inspect a running localnet:
 .sp
 .RS 4
 .nf

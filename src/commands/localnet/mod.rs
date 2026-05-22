@@ -14,7 +14,7 @@ use ton::ton_wallet::WalletVersion;
 use ton_localnet::node::StateSource;
 use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
-use ton_localnet::{Localnet, ServerArgs, StartupWallet, run_server};
+use ton_localnet::{BlockProductionMode, Localnet, ServerArgs, StartupWallet, run_server};
 use ton_retrace::Network;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellSliceParts};
@@ -38,6 +38,7 @@ pub async fn localnet_start_cmd(
     rate_limit: Option<u32>,
     load_state: Option<String>,
     dump_state: Option<String>,
+    block_production: BlockProductionMode,
 ) -> anyhow::Result<()> {
     if load_state.is_some() && db_path.is_some() {
         anyhow::bail!("--load-state cannot be used together with --db-path for now");
@@ -57,7 +58,11 @@ pub async fn localnet_start_cmd(
         (StateSource::Local, None)
     };
 
-    let node = Arc::new(Localnet::new(state_source, db_path.clone()));
+    let node = Arc::new(Localnet::with_block_production(
+        state_source,
+        db_path.clone(),
+        block_production,
+    ));
     if let Some(path) = load_state.as_deref() {
         node.load_state(path.to_owned())
             .await
@@ -138,6 +143,9 @@ async fn setup_startup_accounts(
         node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
             .await
             .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
+        wait_for_startup_wallet_balance(node, &address, STARTUP_ACCOUNT_TOPUP_NANOTONS)
+            .await
+            .with_context(|| format!("Timed out waiting for wallet '{wallet_name}' top-up"))?;
 
         let wallet_state = node
             .get_address_state(address.clone(), None)
@@ -156,6 +164,9 @@ async fn setup_startup_accounts(
             node.send_boc(deploy_boc)
                 .await
                 .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
+            wait_for_startup_wallet_state(node, &address, AccountStatus::Active)
+                .await
+                .with_context(|| format!("Timed out waiting for wallet '{wallet_name}' deploy"))?;
             println!(
                 "       {} wallet {} {}",
                 "Ready".green().bold(),
@@ -176,6 +187,40 @@ async fn setup_startup_accounts(
     }
 
     Ok(startup_wallets)
+}
+
+async fn wait_for_startup_wallet_balance(
+    node: &Arc<Localnet>,
+    address: &str,
+    min_balance: u128,
+) -> anyhow::Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        if node.get_address_balance(address.to_owned(), None).await? >= min_balance {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!("wallet balance did not reach {min_balance}");
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
+}
+
+async fn wait_for_startup_wallet_state(
+    node: &Arc<Localnet>,
+    address: &str,
+    expected_state: AccountStatus,
+) -> anyhow::Result<()> {
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    loop {
+        if node.get_address_state(address.to_owned(), None).await? == expected_state {
+            return Ok(());
+        }
+        if tokio::time::Instant::now() >= deadline {
+            anyhow::bail!("wallet state did not become {expected_state}");
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
+    }
 }
 
 const fn wallet_version_to_string(version: WalletVersion) -> &'static str {

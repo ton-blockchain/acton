@@ -188,6 +188,8 @@ pub struct BlockMeta {
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub tx_hash: Hash256,
+    #[serde(default)]
+    pub tx_hashes: Vec<Hash256>,
     pub block_boc_hash: Hash256,
 }
 
@@ -201,6 +203,17 @@ impl BlockMeta {
             root_hash: self.block_boc_hash,
             file_hash: self.block_boc_hash,
         }
+    }
+
+    #[must_use]
+    pub fn transaction_hashes(&self) -> Vec<Hash256> {
+        if !self.tx_hashes.is_empty() {
+            return self.tx_hashes.clone();
+        }
+        if self.tx_hash.0 == [0; 32] {
+            return Vec::new();
+        }
+        vec![self.tx_hash]
     }
 }
 
@@ -425,7 +438,7 @@ pub struct ReverseLtKey(pub core::cmp::Reverse<Lt>, pub Hash256);
 
 pub struct Indexes {
     pub tx_by_account: HashMap<Addr, BTreeMap<ReverseLtKey, Hash256>>,
-    pub tx_by_block: HashMap<Seqno, Hash256>,
+    pub tx_by_block: HashMap<Seqno, Vec<Hash256>>,
 }
 
 impl Default for Indexes {

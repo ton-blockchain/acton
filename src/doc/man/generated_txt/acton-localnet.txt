@@ -37,6 +37,15 @@ SUBCOMMANDS
               Maximum /api requests per second to simulate provider rate
               limits.
 
+          --periodic-blocks
+              Produce blocks on a timer instead of immediately after every
+              transaction.
+
+          --block-interval duration
+              Interval for timed block production. Bare numbers are
+              milliseconds; ms, s, and m suffixes are supported. Supplying this
+              option also enables periodic block production.
+
           --load-state path
               Load Localnet state from a JSON snapshot before startup.
 
@@ -128,6 +137,15 @@ RUNTIME MODEL
 
        o  --rate-limit applies to /api/* endpoints, not admin endpoints
 
+       o  by default, Localnet uses instant block production and mines a block
+          when a transaction is accepted
+
+       o  --periodic-blocks switches Localnet to timed block production, closer
+          to a real node: accepted messages wait in the queue, empty blocks can
+          be produced, and one block can include multiple transactions
+
+       o  the default periodic block interval is 500ms
+
        o  --dump-state writes a snapshot during graceful shutdown
 
 CONTROL ENDPOINTS
@@ -217,7 +235,11 @@ EXAMPLES
 
               acton localnet start --accounts deployer,user --db-path build/localnet.db
 
-       6. Inspect a running localnet:
+       6. Start with timed block production:
+
+              acton localnet start --periodic-blocks --block-interval 500ms
+
+       7. Inspect a running localnet:
 
               acton localnet status --json
 

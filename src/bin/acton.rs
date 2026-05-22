@@ -53,9 +53,11 @@ use std::fmt::Write as _;
 use std::fs::OpenOptions;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::time::Duration;
 use std::{env, fs, process};
 use tasm_core::printer::FormatOptions;
 use tolk_compiler::SourceMap;
+use ton_localnet::{BlockProductionMode, DEFAULT_BLOCK_PRODUCTION_INTERVAL};
 
 #[derive(Parser)]
 #[command(
@@ -1078,6 +1080,18 @@ pub enum LocalnetCommand {
             help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
+        #[arg(
+            long,
+            help = "Produce localnet blocks on a timer instead of immediately after every transaction"
+        )]
+        periodic_blocks: bool,
+        #[arg(
+            long,
+            value_name = "DURATION",
+            value_parser = parse_localnet_block_interval,
+            help = "Block interval for --periodic-blocks (default: 500ms, accepts ms/s/m or bare milliseconds)"
+        )]
+        block_interval: Option<Duration>,
         #[arg(
             long,
             help = "Load Localnet state from JSON snapshot before startup",
@@ -2304,6 +2318,8 @@ fn main() {
                 accounts,
                 db_path,
                 rate_limit,
+                periodic_blocks,
+                block_interval,
                 load_state,
                 dump_state,
             } => {
@@ -2314,6 +2330,13 @@ fn main() {
                     accounts,
                     rate_limit,
                 );
+                let block_production = if periodic_blocks || block_interval.is_some() {
+                    BlockProductionMode::Interval {
+                        block_time: block_interval.unwrap_or(DEFAULT_BLOCK_PRODUCTION_INTERVAL),
+                    }
+                } else {
+                    BlockProductionMode::Instant
+                };
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
@@ -2328,6 +2351,7 @@ fn main() {
                         resolved_localnet.rate_limit,
                         load_state,
                         dump_state,
+                        block_production,
                     )
                     .await
                 })
@@ -2455,6 +2479,36 @@ struct ResolvedLocalnetSettings {
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
     resolve_localnet_settings(cli_port, None, None, None, None).port
+}
+
+fn parse_localnet_block_interval(value: &str) -> Result<Duration, String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err("duration cannot be empty".to_owned());
+    }
+
+    let (number, multiplier) = if let Some(number) = value.strip_suffix("ms") {
+        (number, Duration::from_millis(1))
+    } else if let Some(number) = value.strip_suffix('s') {
+        (number, Duration::from_secs(1))
+    } else if let Some(number) = value.strip_suffix('m') {
+        (number, Duration::from_secs(60))
+    } else {
+        (value, Duration::from_millis(1))
+    };
+
+    let amount = number
+        .trim()
+        .parse::<u64>()
+        .map_err(|_| format!("invalid duration `{value}`"))?;
+    if amount == 0 {
+        return Err("duration must be greater than zero".to_owned());
+    }
+
+    let amount = u32::try_from(amount).map_err(|_| "duration is too large".to_owned())?;
+    multiplier
+        .checked_mul(amount)
+        .ok_or_else(|| "duration is too large".to_owned())
 }
 
 fn resolve_localnet_settings(
@@ -2885,6 +2939,33 @@ fn parse_minimum_percent(raw: &str, kind: &str, flag: &str) -> Result<f64, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn localnet_block_interval_parser_accepts_supported_units() {
+        assert_eq!(
+            parse_localnet_block_interval("500ms").expect("ms duration must parse"),
+            Duration::from_millis(500)
+        );
+        assert_eq!(
+            parse_localnet_block_interval("2s").expect("seconds duration must parse"),
+            Duration::from_secs(2)
+        );
+        assert_eq!(
+            parse_localnet_block_interval("3m").expect("minutes duration must parse"),
+            Duration::from_secs(180)
+        );
+        assert_eq!(
+            parse_localnet_block_interval("250").expect("bare duration must parse as ms"),
+            Duration::from_millis(250)
+        );
+    }
+
+    #[test]
+    fn localnet_block_interval_parser_rejects_zero_and_invalid_values() {
+        assert!(parse_localnet_block_interval("0ms").is_err());
+        assert!(parse_localnet_block_interval("abc").is_err());
+        assert!(parse_localnet_block_interval("").is_err());
+    }
 
     fn test_settings_to_config_with_ui_trace_default(
         settings: &TestSettings,

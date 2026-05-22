@@ -51,6 +51,16 @@ Path to a SQLite database for persistent node state.
 Maximum `/api` requests per second to simulate provider rate limits.
 {{/option}}
 
+{{#option "`--periodic-blocks`" }}
+Produce blocks on a timer instead of immediately after every transaction.
+{{/option}}
+
+{{#option "`--block-interval` _duration_" }}
+Interval for timed block production. Bare numbers are milliseconds; `ms`, `s`,
+and `m` suffixes are supported. Supplying this option also enables periodic
+block production.
+{{/option}}
+
 {{#option "`--load-state` _path_" }}
 Load Localnet state from a JSON snapshot before startup.
 {{/option}}
@@ -160,6 +170,12 @@ one-off overrides or CI.
 - when `--port` and `[localnet].port` are both absent, the current runtime
   fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
+- by default, Localnet uses instant block production and mines a block when a
+  transaction is accepted
+- `--periodic-blocks` switches Localnet to timed block production, closer to a
+  real node: accepted messages wait in the queue, empty blocks can be produced,
+  and one block can include multiple transactions
+- the default periodic block interval is `500ms`
 - `--dump-state` writes a snapshot during graceful shutdown
 
 ## Control Endpoints
@@ -243,7 +259,13 @@ development. Do not expose the localnet server publicly.
    acton localnet start --accounts deployer,user --db-path build/localnet.db
    ```
 
-6. Inspect a running localnet:
+6. Start with timed block production:
+
+   ```bash
+   acton localnet start --periodic-blocks --block-interval 500ms
+   ```
+
+7. Inspect a running localnet:
 
    ```bash
    acton localnet status --json

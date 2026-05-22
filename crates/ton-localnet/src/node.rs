@@ -6,8 +6,8 @@ use crate::storage::{
 };
 use crate::storage::{
     AccountDelta, AccountMeta, AccountStatePreview, AccountStatus, BlockMeta, CellStore, Globals,
-    History, Indexes, LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey,
-    TraceNode, TransactionInfo, TxMeta,
+    History, Indexes, LatestState, MessageInfo, MessagePool, MsgMeta, ReverseLtKey, TraceNode,
+    TransactionInfo, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
@@ -21,7 +21,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
-use tycho_types::cell::{CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::{
     AccountState, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
     OwnedMessage, ShardAccount, StdAddr, StdAddrFormat,
@@ -55,6 +55,21 @@ pub const GIVER_ADDR: Addr = Addr {
 };
 
 pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
+const MAX_TRANSACTIONS_PER_BLOCK: usize = 1024;
+
+struct PendingTransactionCommit {
+    tx_meta: TxMeta,
+    delta: AccountDelta,
+    out_msg_hashes: Vec<Hash256>,
+    msg_to_tx: Vec<(Hash256, Hash256)>,
+    old_account_boc: BocBytes,
+    new_account_boc: Option<BocBytes>,
+}
+
+struct PendingBlockCommit {
+    block_meta: BlockMeta,
+    transactions: Vec<PendingTransactionCommit>,
+}
 
 impl Node {
     pub fn new(
@@ -130,8 +145,9 @@ impl Node {
             }
 
             // Load transactions into indexes
-            let mut stmt =
-                conn.prepare("SELECT hash, data, account, lt, seqno FROM transactions")?;
+            let mut stmt = conn.prepare(
+                "SELECT hash, data, account, lt, seqno FROM transactions ORDER BY seqno ASC, lt ASC",
+            )?;
             let tx_iter = stmt.query_map([], |row| {
                 let hash_bytes: Vec<u8> = row.get(0)?;
                 let data: Vec<u8> = row.get(1)?;
@@ -165,7 +181,7 @@ impl Node {
                     .entry(addr)
                     .or_default()
                     .insert(key, hash);
-                indexes.tx_by_block.insert(seqno, hash);
+                indexes.tx_by_block.entry(seqno).or_default().push(hash);
             }
 
             // Load accounts
@@ -295,10 +311,44 @@ impl Node {
         expected_kind: MessageKind,
         kind_error: &'static str,
     ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+        let hash = self.enqueue_boc_to_queue(boc, expected_kind, kind_error)?;
+
+        let (block_meta, tx_meta) = self.mine_one()?;
+
+        Ok((
+            hash,
+            tx_meta.tx_hash,
+            block_meta.seqno,
+            tx_meta.out_msg_hashes,
+        ))
+    }
+
+    pub fn enqueue_boc(&mut self, boc: BocBytes) -> anyhow::Result<Hash256> {
+        self.enqueue_boc_to_queue(
+            boc,
+            MessageKind::ExternalIn,
+            "sendBoc accepts only external-in messages",
+        )
+    }
+
+    pub fn enqueue_internal_boc(&mut self, boc: BocBytes) -> anyhow::Result<Hash256> {
+        self.enqueue_boc_to_queue(
+            boc,
+            MessageKind::Internal,
+            "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    fn enqueue_boc_to_queue(
+        &mut self,
+        boc: BocBytes,
+        expected_kind: MessageKind,
+        kind_error: &'static str,
+    ) -> anyhow::Result<Hash256> {
         // 1. Validate
         let hash = compute_boc_hash(&boc)?;
         tracing::info!(
-            "send_boc: msg_hash={}, current_queue={}",
+            "enqueue_boc: msg_hash={}, current_queue={}",
             hash.to_hex(),
             self.pool.external.len() + self.pool.internal.len()
         );
@@ -322,18 +372,105 @@ impl Node {
             MessageKind::ExternalOut => unreachable!("external-out messages are rejected above"),
         }
 
-        // 5. Mine one
-        let (block_meta, tx_meta) = self.mine_one()?;
-
-        Ok((
-            hash,
-            tx_meta.tx_hash,
-            block_meta.seqno,
-            tx_meta.out_msg_hashes,
-        ))
+        Ok(hash)
     }
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
+        let Some((block_meta, tx_metas)) = self.mine_block_with_limit(1, false)? else {
+            anyhow::bail!("Queue empty");
+        };
+        let Some(tx_meta) = tx_metas.into_iter().next() else {
+            anyhow::bail!("No transaction mined");
+        };
+        Ok((block_meta, tx_meta))
+    }
+
+    pub fn mine_block(&mut self) -> anyhow::Result<Option<(BlockMeta, Vec<TxMeta>)>> {
+        self.mine_block_with_limit(MAX_TRANSACTIONS_PER_BLOCK, false)
+    }
+
+    pub fn produce_block(&mut self) -> anyhow::Result<(BlockMeta, Vec<TxMeta>)> {
+        self.mine_block_with_limit(MAX_TRANSACTIONS_PER_BLOCK, true)?
+            .context("Block production returned no block")
+    }
+
+    fn mine_block_with_limit(
+        &mut self,
+        max_transactions: usize,
+        allow_empty: bool,
+    ) -> anyhow::Result<Option<(BlockMeta, Vec<TxMeta>)>> {
+        if !allow_empty && !self.has_pending_messages() {
+            return Ok(None);
+        }
+
+        let seqno = self.globals.head_seqno + 1;
+        let gen_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32;
+        let mut transactions = Vec::new();
+
+        while transactions.len() < max_transactions && self.has_pending_messages() {
+            match self.execute_next_message(seqno, gen_utime) {
+                Ok(transaction) => {
+                    self.apply_transaction_effects(&transaction);
+                    transactions.push(transaction);
+                }
+                Err(err) if transactions.is_empty() => return Err(err),
+                Err(err) => {
+                    tracing::error!(
+                        "Failed to mine a message in block {} after {} transactions: {:?}",
+                        seqno,
+                        transactions.len(),
+                        err
+                    );
+                    break;
+                }
+            }
+        }
+
+        if transactions.is_empty() && !allow_empty {
+            return Ok(None);
+        }
+
+        let tx_hashes = transactions
+            .iter()
+            .map(|tx| tx.tx_meta.tx_hash)
+            .collect::<Vec<_>>();
+        let tx_hash = tx_hashes.first().copied().unwrap_or(Hash256([0; 32]));
+        let block_boc = create_dev_block_boc(seqno, &tx_hashes)?;
+        let block_hash = compute_boc_hash(&block_boc)?;
+        self.cas.put(block_boc, block_hash);
+
+        let block_meta = BlockMeta {
+            seqno,
+            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
+            gen_utime,
+            start_lt: transactions
+                .first()
+                .map_or(self.globals.global_lt, |tx| tx.tx_meta.lt),
+            end_lt: transactions
+                .last()
+                .map_or(self.globals.global_lt, |tx| tx.tx_meta.lt),
+            tx_hash,
+            tx_hashes,
+            block_boc_hash: block_hash,
+        };
+
+        let tx_metas = transactions
+            .iter()
+            .map(|tx| tx.tx_meta.clone())
+            .collect::<Vec<_>>();
+        self.apply_commit(PendingBlockCommit {
+            block_meta: block_meta.clone(),
+            transactions,
+        })?;
+
+        Ok(Some((block_meta, tx_metas)))
+    }
+
+    fn execute_next_message(
+        &mut self,
+        seqno: Seqno,
+        gen_utime: u32,
+    ) -> anyhow::Result<PendingTransactionCommit> {
         // 1. Select message
         let msg_hash = self
             .pool
@@ -345,6 +482,7 @@ impl Node {
             .history
             .msg_by_hash
             .get(&msg_hash)
+            .cloned()
             .context("Msg meta missing")?;
         let msg_boc = self
             .cas
@@ -361,7 +499,6 @@ impl Node {
         // 4. Allocate LT & time
         let lt = self.globals.global_lt + self.globals.lt_step;
         self.globals.global_lt = lt;
-        let gen_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32;
 
         // 5. Execute
         let config_boc = self
@@ -443,22 +580,6 @@ impl Node {
             self.history.msg_by_hash.insert(h, out_meta);
         }
 
-        // 8. Build dev block
-        let seqno = self.globals.head_seqno + 1;
-        let block_boc = create_dev_block_boc(seqno, tx_hash)?;
-        let block_hash = compute_boc_hash(&block_boc)?;
-        self.cas.put(block_boc, block_hash);
-
-        let block_meta = BlockMeta {
-            seqno,
-            prev_seqno: if seqno > 1 { Some(seqno - 1) } else { None },
-            gen_utime,
-            start_lt: lt,
-            end_lt: lt,
-            tx_hash,
-            block_boc_hash: block_hash,
-        };
-
         let compute_exit_code = exec_result.compute_exit_code();
         let action_result_code = exec_result.action_result_code();
 
@@ -511,26 +632,49 @@ impl Node {
             new_meta,
         };
 
-        // 10. Commit
-        let pending = PendingCommit {
-            block_meta: block_meta.clone(),
-            tx_meta: tx_meta.clone(),
+        Ok(PendingTransactionCommit {
+            tx_meta,
             delta,
             out_msg_hashes,
             msg_to_tx: vec![(msg_hash, tx_hash)],
-        };
+            old_account_boc: shard_account_boc,
+            new_account_boc: exec_result.new_account_boc,
+        })
+    }
 
-        self.apply_commit(pending)?;
-        self.update_public_libraries_from_account_diff(
-            &dst,
-            Some(&shard_account_boc),
-            exec_result.new_account_boc.as_ref(),
-            lt,
-        )?;
+    fn apply_transaction_effects(&mut self, transaction: &PendingTransactionCommit) {
+        if let Some(new_meta) = &transaction.delta.new_meta {
+            self.latest
+                .accounts
+                .insert(transaction.delta.addr, new_meta.clone());
+        } else {
+            self.latest.accounts.remove(&transaction.delta.addr);
+        }
 
-        self.detect_assets(&dst)?;
+        if let Err(err) = self.update_public_libraries_from_account_diff(
+            &transaction.delta.addr,
+            Some(&transaction.old_account_boc),
+            transaction.new_account_boc.as_ref(),
+            transaction.tx_meta.lt,
+        ) {
+            tracing::error!(
+                "Failed to update public libraries for account {}: {:?}",
+                transaction.delta.addr,
+                err
+            );
+        }
 
-        Ok((block_meta, tx_meta))
+        if let Err(err) = self.detect_assets(&transaction.delta.addr) {
+            tracing::error!(
+                "Failed to detect assets for account {}: {:?}",
+                transaction.delta.addr,
+                err
+            );
+        }
+
+        for h in &transaction.out_msg_hashes {
+            self.pool.push_internal(*h);
+        }
     }
 
     fn detect_assets(&mut self, addr: &Addr) -> anyhow::Result<()> {
@@ -1058,7 +1202,7 @@ impl Node {
 
     fn extract_public_libraries_from_shard_account(
         shard_account_boc: &BocBytes,
-    ) -> anyhow::Result<HashMap<Hash256, tycho_types::cell::Cell>> {
+    ) -> anyhow::Result<HashMap<Hash256, Cell>> {
         let cell = Boc::decode(shard_account_boc).context("Failed to decode shard account BOC")?;
         let shard_account = cell
             .parse::<ShardAccount>()
@@ -1097,11 +1241,11 @@ impl Node {
         Ok(result)
     }
 
-    fn apply_commit(&mut self, pending: PendingCommit) -> anyhow::Result<()> {
+    fn apply_commit(&mut self, pending: PendingBlockCommit) -> anyhow::Result<()> {
         tracing::info!(
-            "Applying block commit: seqno={}, tx_hash={}",
+            "Applying block commit: seqno={}, transactions={}",
             pending.block_meta.seqno,
-            pending.tx_meta.tx_hash.to_hex()
+            pending.transactions.len()
         );
 
         // Persistent storage
@@ -1115,47 +1259,40 @@ impl Node {
                 params![pending.block_meta.seqno, block_data],
             )?;
 
-            // Save transaction
-            let tx_data = serde_json::to_vec(&pending.tx_meta)?;
-            conn.execute(
-                "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![
-                    pending.tx_meta.tx_hash.0.to_vec(),
-                    tx_data,
-                    pending.tx_meta.account.addr.to_vec(),
-                    pending.tx_meta.lt,
-                    pending.block_meta.seqno
-                ],
-            )?;
-
-            // Save account state
-            if let Some(new_meta) = &pending.delta.new_meta {
-                let account_data = serde_json::to_vec(new_meta)?;
+            for transaction in &pending.transactions {
+                // Save transaction
+                let tx_data = serde_json::to_vec(&transaction.tx_meta)?;
                 conn.execute(
-                    "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                    params![pending.delta.addr.addr.to_vec(), account_data],
+                    "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
+                    params![
+                        transaction.tx_meta.tx_hash.0.to_vec(),
+                        tx_data,
+                        transaction.tx_meta.account.addr.to_vec(),
+                        transaction.tx_meta.lt,
+                        pending.block_meta.seqno
+                    ],
                 )?;
-            }
 
-            // Save messages
-            for h in &pending.out_msg_hashes {
-                if let Some(msg_meta) = self.history.msg_by_hash.get(h) {
-                    let msg_data = serde_json::to_vec(msg_meta)?;
+                // Save account state
+                if let Some(new_meta) = &transaction.delta.new_meta {
+                    let account_data = serde_json::to_vec(new_meta)?;
                     conn.execute(
-                        "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
-                        params![h.0.to_vec(), msg_data],
+                        "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
+                        params![transaction.delta.addr.addr.to_vec(), account_data],
                     )?;
                 }
-            }
-        }
 
-        // Apply delta
-        if let Some(new_meta) = &pending.delta.new_meta {
-            self.latest
-                .accounts
-                .insert(pending.delta.addr, new_meta.clone());
-        } else {
-            self.latest.accounts.remove(&pending.delta.addr);
+                // Save messages
+                for h in &transaction.out_msg_hashes {
+                    if let Some(msg_meta) = self.history.msg_by_hash.get(h) {
+                        let msg_data = serde_json::to_vec(msg_meta)?;
+                        conn.execute(
+                            "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
+                            params![h.0.to_vec(), msg_data],
+                        )?;
+                    }
+                }
+            }
         }
 
         // History
@@ -1169,32 +1306,33 @@ impl Node {
         }
         // seqno is 1-based, index is seqno-1
         if seqno > 0 {
-            self.history.deltas_by_seqno[seqno as usize - 1].push(pending.delta);
+            self.history.deltas_by_seqno[seqno as usize - 1]
+                .extend(pending.transactions.iter().map(|tx| tx.delta.clone()));
         }
 
-        self.history
-            .tx_by_hash
-            .insert(pending.tx_meta.tx_hash, pending.tx_meta.clone());
+        let mut block_tx_hashes = Vec::with_capacity(pending.transactions.len());
+        for transaction in pending.transactions {
+            self.history
+                .tx_by_hash
+                .insert(transaction.tx_meta.tx_hash, transaction.tx_meta.clone());
 
-        for (msg, tx) in pending.msg_to_tx {
-            self.history.msg_to_tx.insert(msg, tx);
+            for (msg, tx) in transaction.msg_to_tx {
+                self.history.msg_to_tx.insert(msg, tx);
+            }
+
+            // Indexes
+            let key = ReverseLtKey(
+                cmp::Reverse(transaction.tx_meta.lt),
+                transaction.tx_meta.tx_hash,
+            );
+            self.indexes
+                .tx_by_account
+                .entry(transaction.tx_meta.account)
+                .or_default()
+                .insert(key, transaction.tx_meta.tx_hash);
+            block_tx_hashes.push(transaction.tx_meta.tx_hash);
         }
-
-        // Indexes
-        let key = ReverseLtKey(cmp::Reverse(pending.tx_meta.lt), pending.tx_meta.tx_hash);
-        self.indexes
-            .tx_by_account
-            .entry(pending.tx_meta.account)
-            .or_default()
-            .insert(key, pending.tx_meta.tx_hash);
-        self.indexes
-            .tx_by_block
-            .insert(seqno, pending.tx_meta.tx_hash);
-
-        // Enqueue out msgs
-        for h in pending.out_msg_hashes {
-            self.pool.push_internal(h);
-        }
+        self.indexes.tx_by_block.insert(seqno, block_tx_hashes);
 
         let remaining = self.pool.external.len() + self.pool.internal.len();
         if remaining > 0 {
@@ -1324,9 +1462,17 @@ impl Node {
 
     #[must_use]
     pub fn get_block_transactions(&self, block_meta: &BlockMeta) -> Option<Vec<TxMeta>> {
-        let tx_hash = self.indexes.tx_by_block.get(&block_meta.seqno)?;
-        let tx = self.history.tx_by_hash.get(tx_hash).cloned()?;
-        Some(vec![tx])
+        let tx_hashes = self
+            .indexes
+            .tx_by_block
+            .get(&block_meta.seqno)
+            .cloned()
+            .unwrap_or_else(|| block_meta.transaction_hashes());
+        let mut transactions = Vec::with_capacity(tx_hashes.len());
+        for tx_hash in tx_hashes {
+            transactions.push(self.history.tx_by_hash.get(&tx_hash).cloned()?);
+        }
+        Some(transactions)
     }
 
     #[must_use]
@@ -1711,7 +1857,7 @@ impl Node {
             last_trans_lt: 0,
         };
         let mut builder = CellBuilder::new();
-        sa.store_into(&mut builder, tycho_types::cell::Cell::empty_context())?;
+        sa.store_into(&mut builder, Cell::empty_context())?;
         let cell = builder.build()?;
         Ok(Boc::encode(cell).into())
     }
@@ -1737,6 +1883,24 @@ impl Node {
     }
 
     pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Value> {
+        let message_boc = self.build_faucet_message(addr, amount)?;
+        let (_, tx_hash, block_seqno, _) = self.send_internal_boc(message_boc)?;
+
+        Ok(serde_json::json!({
+            "ok": true,
+            "result": {
+                "tx_hash": tx_hash.to_hex(),
+                "block_seqno": block_seqno
+            }
+        }))
+    }
+
+    pub fn enqueue_faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Hash256> {
+        let message_boc = self.build_faucet_message(addr, amount)?;
+        self.enqueue_internal_boc(message_boc)
+    }
+
+    fn build_faucet_message(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<BocBytes> {
         let mut giver_meta = self
             .latest
             .accounts
@@ -1787,16 +1951,7 @@ impl Node {
         giver_meta.cached_balance = Some(giver_balance - amount);
         self.latest.accounts.insert(GIVER_ADDR, giver_meta);
 
-        let (_, tx_hash, block_seqno, _) =
-            self.send_internal_boc(BocRepr::encode(message)?.into())?;
-
-        Ok(serde_json::json!({
-            "ok": true,
-            "result": {
-                "tx_hash": tx_hash.to_hex(),
-                "block_seqno": block_seqno
-            }
-        }))
+        Ok(BocRepr::encode(message)?.into())
     }
 }
 
@@ -1964,12 +2119,35 @@ const fn convert_addr(addr: &IntAddr) -> Addr {
     }
 }
 
-fn create_dev_block_boc(seqno: Seqno, tx_hash: Hash256) -> anyhow::Result<BocBytes> {
+fn create_dev_block_boc(seqno: Seqno, tx_hashes: &[Hash256]) -> anyhow::Result<BocBytes> {
     let mut builder = CellBuilder::new();
     builder.store_u32(seqno)?;
-    builder.store_u256(&HashBytes(tx_hash.0))?;
+    if let [tx_hash] = tx_hashes {
+        builder.store_u256(&HashBytes(tx_hash.0))?;
+    } else {
+        builder.store_u32(tx_hashes.len() as u32)?;
+        if !tx_hashes.is_empty() {
+            builder.store_reference(create_tx_hashes_cell(tx_hashes)?)?;
+        }
+    }
     let cell = builder.build()?;
     Ok(Boc::encode(cell).into())
+}
+
+fn create_tx_hashes_cell(tx_hashes: &[Hash256]) -> anyhow::Result<Cell> {
+    let mut next = None;
+    for chunk in tx_hashes.rchunks(3) {
+        let mut builder = CellBuilder::new();
+        builder.store_small_uint(chunk.len() as u8, 8)?;
+        for tx_hash in chunk {
+            builder.store_u256(&HashBytes(tx_hash.0))?;
+        }
+        if let Some(next_cell) = next {
+            builder.store_reference(next_cell)?;
+        }
+        next = Some(builder.build()?);
+    }
+    next.context("tx hash list cannot be empty")
 }
 
 fn resolve_offchain_jetton_content(mut content: Value) -> Value {
@@ -2194,6 +2372,93 @@ mod tests {
             workchain: 0,
             addr: [byte; 32],
         }
+    }
+
+    fn test_tx_meta(hash: Hash256, account: Addr, lt: Lt, block_seqno: Seqno) -> TxMeta {
+        TxMeta {
+            tx_hash: hash,
+            account,
+            lt,
+            now: 0,
+            success: true,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: Some(0),
+            storage_fees: Some(0),
+            other_fees: Some(0),
+            in_msg_hash: None,
+            out_msg_hashes: Vec::new(),
+            block_seqno,
+        }
+    }
+
+    #[test]
+    fn produce_block_without_messages_advances_head_and_has_no_transactions() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+
+        let (block, txs) = node.produce_block().expect("empty block must be produced");
+
+        assert_eq!(block.seqno, 1);
+        assert_eq!(block.tx_hash, Hash256([0; 32]));
+        assert!(block.tx_hashes.is_empty());
+        assert!(txs.is_empty());
+        assert_eq!(node.globals.head_seqno, 1);
+        assert_eq!(node.history.blocks.len(), 1);
+        assert_eq!(node.history.deltas_by_seqno.len(), 1);
+        assert!(
+            node.get_block_transactions(&block)
+                .expect("empty block lookup must succeed")
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn create_dev_block_boc_handles_many_transaction_hashes() {
+        let hashes = (0..8).map(|idx| Hash256([idx; 32])).collect::<Vec<_>>();
+
+        let boc = create_dev_block_boc(42, &hashes).expect("multi-tx block BOC must fit");
+        assert!(!boc.is_empty());
+    }
+
+    #[test]
+    fn get_block_transactions_returns_all_hashes_in_block_order() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x44);
+        let first_hash = Hash256([1; 32]);
+        let second_hash = Hash256([2; 32]);
+        let block_seqno = 7;
+
+        node.history.tx_by_hash.insert(
+            first_hash,
+            test_tx_meta(first_hash, account, 10, block_seqno),
+        );
+        node.history.tx_by_hash.insert(
+            second_hash,
+            test_tx_meta(second_hash, account, 11, block_seqno),
+        );
+        node.indexes
+            .tx_by_block
+            .insert(block_seqno, vec![first_hash, second_hash]);
+
+        let block = BlockMeta {
+            seqno: block_seqno,
+            prev_seqno: Some(block_seqno - 1),
+            gen_utime: 0,
+            start_lt: 10,
+            end_lt: 11,
+            tx_hash: first_hash,
+            tx_hashes: vec![first_hash, second_hash],
+            block_boc_hash: Hash256([7; 32]),
+        };
+
+        let hashes = node
+            .get_block_transactions(&block)
+            .expect("block transactions must be found")
+            .into_iter()
+            .map(|tx| tx.tx_hash)
+            .collect::<Vec<_>>();
+
+        assert_eq!(hashes, vec![first_hash, second_hash]);
     }
 
     fn parse_test_addr(address: &str) -> Addr {

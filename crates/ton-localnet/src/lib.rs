@@ -7,5 +7,5 @@ pub mod remote;
 pub mod server;
 pub mod storage;
 pub mod types;
-pub use localnet::Localnet;
+pub use localnet::{BlockProductionMode, DEFAULT_BLOCK_PRODUCTION_INTERVAL, Localnet};
 pub use server::{ServerArgs, StartupWallet, run_server};

@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
@@ -24,6 +24,18 @@ use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo, StdAddr, StdAddrFormat
 use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
+const MAX_LOOP_REQUESTS: usize = 1024;
+
+pub const DEFAULT_BLOCK_PRODUCTION_INTERVAL: Duration = Duration::from_millis(500);
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum BlockProductionMode {
+    #[default]
+    Instant,
+    Interval {
+        block_time: Duration,
+    },
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockId {
@@ -362,11 +374,20 @@ impl Default for Localnet {
 impl Localnet {
     #[must_use]
     pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
+        Self::with_block_production(state_source, db_path, BlockProductionMode::Instant)
+    }
+
+    #[must_use]
+    pub fn with_block_production(
+        state_source: StateSource,
+        db_path: Option<String>,
+        block_production: BlockProductionMode,
+    ) -> Self {
         let (tx, rx) = mpsc::channel(100);
         let started_at = SystemTime::now();
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, state_source, db_path) {
+            if let Err(e) = run_node_loop(rx, state_source, db_path, block_production) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
@@ -908,17 +929,30 @@ fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
     state_source: StateSource,
     db_path: Option<String>,
+    block_production: BlockProductionMode,
 ) -> anyhow::Result<()> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
     let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
     let mut node = Node::with_db_path(executor, config_bytes.into(), state_source, db_path)?;
 
-    tracing::info!("TON localnet started");
+    tracing::info!(
+        "TON localnet started: block_production={:?}",
+        block_production
+    );
 
+    match block_production {
+        BlockProductionMode::Instant => run_instant_node_loop(&mut node, &mut rx),
+        BlockProductionMode::Interval { block_time } => {
+            run_interval_node_loop(&mut node, &mut rx, block_time)
+        }
+    }
+}
+
+fn run_instant_node_loop(node: &mut Node, rx: &mut mpsc::Receiver<Request>) -> anyhow::Result<()> {
     loop {
         // 1. Process all currently pending requests
-        while let Ok(req) = rx.try_recv() {
-            process_loop_request(&mut node, req);
+        if !drain_loop_requests(node, rx, BlockProductionMode::Instant) {
+            break;
         }
 
         // 2. If there are pending messages in the pool, mine one
@@ -927,13 +961,13 @@ fn run_node_loop(
             if let Err(e) = node.mine_one() {
                 tracing::error!("Auto-mining failed: {:?}", e);
             }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+            std::thread::sleep(Duration::from_millis(1));
             continue;
         }
 
         // 3. If pool is empty, block until next request
         if let Some(req) = rx.blocking_recv() {
-            process_loop_request(&mut node, req);
+            process_loop_request(node, req, BlockProductionMode::Instant);
         } else {
             break; // Channel closed
         }
@@ -941,15 +975,70 @@ fn run_node_loop(
     Ok(())
 }
 
-fn process_loop_request(node: &mut Node, req: Request) {
+fn run_interval_node_loop(
+    node: &mut Node,
+    rx: &mut mpsc::Receiver<Request>,
+    block_time: Duration,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        !block_time.is_zero(),
+        "block production interval must be greater than zero"
+    );
+    let mut next_block_at = Instant::now() + block_time;
+    loop {
+        if !drain_loop_requests(node, rx, BlockProductionMode::Interval { block_time }) {
+            break;
+        }
+
+        let now = Instant::now();
+        if now >= next_block_at {
+            tracing::info!("Producing timed localnet block");
+            if let Err(e) = node.produce_block() {
+                tracing::error!("Timed block production failed: {:?}", e);
+            }
+            next_block_at = Instant::now() + block_time;
+        }
+
+        let now = Instant::now();
+        std::thread::sleep(
+            next_block_at
+                .saturating_duration_since(now)
+                .min(Duration::from_millis(10)),
+        );
+    }
+    Ok(())
+}
+
+fn drain_loop_requests(
+    node: &mut Node,
+    rx: &mut mpsc::Receiver<Request>,
+    block_production: BlockProductionMode,
+) -> bool {
+    for _ in 0..MAX_LOOP_REQUESTS {
+        match rx.try_recv() {
+            Ok(req) => process_loop_request(node, req, block_production),
+            Err(mpsc::error::TryRecvError::Empty) => return true,
+            Err(mpsc::error::TryRecvError::Disconnected) => return false,
+        }
+    }
+    true
+}
+
+fn process_loop_request(node: &mut Node, req: Request, block_production: BlockProductionMode) {
     tracing::debug!("Node loop processing request: {:?}", req);
     match req {
         Request::SendBoc { boc, resp } => {
-            let res = handle_send_boc(node, boc);
+            let res = match block_production {
+                BlockProductionMode::Instant => handle_send_boc(node, boc),
+                BlockProductionMode::Interval { .. } => handle_enqueue_boc(node, boc),
+            };
             let _ = resp.send(res);
         }
         Request::SendInternalBoc { boc, resp } => {
-            let res = handle_send_internal_boc(node, boc);
+            let res = match block_production {
+                BlockProductionMode::Instant => handle_send_internal_boc(node, boc),
+                BlockProductionMode::Interval { .. } => handle_enqueue_internal_boc(node, boc),
+            };
             let _ = resp.send(res);
         }
         Request::GetAddressInformation {
@@ -1080,7 +1169,12 @@ fn process_loop_request(node: &mut Node, req: Request) {
             amount,
             resp,
         } => {
-            let res = node.faucet(&address, amount);
+            let res = match block_production {
+                BlockProductionMode::Instant => node.faucet(&address, amount),
+                BlockProductionMode::Interval { .. } => {
+                    handle_enqueue_faucet(node, address, amount)
+                }
+            };
             let _ = resp.send(res);
         }
         Request::GetTraces { tx_hash, resp } => {
@@ -1190,12 +1284,57 @@ fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlo
     build_send_boc_response(node, msg_hash, msg_hash_norm, tx_hash, seqno)
 }
 
+fn handle_enqueue_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {
+    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?;
+    let msg_hash = node.enqueue_boc(boc)?;
+    Ok(build_accepted_message_response(
+        node,
+        msg_hash,
+        msg_hash_norm,
+    ))
+}
+
 fn handle_send_internal_boc(
     node: &mut Node,
     boc: BocBytes,
 ) -> anyhow::Result<LocalnetBlockTransactions> {
     let (msg_hash, tx_hash, seqno, _) = node.send_internal_boc(boc)?;
     build_send_boc_response(node, msg_hash, None, tx_hash, seqno)
+}
+
+fn handle_enqueue_internal_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetBlockTransactions> {
+    let msg_hash = node.enqueue_internal_boc(boc)?;
+    Ok(build_accepted_message_response(node, msg_hash, None))
+}
+
+fn handle_enqueue_faucet(node: &mut Node, address: Addr, amount: u128) -> anyhow::Result<Value> {
+    let msg_hash = node.enqueue_faucet(&address, amount)?;
+    Ok(serde_json::json!({
+        "ok": true,
+        "result": {
+            "msg_hash": msg_hash.to_hex()
+        }
+    }))
+}
+
+fn build_accepted_message_response(
+    node: &Node,
+    msg_hash: Hash256,
+    msg_hash_norm: Option<Hash256>,
+) -> LocalnetBlockTransactions {
+    let id = node
+        .get_block_header(node.globals.head_seqno)
+        .map_or_else(LocalnetBlockId::first, |block| block.block_id());
+
+    LocalnetBlockTransactions {
+        id,
+        transactions: Vec::new(),
+        msg_hash: Some(msg_hash),
+        msg_hash_norm,
+    }
 }
 
 fn build_send_boc_response(
@@ -1232,11 +1371,13 @@ fn handle_get_address_info(
     let seqno = seqno.unwrap_or(node.globals.head_seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
 
-    let Some(block_header) = node.get_block_header(seqno) else {
+    let block_id = if let Some(block_header) = node.get_block_header(seqno) {
+        block_header.block_id()
+    } else if seqno == 0 {
+        LocalnetBlockId::first()
+    } else {
         anyhow::bail!("Block {seqno} not found")
     };
-
-    let block_id = block_header.block_id();
     let sync_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
 
     let Some(meta) = meta else {

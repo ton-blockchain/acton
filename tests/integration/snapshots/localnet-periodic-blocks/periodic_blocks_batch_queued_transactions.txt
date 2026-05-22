@@ -1,0 +1,18 @@
+{
+  "accepted": [
+    true,
+    true
+  ],
+  "accepted_with_message_hash": [
+    true,
+    true
+  ],
+  "batched_block": {
+    "seqno_delta": 1,
+    "transaction_count": 2
+  },
+  "empty_block": {
+    "seqno_delta": 1,
+    "transaction_count": 0
+  }
+}

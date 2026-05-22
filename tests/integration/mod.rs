@@ -23,6 +23,7 @@ mod hooks_tests;
 mod incremental_tests;
 mod init_tests;
 mod library_tests;
+mod localnet_periodic_blocks_tests;
 mod localnet_tests;
 mod logging_tests;
 mod mappings_tests;
