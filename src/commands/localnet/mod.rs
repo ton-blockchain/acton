@@ -25,6 +25,7 @@ use tycho_types::models::{
 
 const STARTUP_ACCOUNT_TOPUP_NANOTONS: u128 = 100_000_000_000; // 100 TON
 const STARTUP_DEPLOY_TRANSFER_NANOTONS: u128 = 50_000_000; // 0.05 TON
+const STARTUP_ACCOUNT_WAIT_MARGIN: Duration = Duration::from_secs(10);
 const WALLET_MSG_TTL_SECONDS: u64 = 600;
 pub use status::localnet_status_cmd;
 
@@ -74,7 +75,13 @@ pub async fn localnet_start_cmd(
         );
     }
 
-    let startup_wallets = setup_startup_accounts(&node, &accounts).await?;
+    ensure_startup_accounts_fit_block_interval(block_production, &accounts)?;
+    let startup_wallets = setup_startup_accounts(
+        &node,
+        &accounts,
+        startup_account_wait_timeout(block_production),
+    )
+    .await?;
     let run_result = run_server(
         node.clone(),
         ServerArgs {
@@ -108,6 +115,7 @@ pub async fn localnet_start_cmd(
 async fn setup_startup_accounts(
     node: &Arc<Localnet>,
     accounts: &[String],
+    wait_timeout: Duration,
 ) -> anyhow::Result<Vec<StartupWallet>> {
     if accounts.is_empty() {
         return Ok(Vec::new());
@@ -143,9 +151,14 @@ async fn setup_startup_accounts(
         node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
             .await
             .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
-        wait_for_startup_wallet_balance(node, &address, STARTUP_ACCOUNT_TOPUP_NANOTONS)
-            .await
-            .with_context(|| format!("Timed out waiting for wallet '{wallet_name}' top-up"))?;
+        wait_for_startup_wallet_balance(
+            node,
+            &address,
+            STARTUP_ACCOUNT_TOPUP_NANOTONS,
+            wait_timeout,
+        )
+        .await
+        .with_context(|| format!("Timed out waiting for wallet '{wallet_name}' top-up"))?;
 
         let wallet_state = node
             .get_address_state(address.clone(), None)
@@ -164,7 +177,7 @@ async fn setup_startup_accounts(
             node.send_boc(deploy_boc)
                 .await
                 .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
-            wait_for_startup_wallet_state(node, &address, AccountStatus::Active)
+            wait_for_startup_wallet_state(node, &address, AccountStatus::Active, wait_timeout)
                 .await
                 .with_context(|| format!("Timed out waiting for wallet '{wallet_name}' deploy"))?;
             println!(
@@ -193,8 +206,9 @@ async fn wait_for_startup_wallet_balance(
     node: &Arc<Localnet>,
     address: &str,
     min_balance: u128,
+    timeout: Duration,
 ) -> anyhow::Result<()> {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let deadline = tokio::time::Instant::now() + timeout;
     loop {
         if node.get_address_balance(address.to_owned(), None).await? >= min_balance {
             return Ok(());
@@ -210,8 +224,9 @@ async fn wait_for_startup_wallet_state(
     node: &Arc<Localnet>,
     address: &str,
     expected_state: AccountStatus,
+    timeout: Duration,
 ) -> anyhow::Result<()> {
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(10);
+    let deadline = tokio::time::Instant::now() + timeout;
     loop {
         if node.get_address_state(address.to_owned(), None).await? == expected_state {
             return Ok(());
@@ -221,6 +236,35 @@ async fn wait_for_startup_wallet_state(
         }
         tokio::time::sleep(Duration::from_millis(50)).await;
     }
+}
+
+const fn startup_account_wait_timeout(block_production: BlockProductionMode) -> Duration {
+    match block_production {
+        BlockProductionMode::Instant => STARTUP_ACCOUNT_WAIT_MARGIN,
+        BlockProductionMode::Interval { block_time } => {
+            block_time.saturating_add(STARTUP_ACCOUNT_WAIT_MARGIN)
+        }
+    }
+}
+
+fn ensure_startup_accounts_fit_block_interval(
+    block_production: BlockProductionMode,
+    accounts: &[String],
+) -> anyhow::Result<()> {
+    if accounts.is_empty() {
+        return Ok(());
+    }
+
+    if let BlockProductionMode::Interval { block_time } = block_production {
+        let wallet_ttl = Duration::from_secs(WALLET_MSG_TTL_SECONDS);
+        anyhow::ensure!(
+            block_time.saturating_add(STARTUP_ACCOUNT_WAIT_MARGIN) < wallet_ttl,
+            "Periodic block interval is too long for startup account deployment: \
+             block interval plus startup wait margin must be less than {WALLET_MSG_TTL_SECONDS}s"
+        );
+    }
+
+    Ok(())
 }
 
 const fn wallet_version_to_string(version: WalletVersion) -> &'static str {
@@ -315,12 +359,26 @@ pub async fn localnet_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         {
-            println!(
-                "{} airdrop {} TON to {} on localnet",
-                "Successfully".green().bold(),
-                amount_ton,
-                address
-            );
+            let queued = json
+                .pointer("/result/result/status")
+                .or_else(|| json.pointer("/result/status"))
+                .and_then(serde_json::Value::as_str)
+                == Some("queued");
+            if queued {
+                println!(
+                    "{} airdrop {} TON to {} on localnet",
+                    "Queued".yellow().bold(),
+                    amount_ton,
+                    address
+                );
+            } else {
+                println!(
+                    "{} airdrop {} TON to {} on localnet",
+                    "Successfully".green().bold(),
+                    amount_ton,
+                    address
+                );
+            }
         } else {
             let error = json
                 .get("error")
@@ -335,4 +393,46 @@ pub async fn localnet_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn startup_account_wait_timeout_includes_periodic_block_time() {
+        assert_eq!(
+            startup_account_wait_timeout(BlockProductionMode::Instant),
+            STARTUP_ACCOUNT_WAIT_MARGIN
+        );
+        assert_eq!(
+            startup_account_wait_timeout(BlockProductionMode::Interval {
+                block_time: Duration::from_secs(20),
+            }),
+            Duration::from_secs(30)
+        );
+    }
+
+    #[test]
+    fn startup_accounts_reject_periodic_intervals_that_can_expire_deploy_messages() {
+        let accounts = vec!["deployer".to_owned()];
+        assert!(
+            ensure_startup_accounts_fit_block_interval(
+                BlockProductionMode::Interval {
+                    block_time: Duration::from_secs(WALLET_MSG_TTL_SECONDS),
+                },
+                &accounts,
+            )
+            .is_err()
+        );
+        assert!(
+            ensure_startup_accounts_fit_block_interval(
+                BlockProductionMode::Interval {
+                    block_time: Duration::from_secs(1),
+                },
+                &accounts,
+            )
+            .is_ok()
+        );
+    }
 }

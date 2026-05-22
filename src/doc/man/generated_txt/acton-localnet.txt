@@ -57,6 +57,10 @@ SUBCOMMANDS
    acton localnet airdrop
        Send TON from the local faucet to an address.
 
+       In periodic block mode, the faucet request is queued and the command
+       reports it as queued; the balance changes after the next produced block
+       includes the message.
+
       Synopsis
           acton localnet airdrop [options] address
 

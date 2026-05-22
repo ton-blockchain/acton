@@ -612,7 +612,16 @@ fn perform_localnet_airdrop(
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         {
-            let message = format!("Successfully airdropped {amount_ton} TON on localnet");
+            let queued = json
+                .pointer("/result/result/status")
+                .or_else(|| json.pointer("/result/status"))
+                .and_then(serde_json::Value::as_str)
+                == Some("queued");
+            let message = if queued {
+                format!("Queued airdrop of {amount_ton} TON on localnet")
+            } else {
+                format!("Successfully airdropped {amount_ton} TON on localnet")
+            };
             Ok(AirdropResult {
                 address,
                 difficulty: None,

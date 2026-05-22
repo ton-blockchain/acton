@@ -1315,6 +1315,7 @@ fn handle_enqueue_faucet(node: &mut Node, address: Addr, amount: u128) -> anyhow
     Ok(serde_json::json!({
         "ok": true,
         "result": {
+            "status": "queued",
             "msg_hash": msg_hash.to_hex()
         }
     }))
@@ -1363,12 +1364,19 @@ fn build_send_boc_response(
     })
 }
 
+const fn normalize_state_seqno(node: &Node, seqno: Option<u32>) -> u32 {
+    match seqno {
+        Some(0) | None => node.globals.head_seqno,
+        Some(seqno) => seqno,
+    }
+}
+
 fn handle_get_address_info(
     node: &mut Node,
     address: Addr,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetAccountState> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = normalize_state_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
 
     let block_id = if let Some(block_header) = node.get_block_header(seqno) {
@@ -1551,15 +1559,18 @@ fn handle_run_get_method(
     stack: Tuple,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = normalize_state_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
     let meta = meta.ok_or_else(|| anyhow::anyhow!("Account {address} not found"))?;
 
-    let Some(block_header) = node.get_block_header(seqno) else {
+    let block_id = if let Some(block_header) = node.get_block_header(seqno) {
+        block_header.block_id()
+    } else if seqno == 0 {
+        LocalnetBlockId::first()
+    } else {
         anyhow::bail!("Block {seqno} not found")
     };
 
-    let block_id = block_header.block_id();
     let last_transaction_id = meta.last_tx_id();
 
     let code_boc = meta.code_hash.and_then(|h| node.get_cell(&h)).map_or_else(

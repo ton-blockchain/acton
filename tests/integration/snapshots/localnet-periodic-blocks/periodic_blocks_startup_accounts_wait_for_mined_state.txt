@@ -1,4 +1,9 @@
 {
+  "balance_positive": true,
   "has_mined_blocks": true,
+  "last_transaction_lt_nonzero": true,
+  "latest_status": "active",
+  "seqno_zero_block_positive": true,
+  "seqno_zero_matches_latest_balance": true,
   "startup_wallet_count": 1
 }

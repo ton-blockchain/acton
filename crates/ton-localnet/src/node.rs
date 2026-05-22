@@ -69,6 +69,20 @@ struct PendingTransactionCommit {
 struct PendingBlockCommit {
     block_meta: BlockMeta,
     transactions: Vec<PendingTransactionCommit>,
+    discarded_msg_hashes: Vec<Hash256>,
+}
+
+struct MiningStateSnapshot {
+    latest_accounts: HashMap<Addr, AccountMeta>,
+    pool: MessagePool,
+    global_lt: Lt,
+    msg_by_hash: HashMap<Hash256, MsgMeta>,
+    global_libraries: HashMap<Hash256, GlobalLibraryEntry>,
+    vm_global_libs_boc: Option<BocBytes>,
+    vm_global_libs_dirty: bool,
+    jetton_masters: HashMap<Addr, JettonMasterMeta>,
+    jetton_wallets: HashMap<Addr, storage::JettonWalletMeta>,
+    nft_items: HashMap<Addr, NftItemMeta>,
 }
 
 impl Node {
@@ -115,6 +129,18 @@ impl Node {
                 [],
             )?;
             conn.execute(
+                "CREATE TABLE IF NOT EXISTS account_deltas (seqno INTEGER NOT NULL, ord INTEGER NOT NULL, data BLOB NOT NULL, PRIMARY KEY(seqno, ord))",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS pending_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, hash BLOB NOT NULL, kind TEXT NOT NULL)",
+                [],
+            )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS pending_pool_state (id INTEGER PRIMARY KEY CHECK(id = 0), rr_turn INTEGER NOT NULL)",
+                [],
+            )?;
+            conn.execute(
                 "CREATE TABLE IF NOT EXISTS compiler_abis (code_hash BLOB PRIMARY KEY, data BLOB)",
                 [],
             )?;
@@ -128,6 +154,7 @@ impl Node {
         let mut history = History::new();
         let mut latest = LatestState::new();
         let mut indexes = Indexes::new();
+        let mut pool = MessagePool::new();
         let mut head_seqno = 0;
 
         if let Some(conn) = &conn_obj {
@@ -173,6 +200,9 @@ impl Node {
             })?;
             for tx in tx_iter {
                 let (hash, tx_meta, addr, lt, seqno) = tx?;
+                if let Some(in_msg_hash) = tx_meta.in_msg_hash {
+                    history.msg_to_tx.insert(in_msg_hash, hash);
+                }
                 history.tx_by_hash.insert(hash, tx_meta);
 
                 let key = ReverseLtKey(cmp::Reverse(lt), hash);
@@ -200,6 +230,27 @@ impl Node {
                 latest.accounts.insert(addr, meta);
             }
 
+            // Load historical account deltas
+            let mut stmt =
+                conn.prepare("SELECT seqno, data FROM account_deltas ORDER BY seqno ASC, ord ASC")?;
+            let delta_iter = stmt.query_map([], |row| {
+                let seqno: u32 = row.get(0)?;
+                let data: Vec<u8> = row.get(1)?;
+                let delta = serde_json::from_slice::<AccountDelta>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+                Ok((seqno, delta))
+            })?;
+            for delta in delta_iter {
+                let (seqno, delta) = delta?;
+                if seqno == 0 {
+                    continue;
+                }
+                if history.deltas_by_seqno.len() < seqno as usize {
+                    history.deltas_by_seqno.resize(seqno as usize, Vec::new());
+                }
+                history.deltas_by_seqno[seqno as usize - 1].push(delta);
+            }
+
             // Load messages
             let mut stmt = conn.prepare("SELECT hash, data FROM messages")?;
             let msg_iter = stmt.query_map([], |row| {
@@ -215,6 +266,34 @@ impl Node {
                 let (hash, meta) = msg?;
                 history.msg_by_hash.insert(hash, meta);
             }
+
+            // Load pending queue after message metadata is available.
+            let mut stmt =
+                conn.prepare("SELECT hash, kind FROM pending_messages ORDER BY id ASC")?;
+            let pending_iter = stmt.query_map([], |row| {
+                let hash_bytes: Vec<u8> = row.get(0)?;
+                let kind: String = row.get(1)?;
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                Ok((Hash256(hash), kind))
+            })?;
+            for pending in pending_iter {
+                let (hash, kind) = pending?;
+                match MessageKind::from_db_kind(&kind) {
+                    Some(MessageKind::ExternalIn) => pool.push_external(hash),
+                    Some(MessageKind::Internal) => pool.push_internal(hash),
+                    Some(MessageKind::ExternalOut) | None => {}
+                }
+            }
+            pool.rr_turn = match conn.query_row(
+                "SELECT rr_turn FROM pending_pool_state WHERE id = 0",
+                [],
+                |row| row.get::<_, i64>(0),
+            ) {
+                Ok(value) => value != 0,
+                Err(rusqlite::Error::QueryReturnedNoRows) => false,
+                Err(err) => return Err(err.into()),
+            };
 
             // Load compiler ABI registry
             let mut stmt = conn.prepare("SELECT code_hash, data FROM compiler_abis")?;
@@ -271,7 +350,7 @@ impl Node {
             history,
             indexes,
             globals,
-            pool: MessagePool::new(),
+            pool,
             executor,
             state_source,
             conn,
@@ -362,10 +441,14 @@ impl Node {
             self.cas.put(boc, hash);
         }
 
-        // 3. Register MsgMeta
+        // 3. Persist queue state before acknowledging the message
+        self.persist_message_meta(hash, &msg_meta)?;
+        self.persist_pending_message(hash, kind)?;
+
+        // 4. Register MsgMeta
         self.history.msg_by_hash.insert(hash, msg_meta);
 
-        // 4. Enqueue
+        // 5. Enqueue
         match kind {
             MessageKind::ExternalIn => self.pool.push_external(hash),
             MessageKind::Internal => self.pool.push_internal(hash),
@@ -373,6 +456,95 @@ impl Node {
         }
 
         Ok(hash)
+    }
+
+    fn persist_message_meta(&self, hash: Hash256, msg_meta: &MsgMeta) -> anyhow::Result<()> {
+        if let Some(conn) = &self.conn {
+            let data = serde_json::to_vec(msg_meta)?;
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.execute(
+                "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
+                params![hash.0.to_vec(), data],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn persist_pending_message(&self, hash: Hash256, kind: MessageKind) -> anyhow::Result<()> {
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.execute(
+                "INSERT INTO pending_messages (hash, kind) VALUES (?1, ?2)",
+                params![hash.0.to_vec(), kind.db_kind()],
+            )?;
+            conn.execute(
+                "INSERT OR REPLACE INTO pending_pool_state (id, rr_turn) VALUES (0, ?1)",
+                params![if self.pool.rr_turn { 1_i64 } else { 0_i64 }],
+            )?;
+        }
+        Ok(())
+    }
+
+    fn delete_persisted_pending_messages(&self, hashes: &[Hash256]) {
+        if hashes.is_empty() {
+            return;
+        }
+
+        let Some(conn) = &self.conn else {
+            return;
+        };
+
+        let result = (|| -> anyhow::Result<()> {
+            let mut conn = conn.lock().expect("Failed to lock DB connection");
+            let db_tx = conn.transaction()?;
+            for hash in hashes {
+                db_tx.execute(
+                    "DELETE FROM pending_messages WHERE id = (
+                        SELECT id FROM pending_messages WHERE hash = ?1 ORDER BY id ASC LIMIT 1
+                    )",
+                    params![hash.0.to_vec()],
+                )?;
+            }
+            db_tx.execute(
+                "INSERT OR REPLACE INTO pending_pool_state (id, rr_turn) VALUES (0, ?1)",
+                params![if self.pool.rr_turn { 1_i64 } else { 0_i64 }],
+            )?;
+            db_tx.commit()?;
+            drop(conn);
+            Ok(())
+        })();
+
+        if let Err(err) = result {
+            tracing::error!("Failed to remove discarded pending messages: {:?}", err);
+        }
+    }
+
+    fn mining_state_snapshot(&self) -> MiningStateSnapshot {
+        MiningStateSnapshot {
+            latest_accounts: self.latest.accounts.clone(),
+            pool: self.pool.clone(),
+            global_lt: self.globals.global_lt,
+            msg_by_hash: self.history.msg_by_hash.clone(),
+            global_libraries: self.global_libraries.clone(),
+            vm_global_libs_boc: self.vm_global_libs_boc.clone(),
+            vm_global_libs_dirty: self.vm_global_libs_dirty,
+            jetton_masters: self.history.jetton_masters.clone(),
+            jetton_wallets: self.history.jetton_wallets.clone(),
+            nft_items: self.history.nft_items.clone(),
+        }
+    }
+
+    fn restore_mining_state(&mut self, snapshot: MiningStateSnapshot) {
+        self.latest.accounts = snapshot.latest_accounts;
+        self.pool = snapshot.pool;
+        self.globals.global_lt = snapshot.global_lt;
+        self.history.msg_by_hash = snapshot.msg_by_hash;
+        self.global_libraries = snapshot.global_libraries;
+        self.vm_global_libs_boc = snapshot.vm_global_libs_boc;
+        self.vm_global_libs_dirty = snapshot.vm_global_libs_dirty;
+        self.history.jetton_masters = snapshot.jetton_masters;
+        self.history.jetton_wallets = snapshot.jetton_wallets;
+        self.history.nft_items = snapshot.nft_items;
     }
 
     pub fn mine_one(&mut self) -> anyhow::Result<(BlockMeta, TxMeta)> {
@@ -403,18 +575,36 @@ impl Node {
             return Ok(None);
         }
 
+        let snapshot = self.mining_state_snapshot();
         let seqno = self.globals.head_seqno + 1;
-        let gen_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32;
+        let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as u32;
+        let gen_utime = self
+            .history
+            .blocks
+            .last()
+            .map_or(now, |block| now.max(block.gen_utime.saturating_add(1)));
         let mut transactions = Vec::new();
+        let mut discarded_msg_hashes = Vec::new();
 
         while transactions.len() < max_transactions && self.has_pending_messages() {
+            let selected_msg_hash = self
+                .pool
+                .peek_next(self.globals.queue_policy, &self.history.msg_by_hash);
             match self.execute_next_message(seqno, gen_utime) {
                 Ok(transaction) => {
                     self.apply_transaction_effects(&transaction);
                     transactions.push(transaction);
                 }
-                Err(err) if transactions.is_empty() => return Err(err),
+                Err(err) if transactions.is_empty() => {
+                    if let Some(msg_hash) = selected_msg_hash {
+                        self.delete_persisted_pending_messages(&[msg_hash]);
+                    }
+                    return Err(err);
+                }
                 Err(err) => {
+                    if let Some(msg_hash) = selected_msg_hash {
+                        discarded_msg_hashes.push(msg_hash);
+                    }
                     tracing::error!(
                         "Failed to mine a message in block {} after {} transactions: {:?}",
                         seqno,
@@ -458,10 +648,14 @@ impl Node {
             .iter()
             .map(|tx| tx.tx_meta.clone())
             .collect::<Vec<_>>();
-        self.apply_commit(PendingBlockCommit {
+        if let Err(err) = self.apply_commit(PendingBlockCommit {
             block_meta: block_meta.clone(),
             transactions,
-        })?;
+            discarded_msg_hashes,
+        }) {
+            self.restore_mining_state(snapshot);
+            return Err(err);
+        }
 
         Ok(Some((block_meta, tx_metas)))
     }
@@ -1250,19 +1444,28 @@ impl Node {
 
         // Persistent storage
         if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
+            let mut conn = conn.lock().expect("Failed to lock DB connection");
+            let db_tx = conn.transaction()?;
 
             // Save block
             let block_data = serde_json::to_vec(&pending.block_meta)?;
-            conn.execute(
+            db_tx.execute(
                 "INSERT OR REPLACE INTO blocks (seqno, data) VALUES (?1, ?2)",
                 params![pending.block_meta.seqno, block_data],
             )?;
 
-            for transaction in &pending.transactions {
+            let mut consumed_messages = pending
+                .transactions
+                .iter()
+                .filter_map(|transaction| transaction.tx_meta.in_msg_hash)
+                .collect::<Vec<_>>();
+            consumed_messages.extend(pending.discarded_msg_hashes.iter().copied());
+            let consumed_message_set = consumed_messages.iter().copied().collect::<HashSet<_>>();
+
+            for (index, transaction) in pending.transactions.iter().enumerate() {
                 // Save transaction
                 let tx_data = serde_json::to_vec(&transaction.tx_meta)?;
-                conn.execute(
+                db_tx.execute(
                     "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
                     params![
                         transaction.tx_meta.tx_hash.0.to_vec(),
@@ -1276,23 +1479,70 @@ impl Node {
                 // Save account state
                 if let Some(new_meta) = &transaction.delta.new_meta {
                     let account_data = serde_json::to_vec(new_meta)?;
-                    conn.execute(
+                    db_tx.execute(
                         "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
                         params![transaction.delta.addr.addr.to_vec(), account_data],
                     )?;
+                } else {
+                    db_tx.execute(
+                        "DELETE FROM accounts WHERE address = ?1",
+                        params![transaction.delta.addr.addr.to_vec()],
+                    )?;
                 }
 
+                let delta_data = serde_json::to_vec(&transaction.delta)?;
+                db_tx.execute(
+                    "INSERT OR REPLACE INTO account_deltas (seqno, ord, data) VALUES (?1, ?2, ?3)",
+                    params![pending.block_meta.seqno, index as i64, delta_data],
+                )?;
+
                 // Save messages
+                if let Some(h) = transaction.tx_meta.in_msg_hash
+                    && let Some(msg_meta) = self.history.msg_by_hash.get(&h)
+                {
+                    let msg_data = serde_json::to_vec(msg_meta)?;
+                    db_tx.execute(
+                        "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
+                        params![h.0.to_vec(), msg_data],
+                    )?;
+                }
                 for h in &transaction.out_msg_hashes {
                     if let Some(msg_meta) = self.history.msg_by_hash.get(h) {
                         let msg_data = serde_json::to_vec(msg_meta)?;
-                        conn.execute(
+                        db_tx.execute(
                             "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
                             params![h.0.to_vec(), msg_data],
                         )?;
                     }
                 }
             }
+
+            for hash in &consumed_messages {
+                db_tx.execute(
+                    "DELETE FROM pending_messages WHERE id = (
+                        SELECT id FROM pending_messages WHERE hash = ?1 ORDER BY id ASC LIMIT 1
+                    )",
+                    params![hash.0.to_vec()],
+                )?;
+            }
+
+            for transaction in &pending.transactions {
+                for hash in &transaction.out_msg_hashes {
+                    if !consumed_message_set.contains(hash) {
+                        db_tx.execute(
+                            "INSERT INTO pending_messages (hash, kind) VALUES (?1, ?2)",
+                            params![hash.0.to_vec(), MessageKind::Internal.db_kind()],
+                        )?;
+                    }
+                }
+            }
+
+            db_tx.execute(
+                "INSERT OR REPLACE INTO pending_pool_state (id, rr_turn) VALUES (0, ?1)",
+                params![if self.pool.rr_turn { 1_i64 } else { 0_i64 }],
+            )?;
+            db_tx.commit()?;
+            drop(conn);
         }
 
         // History
@@ -1364,7 +1614,7 @@ impl Node {
         addr: &Addr,
         seqno: Seqno,
     ) -> Option<AccountMeta> {
-        if seqno >= self.globals.head_seqno {
+        if seqno == 0 || seqno >= self.globals.head_seqno {
             return self.get_address_information(addr);
         }
 
@@ -1374,7 +1624,7 @@ impl Node {
                 continue;
             }
             let deltas = &self.history.deltas_by_seqno[s as usize - 1];
-            for delta in deltas {
+            for delta in deltas.iter().rev() {
                 if delta.addr == *addr {
                     return delta.new_meta.clone();
                 }
@@ -2050,6 +2300,25 @@ enum MessageKind {
     ExternalOut,
 }
 
+impl MessageKind {
+    const fn db_kind(self) -> &'static str {
+        match self {
+            Self::Internal => "internal",
+            Self::ExternalIn => "external_in",
+            Self::ExternalOut => "external_out",
+        }
+    }
+
+    fn from_db_kind(kind: &str) -> Option<Self> {
+        match kind {
+            "internal" => Some(Self::Internal),
+            "external_in" => Some(Self::ExternalIn),
+            "external_out" => Some(Self::ExternalOut),
+            _ => None,
+        }
+    }
+}
+
 fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
     Ok(parse_msg_meta_with_kind(boc, hash)?.0)
 }
@@ -2249,6 +2518,21 @@ mod tests {
         }
     }
 
+    struct FailingExecutor;
+
+    impl TvmExecutor for FailingExecutor {
+        fn execute(
+            &self,
+            _shard_account: &BocBytes,
+            _in_msg: &BocBytes,
+            _ctx: &ExecContext,
+            _config: &BocBytes,
+            _libs: Option<&BocBytes>,
+        ) -> anyhow::Result<ExecResult> {
+            anyhow::bail!("forced executor failure")
+        }
+    }
+
     #[derive(Clone)]
     struct RecordingExecutor {
         recorded_libs: Arc<Mutex<Vec<Option<BocBytes>>>>,
@@ -2367,6 +2651,432 @@ mod tests {
         let _ = std::fs::remove_dir_all(temp_root);
     }
 
+    #[test]
+    fn transaction_message_indexes_persist_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-message-index-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.clone().into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let account = test_addr(0x50);
+        let dst = test_addr(0x51);
+        let tx_hash = Hash256([0x52; 32]);
+        let in_msg_hash = Hash256([0x53; 32]);
+        let out_msg_hash = Hash256([0x54; 32]);
+        node.history.msg_by_hash.insert(
+            in_msg_hash,
+            MsgMeta {
+                msg_hash: in_msg_hash,
+                msg_boc_hash: Hash256([0x55; 32]),
+                src: None,
+                dst: Some(account),
+                value: Some(1),
+                bounce: Some(false),
+                created_lt: Some(1),
+                created_at: Some(2),
+            },
+        );
+        node.history.msg_by_hash.insert(
+            out_msg_hash,
+            MsgMeta {
+                msg_hash: out_msg_hash,
+                msg_boc_hash: Hash256([0x56; 32]),
+                src: Some(account),
+                dst: Some(dst),
+                value: Some(2),
+                bounce: Some(true),
+                created_lt: Some(3),
+                created_at: Some(4),
+            },
+        );
+
+        let mut tx_meta = test_tx_meta(tx_hash, account, 10, 1);
+        tx_meta.in_msg_hash = Some(in_msg_hash);
+        tx_meta.out_msg_hashes = vec![out_msg_hash];
+
+        node.apply_commit(PendingBlockCommit {
+            block_meta: BlockMeta {
+                seqno: 1,
+                prev_seqno: None,
+                gen_utime: 0,
+                start_lt: 10,
+                end_lt: 10,
+                tx_hash,
+                tx_hashes: vec![tx_hash],
+                block_boc_hash: Hash256([0x57; 32]),
+            },
+            transactions: vec![PendingTransactionCommit {
+                tx_meta,
+                delta: AccountDelta {
+                    addr: account,
+                    old_hash: None,
+                    new_hash: None,
+                    old_meta: None,
+                    new_meta: None,
+                },
+                out_msg_hashes: vec![out_msg_hash],
+                msg_to_tx: vec![(in_msg_hash, tx_hash)],
+                old_account_boc: BocBytes::default(),
+                new_account_boc: None,
+            }],
+            discarded_msg_hashes: Vec::new(),
+        })
+        .expect("must persist committed transaction metadata");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(
+            reopened.history.msg_by_hash.contains_key(&in_msg_hash),
+            "inbound message metadata must survive node restart"
+        );
+        assert!(
+            reopened.history.msg_by_hash.contains_key(&out_msg_hash),
+            "outbound message metadata must survive node restart"
+        );
+        assert_eq!(
+            reopened.history.msg_to_tx.get(&in_msg_hash).copied(),
+            Some(tx_hash),
+            "inbound message lookup must still resolve the root transaction"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn pending_queue_persists_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-pending-queue-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.clone().into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let recipient = test_addr(0x60);
+        let msg_hash = node
+            .enqueue_faucet(&recipient, 1)
+            .expect("must enqueue faucet message");
+        assert!(node.pool.internal.contains(&msg_hash));
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(
+            reopened.pool.internal.contains(&msg_hash),
+            "accepted pending message must survive node restart"
+        );
+        assert!(
+            reopened.history.msg_by_hash.contains_key(&msg_hash),
+            "pending message metadata must survive node restart"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn committed_block_updates_persisted_pending_queue() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-pending-commit-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.clone().into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let account = test_addr(0x61);
+        let consumed_hash = node
+            .enqueue_faucet(&account, 1)
+            .expect("must enqueue faucet message");
+        assert_eq!(
+            node.pool.pop_next(
+                storage::QueuePolicy::ExternalFirstFifo,
+                &node.history.msg_by_hash
+            ),
+            Some(consumed_hash)
+        );
+
+        let out_hash = Hash256([0x62; 32]);
+        node.history.msg_by_hash.insert(
+            out_hash,
+            MsgMeta {
+                msg_hash: out_hash,
+                msg_boc_hash: Hash256([0x63; 32]),
+                src: Some(account),
+                dst: Some(test_addr(0x64)),
+                value: Some(1),
+                bounce: Some(false),
+                created_lt: Some(11),
+                created_at: Some(12),
+            },
+        );
+
+        let tx_hash = Hash256([0x65; 32]);
+        let mut tx_meta = test_tx_meta(tx_hash, account, 10, 1);
+        tx_meta.in_msg_hash = Some(consumed_hash);
+        tx_meta.out_msg_hashes = vec![out_hash];
+
+        node.apply_commit(PendingBlockCommit {
+            block_meta: BlockMeta {
+                seqno: 1,
+                prev_seqno: None,
+                gen_utime: 0,
+                start_lt: 10,
+                end_lt: 10,
+                tx_hash,
+                tx_hashes: vec![tx_hash],
+                block_boc_hash: Hash256([0x66; 32]),
+            },
+            transactions: vec![PendingTransactionCommit {
+                tx_meta,
+                delta: AccountDelta {
+                    addr: account,
+                    old_hash: None,
+                    new_hash: None,
+                    old_meta: None,
+                    new_meta: None,
+                },
+                out_msg_hashes: vec![out_hash],
+                msg_to_tx: vec![(consumed_hash, tx_hash)],
+                old_account_boc: BocBytes::default(),
+                new_account_boc: None,
+            }],
+            discarded_msg_hashes: Vec::new(),
+        })
+        .expect("must persist committed queue changes");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(
+            !reopened.pool.internal.contains(&consumed_hash),
+            "consumed message must be removed from persisted queue"
+        );
+        assert!(
+            reopened.pool.internal.contains(&out_hash),
+            "unconsumed output message must be restored as pending"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn failed_pending_message_is_removed_from_persisted_queue() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-failed-pending-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(FailingExecutor),
+            config_bytes.clone().into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let msg_hash = node
+            .enqueue_faucet(&test_addr(0x71), 1)
+            .expect("must enqueue faucet message");
+        assert!(node.mine_block().is_err(), "executor failure must surface");
+        assert!(
+            !node.pool.internal.contains(&msg_hash),
+            "failed message must be removed from in-memory queue"
+        );
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert!(
+            !reopened.pool.internal.contains(&msg_hash),
+            "failed message must not be restored from persisted queue"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn historical_account_deltas_persist_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-deltas-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_bytes = base64::engine::general_purpose::STANDARD
+            .decode(DEFAULT_CONFIG)
+            .expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.clone().into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let account = test_addr(0x67);
+        let first_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 1);
+        let second_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 2);
+        let first_meta = store_test_account_meta(&mut node, &first_boc, AccountStatus::Active);
+        let second_meta = store_test_account_meta(&mut node, &second_boc, AccountStatus::Active);
+        let first_hash = Hash256([0x68; 32]);
+        let second_hash = Hash256([0x69; 32]);
+
+        node.apply_commit(PendingBlockCommit {
+            block_meta: BlockMeta {
+                seqno: 1,
+                prev_seqno: None,
+                gen_utime: 0,
+                start_lt: 1,
+                end_lt: 2,
+                tx_hash: first_hash,
+                tx_hashes: vec![first_hash, second_hash],
+                block_boc_hash: Hash256([0x70; 32]),
+            },
+            transactions: vec![
+                PendingTransactionCommit {
+                    tx_meta: test_tx_meta(first_hash, account, 1, 1),
+                    delta: AccountDelta {
+                        addr: account,
+                        old_hash: None,
+                        new_hash: Some(first_meta.account_hash),
+                        old_meta: None,
+                        new_meta: Some(first_meta.clone()),
+                    },
+                    out_msg_hashes: Vec::new(),
+                    msg_to_tx: Vec::new(),
+                    old_account_boc: BocBytes::default(),
+                    new_account_boc: Some(first_boc),
+                },
+                PendingTransactionCommit {
+                    tx_meta: test_tx_meta(second_hash, account, 2, 1),
+                    delta: AccountDelta {
+                        addr: account,
+                        old_hash: Some(first_meta.account_hash),
+                        new_hash: Some(second_meta.account_hash),
+                        old_meta: Some(first_meta),
+                        new_meta: Some(second_meta.clone()),
+                    },
+                    out_msg_hashes: Vec::new(),
+                    msg_to_tx: Vec::new(),
+                    old_account_boc: BocBytes::default(),
+                    new_account_boc: Some(second_boc),
+                },
+            ],
+            discarded_msg_hashes: Vec::new(),
+        })
+        .expect("must persist account deltas");
+        drop(node);
+
+        let mut reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_bytes.into(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(
+            reopened.history.deltas_by_seqno[0].len(),
+            2,
+            "all deltas in a block must be restored in order"
+        );
+        assert_eq!(
+            reopened
+                .get_address_information_at_block(&account, 1)
+                .expect("historical state must be restored")
+                .account_hash,
+            second_meta.account_hash
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
     fn test_addr(byte: u8) -> Addr {
         Addr {
             workchain: 0,
@@ -2409,6 +3119,19 @@ mod tests {
             node.get_block_transactions(&block)
                 .expect("empty block lookup must succeed")
                 .is_empty()
+        );
+    }
+
+    #[test]
+    fn produced_blocks_have_monotonic_second_timestamps() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+
+        let (first, _) = node.produce_block().expect("first block must be produced");
+        let (second, _) = node.produce_block().expect("second block must be produced");
+
+        assert!(
+            second.gen_utime > first.gen_utime,
+            "sub-second periodic blocks must still have monotonic second timestamps"
         );
     }
 
@@ -2693,6 +3416,72 @@ mod tests {
             node.get_shard_account_at_block(&account, Some(3))
                 .expect("must return latest active state"),
             active_boc
+        );
+    }
+
+    #[test]
+    fn get_address_information_at_block_uses_latest_for_zero_and_current_queries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x22);
+        let active_boc = make_active_shard_account_boc(account, Dict::new());
+        let active_meta = store_test_account_meta(&mut node, &active_boc, AccountStatus::Active);
+        node.latest.accounts.insert(account, active_meta.clone());
+        node.globals.head_seqno = 3;
+
+        for seqno in [0, 3, 4] {
+            assert_eq!(
+                node.get_address_information_at_block(&account, seqno)
+                    .expect("must return latest account state")
+                    .account_hash,
+                active_meta.account_hash,
+                "seqno {seqno} must resolve to latest account state"
+            );
+        }
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_last_delta_in_same_block() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x24);
+        let first_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 1);
+        let second_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 2);
+        let first_meta = store_test_account_meta(&mut node, &first_boc, AccountStatus::Active);
+        let second_meta = store_test_account_meta(&mut node, &second_boc, AccountStatus::Active);
+
+        node.latest.accounts.insert(account, second_meta.clone());
+        node.history.deltas_by_seqno = vec![
+            Vec::new(),
+            vec![
+                AccountDelta {
+                    addr: account,
+                    old_hash: None,
+                    new_hash: Some(first_meta.account_hash),
+                    old_meta: None,
+                    new_meta: Some(first_meta.clone()),
+                },
+                AccountDelta {
+                    addr: account,
+                    old_hash: Some(first_meta.account_hash),
+                    new_hash: Some(second_meta.account_hash),
+                    old_meta: Some(first_meta),
+                    new_meta: Some(second_meta.clone()),
+                },
+            ],
+        ];
+        node.globals.head_seqno = 3;
+
+        assert_eq!(
+            node.get_address_information_at_block(&account, 2)
+                .expect("historical account state must be found")
+                .account_hash,
+            second_meta.account_hash
+        );
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(2))
+                .expect("must return final account state for the block"),
+            second_boc
         );
     }
 

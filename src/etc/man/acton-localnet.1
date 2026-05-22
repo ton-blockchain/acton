@@ -72,6 +72,10 @@ Dump Localnet state to a JSON snapshot on shutdown.
 \fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
 .SS "acton localnet airdrop"
 Send TON from the local faucet to an address.
+.sp
+In periodic block mode, the faucet request is queued and the command reports it
+as queued; the balance changes after the next produced block includes the
+message.
 .SS "Synopsis"
 \fBacton localnet airdrop\fR [\fIoptions\fR] \fIaddress\fR
 .SS "Options"

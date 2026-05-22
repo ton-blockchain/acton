@@ -23,7 +23,7 @@
         "tags": ["Localnet Control"],
         "operationId": "fundAccount",
         "summary": "Fund an account",
-        "description": "Credits an address with local funds and mines the resulting transfer transaction.",
+        "description": "Credits an address with local funds. Instant mode mines the resulting transfer transaction immediately; periodic block mode queues the faucet message until the next produced block.",
         "requestBody": {
           "required": true,
           "content": {
@@ -527,6 +527,16 @@
         }
       },
       "FundAccountResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/FundAccountMinedResult"
+          },
+          {
+            "$ref": "#/components/schemas/FundAccountQueuedResult"
+          }
+        ]
+      },
+      "FundAccountMinedResult": {
         "type": "object",
         "required": ["tx_hash", "block_seqno"],
         "properties": {
@@ -536,6 +546,19 @@
           "block_seqno": {
             "type": "integer",
             "minimum": 0
+          }
+        }
+      },
+      "FundAccountQueuedResult": {
+        "type": "object",
+        "required": ["status", "msg_hash"],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["queued"]
+          },
+          "msg_hash": {
+            "type": "string"
           }
         }
       },

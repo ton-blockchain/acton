@@ -60,7 +60,7 @@ fn periodic_blocks_batch_queued_transactions() {
     let project = ProjectBuilder::new("localnet-periodic-blocks").build();
     let node = project
         .localnet()
-        .args(["--periodic-blocks", "--block-interval", "1s"])
+        .args(["--periodic-blocks", "--block-interval", "2s"])
         .start();
 
     let initial_seqno = latest_seqno(&node);
@@ -146,6 +146,15 @@ fn periodic_blocks_startup_accounts_wait_for_mined_state() {
 
     let startup_wallets = node.get_json("/acton_getStartupWallets");
     let status = node.get_json("/acton_nodeInfo");
+    let startup_wallet_address = startup_wallets["result"][0]["address"]
+        .as_str()
+        .expect("startup wallet address must be present");
+    let latest_wallet_info = node.get_json(&format!(
+        "/api/v2/getAddressInformation?address={startup_wallet_address}"
+    ));
+    let seqno_zero_wallet_info = node.get_json(&format!(
+        "/api/v2/getAddressInformation?address={startup_wallet_address}&seqno=0"
+    ));
     let snapshot = json!({
         "startup_wallet_count": startup_wallets["result"]
             .as_array()
@@ -154,6 +163,22 @@ fn periodic_blocks_startup_accounts_wait_for_mined_state() {
         "has_mined_blocks": status["result"]["last_block_seqno"]
             .as_u64()
             .expect("last block seqno must be a u64") > 0,
+        "latest_status": latest_wallet_info["result"]["state"]
+            .as_str()
+            .expect("address information state must be a string"),
+        "balance_positive": response_balance(&latest_wallet_info)
+            .parse::<u128>()
+            .expect("balance must parse")
+            > 0,
+        "last_transaction_lt_nonzero": latest_wallet_info["result"]["last_transaction_id"]["lt"]
+            .as_str()
+            .expect("last transaction lt must be a string")
+            .parse::<u64>()
+            .expect("last transaction lt must parse")
+            > 0,
+        "seqno_zero_matches_latest_balance": response_balance(&seqno_zero_wallet_info)
+            == response_balance(&latest_wallet_info),
+        "seqno_zero_block_positive": response_block_seqno(&seqno_zero_wallet_info) > 0,
     });
     let snapshot_text =
         serde_json::to_string_pretty(&snapshot).expect("snapshot JSON must serialize") + "\n";
@@ -270,6 +295,18 @@ fn transaction_count(block: &Value) -> usize {
         .as_array()
         .expect("block transactions must be an array")
         .len()
+}
+
+fn response_balance(response: &Value) -> &str {
+    response["result"]["balance"]
+        .as_str()
+        .expect("address information balance must be a string")
+}
+
+fn response_block_seqno(response: &Value) -> u64 {
+    response["result"]["block_id"]["seqno"]
+        .as_u64()
+        .expect("address information block seqno must be a u64")
 }
 
 fn assert_snapshot(path: &str, content: &str) {

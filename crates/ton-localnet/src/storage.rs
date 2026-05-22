@@ -488,6 +488,7 @@ impl Globals {
     }
 }
 
+#[derive(Clone)]
 pub struct MessagePool {
     pub external: VecDeque<Hash256>,
     pub internal: VecDeque<Hash256>,
@@ -516,6 +517,38 @@ impl MessagePool {
 
     pub fn push_internal(&mut self, msg_hash: Hash256) {
         self.internal.push_back(msg_hash);
+    }
+
+    pub fn peek_next(
+        &self,
+        policy: QueuePolicy,
+        _msg_meta: &HashMap<Hash256, MsgMeta>,
+    ) -> Option<Hash256> {
+        match policy {
+            QueuePolicy::ExternalFirstFifo => self
+                .external
+                .front()
+                .or_else(|| self.internal.front())
+                .copied(),
+            QueuePolicy::InternalFirstFifo => self
+                .internal
+                .front()
+                .or_else(|| self.external.front())
+                .copied(),
+            QueuePolicy::RoundRobinQueues => {
+                if self.rr_turn {
+                    self.internal
+                        .front()
+                        .or_else(|| self.external.front())
+                        .copied()
+                } else {
+                    self.external
+                        .front()
+                        .or_else(|| self.internal.front())
+                        .copied()
+                }
+            }
+        }
     }
 
     pub fn pop_next(
@@ -549,12 +582,4 @@ impl MessagePool {
             }
         }
     }
-}
-
-pub struct PendingCommit {
-    pub block_meta: BlockMeta,
-    pub tx_meta: TxMeta,
-    pub delta: AccountDelta,
-    pub out_msg_hashes: Vec<Hash256>,
-    pub msg_to_tx: Vec<(Hash256, Hash256)>,
 }
