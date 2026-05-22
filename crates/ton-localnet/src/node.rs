@@ -69,7 +69,6 @@ struct PendingTransactionCommit {
 struct PendingBlockCommit {
     block_meta: BlockMeta,
     transactions: Vec<PendingTransactionCommit>,
-    discarded_msg_hashes: Vec<Hash256>,
 }
 
 struct MiningStateSnapshot {
@@ -485,40 +484,6 @@ impl Node {
         Ok(())
     }
 
-    fn delete_persisted_pending_messages(&self, hashes: &[Hash256]) {
-        if hashes.is_empty() {
-            return;
-        }
-
-        let Some(conn) = &self.conn else {
-            return;
-        };
-
-        let result = (|| -> anyhow::Result<()> {
-            let mut conn = conn.lock().expect("Failed to lock DB connection");
-            let db_tx = conn.transaction()?;
-            for hash in hashes {
-                db_tx.execute(
-                    "DELETE FROM pending_messages WHERE id = (
-                        SELECT id FROM pending_messages WHERE hash = ?1 ORDER BY id ASC LIMIT 1
-                    )",
-                    params![hash.0.to_vec()],
-                )?;
-            }
-            db_tx.execute(
-                "INSERT OR REPLACE INTO pending_pool_state (id, rr_turn) VALUES (0, ?1)",
-                params![if self.pool.rr_turn { 1_i64 } else { 0_i64 }],
-            )?;
-            db_tx.commit()?;
-            drop(conn);
-            Ok(())
-        })();
-
-        if let Err(err) = result {
-            tracing::error!("Failed to remove discarded pending messages: {:?}", err);
-        }
-    }
-
     fn mining_state_snapshot(&self) -> MiningStateSnapshot {
         MiningStateSnapshot {
             latest_accounts: self.latest.accounts.clone(),
@@ -584,27 +549,15 @@ impl Node {
             .last()
             .map_or(now, |block| now.max(block.gen_utime.saturating_add(1)));
         let mut transactions = Vec::new();
-        let mut discarded_msg_hashes = Vec::new();
 
         while transactions.len() < max_transactions && self.has_pending_messages() {
-            let selected_msg_hash = self
-                .pool
-                .peek_next(self.globals.queue_policy, &self.history.msg_by_hash);
             match self.execute_next_message(seqno, gen_utime) {
                 Ok(transaction) => {
                     self.apply_transaction_effects(&transaction);
                     transactions.push(transaction);
                 }
-                Err(err) if transactions.is_empty() => {
-                    if let Some(msg_hash) = selected_msg_hash {
-                        self.delete_persisted_pending_messages(&[msg_hash]);
-                    }
-                    return Err(err);
-                }
+                Err(err) if transactions.is_empty() => return Err(err),
                 Err(err) => {
-                    if let Some(msg_hash) = selected_msg_hash {
-                        discarded_msg_hashes.push(msg_hash);
-                    }
                     tracing::error!(
                         "Failed to mine a message in block {} after {} transactions: {:?}",
                         seqno,
@@ -651,7 +604,6 @@ impl Node {
         if let Err(err) = self.apply_commit(PendingBlockCommit {
             block_meta: block_meta.clone(),
             transactions,
-            discarded_msg_hashes,
         }) {
             self.restore_mining_state(snapshot);
             return Err(err);
@@ -1454,12 +1406,11 @@ impl Node {
                 params![pending.block_meta.seqno, block_data],
             )?;
 
-            let mut consumed_messages = pending
+            let consumed_messages = pending
                 .transactions
                 .iter()
                 .filter_map(|transaction| transaction.tx_meta.in_msg_hash)
                 .collect::<Vec<_>>();
-            consumed_messages.extend(pending.discarded_msg_hashes.iter().copied());
             let consumed_message_set = consumed_messages.iter().copied().collect::<HashSet<_>>();
 
             for (index, transaction) in pending.transactions.iter().enumerate() {

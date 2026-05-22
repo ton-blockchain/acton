@@ -519,38 +519,6 @@ impl MessagePool {
         self.internal.push_back(msg_hash);
     }
 
-    pub fn peek_next(
-        &self,
-        policy: QueuePolicy,
-        _msg_meta: &HashMap<Hash256, MsgMeta>,
-    ) -> Option<Hash256> {
-        match policy {
-            QueuePolicy::ExternalFirstFifo => self
-                .external
-                .front()
-                .or_else(|| self.internal.front())
-                .copied(),
-            QueuePolicy::InternalFirstFifo => self
-                .internal
-                .front()
-                .or_else(|| self.external.front())
-                .copied(),
-            QueuePolicy::RoundRobinQueues => {
-                if self.rr_turn {
-                    self.internal
-                        .front()
-                        .or_else(|| self.external.front())
-                        .copied()
-                } else {
-                    self.external
-                        .front()
-                        .or_else(|| self.internal.front())
-                        .copied()
-                }
-            }
-        }
-    }
-
     pub fn pop_next(
         &mut self,
         policy: QueuePolicy,
