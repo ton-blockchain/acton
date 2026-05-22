@@ -2469,21 +2469,6 @@ mod tests {
         }
     }
 
-    struct FailingExecutor;
-
-    impl TvmExecutor for FailingExecutor {
-        fn execute(
-            &self,
-            _shard_account: &BocBytes,
-            _in_msg: &BocBytes,
-            _ctx: &ExecContext,
-            _config: &BocBytes,
-            _libs: Option<&BocBytes>,
-        ) -> anyhow::Result<ExecResult> {
-            anyhow::bail!("forced executor failure")
-        }
-    }
-
     #[derive(Clone)]
     struct RecordingExecutor {
         recorded_libs: Arc<Mutex<Vec<Option<BocBytes>>>>,
@@ -2686,7 +2671,6 @@ mod tests {
                 old_account_boc: BocBytes::default(),
                 new_account_boc: None,
             }],
-            discarded_msg_hashes: Vec::new(),
         })
         .expect("must persist committed transaction metadata");
         drop(node);
@@ -2848,7 +2832,6 @@ mod tests {
                 old_account_boc: BocBytes::default(),
                 new_account_boc: None,
             }],
-            discarded_msg_hashes: Vec::new(),
         })
         .expect("must persist committed queue changes");
         drop(node);
@@ -2868,56 +2851,6 @@ mod tests {
         assert!(
             reopened.pool.internal.contains(&out_hash),
             "unconsumed output message must be restored as pending"
-        );
-
-        drop(reopened);
-        let _ = std::fs::remove_dir_all(temp_root);
-    }
-
-    #[test]
-    fn failed_pending_message_is_removed_from_persisted_queue() {
-        let unique = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("system time must be after unix epoch")
-            .as_nanos();
-        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
-            "ton-localnet-failed-pending-test-{}-{unique}",
-            std::process::id()
-        ));
-        let db_path = temp_root.join("localnet.db");
-
-        let config_bytes = base64::engine::general_purpose::STANDARD
-            .decode(DEFAULT_CONFIG)
-            .expect("must decode default config");
-        let mut node = Node::with_db_path(
-            Box::new(FailingExecutor),
-            config_bytes.clone().into(),
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must create sqlite-backed test node");
-
-        let msg_hash = node
-            .enqueue_faucet(&test_addr(0x71), 1)
-            .expect("must enqueue faucet message");
-        assert!(node.mine_block().is_err(), "executor failure must surface");
-        assert!(
-            !node.pool.internal.contains(&msg_hash),
-            "failed message must be removed from in-memory queue"
-        );
-        drop(node);
-
-        let reopened = Node::with_db_path(
-            Box::new(NoopExecutor),
-            config_bytes.into(),
-            StateSource::Local,
-            Some(&db_path),
-        )
-        .expect("must reopen sqlite-backed test node");
-
-        assert!(
-            !reopened.pool.internal.contains(&msg_hash),
-            "failed message must not be restored from persisted queue"
         );
 
         drop(reopened);
@@ -2998,7 +2931,6 @@ mod tests {
                     new_account_boc: Some(second_boc),
                 },
             ],
-            discarded_msg_hashes: Vec::new(),
         })
         .expect("must persist account deltas");
         drop(node);
