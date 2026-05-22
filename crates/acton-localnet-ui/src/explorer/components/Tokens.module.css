@@ -61,20 +61,20 @@
   color: var(--tonscan-text-secondary);
 }
 
-.priceInfo {
+.supplyInfo {
   text-align: right;
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
 
-.priceValue {
+.supplyShareValue {
   font-weight: 500;
   color: var(--tonscan-text-primary);
   font-size: 0.875rem;
 }
 
-.totalValue {
+.supplyShareLabel {
   font-size: 0.75rem;
   color: var(--tonscan-text-secondary);
 }

@@ -245,6 +245,8 @@ pub struct TransactionInfo {
     pub in_msg: Option<MessageInfo>,
     pub out_msgs: Vec<MessageInfo>,
     pub tx_boc: BocBytes,
+    pub account_state_before: Option<AccountStatePreview>,
+    pub account_state_after: Option<AccountStatePreview>,
 }
 
 #[derive(Clone, Debug)]
@@ -259,6 +261,16 @@ pub struct EmulateTraceResult {
     pub trace: TraceNode,
     pub code_cells: HashMap<Hash256, BocBytes>,
     pub data_cells: HashMap<Hash256, BocBytes>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AccountStatePreview {
+    pub hash: Hash256,
+    pub balance: u128,
+    pub status: AccountStatus,
+    pub code_hash: Option<Hash256>,
+    pub data_hash: Option<Hash256>,
+    pub frozen_hash: Option<Hash256>,
 }
 
 impl TraceNode {

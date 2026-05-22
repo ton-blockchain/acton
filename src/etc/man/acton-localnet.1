@@ -189,6 +189,22 @@ JSON state snapshot without stopping the server
 the current node state with a JSON state snapshot
 .RE
 .sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setShardAccount\fR with
+\fB{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}\fR replaces the selected
+account state with a base64\-encoded \fBShardAccount\fR BOC
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_sendInternalMessage\fR with \fB{"boc":"<BASE64_BOC>"}\fR sends a
+base64\-encoded internal message BOC through the local internal queue
+.RE
+.sp
+TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
+\fB/api/v3/message\fR accept external\-in messages only. Use
+\fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
+message.
+.sp
 Control endpoints are not authenticated and are intended only for local
 development. Do not expose the localnet server publicly.
 .SH "PERSISTENCE"

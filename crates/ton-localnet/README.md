@@ -13,6 +13,37 @@ Errors are returned with HTTP status and request-error payload:
 }
 ```
 
+## `/acton_setShardAccount`
+
+`/acton_setShardAccount` is a local control endpoint for replacing one account
+state with a serialized `ShardAccount`.
+
+Request body:
+
+```json
+{
+  "address": "<ADDR>",
+  "shard_account": "<BASE64_BOC>"
+}
+```
+
+`shard_account` must be a base64-encoded `ShardAccount` BOC string.
+
+## `/acton_sendInternalMessage`
+
+`/acton_sendInternalMessage` is a local control endpoint for injecting a raw
+internal message into the local node. It accepts the same BOC payload shape as
+TonCenter message endpoints:
+
+```json
+{
+  "boc": "<BASE64_BOC>"
+}
+```
+
+The BOC must decode to `MsgInfo::Int`. TonCenter-compatible endpoints such as
+`/api/v2/sendBoc` and `/api/v3/message` accept external-in messages only.
+
 ## `/api/v3/addressInformation`
 
 `/api/v3/addressInformation` is implemented as a v3-compatible view over

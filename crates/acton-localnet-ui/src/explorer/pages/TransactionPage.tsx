@@ -1,9 +1,7 @@
 import {
-  type BackendTransaction,
   ContractChip,
   type ContractData,
   fmt,
-  processTransactions,
   TransactionDetails,
   type TransactionInfo,
   TransactionTree,
@@ -25,11 +23,17 @@ import {useEffect, useState} from "react"
 import {useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
+import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import type {V3Transaction} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {hashToHex, normalizeAddress} from "../components/utils"
+import {
+  formatAddress as formatDisplayAddress,
+  hashToHex,
+  normalizeAddress,
+} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./TransactionPage.module.css"
 
@@ -45,30 +49,6 @@ interface ValueFlowItem {
   readonly after: bigint
   readonly change: bigint
   readonly fee: bigint
-}
-
-const buildBackendTransactions = (
-  transactionsMap: Record<string, V3Transaction>,
-): BackendTransaction[] => {
-  const findParentLt = (targetLt: string): string | undefined => {
-    for (const tx of Object.values(transactionsMap)) {
-      if (tx.child_transactions?.includes(targetLt)) {
-        return tx.lt
-      }
-    }
-    return undefined
-  }
-
-  return Object.values(transactionsMap).map(tx => ({
-    lt: tx.lt,
-    raw_transaction: tx.raw_transaction || "",
-    parent_transaction: findParentLt(tx.lt),
-    child_transactions: tx.child_transactions,
-    shard_account_before: "",
-    shard_account: "",
-    vm_log_diff: "",
-    executor_logs: "",
-  }))
 }
 
 const buildTransactionsHexIndex = (
@@ -117,10 +97,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const [loadingFlow, setLoadingFlow] = useState(false)
   const {fetchName} = useAddressBook()
+  const addressFormat = useAddressFormat()
 
   const handleContractClick = (address: string) => {
-    const formattedAddr = normalizeAddress(address)
-    window.open(`/explorer/address/${formattedAddr}`)
+    const formattedAddr = normalizeAddress(address, addressFormat)
+    void navigate(`/explorer/address/${encodeURIComponent(formattedAddr)}`)
   }
 
   useEffect(() => {
@@ -138,9 +119,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const transactionsMap = trace.transactions
           const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
 
-          const backendTransactions = buildBackendTransactions(transactionsMap)
-
-          const processed = processTransactions(backendTransactions)
+          const processed = buildTraceTransactionInfos(transactionsMap)
           if (!isActive) return
           setTraces(processed)
 
@@ -183,11 +162,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           await Promise.all(
             requestedAddresses.map(async addr => {
               const letter = String.fromCodePoint(nextLetterCode++)
-              const displayAddr = normalizeAddress(addr)
+              const displayAddr = normalizeAddress(addr, addressFormat)
               const customName = await fetchName(addr)
               const abi = abiByCodeHash.get(addressToCodeHash.get(addressKey(addr)) ?? "")
               contractsMap.set(addr, {
-                displayName: customName || fmt.formatAddress(displayAddr),
+                displayName: customName || formatDisplayAddress(displayAddr, true, addressFormat),
                 address: Address.parse(addr),
                 letter,
                 abi,
@@ -252,7 +231,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [client, fetchName, hash])
+  }, [addressFormat, client, fetchName, hash])
 
   if (loading) {
     return (
@@ -277,7 +256,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
 
   const firstTrace = traces[0]
   const traceAddress = firstTrace?.address?.toString() ?? ""
-  const traceAddressDisplay = normalizeAddress(traceAddress)
+  const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
 
   return (
     <div className={styles.container}>

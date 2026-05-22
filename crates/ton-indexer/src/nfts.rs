@@ -18,7 +18,8 @@ pub struct NftItemData {
 
 #[must_use]
 pub fn get_nft_item_data(address: String, code: Cell, data: Cell) -> Option<NftItemData> {
-    let Ok(result) = crate::jettons::run_get_method(address, code, data, "get_nft_data") else {
+    let Ok(result) = crate::jettons::run_get_method(address, code, data, "get_nft_data", None)
+    else {
         return None;
     };
 

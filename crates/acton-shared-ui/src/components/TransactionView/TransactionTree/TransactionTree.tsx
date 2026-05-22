@@ -250,7 +250,7 @@ export function TransactionTree({
       fromAddress:
         sourceLabel ??
         (tx.transaction.inMessage?.info.src
-          ? formatAddress(tx.transaction.inMessage.info.src as Address, new Map())
+          ? formatAddress(tx.transaction.inMessage.info.src as Address, contracts)
           : "unknown"),
       computePhase: {
         success: computePhase?.type === "vm" ? computePhase.success : true,
@@ -280,7 +280,7 @@ export function TransactionTree({
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     triggerRectReference.current = rect
 
-    const contractAddress = tx.address ? formatAddress(tx.address, new Map()) : "unknown"
+    const contractAddress = tx.address ? formatAddress(tx.address, contracts) : "unknown"
     const isCreated =
       tx.transaction.oldStatus === "non-existing" && tx.transaction.endStatus === "active"
     const isDestroyed =

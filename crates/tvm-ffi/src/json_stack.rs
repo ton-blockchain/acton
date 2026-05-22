@@ -171,7 +171,12 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
         .context("Legacy stack entry type must be a string")?;
     let val = &arr[1];
 
-    match type_str {
+    let normalized_type = type_str.to_ascii_lowercase();
+    let type_key = normalized_type
+        .strip_prefix("tvm.")
+        .unwrap_or(normalized_type.as_str());
+
+    match type_key {
         "null" => Ok(TupleItem::Null),
         "num" => {
             let s = val
@@ -185,34 +190,27 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                     }
                 })
                 .context("num value must be string or number")?;
-            let i = if s.starts_with("0x") || s.starts_with("0X") {
-                BigInt::parse_bytes(&s.as_bytes()[2..], 16).context("Failed to parse hex BigInt")?
+            let i = if let Some(hex) = s.strip_prefix("-0x").or_else(|| s.strip_prefix("-0X")) {
+                -BigInt::parse_bytes(hex.as_bytes(), 16).context("Failed to parse hex BigInt")?
+            } else if let Some(hex) = s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+                BigInt::parse_bytes(hex.as_bytes(), 16).context("Failed to parse hex BigInt")?
             } else {
                 s.parse::<BigInt>().context("Failed to parse BigInt")?
             };
             Ok(TupleItem::Int(i))
         }
         "cell" => {
-            let bytes = val
-                .get("bytes")
-                .and_then(|v| v.as_str())
-                .context("cell must have bytes")?;
+            let bytes = legacy_stack_bytes(val, "cell")?;
             let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Cell(c))
         }
         "slice" => {
-            let bytes = val
-                .get("bytes")
-                .and_then(|v| v.as_str())
-                .context("slice must have bytes")?;
+            let bytes = legacy_stack_bytes(val, "slice")?;
             let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Slice(c))
         }
         "builder" => {
-            let bytes = val
-                .get("bytes")
-                .and_then(|v| v.as_str())
-                .context("builder must have bytes")?;
+            let bytes = legacy_stack_bytes(val, "builder")?;
             let c = Boc::decode_base64(bytes)?;
             Ok(TupleItem::Builder(c))
         }
@@ -250,11 +248,23 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
     }
 }
 
+fn legacy_stack_bytes<'a>(value: &'a Value, stack_type: &str) -> anyhow::Result<&'a str> {
+    if let Some(bytes) = value.as_str() {
+        return Ok(bytes);
+    }
+
+    value
+        .get("bytes")
+        .and_then(Value::as_str)
+        .with_context(|| format!("{stack_type} must be a base64 string or an object with `bytes`"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::stack::TupleItem;
     use num_bigint::BigInt;
+    use tycho_types::cell::CellBuilder;
 
     #[test]
     fn test_stack_json_roundtrip() {
@@ -265,5 +275,35 @@ mod tests {
         let back = json_to_stack(json).unwrap();
 
         assert_eq!(tuple, back);
+    }
+
+    #[test]
+    fn test_legacy_stack_accepts_ton_ton_cell_type_names() {
+        let mut builder = CellBuilder::new();
+        builder.store_small_uint(42, 8).unwrap();
+        let cell = builder.build().unwrap();
+
+        let boc = Boc::encode_base64(&cell);
+
+        assert_eq!(
+            json_to_legacy_item(serde_json::json!(["tvm.Cell", boc])).unwrap(),
+            TupleItem::Cell(cell.clone())
+        );
+        assert_eq!(
+            json_to_legacy_item(serde_json::json!(["tvm.Slice", boc])).unwrap(),
+            TupleItem::Slice(cell.clone())
+        );
+        assert_eq!(
+            json_to_legacy_item(serde_json::json!(["tvm.Builder", boc])).unwrap(),
+            TupleItem::Builder(cell)
+        );
+    }
+
+    #[test]
+    fn test_legacy_stack_accepts_negative_hex_numbers() {
+        assert_eq!(
+            json_to_legacy_item(serde_json::json!(["num", "-0x2a"])).unwrap(),
+            TupleItem::Int(BigInt::from(-42))
+        );
     }
 }

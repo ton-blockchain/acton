@@ -3,7 +3,6 @@
   border: 1px solid var(--border-color);
   background-color: var(--bg-secondary-color);
   color: var(--text-primary);
-  box-shadow: var(--shadow);
   overflow: hidden;
 }
 

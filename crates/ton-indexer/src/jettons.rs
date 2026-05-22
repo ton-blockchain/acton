@@ -31,8 +31,13 @@ pub struct JettonWalletData {
 }
 
 #[must_use]
-pub fn get_jetton_wallet_data(address: String, code: Cell, data: Cell) -> Option<JettonWalletData> {
-    let Ok(result) = run_get_method(address, code, data, "get_wallet_data") else {
+pub fn get_jetton_wallet_data(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<JettonWalletData> {
+    let Ok(result) = run_get_method(address, code, data, "get_wallet_data", libs) else {
         return None;
     };
 
@@ -139,8 +144,13 @@ pub fn parse_jetton_content(content_cell: Cell) -> Value {
 }
 
 #[must_use]
-pub fn get_jetton_data(address: String, code: Cell, data: Cell) -> Option<JettonData> {
-    let Ok(result) = run_get_method(address, code, data, "get_jetton_data") else {
+pub fn get_jetton_data(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<JettonData> {
+    let Ok(result) = run_get_method(address, code, data, "get_jetton_data", libs) else {
         return None;
     };
 
@@ -191,6 +201,7 @@ pub fn run_get_method(
     code: Cell,
     data: Cell,
     name: &str,
+    libs: Option<&str>,
 ) -> anyhow::Result<Tuple> {
     const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -203,7 +214,7 @@ pub fn run_get_method(
         code: Boc::encode_base64(code),
         data: Boc::encode_base64(data),
         verbosity: ExecutorVerbosity::Short,
-        libs: String::new(),
+        libs: libs.unwrap_or_default().to_owned(),
         address,
         unixtime: duration_since_epoch.as_secs().try_into()?,
         balance: "10".to_string(),

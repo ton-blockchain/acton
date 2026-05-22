@@ -45,9 +45,9 @@ jobs:
           persist-credentials: false
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
         with:
-          tool: cargo-deny@0.19.4,cargo-audit@0.22.1
+          tool: cargo-deny@0.19.6,cargo-audit@0.22.1
           fallback: none
 
       - name: Run cargo-deny

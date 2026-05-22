@@ -989,6 +989,164 @@ fn localnet_admin_dump_and_load_state_roundtrip() {
 }
 
 #[test]
+fn localnet_admin_set_shard_account_updates_selected_account() {
+    let project = ProjectBuilder::new("localnet-admin-set-shard-account").build();
+    let node = project.localnet().start();
+    let source = "0:1111111111111111111111111111111111111111111111111111111111111111";
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": source,
+            "amount": 1_000_000_000u128,
+        }),
+    );
+    let source_info = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={source}"),
+        Duration::from_secs(5),
+    );
+    let source_balance = parse_address_balance(&source_info);
+    let source_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={source}"),
+        Duration::from_secs(5),
+    );
+    let source_shard_boc = shard_account_cell_boc64(&source_shard_response).to_owned();
+
+    let set = node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": source_shard_boc,
+        }),
+    );
+    let target_info_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_balance_after_set = parse_address_balance(&target_info_after_set);
+    let target_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_shard_boc = shard_account_cell_boc64(&target_shard_response).to_owned();
+
+    let invalid = node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": "not-a-boc",
+        }),
+    );
+
+    let snapshot = json!({
+        "fund": summarize_admin_response(&fund),
+        "set": summarize_admin_response(&set),
+        "source_balance": source_balance.to_string(),
+        "target_balance_after_set": target_balance_after_set.to_string(),
+        "target_cell_matches_source": target_shard_boc == source_shard_boc,
+        "target_after_set": summarize_shard_account_cell_response(&target_shard_response, None),
+        "invalid": summarize_admin_response(&invalid),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_set_shard_account_updates_selected_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_raw_internal_messages_use_acton_endpoint() {
+    let project = ProjectBuilder::new("localnet-raw-internal-message").build();
+    let node = project.localnet().start();
+    let internal_boc = build_localnet_internal_boc();
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let send_boc = node.post_json(
+        "/api/v2/sendBoc",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let send_boc_return_hash = node.post_json(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let (json_rpc_send_boc_status, json_rpc_send_boc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "send",
+            "method": "sendBoc",
+            "params": {
+                "boc": internal_boc,
+            },
+        }),
+    );
+    let (json_rpc_send_boc_return_hash_status, json_rpc_send_boc_return_hash) = node
+        .post_json_with_status(
+            "/api/v2/jsonRPC",
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "send-return-hash",
+                "method": "sendBocReturnHash",
+                "params": {
+                    "boc": internal_boc,
+                },
+            }),
+        );
+    let (message_status, message) = node.post_json_with_status(
+        "/api/v3/message",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let acton_send = node.post_json(
+        "/acton_sendInternalMessage",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let target_info = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={target}"),
+        Duration::from_secs(5),
+    );
+
+    let snapshot = json!({
+        "send_boc": summarize_admin_response(&send_boc),
+        "send_boc_return_hash": summarize_admin_response(&send_boc_return_hash),
+        "json_rpc_send_boc_status": json_rpc_send_boc_status,
+        "json_rpc_send_boc": summarize_admin_response(&json_rpc_send_boc),
+        "json_rpc_send_boc_return_hash_status": json_rpc_send_boc_return_hash_status,
+        "json_rpc_send_boc_return_hash": summarize_admin_response(&json_rpc_send_boc_return_hash),
+        "message_status": message_status,
+        "message": message,
+        "acton_send": summarize_admin_response(&acton_send),
+        "target_balance": parse_address_balance(&target_info).to_string(),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_raw_internal_messages_use_acton_endpoint.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_script_println_net_send_in_broadcast_shows_synthetic_hint() {
     let project = ProjectBuilder::new("localnet-broadcast-println-net-send")
         .contract("child", CHILD_CONTRACT)
@@ -3183,6 +3341,9 @@ fn summarize_admin_response(response: &Value) -> Value {
     if let Some(tx_hash) = response.pointer_mut("/result/result/tx_hash") {
         *tx_hash = json!("[HASH]");
     }
+    if let Some(hash) = response.pointer_mut("/result/hash") {
+        *hash = json!("[HASH]");
+    }
     response
 }
 
@@ -3366,25 +3527,7 @@ fn build_localnet_ext_in_boc() -> String {
         TonWallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
 
     let wallet_addr = ton_address_to_std_addr(&wallet.address);
-    let message = OwnedMessage {
-        info: MsgInfo::Int(IntMsgInfo {
-            ihr_disabled: true,
-            bounce: false,
-            bounced: false,
-            src: IntAddr::Std(wallet_addr.clone()),
-            dst: IntAddr::Std(wallet_addr),
-            value: CurrencyCollection::new(50_000_000),
-            ihr_fee: Default::default(),
-            fwd_fee: Default::default(),
-            created_at: 0,
-            created_lt: 0,
-        }),
-        init: None,
-        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
-        layout: None,
-    };
-
-    let internal_boc = BocRepr::encode(message).expect("must encode internal message boc");
+    let internal_boc = build_internal_message_boc(wallet_addr.clone(), wallet_addr, 50_000_000);
     let internal_cell = TonCell::from_boc(internal_boc).expect("must decode internal TonCell");
     let expire_at = (SystemTime::now() + Duration::from_secs(600))
         .duration_since(UNIX_EPOCH)
@@ -3395,6 +3538,43 @@ fn build_localnet_ext_in_boc() -> String {
         .expect("must build external-in message")
         .to_boc_base64()
         .expect("must encode external-in message boc")
+}
+
+fn build_localnet_internal_boc() -> String {
+    let source = test_std_addr(0x11);
+    let target = test_std_addr(0x22);
+    base64::engine::general_purpose::STANDARD
+        .encode(build_internal_message_boc(source, target, 50_000_000))
+}
+
+fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {
+    let message = OwnedMessage {
+        info: MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: IntAddr::Std(source),
+            dst: IntAddr::Std(target),
+            value: CurrencyCollection::new(value),
+            ihr_fee: Default::default(),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        }),
+        init: None,
+        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
+        layout: None,
+    };
+
+    BocRepr::encode(message).expect("must encode internal message boc")
+}
+
+fn test_std_addr(byte: u8) -> StdAddr {
+    StdAddr {
+        anycast: None,
+        address: HashBytes([byte; 32]),
+        workchain: 0,
+    }
 }
 
 fn compute_message_hashes_base64(boc_b64: &str) -> (String, String) {

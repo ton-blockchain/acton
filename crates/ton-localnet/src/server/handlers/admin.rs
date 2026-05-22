@@ -1,9 +1,11 @@
 use super::utils::handle_result;
+use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
 use crate::node;
+use crate::server::StartupWallet;
 use crate::server::models::{
     FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
-    SetAddressNameRequest, StatePathRequest,
+    SendBocRequest, SetAddressNameRequest, SetShardAccountRequest, StatePathRequest,
 };
 use crate::types::Hash256;
 use axum::{Json, extract::State};
@@ -64,6 +66,16 @@ pub async fn get_status(State(node): State<Arc<Localnet>>) -> Json<Value> {
     .await
 }
 
+pub async fn get_startup_wallets(
+    State(startup_wallets): State<Arc<Vec<StartupWallet>>>,
+) -> Json<Value> {
+    handle_result(
+        async move { Ok::<_, anyhow::Error>(startup_wallets.as_ref().clone()) },
+        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+    )
+    .await
+}
+
 pub async fn dump_state(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<StatePathRequest>,
@@ -83,6 +95,28 @@ pub async fn set_state_source(
     Json(payload): Json<node::StateSource>,
 ) -> Json<Value> {
     handle_result(node.set_state_source(payload), |()| Value::Null).await
+}
+
+pub async fn set_shard_account(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<SetShardAccountRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.set_shard_account(payload.address, payload.shard_account),
+        |()| Value::Null,
+    )
+    .await
+}
+
+pub async fn send_internal_message(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<SendBocRequest>,
+) -> Json<Value> {
+    handle_result(
+        node.send_internal_boc(payload.boc),
+        v2::map_send_boc_return_hash,
+    )
+    .await
 }
 
 pub async fn set_address_name(

@@ -1,16 +1,19 @@
 import * as React from "react"
 import {useEffect, useMemo, useState} from "react"
-import {BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate} from "react-router-dom"
-
-import {Moon, Sun} from "lucide-react"
+import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
+import {ToastProvider} from "@acton/shared-ui"
 
 import {TonClient} from "./explorer/api/client"
-import {hashToHex, toTestnetAddress} from "./explorer/components/utils"
+import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
+import {DashboardPage} from "./dashboard/DashboardPage"
+import {FaucetPage} from "./dashboard/pages/FaucetPage"
+import {HomePage} from "./dashboard/pages/HomePage"
+import {NftsPage} from "./dashboard/pages/NftsPage"
+import {TokensPage} from "./dashboard/pages/TokensPage"
+import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
-import {NftsPage} from "./explorer/pages/NftsPage"
-import {TokensPage} from "./explorer/pages/TokensPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
@@ -43,9 +46,13 @@ export const App: React.FC = () => {
 
   return (
     <BrowserRouter>
-      <AddressBookProvider client={client}>
-        <AppContent client={client} theme={theme} setTheme={setTheme} />
-      </AddressBookProvider>
+      <ToastProvider>
+        <NetworkInfoProvider client={client}>
+          <AddressBookProvider client={client}>
+            <AppContent client={client} theme={theme} setTheme={setTheme} />
+          </AddressBookProvider>
+        </NetworkInfoProvider>
+      </ToastProvider>
     </BrowserRouter>
   )
 }
@@ -57,131 +64,82 @@ interface AppContentProps {
 }
 
 const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
-  const navigate = useNavigate()
-  const location = useLocation()
-
   return (
     <div className={styles.app}>
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <div className={styles.logoSection}>
-            <button
-              type="button"
-              className={styles.logo}
-              onClick={() => {
-                void navigate("/")
-              }}
-            >
-              <svg
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="white"
-                role="img"
-                aria-label="Logo"
-              >
-                <title>Logo</title>
-                <path d="M12 2L2 19h20L12 2zm0 3.8L18.4 17H5.6L12 5.8z" />
-              </svg>
-            </button>
-            <nav className={styles.nav}>
-              <button
-                type="button"
-                className={`${styles.navItem} ${
-                  location.pathname.startsWith("/explorer") ? styles.navItemActive : ""
-                }`}
-                onClick={() => {
-                  void navigate("/explorer")
-                }}
-              >
-                Explorer
-              </button>
-              <button
-                type="button"
-                className={`${styles.navItem} ${
-                  location.pathname.startsWith("/tokens") ? styles.navItemActive : ""
-                }`}
-                onClick={() => {
-                  void navigate("/tokens")
-                }}
-              >
-                Tokens
-              </button>
-              <button
-                type="button"
-                className={`${styles.navItem} ${
-                  location.pathname.startsWith("/nfts") ? styles.navItemActive : ""
-                }`}
-                onClick={() => {
-                  void navigate("/nfts")
-                }}
-              >
-                NFTs
-              </button>
-            </nav>
-          </div>
-
-          <HeaderSearch />
-
-          <div className={styles.themeSection}>
-            <button
-              type="button"
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-              className={styles.themeButton}
-              aria-label="Toggle theme"
-            >
-              <div className={styles.themeIconWrapper}>
-                <Sun
-                  className={`${styles.themeIcon} ${theme === "light" ? styles.active : ""}`}
-                  size={18}
-                />
-                <Moon
-                  className={`${styles.themeIcon} ${theme === "dark" ? styles.active : ""}`}
-                  size={18}
-                />
-              </div>
-            </button>
-          </div>
-        </div>
-      </header>
       <main className={styles.main}>
         <Routes>
-          <Route path="/" element={<Navigate to="/explorer" replace />} />
-          <Route path="/explorer" element={<ExplorerIndexPage />} />
-          <Route path="/explorer/address/:address" element={<AccountPage client={client} />} />
-          <Route path="/tokens" element={<TokensPage client={client} />} />
-          <Route path="/nfts" element={<NftsPage client={client} />} />
-          <Route path="/explorer/tx/:hash" element={<TransactionPage client={client} />} />
-          <Route path="*" element={<Navigate to="/explorer" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/dashboard"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <HomePage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/faucet"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <FaucetPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/wallets"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <WalletsPage client={client} host={HOST} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/tokens"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <TokensPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/nfts"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <NftsPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route path="/dashboard/faucet" element={<Navigate to="/faucet" replace />} />
+          <Route path="/dashboard/wallets" element={<Navigate to="/wallets" replace />} />
+          <Route path="/dashboard/tokens" element={<Navigate to="/tokens" replace />} />
+          <Route path="/dashboard/nfts" element={<Navigate to="/nfts" replace />} />
+          <Route
+            path="/explorer"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <ExplorerIndexPage />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/explorer/address/:address"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <AccountPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/explorer/tx/:hash"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <TransactionPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </main>
-    </div>
-  )
-}
-
-const HeaderSearch: React.FC = () => {
-  const navigate = useNavigate()
-  return (
-    <div className={styles.searchSection}>
-      <div className={styles.searchBox}>
-        <input
-          type="text"
-          placeholder="Search by address or hash"
-          className={styles.searchInput}
-          onKeyDown={e => {
-            if (e.key === "Enter") {
-              const val = (e.target as HTMLInputElement).value.trim()
-              const hashHex = hashToHex(val)
-              if (hashHex) {
-                void navigate(`/explorer/tx/${hashHex}`)
-              } else {
-                const formatted = toTestnetAddress(val)
-                void navigate(`/explorer/address/${formatted ?? val}`)
-              }
-            }
-          }}
-        />
-      </div>
     </div>
   )
 }

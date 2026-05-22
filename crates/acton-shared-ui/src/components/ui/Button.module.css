@@ -1,0 +1,96 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border-radius: 0.625rem;
+  border: 1px solid transparent;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  text-decoration: none;
+  transition:
+    background-color var(--transition-duration-fast) ease,
+    border-color var(--transition-duration-fast) ease,
+    color var(--transition-duration-fast) ease,
+    box-shadow var(--transition-duration-fast) ease;
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px
+    var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
+}
+
+.button:disabled {
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+.button svg {
+  flex: 0 0 auto;
+}
+
+.variantDefault {
+  background: var(--litenode-primary, var(--text-primary));
+  color: var(--litenode-primary-foreground, var(--bg-color));
+}
+
+.variantDefault:hover:not(:disabled) {
+  background: var(--litenode-primary-hover, var(--text-secondary));
+}
+
+.variantOutline {
+  border-color: var(--litenode-border-control, var(--border-color));
+  background: var(--litenode-surface, var(--bg-color));
+  color: var(--litenode-text, var(--text-primary));
+}
+
+.variantOutline:hover:not(:disabled) {
+  background: var(--litenode-surface-hover, var(--hover-bg));
+}
+
+.variantSecondary {
+  background: var(--litenode-surface-hover, var(--bg-secondary-color));
+  color: var(--litenode-text, var(--text-primary));
+}
+
+.variantSecondary:hover:not(:disabled) {
+  background: var(--litenode-surface-active, var(--bg-selection-color));
+}
+
+.variantGhost {
+  background: transparent;
+  color: var(--litenode-text, var(--text-primary));
+}
+
+.variantGhost:hover:not(:disabled) {
+  background: var(--litenode-surface-hover, var(--hover-bg));
+}
+
+.sizeDefault {
+  height: 2.5rem;
+  padding: 0 1rem;
+}
+
+.sizeSm {
+  height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+}
+
+.sizeLg {
+  height: 2.75rem;
+  padding: 0 1.25rem;
+}
+
+.sizeIcon {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+}

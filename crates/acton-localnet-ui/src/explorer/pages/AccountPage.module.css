@@ -1,8 +1,8 @@
 .container {
-  padding: var(--spacing-lg) var(--spacing-md);
+  padding: 24px 32px 40px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 20px;
 }
 
 .loading {
@@ -12,7 +12,7 @@
 }
 
 .error {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--litenode-danger-bg-soft);
   border: 1px solid var(--tonscan-error);
   color: var(--tonscan-error);
   padding: var(--spacing-md);
@@ -24,13 +24,13 @@
   padding: var(--spacing-xl);
   color: var(--tonscan-text-secondary);
   background-color: var(--tonscan-card-bg);
-  border-radius: var(--border-radius-md);
+  border-radius: 16px;
   border: 1px solid var(--tonscan-border);
 }
 
 .topSection {
   display: flex;
-  gap: var(--spacing-lg);
+  gap: 24px;
   align-items: stretch;
 }
 
@@ -41,37 +41,43 @@
 .jettonInfo {
   flex: 1;
   background-color: var(--tonscan-card-bg);
-  border-radius: var(--border-radius-md);
+  border-radius: 16px;
   border: 1px solid var(--tonscan-border);
-  padding: var(--spacing-lg);
+  padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 16px;
 }
 
 .jettonHeader {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 12px;
   align-items: center;
 }
 
 .jettonTitle {
+  min-width: 0;
 }
 
 .jettonImage {
   width: 48px;
   height: 48px;
-  border-radius: 50%;
+  border-radius: 14px;
+  border: 1px solid var(--litenode-border-subtle);
+  background: var(--litenode-surface-subtle);
   object-fit: cover;
+  flex: 0 0 auto;
 }
 
 .jettonName {
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 600;
   color: var(--tonscan-text-primary);
+  line-height: 1.25;
 }
 
 .jettonSymbol {
+  margin-top: 2px;
   font-size: 0.875rem;
   color: var(--tonscan-text-secondary);
 }
@@ -79,24 +85,32 @@
 .jettonDescription {
   font-size: 0.875rem;
   color: var(--tonscan-text-secondary);
-  line-height: 1.4;
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--tonscan-border);
+  line-height: 1.5;
+  padding: 2px 0 0;
 }
 
 .jettonDetails {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
 }
 
 .jettonRow {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--spacing-xs) 0;
+  gap: 16px;
+  min-height: 44px;
+  padding: 0 14px;
   border-bottom: 1px solid var(--tonscan-border);
+}
+
+.jettonRow:last-child {
+  border-bottom: none;
 }
 
 .jettonLabel {
@@ -106,14 +120,30 @@
 
 .jettonValue {
   color: var(--tonscan-text-primary);
-  font-weight: 500;
+  font-weight: 600;
+  text-align: right;
 }
 
-.jettonValue[onClick] {
+.jettonLink {
   cursor: pointer;
+}
+
+.jettonLink:hover {
   color: var(--tonscan-link);
 }
 
-.jettonValue[onClick]:hover {
-  text-decoration: underline;
+.jettonLink:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+@media (max-width: 1100px) {
+  .container {
+    padding: 20px;
+  }
+
+  .topSection {
+    flex-direction: column;
+  }
 }

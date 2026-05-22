@@ -31,13 +31,13 @@
 
 .tab:hover {
   color: var(--tonscan-text-primary);
-  background-color: rgba(0, 136, 204, 0.08);
+  background-color: var(--litenode-accent-bg);
 }
 
 .tabActive {
   background-color: var(--tonscan-card-bg);
   color: var(--tonscan-text-primary);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+  box-shadow: var(--litenode-shadow-sm);
 }
 
 .codeBlock {

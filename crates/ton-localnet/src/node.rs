@@ -1,23 +1,24 @@
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::localnet::compute_normalized_ext_in_hash;
-use crate::remote::{RemoteProvider, fetch_remote_shard_account};
+use crate::remote::{RemoteProvider, account_meta_from_shard_account, fetch_remote_shard_account};
 use crate::storage::{
     self, GlobalLibraryEntry, GlobalLibraryLookup, JettonMasterMeta, NftItemMeta,
 };
 use crate::storage::{
-    AccountDelta, AccountMeta, AccountStatus, BlockMeta, CellStore, Globals, History, Indexes,
-    LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey, TraceNode,
-    TransactionInfo, TxMeta,
+    AccountDelta, AccountMeta, AccountStatePreview, AccountStatus, BlockMeta, CellStore, Globals,
+    History, Indexes, LatestState, MessageInfo, MessagePool, MsgMeta, PendingCommit, ReverseLtKey,
+    TraceNode, TransactionInfo, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
+use base64::Engine;
 use core::cmp;
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellFamily, Store};
@@ -270,25 +271,56 @@ impl Node {
         &mut self,
         boc: BocBytes,
     ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
-        // 1. Validate & Store
+        self.send_boc_to_queue(
+            boc,
+            MessageKind::ExternalIn,
+            "sendBoc accepts only external-in messages",
+        )
+    }
+
+    pub fn send_internal_boc(
+        &mut self,
+        boc: BocBytes,
+    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+        self.send_boc_to_queue(
+            boc,
+            MessageKind::Internal,
+            "acton_sendInternalMessage accepts only internal messages",
+        )
+    }
+
+    fn send_boc_to_queue(
+        &mut self,
+        boc: BocBytes,
+        expected_kind: MessageKind,
+        kind_error: &'static str,
+    ) -> anyhow::Result<(Hash256, Hash256, Seqno, Vec<Hash256>)> {
+        // 1. Validate
         let hash = compute_boc_hash(&boc)?;
         tracing::info!(
             "send_boc: msg_hash={}, current_queue={}",
             hash.to_hex(),
             self.pool.external.len() + self.pool.internal.len()
         );
-        if self.cas.get(&hash).is_none() {
-            self.cas.put(boc.clone(), hash);
+        let (msg_meta, kind) = parse_msg_meta_with_kind(&boc, hash)?;
+        if kind != expected_kind {
+            anyhow::bail!(kind_error);
         }
 
-        // 2. Parse minimal meta
-        let msg_meta = parse_msg_meta(&boc, hash)?;
+        // 2. Store
+        if self.cas.get(&hash).is_none() {
+            self.cas.put(boc, hash);
+        }
 
         // 3. Register MsgMeta
         self.history.msg_by_hash.insert(hash, msg_meta);
 
         // 4. Enqueue
-        self.pool.push_external(hash);
+        match kind {
+            MessageKind::ExternalIn => self.pool.push_external(hash),
+            MessageKind::Internal => self.pool.push_internal(hash),
+            MessageKind::ExternalOut => unreachable!("external-out messages are rejected above"),
+        }
 
         // 5. Mine one
         let (block_meta, tx_meta) = self.mine_one()?;
@@ -496,26 +528,31 @@ impl Node {
             lt,
         )?;
 
-        self.detect_jetton_masters(&dst)?;
-        self.detect_jetton_wallets(&dst)?;
-        self.detect_nft_items(&dst)?;
+        self.detect_assets(&dst)?;
 
         Ok((block_meta, tx_meta))
     }
 
+    fn detect_assets(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        self.detect_jetton_masters(addr)?;
+        self.detect_jetton_wallets(addr)?;
+        self.detect_nft_items(addr)?;
+        Ok(())
+    }
+
     fn detect_jetton_wallets(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some(meta) = self.latest.accounts.get(addr) else {
-            return Ok(());
-        };
-
-        if meta.status != AccountStatus::Active {
-            return Ok(());
-        }
-
-        let Some(code_hash) = meta.code_hash else {
-            return Ok(());
-        };
-        let Some(data_hash) = meta.data_hash else {
+        let Some((code_hash, data_hash, last_transaction_lt)) =
+            self.latest.accounts.get(addr).and_then(|meta| {
+                if meta.status != AccountStatus::Active {
+                    return None;
+                }
+                Some((
+                    meta.code_hash?,
+                    meta.data_hash?,
+                    meta.last_trans_lt.unwrap_or(0),
+                ))
+            })
+        else {
             return Ok(());
         };
 
@@ -528,10 +565,16 @@ impl Node {
 
         let code = Boc::decode(&code_boc)?;
         let data = Boc::decode(&data_boc)?;
+        let libs = self
+            .build_vm_global_libs_boc()?
+            .map(|boc| base64::engine::general_purpose::STANDARD.encode(boc));
 
-        if let Some(wallet_data) =
-            ton_indexer::jettons::get_jetton_wallet_data(addr.to_string(), code, data)
-        {
+        if let Some(wallet_data) = ton_indexer::jettons::get_jetton_wallet_data(
+            addr.to_string(),
+            code,
+            data,
+            libs.as_deref(),
+        ) {
             let wallet_meta = storage::JettonWalletMeta {
                 address: *addr,
                 balance: wallet_data.balance.to_str_radix(10).parse().unwrap_or(0),
@@ -540,7 +583,7 @@ impl Node {
                 jetton_address: self
                     .parse_addr_internal(&wallet_data.jetton_master_address)
                     .unwrap_or(*addr),
-                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+                last_transaction_lt,
                 owner_address: self
                     .parse_addr_internal(&wallet_data.owner_address)
                     .unwrap_or(*addr),
@@ -553,18 +596,18 @@ impl Node {
     }
 
     fn detect_jetton_masters(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some(meta) = self.latest.accounts.get(addr) else {
-            return Ok(());
-        };
-
-        if meta.status != AccountStatus::Active {
-            return Ok(());
-        }
-
-        let Some(code_hash) = meta.code_hash else {
-            return Ok(());
-        };
-        let Some(data_hash) = meta.data_hash else {
+        let Some((code_hash, data_hash, last_transaction_lt)) =
+            self.latest.accounts.get(addr).and_then(|meta| {
+                if meta.status != AccountStatus::Active {
+                    return None;
+                }
+                Some((
+                    meta.code_hash?,
+                    meta.data_hash?,
+                    meta.last_trans_lt.unwrap_or(0),
+                ))
+            })
+        else {
             return Ok(());
         };
 
@@ -577,13 +620,17 @@ impl Node {
 
         let code = Boc::decode(&code_boc)?;
         let data = Boc::decode(&data_boc)?;
+        let libs = self
+            .build_vm_global_libs_boc()?
+            .map(|boc| base64::engine::general_purpose::STANDARD.encode(boc));
 
         if let Some(jetton_data) =
-            ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data)
+            ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data, libs.as_deref())
         {
             let wallet_code_hash = Hash256(*jetton_data.jetton_wallet_code.repr_hash().as_array());
-            let jetton_content =
-                ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content);
+            let jetton_content = resolve_offchain_jetton_content(
+                ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
+            );
 
             let master_meta = JettonMasterMeta {
                 address: *addr,
@@ -594,7 +641,7 @@ impl Node {
                 data_hash,
                 jetton_content,
                 jetton_wallet_code_hash: wallet_code_hash,
-                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
+                last_transaction_lt,
                 mintable: jetton_data.mintable,
                 total_supply: jetton_data
                     .total_supply
@@ -607,6 +654,15 @@ impl Node {
         }
 
         Ok(())
+    }
+
+    fn ensure_jetton_master_detected(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        if self.history.jetton_masters.contains_key(addr) {
+            return Ok(());
+        }
+
+        let _ = self.get_address_information(addr);
+        self.detect_jetton_masters(addr)
     }
 
     fn detect_nft_items(&mut self, addr: &Addr) -> anyhow::Result<()> {
@@ -661,12 +717,26 @@ impl Node {
     }
 
     pub fn get_jetton_masters(
-        &self,
+        &mut self,
         address: Option<Addr>,
         admin_address: Option<Addr>,
         limit: usize,
         offset: usize,
     ) -> anyhow::Result<Vec<JettonMasterMeta>> {
+        if let Some(addr) = address {
+            self.ensure_jetton_master_detected(&addr)?;
+        } else {
+            let jetton_addresses: HashSet<_> = self
+                .history
+                .jetton_wallets
+                .values()
+                .map(|wallet| wallet.jetton_address)
+                .collect();
+            for addr in jetton_addresses {
+                self.ensure_jetton_master_detected(&addr)?;
+            }
+        }
+
         let mut masters: Vec<_> = self
             .history
             .jetton_masters
@@ -855,7 +925,7 @@ impl Node {
         Ok(())
     }
 
-    fn build_vm_global_libs_boc(&mut self) -> anyhow::Result<Option<BocBytes>> {
+    pub(crate) fn build_vm_global_libs_boc(&mut self) -> anyhow::Result<Option<BocBytes>> {
         if !self.vm_global_libs_dirty {
             return Ok(self.vm_global_libs_boc.clone());
         }
@@ -942,7 +1012,7 @@ impl Node {
                         self.vm_global_libs_dirty = true;
                     }
                 }
-                (None, Some(new_lib)) => {
+                (_, Some(new_lib)) => {
                     let new_hash = Hash256(*new_lib.repr_hash().as_array());
                     if new_hash != hash {
                         anyhow::bail!(
@@ -1143,9 +1213,8 @@ impl Node {
 
         if let StateSource::Remote(provider) = &self.state_source {
             let provider = provider.clone();
-            if let Ok((_, meta)) = fetch_remote_shard_account(addr, &provider, &mut self.cas) {
-                self.latest.accounts.insert(*addr, meta.clone());
-                return Some(meta);
+            if let Ok(Some(_)) = self.fetch_remote_shard_account(addr, &provider) {
+                return self.latest.accounts.get(addr).cloned();
             }
         }
 
@@ -1218,6 +1287,8 @@ impl Node {
                     in_msg,
                     out_msgs,
                     tx_boc,
+                    account_state_before: None,
+                    account_state_after: None,
                 }
             })
             .collect()
@@ -1280,6 +1351,8 @@ impl Node {
             in_msg,
             out_msgs,
             tx_boc,
+            account_state_before: None,
+            account_state_after: None,
         })
     }
 
@@ -1413,6 +1486,55 @@ impl Node {
         Self::empty_shard_account_boc()
     }
 
+    pub fn set_shard_account(
+        &mut self,
+        addr: &Addr,
+        shard_account_boc: BocBytes,
+    ) -> anyhow::Result<()> {
+        let old_boc = self.get_shard_account(addr).ok();
+        self.clear_detected_assets(addr);
+
+        let cell = Boc::decode(&shard_account_boc).context("Failed to decode ShardAccount BOC")?;
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse ShardAccount BOC")?;
+        let meta =
+            account_meta_from_shard_account(&shard_account, &shard_account_boc, &mut self.cas)?;
+        let lt = meta.last_trans_lt.unwrap_or(self.globals.global_lt);
+
+        self.persist_account_meta(addr, &meta)?;
+        self.latest.accounts.insert(*addr, meta);
+        self.update_public_libraries_from_account_diff(
+            addr,
+            old_boc.as_ref(),
+            Some(&shard_account_boc),
+            lt,
+        )?;
+        self.detect_assets(addr)?;
+
+        Ok(())
+    }
+
+    fn clear_detected_assets(&mut self, addr: &Addr) {
+        self.history.jetton_masters.remove(addr);
+        self.history.jetton_wallets.remove(addr);
+        self.history.nft_items.remove(addr);
+    }
+
+    fn persist_account_meta(&self, addr: &Addr, meta: &AccountMeta) -> anyhow::Result<()> {
+        let Some(conn) = &self.conn else {
+            return Ok(());
+        };
+
+        let account_data = serde_json::to_vec(meta)?;
+        conn.lock().expect("Failed to lock DB connection").execute(
+            "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
+            params![addr.addr.to_vec(), account_data],
+        )?;
+
+        Ok(())
+    }
+
     pub fn get_shard_account_at_block(
         &mut self,
         addr: &Addr,
@@ -1533,6 +1655,11 @@ impl Node {
                     }),
                     out_msgs,
                     tx_boc: exec_result.tx_boc,
+                    account_state_before: account_state_preview_from_boc(&shard_account_boc),
+                    account_state_after: exec_result
+                        .new_account_boc
+                        .as_ref()
+                        .and_then(account_state_preview_from_boc),
                 },
                 children: Vec::new(),
                 external_hash: Some(msg_hash),
@@ -1598,7 +1725,9 @@ impl Node {
         if meta.status == AccountStatus::Nonexist {
             return Ok(None);
         }
+        let lt = meta.last_trans_lt.unwrap_or(0);
         self.latest.accounts.insert(*addr, meta);
+        self.update_public_libraries_from_account_diff(addr, None, Some(&boc), lt)?;
         Ok(Some(boc))
     }
 
@@ -1653,29 +1782,19 @@ impl Node {
             layout: None,
         };
 
-        let boc = BocRepr::encode(message)?;
-        let hash = compute_boc_hash(&boc)?;
-        self.cas.put(boc.clone().into(), hash);
-
-        // 2. Register MsgMeta
-        let msg_meta = parse_msg_meta(&boc, hash)?;
-        self.history.msg_by_hash.insert(hash, msg_meta);
-
-        // 3. Decrease Giver balance
+        // Decrease giver balance before injecting the internal message. The local faucet
+        // models a single destination transaction, so the source account is adjusted here.
         giver_meta.cached_balance = Some(giver_balance - amount);
         self.latest.accounts.insert(GIVER_ADDR, giver_meta);
 
-        // 4. Enqueue internal message
-        self.pool.push_internal(hash);
-
-        // 5. Mine one
-        let (block_meta, tx_meta) = self.mine_one()?;
+        let (_, tx_hash, block_seqno, _) =
+            self.send_internal_boc(BocRepr::encode(message)?.into())?;
 
         Ok(serde_json::json!({
             "ok": true,
             "result": {
-                "tx_hash": tx_meta.tx_hash.to_hex(),
-                "block_seqno": block_meta.seqno
+                "tx_hash": tx_hash.to_hex(),
+                "block_seqno": block_seqno
             }
         }))
     }
@@ -1685,6 +1804,48 @@ fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     let cell = Boc::decode(boc)?;
     let hash = cell.repr_hash();
     Ok(Hash256(*hash.as_array()))
+}
+
+fn account_state_preview_from_boc(shard_account_boc: &BocBytes) -> Option<AccountStatePreview> {
+    let hash = compute_boc_hash(shard_account_boc).ok()?;
+    let cell = Boc::decode(shard_account_boc).ok()?;
+    let shard_account = cell.parse::<ShardAccount>().ok()?;
+    let optional_account = shard_account.account.load().ok()?;
+    let Some(account) = optional_account.0 else {
+        return Some(AccountStatePreview {
+            hash,
+            balance: 0,
+            status: AccountStatus::Nonexist,
+            code_hash: None,
+            data_hash: None,
+            frozen_hash: None,
+        });
+    };
+
+    let mut code_hash = None;
+    let mut data_hash = None;
+    let mut frozen_hash = None;
+    let status = match account.state {
+        AccountState::Uninit => AccountStatus::Uninit,
+        AccountState::Active(state) => {
+            code_hash = state.code.map(|cell| Hash256(*cell.repr_hash().as_array()));
+            data_hash = state.data.map(|cell| Hash256(*cell.repr_hash().as_array()));
+            AccountStatus::Active
+        }
+        AccountState::Frozen(state) => {
+            frozen_hash = Some(Hash256(state.0));
+            AccountStatus::Frozen
+        }
+    };
+
+    Some(AccountStatePreview {
+        hash,
+        balance: account.balance.tokens.into(),
+        status,
+        code_hash,
+        data_hash,
+        frozen_hash,
+    })
 }
 
 fn collect_code_data_cells(
@@ -1727,12 +1888,24 @@ fn collect_code_data_cells(
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum MessageKind {
+    Internal,
+    ExternalIn,
+    ExternalOut,
+}
+
 fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
+    Ok(parse_msg_meta_with_kind(boc, hash)?.0)
+}
+
+fn parse_msg_meta_with_kind(boc: &[u8], hash: Hash256) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let cell = Boc::decode(boc)?;
     let msg = cell.parse::<Message<'_>>()?;
 
-    let (src, dst, value, bounce, created_lt, created_at) = match msg.info {
+    let (kind, src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
+            MessageKind::Internal,
             Some(convert_addr(&info.src)),
             Some(convert_addr(&info.dst)),
             Some(info.value.tokens.into()),
@@ -1740,8 +1913,17 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
             Some(info.created_lt),
             Some(info.created_at),
         ),
-        MsgInfo::ExtIn(info) => (None, Some(convert_addr(&info.dst)), None, None, None, None),
+        MsgInfo::ExtIn(info) => (
+            MessageKind::ExternalIn,
+            None,
+            Some(convert_addr(&info.dst)),
+            None,
+            None,
+            None,
+            None,
+        ),
         MsgInfo::ExtOut(info) => (
+            MessageKind::ExternalOut,
             Some(convert_addr(&info.src)),
             None,
             None,
@@ -1751,16 +1933,19 @@ fn parse_msg_meta(boc: &[u8], hash: Hash256) -> anyhow::Result<MsgMeta> {
         ),
     };
 
-    Ok(MsgMeta {
-        msg_hash: hash,
-        msg_boc_hash: hash,
-        src,
-        dst,
-        value,
-        bounce,
-        created_lt,
-        created_at,
-    })
+    Ok((
+        MsgMeta {
+            msg_hash: hash,
+            msg_boc_hash: hash,
+            src,
+            dst,
+            value,
+            bounce,
+            created_lt,
+            created_at,
+        },
+        kind,
+    ))
 }
 
 const fn convert_addr(addr: &IntAddr) -> Addr {
@@ -1785,6 +1970,74 @@ fn create_dev_block_boc(seqno: Seqno, tx_hash: Hash256) -> anyhow::Result<BocByt
     builder.store_u256(&HashBytes(tx_hash.0))?;
     let cell = builder.build()?;
     Ok(Boc::encode(cell).into())
+}
+
+fn resolve_offchain_jetton_content(mut content: Value) -> Value {
+    let Some(uri) = content
+        .get("uri")
+        .and_then(Value::as_str)
+        .filter(|uri| uri.starts_with("https://") || uri.starts_with("http://"))
+        .map(ToOwned::to_owned)
+    else {
+        return content;
+    };
+
+    let Ok(client) = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(3))
+        .build()
+    else {
+        return content;
+    };
+    let Ok(response) = client.get(uri).send() else {
+        return content;
+    };
+    if !response.status().is_success() {
+        return content;
+    }
+    let Ok(remote_content) = response.json::<Value>() else {
+        return content;
+    };
+
+    merge_jetton_content(&mut content, &remote_content);
+    content
+}
+
+fn merge_jetton_content(content: &mut Value, remote_content: &Value) {
+    let Some(content) = content.as_object_mut() else {
+        return;
+    };
+    let Some(remote_content) = remote_content.as_object() else {
+        return;
+    };
+
+    for key in [
+        "name",
+        "description",
+        "image",
+        "image_data",
+        "symbol",
+        "decimals",
+        "amount_style",
+        "render_type",
+    ] {
+        if content
+            .get(key)
+            .and_then(Value::as_str)
+            .is_some_and(|value| !value.is_empty())
+        {
+            continue;
+        }
+
+        match remote_content.get(key) {
+            Some(Value::String(value)) if !value.is_empty() => {
+                content.insert(key.to_string(), Value::String(value.clone()));
+            }
+            Some(Value::Number(value)) => {
+                content.insert(key.to_string(), Value::String(value.to_string()));
+            }
+            _ => {}
+        }
+    }
 }
 
 #[cfg(test)]
@@ -1943,6 +2196,40 @@ mod tests {
         }
     }
 
+    fn parse_test_addr(address: &str) -> Addr {
+        let (std_addr, _) =
+            StdAddr::from_str_ext(address, StdAddrFormat::any()).expect("test address must parse");
+        Addr {
+            workchain: i32::from(std_addr.workchain),
+            addr: std_addr.address.0,
+        }
+    }
+
+    #[test]
+    fn jetton_content_merge_keeps_onchain_values_and_adds_offchain_metadata() {
+        let mut content = json!({
+            "uri": "https://example.test/jetton.json",
+            "decimals": "6",
+            "symbol": "LOCAL"
+        });
+        let remote_content = json!({
+            "name": "Tether USD",
+            "description": "Tether Token for Tether USD",
+            "image": "https://tether.to/images/logoCircle.png",
+            "symbol": "USDt",
+            "decimals": 9
+        });
+
+        merge_jetton_content(&mut content, &remote_content);
+
+        assert_eq!(content["uri"], "https://example.test/jetton.json");
+        assert_eq!(content["name"], "Tether USD");
+        assert_eq!(content["description"], "Tether Token for Tether USD");
+        assert_eq!(content["image"], "https://tether.to/images/logoCircle.png");
+        assert_eq!(content["symbol"], "LOCAL");
+        assert_eq!(content["decimals"], "6");
+    }
+
     fn store_test_account_meta(
         node: &mut Node,
         boc: &BocBytes,
@@ -2003,18 +2290,28 @@ mod tests {
         addr: Addr,
         libraries: Dict<HashBytes, SimpleLib>,
     ) -> BocBytes {
+        make_active_shard_account_boc_with_state(addr, None, None, libraries, 1_000_000_000)
+    }
+
+    fn make_active_shard_account_boc_with_state(
+        addr: Addr,
+        code: Option<Cell>,
+        data: Option<Cell>,
+        libraries: Dict<HashBytes, SimpleLib>,
+        balance: u128,
+    ) -> BocBytes {
         let state_init = StateInit {
             split_depth: None,
             special: None,
-            code: None,
-            data: None,
+            code,
+            data,
             libraries,
         };
         let account = Account {
             address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
             storage_stat: Default::default(),
             last_trans_lt: 0,
-            balance: CurrencyCollection::new(1_000_000_000),
+            balance: CurrencyCollection::new(balance),
             state: AccountState::Active(state_init),
         };
         shard_account_boc(OptionalAccount(Some(account)))
@@ -2457,6 +2754,107 @@ mod tests {
             found_library_entry(&node, Hash256(hash.0)).is_some(),
             "final state with public library must be indexed"
         );
+    }
+
+    #[test]
+    fn unchanged_public_library_is_indexed_when_global_cache_is_empty() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0xAC);
+
+        let mut libs = Dict::<HashBytes, SimpleLib>::new();
+        let (hash, lib) = valid_simple_lib_entry(true, 16);
+        libs.set(hash, lib).expect("must insert public lib");
+        let active_with_lib = make_active_shard_account_boc(account, libs);
+
+        node.update_public_libraries_from_account_diff(
+            &account,
+            Some(&active_with_lib),
+            Some(&active_with_lib),
+            14,
+        )
+        .expect("unchanged public library must still be indexed");
+
+        let entry = found_library_entry(&node, Hash256(hash.0))
+            .expect("unchanged public library must be visible");
+        assert!(
+            entry.publishers.contains(&account),
+            "publisher must be recorded for unchanged public library"
+        );
+    }
+
+    #[test]
+    fn jetton_wallet_detection_uses_global_libraries_for_library_reference_code() {
+        const USDT_WALLET_CODE_REF_B64: &str =
+            "te6ccgEBAQEAIwAIQgKPRS16Tf10BmtoI2UXclntBXNENb52tf1L1divK3w9aA==";
+        const USDT_WALLET_DATA_B64: &str = "te6ccgEBAQEASQAAjQMfVDaAEMMwjOj71Lak4LOU/ILddUHU9Jsd9EI9CQzS2z/InxmQAsROplLUCShZxn2kTkyjrdZWWw4ol9ZAosUb+zcNiHf6";
+        const USDT_WALLET_LIBRARY_B64: &str = "te6ccgECDwEAA9EAART/APSkE/S88sgLAQIBYgUCAgEgBAMAIbxQj2omhpgf0AfSB9IGivgcACe/2BdqJoaYH9AH0gfSBomfwVIJhAL40AHQ0wMBcbCOSBNfA4Ag1yHtRNDTA/oA+kD6QNEE0x8BhA8hghAXjUUZugKCEHvdl966ErHy9IBA1yH6ADASoEATA8jLA1j6AgHPFgHPFsntVOD6QPpAMfoAMfQB+gAx+gABMXD4OgLTHwEgghAPin6luo6FMDRZ2zzgMwwGAtAighAXjUUZuo6EMlrbPOA0IYIQWV8HvLqOhDEB2zzgMiCCEO7SNtO6ji8wAYBA1yHTA9HtRNDTA/oA+kD6QNEzUULHBfLgSkAzA8jLA1j6AgHPFgHPFsntVOBsIYIQ03IVjLrchA/y8AgHAfLtRNDTA/oA+kD6QNEG0z8BAfoA+kD0AdFRQaFSiMcF8uBJJsL/8q/IghB73ZfeAcsfWAHLPwH6AiHPFljPFsnIgBgBywUmzxZw+gIBcVjLaszJA/g5IG6UMIEWn95xgQLycPg4AXD4NqCBGndw+DagvPKwAoBQ+wADCQP07UTQ0wP6APpA+kDRI3KwwALybQfTPwEB+gBRQaAE+kD6QFO6xwX4KlRk4HBUYAQTFQPIywNY+gIBzxYBzxbJIcjLARP0ABL0AMsAyfkAcHTIywLKB8v/ydBQDMcFG7Hy4EoJ+gAhkl8E4w0m1wsBwACzkzBsM+MNVQILCgkAIAPIywNY+gIBzxYBzxbJ7VQAelBUofgvoHOBBAmCEAlmAYBw+De2CXL7AsiAEAHLBVAFzxZw+gJwActqghDVMnbbAcsfWAHLP8mBAIL7AFkAYMiCEHNi0JwByx8lAcs/UAT6AljPFljPFsnIgBABywUkzxZY+gIBcVjLaszJgBH7AAHyA9M/AQH6APpAIfpEMMAA8uFN7UTQ0wP6APpA+kDRUwnHBSRxsMAAIbHyrVIrxwVQCrHy4ElRFaEgwv/yr/gqVCWQcFRgBBMVA8jLA1j6AgHPFgHPFskhyMsBE/QAEvQAywDJIPkAcHTIywLKB8v/ydAE+kD0AfoAIA0BmCDXCwCa10vAAQHAAbDysZEw4siCEBeNRRkByx9QCgHLP1AI+gIjzxYBzxYm+gJQB88WyciAGAHLBVAEzxZw+gJAY3dQA8trzMzJRTcOALQhkXKRceL4OSBuk4EkJ5Eg4iFulDGBKHORAeJQI6gToHOBA6Nw+DygAnD4NhKgAXD4NqBzgQQJghAJZgGAcPg3oLzysASAUPsAWAPIywNY+gIBzxYBzxbJ7VQ=";
+
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let wallet_address = parse_test_addr("EQAeizBKpsdLcS-ZOQW3_YEUYQHlCzWr2A5QMvyG1Ba7U_xb");
+        let owner_address = parse_test_addr("EQCGGYRnR96ltScFnKfkFuuqDqek2O-iEehIZpbZ_kT4zJiF");
+        let jetton_address = parse_test_addr("EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs");
+
+        let code = Boc::decode_base64(USDT_WALLET_CODE_REF_B64)
+            .expect("USDT wallet code reference must decode");
+        let data = Boc::decode_base64(USDT_WALLET_DATA_B64).expect("USDT wallet data must decode");
+        let library =
+            Boc::decode_base64(USDT_WALLET_LIBRARY_B64).expect("USDT wallet library must decode");
+
+        let library_hash = Hash256(*library.repr_hash().as_array());
+        assert_eq!(
+            library_hash.to_hex().to_uppercase(),
+            "8F452D7A4DFD74066B682365177259ED05734435BE76B5FD4BD5D8AF2B7C3D68"
+        );
+        node.global_libraries.insert(
+            library_hash,
+            GlobalLibraryEntry {
+                hash: library_hash,
+                lib_boc: Boc::encode(library).into(),
+                publishers: std::iter::once(test_addr(0x77)).collect(),
+                first_seen_lt: 1,
+                last_seen_lt: 1,
+            },
+        );
+
+        let code_hash = Hash256(*code.repr_hash().as_array());
+        node.cas.put(Boc::encode(code.clone()).into(), code_hash);
+        let data_hash = Hash256(*data.repr_hash().as_array());
+        node.cas.put(Boc::encode(data.clone()).into(), data_hash);
+        let account_boc = make_active_shard_account_boc_with_state(
+            wallet_address,
+            Some(code),
+            Some(data),
+            Dict::new(),
+            974_433,
+        );
+        let account_hash = compute_boc_hash(&account_boc).expect("account BOC must hash");
+        node.cas.put(account_boc, account_hash);
+        node.latest.accounts.insert(
+            wallet_address,
+            AccountMeta {
+                account_hash,
+                status: AccountStatus::Active,
+                cached_balance: Some(974_433),
+                last_trans_lt: Some(42),
+                last_trans_hash: None,
+                code_hash: Some(code_hash),
+                data_hash: Some(data_hash),
+                frozen_hash: None,
+            },
+        );
+
+        node.detect_jetton_wallets(&wallet_address)
+            .expect("library-backed jetton wallet must be detected");
+
+        let wallet = node
+            .history
+            .jetton_wallets
+            .get(&wallet_address)
+            .expect("USDT jetton wallet must be indexed");
+        assert_eq!(wallet.balance, 2_053_174);
+        assert_eq!(wallet.owner_address, owner_address);
+        assert_eq!(wallet.jetton_address, jetton_address);
+        assert_eq!(wallet.last_transaction_lt, 42);
     }
 
     #[test]

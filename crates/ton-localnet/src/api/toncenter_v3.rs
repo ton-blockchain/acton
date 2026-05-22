@@ -3,16 +3,17 @@ use crate::localnet::{
     LocalnetTransaction, convert_to_message_struct,
 };
 use crate::storage::{
-    AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta, MessageInfo, MsgMeta,
-    NftItemMeta, TraceNode, TransactionInfo,
+    AccountStatePreview, AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta,
+    MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
 };
-use crate::types::Addr;
+use crate::types::{Addr, BocBytes, Hash256};
 use base64::Engine;
 use serde_json::value::Value;
 use std::collections::HashMap;
 use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
+use tycho_types::cell::HashBytes;
 
 #[allow(clippy::ptr_arg)]
 pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
@@ -189,7 +190,7 @@ pub fn map_address_information(state: &LocalnetAccountState) -> Value {
         "balance": state.balance.to_string(),
         "code": encode_optional_boc(state.code.as_ref()),
         "data": encode_optional_boc(state.data.as_ref()),
-        "frozen_hash": state.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
+        "frozen_hash": state.frozen_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
         "last_transaction_hash": state.last_transaction_id.hash.to_base64(),
         "last_transaction_lt": state.last_transaction_id.lt.to_string(),
         "status": map_address_information_status(&state.state),
@@ -201,12 +202,12 @@ pub fn map_send_message(bt: &LocalnetBlockTransactions) -> Value {
     let message_hash = bt
         .msg_hash
         .as_ref()
-        .map(super::super::types::Hash256::to_base64)
+        .map(Hash256::to_base64)
         .unwrap_or_default();
-    let message_hash_norm = bt.msg_hash_norm.as_ref().map_or_else(
-        || message_hash.clone(),
-        super::super::types::Hash256::to_base64,
-    );
+    let message_hash_norm = bt
+        .msg_hash_norm
+        .as_ref()
+        .map_or_else(|| message_hash.clone(), Hash256::to_base64);
     serde_json::json!({
         "message_hash": message_hash,
         "message_hash_norm": message_hash_norm,
@@ -221,6 +222,13 @@ pub fn map_transactions_response(transactions: &[LocalnetTransaction]) -> Value 
 }
 
 fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
+    let tx_details = transaction_details(&tx.data);
+    let trace_external_hash = tx
+        .in_msg
+        .hash_norm
+        .as_ref()
+        .unwrap_or(&tx.in_msg.hash)
+        .to_base64();
     let in_msg = if tx.in_msg.hash.0 == [0; 32] {
         Value::Null
     } else {
@@ -238,27 +246,66 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         "hash": tx.hash.to_base64(),
         "lt": tx.transaction_id.lt.to_string(),
         "now": tx.utime,
-        "orig_status": "active",
-        "end_status": "active",
+        "orig_status": tx_details.orig_status,
+        "end_status": tx_details.end_status,
         "total_fees": tx.total_fees.to_string(),
         "total_fees_extra_currencies": {},
-        "prev_trans_hash": zero_hash_base64(),
-        "prev_trans_lt": "0",
+        "prev_trans_hash": tx_details.prev_trans_hash,
+        "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
             "aborted": !tx.success,
+            "destroyed": false,
+            "credit_first": false,
+            "is_tock": false,
+            "installed": false,
+            "storage_ph": {
+                "storage_fees_collected": tx.storage_fees.to_string(),
+                "status_change": "unchanged",
+            },
             "compute_ph": {
                 "skipped": false,
                 "success": tx.success,
+                "msg_state_used": false,
+                "account_activated": false,
+                "gas_fees": "0",
+                "gas_used": "0",
+                "gas_limit": "0",
+                "mode": 0,
                 "exit_code": tx.exit_code,
+                "vm_steps": 0,
+                "vm_init_state_hash": zero_hash_base64(),
+                "vm_final_state_hash": zero_hash_base64(),
             },
             "action": {
                 "success": tx.success,
+                "valid": true,
+                "no_funds": false,
+                "status_change": "unchanged",
                 "result_code": if tx.success { 0 } else { tx.exit_code },
+                "tot_actions": tx.out_msgs.len(),
+                "spec_actions": 0,
+                "skipped_actions": 0,
+                "msgs_created": tx.out_msgs.len(),
+                "action_list_hash": zero_hash_base64(),
+                "tot_msg_size": {
+                    "cells": "0",
+                    "bits": "0",
+                },
             }
         },
         "in_msg": in_msg,
         "out_msgs": out_msgs,
+        "account_state_before": map_transaction_account_state(
+            None,
+            &tx_details.account_state_before_hash,
+            tx_details.orig_status,
+        ),
+        "account_state_after": map_transaction_account_state(
+            None,
+            &tx_details.account_state_after_hash,
+            tx_details.end_status,
+        ),
         "block_ref": {
             "workchain": 0,
             "shard": "-9223372036854775808",
@@ -267,13 +314,13 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         "mc_block_seqno": tx.mc_block_seqno,
         "emulated": false,
         "trace_id": tx.hash.to_base64(),
-        "trace_external_hash": tx.hash.to_base64(),
+        "trace_external_hash": trace_external_hash,
     })
 }
 
 fn map_v3_message(
     msg: &LocalnetMessage,
-    tx_hash: &crate::types::Hash256,
+    tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
 ) -> Value {
@@ -303,10 +350,7 @@ fn map_v3_message(
         root.insert("opcode".to_string(), Value::from(i64::from(opcode)));
     }
 
-    if let Some(hash_norm) = msg
-        .hash_norm
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
+    if let Some(hash_norm) = msg.hash_norm.as_ref().map(Hash256::to_base64)
         && let Some(root) = mapped.as_object_mut()
     {
         root.insert("hash_norm".to_string(), Value::String(hash_norm));
@@ -341,9 +385,9 @@ fn map_v3_message(
     mapped
 }
 
-fn hash_boc_base64(boc: &crate::types::BocBytes) -> Option<String> {
+fn hash_boc_base64(boc: &BocBytes) -> Option<String> {
     let cell = Boc::decode(boc).ok()?;
-    Some(crate::types::Hash256(*cell.repr_hash().as_array()).to_base64())
+    Some(Hash256(*cell.repr_hash().as_array()).to_base64())
 }
 
 fn map_jetton_wallet(w: &JettonWalletMeta) -> Value {
@@ -576,15 +620,19 @@ fn content_string(content: &Value, key: &str) -> Option<String> {
 
 #[must_use]
 pub fn map_traces(tn: &TraceNode) -> Value {
+    map_traces_with_emulated(tn, false)
+}
+
+fn map_traces_with_emulated(tn: &TraceNode, emulated: bool) -> Value {
     let mut transactions = HashMap::new();
     let mut transactions_order = Vec::new();
-    collect_transactions(tn, &mut transactions, &mut transactions_order);
+    collect_transactions(tn, &mut transactions, &mut transactions_order, emulated);
 
     serde_json::json!({
         "address_book": {},
         "metadata": {},
         "traces": [
-            map_trace(tn, &transactions, &transactions_order)
+            map_trace(tn, &transactions, &transactions_order, emulated)
         ]
     })
 }
@@ -597,7 +645,7 @@ pub fn map_emulate_trace_response(
     metadata: Option<Value>,
 ) -> Value {
     let tn = &emulation.trace;
-    let mapped = map_traces(tn);
+    let mapped = map_traces_with_emulated(tn, true);
     let trace_entry = mapped
         .get("traces")
         .and_then(Value::as_array)
@@ -654,7 +702,10 @@ pub fn map_emulate_trace_response(
         response.insert("metadata".to_string(), metadata);
     }
 
-    response.insert("rand_seed".to_string(), serde_json::json!(""));
+    response.insert(
+        "rand_seed".to_string(),
+        serde_json::json!(zero_hash_base64()),
+    );
     response.insert(
         "is_incomplete".to_string(),
         trace_entry
@@ -666,9 +717,7 @@ pub fn map_emulate_trace_response(
     Value::Object(response)
 }
 
-fn map_cells_by_hash_base64(
-    cells: &HashMap<crate::types::Hash256, crate::types::BocBytes>,
-) -> Value {
+fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> Value {
     let mut entries = cells
         .iter()
         .map(|(hash, boc)| (hash.to_base64(), boc.to_base64()))
@@ -704,10 +753,11 @@ fn collect_transactions(
     tn: &TraceNode,
     transactions: &mut HashMap<String, Value>,
     order: &mut Vec<String>,
+    emulated: bool,
 ) {
     let tx_hash = tn.transaction.meta.tx_hash.to_base64();
     if !transactions.contains_key(&tx_hash) {
-        let mut tx_val = map_transaction(&tn.transaction);
+        let mut tx_val = map_transaction(&tn.transaction, emulated);
 
         let child_lts: Vec<String> = tn
             .children
@@ -726,7 +776,7 @@ fn collect_transactions(
         order.push(tx_hash);
     }
     for child in &tn.children {
-        collect_transactions(child, transactions, order);
+        collect_transactions(child, transactions, order, emulated);
     }
 }
 
@@ -734,10 +784,11 @@ fn map_trace(
     tn: &TraceNode,
     transactions: &HashMap<String, Value>,
     transactions_order: &[String],
+    emulated: bool,
 ) -> Value {
     serde_json::json!({
         "trace_id": tn.transaction.meta.tx_hash.to_base64(),
-        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), super::super::types::Hash256::to_base64),
+        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), Hash256::to_base64),
         "mc_seqno_start": "0",
         "mc_seqno_end": "0",
         "start_lt": tn.transaction.meta.lt.to_string(),
@@ -745,7 +796,7 @@ fn map_trace(
         "end_lt": tn.max_lt().to_string(),
         "end_utime": tn.max_utime(),
         "is_incomplete": false,
-        "trace": map_trace_node(tn),
+        "trace": map_trace_node(tn, emulated),
         "transactions": transactions,
         "transactions_order": transactions_order,
         "actions": [],
@@ -759,40 +810,73 @@ fn map_trace(
     })
 }
 
-fn map_trace_node(tn: &TraceNode) -> Value {
+fn map_trace_node(tn: &TraceNode, emulated: bool) -> Value {
     serde_json::json!({
         "tx_hash": tn.transaction.meta.tx_hash.to_base64(),
-        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
+        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
         "in_msg": tn.transaction.in_msg.as_ref().map(|m| {
             map_trace_message_info(m, &tn.transaction.meta.tx_hash, tn.transaction.meta.now, true)
         }),
-        "transaction": map_transaction(&tn.transaction),
-        "children": tn.children.iter().map(map_trace_node).collect::<Vec<_>>(),
+        "transaction": map_transaction(&tn.transaction, emulated),
+        "children": tn.children.iter().map(|child| map_trace_node(child, emulated)).collect::<Vec<_>>(),
     })
 }
 
-fn map_transaction(tx: &TransactionInfo) -> Value {
+fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
+    let tx_details = transaction_details(&tx.tx_boc);
+    let trace_external_hash = tx.meta.in_msg_hash.unwrap_or(tx.meta.tx_hash).to_base64();
+
     serde_json::json!({
         "account": tx.meta.account.to_string(),
         "hash": tx.meta.tx_hash.to_base64(),
         "lt": tx.meta.lt.to_string(),
         "now": tx.meta.now,
-        "orig_status": "active",
-        "end_status": "active",
+        "orig_status": tx_details.orig_status,
+        "end_status": tx_details.end_status,
         "total_fees": tx.meta.total_fees.unwrap_or(0).to_string(),
-        "prev_trans_hash": zero_hash_base64(),
-        "prev_trans_lt": "0",
+        "total_fees_extra_currencies": {},
+        "prev_trans_hash": tx_details.prev_trans_hash,
+        "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
             "aborted": !tx.meta.success,
+            "destroyed": false,
+            "credit_first": false,
+            "is_tock": false,
+            "installed": false,
+            "storage_ph": {
+                "storage_fees_collected": tx.meta.storage_fees.unwrap_or(0).to_string(),
+                "status_change": "unchanged",
+            },
             "compute_ph": {
                 "skipped": tx.meta.compute_exit_code.is_none(),
                 "success": tx.meta.compute_exit_code == Some(0),
+                "msg_state_used": false,
+                "account_activated": false,
+                "gas_fees": "0",
+                "gas_used": "0",
+                "gas_limit": "0",
+                "mode": 0,
                 "exit_code": tx.meta.compute_exit_code.unwrap_or(0),
+                "vm_steps": 0,
+                "vm_init_state_hash": zero_hash_base64(),
+                "vm_final_state_hash": zero_hash_base64(),
             },
             "action": {
                 "success": tx.meta.action_result_code == Some(0),
+                "valid": true,
+                "no_funds": false,
+                "status_change": "unchanged",
                 "result_code": tx.meta.action_result_code.unwrap_or(0),
+                "tot_actions": tx.out_msgs.len(),
+                "spec_actions": 0,
+                "skipped_actions": 0,
+                "msgs_created": tx.out_msgs.len(),
+                "action_list_hash": zero_hash_base64(),
+                "tot_msg_size": {
+                    "cells": "0",
+                    "bits": "0",
+                },
             }
         },
         "in_msg": tx.in_msg.as_ref().map(|m| {
@@ -801,6 +885,16 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
         "out_msgs": tx.out_msgs.iter().map(|m| {
             map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false)
         }).collect::<Vec<_>>(),
+        "account_state_before": map_transaction_account_state(
+            tx.account_state_before.as_ref(),
+            &tx_details.account_state_before_hash,
+            tx_details.orig_status,
+        ),
+        "account_state_after": map_transaction_account_state(
+            tx.account_state_after.as_ref(),
+            &tx_details.account_state_after_hash,
+            tx_details.end_status,
+        ),
         "block_ref": {
             "workchain": 0,
             "shard": "-9223372036854775808",
@@ -808,12 +902,112 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
         },
         "mc_block_seqno": tx.meta.block_seqno,
         "child_transactions": [],
+        "emulated": emulated,
+        "trace_id": tx.meta.tx_hash.to_base64(),
+        "trace_external_hash": trace_external_hash,
     })
+}
+
+struct TransactionDetails {
+    prev_trans_hash: String,
+    prev_trans_lt: String,
+    orig_status: &'static str,
+    end_status: &'static str,
+    account_state_before_hash: String,
+    account_state_after_hash: String,
+}
+
+impl Default for TransactionDetails {
+    fn default() -> Self {
+        Self {
+            prev_trans_hash: zero_hash_base64(),
+            prev_trans_lt: "0".to_string(),
+            orig_status: "active",
+            end_status: "active",
+            account_state_before_hash: zero_hash_base64(),
+            account_state_after_hash: zero_hash_base64(),
+        }
+    }
+}
+
+fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
+    let Some(transaction) = Boc::decode(tx_boc)
+        .ok()
+        .and_then(|cell| cell.parse::<tycho_types::models::Transaction>().ok())
+    else {
+        return TransactionDetails::default();
+    };
+
+    let state_update = transaction.state_update.load().ok();
+
+    TransactionDetails {
+        prev_trans_hash: hash_bytes_base64(&transaction.prev_trans_hash),
+        prev_trans_lt: transaction.prev_trans_lt.to_string(),
+        orig_status: map_tycho_account_status(transaction.orig_status),
+        end_status: map_tycho_account_status(transaction.end_status),
+        account_state_before_hash: state_update
+            .as_ref()
+            .map_or_else(zero_hash_base64, |update| hash_bytes_base64(&update.old)),
+        account_state_after_hash: state_update
+            .as_ref()
+            .map_or_else(zero_hash_base64, |update| hash_bytes_base64(&update.new)),
+    }
+}
+
+fn map_transaction_account_state(
+    preview: Option<&AccountStatePreview>,
+    fallback_hash: &str,
+    fallback_status: &str,
+) -> Value {
+    if let Some(preview) = preview {
+        return map_emulation_account_state(
+            &preview.hash.to_base64(),
+            &preview.balance.to_string(),
+            map_account_state_status(&preview.status),
+            preview.frozen_hash.as_ref(),
+            preview.data_hash.as_ref(),
+            preview.code_hash.as_ref(),
+        );
+    }
+
+    map_emulation_account_state(fallback_hash, "0", fallback_status, None, None, None)
+}
+
+fn map_emulation_account_state(
+    hash: &str,
+    balance: &str,
+    account_status: &str,
+    frozen_hash: Option<&Hash256>,
+    data_hash: Option<&Hash256>,
+    code_hash: Option<&Hash256>,
+) -> Value {
+    serde_json::json!({
+        "hash": hash,
+        "balance": balance,
+        "extra_currencies": {},
+        "account_status": account_status,
+        "frozen_hash": frozen_hash.map(Hash256::to_base64),
+        "data_hash": data_hash.map(Hash256::to_base64),
+        "code_hash": code_hash.map(Hash256::to_base64),
+    })
+}
+
+fn hash_bytes_base64(hash: &HashBytes) -> String {
+    Hash256(*hash.as_array()).to_base64()
+}
+
+const fn map_tycho_account_status(status: tycho_types::models::AccountStatus) -> &'static str {
+    match status {
+        tycho_types::models::AccountStatus::Uninit => "uninit",
+        tycho_types::models::AccountStatus::Frozen => "frozen",
+        tycho_types::models::AccountStatus::Active => "active",
+        tycho_types::models::AccountStatus::NotExists => "nonexist",
+    }
 }
 
 fn map_trace_message_info(
     msg: &MessageInfo,
-    tx_hash: &crate::types::Hash256,
+    tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
 ) -> Value {
@@ -893,13 +1087,13 @@ fn map_stack_entry(entry: Value) -> Value {
     }
 }
 
-fn encode_optional_boc(data: Option<&crate::types::BocBytes>) -> String {
+fn encode_optional_boc(data: Option<&BocBytes>) -> String {
     data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
         .unwrap_or_default()
 }
 
 fn zero_hash_base64() -> String {
-    crate::types::Hash256([0; 32]).to_base64()
+    Hash256([0; 32]).to_base64()
 }
 
 const fn map_address_information_status(status: &AccountStatus) -> &'static str {

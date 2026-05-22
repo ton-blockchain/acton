@@ -140,7 +140,7 @@ fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     Ok(Hash256(*hash.as_array()))
 }
 
-fn account_meta_from_shard_account(
+pub(crate) fn account_meta_from_shard_account(
     shard_account: &ShardAccount,
     shard_account_boc: &[u8],
     cas: &mut CellStore,

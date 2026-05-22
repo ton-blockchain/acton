@@ -32,6 +32,7 @@ rusqlite = { workspace = true }
 ton-indexer = { workspace = true }
 url = { workspace = true }
 include_dir = { workspace = true, optional = true }
+reqwest = { workspace = true }
 
 [features]
 default = ["ui"]

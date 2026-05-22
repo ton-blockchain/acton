@@ -10,10 +10,11 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
+use ton::ton_wallet::WalletVersion;
 use ton_localnet::node::StateSource;
 use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
-use ton_localnet::{Localnet, ServerArgs, run_server};
+use ton_localnet::{Localnet, ServerArgs, StartupWallet, run_server};
 use ton_retrace::Network;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellSliceParts};
@@ -68,7 +69,7 @@ pub async fn localnet_start_cmd(
         );
     }
 
-    setup_startup_accounts(&node, &accounts).await?;
+    let startup_wallets = setup_startup_accounts(&node, &accounts).await?;
     let run_result = run_server(
         node.clone(),
         ServerArgs {
@@ -77,6 +78,7 @@ pub async fn localnet_start_cmd(
             fork_network,
             fork_block_number,
             rate_limit_rps: rate_limit,
+            startup_wallets,
         },
     )
     .await;
@@ -98,9 +100,12 @@ pub async fn localnet_start_cmd(
     Ok(())
 }
 
-async fn setup_startup_accounts(node: &Arc<Localnet>, accounts: &[String]) -> anyhow::Result<()> {
+async fn setup_startup_accounts(
+    node: &Arc<Localnet>,
+    accounts: &[String],
+) -> anyhow::Result<Vec<StartupWallet>> {
     if accounts.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
 
     let config =
@@ -108,11 +113,27 @@ async fn setup_startup_accounts(node: &Arc<Localnet>, accounts: &[String]) -> an
     let selected_wallets = wallets::open_selected_wallets(&config, accounts, &Network::Localnet)?;
 
     if selected_wallets.is_empty() {
-        return Ok(());
+        return Ok(Vec::new());
     }
+
+    let configured_wallets = config
+        .wallets
+        .as_ref()
+        .map(|wallets| &wallets.wallets)
+        .context("No wallets are configured in Acton.toml")?;
+    let mut startup_wallets = Vec::with_capacity(selected_wallets.len());
 
     for (wallet_name, wallet) in selected_wallets {
         let address = format_std_address(&wallet.address(), &Network::Localnet);
+        let wallet_config = configured_wallets
+            .get(&wallet_name)
+            .with_context(|| format!("Wallet '{wallet_name}' disappeared from Acton.toml"))?;
+        let mnemonic = wallets::load_mnemonic(&wallet_name, wallet_config)
+            .with_context(|| format!("Failed to load mnemonic for wallet '{wallet_name}'"))?
+            .split_whitespace()
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        let version = wallet_version_to_string(wallet.wallet.version).to_owned();
 
         node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
             .await
@@ -128,7 +149,7 @@ async fn setup_startup_accounts(node: &Arc<Localnet>, accounts: &[String]) -> an
                 "      {} wallet {} {}",
                 "Funded".green().bold(),
                 wallet_name.cyan(),
-                address.dimmed(),
+                address.as_str().dimmed(),
             );
         } else {
             let deploy_boc = build_wallet_deploy_message(&wallet)?;
@@ -139,12 +160,42 @@ async fn setup_startup_accounts(node: &Arc<Localnet>, accounts: &[String]) -> an
                 "       {} wallet {} {}",
                 "Ready".green().bold(),
                 wallet_name.cyan(),
-                address.dimmed(),
+                address.as_str().dimmed(),
             );
         }
+
+        startup_wallets.push(StartupWallet {
+            name: wallet_name,
+            mnemonic,
+            version,
+            network: "localnet".to_owned(),
+            address,
+            public_key: hex::encode(wallet.wallet.key_pair.public_key),
+            wallet_id: wallet.wallet.wallet_id,
+        });
     }
 
-    Ok(())
+    Ok(startup_wallets)
+}
+
+const fn wallet_version_to_string(version: WalletVersion) -> &'static str {
+    match version {
+        WalletVersion::V1R1 => "v1r1",
+        WalletVersion::V1R2 => "v1r2",
+        WalletVersion::V1R3 => "v1r3",
+        WalletVersion::V2R1 => "v2r1",
+        WalletVersion::V2R2 => "v2r2",
+        WalletVersion::V3R1 => "v3r1",
+        WalletVersion::V3R2 => "v3r2",
+        WalletVersion::V4R1 => "v4r1",
+        WalletVersion::V4R2 => "v4r2",
+        WalletVersion::V5R1 => "v5r1",
+        WalletVersion::HLV1R1 => "highloadv1r1",
+        WalletVersion::HLV1R2 => "highloadv1r2",
+        WalletVersion::HLV2 => "highloadv2",
+        WalletVersion::HLV2R1 => "highloadv2r1",
+        WalletVersion::HLV2R2 => "highloadv2r2",
+    }
 }
 
 fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {

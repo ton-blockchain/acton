@@ -1,4 +1,5 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {Cell} from "@ton/core"
 
 import type {
   AccountStatesResponse,
@@ -6,15 +7,27 @@ import type {
   FullAccountState,
   JettonMaster,
   JettonWallet,
+  JettonWalletData,
+  LocalnetNodeInfo,
   NftItem,
+  StartupWallet,
   Transaction,
+  V3RunGetMethodResponse,
+  V3RunGetMethodStackEntry,
   V3TracesResponse,
+  V3TransactionsResponse,
 } from "./types"
 
 interface TonClientOptions {
   readonly v2BaseUrl: string
   readonly v3BaseUrl: string
   readonly addressNameBaseUrl: string
+}
+
+interface FaucetResponse {
+  readonly ok?: boolean
+  readonly success?: boolean
+  readonly error?: string
 }
 
 export class TonClient {
@@ -97,6 +110,58 @@ export class TonClient {
     const addresses = owner_address || jetton_address || []
     const paramName = owner_address ? "owner_address" : "jetton_address"
 
+    return this.fetchJettonWallets(paramName, addresses)
+  }
+
+  async getJettonWalletsByAddress(address: string[]): Promise<JettonWallet[]> {
+    if (address.length === 0) return []
+    return this.fetchJettonWallets("address", address)
+  }
+
+  async runGetMethod(
+    address: string,
+    method: string | number,
+    stack: readonly V3RunGetMethodStackEntry[] = [],
+    seqno?: number,
+  ): Promise<V3RunGetMethodResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/runGetMethod")
+    const body: {
+      readonly address: string
+      readonly method: string | number
+      readonly stack: readonly V3RunGetMethodStackEntry[]
+      readonly seqno?: number
+    } = seqno === undefined ? {address, method, stack} : {address, method, stack, seqno}
+
+    return this.request(url, "Failed to run get method", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    })
+  }
+
+  async getJettonWalletData(
+    address: string,
+    seqno?: number,
+  ): Promise<JettonWalletData | undefined> {
+    const response = await this.runGetMethod(address, "get_wallet_data", [], seqno)
+    if (response.exit_code !== 0) {
+      return undefined
+    }
+
+    const balance = this.stackNumber(response.stack[0])
+    const owner = this.stackAddress(response.stack[1])
+    const jetton = this.stackAddress(response.stack[2])
+    if (balance === undefined || owner === undefined || jetton === undefined) {
+      return undefined
+    }
+
+    return {balance, owner, jetton}
+  }
+
+  private async fetchJettonWallets(
+    paramName: "address" | "owner_address" | "jetton_address",
+    addresses: string[],
+  ): Promise<JettonWallet[]> {
     const results = await Promise.all(
       addresses.map(async addr => {
         const url = this.buildUrl(this.v3BaseUrl, "/jetton/wallets")
@@ -121,6 +186,12 @@ export class TonClient {
     const url = this.buildUrl(this.v3BaseUrl, "/traces")
     url.searchParams.append("hash", hash)
     return this.request(url, "Failed to fetch traces")
+  }
+
+  async getRecentTransactions(limit = 10): Promise<V3TransactionsResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/transactions")
+    url.searchParams.append("limit", limit.toString())
+    return this.request(url, "Failed to fetch recent transactions")
   }
 
   async getNftItems(options?: {
@@ -210,6 +281,16 @@ export class TonClient {
     return this.request(url, "Failed to fetch compiler ABI")
   }
 
+  async getNodeInfo(): Promise<LocalnetNodeInfo> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_nodeInfo")
+    return this.request(url, "Failed to fetch node info")
+  }
+
+  async getStartupWallets(): Promise<StartupWallet[]> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getStartupWallets")
+    return this.request(url, "Failed to fetch startup wallets")
+  }
+
   async setAddressName(address: string, name: string): Promise<void> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setAddressName")
     await this.request<null>(url, "Failed to set address name", {
@@ -217,6 +298,45 @@ export class TonClient {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({address, name}),
     })
+  }
+
+  async fundAccount(address: string, amount: number): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_fundAccount")
+    const response = await this.request<FaucetResponse>(url, "Failed to fund account", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address, amount}),
+    })
+
+    if (response.ok === false || response.success === false) {
+      throw new Error(response.error || "Failed to fund account")
+    }
+  }
+
+  async setShardAccount(address: string, shardAccount: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setShardAccount")
+    await this.request<null>(url, "Failed to set shard account", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({address, shard_account: shardAccount}),
+    })
+  }
+
+  async sendInternalMessage(boc: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_sendInternalMessage")
+    await this.request<unknown>(url, "Failed to send internal message", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({boc}),
+    })
+  }
+
+  getEndpoints(): {readonly apiV2: string; readonly apiV3: string; readonly admin: string} {
+    return {
+      apiV2: this.buildUrl(this.v2BaseUrl, "").toString().replace(/\/$/, ""),
+      apiV3: this.buildUrl(this.v3BaseUrl, "").toString().replace(/\/$/, ""),
+      admin: this.buildUrl(this.addressNameBaseUrl, "").toString().replace(/\/$/, ""),
+    }
   }
 
   private buildUrl(base: string, path: string): URL {
@@ -275,5 +395,32 @@ export class TonClient {
     }
     const error = (value as {error?: unknown}).error
     return typeof error === "string" ? error : undefined
+  }
+
+  private stackNumber(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
+    if (entry?.type !== "num") return undefined
+    if (typeof entry.value === "string") {
+      try {
+        return BigInt(entry.value).toString()
+      } catch {
+        return undefined
+      }
+    }
+    if (typeof entry.value === "number") {
+      return Math.trunc(entry.value).toString()
+    }
+    return undefined
+  }
+
+  private stackAddress(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
+    if (entry?.type !== "slice" || typeof entry.value !== "string") {
+      return undefined
+    }
+
+    try {
+      return Cell.fromBase64(entry.value).beginParse().loadAddress()?.toString()
+    } catch {
+      return undefined
+    }
   }
 }

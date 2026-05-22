@@ -1,13 +1,19 @@
 .card {
   background-color: var(--tonscan-card-bg);
   border: 1px solid var(--tonscan-border);
+  border-radius: 16px;
+}
+
+.header {
+  gap: 10px;
+  padding: 20px;
 }
 
 .assetIcon {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background-color: #22c55e;
+  background-color: var(--tonscan-success);
 }
 
 .assetIconImage {
@@ -32,6 +38,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
 }
 
 .noAssets {
@@ -44,12 +51,16 @@
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: var(--spacing-xs);
+  letter-spacing: 0.08em;
+  line-height: 1;
 }
 
 .addressValue {
-  font-size: var(--font-size-lg);
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 1.35rem;
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--tonscan-text-primary);
   word-break: break-all;
 }
@@ -63,12 +74,19 @@
 
 .addressRow {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  align-items: flex-start;
+  gap: 6px;
   width: 100%;
 }
 
-.editContainer {
+.renamePanel {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.renameRow {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -76,55 +94,114 @@
 }
 
 .editInput {
-  background: var(--tonscan-bg);
-  border: 1px solid var(--tonscan-border);
-  color: var(--tonscan-text);
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 1.1rem;
+  height: 36px;
+  background: var(--litenode-surface);
+  border: 1px solid var(--litenode-border-control);
+  color: var(--litenode-text);
+  padding: 0 10px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 1rem;
   flex: 1;
   outline: none;
 }
 
 .editInput:focus {
-  border-color: var(--tonscan-accent);
+  border-color: var(--litenode-border-strong);
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.renameMeta {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
+  word-break: break-all;
+}
+
+.renameSaveButton,
+.renameCancelButton {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  cursor: pointer;
+  flex: 0 0 auto;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
+}
+
+.renameSaveButton {
+  border: 1px solid var(--litenode-primary);
+  background: var(--litenode-primary);
+  color: var(--litenode-primary-foreground);
+}
+
+.renameSaveButton:hover:not(:disabled) {
+  border-color: var(--litenode-primary-hover);
+  background: var(--litenode-primary-hover);
+}
+
+.renameSaveButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.renameCancelButton {
+  border: 1px solid var(--litenode-border-control);
+  background: var(--litenode-surface);
+  color: var(--tonscan-text-primary);
+}
+
+.renameCancelButton:hover {
+  background: var(--litenode-control-hover);
 }
 
 .iconButton {
-  background: none;
-  border: none;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--tonscan-text-secondary);
   cursor: pointer;
-  padding: 4px;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
+  border-radius: 8px;
+  flex: 0 0 auto;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
 }
 
 .iconButton:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--litenode-control-hover);
+  border-color: var(--litenode-border-control);
   color: var(--tonscan-text);
 }
 
 .saveIcon {
-  color: #22c55e;
+  color: var(--tonscan-success);
 }
 
 .cancelIcon {
-  color: #ef4444;
+  color: var(--tonscan-error);
 }
 
 .customName {
-  color: var(--tonscan-accent);
+  color: var(--tonscan-text-primary);
   font-weight: 600;
 }
 
 .realAddress {
   color: var(--tonscan-text-secondary);
   font-weight: 400;
-  font-size: var(--font-size-sm);
+  font-size: 0.95rem;
   margin-left: var(--spacing-xs);
 }
 
@@ -136,16 +213,21 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: var(--spacing-xl);
-  padding: var(--spacing-lg);
-  border-top: 1px solid var(--tonscan-border);
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  padding: 0 20px 20px;
+  border-top: none;
 }
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: 6px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
 }
 
 .label {
@@ -154,46 +236,43 @@
 }
 
 .value {
-  font-size: var(--font-size-lg);
+  min-width: 0;
+  font-size: 1rem;
   font-weight: var(--font-weight-semibold);
   color: var(--tonscan-text-primary);
-}
-
-.subValue {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-sm);
 }
 
 .status {
   display: inline-flex;
   align-items: center;
-  padding: var(--spacing-xss) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
+  padding: 3px 8px;
+  border-radius: 999px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-transform: capitalize;
-  background-color: rgba(48, 209, 88, 0.1);
+  background-color: var(--litenode-success-bg);
   color: var(--tonscan-success);
 }
 
 .statusUninitialized {
-  background-color: rgba(160, 160, 160, 0.1);
+  background-color: var(--litenode-neutral-bg);
   color: var(--tonscan-text-secondary);
 }
 
 .detailsGrid {
   display: flex;
-  gap: var(--spacing-md);
+  gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  background-color: rgba(160, 160, 160, 0.1);
+  background-color: var(--litenode-neutral-bg);
   color: var(--tonscan-text-secondary);
-  padding: var(--spacing-xss) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
+  padding: 3px 8px;
+  border-radius: 999px;
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
   text-transform: capitalize;
@@ -210,7 +289,7 @@
   line-height: 1;
   min-width: unset;
   width: max-content;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--litenode-shadow-tooltip);
   display: flex;
   align-items: center;
   justify-content: center;
