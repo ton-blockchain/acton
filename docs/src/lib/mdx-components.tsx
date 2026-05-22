@@ -9,6 +9,7 @@ import {
   CommandOptionTitle,
 } from "@/components/CommandOptions"
 import {Callout} from "@/components/Callout"
+import {APIPage} from "@/components/api-page"
 import {File, Files, Folder} from "@/components/Files"
 import {ImageZoom} from "@/components/image-zoom"
 import {Mermaid} from "@/components/Mermaid"
@@ -23,6 +24,7 @@ export function getMDXComponents(components?: MDXComponents): MDXComponents {
     CommandOptionTitle,
     Cards,
     Card,
+    APIPage,
     File,
     Folder,
     Files,
