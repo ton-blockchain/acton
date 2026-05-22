@@ -11,9 +11,6 @@ concurrency:
   group: check-installer-file-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  PUBLIC_ACTON_REPOSITORY: ton-blockchain/acton
-
 permissions: { }
 
 jobs:
@@ -42,9 +39,9 @@ jobs:
           RELEASE_TAG: ${{ steps.release-metadata.outputs.release_tag }}
         # language=Bash
         run: |
-          gh release delete "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+          gh release delete "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" -y || true
 
-          gh api "repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true
 
       - name: Download global dist artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -88,12 +85,12 @@ jobs:
         run: |
           cat > "${RUNNER_TEMP}/temporary-installer-check-notes.txt" <<EOF
           **DO NOT USE THIS RELEASE.**
-          Temporary release for installer validation in workflow run ${GITHUB_RUN_ID}.
+          Temporary release for installer validation in [workflow run ${GITHUB_RUN_ID}](https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}).
           **DO NOT USE THIS RELEASE.**
           EOF
 
           gh release create "${RELEASE_TAG}" \
-            --repo "${PUBLIC_ACTON_REPOSITORY}" \
+            --repo "${GITHUB_REPOSITORY}" \
             --title "Temporary installer check ${RELEASE_TAG}" \
             --notes-file "${RUNNER_TEMP}/temporary-installer-check-notes.txt" \
             --prerelease \
@@ -126,7 +123,7 @@ jobs:
         working-directory: ${{ runner.temp }}
         shell: bash
         env:
-          ACTON_DOWNLOAD_URL: ${{ format('https://github.com/{0}/releases/download/{1}', env.PUBLIC_ACTON_REPOSITORY, needs.create-temporary-release.outputs.release_tag) }}
+          ACTON_DOWNLOAD_URL: ${{ format('https://github.com/{0}/releases/download/{1}', github.repository, needs.create-temporary-release.outputs.release_tag) }}
         # language=Bash
         run: |
           set -euo pipefail
@@ -163,6 +160,6 @@ jobs:
           RELEASE_TAG: ${{ needs.create-temporary-release.outputs.release_tag }}
         # language=Bash
         run: |
-          gh release delete "${RELEASE_TAG}" --repo "${PUBLIC_ACTON_REPOSITORY}" -y || true
+          gh release delete "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" -y || true
 
-          gh api "repos/${PUBLIC_ACTON_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true
+          gh api "repos/${GITHUB_REPOSITORY}/git/refs/tags/${RELEASE_TAG}" -X DELETE || true
