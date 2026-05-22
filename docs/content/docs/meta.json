@@ -19,7 +19,7 @@
     "deploy.mdx",
     "verify.mdx",
     "libraries.mdx",
-    "!localnet",
+    "localnet",
     "dapps.mdx",
     "ci-setup.mdx",
     "--- Reference ---",
