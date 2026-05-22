@@ -48,7 +48,7 @@ OPTIONS
        --compiler-version version
            Tolk compiler version to request on the verifier side.
 
-           Currently defaults to 1.4.0.
+           Currently defaults to 1.4.1.
 
        --dry-run
            Run verification without submitting the final blockchain

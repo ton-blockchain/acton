@@ -59,7 +59,7 @@ Defaults to `52258`.
 {{#option "`--compiler-version` _version_" }}
 Tolk compiler version to request on the verifier side.
 
-Currently defaults to `1.4.0`.
+Currently defaults to `1.4.1`.
 {{/option}}
 
 {{#option "`--dry-run`" }}
