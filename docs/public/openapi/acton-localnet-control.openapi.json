@@ -194,55 +194,6 @@
         }
       }
     },
-    "/acton_getStateSource": {
-      "get": {
-        "tags": ["Localnet Control"],
-        "operationId": "getStateSource",
-        "summary": "Get account state source",
-        "description": "Returns the current source used for account state resolution.",
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/StateSourceResponse"
-          }
-        }
-      }
-    },
-    "/acton_setStateSource": {
-      "post": {
-        "tags": ["Localnet Control"],
-        "operationId": "setStateSource",
-        "summary": "Set account state source",
-        "description": "Switches account state source at runtime.",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/StateSource"
-              },
-              "examples": {
-                "local": {
-                  "value": "Local"
-                },
-                "remote": {
-                  "value": {
-                    "Remote": {
-                      "network": "mainnet",
-                      "fork_block_number": 12345678
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/NullResponse"
-          }
-        }
-      }
-    },
     "/acton_setShardAccount": {
       "post": {
         "tags": ["Localnet Control"],
@@ -479,28 +430,6 @@
           }
         }
       },
-      "StateSourceResponse": {
-        "description": "Successful state-source response.",
-        "content": {
-          "application/json": {
-            "schema": {
-              "allOf": [
-                {
-                  "$ref": "#/components/schemas/SuccessEnvelope"
-                },
-                {
-                  "type": "object",
-                  "properties": {
-                    "result": {
-                      "$ref": "#/components/schemas/StateSource"
-                    }
-                  }
-                }
-              ]
-            }
-          }
-        }
-      },
       "NodeInfoResponse": {
         "description": "Successful node status response.",
         "content": {
@@ -652,37 +581,6 @@
             "type": "string"
           }
         }
-      },
-      "RemoteProvider": {
-        "type": "object",
-        "required": ["network"],
-        "properties": {
-          "network": {
-            "type": "string",
-            "description": "Configured TON network name."
-          },
-          "fork_block_number": {
-            "type": "integer",
-            "nullable": true
-          }
-        }
-      },
-      "StateSource": {
-        "oneOf": [
-          {
-            "type": "string",
-            "enum": ["Local"]
-          },
-          {
-            "type": "object",
-            "required": ["Remote"],
-            "properties": {
-              "Remote": {
-                "$ref": "#/components/schemas/RemoteProvider"
-              }
-            }
-          }
-        ]
       },
       "SetShardAccountRequest": {
         "type": "object",

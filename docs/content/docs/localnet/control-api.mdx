@@ -34,12 +34,6 @@ _openapi:
       title: Load local state
       url: '#load-local-state'
     - depth: 2
-      title: Get account state source
-      url: '#get-account-state-source'
-    - depth: 2
-      title: Set account state source
-      url: '#set-account-state-source'
-    - depth: 2
       title: Set a ShardAccount
       url: '#set-a-shardaccount'
     - depth: 2
@@ -67,10 +61,6 @@ _openapi:
         id: dump-local-state
       - content: Load local state
         id: load-local-state
-      - content: Get account state source
-        id: get-account-state-source
-      - content: Set account state source
-        id: set-account-state-source
       - content: Set a ShardAccount
         id: set-a-shardaccount
       - content: Send a raw internal message
@@ -100,10 +90,6 @@ _openapi:
         heading: dump-local-state
       - content: Replaces the current node state with a JSON state snapshot.
         heading: load-local-state
-      - content: Returns the current source used for account state resolution.
-        heading: get-account-state-source
-      - content: Switches account state source at runtime.
-        heading: set-account-state-source
       - content: >-
           Replaces the selected account state with a base64-encoded ShardAccount
           BOC.
@@ -127,4 +113,4 @@ Acton-only control routes for local state, wallets, address names, compiler ABI 
 
 These routes are intended for local development tooling, are not authenticated, and should not be exposed publicly. Rate limiting applies only to /api routes; control routes remain available when --rate-limit is enabled.
 
-<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_getStateSource","method":"get"},{"path":"/acton_setStateSource","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
+<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

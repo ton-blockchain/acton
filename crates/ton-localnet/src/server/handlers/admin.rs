@@ -1,12 +1,11 @@
 use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
-use crate::node;
-use crate::server::StartupWallet;
 use crate::server::models::{
     FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
     SendBocRequest, SetAddressNameRequest, SetShardAccountRequest, StatePathRequest,
 };
+use crate::server::{StartupWallet, StateSourceInfo};
 use crate::types::Hash256;
 use axum::{Json, extract::State};
 use serde::Serialize;
@@ -23,42 +22,26 @@ pub async fn faucet(
     .await
 }
 
-pub async fn get_state_source(State(node): State<Arc<Localnet>>) -> Json<Value> {
-    handle_result(node.get_state_source(), |res| {
-        serde_json::to_value(res).unwrap_or(Value::Null)
-    })
-    .await
-}
-
 #[derive(Serialize)]
 struct LocalnetAdminStatus {
     uptime_seconds: u64,
     last_block_seqno: u64,
-    state_source: String,
-    fork_network: Option<String>,
-    fork_block_number: Option<u64>,
+    #[serde(flatten)]
+    state_source: StateSourceInfo,
 }
 
-pub async fn get_status(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn get_status(
+    State(node): State<Arc<Localnet>>,
+    State(state_source): State<Arc<StateSourceInfo>>,
+) -> Json<Value> {
     handle_result(
         async move {
             let masterchain_info = node.get_masterchain_info().await?;
-            let state_source = node.get_state_source().await?;
-            let (state_source_name, fork_network, fork_block_number) = match state_source {
-                node::StateSource::Local => ("local".to_owned(), None, None),
-                node::StateSource::Remote(provider) => (
-                    "remote".to_owned(),
-                    Some(provider.network.to_string()),
-                    provider.fork_block_number,
-                ),
-            };
 
             Ok(LocalnetAdminStatus {
                 uptime_seconds: node.uptime_seconds(),
                 last_block_seqno: u64::from(masterchain_info.last.seqno),
-                state_source: state_source_name,
-                fork_network,
-                fork_block_number,
+                state_source: state_source.as_ref().clone(),
             })
         },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -88,13 +71,6 @@ pub async fn load_state(
     Json(payload): Json<StatePathRequest>,
 ) -> Json<Value> {
     handle_result(node.load_state(payload.path), |()| Value::Null).await
-}
-
-pub async fn set_state_source(
-    State(node): State<Arc<Localnet>>,
-    Json(payload): Json<node::StateSource>,
-) -> Json<Value> {
-    handle_result(node.set_state_source(payload), |()| Value::Null).await
 }
 
 pub async fn set_shard_account(

@@ -745,7 +745,7 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         serde_json::to_string_pretty(&rate_limited).unwrap_or_default()
     );
 
-    let (admin_status, admin_response) = node.get_json_with_status("/acton_getStateSource");
+    let (admin_status, admin_response) = node.get_json_with_status("/acton_nodeInfo");
     assert_eq!(
         admin_status, 200,
         "Admin endpoints must stay available when API rate-limit is enabled"

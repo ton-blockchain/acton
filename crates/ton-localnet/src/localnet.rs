@@ -330,13 +330,6 @@ pub(crate) enum Request {
         address: Addr,
         resp: oneshot::Sender<anyhow::Result<Option<String>>>,
     },
-    SetStateSource {
-        source: StateSource,
-        resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    GetStateSource {
-        resp: oneshot::Sender<anyhow::Result<StateSource>>,
-    },
     RegisterCompilerAbis {
         entries: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
@@ -865,20 +858,6 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::SetStateSource { source, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn get_state_source(&self) -> anyhow::Result<StateSource> {
-        let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::GetStateSource { resp }).await?;
-        rx.await?
-    }
-
     pub async fn register_compiler_abis(
         &self,
         entries: Vec<(Hash256, Value)>,
@@ -1182,13 +1161,6 @@ fn process_loop_request(node: &mut Node, req: Request) {
         Request::GetAddressName { address, resp } => {
             let res = node.history.address_names.get(&address).cloned();
             let _ = resp.send(Ok(res));
-        }
-        Request::SetStateSource { source, resp } => {
-            node.state_source = source;
-            let _ = resp.send(Ok(()));
-        }
-        Request::GetStateSource { resp } => {
-            let _ = resp.send(Ok(node.state_source.clone()));
         }
         Request::RegisterCompilerAbis { entries, resp } => {
             let res = entries

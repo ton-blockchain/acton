@@ -23,6 +23,14 @@ pub struct StartupWallet {
 pub struct ServerState {
     pub node: Arc<Localnet>,
     pub startup_wallets: Arc<Vec<StartupWallet>>,
+    pub state_source: Arc<StateSourceInfo>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub struct StateSourceInfo {
+    pub state_source: &'static str,
+    pub fork_network: Option<String>,
+    pub fork_block_number: Option<u64>,
 }
 
 impl FromRef<ServerState> for Arc<Localnet> {
@@ -37,6 +45,12 @@ impl FromRef<ServerState> for Arc<Vec<StartupWallet>> {
     }
 }
 
+impl FromRef<ServerState> for Arc<StateSourceInfo> {
+    fn from_ref(state: &ServerState) -> Self {
+        state.state_source.clone()
+    }
+}
+
 pub struct ServerArgs {
     pub port: u16,
     pub db_path: Option<String>,
@@ -47,10 +61,20 @@ pub struct ServerArgs {
 }
 
 pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> anyhow::Result<()> {
+    let state_source = StateSourceInfo {
+        state_source: if args.fork_network.is_some() {
+            "remote"
+        } else {
+            "local"
+        },
+        fork_network: args.fork_network.clone(),
+        fork_block_number: args.fork_block_number,
+    };
     let app = router::create_router(
         ServerState {
             node,
             startup_wallets: Arc::new(args.startup_wallets),
+            state_source: Arc::new(state_source),
         },
         args.rate_limit_rps,
     );
