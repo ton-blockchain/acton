@@ -245,7 +245,7 @@ pub fn verify_cmd(
         })
         .collect();
 
-    let version = compiler_version.unwrap_or_else(|| "1.4.0".to_owned());
+    let version = compiler_version.unwrap_or_else(|| "1.4.1".to_owned());
 
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {

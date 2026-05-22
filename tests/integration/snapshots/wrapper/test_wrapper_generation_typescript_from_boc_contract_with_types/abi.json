@@ -3,7 +3,7 @@
   "alias_instantiations": [],
   "code_boc64": "te6ccgEBBAEAaAABFP8A9KQT9LzyyAsBAgFiAwIAEaFM8dqJoaZ/owCS0PiRkTDgIO1E0NM/0aYGyMs/ye1U1ywgAAAAHI4TW/iSyM+FCPpScM8LbsmBAKD7AODXLCAAAAAUljH6ADDy8OAwhA8BxwDy9A==",
   "compiler_name": "tolk",
-  "compiler_version": "1.4.0",
+  "compiler_version": "1.4.1",
   "contract_name": "Precompiled",
   "declarations": [
     {
