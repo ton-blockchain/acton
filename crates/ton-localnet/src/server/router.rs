@@ -6,14 +6,14 @@ use super::handlers::{
     get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
     get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
     get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
-    get_shard_account_cell, get_shards, get_state_source, get_status, get_traces, get_transactions,
-    get_transactions_by_message_v3, get_transactions_std, get_transactions_v3, json_rpc,
-    load_state, lookup_block, pack_address, register_compiler_abis, run_get_method,
-    run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash, send_message_v3,
-    set_address_name, set_state_source, try_locate_result_tx, try_locate_source_tx, try_locate_tx,
-    unpack_address,
+    get_shard_account_cell, get_shards, get_startup_wallets, get_state_source, get_status,
+    get_traces, get_transactions, get_transactions_by_message_v3, get_transactions_std,
+    get_transactions_v3, json_rpc, load_state, lookup_block, pack_address, register_compiler_abis,
+    run_get_method, run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash,
+    send_message_v3, set_address_name, set_state_source, try_locate_result_tx,
+    try_locate_source_tx, try_locate_tx, unpack_address,
 };
-use crate::localnet::Localnet;
+use crate::server::ServerState;
 use axum::{
     Json, Router,
     http::{HeaderValue, Method, StatusCode, request::Parts},
@@ -37,7 +37,7 @@ use tower_http::trace::TraceLayer;
 #[cfg(not(debug_assertions))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../acton-localnet-ui/dist");
 
-pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router {
+pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
     let api_v2_router = Router::new()
         .route("/v2", post(json_rpc))
         .route("/v2/jsonRPC", post(json_rpc))
@@ -111,6 +111,7 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         .route("/acton_loadState", post(load_state))
         .route("/acton_getStateSource", get(get_state_source))
         .route("/acton_setStateSource", post(set_state_source))
+        .route("/acton_getStartupWallets", get(get_startup_wallets))
         .route("/acton_nodeInfo", get(get_status));
 
     if let Some(limit) = rate_limit_rps {
@@ -132,7 +133,7 @@ pub fn create_router(node: Arc<Localnet>, rate_limit_rps: Option<u32>) -> Router
         .merge(acton_router)
         .layer(loopback_cors())
         .layer(TraceLayer::new_for_http())
-        .with_state(node);
+        .with_state(state);
 
     #[cfg(debug_assertions)]
     let app = {

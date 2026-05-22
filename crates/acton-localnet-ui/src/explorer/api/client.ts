@@ -1,4 +1,5 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {Cell} from "@ton/core"
 
 import type {
   AccountStatesResponse,
@@ -6,9 +7,13 @@ import type {
   FullAccountState,
   JettonMaster,
   JettonWallet,
+  JettonWalletData,
   LocalnetNodeInfo,
   NftItem,
+  StartupWallet,
   Transaction,
+  V3RunGetMethodResponse,
+  V3RunGetMethodStackEntry,
   V3TracesResponse,
   V3TransactionsResponse,
 } from "./types"
@@ -111,6 +116,46 @@ export class TonClient {
   async getJettonWalletsByAddress(address: string[]): Promise<JettonWallet[]> {
     if (address.length === 0) return []
     return this.fetchJettonWallets("address", address)
+  }
+
+  async runGetMethod(
+    address: string,
+    method: string | number,
+    stack: readonly V3RunGetMethodStackEntry[] = [],
+    seqno?: number,
+  ): Promise<V3RunGetMethodResponse> {
+    const url = this.buildUrl(this.v3BaseUrl, "/runGetMethod")
+    const body: {
+      readonly address: string
+      readonly method: string | number
+      readonly stack: readonly V3RunGetMethodStackEntry[]
+      readonly seqno?: number
+    } = seqno === undefined ? {address, method, stack} : {address, method, stack, seqno}
+
+    return this.request(url, "Failed to run get method", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(body),
+    })
+  }
+
+  async getJettonWalletData(
+    address: string,
+    seqno?: number,
+  ): Promise<JettonWalletData | undefined> {
+    const response = await this.runGetMethod(address, "get_wallet_data", [], seqno)
+    if (response.exit_code !== 0) {
+      return undefined
+    }
+
+    const balance = this.stackNumber(response.stack[0])
+    const owner = this.stackAddress(response.stack[1])
+    const jetton = this.stackAddress(response.stack[2])
+    if (balance === undefined || owner === undefined || jetton === undefined) {
+      return undefined
+    }
+
+    return {balance, owner, jetton}
   }
 
   private async fetchJettonWallets(
@@ -241,6 +286,11 @@ export class TonClient {
     return this.request(url, "Failed to fetch node info")
   }
 
+  async getStartupWallets(): Promise<StartupWallet[]> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getStartupWallets")
+    return this.request(url, "Failed to fetch startup wallets")
+  }
+
   async setAddressName(address: string, name: string): Promise<void> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_setAddressName")
     await this.request<null>(url, "Failed to set address name", {
@@ -327,5 +377,32 @@ export class TonClient {
     }
     const error = (value as {error?: unknown}).error
     return typeof error === "string" ? error : undefined
+  }
+
+  private stackNumber(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
+    if (entry?.type !== "num") return undefined
+    if (typeof entry.value === "string") {
+      try {
+        return BigInt(entry.value).toString()
+      } catch {
+        return undefined
+      }
+    }
+    if (typeof entry.value === "number") {
+      return Math.trunc(entry.value).toString()
+    }
+    return undefined
+  }
+
+  private stackAddress(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
+    if (entry?.type !== "slice" || typeof entry.value !== "string") {
+      return undefined
+    }
+
+    try {
+      return Cell.fromBase64(entry.value).beginParse().loadAddress()?.toString()
+    } catch {
+      return undefined
+    }
   }
 }

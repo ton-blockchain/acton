@@ -8,4 +8,4 @@ pub mod server;
 pub mod storage;
 pub mod types;
 pub use localnet::Localnet;
-pub use server::{ServerArgs, run_server};
+pub use server::{ServerArgs, StartupWallet, run_server};

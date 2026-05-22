@@ -170,6 +170,28 @@ export interface LocalnetNodeInfo {
   readonly fork_block_number?: number | null
 }
 
+export interface StartupWallet {
+  readonly name: string
+  readonly mnemonic: readonly string[]
+  readonly version: string
+  readonly network: string
+  readonly address: string
+  readonly public_key: string
+  readonly wallet_id: number
+}
+
+export interface V3RunGetMethodStackEntry {
+  readonly type: string
+  readonly value: unknown
+}
+
+export interface V3RunGetMethodResponse {
+  readonly gas_used: number
+  readonly exit_code: number
+  readonly stack: readonly V3RunGetMethodStackEntry[]
+  readonly vm_log: string
+}
+
 export interface V3Trace {
   readonly trace_id: string
   readonly external_hash: string
@@ -312,6 +334,12 @@ export interface JettonWallet {
   readonly data_hash: string
   readonly jetton: string
   readonly last_transaction_lt: string
+  readonly owner: string
+}
+
+export interface JettonWalletData {
+  readonly balance: string
+  readonly jetton: string
   readonly owner: string
 }
 

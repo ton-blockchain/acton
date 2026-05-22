@@ -4,6 +4,7 @@ import {
   Boxes,
   Github,
   Image,
+  KeyRound,
   LayoutGrid,
   Moon,
   Search as SearchIcon,
@@ -36,6 +37,7 @@ interface SidebarItem {
 const mainItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
+  {label: "Wallets", icon: KeyRound, path: "/wallets"},
   {label: "Faucet", icon: Wallet, path: "/faucet"},
   {label: "Tokens", icon: Boxes, path: "/tokens"},
   {label: "NFTs", icon: Image, path: "/nfts"},

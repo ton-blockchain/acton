@@ -1,6 +1,7 @@
 use super::utils::handle_result;
 use crate::localnet::Localnet;
 use crate::node;
+use crate::server::StartupWallet;
 use crate::server::models::{
     FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
     SetAddressNameRequest, StatePathRequest,
@@ -59,6 +60,16 @@ pub async fn get_status(State(node): State<Arc<Localnet>>) -> Json<Value> {
                 fork_block_number,
             })
         },
+        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+    )
+    .await
+}
+
+pub async fn get_startup_wallets(
+    State(startup_wallets): State<Arc<Vec<StartupWallet>>>,
+) -> Json<Value> {
+    handle_result(
+        async move { Ok::<_, anyhow::Error>(startup_wallets.as_ref().clone()) },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
     )
     .await

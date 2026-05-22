@@ -10,6 +10,7 @@ import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
 import {NftsPage} from "./dashboard/pages/NftsPage"
 import {TokensPage} from "./dashboard/pages/TokensPage"
+import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {AccountPage} from "./explorer/pages/AccountPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
@@ -82,6 +83,14 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
             }
           />
           <Route
+            path="/wallets"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme}>
+                <WalletsPage client={client} host={HOST} />
+              </DashboardPage>
+            }
+          />
+          <Route
             path="/tokens"
             element={
               <DashboardPage client={client} theme={theme} setTheme={setTheme}>
@@ -98,6 +107,7 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
             }
           />
           <Route path="/dashboard/faucet" element={<Navigate to="/faucet" replace />} />
+          <Route path="/dashboard/wallets" element={<Navigate to="/wallets" replace />} />
           <Route path="/dashboard/tokens" element={<Navigate to="/tokens" replace />} />
           <Route path="/dashboard/nfts" element={<Navigate to="/nfts" replace />} />
           <Route
