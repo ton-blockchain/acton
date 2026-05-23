@@ -69,6 +69,7 @@ struct DecodedMessageBody {
 enum MessageBodyDirection {
     Incoming,
     Outgoing,
+    ExternalOutgoing,
 }
 
 enum FormattedExtraInfo {
@@ -1058,13 +1059,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         tx: &Transaction,
         msg: &RelaxedMessage,
     ) -> Option<DecodedMessageBody> {
-        let build = self.build_result_for_tx_account(tx)?;
-        let abi = build.abi.as_ref()?;
-        self.try_decode_message_body_types(
+        let build = self.build_result_for_tx_account(tx);
+        self.try_decode_message_with_builds(
             msg.body,
-            abi,
-            abi.emitted_events.iter().map(|message| message.body_ty_idx),
-            0,
+            self.build_cache.prioritized_results(build),
+            MessageBodyDirection::ExternalOutgoing,
+            false,
         )
     }
 
@@ -1139,6 +1139,22 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 }
             }
             MessageBodyDirection::Outgoing => {
+                for message in &abi.outgoing_messages {
+                    Self::push_compiler_message_candidate(
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty_idx,
+                    );
+                }
+            }
+            MessageBodyDirection::ExternalOutgoing => {
+                for message in &abi.emitted_events {
+                    Self::push_compiler_message_candidate(
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty_idx,
+                    );
+                }
                 for message in &abi.outgoing_messages {
                     Self::push_compiler_message_candidate(
                         &mut candidates,
@@ -2196,7 +2212,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
     fn format_outgoing_external_message_name(&self, tx: &Transaction, opcode: u32) -> String {
         let build = self.build_result_for_tx_account(tx);
-        self.format_message_name_from_build(opcode, build.as_ref())
+        self.format_message_name_from_builds(opcode, self.build_cache.prioritized_results(build))
     }
 
     fn format_message_name_from_build(
@@ -2207,6 +2223,18 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if let Some(build) = build
             && let Some(name) = build.message_name_by_opcode(opcode)
         {
+            return Self::color_message_name(&name);
+        }
+
+        self.format_unknown_message_name(opcode)
+    }
+
+    fn format_message_name_from_builds(
+        &self,
+        opcode: u32,
+        builds: impl IntoIterator<Item = context::CompilationResult>,
+    ) -> String {
+        if let Some(name) = self.build_cache.message_name_by_opcode(opcode, builds) {
             return Self::color_message_name(&name);
         }
 

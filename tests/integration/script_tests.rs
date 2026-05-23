@@ -896,6 +896,108 @@ fun main() {
         );
 }
 
+#[test]
+fn test_script_trace_uses_built_abi_for_external_out_message_names() {
+    let project = ProjectBuilder::new("script-built-abi-external-out-message-names")
+        .file(
+            "contracts/script_external_trigger_messages",
+            r"
+struct (0xF8000004) TriggerExternalNotice {
+    queryId: uint64
+}
+",
+        )
+        .file(
+            "contracts/script_external_catalog",
+            r"
+struct (0xF8000005) ScriptOnlyExternalNotice {
+    queryId: uint64
+}
+
+contract ScriptExternalCatalog {
+    outgoingMessages: ScriptOnlyExternalNotice
+}
+
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+",
+        )
+        .contract(
+            "external_emitter",
+            r#"
+import "script_external_trigger_messages"
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy TriggerExternalNotice.fromSlice(in.body);
+    createExternalLogMessage({
+        dest: createAddressNone(),
+        body: beginCell()
+            .storeUint(0xF8000005, 32)
+            .storeUint(msg.queryId, 64)
+            .endCell(),
+    }).send(SEND_MODE_REGULAR);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#,
+        )
+        .script_file(
+            "print_built_abi_external_out_txs",
+            r#"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/io"
+import "../contracts/script_external_trigger_messages"
+
+fun main() {
+    val _ = build("script_external_catalog", "contracts/script_external_catalog.tolk");
+
+    val sender = testing.treasury("sender");
+    val init = ContractState {
+        code: build("external_emitter"),
+        data: createEmptyCell(),
+    };
+    val emitterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("1"),
+        dest: {
+            stateInit: init,
+        },
+    }));
+
+    val txs = net.send(sender.address, createMessage({
+        bounce: false,
+        value: ton("0.1"),
+        dest: emitterAddress,
+        body: TriggerExternalNotice {
+            queryId: 33,
+        },
+    }));
+
+    println(txs);
+}
+"#,
+        )
+        .build();
+
+    project
+        .acton()
+        .script("scripts/print_built_abi_external_out_txs.tolk")
+        .show_bodies()
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_trace_uses_built_abi_for_external_out_message_names.stdout.txt",
+        );
+}
+
 const PRECOMPILED_SCRIPT_REMOTE_CONTRACT: &str = r"
 struct (0xF8200002) PrecompiledRemotePing {
     queryId: uint64
