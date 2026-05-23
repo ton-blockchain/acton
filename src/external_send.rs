@@ -127,6 +127,11 @@ mod tests {
     use super::{SendBocContext, render_send_boc_error};
     use ton_api::SendBocErrorKind;
 
+    fn plain_text(text: &str) -> String {
+        let bytes = strip_ansi_escapes::strip(text.as_bytes());
+        String::from_utf8(bytes).unwrap_or_else(|_| text.to_owned())
+    }
+
     #[test]
     fn wallet_missing_account_state_mentions_wallet_setup() {
         let rendered = render_send_boc_error(
@@ -141,7 +146,7 @@ mod tests {
         );
 
         assert_eq!(
-            rendered,
+            plain_text(&rendered),
             r"wallet deployer has no active state on network testnet and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on testnet
 - wallet configuration/address does not match testnet
@@ -165,7 +170,7 @@ Possible fix:
         );
 
         assert_eq!(
-            rendered,
+            plain_text(&rendered),
             r"wallet deployer rejected the external message before contract execution; likely causes:
 - not enough balance to cover the transfer and fees
 - wallet is not deployed on testnet
@@ -202,7 +207,7 @@ Possible fix:
         );
 
         assert_eq!(
-            rendered,
+            plain_text(&rendered),
             r"wallet deployer has no active state on network localnet and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on localnet
 - wallet configuration/address does not match localnet
@@ -226,7 +231,7 @@ Possible fix:
         );
 
         assert_eq!(
-            rendered,
+            plain_text(&rendered),
             r"wallet deployer has no active state on network mock-v2 and the deployment message was not accepted; likely causes:
 - wallet is not deployed yet on mock-v2
 - wallet configuration/address does not match mock-v2",
