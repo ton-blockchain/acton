@@ -267,6 +267,10 @@ jobs:
     # "host" however must run to completion, no skipping allowed!
     if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release-binary.result == 'success' && needs.custom-check-installer-file.result == 'success' }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
+    permissions:
+      "attestations": "write"
+      "contents": "write"
+      "id-token": "write"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -285,6 +289,13 @@ jobs:
         run: |
           # Remove the granular manifests
           rm -f artifacts/*-dist-manifest.json
+      - name: Attest
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            artifacts/*.json
+            artifacts/*.sh
+            artifacts/*.tar.gz
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(needs.host.outputs.val).announcement_is_prerelease && '--prerelease' || '' }}"
