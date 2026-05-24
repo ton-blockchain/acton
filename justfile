@@ -83,7 +83,14 @@ check-deny:
 check-audit:
     cargo audit
 
-check-security: check-deny check-audit
+check-templates-security:
+  cd src/commands/new/templates/counter-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/empty-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/jetton-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/nft-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
+
+check-security: check-deny check-audit check-templates-security
     bun audit --audit-level=moderate
     cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
