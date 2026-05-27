@@ -105,6 +105,70 @@ fun deployCounter() {
 }
 "#;
 
+const GENERATED_CHILD_MESSAGES: &str = r"
+struct GeneratedChildStorage {
+    parent: address
+}
+
+struct (0x52a10001) DeployGeneratedChild {
+    queryId: uint64
+    parent: address
+}
+
+struct (0x52a10002) GeneratedChildPing {
+    queryId: uint64
+}
+";
+
+const GENERATED_CHILD_PARENT_CONTRACT: &str = r#"
+import "generated_child_messages"
+import "../gen/child.code.tolk"
+
+contract parent {
+    incomingMessages: DeployGeneratedChild
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val msg = lazy DeployGeneratedChild.fromSlice(in.body);
+    val childInit = ContractState {
+        code: childCompiledCode(),
+        data: GeneratedChildStorage { parent: msg.parent }.toCell(),
+    };
+
+    createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: { stateInit: childInit },
+        body: GeneratedChildPing { queryId: msg.queryId }.toCell(),
+    }).send(SEND_MODE_PAY_FEES_SEPARATELY);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const GENERATED_CHILD_CONTRACT: &str = r#"
+import "generated_child_messages"
+
+contract child {
+    storage: GeneratedChildStorage
+    incomingMessages: GeneratedChildPing
+}
+
+fun onInternalMessage(in: InMessage) {
+    if (in.body.isEmpty()) {
+        return;
+    }
+
+    val _msg = lazy GeneratedChildPing.fromSlice(in.body);
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
 fn trace_project(name: &str, test_cases: &str) -> crate::support::project::Project {
     let source = format!("{TRACE_TEST_PREPARE}\n{test_cases}");
     ProjectBuilder::new(name)
@@ -129,6 +193,16 @@ fn assert_trace_summary_snapshot(summary: String, snapshot_path: &str) {
     path.push("tests");
     path.push(snapshot_path);
     assertion().eq(summary, snapbox::Data::read_from(&path, None));
+}
+
+fn string_list(value: &serde_json::Value) -> Vec<String> {
+    value.as_array().map_or_else(Vec::new, |values| {
+        values
+            .iter()
+            .filter_map(serde_json::Value::as_str)
+            .map(ToString::to_string)
+            .collect()
+    })
 }
 
 fn replace_contract_display_name(project: &crate::support::project::Project, from: &str, to: &str) {
@@ -260,6 +334,121 @@ fn assert_trace_json_contract(
     assert!(
         wallets.values().any(|name| name.as_str() == Some("sender")),
         "Expected sender wallet in {relative_path}"
+    );
+}
+
+#[test]
+fn save_test_trace_recognizes_contract_deployed_from_generated_code() {
+    let project = ProjectBuilder::new("h-save-trace-generated-code")
+        .file(
+            "contracts/generated_child_messages",
+            GENERATED_CHILD_MESSAGES,
+        )
+        .contract("child", GENERATED_CHILD_CONTRACT)
+        .contract_with_deps("parent", GENERATED_CHILD_PARENT_CONTRACT, vec!["child"])
+        .test_file(
+            "trace",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../contracts/generated_child_messages"
+            import "../gen/child.code.tolk"
+
+            get fun `test-generated-code-child-trace`() {
+                val deployer = testing.treasury("deployer");
+                val parentInit = ContractState {
+                    code: build("parent"),
+                    data: createEmptyCell(),
+                };
+                val parentAddress = AutoDeployAddress { stateInit: parentInit }.calculateAddress();
+
+                val deployParent = createMessage({
+                    bounce: false,
+                    value: ton("1.0"),
+                    dest: { stateInit: parentInit },
+                });
+                expect(net.send(deployer.address, deployParent)).toHaveSuccessfulDeploy({
+                    to: parentAddress,
+                });
+
+                val childInit = ContractState {
+                    code: childCompiledCode(),
+                    data: GeneratedChildStorage { parent: parentAddress }.toCell(),
+                };
+                val childAddress = AutoDeployAddress { stateInit: childInit }.calculateAddress();
+                val deployChild = createMessage({
+                    bounce: false,
+                    value: ton("0.4"),
+                    dest: parentAddress,
+                    body: DeployGeneratedChild { queryId: 1, parent: parentAddress }.toCell(),
+                });
+
+                val txs = net.send(deployer.address, deployChild);
+                expect(txs).toHaveSuccessfulTx<DeployGeneratedChild>({ to: parentAddress });
+                expect(txs).toHaveSuccessfulDeploy({ to: childAddress });
+                expect(txs).toHaveSuccessfulTx<GeneratedChildPing>({ to: childAddress });
+            }
+            "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .arg("--save-test-trace")
+        .arg("trace-generated")
+        .run()
+        .success()
+        .assert_passed(1);
+
+    let trace = read_json_from_project(
+        &project,
+        "trace-generated/test-generated-code-child-trace_trace.json",
+    );
+    let child_contract = read_json_from_project(&project, "trace-generated/contracts/child.json");
+    let parent_contract = read_json_from_project(&project, "trace-generated/contracts/parent.json");
+
+    let mut contract_files = fs::read_dir(project.path().join("trace-generated/contracts"))
+        .expect("should read generated trace contracts directory")
+        .filter_map(Result::ok)
+        .filter_map(|entry| entry.file_name().into_string().ok())
+        .collect::<Vec<_>>();
+    contract_files.sort();
+
+    let tx_dest_contracts = trace["traces"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .flat_map(|chain| chain["transactions"].as_array().into_iter().flatten())
+        .map(|tx| {
+            tx["dest_contract_info"]
+                .as_str()
+                .unwrap_or("<unknown>")
+                .to_string()
+        })
+        .collect::<Vec<_>>();
+
+    assert_trace_summary_snapshot(
+        format!(
+            "trace_contracts: {}\ncontract_files: {}\ntx_dest_contracts: {}\nparent_json_name: {}\nchild_json_name: {}\nchild_abi_contract_name: {}\nchild_storage_ty_idx: {}\nchild_incoming_messages: {}\n",
+            string_list(&trace["contracts"]).join(","),
+            contract_files.join(","),
+            tx_dest_contracts.join(" -> "),
+            parent_contract["name"].as_str().unwrap_or("<missing>"),
+            child_contract["name"].as_str().unwrap_or("<missing>"),
+            child_contract["abi"]["contract_name"]
+                .as_str()
+                .unwrap_or("<missing>"),
+            child_contract["abi"]["storage"]["storage_ty_idx"]
+                .as_i64()
+                .map_or_else(|| "<missing>".to_string(), |value| value.to_string()),
+            child_contract["abi"]["incoming_messages"]
+                .as_array()
+                .map_or(0, Vec::len),
+        ),
+        "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_recognizes_contract_deployed_from_generated_code.txt",
     );
 }
 

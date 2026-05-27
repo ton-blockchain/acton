@@ -337,6 +337,16 @@ fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2Moc
     }
 }
 
+fn localnet_acton_ok_response() -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+        })
+        .to_string(),
+    }
+}
+
 fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
     let project = ProjectBuilder::new(project_name)
         .script_file(
@@ -3510,6 +3520,7 @@ fn test_script_broadcast_missing_account_state_on_localnet_shows_localnet_airdro
         build_broadcast_wallet_error_project("script-broadcast-wallet-missing-account-localnet");
 
     let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        localnet_acton_ok_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_error_response(
             400,

@@ -3,9 +3,8 @@ use crate::commands::common::{
     error_fmt, executor_verbosity_for_cli_level, max_executor_verbosity,
 };
 use crate::commands::test::coverage::{
-    collect_coverage, compile_project_contracts_for_coverage, generate_lcov_file,
-    generate_lcov_report, generate_text_file, print_coverage_summary,
-    total_coverage_score_percentage,
+    collect_coverage, compile_project_contracts, generate_lcov_file, generate_lcov_report,
+    generate_text_file, print_coverage_summary, total_coverage_score_percentage,
 };
 use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
@@ -392,7 +391,7 @@ impl<'a> TestRunner<'a> {
 
                 let get_result = executor.finish(&params.code)?;
 
-                dump_trace_if_available(test, &self.config, &ctx)?;
+                dump_trace_if_available(test, &self.config, &mut ctx)?;
 
                 (
                     get_result,
@@ -407,7 +406,7 @@ impl<'a> TestRunner<'a> {
 
                 let get_result = executor.run_get_method(&stack, &params, Some(DEFAULT_CONFIG))?;
 
-                dump_trace_if_available(test, &self.config, &ctx)?;
+                dump_trace_if_available(test, &self.config, &mut ctx)?;
 
                 (
                     get_result,
@@ -479,7 +478,7 @@ impl<'a> TestRunner<'a> {
 fn dump_trace_if_available(
     test: &TestDescriptor,
     config: &TestConfig,
-    ctx: &Context<'_>,
+    ctx: &mut Context<'_>,
 ) -> anyhow::Result<()> {
     let Some(trace_dir) = &config.save_test_trace else {
         return Ok(());
@@ -494,6 +493,14 @@ fn dump_trace_if_available(
         );
         return Ok(());
     };
+
+    compile_project_contracts(
+        ctx.build.build_cache,
+        ctx.build.file_build_cache,
+        ctx.env.config,
+        &ctx.env.project_root,
+        ctx.build.need_debug_info,
+    )?;
 
     trace::dump_test_transactions(
         test,
@@ -701,11 +708,12 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
         let project_root = configured_project_root().to_path_buf();
         // Contracts can be deployed from generated `gen/*.code.tolk` helpers without calling
         // `build(...)` at runtime, so coverage needs source maps for project contracts upfront.
-        compile_project_contracts_for_coverage(
+        compile_project_contracts(
             &mut runner.build_cache,
             runner.file_build_cache,
             &runner.acton_config,
             &project_root,
+            true,
         )?;
         let wrapper_roots: Vec<_> = runner
             .acton_config
