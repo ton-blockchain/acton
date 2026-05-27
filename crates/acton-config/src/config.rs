@@ -1385,6 +1385,7 @@ impl TestSettings {
             fail_fast: fail_fast_override.unwrap_or_else(|| self.fail_fast.unwrap_or(false)),
             ui: ui_override || self.ui.unwrap_or(false),
             ui_port: ui_port_override.unwrap_or_else(|| self.ui_port.unwrap_or(12344)),
+            ui_trace_dir: None,
         }
     }
 }

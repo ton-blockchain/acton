@@ -10,7 +10,9 @@ use crate::commands::test::reporting::console::{ConsoleConfig, ConsoleReporter};
 use crate::commands::test::reporting::dot::DotReporter;
 use crate::commands::test::reporting::junit::{JUnitConfig, JUnitReporter};
 use crate::commands::test::reporting::teamcity::TeamCityReporter;
-use crate::commands::test::reporting::ui::{UiReporter, reserve_ui_listener, start_ui_server};
+use crate::commands::test::reporting::ui::{
+    UiReporter, reports_from_trace_dir, reserve_ui_listener, start_ui_server,
+};
 use crate::commands::test::reporting::{
     FuzzExecutionContext, ReporterManager, TestExecutionContext, TestFailureExecutionContext,
     TestReport, TestStatus, TestSuiteStats, extract_suite_name,
@@ -33,7 +35,7 @@ use acton_debug::replayer::TolkReplayer;
 use acton_debug::{
     DapTransport, ReplayerDebugSession, reserve_dap_listener, start_dap_server_with_listener,
 };
-use anyhow::anyhow;
+use anyhow::{Context as _, anyhow};
 use dunce;
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use log::{debug, error, warn};
@@ -552,6 +554,10 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
 
+    if let Some(trace_dir) = config.ui_trace_dir.as_deref() {
+        return serve_saved_trace_ui(trace_dir, &config, project_root);
+    }
+
     // First we need to build all contracts and generate all dependency files with code.
     // Internal mutation child runs may skip this via environment variable.
     if need_to_build() {
@@ -827,6 +833,45 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     Ok(())
 }
 
+fn serve_saved_trace_ui(
+    trace_dir: &str,
+    config: &TestConfig,
+    project_root: &Path,
+) -> anyhow::Result<()> {
+    let trace_dir = PathBuf::from(trace_dir);
+    let trace_dir = dunce::canonicalize(&trace_dir)
+        .with_context(|| format!("Failed to resolve trace directory {}", trace_dir.display()))?;
+    if !trace_dir.is_dir() {
+        anyhow::bail!("Trace path is not a directory: {}", trace_dir.display());
+    }
+
+    let listener = reserve_ui_listener(config.ui_port)?;
+    let reports = reports_from_trace_dir(&trace_dir)?;
+    let project_root = dunce::canonicalize(project_root)
+        .unwrap_or_else(|_| project_root.to_path_buf())
+        .to_string_lossy()
+        .to_string();
+    let project_root = if project_root.ends_with(std::path::MAIN_SEPARATOR) {
+        project_root
+    } else {
+        format!("{}{}", project_root, std::path::MAIN_SEPARATOR)
+    };
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    rt.block_on(async {
+        start_ui_server(
+            reports,
+            Some(trace_dir.to_string_lossy().to_string()),
+            project_root,
+            None,
+            listener,
+        )
+        .await
+    })
+}
+
 fn need_to_build() -> bool {
     let Ok(value) = std::env::var(INTERNAL_SKIP_BUILD_ENV) else {
         return true;
@@ -879,6 +924,10 @@ fn empty_test_selection_message(
 fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
     config.save_test_trace = config
         .save_test_trace
+        .as_deref()
+        .map(|path| resolve_project_relative_path(project_root, path));
+    config.ui_trace_dir = config
+        .ui_trace_dir
         .as_deref()
         .map(|path| resolve_project_relative_path(project_root, path));
     config.junit_path = config

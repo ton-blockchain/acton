@@ -1,8 +1,8 @@
-trace_contracts: child,parent
-contract_files: child.json,parent.json
-tx_dest_contracts: <unknown> -> parent -> parent -> child
-parent_json_name: parent
-child_json_name: child
-child_abi_contract_name: child
-child_storage_ty_idx: 13
-child_incoming_messages: 1
+trace_contracts: Factory,Pool,Position
+contract_files: Factory.json,Pool.json,Position.json
+tx_dest_contracts: <unknown> -> Factory -> Factory -> Pool
+factory_json_name: Factory
+pool_json_name: Pool
+pool_abi_contract_name: Pool
+pool_storage_ty_idx: 13
+pool_incoming_messages: 1

@@ -170,4 +170,5 @@ pub struct TestConfig {
     pub fail_fast: bool,
     pub ui: bool,
     pub ui_port: u16,
+    pub ui_trace_dir: Option<String>,
 }

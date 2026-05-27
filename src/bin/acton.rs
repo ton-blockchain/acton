@@ -484,6 +484,8 @@ enum Commands {
             value_name = "PORT"
         )]
         ui_port: Option<u16>,
+        #[arg(long, hide = true, value_name = "DIR")]
+        ui_trace_dir: Option<String>,
     },
     #[command(
         about = "Generate contract wrappers and test stubs",
@@ -1904,6 +1906,7 @@ fn main() {
             fork_block_number,
             ui,
             ui_port,
+            ui_trace_dir,
         } => match (
             fork_net.as_deref().map(Network::from_str).transpose(),
             commands::common::validate_cli_verbosity(verbose),
@@ -1950,6 +1953,7 @@ fn main() {
                     fail_fast,
                     ui,
                     ui_port,
+                    ui_trace_dir,
                 ) {
                     Ok(config) => {
                         if mutate {
@@ -2642,6 +2646,7 @@ fn create_test_config(
     fail_fast: Option<bool>,
     ui: bool,
     ui_port: Option<u16>,
+    ui_trace_dir: Option<String>,
 ) -> anyhow::Result<TestConfig> {
     let acton_config = ActonConfig::load();
 
@@ -2710,6 +2715,10 @@ fn create_test_config(
         }
         config.mutation_session_id = mutation_session_id;
         config.mutation_workers = mutation_workers;
+        config.ui_trace_dir = ui_trace_dir;
+        if config.ui_trace_dir.is_some() {
+            config.ui = true;
+        }
         apply_ui_trace_default(&mut config);
         validate_merged_test_fork_network(Some(acton_config), config.fork_net.as_ref())?;
         return Ok(config);
@@ -2755,8 +2764,9 @@ fn create_test_config(
         fuzz_max_test_rejects: None,
         fuzz_seed,
         fail_fast: fail_fast.unwrap_or(false),
-        ui,
+        ui: ui || ui_trace_dir.is_some(),
         ui_port: ui_port.unwrap_or(12344),
+        ui_trace_dir,
         fork_net,
     };
     apply_ui_trace_default(&mut config);
@@ -2767,7 +2777,7 @@ fn create_test_config(
 }
 
 fn apply_ui_trace_default(config: &mut TestConfig) {
-    if config.ui && config.save_test_trace.is_none() {
+    if config.ui && config.save_test_trace.is_none() && config.ui_trace_dir.is_none() {
         config.save_test_trace = Some(paths::DEFAULT_BUILD_TRACES_DIR.to_owned());
     }
 }

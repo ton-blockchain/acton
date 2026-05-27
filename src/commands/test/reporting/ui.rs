@@ -1,5 +1,7 @@
 use crate::commands::common::error_fmt;
-use crate::commands::test::reporting::{FuzzExecutionContext, TestReport, TestReporter};
+use crate::commands::test::reporting::{
+    FuzzExecutionContext, TestReport, TestReporter, TestStatus,
+};
 use crate::commands::test::trace;
 use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
@@ -15,8 +17,11 @@ use axum::{
 use include_dir::{Dir, include_dir};
 use log::warn;
 use serde::{Deserialize, Serialize};
+use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+use tolk_compiler::SourceMap;
 #[cfg(debug_assertions)]
 use tower_http::services::ServeDir;
 
@@ -55,8 +60,8 @@ struct UiTestReport {
     file_path: PathBuf,
     row: usize,
     column: usize,
-    duration: std::time::Duration,
-    status: crate::commands::test::reporting::TestStatus,
+    duration: Duration,
+    status: TestStatus,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     message: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -127,6 +132,88 @@ impl TestReporter for UiReporter {
             .push(test.clone());
         Ok(())
     }
+}
+
+pub(crate) fn reports_from_trace_dir(trace_dir: &Path) -> anyhow::Result<Vec<TestReport>> {
+    let mut reports = Vec::new();
+    let entries = fs::read_dir(trace_dir)
+        .with_context(|| format!("Failed to read trace directory {}", trace_dir.display()))?;
+
+    for entry in entries {
+        let entry =
+            entry.with_context(|| format!("Failed to read entry in {}", trace_dir.display()))?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            continue;
+        };
+        if !file_name.ends_with("_trace.json") {
+            continue;
+        }
+
+        let content = fs::read_to_string(&path)
+            .with_context(|| format!("Failed to read trace file {}", path.display()))?;
+        let json: serde_json::Value = serde_json::from_str(&content)
+            .with_context(|| format!("Trace file {} is not valid JSON", path.display()))?;
+
+        let name = json
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_else(|| file_name.trim_end_matches("_trace.json"));
+        let pos = json.get("pos").unwrap_or(&serde_json::Value::Null);
+        let file_path = pos
+            .get("uri")
+            .and_then(serde_json::Value::as_str)
+            .map_or_else(|| path.clone(), PathBuf::from);
+        let row = pos
+            .get("row")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(1) as usize;
+        let column = pos
+            .get("column")
+            .and_then(serde_json::Value::as_u64)
+            .unwrap_or(1) as usize;
+
+        reports.push(TestReport {
+            name: Arc::from(name),
+            suite_name: Arc::from("saved traces"),
+            file_path,
+            row,
+            column,
+            duration: Duration::default(),
+            gas_limit: None,
+            status: TestStatus::Passed,
+            message: Some("Loaded from saved trace directory".to_owned()),
+            detailed_message: None,
+            failed_transactions: None,
+            failed_transaction_context: None,
+            details: None,
+            location: None,
+            abi: None,
+            source_map: Arc::new(SourceMap::default()),
+            show_bodies: false,
+            backtrace: None,
+            execution: None,
+            trace_path: Some(file_name.to_owned()),
+        });
+    }
+
+    reports.sort_by(|left, right| {
+        left.name
+            .cmp(&right.name)
+            .then_with(|| left.trace_path.cmp(&right.trace_path))
+    });
+
+    anyhow::ensure!(
+        !reports.is_empty(),
+        "No *_trace.json files found in {}",
+        trace_dir.display()
+    );
+
+    Ok(reports)
 }
 
 pub(crate) fn reserve_ui_listener(port: u16) -> anyhow::Result<std::net::TcpListener> {

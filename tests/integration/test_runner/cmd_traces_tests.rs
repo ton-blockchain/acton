@@ -105,27 +105,31 @@ fun deployCounter() {
 }
 "#;
 
-const GENERATED_CHILD_MESSAGES: &str = r"
-struct GeneratedChildStorage {
+const GENERATED_POOL_MESSAGES: &str = r"
+struct GeneratedPoolStorage {
     parent: address
 }
 
-struct (0x52a10001) DeployGeneratedChild {
+struct GeneratedPositionStorage {
+    owner: address
+}
+
+struct (0x52a10001) DeployGeneratedPool {
     queryId: uint64
     parent: address
 }
 
-struct (0x52a10002) GeneratedChildPing {
+struct (0x52a10002) GeneratedPoolPing {
     queryId: uint64
 }
 ";
 
-const GENERATED_CHILD_PARENT_CONTRACT: &str = r#"
-import "generated_child_messages"
-import "../gen/child.code.tolk"
+const GENERATED_FACTORY_CONTRACT: &str = r#"
+import "generated_pool_messages"
+import "@gen/Pool.code"
 
-contract parent {
-    incomingMessages: DeployGeneratedChild
+contract Factory {
+    incomingMessages: DeployGeneratedPool
 }
 
 fun onInternalMessage(in: InMessage) {
@@ -133,29 +137,29 @@ fun onInternalMessage(in: InMessage) {
         return;
     }
 
-    val msg = lazy DeployGeneratedChild.fromSlice(in.body);
-    val childInit = ContractState {
-        code: childCompiledCode(),
-        data: GeneratedChildStorage { parent: msg.parent }.toCell(),
+    val msg = lazy DeployGeneratedPool.fromSlice(in.body);
+    val poolInit = ContractState {
+        code: poolCompiledCode(),
+        data: GeneratedPoolStorage { parent: msg.parent }.toCell(),
     };
 
     createMessage({
         bounce: false,
         value: ton("0.2"),
-        dest: { stateInit: childInit },
-        body: GeneratedChildPing { queryId: msg.queryId }.toCell(),
+        dest: { stateInit: poolInit },
+        body: GeneratedPoolPing { queryId: msg.queryId }.toCell(),
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
 
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
 
-const GENERATED_CHILD_CONTRACT: &str = r#"
-import "generated_child_messages"
+const GENERATED_POOL_CONTRACT: &str = r#"
+import "generated_pool_messages"
 
-contract child {
-    storage: GeneratedChildStorage
-    incomingMessages: GeneratedChildPing
+contract Pool {
+    storage: GeneratedPoolStorage
+    incomingMessages: GeneratedPoolPing
 }
 
 fun onInternalMessage(in: InMessage) {
@@ -163,8 +167,20 @@ fun onInternalMessage(in: InMessage) {
         return;
     }
 
-    val _msg = lazy GeneratedChildPing.fromSlice(in.body);
+    val _msg = lazy GeneratedPoolPing.fromSlice(in.body);
 }
+
+fun onBouncedMessage(_: InMessageBounced) {}
+"#;
+
+const GENERATED_POSITION_CONTRACT: &str = r#"
+import "generated_pool_messages"
+
+contract Position {
+    storage: GeneratedPositionStorage
+}
+
+fun onInternalMessage(_: InMessage) {}
 
 fun onBouncedMessage(_: InMessageBounced) {}
 "#;
@@ -340,12 +356,14 @@ fn assert_trace_json_contract(
 #[test]
 fn save_test_trace_recognizes_contract_deployed_from_generated_code() {
     let project = ProjectBuilder::new("h-save-trace-generated-code")
+        .mapping("gen", "gen")
         .file(
-            "contracts/generated_child_messages",
-            GENERATED_CHILD_MESSAGES,
+            "contracts/generated_pool_messages",
+            GENERATED_POOL_MESSAGES,
         )
-        .contract("child", GENERATED_CHILD_CONTRACT)
-        .contract_with_deps("parent", GENERATED_CHILD_PARENT_CONTRACT, vec!["child"])
+        .contract("Position", GENERATED_POSITION_CONTRACT)
+        .contract_with_deps("Pool", GENERATED_POOL_CONTRACT, vec!["Position"])
+        .contract_with_deps("Factory", GENERATED_FACTORY_CONTRACT, vec!["Pool", "Position"])
         .test_file(
             "trace",
             r#"
@@ -353,46 +371,55 @@ fn save_test_trace_recognizes_contract_deployed_from_generated_code() {
             import "../../lib/build"
             import "../../lib/emulation/network"
             import "../../lib/emulation/testing"
-            import "../contracts/generated_child_messages"
-            import "../gen/child.code.tolk"
+            import "../contracts/generated_pool_messages"
+            import "@gen/Pool.code"
 
-            get fun `test-generated-code-child-trace`() {
+            get fun `test-generated-code-pool-trace`() {
                 val deployer = testing.treasury("deployer");
-                val parentInit = ContractState {
-                    code: build("parent"),
+                val factoryInit = ContractState {
+                    code: build("Factory"),
                     data: createEmptyCell(),
                 };
-                val parentAddress = AutoDeployAddress { stateInit: parentInit }.calculateAddress();
+                val factoryAddress = AutoDeployAddress { stateInit: factoryInit }.calculateAddress();
 
-                val deployParent = createMessage({
+                val deployFactory = createMessage({
                     bounce: false,
                     value: ton("1.0"),
-                    dest: { stateInit: parentInit },
+                    dest: { stateInit: factoryInit },
                 });
-                expect(net.send(deployer.address, deployParent)).toHaveSuccessfulDeploy({
-                    to: parentAddress,
+                expect(net.send(deployer.address, deployFactory)).toHaveSuccessfulDeploy({
+                    to: factoryAddress,
                 });
 
-                val childInit = ContractState {
-                    code: childCompiledCode(),
-                    data: GeneratedChildStorage { parent: parentAddress }.toCell(),
+                val poolInit = ContractState {
+                    code: poolCompiledCode(),
+                    data: GeneratedPoolStorage { parent: factoryAddress }.toCell(),
                 };
-                val childAddress = AutoDeployAddress { stateInit: childInit }.calculateAddress();
-                val deployChild = createMessage({
+                val poolAddress = AutoDeployAddress { stateInit: poolInit }.calculateAddress();
+                val deployPool = createMessage({
                     bounce: false,
                     value: ton("0.4"),
-                    dest: parentAddress,
-                    body: DeployGeneratedChild { queryId: 1, parent: parentAddress }.toCell(),
+                    dest: factoryAddress,
+                    body: DeployGeneratedPool { queryId: 1, parent: factoryAddress }.toCell(),
                 });
 
-                val txs = net.send(deployer.address, deployChild);
-                expect(txs).toHaveSuccessfulTx<DeployGeneratedChild>({ to: parentAddress });
-                expect(txs).toHaveSuccessfulDeploy({ to: childAddress });
-                expect(txs).toHaveSuccessfulTx<GeneratedChildPing>({ to: childAddress });
+                val txs = net.send(deployer.address, deployPool);
+                expect(txs).toHaveSuccessfulTx<DeployGeneratedPool>({ to: factoryAddress });
+                expect(txs).toHaveSuccessfulDeploy({ to: poolAddress });
+                expect(txs).toHaveSuccessfulTx<GeneratedPoolPing>({ to: poolAddress });
             }
             "#,
         )
         .build();
+
+    let acton_toml_path = project.path().join("Acton.toml");
+    let acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("should read generated Acton.toml");
+    let acton_toml = acton_toml
+        .replace("[contracts.factory]", "[contracts.Factory]")
+        .replace("[contracts.pool]", "[contracts.Pool]")
+        .replace("[contracts.position]", "[contracts.Position]");
+    fs::write(&acton_toml_path, acton_toml).expect("should update generated Acton.toml");
 
     project
         .acton()
@@ -405,10 +432,11 @@ fn save_test_trace_recognizes_contract_deployed_from_generated_code() {
 
     let trace = read_json_from_project(
         &project,
-        "trace-generated/test-generated-code-child-trace_trace.json",
+        "trace-generated/test-generated-code-pool-trace_trace.json",
     );
-    let child_contract = read_json_from_project(&project, "trace-generated/contracts/child.json");
-    let parent_contract = read_json_from_project(&project, "trace-generated/contracts/parent.json");
+    let factory_contract =
+        read_json_from_project(&project, "trace-generated/contracts/Factory.json");
+    let pool_contract = read_json_from_project(&project, "trace-generated/contracts/Pool.json");
 
     let mut contract_files = fs::read_dir(project.path().join("trace-generated/contracts"))
         .expect("should read generated trace contracts directory")
@@ -432,19 +460,19 @@ fn save_test_trace_recognizes_contract_deployed_from_generated_code() {
 
     assert_trace_summary_snapshot(
         format!(
-            "trace_contracts: {}\ncontract_files: {}\ntx_dest_contracts: {}\nparent_json_name: {}\nchild_json_name: {}\nchild_abi_contract_name: {}\nchild_storage_ty_idx: {}\nchild_incoming_messages: {}\n",
+            "trace_contracts: {}\ncontract_files: {}\ntx_dest_contracts: {}\nfactory_json_name: {}\npool_json_name: {}\npool_abi_contract_name: {}\npool_storage_ty_idx: {}\npool_incoming_messages: {}\n",
             string_list(&trace["contracts"]).join(","),
             contract_files.join(","),
             tx_dest_contracts.join(" -> "),
-            parent_contract["name"].as_str().unwrap_or("<missing>"),
-            child_contract["name"].as_str().unwrap_or("<missing>"),
-            child_contract["abi"]["contract_name"]
+            factory_contract["name"].as_str().unwrap_or("<missing>"),
+            pool_contract["name"].as_str().unwrap_or("<missing>"),
+            pool_contract["abi"]["contract_name"]
                 .as_str()
                 .unwrap_or("<missing>"),
-            child_contract["abi"]["storage"]["storage_ty_idx"]
+            pool_contract["abi"]["storage"]["storage_ty_idx"]
                 .as_i64()
                 .map_or_else(|| "<missing>".to_string(), |value| value.to_string()),
-            child_contract["abi"]["incoming_messages"]
+            pool_contract["abi"]["incoming_messages"]
                 .as_array()
                 .map_or(0, Vec::len),
         ),

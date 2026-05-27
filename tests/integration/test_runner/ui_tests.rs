@@ -104,6 +104,14 @@ impl Drop for UiTestProcess {
 }
 
 fn spawn_test_ui(project: &Project, port: u16) -> UiTestProcess {
+    let port = port.to_string();
+    spawn_test_ui_with_args(project, ["test", "--ui", "--ui-port", &port])
+}
+
+fn spawn_test_ui_with_args<'a>(
+    project: &Project,
+    args: impl IntoIterator<Item = &'a str>,
+) -> UiTestProcess {
     let mut command = Command::new(acton_exe());
     command
         .current_dir(project.path())
@@ -113,7 +121,7 @@ fn spawn_test_ui(project: &Project, port: u16) -> UiTestProcess {
         .env("ACTON_LOG_DIR", project.path().join(".acton-test-logs"))
         .env("NO_COLOR", "1")
         .env("ACTON_INTERNAL_SKIP_BROWSER", "1")
-        .args(["test", "--ui", "--ui-port", &port.to_string()])
+        .args(args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -359,6 +367,93 @@ fn ui_api_returns_no_content_for_missing_or_empty_trace_file() {
             "missing_trace_status: {missing_trace_status}\nmissing_trace_body: {missing_trace_body:?}\nempty_trace_status: {empty_trace_status}\nempty_trace_body: {empty_trace_body:?}\n"
         ),
         "integration/snapshots/test-runner/test_runner_ui/ui_api_returns_no_content_for_missing_or_empty_trace_file.txt",
+    );
+}
+
+#[test]
+fn ui_trace_dir_starts_test_ui_from_saved_traces_without_running_tests() {
+    let project = ProjectBuilder::new("f-ui-saved-trace-dir").build();
+    let trace_dir = project.path().join("saved-traces");
+    fs::create_dir_all(&trace_dir).expect("should create saved trace dir");
+    let source_path = project.path().join("tests/manual.test.tolk");
+    fs::create_dir_all(
+        source_path
+            .parent()
+            .expect("source path should have parent"),
+    )
+    .expect("should create tests dir");
+    fs::write(&source_path, "// saved trace source\n").expect("should write source file");
+    fs::write(
+        trace_dir.join("manual_trace_trace.json"),
+        serde_json::json!({
+            "name": "manual saved trace",
+            "pos": {
+                "uri": source_path.to_string_lossy(),
+                "row": 7,
+                "column": 3,
+            },
+            "traces": [
+                {
+                    "name": "Manual chain",
+                    "transactions": [],
+                    "failed_messages": [],
+                },
+            ],
+            "contracts": [],
+            "wallets": {},
+        })
+        .to_string(),
+    )
+    .expect("should write saved trace file");
+
+    let port = unused_ui_port();
+    let port_arg = port.to_string();
+    let trace_dir_arg = trace_dir.to_string_lossy().to_string();
+    let base_url = format!("http://127.0.0.1:{port}");
+    let mut process = spawn_test_ui_with_args(
+        &project,
+        [
+            "test",
+            "--ui-trace-dir",
+            &trace_dir_arg,
+            "--ui-port",
+            &port_arg,
+        ],
+    );
+    wait_for_test_ui(&mut process, &base_url);
+
+    let client = reqwest::blocking::Client::new();
+    let reports: Value = client
+        .get(format!("{base_url}/api/reports"))
+        .send()
+        .expect("should fetch UI reports")
+        .json()
+        .expect("reports response should be JSON");
+    let trace_path = reports[0]["trace_path"]
+        .as_str()
+        .expect("UI report should include trace path");
+    let trace: Value = client
+        .get(format!(
+            "{base_url}/api/trace/{}",
+            encode_component(trace_path)
+        ))
+        .send()
+        .expect("should fetch saved UI trace")
+        .json()
+        .expect("saved trace response should be JSON");
+
+    assert_ui_api_snapshot(
+        format!(
+            "reports: {}\nreport_name: {}\nreport_suite: {}\nreport_status: {}\ntrace_path: {}\ntrace_name: {}\ntrace_count: {}\n",
+            reports.as_array().map_or(0, Vec::len),
+            reports[0]["name"].as_str().unwrap_or("<missing>"),
+            reports[0]["suite_name"].as_str().unwrap_or("<missing>"),
+            reports[0]["status"].as_str().unwrap_or("<missing>"),
+            trace_path,
+            trace["name"].as_str().unwrap_or("<missing>"),
+            trace["traces"].as_array().map_or(0, Vec::len),
+        ),
+        "integration/snapshots/test-runner/test_runner_ui/ui_trace_dir_starts_test_ui_from_saved_traces_without_running_tests.txt",
     );
 }
 
