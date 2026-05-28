@@ -115,18 +115,96 @@ fn run_success_with_contract(
     test_body: &str,
     snapshot_name: &str,
 ) {
-    ProjectBuilder::new(project_name)
+    run_success_with_contract_with_backtrace(
+        project_name,
+        contract,
+        test_body,
+        snapshot_name,
+        None,
+    );
+}
+
+fn run_success_with_contract_with_backtrace(
+    project_name: &str,
+    contract: &str,
+    test_body: &str,
+    snapshot_name: &str,
+    backtrace: Option<&str>,
+) {
+    let project = ProjectBuilder::new(project_name)
         .file("contracts/messages", MESSAGES)
         .contract("self_call_counter", contract)
         .test_file("self_call_state", &format!("{TEST_IMPORTS}\n{test_body}\n"))
-        .build()
-        .acton()
-        .test()
+        .build();
+    let test_command = project.acton().test();
+    let test_command = if let Some(backtrace) = backtrace {
+        test_command.with_backtrace(backtrace)
+    } else {
+        test_command
+    };
+
+    test_command
         .run()
         .success()
         .assert_passed(1)
         .assert_snapshot_matches(&format!("{SNAPSHOT_DIR}/{snapshot_name}.stdout.txt"));
 }
+
+const RAW_SELF_CALL_OPCODE_BEFORE_COMMON_INFO_TAIL_TEST: &str = r#"
+get fun `test raw self call opcode before common info tail`() {
+    val sender = testing.treasury("sender");
+    val init = ContractState {
+        code: build("self_call_counter"),
+        data: beginCell().storeUint(0, 32).endCell(),
+    };
+    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+    val deployRes = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("1"),
+            dest: {
+                stateInit: init,
+            },
+            body: SelfCall {},
+        }),
+    );
+    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
+    val initialTotalDeposits = net.runGetMethod<int>(counterAddress, "totalDeposits");
+    expect(initialTotalDeposits).toEqual(0);
+
+    val txs = net.send(
+        sender.address,
+        createMessage({
+            bounce: false,
+            value: ton("10"),
+            dest: counterAddress,
+        }),
+    );
+
+    expect(txs).toHaveLength(1);
+    expect(txs.findTransaction({
+        from: sender.address,
+        to: counterAddress,
+        success: false,
+    })).toBeNotNull();
+
+    val rootActions = txs.at(0).allOutActions();
+    expect(rootActions.size()).toEqual(1);
+    expect(rootActions.at(0).kind()).toEqual("send-message");
+    val selfCallSend = rootActions.getSendMessageAt(0);
+    expect(selfCallSend).toBeNotNull();
+    expect(selfCallSend!.mode).toEqual(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
+
+    println(txs);
+    println("txCount={}", txs.size());
+
+    val totalDeposits = net.runGetMethod<int>(counterAddress, "totalDeposits");
+    println("totalDeposits={}", totalDeposits);
+    expect(totalDeposits).toEqual(initialTotalDeposits);
+}
+"#;
 
 #[test]
 fn self_call_after_set_data_persists_storage_for_followup_get_method() {
@@ -202,61 +280,18 @@ fn raw_self_call_opcode_before_common_info_tail_rolls_back_state() {
     run_success_with_contract(
         "ag-self-call-opcode-before-common-info-tail",
         SUSPICIOUS_STORE_ORDER_CONTRACT,
-        r#"
-get fun `test raw self call opcode before common info tail`() {
-    val sender = testing.treasury("sender");
-    val init = ContractState {
-        code: build("self_call_counter"),
-        data: beginCell().storeUint(0, 32).endCell(),
-    };
-    val counterAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
-
-    val deployRes = net.send(
-        sender.address,
-        createMessage({
-            bounce: false,
-            value: ton("1"),
-            dest: {
-                stateInit: init,
-            },
-            body: SelfCall {},
-        }),
-    );
-    expect(deployRes).toHaveSuccessfulDeploy({ to: counterAddress });
-    val initialTotalDeposits = net.runGetMethod<int>(counterAddress, "totalDeposits");
-    expect(initialTotalDeposits).toEqual(0);
-
-    val txs = net.send(
-        sender.address,
-        createMessage({
-            bounce: false,
-            value: ton("10"),
-            dest: counterAddress,
-        }),
-    );
-
-    expect(txs).toHaveLength(1);
-    expect(txs.findTransaction({
-        from: sender.address,
-        to: counterAddress,
-        success: false,
-    })).toBeNotNull();
-
-    val rootActions = txs.at(0).allOutActions();
-    expect(rootActions.size()).toEqual(1);
-    expect(rootActions.at(0).kind()).toEqual("send-message");
-    val selfCallSend = rootActions.getSendMessageAt(0);
-    expect(selfCallSend).toBeNotNull();
-    expect(selfCallSend!.mode).toEqual(SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE);
-
-    println(txs);
-    println("txCount={}", txs.size());
-
-    val totalDeposits = net.runGetMethod<int>(counterAddress, "totalDeposits");
-    println("totalDeposits={}", totalDeposits);
-    expect(totalDeposits).toEqual(initialTotalDeposits);
-}
-"#,
+        RAW_SELF_CALL_OPCODE_BEFORE_COMMON_INFO_TAIL_TEST,
         "raw_self_call_opcode_before_common_info_tail_rolls_back_state",
+    );
+}
+
+#[test]
+fn raw_self_call_opcode_before_common_info_tail_backtrace_full_shows_action_location() {
+    run_success_with_contract_with_backtrace(
+        "ag-self-call-opcode-before-common-info-tail-backtrace",
+        SUSPICIOUS_STORE_ORDER_CONTRACT,
+        RAW_SELF_CALL_OPCODE_BEFORE_COMMON_INFO_TAIL_TEST,
+        "raw_self_call_opcode_before_common_info_tail_backtrace_full_shows_action_location",
+        Some("full"),
     );
 }
