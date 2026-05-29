@@ -12,6 +12,9 @@ export default defineConfig({
   timeout: 45_000,
   expect: {
     timeout: 5000,
+    toHaveScreenshot: {
+      pathTemplate: "{testDir}/__image_snapshots__/{arg}{-projectName}{-snapshotSuffix}{ext}",
+    },
   },
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
