@@ -7,6 +7,8 @@ import {
   type VisualSnapshotOptions,
 } from "./support/acton-test-ui"
 
+const visualSnapshotsEnabled = process.platform === "darwin"
+
 interface StableScreenshotOptions extends VisualSnapshotOptions {
   readonly fitTestDetailsContent?: boolean
   readonly fullPage?: boolean
@@ -166,72 +168,76 @@ test.describe("Test UI", () => {
     await expect(page.getByText(/Score \d+\.\d%/)).toBeVisible()
   })
 
-  test("matches visual snapshots for primary states", async ({actonUi, page}) => {
-    await page.goto(actonUi.baseUrl)
+  test.describe("visual snapshots", () => {
+    test.skip(!visualSnapshotsEnabled, "Visual snapshots are recorded on macOS")
 
-    await page.getByRole("button", {name: /owner can send jettons/}).click()
-    await expect(page.getByTestId("test-details-title")).toContainText("owner can send jettons")
-    await expect(page.getByText("Fee Summary", {exact: true})).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-info.png")
+    test("matches primary states", async ({actonUi, page}) => {
+      await page.goto(actonUi.baseUrl)
 
-    await page.getByPlaceholder("Filter tests...").fill("owner can send")
-    await expect(page.getByRole("button", {name: /owner can send jettons/})).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-filtered-sidebar.png")
-    await page.getByPlaceholder("Filter tests...").fill("")
+      await page.getByRole("button", {name: /owner can send jettons/}).click()
+      await expect(page.getByTestId("test-details-title")).toContainText("owner can send jettons")
+      await expect(page.getByText("Fee Summary", {exact: true})).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-info.png")
 
-    await page.getByRole("tab", {name: "Transactions"}).click()
-    const firstTransaction = page.getByRole("button", {name: /^Transaction /}).first()
-    await expect(firstTransaction).toBeVisible()
-    await firstTransaction.click()
-    await expect(page.getByText("Compute Phase", {exact: true})).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-transactions.png")
+      await page.getByPlaceholder("Filter tests...").fill("owner can send")
+      await expect(page.getByRole("button", {name: /owner can send jettons/})).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-filtered-sidebar.png")
+      await page.getByPlaceholder("Filter tests...").fill("")
 
-    await openTrace4BodyAndActions(page)
-    await expectStableScreenshot(page, "test-ui-trace4-body-actions.png", {
-      fitTestDetailsContent: true,
-      fullPage: true,
-    })
-    await openTrace4SendMessageAction(page)
-    await expectStableScreenshot(page, "test-ui-trace4-open-message.png", {
-      fitTestDetailsContent: true,
-      fullPage: true,
-    })
+      await page.getByRole("tab", {name: "Transactions"}).click()
+      const firstTransaction = page.getByRole("button", {name: /^Transaction /}).first()
+      await expect(firstTransaction).toBeVisible()
+      await firstTransaction.click()
+      await expect(page.getByText("Compute Phase", {exact: true})).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-transactions.png")
 
-    await page.getByRole("button", {name: "Trace 1"}).click()
-    await page.getByRole("tab", {name: "Logs"}).click()
-    await expect(page.getByText("VM Log", {exact: true}).first()).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-logs.png")
+      await openTrace4BodyAndActions(page)
+      await expectStableScreenshot(page, "test-ui-trace4-body-actions.png", {
+        fitTestDetailsContent: true,
+        fullPage: true,
+      })
+      await openTrace4SendMessageAction(page)
+      await expectStableScreenshot(page, "test-ui-trace4-open-message.png", {
+        fitTestDetailsContent: true,
+        fullPage: true,
+      })
 
-    await page.getByRole("tab", {name: "Coverage"}).click()
-    await expect(page.getByText("Coverage Files", {exact: true})).toBeVisible()
-    await page.getByPlaceholder("Filter files...").fill("JettonWallet")
-    const walletFile = page.getByRole("button", {name: /JettonWallet\.tolk/}).first()
-    await expect(walletFile).toBeVisible()
-    await walletFile.click()
-    await expect(page.getByRole("region", {name: "Coverage source"})).toContainText(
-      "JettonWallet.tolk",
-    )
-    await expectStableScreenshot(page, "test-ui-coverage.png")
+      await page.getByRole("button", {name: "Trace 1"}).click()
+      await page.getByRole("tab", {name: "Logs"}).click()
+      await expect(page.getByText("VM Log", {exact: true}).first()).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-logs.png")
 
-    await page.getByRole("button", {name: "Collapse sidebar"}).click()
-    await expect(page.getByRole("button", {name: "Expand sidebar"})).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-collapsed-sidebar.png")
+      await page.getByRole("tab", {name: "Coverage"}).click()
+      await expect(page.getByText("Coverage Files", {exact: true})).toBeVisible()
+      await page.getByPlaceholder("Filter files...").fill("JettonWallet")
+      const walletFile = page.getByRole("button", {name: /JettonWallet\.tolk/}).first()
+      await expect(walletFile).toBeVisible()
+      await walletFile.click()
+      await expect(page.getByRole("region", {name: "Coverage source"})).toContainText(
+        "JettonWallet.tolk",
+      )
+      await expectStableScreenshot(page, "test-ui-coverage.png")
 
-    await page.getByRole("button", {name: "Expand sidebar"}).click()
-    await page.getByRole("button", {name: "Switch to dark theme"}).click()
-    await expect(page.getByRole("button", {name: "Switch to light theme"})).toBeVisible()
+      await page.getByRole("button", {name: "Collapse sidebar"}).click()
+      await expect(page.getByRole("button", {name: "Expand sidebar"})).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-collapsed-sidebar.png")
 
-    await page.getByRole("tab", {name: "Tests"}).click()
-    await page.getByRole("tab", {name: "Info"}).click()
-    await expect(page.getByText("Fee Summary", {exact: true})).toBeVisible()
-    await expectStableScreenshot(page, "test-ui-dark-info.png", {theme: "dark"})
+      await page.getByRole("button", {name: "Expand sidebar"}).click()
+      await page.getByRole("button", {name: "Switch to dark theme"}).click()
+      await expect(page.getByRole("button", {name: "Switch to light theme"})).toBeVisible()
 
-    await page.getByRole("tab", {name: "Transactions"}).click()
-    await openTrace4BodyAndActions(page)
-    await expectStableScreenshot(page, "test-ui-dark-trace4-body-actions.png", {
-      fitTestDetailsContent: true,
-      fullPage: true,
-      theme: "dark",
+      await page.getByRole("tab", {name: "Tests"}).click()
+      await page.getByRole("tab", {name: "Info"}).click()
+      await expect(page.getByText("Fee Summary", {exact: true})).toBeVisible()
+      await expectStableScreenshot(page, "test-ui-dark-info.png", {theme: "dark"})
+
+      await page.getByRole("tab", {name: "Transactions"}).click()
+      await openTrace4BodyAndActions(page)
+      await expectStableScreenshot(page, "test-ui-dark-trace4-body-actions.png", {
+        fitTestDetailsContent: true,
+        fullPage: true,
+        theme: "dark",
+      })
     })
   })
 })

@@ -24,7 +24,7 @@ test-workspace:
     cargo test --workspace --doc
 
 install-test-ui-e2e-browsers:
-    bunx playwright install chromium
+    bun run playwright install chromium
 
 test-ui-e2e: build-ui build-dev install-test-ui-e2e-browsers
     bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit

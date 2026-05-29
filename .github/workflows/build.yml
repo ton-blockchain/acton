@@ -431,6 +431,15 @@ jobs:
       - name: Run Test UI E2E
         run: just test-ui-e2e
 
+      - name: Upload Test UI E2E artifacts
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-ui-e2e-results
+          path: test-results/acton-test-ui-e2e
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Save Bun cache
         if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-bun-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5

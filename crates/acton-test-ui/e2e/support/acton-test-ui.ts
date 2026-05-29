@@ -43,9 +43,7 @@ export interface VisualSnapshotOptions {
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url))
 const repositoryRoot = path.resolve(currentDir, "../../../..")
-const actonBinary =
-  process.env.ACTON_E2E_BIN ??
-  path.join(repositoryRoot, "target/debug", process.platform === "win32" ? "acton.exe" : "acton")
+const actonBinary = process.env.ACTON_E2E_BIN ?? path.join(repositoryRoot, "target/debug/acton")
 const tempParent = process.env.ACTON_E2E_TMPDIR ?? "/tmp"
 const keepTemp = process.env.ACTON_E2E_KEEP_TEMP === "1"
 const serverUrlPattern = /Starting\s+UI server at (http:\/\/127\.0\.0\.1:\d+)/
@@ -93,7 +91,6 @@ const actonEnv = (fixture: FixtureProject): NodeJS.ProcessEnv => ({
   ACTON_INTERNAL_SKIP_BROWSER: "1",
   ACTON_LOG_DIR: path.join(fixture.tempDir, "logs"),
   HOME: fixture.homeDir,
-  USERPROFILE: fixture.homeDir,
 })
 
 const formatCommandFailure = (
@@ -318,8 +315,11 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
     // eslint-disable-next-line no-empty-pattern
     async ({}, use) => {
       const running = await startActonTestUi()
-      await use(running)
-      await running.stop()
+      try {
+        await use(running)
+      } finally {
+        await running.stop()
+      }
     },
     {scope: "worker", timeout: startupTimeoutMs + shutdownTimeoutMs},
   ],

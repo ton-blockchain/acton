@@ -114,7 +114,7 @@ For Linux Test UI E2E runs, Playwright may require extra browser libraries.
 If Chromium fails to start, run:
 
 ```bash
-bunx playwright install --with-deps chromium
+bun run playwright install --with-deps chromium
 ```
 
 For first-time Linux TON artifact builds (closer to CI), install the extended
@@ -300,9 +300,8 @@ Useful E2E environment variables:
 - `ACTON_E2E_KEEP_TEMP=1`: keep the generated project for debugging.
 
 CI runs these visual E2E tests on macOS so the committed `*-darwin.png`
-snapshots are compared on the same OS family. If you intentionally validate or
-update snapshots on Linux, expect Playwright to use `*-linux.png` snapshot
-names and font rendering to differ.
+snapshots are compared on the same OS family. Linux local runs still check the
+browser workflows, but skip visual snapshot assertions.
 
 Run specific suites:
 
@@ -549,7 +548,7 @@ cache-pruning helpers and should not be used casually.
 Use this as a quick local matrix before pushing:
 
 | Change type                                                                                                  | Required local checks                                                                                           |
-|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | Rust-only code                                                                                               | `just check`                                                                                                    |
 | UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`; for Test UI behavior/screenshots also run `just test-ui-e2e`  |
 | Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
