@@ -23,6 +23,17 @@ test-workspace:
     cargo nextest run --workspace {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
     cargo test --workspace --doc
 
+install-test-ui-e2e-browsers:
+    bunx playwright install chromium
+
+test-ui-e2e: build-ui build-dev install-test-ui-e2e-browsers
+    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bun run test:e2e:test-ui
+
+test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
+    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bun run test:e2e:test-ui -- --update-snapshots
+
 _tree-sitter-test grammar:
     cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
 

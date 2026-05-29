@@ -369,6 +369,7 @@ export const App: React.FC = () => {
           type="button"
           onClick={toggleSidebar}
           className={styles.expandButton}
+          aria-label="Expand sidebar"
           title="Expand sidebar"
         >
           <FiChevronRight size={20} />
@@ -392,9 +393,11 @@ export const App: React.FC = () => {
 
       <div className={styles.mainContent}>
         {coverageLcov !== undefined && (
-          <div className={styles.viewTabs}>
+          <div className={styles.viewTabs} role="tablist" aria-label="Main view">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeView === "tests"}
               className={`${styles.viewTab} ${activeView === "tests" ? styles.viewTabActive : ""}`}
               onClick={() => handleActiveViewChange("tests")}
             >
@@ -402,6 +405,8 @@ export const App: React.FC = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={activeView === "coverage"}
               className={`${styles.viewTab} ${activeView === "coverage" ? styles.viewTabActive : ""}`}
               onClick={() => handleActiveViewChange("coverage")}
             >

@@ -126,6 +126,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onToggleTheme}
                 className={styles.themeButton}
+                aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
                 title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
               >
                 {theme === "light" ? <FiMoon /> : <FiSun />}
@@ -136,6 +137,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onCollapse}
                 className={styles.collapseButton}
+                aria-label="Collapse sidebar"
                 title="Collapse sidebar"
               >
                 <FiChevronLeft />
@@ -163,6 +165,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
               type="button"
               className={`${styles.filterButton} ${statusFilter.has(status) ? styles.activeFilter : ""} ${styles[status.toLowerCase()]}`}
               onClick={() => toggleStatusFilter(status)}
+              aria-label={`Show ${status} tests`}
+              aria-pressed={statusFilter.has(status)}
               title={`Show ${status} tests`}
             >
               {getStatusIcon(status)}
@@ -182,6 +186,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 className={`${styles.suiteHeader} ${hasFailed ? styles.suiteFailed : ""}`}
                 onClick={() => toggleSuite(suiteName)}
+                aria-expanded={!isCollapsed}
               >
                 <span className={styles.suiteToggle}>
                   {isCollapsed ? <FiChevronRight /> : <FiChevronDown />}
@@ -210,6 +215,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         type="button"
                         className={`${styles.testItem} ${isSelected ? styles.selected : ""} ${isFailed ? styles.testFailed : ""}`}
                         onClick={() => onSelectTest(report)}
+                        aria-current={isSelected ? "true" : undefined}
                       >
                         <span className={styles.testStatusIcon}>
                           {getStatusIcon(report.status)}

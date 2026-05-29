@@ -58,7 +58,13 @@ For the minimal local build/test flow, install:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
-5. GitHub CLI (`gh`) (used by `just sync-artifacts`)
+5. Playwright Chromium (required for Test UI E2E; `just test-ui-e2e` also
+   installs it automatically)
+   ```bash
+   bun ci
+   just install-test-ui-e2e-browsers
+   ```
+6. GitHub CLI (`gh`) (used by `just sync-artifacts`)
 
 - macOS:
   ```bash
@@ -103,6 +109,13 @@ System dependencies:
   ```bash
   sudo apt install libsodium-dev libmicrohttpd-dev pkg-config
   ```
+
+For Linux Test UI E2E runs, Playwright may require extra browser libraries.
+If Chromium fails to start, run:
+
+```bash
+bunx playwright install --with-deps chromium
+```
 
 For first-time Linux TON artifact builds (closer to CI), install the extended
 toolchain set:
@@ -257,6 +270,39 @@ Equivalent explicit form (with env):
 ```bash
 SNAPSHOTS=overwrite just test
 ```
+
+### Test UI E2E
+
+Run browser E2E tests against a real `acton test --ui` server:
+
+```bash
+just test-ui-e2e
+```
+
+This target builds UI bundles, builds the debug Acton binary with those fresh
+assets embedded, installs Playwright Chromium, type-checks the E2E test files,
+creates a temporary Jetton template project under `/tmp`, starts
+`acton test --ui --coverage`, and checks the Test UI in headless Chromium.
+
+When an intentional visual change requires new screenshots:
+
+```bash
+just test-ui-e2e-update
+```
+
+Commit the updated files under
+`crates/acton-test-ui/e2e/test-ui.spec.ts-snapshots/`.
+
+Useful E2E environment variables:
+
+- `ACTON_E2E_BIN`: override the Acton binary used by the fixture.
+- `ACTON_E2E_TMPDIR`: override the parent directory for temporary projects.
+- `ACTON_E2E_KEEP_TEMP=1`: keep the generated project for debugging.
+
+CI runs these visual E2E tests on macOS so the committed `*-darwin.png`
+snapshots are compared on the same OS family. If you intentionally validate or
+update snapshots on Linux, expect Playwright to use `*-linux.png` snapshot
+names and font rendering to differ.
 
 Run specific suites:
 
@@ -505,7 +551,7 @@ Use this as a quick local matrix before pushing:
 | Change type                                                                                                  | Required local checks                                                                                           |
 |--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
 | Rust-only code                                                                                               | `just check`                                                                                                    |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`                                                                |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`; for Test UI behavior/screenshots also run `just test-ui-e2e`  |
 | Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)   | `just check` + `acton docgen` and commit generated docs                                                         |
 | Docs site content/config/dependencies (`docs/`)                                                              | `just check-docs`                                                                                               |
@@ -532,6 +578,15 @@ run:
 just build-ui
 just check-ui
 ```
+
+If your PR changes Test UI behavior or visuals, also run:
+
+```bash
+just test-ui-e2e
+```
+
+Use `just test-ui-e2e-update` only when the visual change is intentional and
+commit the regenerated screenshots.
 
 Recommended extended local validation before opening a PR:
 

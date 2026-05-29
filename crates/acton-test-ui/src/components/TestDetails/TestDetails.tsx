@@ -754,7 +754,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Stats</div>
               <div className={styles.infoValue}>
-                {formatDuration(test.duration)} • {transactionStats}
+                <span data-visual-dynamic="duration" data-visual-placeholder="<duration>">
+                  {formatDuration(test.duration)}
+                </span>{" "}
+                • {transactionStats}
               </div>
             </div>
           </div>
@@ -984,12 +987,20 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 {hasExecutorLog && (
                   <div className={styles.logSection}>
                     <div className={styles.logSectionTitle}>Executor Log</div>
-                    <DataBlock data={tx.executor_logs} />
+                    <DataBlock
+                      data={tx.executor_logs}
+                      visualDynamic="executor-log"
+                      visualPlaceholder="<executor log>"
+                    />
                   </div>
                 )}
                 <div className={styles.logSection}>
                   <div className={styles.logSectionTitle}>VM Log</div>
-                  <DataBlock data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT} />
+                  <DataBlock
+                    data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    visualDynamic="vm-log"
+                    visualPlaceholder="<vm log>"
+                  />
                 </div>
               </div>
             )
@@ -1005,7 +1016,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           <div className={styles.txLogs}>
             <div className={styles.logSection}>
               <div className={styles.logSectionTitle}>VM Log</div>
-              <DataBlock data={MISSING_VM_LOG_HINT} />
+              <DataBlock
+                data={MISSING_VM_LOG_HINT}
+                visualDynamic="vm-log"
+                visualPlaceholder="<vm log>"
+              />
             </div>
           </div>
         )
@@ -1079,7 +1094,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   return (
     <div className={styles.details}>
       <div className={styles.header}>
-        <div className={styles.titleInfo}>
+        <div className={styles.titleInfo} data-testid="test-details-title">
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>
@@ -1121,9 +1136,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       </div>
 
       <div className={styles.tabsContainer}>
-        <div className={styles.tabsList}>
+        <div className={styles.tabsList} role="tablist" aria-label="Test details">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "info"}
             className={`${styles.tabTrigger} ${activeTab === "info" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("info")}
           >
@@ -1131,6 +1148,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "transactions"}
             className={`${styles.tabTrigger} ${activeTab === "transactions" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("transactions")}
           >
@@ -1138,6 +1157,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "logs"}
             className={`${styles.tabTrigger} ${activeTab === "logs" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("logs")}
           >
@@ -1170,7 +1191,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         </div>
       )}
 
-      <div className={styles.tabContent}>{renderTabContent()}</div>
+      <div className={styles.tabContent} data-testid="test-details-content">
+        {renderTabContent()}
+      </div>
     </div>
   )
 }

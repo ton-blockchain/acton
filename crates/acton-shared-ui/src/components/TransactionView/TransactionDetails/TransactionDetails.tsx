@@ -219,7 +219,11 @@ export function TransactionDetails({
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Created At</div>
-                <div className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}>
+                <div
+                  className={`${styles.multiColumnItemValue} ${styles.timestampValue}`}
+                  data-visual-dynamic="timestamp"
+                  data-visual-placeholder="<timestamp>"
+                >
                   {formatDetailedTimestamp(inMessage.info.createdAt, false)}
                 </div>
               </div>
@@ -480,7 +484,11 @@ export function TransactionDetails({
 
       <div className={styles.detailRow}>
         <div className={styles.detailLabel}>Time</div>
-        <div className={`${styles.detailValue} ${styles.timestampValue}`}>
+        <div
+          className={`${styles.detailValue} ${styles.timestampValue}`}
+          data-visual-dynamic="timestamp"
+          data-visual-placeholder="<timestamp>"
+        >
           {formatDetailedTimestamp(tx.transaction.now)}
         </div>
       </div>

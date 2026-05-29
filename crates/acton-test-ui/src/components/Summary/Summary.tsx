@@ -14,15 +14,15 @@ export const Summary: React.FC<SummaryProps> = ({reports}) => {
 
   return (
     <div className={styles.summary}>
-      <div className={styles.card}>
+      <div className={styles.card} data-testid="summary-total">
         <span className={styles.count}>{total}</span>
         <span className={styles.label}>Total</span>
       </div>
-      <div className={`${styles.card} ${styles.passed}`}>
+      <div className={`${styles.card} ${styles.passed}`} data-testid="summary-passed">
         <span className={styles.count}>{passed}</span>
         <span className={styles.label}>Passed</span>
       </div>
-      <div className={`${styles.card} ${styles.failed}`}>
+      <div className={`${styles.card} ${styles.failed}`} data-testid="summary-failed">
         <span className={styles.count}>{failed}</span>
         <span className={styles.label}>Failed</span>
       </div>
