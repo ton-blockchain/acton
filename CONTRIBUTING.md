@@ -58,13 +58,23 @@ For the minimal local build/test flow, install:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
-5. Playwright Chromium (required for Test UI E2E; `just test-ui-e2e` also
+5. Git LFS (required for files tracked through LFS)
+   ```bash
+   # macOS
+   brew install git-lfs
+
+   # Linux (Debian/Ubuntu)
+   sudo apt install git-lfs
+
+   git lfs install
+   ```
+6. Playwright Chromium (required for Test UI E2E; `just test-ui-e2e` also
    installs it automatically)
    ```bash
    bun ci
    just install-test-ui-e2e-browsers
    ```
-6. GitHub CLI (`gh`) (used by `just sync-artifacts`)
+7. GitHub CLI (`gh`) (used by `just sync-artifacts`)
 
 - macOS:
   ```bash
@@ -291,7 +301,7 @@ just test-ui-e2e-update
 ```
 
 Commit the updated files under
-`crates/acton-test-ui/e2e/test-ui.spec.ts-snapshots/`.
+`crates/acton-test-ui/e2e/__image_snapshots__/`.
 
 Useful E2E environment variables:
 
