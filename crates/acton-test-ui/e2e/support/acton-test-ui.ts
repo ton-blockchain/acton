@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import path from "node:path"
 import process from "node:process"
 import {fileURLToPath} from "node:url"
+import {stripVTControlCharacters} from "node:util"
 
 import {test as base, type Page} from "@playwright/test"
 
@@ -24,8 +25,6 @@ interface FixtureProject {
 
 interface RunningActonUi {
   readonly baseUrl: string
-  readonly projectDir: string
-  readonly output: ProcessOutput
   readonly stop: () => Promise<void>
 }
 
@@ -47,8 +46,8 @@ const actonBinary = process.env.ACTON_E2E_BIN ?? path.join(repositoryRoot, "targ
 const tempParent = process.env.ACTON_E2E_TMPDIR ?? "/tmp"
 const keepTemp = process.env.ACTON_E2E_KEEP_TEMP === "1"
 const serverUrlPattern = /Starting\s+UI server at (http:\/\/127\.0\.0\.1:\d+)/
-const startupTimeoutMs = 120_000
-const shutdownTimeoutMs = 5000
+const startupTimeoutMs = 45_000
+const shutdownTimeoutMs = 2000
 const jettonSmokeFilter = [
   "deploy should create minter without bounce",
   "owner can send jettons",
@@ -188,7 +187,7 @@ const waitForServerUrl = async (child: ChildProcess, output: ProcessOutput): Pro
     }
 
     const inspectStdout = () => {
-      const match = output.stdout.match(serverUrlPattern)
+      const match = stripVTControlCharacters(output.stdout).match(serverUrlPattern)
       if (match?.[1]) {
         settle(() => resolve(match[1]))
       }
@@ -287,8 +286,6 @@ const startActonTestUi = async (): Promise<RunningActonUi> => {
 
     return {
       baseUrl,
-      projectDir: fixture.projectDir,
-      output,
       stop: async () => {
         if (child !== undefined) {
           await stopProcess(child)
