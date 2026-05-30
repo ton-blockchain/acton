@@ -961,7 +961,7 @@ fn map_transaction_account_state(
 ) -> Value {
     if let Some(preview) = preview {
         return map_emulation_account_state(
-            &preview.hash.to_base64(),
+            fallback_hash,
             &preview.balance.to_string(),
             map_account_state_status(&preview.status),
             preview.frozen_hash.as_ref(),

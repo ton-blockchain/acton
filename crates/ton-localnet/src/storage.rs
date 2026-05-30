@@ -73,6 +73,27 @@ impl CellStore {
             self.boc_by_hash.get(hash).cloned()
         }
     }
+
+    #[must_use]
+    pub fn values(&self) -> Vec<BocBytes> {
+        let Some(conn) = &self.conn else {
+            return self.boc_by_hash.values().cloned().collect();
+        };
+
+        {
+            let conn_guard = conn.lock().expect("Failed to lock DB connection");
+            let Ok(mut stmt) = conn_guard.prepare("SELECT boc FROM cas") else {
+                return Vec::new();
+            };
+            let Ok(rows) = stmt.query_map([], |row| row.get::<_, BocBytes>(0)) else {
+                return Vec::new();
+            };
+            let bocs = rows.filter_map(Result::ok).collect();
+            drop(stmt);
+            drop(conn_guard);
+            bocs
+        }
+    }
 }
 
 impl Default for CellStore {

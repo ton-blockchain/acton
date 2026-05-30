@@ -24,7 +24,7 @@ use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellFamily, Store};
 use tycho_types::models::{
     AccountState, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr, Message, MsgInfo,
-    OwnedMessage, ShardAccount, StdAddr, StdAddrFormat,
+    OptionalAccount, OwnedMessage, ShardAccount, StdAddr, StdAddrFormat,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -356,6 +356,7 @@ impl Node {
 
         // 3. Load old account
         let shard_account_boc = self.get_shard_account(&dst)?;
+        let _ = store_account_state_cell_from_shard_account_boc(&mut self.cas, &shard_account_boc);
         let old_meta = self.latest.accounts.get(&dst).cloned();
 
         // 4. Allocate LT & time
@@ -397,6 +398,7 @@ impl Node {
         let new_account_hash = if let Some(acc_boc) = &exec_result.new_account_boc {
             let h = compute_boc_hash(acc_boc)?;
             self.cas.put(acc_boc.clone(), h);
+            let _ = store_account_state_cell_from_shard_account_boc(&mut self.cas, acc_boc);
 
             // Parse for meta
             if let Ok(cell) = Boc::decode(acc_boc)
@@ -1274,23 +1276,7 @@ impl Node {
             .range(start_key..)
             .take(limit)
             .filter_map(|(_, tx_hash)| self.history.tx_by_hash.get(tx_hash).cloned())
-            .map(|tx| {
-                let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
-                let out_msgs = tx
-                    .out_msg_hashes
-                    .iter()
-                    .filter_map(|h| self.get_message_info(h))
-                    .collect();
-                let tx_boc = self.get_cell(&tx.tx_hash).unwrap_or_default();
-                TransactionInfo {
-                    meta: tx,
-                    in_msg,
-                    out_msgs,
-                    tx_boc,
-                    account_state_before: None,
-                    account_state_after: None,
-                }
-            })
+            .map(|tx| self.transaction_info_from_meta(tx))
             .collect()
     }
 
@@ -1339,20 +1325,57 @@ impl Node {
     #[must_use]
     pub fn get_transaction_by_hash(&self, hash: &Hash256) -> Option<TransactionInfo> {
         let tx = self.history.tx_by_hash.get(hash).cloned()?;
+        Some(self.transaction_info_from_meta(tx))
+    }
+
+    fn transaction_info_from_meta(&self, tx: TxMeta) -> TransactionInfo {
         let in_msg = tx.in_msg_hash.and_then(|h| self.get_message_info(&h));
         let out_msgs = tx
             .out_msg_hashes
             .iter()
             .filter_map(|h| self.get_message_info(h))
             .collect();
-        let tx_boc = self.get_cell(hash).unwrap_or_default();
-        Some(TransactionInfo {
+        let tx_boc = self.get_cell(&tx.tx_hash).unwrap_or_default();
+        let (account_state_before, account_state_after) =
+            self.transaction_account_state_previews(&tx_boc);
+        TransactionInfo {
             meta: tx,
             in_msg,
             out_msgs,
             tx_boc,
-            account_state_before: None,
-            account_state_after: None,
+            account_state_before,
+            account_state_after,
+        }
+    }
+
+    fn transaction_account_state_previews(
+        &self,
+        tx_boc: &BocBytes,
+    ) -> (Option<AccountStatePreview>, Option<AccountStatePreview>) {
+        let Some(state_update) = Boc::decode(tx_boc)
+            .ok()
+            .and_then(|cell| cell.parse::<tycho_types::models::Transaction>().ok())
+            .and_then(|tx| tx.state_update.load().ok())
+        else {
+            return (None, None);
+        };
+
+        (
+            self.find_account_state_preview(&Hash256(*state_update.old.as_array())),
+            self.find_account_state_preview(&Hash256(*state_update.new.as_array())),
+        )
+    }
+
+    fn find_account_state_preview(&self, state_hash: &Hash256) -> Option<AccountStatePreview> {
+        if let Some(boc) = self.cas.get(state_hash)
+            && let Some(preview) = account_state_preview_from_boc(&boc)
+        {
+            return Some(preview);
+        }
+
+        self.cas.values().into_iter().find_map(|boc| {
+            let preview = account_state_preview_from_boc(&boc)?;
+            (preview.hash == *state_hash).then_some(preview)
         })
     }
 
@@ -1500,6 +1523,7 @@ impl Node {
             .context("Failed to parse ShardAccount BOC")?;
         let meta =
             account_meta_from_shard_account(&shard_account, &shard_account_boc, &mut self.cas)?;
+        let _ = store_account_state_cell_from_shard_account_boc(&mut self.cas, &shard_account_boc);
         let lt = meta.last_trans_lt.unwrap_or(self.globals.global_lt);
 
         self.persist_account_meta(addr, &meta)?;
@@ -1706,7 +1730,7 @@ impl Node {
 
     fn empty_shard_account_boc() -> anyhow::Result<BocBytes> {
         let sa = ShardAccount {
-            account: tycho_types::cell::Lazy::new(&tycho_types::models::OptionalAccount(None))?,
+            account: tycho_types::cell::Lazy::new(&OptionalAccount(None))?,
             last_trans_hash: HashBytes([0u8; 32]),
             last_trans_lt: 0,
         };
@@ -1806,11 +1830,33 @@ fn compute_boc_hash(boc: &[u8]) -> anyhow::Result<Hash256> {
     Ok(Hash256(*hash.as_array()))
 }
 
-fn account_state_preview_from_boc(shard_account_boc: &BocBytes) -> Option<AccountStatePreview> {
-    let hash = compute_boc_hash(shard_account_boc).ok()?;
+fn store_account_state_cell_from_shard_account_boc(
+    cas: &mut CellStore,
+    shard_account_boc: &BocBytes,
+) -> Option<Hash256> {
     let cell = Boc::decode(shard_account_boc).ok()?;
     let shard_account = cell.parse::<ShardAccount>().ok()?;
-    let optional_account = shard_account.account.load().ok()?;
+    let account_cell = shard_account.account.inner().clone();
+    let hash = Hash256(*account_cell.repr_hash().as_array());
+    cas.put(Boc::encode(account_cell).into(), hash);
+    Some(hash)
+}
+
+fn account_state_preview_from_boc(boc: &BocBytes) -> Option<AccountStatePreview> {
+    let cell = Boc::decode(boc).ok()?;
+
+    if let Ok(shard_account) = cell.parse::<ShardAccount>() {
+        return account_state_preview_from_optional_account_cell(shard_account.account.inner());
+    }
+
+    account_state_preview_from_optional_account_cell(&cell)
+}
+
+fn account_state_preview_from_optional_account_cell(
+    cell: &tycho_types::cell::Cell,
+) -> Option<AccountStatePreview> {
+    let hash = Hash256(*cell.repr_hash().as_array());
+    let optional_account = cell.parse::<OptionalAccount>().ok()?;
     let Some(account) = optional_account.0 else {
         return Some(AccountStatePreview {
             hash,
@@ -2355,6 +2401,47 @@ mod tests {
             .expect("must serialize shard account");
         let cell = builder.build().expect("must build shard account cell");
         Boc::encode(cell).into()
+    }
+
+    fn account_state_hash_from_shard_account_boc(boc: &BocBytes) -> Hash256 {
+        let cell = Boc::decode(boc).expect("shard account BOC must decode");
+        let shard_account = cell
+            .parse::<ShardAccount>()
+            .expect("shard account BOC must parse");
+        Hash256(*shard_account.account.inner().repr_hash().as_array())
+    }
+
+    #[test]
+    fn account_state_preview_uses_account_state_hash_and_balance() {
+        let account = test_addr(0x21);
+        let boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 12_345_678);
+
+        let preview = account_state_preview_from_boc(&boc).expect("preview must parse");
+
+        assert_eq!(
+            preview.hash,
+            account_state_hash_from_shard_account_boc(&boc)
+        );
+        assert_eq!(preview.balance, 12_345_678);
+        assert_eq!(preview.status, AccountStatus::Active);
+    }
+
+    #[test]
+    fn account_state_preview_lookup_scans_shard_account_bocs_by_account_state_hash() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x22);
+        let boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 777_000);
+        let shard_hash = compute_boc_hash(&boc).expect("shard account BOC must hash");
+        node.cas.put(boc.clone(), shard_hash);
+
+        let preview = node
+            .find_account_state_preview(&account_state_hash_from_shard_account_boc(&boc))
+            .expect("preview must be found by account state hash");
+
+        assert_eq!(preview.balance, 777_000);
+        assert_eq!(preview.status, AccountStatus::Active);
     }
 
     fn single_library_lookup(node: &Node, hash: Hash256) -> GlobalLibraryLookup {
