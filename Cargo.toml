@@ -141,7 +141,7 @@ ctrlc = "3.4.5" # graceful Ctrl+C handling
 semver = "1.0.27"
 indicatif = "0.18.3"
 flate2 = "1.1.5"
-tar = "0.4.44"
+tar = "0.4.46"
 
 # axum for test ui
 axum = "0.8.1"
