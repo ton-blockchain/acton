@@ -1,4 +1,4 @@
-import {Boxes, ChartNoAxesColumn, CircleUserRound, Image, Search, Wallet} from "lucide-react"
+import {Boxes, ChartNoAxesColumn, CircleUserRound, FileJson, Image, Search, Wallet} from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import * as React from "react"
 import {useNavigate} from "react-router-dom"
@@ -8,6 +8,7 @@ import type {JettonMaster, NftItem} from "../explorer/api/types"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
+import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
 import {NFT_PLACEHOLDER_IMAGE, TOKEN_PLACEHOLDER_IMAGE} from "./constants"
 import {contentString, matchesQuery, shortHash, isTextEntryTarget} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
@@ -19,6 +20,13 @@ interface DashboardSearchProps {
 interface SearchAssetsState {
   readonly tokens: readonly JettonMaster[]
   readonly nfts: readonly NftItem[]
+  readonly isLoading: boolean
+  readonly isLoaded: boolean
+  readonly error?: string
+}
+
+interface ApiSearchState {
+  readonly entries: readonly ApiSearchIndexEntry[]
   readonly isLoading: boolean
   readonly isLoaded: boolean
   readonly error?: string
@@ -94,6 +102,11 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
     isLoading: false,
     isLoaded: false,
   })
+  const [apiSearchState, setApiSearchState] = React.useState<ApiSearchState>({
+    entries: [],
+    isLoading: false,
+    isLoaded: false,
+  })
   const searchButtonRef = React.useRef<HTMLButtonElement>(null)
   const searchInputRef = React.useRef<HTMLInputElement>(null)
   const searchAnimationRef = React.useRef<number | undefined>(undefined)
@@ -128,7 +141,30 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
       })
     }
 
+    if (results.length < 12) {
+      for (const entry of apiSearchState.entries) {
+        if (!entry.searchText.includes(query)) {
+          continue
+        }
+
+        results.push({
+          id: entry.id,
+          title: entry.title,
+          description: entry.description,
+          href: entry.href,
+          icon: FileJson,
+        })
+        if (results.length >= 12) {
+          break
+        }
+      }
+    }
+
     for (const token of searchAssetsState.tokens) {
+      if (results.length >= 12) {
+        break
+      }
+
       const name = token.jetton_content.name || "Unknown Jetton"
       const symbol = token.jetton_content.symbol || "???"
       const description = token.jetton_content.description
@@ -175,7 +211,7 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
     }
 
     return results
-  }, [addressFormat, searchAssetsState.nfts, searchAssetsState.tokens, searchQuery])
+  }, [addressFormat, apiSearchState.entries, searchAssetsState.nfts, searchAssetsState.tokens, searchQuery])
 
   const measureSearchOrigin = React.useCallback(() => {
     const rect = searchButtonRef.current?.getBoundingClientRect()
@@ -300,7 +336,7 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
   }, [isSearchMounted, isSearchOpen])
 
   React.useEffect(() => {
-    if (!isSearchMounted || searchAssetsState.isLoaded || searchAssetsState.isLoading) {
+    if (!isSearchMounted || searchAssetsState.isLoaded) {
       return
     }
 
@@ -351,7 +387,54 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
     return () => {
       cancelled = true
     }
-  }, [client, isSearchMounted, searchAssetsState.isLoaded, searchAssetsState.isLoading])
+  }, [client, isSearchMounted, searchAssetsState.isLoaded])
+
+  React.useEffect(() => {
+    if (!isSearchMounted || apiSearchState.isLoaded) {
+      return
+    }
+
+    let cancelled = false
+
+    void (async () => {
+      setApiSearchState(current => ({
+        ...current,
+        isLoading: true,
+        error: undefined,
+      }))
+
+      try {
+        const entries = await loadApiSearchIndex()
+        if (cancelled) {
+          return
+        }
+
+        setApiSearchState({
+          entries,
+          isLoading: false,
+          isLoaded: true,
+        })
+      } catch (error) {
+        if (cancelled) {
+          return
+        }
+
+        setApiSearchState({
+          entries: [],
+          isLoading: false,
+          isLoaded: true,
+          error: error instanceof Error ? error.message : "Failed to load API search index",
+        })
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [apiSearchState.isLoaded, isSearchMounted])
+
+  const isSearchIndexLoading =
+    (apiSearchState.isLoading || searchAssetsState.isLoading) && searchQuery.trim().length > 0
 
   return (
     <>
@@ -413,7 +496,8 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
             <div className={styles.searchResultBody}>
               {searchResults.length === 0 ? (
                 <div className={styles.searchEmpty}>
-                  No matches. Paste an address, a transaction hash, or search by token/NFT metadata.
+                  No matches. Paste an address, a transaction hash, or search by API method,
+                  token/NFT metadata.
                 </div>
               ) : (
                 <div className={styles.searchResultList}>
@@ -460,10 +544,13 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
                 </div>
               )}
 
-              {searchAssetsState.isLoading && searchQuery.trim().length > 0 ? (
-                <div className={styles.searchIndexState}>Loading token and NFT metadata…</div>
+              {isSearchIndexLoading ? (
+                <div className={styles.searchIndexState}>Loading search indexes…</div>
               ) : undefined}
-              {searchAssetsState.error ? (
+              {apiSearchState.error && searchResults.length === 0 ? (
+                <div className={styles.searchIndexError}>{apiSearchState.error}</div>
+              ) : undefined}
+              {searchAssetsState.error && searchResults.length === 0 ? (
                 <div className={styles.searchIndexError}>{searchAssetsState.error}</div>
               ) : undefined}
             </div>

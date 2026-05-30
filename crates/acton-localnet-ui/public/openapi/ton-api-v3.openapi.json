@@ -1,0 +1,2895 @@
+{
+  "schemes": [],
+  "swagger": "2.0",
+  "info": {
+    "description": "TON Index collects data from a full node to PostgreSQL database and provides convenient API to an indexed blockchain.\n\nThis bundled reference is derived from the official TonCenter v3 OpenAPI document and filtered to endpoints implemented by Acton localnet.",
+    "title": "Acton Localnet TonCenter API v3",
+    "contact": {},
+    "version": "1.2.6"
+  },
+  "host": "",
+  "basePath": "",
+  "paths": {
+    "/api/v3/traces": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get traces by specified filter.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["actions"],
+        "summary": "Get Traces",
+        "operationId": "api_v3_get_traces",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "List of account addresses to get transactions. Can be sent in hex, base64 or base64url form.",
+            "name": "account",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Find trace by trace id.",
+            "name": "trace_id",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Find trace by transaction hash.",
+            "name": "tx_hash",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Find trace by message hash.",
+            "name": "msg_hash",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Query traces that was completed in masterchain block with given seqno",
+            "name": "mc_seqno",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query traces, which was finished **after** given timestamp.",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query traces, which was finished **before** given timestamp.",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query traces with `end_lt >= start_lt`.",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query traces with `end_lt <= end_lt`.",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Include trace actions.",
+            "name": "include_actions",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Supported action types",
+            "name": "supported_action_types",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort traces by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/TracesResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/accountStates": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Query account states",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["accounts"],
+        "summary": "Get Account States",
+        "operationId": "api_v3_get_account_states",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "List of addresses in any form. Maximum 1000 addresses allowed.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "Include code and data BOCs. Default: true",
+            "name": "include_boc",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/AccountStatesResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/addressInformation": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get smart contract information.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["api/v2"],
+        "summary": "Get Address Information",
+        "operationId": "api_v3_get_v2_addressInformation",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Account address in any form.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "Use method from api/v2. Not recommended",
+            "name": "use_v2",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/V2AddressInformation"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/transactions": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get transactions by specified filter.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get transactions",
+        "operationId": "api_v3_get_transactions",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Block workchain.",
+            "name": "workchain",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Block shard id. Must be sent with *workchain*. Example: `8000000000000000`.",
+            "name": "shard",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Block block seqno. Must be sent with *workchain* and *shard*.",
+            "name": "seqno",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Masterchain block seqno.",
+            "name": "mc_seqno",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "List of account addresses to get transactions. Can be sent in hex, base64 or base64url form.",
+            "name": "account",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Exclude transactions on specified account addresses.",
+            "name": "exclude_account",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Transaction hash.",
+            "name": "hash",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int64",
+            "description": "Transaction lt.",
+            "name": "lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **after** given timestamp.",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **before** given timestamp.",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt >= start_lt`.",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt <= end_lt`.",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort transactions by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/TransactionsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/transactionsByMessage": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get transactions whose inbound/outbound message has the specified hash. \\",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get transactions by message",
+        "operationId": "api_v3_get_transactions_by_message",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Message hash. Acceptable in hex, base64 and base64url forms.",
+            "name": "msg_hash",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Hash of message body.",
+            "name": "body_hash",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Opcode of message in hex or signed 32-bit decimal form.",
+            "name": "opcode",
+            "in": "query"
+          },
+          {
+            "enum": ["in", "out"],
+            "type": "string",
+            "description": "Direction of message.",
+            "name": "direction",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/TransactionsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/pendingTransactions": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get pending transactions by specified filter.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get pending transactions",
+        "operationId": "api_v3_get_pending_transactions",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "List of account addresses to get transactions. Can be sent in hex, base64 or base64url form.",
+            "name": "account",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Find transactions by trace id.",
+            "name": "trace_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/TransactionsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/message": {
+      "post": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Send an external message to the TON network.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["api/v2"],
+        "summary": "Send Message",
+        "operationId": "api_v3_post_v2_message",
+        "parameters": [
+          {
+            "description": "Message in boc base64 format.",
+            "name": "boc",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/V2SendMessageRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/V2SendMessageResult"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/runGetMethod": {
+      "post": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Run get method of smart contract. Stack supports only `num`, `cell` and `slice` types:\n```\n[\n{\n\"type\": \"num\",\n\"value\": \"0x12a\"\n},\n{\n\"type\": \"cell\",\n\"value\": \"te6...\" // base64 encoded boc with cell\n},\n{\n\"type\": \"slice\",\n\"value\": \"te6...\" // base64 encoded boc with slice\n}\n]\n```",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["api/v2"],
+        "summary": "Run Get-Method",
+        "operationId": "api_v3_post_v2_rungetmethod",
+        "parameters": [
+          {
+            "description": "Run Get-method request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/V2RunGetMethodRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/V2RunGetMethodRequest"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/jetton/masters": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get Jetton masters by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["jettons"],
+        "summary": "Get Jetton Masters",
+        "operationId": "api_v3_get_jetton_masters",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Jetton Master address in any form. Max: 1024.",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of Jetton Master's admin in any form. Max: 1024.",
+            "name": "admin_address",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/JettonMastersResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/jetton/wallets": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get Jetton wallets by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["jettons"],
+        "summary": "Get Jetton Wallets",
+        "operationId": "api_v3_get_jetton_wallets",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Jetton wallet address in any form. Max: 1000.",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of Jetton wallet's owner in any form. Max: 1000.",
+            "name": "owner_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Jetton Master in any form.",
+            "name": "jetton_address",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Exclude jetton wallets with 0 balance.",
+            "name": "exclude_zero_balance",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "description": "Sort jetton wallets by balance. **Warning:** results may be inconsistent during the read with limit and offset.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/JettonWalletsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/nft/items": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get NFT items by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["nfts"],
+        "summary": "Get NFT items",
+        "operationId": "api_v3_get_nft_items",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "NFT item address in any form. Max: 1000.",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of NFT item owner in any form. Max: 1000.",
+            "name": "owner_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Collection address in any form.",
+            "name": "collection_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Index of item for given collection. Max: 1000.",
+            "name": "index",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Include nft on sales and auctions. Used only when owner_address is passed",
+            "name": "include_on_sale",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "description": "Sort NFT items by last transaction lt descending. **Warning:** results may be inconsistent during pagination with limit and offset.",
+            "name": "sort_by_last_transaction_lt",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/NFTItemsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "AccountBalance": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "string"
+        }
+      }
+    },
+    "AccountState": {
+      "type": "object",
+      "properties": {
+        "account_status": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "string"
+        },
+        "code_boc": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "data_boc": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "frozen_hash": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        }
+      }
+    },
+    "AccountStateFull": {
+      "type": "object",
+      "properties": {
+        "account_state_hash": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "string"
+        },
+        "code_boc": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "contract_methods": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "data_boc": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "frozen_hash": {
+          "type": "string"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "last_transaction_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "AccountStatesResponse": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AccountStateFull"
+          }
+        },
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "Action": {
+      "type": "object",
+      "properties": {
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "action_id": {
+          "type": "string"
+        },
+        "details": {},
+        "end_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "end_utime": {
+          "type": "integer"
+        },
+        "finality": {
+          "$ref": "#/definitions/models.FinalityState"
+        },
+        "start_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "start_utime": {
+          "type": "integer"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "trace_end_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "trace_end_utime": {
+          "type": "integer"
+        },
+        "trace_external_hash": {
+          "type": "string"
+        },
+        "trace_external_hash_norm": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "trace_mc_seqno_end": {
+          "type": "integer"
+        },
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "transactions_full": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Transaction"
+          }
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "ActionPhase": {
+      "type": "object",
+      "properties": {
+        "action_list_hash": {
+          "type": "string"
+        },
+        "msgs_created": {
+          "type": "integer"
+        },
+        "no_funds": {
+          "type": "boolean"
+        },
+        "result_arg": {
+          "type": "integer"
+        },
+        "result_code": {
+          "type": "integer"
+        },
+        "skipped_actions": {
+          "type": "integer"
+        },
+        "spec_actions": {
+          "type": "integer"
+        },
+        "status_change": {
+          "type": "string"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "tot_actions": {
+          "type": "integer"
+        },
+        "tot_msg_size": {
+          "$ref": "#/definitions/MsgSize"
+        },
+        "total_action_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "total_fwd_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      }
+    },
+    "ActionsResponse": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Action"
+          }
+        },
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "AddressBook": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/AddressBookRow"
+      }
+    },
+    "AddressBookRow": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "user_friendly": {
+          "type": "string"
+        }
+      }
+    },
+    "AddressMetadata": {
+      "type": "object",
+      "properties": {
+        "is_indexed": {
+          "type": "boolean"
+        },
+        "token_info": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TokenInfo"
+          }
+        }
+      }
+    },
+    "Block": {
+      "type": "object",
+      "properties": {
+        "after_merge": {
+          "type": "boolean"
+        },
+        "after_split": {
+          "type": "boolean"
+        },
+        "before_split": {
+          "type": "boolean"
+        },
+        "created_by": {
+          "type": "string"
+        },
+        "end_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "file_hash": {
+          "type": "string"
+        },
+        "flags": {
+          "type": "integer"
+        },
+        "gen_catchain_seqno": {
+          "type": "integer"
+        },
+        "gen_utime": {
+          "type": "string",
+          "example": "0"
+        },
+        "global_id": {
+          "type": "integer"
+        },
+        "key_block": {
+          "type": "boolean"
+        },
+        "master_ref_seqno": {
+          "type": "integer"
+        },
+        "masterchain_block_ref": {
+          "$ref": "#/definitions/BlockId"
+        },
+        "min_ref_mc_seqno": {
+          "type": "integer"
+        },
+        "prev_blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BlockId"
+          }
+        },
+        "prev_key_block_seqno": {
+          "type": "integer"
+        },
+        "rand_seed": {
+          "type": "string"
+        },
+        "root_hash": {
+          "type": "string"
+        },
+        "seqno": {
+          "type": "integer"
+        },
+        "shard": {
+          "type": "string",
+          "example": "0"
+        },
+        "start_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "tx_count": {
+          "type": "integer"
+        },
+        "validator_list_hash_short": {
+          "type": "integer"
+        },
+        "version": {
+          "type": "integer"
+        },
+        "vert_seqno": {
+          "type": "integer"
+        },
+        "vert_seqno_incr": {
+          "type": "boolean"
+        },
+        "want_merge": {
+          "type": "boolean"
+        },
+        "want_split": {
+          "type": "boolean"
+        },
+        "workchain": {
+          "type": "integer"
+        }
+      }
+    },
+    "BlockId": {
+      "type": "object",
+      "properties": {
+        "seqno": {
+          "type": "integer"
+        },
+        "shard": {
+          "type": "string",
+          "example": "0"
+        },
+        "workchain": {
+          "type": "integer"
+        }
+      }
+    },
+    "BlocksResponse": {
+      "type": "object",
+      "properties": {
+        "blocks": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Block"
+          }
+        }
+      }
+    },
+    "BouncePhase": {
+      "type": "object",
+      "properties": {
+        "fwd_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "msg_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "msg_size": {
+          "$ref": "#/definitions/MsgSize"
+        },
+        "req_fwd_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "ComputePhase": {
+      "type": "object",
+      "properties": {
+        "account_activated": {
+          "type": "boolean"
+        },
+        "exit_arg": {
+          "type": "integer"
+        },
+        "exit_code": {
+          "type": "integer"
+        },
+        "gas_credit": {
+          "type": "string",
+          "example": "0"
+        },
+        "gas_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "gas_limit": {
+          "type": "string",
+          "example": "0"
+        },
+        "gas_used": {
+          "type": "string",
+          "example": "0"
+        },
+        "mode": {
+          "type": "integer"
+        },
+        "msg_state_used": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "skipped": {
+          "type": "boolean"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "vm_final_state_hash": {
+          "type": "string"
+        },
+        "vm_init_state_hash": {
+          "type": "string"
+        },
+        "vm_steps": {
+          "type": "integer"
+        }
+      }
+    },
+    "CreditPhase": {
+      "type": "object",
+      "properties": {
+        "credit": {
+          "type": "string",
+          "example": "0"
+        },
+        "credit_extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "due_fees_collected": {
+          "type": "string",
+          "example": "0"
+        }
+      }
+    },
+    "DNSRecord": {
+      "type": "object",
+      "properties": {
+        "dns_next_resolver": {
+          "type": "string"
+        },
+        "dns_site_adnl": {
+          "type": "string"
+        },
+        "dns_storage_bag_id": {
+          "type": "string"
+        },
+        "dns_wallet": {
+          "type": "string"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "nft_item_address": {
+          "type": "string"
+        },
+        "nft_item_owner": {
+          "type": "string"
+        }
+      }
+    },
+    "DNSRecordsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DNSRecord"
+          }
+        }
+      }
+    },
+    "DecodeRequest": {
+      "type": "object",
+      "properties": {
+        "bodies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "opcodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "DecodeResponse": {
+      "type": "object",
+      "properties": {
+        "bodies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "opcodes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "JettonBurn": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "custom_payload": {
+          "type": "string"
+        },
+        "decoded_custom_payload": {
+          "type": "object"
+        },
+        "jetton_master": {
+          "type": "string"
+        },
+        "jetton_wallet": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "query_id": {
+          "type": "string"
+        },
+        "response_destination": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "transaction_aborted": {
+          "type": "boolean"
+        },
+        "transaction_hash": {
+          "type": "string"
+        },
+        "transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "transaction_now": {
+          "type": "integer"
+        }
+      }
+    },
+    "JettonBurnsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "jetton_burns": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JettonBurn"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "JettonMaster": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "admin_address": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "jetton_content": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "jetton_wallet_code_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "mintable": {
+          "type": "boolean"
+        },
+        "total_supply": {
+          "type": "string"
+        }
+      }
+    },
+    "JettonMastersResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "jetton_masters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JettonMaster"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "JettonTransfer": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "custom_payload": {
+          "type": "string"
+        },
+        "decoded_custom_payload": {
+          "type": "object"
+        },
+        "decoded_forward_payload": {
+          "type": "object"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "forward_payload": {
+          "type": "string"
+        },
+        "forward_ton_amount": {
+          "type": "string"
+        },
+        "jetton_master": {
+          "type": "string"
+        },
+        "query_id": {
+          "type": "string"
+        },
+        "response_destination": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "source_wallet": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "transaction_aborted": {
+          "type": "boolean"
+        },
+        "transaction_hash": {
+          "type": "string"
+        },
+        "transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "transaction_now": {
+          "type": "integer"
+        }
+      }
+    },
+    "JettonTransfersResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "jetton_transfers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JettonTransfer"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "JettonWallet": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "jetton": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "mintless_info": {
+          "$ref": "#/definitions/JettonWalletMintlessInfo"
+        },
+        "owner": {
+          "type": "string"
+        }
+      }
+    },
+    "JettonWalletMintlessInfo": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string"
+        },
+        "custom_payload_api_uri": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "expire_at": {
+          "type": "integer"
+        },
+        "start_from": {
+          "type": "integer"
+        }
+      }
+    },
+    "JettonWalletsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "jetton_wallets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JettonWallet"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "MasterchainInfo": {
+      "type": "object",
+      "properties": {
+        "first": {
+          "$ref": "#/definitions/Block"
+        },
+        "last": {
+          "$ref": "#/definitions/Block"
+        }
+      }
+    },
+    "Message": {
+      "type": "object",
+      "properties": {
+        "bounce": {
+          "type": "boolean"
+        },
+        "bounced": {
+          "type": "boolean"
+        },
+        "created_at": {
+          "type": "string",
+          "example": "0"
+        },
+        "created_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "decoded_opcode": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "string"
+        },
+        "extra_flags": {
+          "type": "string"
+        },
+        "fwd_fee": {
+          "type": "string",
+          "example": "0"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "hash_norm": {
+          "type": "string"
+        },
+        "ihr_disabled": {
+          "type": "boolean"
+        },
+        "ihr_fee": {
+          "type": "string",
+          "example": "0"
+        },
+        "import_fee": {
+          "type": "string",
+          "example": "0"
+        },
+        "in_msg_tx_hash": {
+          "type": "string"
+        },
+        "init_state": {
+          "$ref": "#/definitions/MessageContent"
+        },
+        "message_content": {
+          "$ref": "#/definitions/MessageContent"
+        },
+        "opcode": {
+          "type": "integer"
+        },
+        "out_msg_tx_hash": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string",
+          "example": "0"
+        },
+        "value_extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "MessageContent": {
+      "type": "object",
+      "properties": {
+        "body": {
+          "type": "string"
+        },
+        "decoded": {
+          "type": "object"
+        },
+        "hash": {
+          "type": "string"
+        }
+      }
+    },
+    "MessagesResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "messages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Message"
+          }
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        }
+      }
+    },
+    "Metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/AddressMetadata"
+      }
+    },
+    "MsgSize": {
+      "type": "object",
+      "properties": {
+        "bits": {
+          "type": "string",
+          "example": "0"
+        },
+        "cells": {
+          "type": "string",
+          "example": "0"
+        }
+      }
+    },
+    "Multisig": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "next_order_seqno": {
+          "type": "string"
+        },
+        "orders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MultisigOrder"
+          }
+        },
+        "proposers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "signers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "threshold": {
+          "type": "integer"
+        }
+      }
+    },
+    "MultisigOrder": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.OrderAction"
+          }
+        },
+        "address": {
+          "type": "string"
+        },
+        "approvals_mask": {
+          "type": "string"
+        },
+        "approvals_num": {
+          "type": "integer"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "expiration_date": {
+          "type": "integer"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "multisig_address": {
+          "type": "string"
+        },
+        "order_boc": {
+          "type": "string"
+        },
+        "order_seqno": {
+          "type": "string"
+        },
+        "sent_for_execution": {
+          "type": "boolean"
+        },
+        "signers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "threshold": {
+          "type": "integer"
+        }
+      }
+    },
+    "MultisigOrderResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "orders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MultisigOrder"
+          }
+        }
+      }
+    },
+    "MultisigResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "multisigs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Multisig"
+          }
+        }
+      }
+    },
+    "NFTCollection": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "collection_content": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "next_item_index": {
+          "type": "string"
+        },
+        "owner_address": {
+          "type": "string"
+        }
+      }
+    },
+    "NFTCollectionsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "nft_collections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NFTCollection"
+          }
+        }
+      }
+    },
+    "NFTItem": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "auction_contract_address": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "collection": {
+          "$ref": "#/definitions/NFTCollection"
+        },
+        "collection_address": {
+          "type": "string"
+        },
+        "content": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "index": {
+          "type": "string"
+        },
+        "init": {
+          "type": "boolean"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "on_sale": {
+          "type": "boolean"
+        },
+        "owner_address": {
+          "type": "string"
+        },
+        "real_owner": {
+          "type": "string"
+        },
+        "sale_contract_address": {
+          "type": "string"
+        }
+      }
+    },
+    "NFTItemsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "nft_items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NFTItem"
+          }
+        }
+      }
+    },
+    "NFTSale": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "created_at": {
+          "type": "integer"
+        },
+        "data_hash": {
+          "type": "string"
+        },
+        "details": {},
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "marketplace_address": {
+          "type": "string"
+        },
+        "nft_address": {
+          "type": "string"
+        },
+        "nft_item": {
+          "$ref": "#/definitions/NFTItem"
+        },
+        "nft_owner_address": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "NFTSalesResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "nft_sales": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NFTSale"
+          }
+        }
+      }
+    },
+    "NFTTransfer": {
+      "type": "object",
+      "properties": {
+        "custom_payload": {
+          "type": "string"
+        },
+        "decoded_custom_payload": {
+          "type": "object"
+        },
+        "decoded_forward_payload": {
+          "type": "object"
+        },
+        "forward_amount": {
+          "type": "string"
+        },
+        "forward_payload": {
+          "type": "string"
+        },
+        "new_owner": {
+          "type": "string"
+        },
+        "nft_address": {
+          "type": "string"
+        },
+        "nft_collection": {
+          "type": "string"
+        },
+        "old_owner": {
+          "type": "string"
+        },
+        "query_id": {
+          "type": "string"
+        },
+        "response_destination": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "transaction_aborted": {
+          "type": "boolean"
+        },
+        "transaction_hash": {
+          "type": "string"
+        },
+        "transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "transaction_now": {
+          "type": "integer"
+        }
+      }
+    },
+    "NFTTransfersResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "nft_transfers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/NFTTransfer"
+          }
+        }
+      }
+    },
+    "RequestError": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer"
+        },
+        "error": {
+          "type": "string"
+        }
+      }
+    },
+    "SplitInfo": {
+      "type": "object",
+      "properties": {
+        "acc_split_depth": {
+          "type": "integer"
+        },
+        "cur_shard_pfx_len": {
+          "type": "integer"
+        },
+        "sibling_addr": {
+          "type": "string"
+        },
+        "this_addr": {
+          "type": "string"
+        }
+      }
+    },
+    "StoragePhase": {
+      "type": "object",
+      "properties": {
+        "status_change": {
+          "type": "string"
+        },
+        "storage_fees_collected": {
+          "type": "string",
+          "example": "0"
+        },
+        "storage_fees_due": {
+          "type": "string",
+          "example": "0"
+        }
+      }
+    },
+    "TokenInfo": {
+      "type": "object",
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "extra": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "image": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nft_index": {
+          "type": "string"
+        },
+        "symbol": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      }
+    },
+    "Trace": {
+      "type": "object",
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Action"
+          }
+        },
+        "end_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "end_utime": {
+          "type": "integer"
+        },
+        "external_hash": {
+          "type": "string"
+        },
+        "is_incomplete": {
+          "type": "boolean"
+        },
+        "mc_seqno_end": {
+          "type": "string"
+        },
+        "mc_seqno_start": {
+          "type": "string"
+        },
+        "start_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "start_utime": {
+          "type": "integer"
+        },
+        "trace": {
+          "$ref": "#/definitions/TraceNode"
+        },
+        "trace_id": {
+          "type": "string"
+        },
+        "trace_info": {
+          "$ref": "#/definitions/TraceMeta"
+        },
+        "transactions": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Transaction"
+          }
+        },
+        "transactions_order": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warning": {
+          "type": "string"
+        }
+      }
+    },
+    "TraceMeta": {
+      "type": "object",
+      "properties": {
+        "classification_state": {
+          "type": "string"
+        },
+        "messages": {
+          "type": "integer"
+        },
+        "pending_messages": {
+          "type": "integer"
+        },
+        "trace_state": {
+          "type": "string"
+        },
+        "transactions": {
+          "type": "integer"
+        }
+      }
+    },
+    "TraceNode": {
+      "type": "object",
+      "properties": {
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TraceNode"
+          }
+        },
+        "in_msg": {
+          "$ref": "#/definitions/Message"
+        },
+        "in_msg_hash": {
+          "type": "string"
+        },
+        "transaction": {
+          "$ref": "#/definitions/Transaction"
+        },
+        "tx_hash": {
+          "type": "string"
+        }
+      }
+    },
+    "TracesResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "traces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Trace"
+          }
+        }
+      }
+    },
+    "Transaction": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "account_state_after": {
+          "$ref": "#/definitions/AccountState"
+        },
+        "account_state_before": {
+          "$ref": "#/definitions/AccountState"
+        },
+        "block_ref": {
+          "$ref": "#/definitions/BlockId"
+        },
+        "description": {
+          "$ref": "#/definitions/TransactionDescr"
+        },
+        "emulated": {
+          "type": "boolean"
+        },
+        "end_status": {
+          "type": "string"
+        },
+        "finality": {
+          "$ref": "#/definitions/models.FinalityState"
+        },
+        "hash": {
+          "type": "string"
+        },
+        "in_msg": {
+          "$ref": "#/definitions/Message"
+        },
+        "lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "mc_block_seqno": {
+          "type": "integer"
+        },
+        "now": {
+          "type": "integer"
+        },
+        "orig_status": {
+          "type": "string"
+        },
+        "out_msgs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Message"
+          }
+        },
+        "prev_trans_hash": {
+          "type": "string"
+        },
+        "prev_trans_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "total_fees": {
+          "type": "string",
+          "example": "0"
+        },
+        "total_fees_extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "trace_external_hash": {
+          "type": "string"
+        },
+        "trace_id": {
+          "type": "string"
+        }
+      }
+    },
+    "TransactionDescr": {
+      "type": "object",
+      "properties": {
+        "aborted": {
+          "type": "boolean"
+        },
+        "action": {
+          "$ref": "#/definitions/ActionPhase"
+        },
+        "bounce": {
+          "$ref": "#/definitions/BouncePhase"
+        },
+        "compute_ph": {
+          "$ref": "#/definitions/ComputePhase"
+        },
+        "credit_first": {
+          "type": "boolean"
+        },
+        "credit_ph": {
+          "$ref": "#/definitions/CreditPhase"
+        },
+        "destroyed": {
+          "type": "boolean"
+        },
+        "installed": {
+          "type": "boolean"
+        },
+        "is_tock": {
+          "type": "boolean"
+        },
+        "split_info": {
+          "$ref": "#/definitions/SplitInfo"
+        },
+        "storage_ph": {
+          "$ref": "#/definitions/StoragePhase"
+        },
+        "type": {
+          "type": "string"
+        }
+      }
+    },
+    "TransactionsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "transactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Transaction"
+          }
+        }
+      }
+    },
+    "V2AddressInformation": {
+      "type": "object",
+      "properties": {
+        "balance": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "data": {
+          "type": "string"
+        },
+        "frozen_hash": {
+          "type": "string"
+        },
+        "last_transaction_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    },
+    "V2EstimateFeeRequest": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "ignore_chksig": {
+          "type": "boolean"
+        },
+        "init_code": {
+          "type": "string"
+        },
+        "init_data": {
+          "type": "string"
+        }
+      }
+    },
+    "V2EstimateFeeResult": {
+      "type": "object",
+      "properties": {
+        "destination_fees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/V2EstimatedFee"
+          }
+        },
+        "source_fees": {
+          "$ref": "#/definitions/V2EstimatedFee"
+        }
+      }
+    },
+    "V2EstimatedFee": {
+      "type": "object",
+      "properties": {
+        "fwd_fee": {
+          "type": "integer"
+        },
+        "gas_fee": {
+          "type": "integer"
+        },
+        "in_fwd_fee": {
+          "type": "integer"
+        },
+        "storage_fee": {
+          "type": "integer"
+        }
+      }
+    },
+    "V2RunGetMethodRequest": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "stack": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/V2StackEntity"
+          }
+        }
+      }
+    },
+    "V2SendMessageRequest": {
+      "type": "object",
+      "properties": {
+        "boc": {
+          "type": "string"
+        }
+      }
+    },
+    "V2SendMessageResult": {
+      "type": "object",
+      "properties": {
+        "message_hash": {
+          "type": "string"
+        },
+        "message_hash_norm": {
+          "type": "string"
+        }
+      }
+    },
+    "V2StackEntity": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string"
+        },
+        "value": {}
+      }
+    },
+    "V2WalletInformation": {
+      "type": "object",
+      "properties": {
+        "balance": {
+          "type": "string"
+        },
+        "last_transaction_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string"
+        },
+        "seqno": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "wallet_id": {
+          "type": "integer"
+        },
+        "wallet_type": {
+          "type": "string"
+        }
+      }
+    },
+    "VestingContractsResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "vesting_contracts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/models.VestingInfo"
+          }
+        }
+      }
+    },
+    "WalletState": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "string"
+        },
+        "code_hash": {
+          "type": "string"
+        },
+        "extra_currencies": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "is_signature_allowed": {
+          "type": "boolean"
+        },
+        "is_wallet": {
+          "type": "boolean"
+        },
+        "last_transaction_hash": {
+          "type": "string"
+        },
+        "last_transaction_lt": {
+          "type": "string",
+          "example": "0"
+        },
+        "seqno": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "wallet_id": {
+          "type": "integer"
+        },
+        "wallet_type": {
+          "type": "string"
+        }
+      }
+    },
+    "WalletStatesResponse": {
+      "type": "object",
+      "properties": {
+        "address_book": {
+          "$ref": "#/definitions/AddressBook"
+        },
+        "metadata": {
+          "$ref": "#/definitions/Metadata"
+        },
+        "wallets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WalletState"
+          }
+        }
+      }
+    },
+    "models.FinalityState": {
+      "type": "integer",
+      "format": "int32",
+      "enum": [0, 1, 2],
+      "x-enum-varnames": [
+        "FinalityStatePending",
+        "FinalityStateConfirmed",
+        "FinalityStateFinalized"
+      ]
+    },
+    "models.OrderAction": {
+      "type": "object",
+      "properties": {
+        "body_raw": {
+          "type": "array",
+          "items": {
+            "type": "integer"
+          }
+        },
+        "destination": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "parsed": {
+          "type": "boolean"
+        },
+        "parsed_body": {},
+        "parsed_body_type": {
+          "type": "string"
+        },
+        "send_mode": {
+          "type": "integer"
+        },
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "models.VestingInfo": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "cliff_duration": {
+          "type": "integer"
+        },
+        "owner_address": {
+          "type": "string"
+        },
+        "sender_address": {
+          "type": "string"
+        },
+        "start_time": {
+          "type": "integer"
+        },
+        "total_amount": {
+          "type": "string"
+        },
+        "total_duration": {
+          "type": "integer"
+        },
+        "unlock_period": {
+          "type": "integer"
+        },
+        "whitelist": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "APIKeyHeader": {
+      "type": "apiKey",
+      "name": "X-Api-Key",
+      "in": "header"
+    },
+    "APIKeyQuery": {
+      "type": "apiKey",
+      "name": "api_key",
+      "in": "query"
+    }
+  },
+  "x-acton-source-openapi-url": "https://toncenter.com/api/v3/doc.json",
+  "x-acton-filtered-paths": true
+}

@@ -2,12 +2,15 @@ import {
   ArrowUpRight,
   BookOpen,
   Boxes,
+  Braces,
+  FileJson,
   Github,
   Image,
   KeyRound,
   LayoutGrid,
   Moon,
   Search as SearchIcon,
+  Settings2,
   Sun,
   Wallet,
 } from "lucide-react"
@@ -42,6 +45,17 @@ const mainItems: SidebarItem[] = [
   {label: "Faucet", icon: Wallet, path: "/faucet"},
   {label: "Tokens", icon: Boxes, path: "/tokens"},
   {label: "NFTs", icon: Image, path: "/nfts"},
+]
+
+const apiItems: SidebarItem[] = [
+  {label: "v2 API", icon: FileJson, path: "/api-reference/v2"},
+  {label: "v3 API", icon: Braces, path: "/api-reference/v3"},
+  {label: "Control API", icon: Settings2, path: "/api-reference/control"},
+]
+
+const navigationSections: Array<{readonly id: string; readonly items: readonly SidebarItem[]}> = [
+  {id: "main", items: mainItems},
+  {id: "api", items: apiItems},
 ]
 
 const footerItems: SidebarItem[] = [
@@ -97,34 +111,39 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
 
       <div className={styles.navScroll}>
         <nav className={styles.nav}>
-          <div className={styles.navSection}>
-            {mainItems.map(item => {
-              const Icon = item.icon
-              const targetPath = item.path === "/explorer" ? explorerPath : item.path
-              const isActive =
-                item.path === "/explorer"
-                  ? location.pathname.startsWith("/explorer")
-                  : item.path === location.pathname
+          {navigationSections.map((section, index) => (
+            <React.Fragment key={section.id}>
+              {index > 0 && <div className={styles.navDivider} />}
+              <div className={styles.navSection}>
+                {section.items.map(item => {
+                  const Icon = item.icon
+                  const targetPath = item.path === "/explorer" ? explorerPath : item.path
+                  const isActive =
+                    item.path === "/explorer"
+                      ? location.pathname.startsWith("/explorer")
+                      : item.path === location.pathname
 
-              return (
-                <button
-                  type="button"
-                  key={item.label}
-                  className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                  onClick={() => {
-                    if (targetPath) {
-                      void navigate(targetPath)
-                    }
-                  }}
-                >
-                  <span className={styles.navItemMain}>
-                    <Icon size={18} />
-                    <span>{item.label}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+                  return (
+                    <button
+                      type="button"
+                      key={item.label}
+                      className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                      onClick={() => {
+                        if (targetPath) {
+                          void navigate(targetPath)
+                        }
+                      }}
+                    >
+                      <span className={styles.navItemMain}>
+                        <Icon size={18} />
+                        <span>{item.label}</span>
+                      </span>
+                    </button>
+                  )
+                })}
+              </div>
+            </React.Fragment>
+          ))}
 
           <div className={styles.navDivider} />
 

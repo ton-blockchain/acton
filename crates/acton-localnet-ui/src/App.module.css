@@ -11,3 +11,12 @@
   width: 100vw;
   overflow: hidden;
 }
+
+.routeLoading {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--litenode-text-muted);
+  background: var(--litenode-bg);
+  font-size: 0.92rem;
+}

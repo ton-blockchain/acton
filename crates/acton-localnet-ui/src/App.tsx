@@ -20,6 +20,10 @@ import "./index.css"
 import styles from "./App.module.css"
 
 const HOST = (import.meta.env.VITE_LOCALNET_HOST || "").replace(/\/$/, "")
+const ApiReferencePage = React.lazy(async () => {
+  const module = await import("./dashboard/pages/ApiReferencePage")
+  return {default: module.ApiReferencePage}
+})
 
 export const App: React.FC = () => {
   const [theme, setTheme] = useState(() => {
@@ -41,6 +45,8 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark")
+    document.body.classList.toggle("dark-mode", theme === "dark")
+    document.body.classList.toggle("light-mode", theme !== "dark")
     localStorage.setItem("theme", theme)
   }, [theme])
 
@@ -106,6 +112,37 @@ const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {
             element={
               <DashboardPage client={client} theme={theme} setTheme={setTheme}>
                 <NftsPage client={client} />
+              </DashboardPage>
+            }
+          />
+          <Route path="/api-reference" element={<Navigate to="/api-reference/v2" replace />} />
+          <Route
+            path="/api-reference/v2"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <React.Suspense fallback={<div className={styles.routeLoading}>Loading…</div>}>
+                  <ApiReferencePage apiBaseUrl={`${HOST}/api/v2`} theme={theme} version="v2" />
+                </React.Suspense>
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/api-reference/v3"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <React.Suspense fallback={<div className={styles.routeLoading}>Loading…</div>}>
+                  <ApiReferencePage apiBaseUrl={`${HOST}/api/v3`} theme={theme} version="v3" />
+                </React.Suspense>
+              </DashboardPage>
+            }
+          />
+          <Route
+            path="/api-reference/control"
+            element={
+              <DashboardPage client={client} theme={theme} setTheme={setTheme} embedded>
+                <React.Suspense fallback={<div className={styles.routeLoading}>Loading…</div>}>
+                  <ApiReferencePage apiBaseUrl={HOST} theme={theme} version="control" />
+                </React.Suspense>
               </DashboardPage>
             }
           />
