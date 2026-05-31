@@ -6,6 +6,7 @@ use crate::support::toncenter::{
     spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
     toncenter_v2_account_info_ok_response, toncenter_v2_error_response,
     toncenter_v2_send_boc_ok_response, toncenter_v2_seqno_ok_response,
+    write_fork_account_cache_summary,
 };
 
 use base64::Engine;
@@ -345,6 +346,27 @@ fn localnet_acton_ok_response() -> ToncenterV2MockResponse {
         })
         .to_string(),
     }
+}
+
+fn remote_shard_account_script_source() -> String {
+    r#"
+import "../../lib/emulation/scripts"
+import "../../lib/io"
+
+fun main() {
+    val shard = scripts.fetchShardAccount(address("__REMOTE_ADDRESS__"));
+    if (shard == null) {
+        println("SCRIPT_FORK_SHARD_NULL");
+        return;
+    }
+
+    println("SCRIPT_FORK_LAST_LT={}", shard!.lastTransLt);
+}
+"#
+    .replace(
+        "__REMOTE_ADDRESS__",
+        "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
+    )
 }
 
 fn build_broadcast_wallet_error_project(project_name: &str) -> Project {
@@ -3701,27 +3723,8 @@ fn test_script_fork_block_number_is_forwarded_to_remote_account_requests() {
         toncenter_v2_account_info_ok_response(1000, "uninitialized", 202, &last_hash_b64),
     ]);
 
-    let script = r#"
-import "../../lib/emulation/scripts"
-import "../../lib/io"
-
-fun main() {
-    val shard = scripts.fetchShardAccount(address("__REMOTE_ADDRESS__"));
-    if (shard == null) {
-        println("SCRIPT_FORK_SHARD_NULL");
-        return;
-    }
-
-    println("SCRIPT_FORK_LAST_LT={}", shard!.lastTransLt);
-}
-"#
-    .replace(
-        "__REMOTE_ADDRESS__",
-        "EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ",
-    );
-
     let project = ProjectBuilder::new("script-fork-block-number-forwarded")
-        .script_file("fork_block_query", &script)
+        .script_file("fork_block_query", &remote_shard_account_script_source())
         .build();
     append_custom_network(
         project.path(),
@@ -3754,6 +3757,71 @@ fun main() {
     output.assert_file_snapshot_matches(
         "script-fork-block-requests.txt",
         "integration/snapshots/script/test_script_fork_block_number_is_forwarded_to_remote_account_requests.requests.txt",
+    );
+}
+
+#[test]
+fn test_script_fork_block_number_reuses_persistent_account_cache_between_runs() {
+    let last_hash_bytes = [0x88_u8; 32];
+    let last_hash_b64 = base64::engine::general_purpose::STANDARD.encode(last_hash_bytes);
+    let fork_block_number = 765432_u64;
+    let (mock_url, mock_handle, captured_requests) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_error_response(404, "getShardAccountCell is unavailable"),
+        toncenter_v2_account_info_ok_response(1000, "uninitialized", 707, &last_hash_b64),
+    ]);
+
+    let project = ProjectBuilder::new("script-fork-block-cache")
+        .script_file(
+            "fork_block_cache_query",
+            &remote_shard_account_script_source(),
+        )
+        .build();
+    append_custom_network(
+        project.path(),
+        "script-remote-cache",
+        &format!("{mock_url}/api/v2"),
+    );
+
+    project
+        .acton()
+        .script("scripts/fork_block_cache_query.tolk")
+        .fork_net("custom:script-remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.first.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock toncenter must finish");
+
+    let output = project
+        .acton()
+        .script("scripts/fork_block_cache_query.tolk")
+        .fork_net("custom:script-remote-cache")
+        .arg("--fork-block-number")
+        .arg(&fork_block_number.to_string())
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.second.stdout.txt",
+    );
+
+    let captured_requests = captured_requests
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    write_fork_account_cache_summary(
+        project.path(),
+        "script-remote-cache",
+        fork_block_number,
+        "script-fork-block-cache-summary.txt",
+        &captured_requests,
+    );
+    output.assert_file_snapshot_matches(
+        "script-fork-block-cache-summary.txt",
+        "integration/snapshots/script/test_script_fork_block_number_reuses_persistent_account_cache_between_runs.summary.txt",
     );
 }
 
@@ -3850,6 +3918,98 @@ fn test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace(
         .assert_snapshot_matches(
             "integration/snapshots/script/test_script_fork_localnet_explicit_block_preserves_history_and_formats_trace.triggered_block.stdout.txt",
         );
+
+    node.stop();
+}
+
+#[test]
+#[ignore = "benchmark scenario for local fork account cache perf tracking"]
+fn test_script_fork_localnet_account_cache_benchmark() {
+    let project = build_localnet_wait_project(
+        "script-fork-localnet-cache-benchmark",
+        "deploy_fork_targets",
+        FORK_LOCALNET_DEPLOY_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_fork_targets.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+
+    let deploy_stdout = deploy_output.get_stdout();
+    let receiver_address = extract_marker_value(&deploy_stdout, "RECEIVER_CONTRACT=")
+        .split_whitespace()
+        .next()
+        .expect("receiver address must be present")
+        .to_string();
+
+    wait_until_address_state_active(&node, &receiver_address, Duration::from_secs(12));
+    let fork_block_number = latest_localnet_seqno(&node).to_string();
+
+    fs::write(
+        project
+            .path()
+            .join("scripts/fork_cache_benchmark_query.tolk"),
+        format!(
+            r#"
+import "../../lib/emulation/network"
+import "../../lib/io"
+
+fun main() {{
+    val received: int = net.runGetMethod(address("{receiver_address}"), "received");
+    println("BENCH_RECEIVED={{}}", received);
+}}
+"#
+        ),
+    )
+    .expect("failed to write fork cache benchmark query script");
+
+    let run_query = |no_fork_cache: bool| -> Duration {
+        let mut command = project
+            .acton()
+            .script("scripts/fork_cache_benchmark_query.tolk")
+            .fork_net("localnet")
+            .arg("--fork-block-number")
+            .arg(&fork_block_number);
+        if no_fork_cache {
+            command = command.arg("--no-fork-cache");
+        }
+
+        let started = Instant::now();
+        command.run().success().assert_contains("BENCH_RECEIVED=1");
+        started.elapsed()
+    };
+
+    run_query(true);
+
+    let runs = 3_u32;
+    let mut uncached_total = Duration::ZERO;
+    for _ in 0..runs {
+        uncached_total += run_query(true);
+    }
+
+    let warm_cache = run_query(false);
+
+    let mut cached_total = Duration::ZERO;
+    for _ in 0..runs {
+        cached_total += run_query(false);
+    }
+
+    let uncached_avg_ms = uncached_total.as_secs_f64() * 1000.0 / f64::from(runs);
+    let cached_avg_ms = cached_total.as_secs_f64() * 1000.0 / f64::from(runs);
+    let warm_cache_ms = warm_cache.as_secs_f64() * 1000.0;
+    let speedup = uncached_avg_ms / cached_avg_ms.max(0.001);
+
+    eprintln!(
+        "fork account cache benchmark: runs={runs} uncached_avg_ms={uncached_avg_ms:.2} cached_avg_ms={cached_avg_ms:.2} warm_cache_ms={warm_cache_ms:.2} speedup={speedup:.2}x"
+    );
 
     node.stop();
 }

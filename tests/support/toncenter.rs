@@ -322,6 +322,117 @@ pub(crate) fn format_captured_requests(requests: &[CapturedToncenterRequest]) ->
     out
 }
 
+pub(crate) fn write_fork_account_cache_summary(
+    project_path: &Path,
+    network_name: &str,
+    fork_block_number: u64,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_files:\n");
+    let cache_dir = project_path
+        .join("build")
+        .join("cache")
+        .join(network_name)
+        .join(fork_block_number.to_string());
+    match fs::read_dir(cache_dir) {
+        Ok(entries) => {
+            let mut file_names = entries
+                .map(|entry| {
+                    entry
+                        .expect("failed to read fork account cache directory entry")
+                        .file_name()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect::<Vec<_>>();
+            file_names.sort();
+            if file_names.is_empty() {
+                out.push_str("<empty>\n");
+            } else {
+                for file_name in file_names {
+                    let _ = writeln!(out, "{file_name}");
+                }
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache directory: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache summary");
+}
+
+pub(crate) fn write_fork_account_cache_tree_summary(
+    project_path: &Path,
+    network_name: &str,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_tree:\n");
+    let cache_root = project_path.join("build").join("cache").join(network_name);
+    match collect_cache_tree_entries(&cache_root) {
+        Ok(entries) if entries.is_empty() => out.push_str("<empty>\n"),
+        Ok(entries) => {
+            for entry in entries {
+                let _ = writeln!(out, "{entry}");
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache tree: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache tree summary");
+}
+
+fn collect_cache_tree_entries(root: &Path) -> std::io::Result<Vec<String>> {
+    fn collect(
+        root: &Path,
+        relative_prefix: &Path,
+        entries: &mut Vec<String>,
+    ) -> std::io::Result<()> {
+        let mut children = fs::read_dir(root)?.collect::<Result<Vec<_>, _>>()?;
+        children.sort_by_key(fs::DirEntry::file_name);
+
+        for child in children {
+            let child_name = child.file_name();
+            let child_relative = relative_prefix.join(&child_name);
+            let file_type = child.file_type()?;
+            if file_type.is_dir() {
+                entries.push(format!("{}/", child_relative.to_string_lossy()));
+                collect(&child.path(), &child_relative, entries)?;
+            } else if file_type.is_file() {
+                entries.push(child_relative.to_string_lossy().into_owned());
+            }
+        }
+
+        Ok(())
+    }
+
+    let mut entries = Vec::new();
+    collect(root, Path::new(""), &mut entries)?;
+    Ok(entries)
+}
+
 pub(crate) fn toncenter_v2_verify_registry_address_response(
     registry_address: &str,
 ) -> ToncenterV2MockResponse {

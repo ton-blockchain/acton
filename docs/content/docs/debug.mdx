@@ -350,12 +350,16 @@ Strengths:
 - fast local iteration against real deployed account state
 - suited to integration debugging
 - test runs share a suite-level remote cache, which helps repeated accesses
+- pinned fork runs with `--fork-block-number` persist fetched accounts under
+  `build/cache/<network>/<seqno>/`, so repeated CLI runs can skip remote account
+  fetches for the same network, block, and address
 - nested debug across `net.send*` and `net.runGetMethod()` still works for the local parts of execution
 
 Important limits:
 
 - fork mode is not historical replay
 - `--fork-block-number` pins remote account reads, not the full chain environment
+- `--no-fork-cache` disables the persistent cache when you need fresh remote reads
 - time, randomness, and configuration still come from the local run model
 - remote lookup failures can degrade into what looks like a non-existing account
 - remote contracts may execute under debug but still lack useful local source-level information

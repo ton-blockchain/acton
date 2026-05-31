@@ -42,6 +42,15 @@ Pin a historical state by passing a block sequence number:
 acton test --fork-net mainnet --fork-block-number 54321000
 ```
 
+<Callout type="tip" title="Pin the fork block for faster reruns">
+    If you rerun the same fork tests often, pass `--fork-block-number` instead
+    of using a live fork. Pinned fork runs persist fetched accounts under
+    `build/cache/<network>/<seqno>/`, so the next CLI run can load the same
+    accounts from disk before calling the remote API. Live fork runs without a
+    block number only use the in-memory cache for the current `acton test`
+    process and will fetch accounts again on the next run.
+</Callout>
+
 You can also set defaults in `Acton.toml`:
 
 ```acton-toml title="Acton.toml"
@@ -95,13 +104,17 @@ acton test tests/wallet.test.tolk --fork-net custom:archive-rpc
 When fork testing is enabled and a test touches an account:
 
 1. The system first checks if the account was already loaded in the local cache.
-2. If not cached and `--fork-net` is specified, it queries the configured API endpoint.
-3. Account state, i.e., balance, code, data, status, is downloaded and deserialized.
-4. The state is cached for subsequent accesses during the test run.
-5. Tests execute using this real state in the local emulator.
+2. If `--fork-block-number` is set, it checks the persistent fork account cache.
+3. If the account is still not cached and `--fork-net` is specified, it queries
+   the configured API endpoint.
+4. Account state, i.e., balance, code, data, status, is downloaded and deserialized.
+5. The state is cached for subsequent accesses.
+6. Tests execute using this real state in the local emulator.
 
 <Callout type="warn" title="Network latency">
-    The first fetch of each distinct account hits the network and adds latency. Subsequent fetches reuse the cache. Plan accordingly when many distinct accounts appear in one run.
+    The first fetch of each distinct account hits the network and adds latency.
+    Subsequent fetches reuse the cache. Plan accordingly when many distinct
+    accounts appear in one run.
 </Callout>
 
 ## Cache scope and refresh behavior
@@ -110,12 +123,23 @@ Fork testing uses two layers of account state:
 
 - Local account changes are scoped to the current test.
 - The remote snapshot cache is shared by tests in the same `acton test` run.
+- When a fork block number is pinned, fetched remote snapshots are also saved to
+  disk under `build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`.
 
 The shared remote cache stores only fetched remote snapshots:
 
-- The cache key is the tuple of fork network, optional pinned block number, and account address.
-- The second test that touches the same remote account reuses the cached remote snapshot instead of re-fetching it.
-- The cache is not persisted to disk. A fresh `acton test --fork-net ...` run starts with an empty remote snapshot cache.
+- The cache key is the tuple of fork network, optional pinned block number, and
+  account address.
+- The second test that touches the same remote account reuses the cached remote
+  snapshot instead of re-fetching it.
+- A fresh `acton test --fork-net ...` run starts with an empty in-memory cache.
+- If `--fork-block-number` is set, a fresh run can reuse the persistent account
+  cache before making a network request.
+- Live fork runs without `--fork-block-number` are not persisted across CLI runs.
+- Pass `--no-fork-cache` to skip persistent cache reads and writes for the
+  current run.
+- Pass `--clear-cache` to remove persistent fork account entries together with
+  the rest of `build/cache`.
 - Failed lookups are not cached. If a request errors, the next access can try the network again.
 
 Local changes are scoped to the current test. If a test fetches a remote account
@@ -124,9 +148,9 @@ account. Other tests do not inherit that local mutation; they start from a fresh
 local state and, if they touch the same account, reuse the shared remote snapshot
 that was fetched earlier in the run.
 
-To refetch remote snapshots from the same network and block, rerun
-`acton test --fork-net ...`. Changing `--fork-net` or `--fork-block-number` also
-uses a different cache key.
+To refetch remote snapshots from the same network and pinned block, run with
+`--no-fork-cache` once or clear `build/cache`. Changing `--fork-net` or
+`--fork-block-number` also uses a different cache key.
 
 Fork testing only loads accounts that are not already present in the current
 test's local account state. Accounts deployed or changed during a test are not

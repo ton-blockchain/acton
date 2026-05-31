@@ -1261,6 +1261,7 @@ impl TestSettings {
         baseline_gas_override: Option<String>,
         fork_net_override: Option<Network>,
         fork_block_number_override: Option<u64>,
+        fork_cache_enabled: bool,
         save_test_trace_override: Option<String>,
         mutate_override: bool,
         mutate_overrides_override: Option<String>,
@@ -1341,6 +1342,7 @@ impl TestSettings {
                     .and_then(|n| Network::from_str(n).ok())
             }),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
+            fork_cache_enabled,
             save_test_trace: save_test_trace_override,
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
@@ -1424,6 +1426,7 @@ mod tests {
             None,
             fork_net_override,
             fork_block_number_override,
+            true,
             None,
             false,
             None,

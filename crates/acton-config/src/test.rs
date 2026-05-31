@@ -126,7 +126,7 @@ impl std::fmt::Display for MutationDiffMode {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct TestConfig {
     pub report_formats: Vec<ReportFormat>,
     pub show_bodies: bool,
@@ -151,6 +151,7 @@ pub struct TestConfig {
     pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub fork_block_number: Option<u64>,
+    pub fork_cache_enabled: bool,
     pub save_test_trace: Option<String>,
     pub mutate: bool,
     pub mutate_overrides: Option<String>,
@@ -170,4 +171,54 @@ pub struct TestConfig {
     pub fail_fast: bool,
     pub ui: bool,
     pub ui_port: u16,
+}
+
+impl Default for TestConfig {
+    fn default() -> Self {
+        Self {
+            report_formats: Vec::new(),
+            show_bodies: false,
+            verbosity: 0,
+            debug: false,
+            debug_port: 0,
+            backtrace: None,
+            coverage: false,
+            coverage_minimum_percent: None,
+            coverage_include_wrappers: false,
+            coverage_include_tests: false,
+            filter: None,
+            coverage_format: None,
+            coverage_file: None,
+            exclude_patterns: Vec::new(),
+            include_patterns: Vec::new(),
+            clear_cache: false,
+            junit_path: None,
+            junit_merge: false,
+            snapshot: None,
+            baseline_snapshot: None,
+            fail_on_diff: false,
+            fork_net: None,
+            fork_block_number: None,
+            fork_cache_enabled: true,
+            save_test_trace: None,
+            mutate: false,
+            mutate_overrides: None,
+            mutate_contract: None,
+            mutation_rules_file: None,
+            mutation_session_id: None,
+            mutation_workers: None,
+            mutation_levels: Vec::new(),
+            mutation_minimum_percent: None,
+            mutation_ids: Vec::new(),
+            mutation_diff: None,
+            mutation_diff_ref: None,
+            disable_rules: Vec::new(),
+            fuzz_runs: None,
+            fuzz_max_test_rejects: None,
+            fuzz_seed: None,
+            fail_fast: false,
+            ui: false,
+            ui_port: 0,
+        }
+    }
 }

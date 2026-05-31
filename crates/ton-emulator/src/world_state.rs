@@ -4,7 +4,7 @@
 //! and global libraries. The state can be managed purely locally or forked from a remote
 //! TON network (mainnet or testnet).
 
-use acton_config::config::ActonConfig;
+use acton_config::config::{ActonConfig, project_root as configured_project_root};
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use num_traits::cast::ToPrimitive;
@@ -13,9 +13,12 @@ use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::{OnceCell, RefCell};
 use std::collections::HashMap;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str::FromStr;
 use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
 use ton_api::TonApiClient;
 use ton_executor::{DEFAULT_CONFIG, DEFAULT_CONFIG_CELL, DEFAULT_CONFIG_DICT};
 use ton_networks::Network;
@@ -28,6 +31,7 @@ use tycho_types::models::{
 };
 
 const WORLD_STATE_SNAPSHOT_VERSION: u32 = 1;
+const FORK_ACCOUNT_CACHE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct WorldStateSnapshot {
@@ -193,6 +197,116 @@ impl RemoteSnapshotCache {
     }
 }
 
+#[derive(Clone, Debug)]
+struct RemoteDiskCache {
+    dir: PathBuf,
+    fork_net: String,
+    fork_block_number: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct RemoteDiskCacheEntry {
+    schema_version: u32,
+    fork_net: String,
+    fork_block_number: u64,
+    address: String,
+    shard_account_boc64: String,
+    timestamp: u64,
+}
+
+impl RemoteDiskCache {
+    fn new(dir: PathBuf, fork_net: &Network, fork_block_number: u64) -> Self {
+        Self {
+            dir,
+            fork_net: fork_net.to_string(),
+            fork_block_number,
+        }
+    }
+
+    fn cache_file_path(&self, address: &StdAddr) -> PathBuf {
+        self.dir
+            .join(format!("{}.json", address_cache_key(address)))
+    }
+
+    fn read(&self, address: &StdAddr) -> Option<ShardAccount> {
+        let path = self.cache_file_path(address);
+        let entry =
+            serde_json::from_reader::<_, RemoteDiskCacheEntry>(fs::File::open(path).ok()?).ok()?;
+
+        if entry.schema_version != FORK_ACCOUNT_CACHE_SCHEMA_VERSION
+            || entry.fork_net != self.fork_net
+            || entry.fork_block_number != self.fork_block_number
+            || entry.address != address.to_string()
+        {
+            return None;
+        }
+
+        decode_shard_account_boc64(&entry.shard_account_boc64).ok()
+    }
+
+    fn write(&self, address: &StdAddr, account: &ShardAccount) -> anyhow::Result<()> {
+        fs::create_dir_all(&self.dir)?;
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default();
+        let entry = RemoteDiskCacheEntry {
+            schema_version: FORK_ACCOUNT_CACHE_SCHEMA_VERSION,
+            fork_net: self.fork_net.clone(),
+            fork_block_number: self.fork_block_number,
+            address: address.to_string(),
+            shard_account_boc64: encode_shard_account_boc64(account)?,
+            timestamp: now.as_secs(),
+        };
+
+        let path = self.cache_file_path(address);
+        let temp_suffix = now.as_nanos();
+        let temp_path =
+            path.with_extension(format!("json.{}.{}.tmp", std::process::id(), temp_suffix));
+        fs::write(&temp_path, serde_json::to_vec_pretty(&entry)?)?;
+        fs::rename(&temp_path, &path).or_else(|_| {
+            let contents = fs::read(&temp_path)?;
+            fs::write(&path, contents)?;
+            fs::remove_file(&temp_path).ok();
+            Ok::<_, std::io::Error>(())
+        })?;
+        Ok(())
+    }
+}
+
+#[must_use]
+fn fork_account_cache_dir(
+    project_root: &Path,
+    fork_net: &Network,
+    fork_block_number: u64,
+) -> PathBuf {
+    project_root
+        .join("build")
+        .join("cache")
+        .join(sanitize_cache_path_component(&fork_net.to_string()))
+        .join(fork_block_number.to_string())
+}
+
+fn sanitize_cache_path_component(value: &str) -> String {
+    value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn address_cache_key(address: &StdAddr) -> String {
+    format!(
+        "{}_{}",
+        address.workchain,
+        hex::encode(address.address.as_array())
+    )
+}
+
 /// A state implementation that fetches missing accounts from a remote network.
 pub struct RemoteAccountState {
     /// Local cache and overrides for accounts.
@@ -206,6 +320,8 @@ pub struct RemoteAccountState {
     api_client: OnceCell<TonApiClient>,
     /// Cache for less network queries in subsequent tests.
     cache: RemoteSnapshotCache,
+    /// Persistent cache used across CLI process restarts for pinned forks.
+    disk_cache: Option<RemoteDiskCache>,
 }
 
 impl RemoteAccountState {
@@ -215,13 +331,24 @@ impl RemoteAccountState {
         fork_net: Network,
         fork_block_number: Option<u64>,
         cache: RemoteSnapshotCache,
+        fork_cache_enabled: bool,
     ) -> Self {
+        let disk_cache = match (fork_cache_enabled, fork_block_number) {
+            (true, Some(fork_block_number)) => {
+                let dir =
+                    fork_account_cache_dir(configured_project_root(), &fork_net, fork_block_number);
+                Some(RemoteDiskCache::new(dir, &fork_net, fork_block_number))
+            }
+            _ => None,
+        };
+
         Self {
             accounts: FxHashMap::default(),
             fork_net,
             fork_block_number,
             api_client: OnceCell::new(),
             cache,
+            disk_cache,
         }
     }
 
@@ -268,6 +395,14 @@ impl RemoteAccountState {
         if let Some(cached) = self.cache.get(&cache_key) {
             return Ok(cached);
         }
+        if let Some(cached) = self
+            .disk_cache
+            .as_ref()
+            .and_then(|disk_cache| disk_cache.read(address))
+        {
+            self.cache.insert(cache_key, cached.clone());
+            return Ok(cached);
+        }
 
         let api_client = self.api_client()?;
         if let Ok(cell) =
@@ -276,7 +411,7 @@ impl RemoteAccountState {
             let acc = cell
                 .parse::<ShardAccount>()
                 .context("Failed to parse getShardAccountCell response as ShardAccount")?;
-            self.cache.insert(cache_key, acc.clone());
+            self.store_resolved_account(cache_key, address, &acc);
             return Ok(acc);
         }
 
@@ -319,8 +454,20 @@ impl RemoteAccountState {
             last_trans_hash,
             last_trans_lt,
         };
-        self.cache.insert(cache_key, acc.clone());
+        self.store_resolved_account(cache_key, address, &acc);
         Ok(acc)
+    }
+
+    fn store_resolved_account(
+        &self,
+        cache_key: RemoteCacheKey,
+        address: &StdAddr,
+        account: &ShardAccount,
+    ) {
+        self.cache.insert(cache_key, account.clone());
+        if let Some(disk_cache) = &self.disk_cache {
+            let _ = disk_cache.write(address, account);
+        }
     }
 
     fn api_client(&self) -> anyhow::Result<&TonApiClient> {
@@ -736,7 +883,7 @@ mod tests {
             address: address.clone(),
         };
 
-        let mut remote = RemoteAccountState::new(Network::Testnet, None, cache.clone());
+        let mut remote = RemoteAccountState::new(Network::Testnet, None, cache.clone(), false);
         remote.accounts.insert(address, account.clone());
         cache.insert(cache_key.clone(), account);
 

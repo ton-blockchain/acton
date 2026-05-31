@@ -89,6 +89,7 @@ pub fn script_cmd(
     clear_cache: bool,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     net: Option<String>,
     explorer: Option<Explorer>,
     show_bodies: bool,
@@ -152,6 +153,7 @@ pub fn script_cmd(
         debug_listener,
         fork_net,
         fork_block_number,
+        fork_cache_enabled,
         network,
         explorer,
         show_bodies,
@@ -176,6 +178,7 @@ fn run_script_file(
     debug_listener: Option<TcpListener>,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     net: Option<Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
@@ -211,6 +214,7 @@ fn run_script_file(
                 verbosity,
                 fork_net,
                 fork_block_number,
+                fork_cache_enabled,
                 net.as_ref(),
                 explorer,
                 show_bodies,
@@ -245,6 +249,7 @@ fn execute_script(
     verbosity: ExecutorVerbosity,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     net: Option<&Network>,
     explorer: Option<Explorer>,
     show_bodies: bool,
@@ -278,11 +283,15 @@ fn execute_script(
 
     let mut emulator = Emulator::new(verbosity, config_b64)?;
     let resolver = match &fork_net {
-        Some(net) => AccountsState::Remote(RemoteAccountState::new(
-            net.clone(),
-            fork_block_number,
-            RemoteSnapshotCache::new(),
-        )),
+        Some(net) => {
+            let remote = RemoteAccountState::new(
+                net.clone(),
+                fork_block_number,
+                RemoteSnapshotCache::new(),
+                fork_cache_enabled,
+            );
+            AccountsState::Remote(remote)
+        }
         None => AccountsState::Local(LocalAccountsState::new()),
     };
     let mut world_state = WorldState::new(resolver, config_b64)?;

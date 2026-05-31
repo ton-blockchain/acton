@@ -373,6 +373,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Tracing
         #[arg(
@@ -614,6 +620,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Broadcasting
         #[arg(
@@ -1907,6 +1919,7 @@ fn main() {
             fail_fast,
             fuzz_seed,
             fork_block_number,
+            no_fork_cache,
             ui,
             ui_port,
         } => match (
@@ -1938,6 +1951,7 @@ fn main() {
                     fail_on_diff,
                     fork_net,
                     fork_block_number,
+                    !no_fork_cache,
                     save_test_trace,
                     mutate,
                     mutate_overrides,
@@ -2007,6 +2021,7 @@ fn main() {
             clear_cache,
             fork_net,
             fork_block_number,
+            no_fork_cache,
             net,
             tonconnect,
             tonconnect_port,
@@ -2023,6 +2038,7 @@ fn main() {
                 clear_cache,
                 fork_net,
                 fork_block_number,
+                !no_fork_cache,
                 net,
                 explorer,
                 show_bodies,
@@ -2630,6 +2646,7 @@ fn create_test_config(
     fail_on_diff: bool,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     save_test_trace: Option<String>,
     mutate: bool,
     mutate_overrides: Option<String>,
@@ -2693,6 +2710,7 @@ fn create_test_config(
             baseline_snapshot,
             fork_net,
             fork_block_number,
+            fork_cache_enabled,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -2743,6 +2761,7 @@ fn create_test_config(
         baseline_snapshot,
         fail_on_diff,
         fork_block_number,
+        fork_cache_enabled,
         save_test_trace,
         mutate,
         mutate_overrides,
@@ -2918,6 +2937,7 @@ mod tests {
             None,
             None,
             None,
+            true,
             save_test_trace_override.map(str::to_owned),
             false,
             None,

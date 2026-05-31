@@ -1,0 +1,5 @@
+requests:
+GET /api/v2/getShardAccountCell?address=0%3A6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707&seqno=777777
+GET /api/v2/getAddressInformation?address=0%3A6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707&seqno=777777
+cache_files:
+0_6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707.json

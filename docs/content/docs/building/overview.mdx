@@ -62,11 +62,20 @@ To limit the build set to a single contract and its transitive dependencies, pro
 
 ## Build caching
 
-Acton uses a shared file-based cache under `build/cache/`. Each cache entry is keyed on the source file path, Tolk compiler version, optimization level, debug mode, Fift generation flag, and import mappings from `Acton.toml`.
+Acton uses a shared file-based cache under `build/cache/`. Compilation cache
+entries are keyed on the source file path, Tolk compiler version, optimization
+level, debug mode, Fift generation flag, and import mappings from `Acton.toml`.
 
 A cache entry is valid only if the content hash of every imported source file matches the stored hash. This includes helper files generated in `gen/`, so changing a child contract's source also invalidates the cache for any parent that imports the generated helper.
 
-The same cache directory is shared by `acton build`, `acton compile`, and [`acton test`](/docs/commands/test). Recent builds often speed up subsequent test runs.
+The same cache directory is shared by `acton build`, `acton compile`, and
+[`acton test`](/docs/commands/test). Recent builds often speed up subsequent
+test runs.
+
+Pinned fork runs also store fetched remote accounts in this directory under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. `acton test`
+and `acton script` reuse those files when the same fork network, block number,
+and account address are requested again.
 
 Clear the cache to force a full rebuild:
 
@@ -75,7 +84,9 @@ acton build --clear-cache
 ```
 
 <Callout>
-    `--clear-cache` removes all entries under `build/cache/` but does not delete other artifacts in `build/`, generated helpers in `gen/`, or saved traces.
+    `--clear-cache` removes all entries under `build/cache/`, including
+    persistent fork account entries, but does not delete other artifacts in
+    `build/`, generated helpers in `gen/`, or saved traces.
 </Callout>
 
 ## See also

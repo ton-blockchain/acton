@@ -795,6 +795,10 @@ fn append_mutation_test_command_args(
             .arg(fork_block_number.to_string());
     }
 
+    if !config.fork_cache_enabled {
+        cmd.arg("--no-fork-cache");
+    }
+
     if let Some(fuzz_seed) = config.fuzz_seed {
         cmd.arg("--fuzz-seed").arg(fuzz_seed.to_string());
     }
@@ -853,6 +857,10 @@ fn mutation_resume_command(paths: &[String], config: &TestConfig, session_id: &s
     if let Some(fork_block_number) = config.fork_block_number {
         args.push("--fork-block-number".to_owned());
         args.push(fork_block_number.to_string());
+    }
+
+    if !config.fork_cache_enabled {
+        args.push("--no-fork-cache".to_owned());
     }
 
     if !config.mutation_levels.is_empty() {

@@ -74,6 +74,7 @@ fn remote_account_retrieve_error_uses_current_lt_marker() -> anyhow::Result<()> 
         Network::Custom(Arc::from("unit-missing-remote-network")),
         None,
         RemoteSnapshotCache::default(),
+        false,
     );
     let mut state = WorldState::new(AccountsState::Remote(remote), None)?;
     let address = std_addr(0, 0xaa);

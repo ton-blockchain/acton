@@ -215,6 +215,18 @@ Fork remote blockchain state for account resolution.
 
 {{#option "`--fork-block-number` _seqno_" }}
 Historical block sequence number to fork from.
+
+When a fork block number is set, Acton caches resolved remote accounts under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later test
+runs with the same fork network, block number, and address read that file before
+calling the remote API.
+{{/option}}
+
+{{#option "`--no-fork-cache`" }}
+Disable persistent account cache for pinned fork block numbers. Use this when
+you want every test run to fetch forked accounts from the remote API. The
+regular `--clear-cache` flag removes this cache together with the rest of
+`build/cache`.
 {{/option}}
 
 {{/options}}

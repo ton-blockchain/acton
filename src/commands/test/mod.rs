@@ -306,11 +306,15 @@ impl<'a> TestRunner<'a> {
 
         let mut emulator = Emulator::new(verbosity, config_b64)?;
         let state = match &self.config.fork_net {
-            Some(net) => AccountsState::Remote(RemoteAccountState::new(
-                net.clone(),
-                self.config.fork_block_number,
-                self.remote_cache.clone(),
-            )),
+            Some(net) => {
+                let remote = RemoteAccountState::new(
+                    net.clone(),
+                    self.config.fork_block_number,
+                    self.remote_cache.clone(),
+                    self.config.fork_cache_enabled,
+                );
+                AccountsState::Remote(remote)
+            }
             None => AccountsState::Local(LocalAccountsState::new()),
         };
         let mut world_state = WorldState::new(state, config_b64)?;
