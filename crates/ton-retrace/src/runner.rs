@@ -5,14 +5,15 @@ use crate::methods::{
 };
 use crate::types::{BaseTxInfo, TraceEmulatedTx, TraceInMessage, TraceResult};
 use crate::{ComputeInfo, find_base_tx_by_hash, methods};
+use anyhow::Context;
 use base64::Engine;
 use base64::engine::general_purpose;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
-use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, RunTransactionArgs};
+use ton_executor::{ExecutorVerbosity, MissingLibrariesContext, missing_library_callback};
 pub use ton_networks::Network;
-use tvm_logs::parser::{CellLike, VmLine, VmStackValue, parse_lines};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::models::{AccountState, ShardAccount, Transaction};
@@ -75,54 +76,17 @@ pub async fn retrace(
     for _ in 0..5 {
         let result = retrace_base_tx(net.clone(), base_tx.clone(), additional_libs.clone()).await?;
 
-        if let ComputeInfo::Success { exit_code: 9, .. } = result.emulated_tx.compute_info {
-            // This can be both a simple cell underflow and failed to load a library cell.
-            // Parse vm_logs to find out.
-
-            // Example logs:
-            //
-            // stack: [ ... C{B5EE9C72010101010023000842029468B29F43AC803FC9F621953FDD069A432E4CD1D9A56B9C299B587FE6898FAB} ]
-            // code cell hash: 4F5F4CE417F91358B532A9670A09D20AC7E01850E9B704A4DF1CC5373EE6EDE4 offset: 887
-            // execute CTOS
-            // handling exception code 9: failed to load library cell
-            // default exception handler, terminating vm with exit code 9
-
-            let lines: Vec<_> = parse_lines(&result.emulated_tx.vm_logs)
-                .filter_map(Result::ok)
-                .collect();
-
-            if lines.len() < 6 {
-                return Ok(result);
-            }
-
-            let n = lines.len();
-            let exception_handler_line = &lines[n - 1];
-            let exception_line = &lines[n - 2];
-            let ctos_line = &lines[n - 3];
-            let stack_line = &lines[n - 5];
-
-            if let (
-                VmLine::VmExceptionHandler { .. },
-                VmLine::VmException { message, .. },
-                VmLine::VmExecute { instr },
-                VmLine::VmStack { stack },
-            ) = (
-                exception_handler_line,
-                exception_line,
-                ctos_line,
-                stack_line,
-            ) && message == &"failed to load library cell"
-                && instr == &"CTOS"
-                && let Some(VmStackValue::Cell(CellLike::Cell(hex_boc))) = stack.parsed().last()
-                && let Some((hash, code)) = try_load_as_library(net.clone(), hex_boc).await?
-            {
-                // So we find out that the transaction failed to load a library cell.
-                // Stack before CTOS will contain the library cell as the top element.
-
-                // Now we have the library content and hash, so we try again with this library.
-                additional_libs.insert(hash, code);
-                continue;
-            }
+        if matches!(
+            &result.emulated_tx.compute_info,
+            ComputeInfo::Success { exit_code: 9, .. }
+        ) && load_missing_libraries(
+            net.clone(),
+            &result.emulated_tx.missing_libraries,
+            &mut additional_libs,
+        )
+        .await?
+        {
+            continue;
         }
 
         return Ok(result);
@@ -131,28 +95,29 @@ pub async fn retrace(
     anyhow::bail!("retrace failed to recover exit code 9");
 }
 
-async fn try_load_as_library(
+async fn load_missing_libraries(
     net: Network,
-    hex_boc: &str,
-) -> anyhow::Result<Option<(HashBytes, Cell)>> {
-    let cell = Boc::decode_hex(hex_boc)?;
+    missing_libraries: &[String],
+    additional_libs: &mut HashMap<HashBytes, Cell>,
+) -> anyhow::Result<bool> {
+    let mut loaded_any = false;
 
-    const EXOTIC_LIBRARY_TAG: u8 = 2;
-    let slice = cell.as_slice_allow_exotic();
-    if slice.size_bits() != 256 + 8 {
-        return Ok(None);
+    for hash_hex in missing_libraries {
+        let hash = HashBytes::from_str(hash_hex)
+            .with_context(|| format!("Invalid missing library hash: {hash_hex}"))?;
+        if additional_libs.contains_key(&hash) {
+            continue;
+        }
+
+        let hash_for_api = format!("{hash:X}");
+        let code = methods::get_library_by_hash(net.clone(), &hash_for_api)
+            .await
+            .with_context(|| format!("Failed to load missing library {hash_hex}"))?;
+        additional_libs.insert(hash, code);
+        loaded_any = true;
     }
 
-    let mut cs = cell.as_slice_allow_exotic();
-    let tag = cs.load_u8()?;
-    if tag != EXOTIC_LIBRARY_TAG {
-        return Ok(None);
-    }
-
-    let lib_hash = cs.load_u256()?;
-    let lib_hash_hex = format!("{lib_hash:X}");
-    let actual_code = methods::get_library_by_hash(net, &lib_hash_hex).await?;
-    Ok(Some((lib_hash, actual_code)))
+    Ok(loaded_any)
 }
 
 /// Fully reproduce (re‑trace) a TON transaction by transaction triple
@@ -276,6 +241,8 @@ pub async fn retrace_base_tx(
             anyhow::bail!("Emulated transaction failed: {:?}", err.error);
         }
     };
+    let mut missing_libraries = res.missing_libraries.iter().cloned().collect::<Vec<_>>();
+    missing_libraries.sort_unstable();
 
     // extract out actions from the c5 control register
     let (final_actions, c5) = find_final_actions(&res);
@@ -309,6 +276,7 @@ pub async fn retrace_base_tx(
             actions: final_actions,
             c5,
             vm_logs: res.vm_log,
+            missing_libraries,
         },
     })
 }
@@ -363,7 +331,12 @@ fn emulate(
         ExecutorVerbosity::FullLocationStackVerbose,
         Some(block_config),
     )?;
-    let (tx_res, executor_logs) = emulator.run_transaction(
+    let mut missing_libraries_ctx = MissingLibrariesContext::default();
+    emulator
+        .register_missing_library_callback(&mut missing_libraries_ctx, missing_library_callback)
+        .context("Cannot register missing library callback")?;
+
+    let (mut tx_res, executor_logs) = emulator.run_transaction(
         &Boc::encode_base64(in_msg),
         &RunTransactionArgs {
             libs: libs.map(Boc::encode_base64),
@@ -378,6 +351,16 @@ fn emulate(
             is_tock: None,
         },
     )?;
+    let mut missing_libraries = Some(missing_libraries_ctx.into_set());
+    match &mut tx_res {
+        EmulationResult::Success(result) => {
+            result.missing_libraries = missing_libraries.take().unwrap_or_default();
+        }
+        EmulationResult::Error(error) => {
+            error.missing_libraries = missing_libraries.take().unwrap_or_default();
+        }
+    }
+
     Ok((tx_res, executor_logs))
 }
 

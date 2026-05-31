@@ -237,6 +237,8 @@ pub struct TraceEmulatedTx {
     pub c5: Option<Cell>,
     /// Detailed VM execution logs.
     pub vm_logs: Arc<str>,
+    /// Missing global-library hashes reported by the native emulator.
+    pub missing_libraries: Vec<String>,
 }
 
 /// Breakdown of money movements and fees within the transaction.
