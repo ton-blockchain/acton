@@ -88,6 +88,14 @@ Example:
 acton = "{{ acton_version }}"
 ```
 
+For preview-channel builds installed with `acton up --trunk`, set the pin to
+`trunk` instead of the numbered stable release:
+
+```acton-toml title="Acton.toml"
+[toolchain]
+acton = "trunk"
+```
+
 `acton up` remains available when the configured version does not match, so the
 expected version can be installed from the same project directory.
 

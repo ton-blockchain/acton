@@ -2431,8 +2431,14 @@ fn validate_project_toolchain_version() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let suggested_config_acton = if acton::build_info::is_trunk_build() {
+        "trunk"
+    } else {
+        installed
+    };
+
     anyhow::bail!(
-        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update [toolchain].acton if this project supports acton {installed}."
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update Acton.toml if this project supports the installed Acton CLI:\n\n[toolchain]\nacton = \"{suggested_config_acton}\""
     );
 }
 

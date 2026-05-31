@@ -88,6 +88,17 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+fn toolchain_mismatch_snapshot_path(
+    stable_path: &'static str,
+    trunk_path: &'static str,
+) -> &'static str {
+    if build_info::is_trunk_build() {
+        trunk_path
+    } else {
+        stable_path
+    }
+}
+
 #[test]
 fn test_filter_via_config() {
     ProjectBuilder::new("filter-config")
@@ -157,8 +168,39 @@ acton = "0.0.0"
         .run_script_cmd("hello")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
             "integration/snapshots/config/test_toolchain_acton_version_mismatch.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_version_mismatch.trunk.stderr.txt",
+        ));
+}
+
+#[test]
+fn test_toolchain_acton_trunk_build_mismatch_suggests_trunk_config_value() {
+    if !build_info::is_trunk_build() {
+        return;
+    }
+
+    let project = ProjectBuilder::new("toolchain-trunk-version-mismatch")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "1.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/config/test_toolchain_acton_trunk_build_mismatch.stderr.txt",
         );
 }
 
@@ -242,9 +284,10 @@ acton = "v{}"
         .run_script_cmd("hello")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
             "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
-        );
+            "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.trunk.stderr.txt",
+        ));
 }
 
 #[test]
