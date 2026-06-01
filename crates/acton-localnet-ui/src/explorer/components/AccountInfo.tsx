@@ -177,7 +177,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
             </div>
           ) : (
             <div className={styles.addressRow}>
-              <div className={styles.addressValue}>
+              <span className={styles.addressValue}>
                 {customName ? (
                   <span className={styles.customName}>
                     {customName}{" "}
@@ -188,8 +188,8 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                 ) : (
                   formatAddress(displayAddress, false, addressFormat)
                 )}
-              </div>
-              <div className={styles.addressActions}>
+              </span>
+              <span className={styles.addressActions}>
                 <button
                   type="button"
                   className={styles.iconButton}
@@ -208,7 +208,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                 >
                   {copied ? <Check size={16} className={styles.saveIcon} /> : <Copy size={16} />}
                 </button>
-              </div>
+              </span>
             </div>
           )}
         </div>

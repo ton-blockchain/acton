@@ -59,7 +59,7 @@
 
 .addressValue {
   min-width: 0;
-  flex: 0 1 auto;
+  display: inline;
   font-size: 1.35rem;
   font-weight: 600;
   line-height: 1.35;
@@ -76,10 +76,7 @@
 }
 
 .addressRow {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: block;
   width: 100%;
   min-width: 0;
 }
@@ -88,7 +85,17 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 auto;
+  margin-left: 8px;
+  line-height: 1;
+  position: relative;
+  top: -0.16em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.addressActions .iconButton {
+  width: 28px;
+  height: 28px;
 }
 
 .renamePanel {
