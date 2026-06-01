@@ -36,8 +36,11 @@ import {
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
+import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
 
 import styles from "./TestDetails.module.css"
+
+type TestDetailsTab = "info" | "logs" | "profile" | "transactions"
 
 interface TestDetailsProps {
   readonly test: TestReport
@@ -45,6 +48,7 @@ interface TestDetailsProps {
   readonly traceError?: string
   readonly isTraceLoading?: boolean
   readonly projectRoot?: string
+  readonly gasProfile?: GasProfileData
 }
 
 interface IDEConfig {
@@ -132,11 +136,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   traceError,
   isTraceLoading = false,
   projectRoot,
+  gasProfile,
 }) => {
-  const [activeTab, setActiveTab] = useState<"info" | "logs" | "transactions">(() => {
+  const [activeTab, setActiveTab] = useState<TestDetailsTab>(() => {
     const saved = localStorage.getItem("activeTab")
     if (saved === "vm" || saved === "executor") return "logs"
-    return (saved as "info" | "logs" | "transactions") || "info"
+    return saved === "info" || saved === "logs" || saved === "profile" || saved === "transactions"
+      ? saved
+      : "info"
   })
   const [selectedTraceIndex, setSelectedTraceIndex] = useState<number>(() => {
     const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
@@ -375,8 +382,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       : `${transactionCount} transactions`
   const skippedTracesCount = trace?.skipped_traces_count ?? 0
   const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
+  const hasGasProfile = gasProfile !== undefined && gasProfile.total_gas > 0
   const shouldShowTraceSelector =
     activeTab !== "info" &&
+    activeTab !== "profile" &&
     trace !== undefined &&
     (trace.traces.length > 1 || skippedTracesCount > 0)
 
@@ -596,7 +605,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     localStorage.setItem(`selectedTraceIndex:${test.suite_name}::${test.name}`, index.toString())
   }
 
-  const handleTabChange = (tab: "info" | "logs" | "transactions") => {
+  useEffect(() => {
+    if (activeTab === "profile" && !hasGasProfile) {
+      setActiveTab("info")
+      localStorage.setItem("activeTab", "info")
+    }
+  }, [activeTab, hasGasProfile])
+
+  const handleTabChange = (tab: TestDetailsTab) => {
     setActiveTab(tab)
     localStorage.setItem("activeTab", tab)
   }
@@ -962,6 +978,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       )
     }
 
+    if (activeTab === "profile") {
+      return hasGasProfile ? (
+        <div className={styles.profileTab}>
+          <GasProfile profile={gasProfile} projectRoot={projectRoot} />
+        </div>
+      ) : (
+        <div className={styles.empty}>No gas profile samples were recorded for this test</div>
+      )
+    }
+
     if (trace && trace.traces.length === 0 && skippedTracesCount > 0) {
       return <div className={styles.empty}>{skippedTraceLabel}</div>
     }
@@ -1143,6 +1169,15 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           >
             Logs
           </button>
+          {hasGasProfile && (
+            <button
+              type="button"
+              className={`${styles.tabTrigger} ${activeTab === "profile" ? styles.activeTabTrigger : ""}`}
+              onClick={() => handleTabChange("profile")}
+            >
+              Profile
+            </button>
+          )}
         </div>
       </div>
 

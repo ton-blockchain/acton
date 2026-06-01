@@ -5,9 +5,17 @@ import {select} from "d3-selection"
 
 import styles from "./GasProfile.module.css"
 
-export interface GasProfileReport {
+export interface GasProfileData {
   readonly total_gas: number
   readonly contracts: readonly GasProfileContract[]
+}
+
+export interface GasProfileReport extends GasProfileData {
+  readonly tests?: readonly GasProfileTestReport[]
+}
+
+export interface GasProfileTestReport extends GasProfileData {
+  readonly name: string
 }
 
 interface GasProfileContract {
@@ -30,7 +38,7 @@ interface GasProfileFrame {
 }
 
 interface GasProfileProps {
-  readonly profile: GasProfileReport
+  readonly profile: GasProfileData
   readonly projectRoot?: string
 }
 

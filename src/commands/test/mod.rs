@@ -1163,6 +1163,19 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = Arc::new(result.source_map.unwrap_or_default());
     let abi = result.abi.map(Arc::new);
+    if config.coverage || (config.gas_profile.is_some() && config.gas_profile_include_tests) {
+        let build_path = Path::new(filepath).absolutize()?.to_path_buf();
+        let display_name = extract_suite_name(&build_path);
+        runner.build_cache.memoize(
+            display_name.as_ref(),
+            display_name.as_ref(),
+            &build_path,
+            &result.code_boc64,
+            *code_cell.repr_hash(),
+            source_map.clone(),
+            abi.clone(),
+        );
+    }
     let tests = attach_test_parameter_metadata(tests, abi.as_deref());
     let stats = run_file_tests(runner, filepath, tests, &code_cell, abi, source_map)?;
     Ok(stats)
@@ -1441,18 +1454,6 @@ fn run_file_tests(
                 for get_result in executed_get_methods {
                     runner.emulations.save_get_method(&test.name, get_result);
                 }
-
-                // TODO: remove this memoize somehow
-                let code_boc64 = Boc::encode_base64(code);
-                runner.build_cache.memoize(
-                    &test.name,
-                    &test.name,
-                    &file_path,
-                    &code_boc64,
-                    *code.repr_hash(),
-                    source_map.clone(),
-                    abi.clone(),
-                );
             }
         }
 

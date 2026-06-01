@@ -254,12 +254,34 @@ get fun `test-profiled-unknown-opcode`() {
 "#;
 
 const GAS_PROFILED_UNIT_TEST: &str = r"
-fun add(a: int, b: int): int {
-    return a + b;
+struct X {
+    seed: int
 }
 
-get fun `test gas profile`() {
-    add(2, 3);
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    if (result == 0) {
+        throw 901;
+    }
 }
 ";
 

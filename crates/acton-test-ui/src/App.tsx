@@ -1,5 +1,5 @@
 import * as React from "react"
-import {useCallback, useEffect, useRef, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {FiChevronRight, FiWifiOff} from "react-icons/fi"
 
 import type {TestReport, Trace} from "@acton/shared-ui"
@@ -368,6 +368,14 @@ export const App: React.FC = () => {
     handleActiveViewChange,
   ])
 
+  const selectedTestGasProfile = useMemo(() => {
+    if (selectedTest === undefined) {
+      return
+    }
+
+    return gasProfile?.tests?.find(profile => profile.name === selectedTest.name)
+  }, [gasProfile, selectedTest])
+
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>
   }
@@ -482,6 +490,7 @@ export const App: React.FC = () => {
               traceError={currentTraceError}
               isTraceLoading={isCurrentTraceLoading}
               projectRoot={projectRoot}
+              gasProfile={selectedTestGasProfile}
             />
           ) : (
             <div className={styles.noSelection}>Select a test to see details</div>

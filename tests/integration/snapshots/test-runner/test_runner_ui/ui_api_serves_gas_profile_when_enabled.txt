@@ -8,4 +8,12 @@ frames_include_entrypoint: true
 frames_include_prefixed_entrypoint: false
 frames_include_level_one: true
 frames_include_leaf: true
+test_profiles: 1
+first_test_name: test ui gas profile deep stack
+first_test_gas_positive: true
+first_test_contracts: 1
+first_test_contract_name: deep
+test_frames_include_entrypoint: true
+test_frames_include_level_one: true
+test_frames_include_leaf: true
 profile_file_exists: true

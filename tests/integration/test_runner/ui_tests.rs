@@ -115,6 +115,38 @@ get fun `test ui gas profile deep stack`() {
 }
 "#;
 
+const GAS_PROFILED_UNIT_HELPER_TEST: &str = r#"
+import "@acton/testing/expect"
+
+struct X {
+    seed: int
+}
+
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test ui gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    expect(result).toNotEqual(0);
+}
+"#;
+
 fn ui_deploy_test_source(test_name: &str) -> String {
     ui_deploy_test_source_for_contract(test_name, "simple")
 }
@@ -475,10 +507,29 @@ fn ui_api_serves_gas_profile_when_enabled() {
         .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
         .filter_map(|frame| frame["function_name"].as_str())
         .collect::<Vec<_>>();
+    let test_profiles = profile["tests"]
+        .as_array()
+        .expect("gas profile should include per-test profiles");
+    let first_test_profile = test_profiles
+        .first()
+        .expect("gas profile should include a test profile");
+    let test_contracts = first_test_profile["contracts"]
+        .as_array()
+        .expect("test gas profile should include contracts");
+    let first_test_contract = test_contracts
+        .first()
+        .expect("test gas profile should include a contract");
+    let test_frame_names = first_test_contract["samples"]
+        .as_array()
+        .expect("test gas profile contract should include samples")
+        .iter()
+        .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
+        .filter_map(|frame| frame["function_name"].as_str())
+        .collect::<Vec<_>>();
 
     assert_ui_api_snapshot(
         format!(
-            "status: {status}\ntotal_gas_positive: {}\ncontracts: {}\nfirst_contract_name: {}\nfirst_contract_gas_positive: {}\nfirst_contract_sample_count_positive: {}\nframes_include_entrypoint: {}\nframes_include_prefixed_entrypoint: {}\nframes_include_level_one: {}\nframes_include_leaf: {}\nprofile_file_exists: {}\n",
+            "status: {status}\ntotal_gas_positive: {}\ncontracts: {}\nfirst_contract_name: {}\nfirst_contract_gas_positive: {}\nfirst_contract_sample_count_positive: {}\nframes_include_entrypoint: {}\nframes_include_prefixed_entrypoint: {}\nframes_include_level_one: {}\nframes_include_leaf: {}\ntest_profiles: {}\nfirst_test_name: {}\nfirst_test_gas_positive: {}\nfirst_test_contracts: {}\nfirst_test_contract_name: {}\ntest_frames_include_entrypoint: {}\ntest_frames_include_level_one: {}\ntest_frames_include_leaf: {}\nprofile_file_exists: {}\n",
             profile["total_gas"].as_u64().is_some_and(|gas| gas > 0),
             contracts.len(),
             first_contract["name"].as_str().unwrap_or("<missing>"),
@@ -492,9 +543,107 @@ fn ui_api_serves_gas_profile_when_enabled() {
             frame_names.contains(&"deep:onInternalMessage"),
             frame_names.contains(&"profileLevelOne"),
             frame_names.contains(&"profileLeaf"),
+            test_profiles.len(),
+            first_test_profile["name"].as_str().unwrap_or("<missing>"),
+            first_test_profile["total_gas"]
+                .as_u64()
+                .is_some_and(|gas| gas > 0),
+            test_contracts.len(),
+            first_test_contract["name"].as_str().unwrap_or("<missing>"),
+            test_frame_names.contains(&"onInternalMessage"),
+            test_frame_names.contains(&"profileLevelOne"),
+            test_frame_names.contains(&"profileLeaf"),
             project.path().join("gas.cpuprofile").exists(),
         ),
         "integration/snapshots/test-runner/test_runner_ui/ui_api_serves_gas_profile_when_enabled.txt",
+    );
+}
+
+#[test]
+fn ui_api_serves_unit_profile_when_include_tests_enabled() {
+    let project = ProjectBuilder::new("f-ui-gas-profile-include-tests")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_HELPER_TEST)
+        .build();
+
+    let port = unused_ui_port();
+    let base_url = format!("http://127.0.0.1:{port}");
+    let mut process = spawn_test_ui_with_args(
+        &project,
+        port,
+        &[
+            "--gas-profile",
+            "gas.cpuprofile",
+            "--gas-profile-include-tests",
+        ],
+    );
+    wait_for_test_ui(&mut process, &base_url);
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(format!("{base_url}/api/gas-profile"))
+        .send()
+        .expect("should fetch UI gas profile");
+    let status = response.status();
+    let profile: Value = response
+        .json()
+        .expect("gas profile response should be JSON");
+    let test_profiles = profile["tests"]
+        .as_array()
+        .expect("gas profile should include per-test profiles");
+    let unit_test_profile = test_profiles
+        .iter()
+        .find(|test| test["name"].as_str() == Some("test ui gas profile heavy unit helper"))
+        .expect("gas profile should include the unit test profile");
+    let test_contracts = unit_test_profile["contracts"]
+        .as_array()
+        .expect("unit test gas profile should include contracts");
+    let tests_contract = test_contracts
+        .iter()
+        .find(|contract| contract["name"].as_str() == Some("Tests"))
+        .expect("unit test gas profile should include the Tests contract group");
+    let frame_names = tests_contract["samples"]
+        .as_array()
+        .expect("Tests contract should include samples")
+        .iter()
+        .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
+        .filter_map(|frame| frame["function_name"].as_str())
+        .collect::<Vec<_>>();
+    let frame_urls = tests_contract["samples"]
+        .as_array()
+        .expect("Tests contract should include samples")
+        .iter()
+        .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
+        .filter_map(|frame| frame["url"].as_str())
+        .collect::<Vec<_>>();
+    let has_acton_runtime_source = frame_urls.iter().any(|url| {
+        url.contains("@acton/")
+            || url.contains("/.acton/")
+            || url.contains("/lib/testing/")
+            || url.contains("/lib/emulation/")
+    });
+
+    assert_ui_api_snapshot(
+        format!(
+            "status: {status}\ntotal_gas_positive: {}\ntest_profiles: {}\nunit_test_name: {}\nunit_test_gas_positive: {}\nunit_test_contracts: {}\ntests_contract_gas_positive: {}\nframes_include_test_method: {}\nframes_include_create: {}\nframes_include_heavy_job: {}\nframes_include_mix: {}\nframes_include_acton_runtime_source: {}\nprofile_file_exists: {}\n",
+            profile["total_gas"].as_u64().is_some_and(|gas| gas > 0),
+            test_profiles.len(),
+            unit_test_profile["name"].as_str().unwrap_or("<missing>"),
+            unit_test_profile["total_gas"]
+                .as_u64()
+                .is_some_and(|gas| gas > 0),
+            test_contracts.len(),
+            tests_contract["total_gas"]
+                .as_u64()
+                .is_some_and(|gas| gas > 0),
+            frame_names.contains(&"test ui gas profile heavy unit helper"),
+            frame_names.contains(&"X.create"),
+            frame_names.contains(&"X.heavyJob"),
+            frame_names.contains(&"X.mix"),
+            has_acton_runtime_source,
+            project.path().join("gas.cpuprofile").exists(),
+        ),
+        "integration/snapshots/test-runner/test_runner_ui/ui_api_serves_unit_test_gas_profile_when_include_tests_enabled.txt",
     );
 }
 

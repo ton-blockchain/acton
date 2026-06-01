@@ -930,6 +930,47 @@ fn build_collapsed_profile(execution_samples: &[ProfileExecutionSamples]) -> Str
 }
 
 fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasProfileReport {
+    let (total_gas, contracts) =
+        build_ui_gas_profile_contracts(execution_samples.iter(), UiGasProfileFrameFilter::All);
+    let mut executions_by_test = BTreeMap::<String, Vec<&ProfileExecutionSamples>>::new();
+
+    for execution in execution_samples {
+        if execution.samples.is_empty() {
+            continue;
+        }
+
+        executions_by_test
+            .entry(execution.test_name.clone())
+            .or_default()
+            .push(execution);
+    }
+
+    let tests = executions_by_test
+        .into_iter()
+        .filter_map(|(name, executions)| {
+            let (total_gas, contracts) = build_ui_gas_profile_contracts(
+                executions,
+                UiGasProfileFrameFilter::ExcludeActonRuntime,
+            );
+            (total_gas > 0).then_some(UiGasProfileTestReport {
+                name,
+                total_gas,
+                contracts,
+            })
+        })
+        .collect();
+
+    UiGasProfileReport {
+        total_gas,
+        contracts,
+        tests,
+    }
+}
+
+fn build_ui_gas_profile_contracts<'a>(
+    execution_samples: impl IntoIterator<Item = &'a ProfileExecutionSamples>,
+    frame_filter: UiGasProfileFrameFilter,
+) -> (u64, Vec<UiGasProfileContract>) {
     let mut contracts = BTreeMap::<String, UiGasProfileContract>::new();
 
     for execution in execution_samples {
@@ -954,24 +995,16 @@ fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasP
                 });
 
         for sample in &execution.samples {
+            let Some(frames) = build_ui_sample_frames(sample, &contract_prefix, frame_filter)
+            else {
+                continue;
+            };
+
             contract.total_gas += sample.weight;
             contract.sample_count += 1;
             contract.samples.push(UiGasProfileSample {
                 weight: sample.weight,
-                frames: sample
-                    .frames
-                    .iter()
-                    .map(|frame| UiGasProfileFrame {
-                        function_name: frame
-                            .function_name
-                            .strip_prefix(&contract_prefix)
-                            .unwrap_or(&frame.function_name)
-                            .to_string(),
-                        url: frame.url.clone(),
-                        line_number: frame.line_number,
-                        column_number: frame.column_number,
-                    })
-                    .collect(),
+                frames,
             });
         }
     }
@@ -984,10 +1017,59 @@ fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasP
             .then_with(|| a.name.cmp(&b.name))
     });
 
-    UiGasProfileReport {
-        total_gas,
-        contracts,
+    (total_gas, contracts)
+}
+
+#[derive(Clone, Copy)]
+enum UiGasProfileFrameFilter {
+    All,
+    ExcludeActonRuntime,
+}
+
+fn build_ui_sample_frames(
+    sample: &ProfileSample,
+    contract_prefix: &str,
+    frame_filter: UiGasProfileFrameFilter,
+) -> Option<Vec<UiGasProfileFrame>> {
+    let exclude_acton_runtime =
+        matches!(frame_filter, UiGasProfileFrameFilter::ExcludeActonRuntime);
+    if exclude_acton_runtime
+        && sample
+            .frames
+            .last()
+            .is_some_and(|frame| is_acton_profile_source(&frame.url))
+    {
+        return None;
     }
+
+    let frames = sample
+        .frames
+        .iter()
+        .filter(|frame| !exclude_acton_runtime || !is_acton_profile_source(&frame.url))
+        .map(|frame| UiGasProfileFrame {
+            function_name: frame
+                .function_name
+                .strip_prefix(contract_prefix)
+                .unwrap_or(&frame.function_name)
+                .to_string(),
+            url: frame.url.clone(),
+            line_number: frame.line_number,
+            column_number: frame.column_number,
+        })
+        .collect::<Vec<_>>();
+
+    (!frames.is_empty()).then_some(frames)
+}
+
+fn is_acton_profile_source(url: &str) -> bool {
+    let normalized = url.replace('\\', "/");
+    let manifest_lib = format!("{}/lib/", env!("CARGO_MANIFEST_DIR").replace('\\', "/"));
+
+    normalized == "@acton"
+        || normalized.starts_with("@acton/")
+        || normalized.contains("/@acton/")
+        || normalized.contains("/.acton/")
+        || normalized.starts_with(&manifest_lib)
 }
 
 fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput> {
@@ -1013,6 +1095,7 @@ fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput>
                 };
 
                 executions.push(ProfileExecutionInput {
+                    test_name: test_name.clone(),
                     vm_log: tx.vm_log.clone(),
                     initial_gas: tx.initial_gas(),
                     source_map: build_result.source_map.clone(),
@@ -1032,6 +1115,7 @@ fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput>
                 };
 
                 executions.push(ProfileExecutionInput {
+                    test_name: test_name.clone(),
                     vm_log: get_result.vm_log.clone(),
                     initial_gas: Some(DEFAULT_GET_METHOD_GAS_LIMIT as u64),
                     source_map: build_result.source_map.clone(),
@@ -1050,6 +1134,7 @@ fn collect_profile_execution_samples(
     executions
         .iter()
         .map(|execution| ProfileExecutionSamples {
+            test_name: execution.test_name.clone(),
             contract_display_name: execution.contract_display_name.clone(),
             samples: collect_execution_samples(execution),
         })
@@ -1173,6 +1258,7 @@ fn build_profile_frames(
 
 #[derive(Debug, Clone)]
 struct ProfileExecutionInput {
+    test_name: String,
     vm_log: Arc<str>,
     initial_gas: Option<u64>,
     source_map: Arc<SourceMap>,
@@ -1181,6 +1267,7 @@ struct ProfileExecutionInput {
 
 #[derive(Debug, Clone)]
 struct ProfileExecutionSamples {
+    test_name: String,
     contract_display_name: Option<String>,
     samples: Vec<ProfileSample>,
 }
@@ -1208,6 +1295,15 @@ struct ProfileFrameSpec {
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct UiGasProfileReport {
+    pub total_gas: u64,
+    pub contracts: Vec<UiGasProfileContract>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tests: Vec<UiGasProfileTestReport>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct UiGasProfileTestReport {
+    pub name: String,
     pub total_gas: u64,
     pub contracts: Vec<UiGasProfileContract>,
 }
