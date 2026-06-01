@@ -153,6 +153,7 @@ Requires \fB\-\-baseline\-snapshot\fR\&.
 Write a gas\-weighted execution profile.
 .sp
 By default, Acton records contract transactions produced by test messages.
+Combine with \fB\-\-ui\fR to browse the profile as a flamegraph in the Test UI.
 .RE
 .sp
 \fB\-\-gas\-profile\-format\fR \fIformat\fR
@@ -166,6 +167,9 @@ Defaults to \fBcpuprofile\fR\&.
 \fB\-\-gas\-profile\-include\-tests\fR
 .RS 4
 Include \fB\&.test.tolk\fR unit\-test get\-method execution in the gas profile.
+.sp
+Use this when the expensive work is called directly from a unit test instead of
+through a contract message transaction.
 .RE
 .SS "Reporting Options"
 .sp
@@ -418,6 +422,12 @@ coverage summaries, files, and annotated source
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile \-\-ui\fR adds a \fBProfile\fR tab to the browser UI; the top\-level
+view is grouped by contract, and selected tests with recorded samples get a
+per\-test profile next to \fBInfo\fR, \fBTransactions\fR, and \fBLogs\fR
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-junit\-path\fR matters when the JUnit reporter is enabled; it defaults to
 \fB[test].junit\-path\fR, or \fBtest\-results\fR when it is not configured
 .RE
@@ -501,6 +511,12 @@ transaction chain
 \h'-04'\(bu\h'+03'\fB\-\-gas\-profile\-format cpuprofile\fR writes Chrome DevTools\-compatible JSON;
 \fB\-\-gas\-profile\-format collapsed\fR writes folded stacks for flamegraph\-style
 tooling
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile\-include\-tests\fR records \fB\&.test.tolk\fR unit\-test get\-method
+execution; the Test UI hides Acton runtime frames from the per\-test profile,
+but exported \fBcpuprofile\fR and \fBcollapsed\fR files remain complete
 .RE
 .sp
 .RS 4
@@ -777,17 +793,27 @@ acton test \-\-gas\-profile build/gas.collapsed \-\-gas\-profile\-format collaps
 .RE
 .sp
 .RS 4
-\h'-04' 9.\h'+01'Run mutation testing for one contract:
+\h'-04' 9.\h'+01'Open Test UI with gas profile flamegraphs:
+.sp
+.RS 4
+.nf
+acton test \-\-gas\-profile build/gas.cpuprofile \-\-ui
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 10.\h'+01'Run mutation testing for one contract:
+.RE
 .sp
 .RS 4
 .nf
 acton test \-\-mutate \-\-mutate\-contract Wallet
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 10.\h'+01'Run mutation testing only for changed lines in the current worktree:
+\h'-04' 11.\h'+01'Run mutation testing only for changed lines in the current worktree:
 .RE
 .sp
 .RS 4
@@ -797,7 +823,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff worktree
 .RE
 .sp
 .RS 4
-\h'-04' 11.\h'+01'Run mutation testing for selected levels on the current branch:
+\h'-04' 12.\h'+01'Run mutation testing for selected levels on the current branch:
 .RE
 .sp
 .RS 4
@@ -808,7 +834,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \(rs
 .RE
 .sp
 .RS 4
-\h'-04' 12.\h'+01'Re\-run one specific mutant from a previous report:
+\h'-04' 13.\h'+01'Re\-run one specific mutant from a previous report:
 .RE
 .sp
 .RS 4
@@ -818,7 +844,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-id 2
 .RE
 .sp
 .RS 4
-\h'-04' 13.\h'+01'Resume an unfinished mutation session:
+\h'-04' 14.\h'+01'Resume an unfinished mutation session:
 .RE
 .sp
 .RS 4
@@ -829,7 +855,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wall
 .RE
 .sp
 .RS 4
-\h'-04' 14.\h'+01'Fail the run when mutation score drops below 85%:
+\h'-04' 15.\h'+01'Fail the run when mutation score drops below 85%:
 .RE
 .sp
 .RS 4
@@ -839,7 +865,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-minimum\-percent
 .RE
 .sp
 .RS 4
-\h'-04' 15.\h'+01'Limit mutation testing to four workers:
+\h'-04' 16.\h'+01'Limit mutation testing to four workers:
 .RE
 .sp
 .RS 4
@@ -849,7 +875,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-workers 4
 .RE
 .sp
 .RS 4
-\h'-04' 16.\h'+01'Debug a forked\-state failure with traces and the UI:
+\h'-04' 17.\h'+01'Debug a forked\-state failure with traces and the UI:
 .RE
 .sp
 .RS 4
@@ -861,7 +887,7 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \(rs
 .RE
 .sp
 .RS 4
-\h'-04' 17.\h'+01'Enforce a gas baseline in CI:
+\h'-04' 18.\h'+01'Enforce a gas baseline in CI:
 .RE
 .sp
 .RS 4

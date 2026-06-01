@@ -114,7 +114,8 @@ OPTIONS
            Write a gas-weighted execution profile.
 
            By default, Acton records contract transactions produced by test
-           messages.
+           messages. Combine with --ui to browse the profile as a flamegraph in
+           the Test UI.
 
        --gas-profile-format format
            Execution profile output format.
@@ -124,6 +125,9 @@ OPTIONS
        --gas-profile-include-tests
            Include .test.tolk unit-test get-method execution in the gas
            profile.
+
+           Use this when the expensive work is called directly from a unit test
+           instead of through a contract message transaction.
 
    Reporting Options
        --reporter format[,format…]_
@@ -318,6 +322,11 @@ REPORTING AND ARTIFACTS
        o  --coverage --ui adds a Coverage tab to the browser UI for browsing
           coverage summaries, files, and annotated source
 
+       o  --gas-profile --ui adds a Profile tab to the browser UI; the
+          top-level view is grouped by contract, and selected tests with
+          recorded samples get a per-test profile next to Info, Transactions,
+          and Logs
+
        o  --junit-path matters when the JUnit reporter is enabled; it defaults
           to [test].junit-path, or test-results when it is not configured
 
@@ -371,6 +380,10 @@ REPORTING AND ARTIFACTS
        o  --gas-profile-format cpuprofile writes Chrome DevTools-compatible
           JSON; --gas-profile-format collapsed writes folded stacks for
           flamegraph-style tooling
+
+       o  --gas-profile-include-tests records .test.tolk unit-test get-method
+          execution; the Test UI hides Acton runtime frames from the per-test
+          profile, but exported cpuprofile and collapsed files remain complete
 
        o  [test.fuzz] applies only to parameterized tests that explicitly opt
           in with @test.fuzz, @test.fuzz(<runs>), or @test.fuzz({ ... })
@@ -537,43 +550,47 @@ EXAMPLES
 
               acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
 
-       9. Run mutation testing for one contract:
+       9. Open Test UI with gas profile flamegraphs:
 
-              acton test --mutate --mutate-contract Wallet
+              acton test --gas-profile build/gas.cpuprofile --ui
 
-       10. Run mutation testing only for changed lines in the current worktree:
+       10. Run mutation testing for one contract:
+
+           acton test --mutate --mutate-contract Wallet
+
+       11. Run mutation testing only for changed lines in the current worktree:
 
            acton test --mutate --mutate-contract Wallet --mutation-diff worktree
 
-       11. Run mutation testing for selected levels on the current branch:
+       12. Run mutation testing for selected levels on the current branch:
 
            acton test --mutate --mutate-contract Wallet --mutation-diff branch \
                                                         --mutation-levels critical,major
 
-       12. Re-run one specific mutant from a previous report:
+       13. Re-run one specific mutant from a previous report:
 
            acton test --mutate --mutate-contract Wallet --mutation-id 2
 
-       13. Resume an unfinished mutation session:
+       14. Resume an unfinished mutation session:
 
            acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 \
                                                         --mutation-diff worktree
 
-       14. Fail the run when mutation score drops below 85%:
+       15. Fail the run when mutation score drops below 85%:
 
            acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
 
-       15. Limit mutation testing to four workers:
+       16. Limit mutation testing to four workers:
 
            acton test --mutate --mutate-contract Wallet --mutation-workers 4
 
-       16. Debug a forked-state failure with traces and the UI:
+       17. Debug a forked-state failure with traces and the UI:
 
            acton test tests/wallet.test.tolk --fork-net testnet \
                                              --fork-block-number 55000000 \
                                              --save-test-trace --ui
 
-       17. Enforce a gas baseline in CI:
+       18. Enforce a gas baseline in CI:
 
            acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff \
                                                                   --reporter console,junit

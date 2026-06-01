@@ -230,6 +230,9 @@ seed = 42
 `fail-on-diff` is applied when running baseline comparison mode with
 `--baseline-snapshot <FILE>`.
 Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
+Combine `--gas-profile <FILE>` with `--ui` to browse the profile as a
+flamegraph in Test UI. Add `--gas-profile-include-tests` when the expensive
+work is executed directly from `.test.tolk` unit-test get methods.
 
 Examples:
 
@@ -244,6 +247,7 @@ gas-profile-include-tests = false
 ```bash
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
 acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+acton test --gas-profile build/gas.cpuprofile --gas-profile-include-tests --ui
 ```
 
 ### Mutation testing options

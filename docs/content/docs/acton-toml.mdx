@@ -382,6 +382,10 @@ CLI flags such as `--mutation-diff`, `--mutation-diff-ref`, `--mutation-levels`,
 
 The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`). Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
 
+Combine them with `ui = true` or `acton test --gas-profile <FILE> --ui` to
+browse flamegraphs in Test UI. Set `gas-profile-include-tests = true` when
+`.test.tolk` unit-test get methods contain the hot path you want to inspect.
+
 ## `[lint]`
 
 Configures the Tolk linter (`acton check`).

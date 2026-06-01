@@ -1,13 +1,13 @@
 ---
-title: "Gas profiling with snapshots"
-description: "Learn how to profile gas and fees of transaction chains with --snapshot and baseline comparison"
+title: "Gas profiling and snapshots"
+description: "Profile gas hot paths, inspect flamegraphs in Test UI, and compare gas snapshots in CI"
 ---
 
-Gas profiling records gas and fee metrics for message opcodes and transaction chains. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs. For source-level hot paths, Acton can also write gas-weighted execution profiles with `--gas-profile`.
+Gas profiling records gas and fee metrics for message opcodes and transaction chains. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs. For source-level hot paths, Acton can also write gas-weighted execution profiles with `--gas-profile` and render them in Test UI.
 
 ## What gets profiled
 
-When profiling is enabled, Acton prints:
+Snapshot profiling tracks aggregate gas and fee metrics:
 
 - Opcode gas usage table: min, max, and avg gas per opcode or message opcode name.
 - Per test gas and fees summary.
@@ -15,7 +15,9 @@ When profiling is enabled, Acton prints:
 
 For chain-level metrics, Acton tracks: transaction count, gas used, gas fee, forward fee, and the total fee.
 
-Profiling is collected after the selected tests pass. If any selected test fails, Acton skips snapshot writing and comparison tables for that run.
+Source-level execution profiles track sampled VM execution stacks and weight each sample by gas delta. They answer questions such as "which function inside this contract consumed gas?" instead of only "which trace consumed gas?"
+
+Profiling artifacts are collected after the selected tests pass. If any selected test fails, Acton skips snapshot writing, comparison tables, and gas profile files for that run.
 
 ## Quick start
 
@@ -110,7 +112,8 @@ acton test --gas-profile build/gas.cpuprofile
 ```
 
 This writes a Chrome DevTools-compatible `.cpuprofile` where sample weights are
-gas deltas. For flamegraph-style tooling, use folded stacks:
+gas deltas rather than elapsed time. For flamegraph-style tooling, use folded
+stacks:
 
 ```bash
 acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
@@ -118,7 +121,34 @@ acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
 
 Execution profiles record contract message transactions by default. Add
 `--gas-profile-include-tests` if you also need `.test.tolk` unit-test get-method
-execution in the profile.
+execution in the profile. This is useful when the expensive work is called
+directly from a unit test:
+
+```tolk
+get fun `test heavy job`() {
+    var x = X.create();
+    x.heavyJob();
+}
+```
+
+### Inspect profiles in Test UI
+
+Run the UI together with a gas profile:
+
+```bash
+acton test --gas-profile build/gas.cpuprofile --ui
+```
+
+Test UI adds a top-level `Profile` tab when a gas profile is available. The
+profile is grouped by contract, and each contract view shows a flamegraph plus
+details for the selected frame: source location, total gas, self gas, and share
+inside the contract.
+
+When `--gas-profile-include-tests` is enabled, tests with recorded unit
+execution also get a `Profile` tab next to `Info`, `Transactions`, and `Logs`.
+That per-test view hides Acton runtime frames from `@acton`/`.acton` paths so
+the test hot path stays focused on user code. Exported `cpuprofile` and
+`collapsed` files remain complete and unfiltered.
 
 ### Fail CI on drift
 
