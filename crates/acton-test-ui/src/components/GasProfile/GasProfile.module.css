@@ -50,7 +50,6 @@
 
 .contractButton:hover {
   color: var(--text-primary);
-  border-color: var(--text-muted);
 }
 
 .contractButton:focus {

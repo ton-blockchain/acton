@@ -103,8 +103,12 @@ const getRelativePath = (filePath: string, projectRoot?: string) => {
     return "unknown source"
   }
 
-  if (projectRoot && filePath.startsWith(projectRoot)) {
-    return filePath.slice(projectRoot.length) || filePath
+  const normalizedProjectRoot = projectRoot?.replace(/\/+$/, "")
+  if (
+    normalizedProjectRoot &&
+    (filePath === normalizedProjectRoot || filePath.startsWith(`${normalizedProjectRoot}/`))
+  ) {
+    return filePath.slice(normalizedProjectRoot.length + 1) || filePath
   }
 
   const pathSegments = filePath.split("/")

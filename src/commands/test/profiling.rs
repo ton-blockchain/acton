@@ -93,7 +93,10 @@ pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<Option<UiGa
             gas_profile_filename,
         )?;
         if runner.config.ui {
-            ui_gas_profile = Some(build_ui_gas_profile(&execution_samples));
+            ui_gas_profile = Some(build_ui_gas_profile(
+                &execution_samples,
+                &acton_profile_roots(runner),
+            ));
         }
     }
 
@@ -929,9 +932,15 @@ fn build_collapsed_profile(execution_samples: &[ProfileExecutionSamples]) -> Str
     output
 }
 
-fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasProfileReport {
-    let (total_gas, contracts) =
-        build_ui_gas_profile_contracts(execution_samples.iter(), UiGasProfileFrameFilter::All);
+fn build_ui_gas_profile(
+    execution_samples: &[ProfileExecutionSamples],
+    acton_profile_roots: &[String],
+) -> UiGasProfileReport {
+    let (total_gas, contracts) = build_ui_gas_profile_contracts(
+        execution_samples.iter(),
+        UiGasProfileFrameFilter::All,
+        acton_profile_roots,
+    );
     let mut executions_by_test = BTreeMap::<String, Vec<&ProfileExecutionSamples>>::new();
 
     for execution in execution_samples {
@@ -951,6 +960,7 @@ fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasP
             let (total_gas, contracts) = build_ui_gas_profile_contracts(
                 executions,
                 UiGasProfileFrameFilter::ExcludeActonRuntime,
+                acton_profile_roots,
             );
             (total_gas > 0).then_some(UiGasProfileTestReport {
                 name,
@@ -970,6 +980,7 @@ fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasP
 fn build_ui_gas_profile_contracts<'a>(
     execution_samples: impl IntoIterator<Item = &'a ProfileExecutionSamples>,
     frame_filter: UiGasProfileFrameFilter,
+    acton_profile_roots: &[String],
 ) -> (u64, Vec<UiGasProfileContract>) {
     let mut contracts = BTreeMap::<String, UiGasProfileContract>::new();
 
@@ -984,22 +995,22 @@ fn build_ui_gas_profile_contracts<'a>(
             .unwrap_or_else(|| "Tests".to_string());
         let contract_prefix = format!("{contract_name}:");
 
-        let contract =
-            contracts
-                .entry(contract_name.clone())
-                .or_insert_with(|| UiGasProfileContract {
-                    name: contract_name.clone(),
-                    total_gas: 0,
-                    sample_count: 0,
-                    samples: Vec::new(),
-                });
-
         for sample in &execution.samples {
-            let Some(frames) = build_ui_sample_frames(sample, &contract_prefix, frame_filter)
+            let Some(frames) =
+                build_ui_sample_frames(sample, &contract_prefix, frame_filter, acton_profile_roots)
             else {
                 continue;
             };
 
+            let contract =
+                contracts
+                    .entry(contract_name.clone())
+                    .or_insert_with(|| UiGasProfileContract {
+                        name: contract_name.clone(),
+                        total_gas: 0,
+                        sample_count: 0,
+                        samples: Vec::new(),
+                    });
             contract.total_gas += sample.weight;
             contract.sample_count += 1;
             contract.samples.push(UiGasProfileSample {
@@ -1030,6 +1041,7 @@ fn build_ui_sample_frames(
     sample: &ProfileSample,
     contract_prefix: &str,
     frame_filter: UiGasProfileFrameFilter,
+    acton_profile_roots: &[String],
 ) -> Option<Vec<UiGasProfileFrame>> {
     let exclude_acton_runtime =
         matches!(frame_filter, UiGasProfileFrameFilter::ExcludeActonRuntime);
@@ -1037,7 +1049,7 @@ fn build_ui_sample_frames(
         && sample
             .frames
             .last()
-            .is_some_and(|frame| is_acton_profile_source(&frame.url))
+            .is_some_and(|frame| is_acton_profile_source(&frame.url, acton_profile_roots))
     {
         return None;
     }
@@ -1045,7 +1057,9 @@ fn build_ui_sample_frames(
     let frames = sample
         .frames
         .iter()
-        .filter(|frame| !exclude_acton_runtime || !is_acton_profile_source(&frame.url))
+        .filter(|frame| {
+            !exclude_acton_runtime || !is_acton_profile_source(&frame.url, acton_profile_roots)
+        })
         .map(|frame| UiGasProfileFrame {
             function_name: frame
                 .function_name
@@ -1061,15 +1075,54 @@ fn build_ui_sample_frames(
     (!frames.is_empty()).then_some(frames)
 }
 
-fn is_acton_profile_source(url: &str) -> bool {
-    let normalized = url.replace('\\', "/");
-    let manifest_lib = format!("{}/lib/", env!("CARGO_MANIFEST_DIR").replace('\\', "/"));
+fn is_acton_profile_source(url: &str, acton_profile_roots: &[String]) -> bool {
+    let normalized = normalize_profile_path(url);
 
     normalized == "@acton"
         || normalized.starts_with("@acton/")
-        || normalized.contains("/@acton/")
         || normalized.contains("/.acton/")
-        || normalized.starts_with(&manifest_lib)
+        || acton_profile_roots
+            .iter()
+            .any(|root| path_is_at_or_under(&normalized, root))
+}
+
+fn acton_profile_roots(runner: &TestRunner) -> Vec<String> {
+    let mut roots = Vec::new();
+
+    if let Some(acton_mapping) = runner
+        .acton_config
+        .mappings()
+        .and_then(|mappings| mappings.get("@acton").cloned())
+    {
+        roots.push(acton_mapping);
+    }
+
+    roots.push(
+        runner
+            .project_root
+            .join(".acton")
+            .to_string_lossy()
+            .into_owned(),
+    );
+    let mut roots = roots
+        .into_iter()
+        .map(|root| normalize_profile_path(&root))
+        .filter(|root| !root.is_empty())
+        .collect::<Vec<_>>();
+    roots.sort();
+    roots.dedup();
+    roots
+}
+
+fn normalize_profile_path(path: &str) -> String {
+    path.replace('\\', "/").trim_end_matches('/').to_string()
+}
+
+fn path_is_at_or_under(path: &str, root: &str) -> bool {
+    path == root
+        || path
+            .strip_prefix(root)
+            .is_some_and(|rest| rest.starts_with('/'))
 }
 
 fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput> {

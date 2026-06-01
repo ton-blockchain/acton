@@ -563,6 +563,7 @@ fn ui_api_serves_gas_profile_when_enabled() {
 fn ui_api_serves_unit_profile_when_include_tests_enabled() {
     let project = ProjectBuilder::new("f-ui-gas-profile-include-tests")
         .contract("simple", SIMPLE_CONTRACT)
+        .mapping("@acton", "../lib")
         .test_file("profile", GAS_PROFILED_UNIT_HELPER_TEST)
         .build();
 
@@ -616,11 +617,21 @@ fn ui_api_serves_unit_profile_when_include_tests_enabled() {
         .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
         .filter_map(|frame| frame["url"].as_str())
         .collect::<Vec<_>>();
+    let acton_mapping_root = project
+        .path()
+        .parent()
+        .expect("project path should have a temp root")
+        .join("lib")
+        .to_string_lossy()
+        .replace('\\', "/");
     let has_acton_runtime_source = frame_urls.iter().any(|url| {
+        let url = url.replace('\\', "/");
         url.contains("@acton/")
             || url.contains("/.acton/")
-            || url.contains("/lib/testing/")
-            || url.contains("/lib/emulation/")
+            || url == acton_mapping_root
+            || url
+                .strip_prefix(&acton_mapping_root)
+                .is_some_and(|rest| rest.starts_with('/'))
     });
 
     assert_ui_api_snapshot(
