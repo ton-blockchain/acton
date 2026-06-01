@@ -2,8 +2,8 @@
   height: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: 0;
+  padding: 0 var(--spacing-md) var(--spacing-md);
   background-color: var(--bg-color);
 }
 
@@ -25,7 +25,7 @@
   gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 8px 16px 8px 0;
+  padding: var(--spacing-sm) var(--spacing-md) var(--spacing-sm) 0;
   scrollbar-width: thin;
   -webkit-overflow-scrolling: touch;
 }
@@ -64,12 +64,15 @@
 }
 
 .viewer {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .flameWrap {
+  position: relative;
+  z-index: 1;
   min-height: 220px;
   max-height: 58%;
   overflow: auto;
@@ -119,14 +122,33 @@
   font-size: var(--font-size-xs);
 }
 
+.connectorLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.connectorLayer line {
+  stroke: var(--border-color);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
 .details {
+  position: relative;
+  z-index: 1;
   width: fit-content;
-  max-width: 100%;
+  max-width: calc(100% - var(--spacing-md));
   min-height: 0;
   overflow: auto;
   margin-top: var(--spacing-md);
+  margin-left: var(--spacing-md);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
   padding: 12px var(--spacing-md);
 }
 
@@ -223,7 +245,7 @@
 
 @media (max-width: 720px) {
   .gasProfile {
-    padding: var(--spacing-sm);
+    padding: 0 var(--spacing-sm) var(--spacing-sm);
   }
 
   .contractSelector {
@@ -236,5 +258,10 @@
     margin-right: 0;
     padding-right: 0;
     border-right: 0;
+  }
+
+  .details {
+    max-width: 100%;
+    margin-left: 0;
   }
 }

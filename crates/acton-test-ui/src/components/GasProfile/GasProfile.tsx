@@ -53,6 +53,18 @@ interface FlameNode {
   readonly children: FlameNode[]
 }
 
+type ConnectorLine = {
+  readonly x1: number
+  readonly y1: number
+  readonly x2: number
+  readonly y2: number
+}
+
+type FrameConnector = {
+  readonly left: ConnectorLine
+  readonly right: ConnectorLine
+}
+
 class MutableFlameNode {
   selfGas = 0
   totalGas = 0
@@ -242,6 +254,11 @@ const findFallbackSourceNode = (root: FlameNode): FlameNode | undefined => {
   return onInternalMessage ?? firstSourceNode
 }
 
+const getFrameDatum = (frame: SVGGElement): FlameGraphDatum | undefined => {
+  return (frame as Readonly<{readonly __data__?: Readonly<{readonly data?: FlameGraphDatum}>}>)
+    .__data__?.data
+}
+
 const updateFrameSeparators = (element: HTMLElement) => {
   const frames = element.querySelectorAll<SVGGElement>(".d3-flame-graph g.frame")
 
@@ -276,33 +293,72 @@ const scheduleFrameSeparatorsUpdate = (element: HTMLElement) => {
   requestAnimationFrame(() => updateFrameSeparators(element))
 }
 
-const findHottestLeafPath = (root: FlameNode): FlameNode[] => {
-  let hottestPath: FlameNode[] = [root]
+const findRenderedFrameById = (
+  element: HTMLElement,
+  selectedFrameId: string,
+): SVGGElement | undefined => {
+  const frames = element.querySelectorAll<SVGGElement>(".d3-flame-graph g.frame")
 
-  const visit = (node: FlameNode, path: FlameNode[]) => {
-    const currentHottest = hottestPath.at(-1)
-    if (currentHottest === undefined || node.selfGas > currentHottest.selfGas) {
-      hottestPath = path
-    }
-
-    for (const child of node.children) {
-      visit(child, [...path, child])
+  for (const frame of frames) {
+    const frameDatum = getFrameDatum(frame)
+    if (frameDatum !== undefined && flameDatumString(frameDatum, "id") === selectedFrameId) {
+      return frame
     }
   }
 
-  visit(root, [root])
-  return hottestPath
+  return undefined
+}
+
+const buildFrameConnector = (
+  viewer: HTMLElement,
+  flameChart: HTMLElement,
+  details: HTMLElement,
+  selectedFrameId: string,
+): FrameConnector | undefined => {
+  const selectedFrameElement = findRenderedFrameById(flameChart, selectedFrameId)
+  const selectedRect = selectedFrameElement?.querySelector<SVGRectElement>("rect")
+  if (selectedRect === undefined || selectedRect === null) {
+    return undefined
+  }
+
+  const viewerRect = viewer.getBoundingClientRect()
+  const frameRect = selectedRect.getBoundingClientRect()
+  const detailsRect = details.getBoundingClientRect()
+  if (frameRect.width <= 0 || frameRect.height <= 0 || detailsRect.width <= 0) {
+    return undefined
+  }
+
+  const frameY = frameRect.bottom - viewerRect.top
+  const detailsY = detailsRect.top - viewerRect.top
+
+  return {
+    left: {
+      x1: detailsRect.left - viewerRect.left,
+      y1: detailsY,
+      x2: frameRect.left - viewerRect.left,
+      y2: frameY,
+    },
+    right: {
+      x1: detailsRect.right - viewerRect.left,
+      y1: detailsY,
+      x2: frameRect.right - viewerRect.left,
+      y2: frameY,
+    },
+  }
 }
 
 export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) => {
   const [selectedContractName, setSelectedContractName] = useState<string | undefined>(
     () => profile.contracts[0]?.name,
   )
+  const viewerRef = useRef<HTMLElement | null>(null)
   const flameContainerRef = useRef<HTMLDivElement | null>(null)
   const flameChartRef = useRef<HTMLDivElement | null>(null)
+  const detailsRef = useRef<HTMLDivElement | null>(null)
   const [flameWidth, setFlameWidth] = useState(0)
   const [selectedFrame, setSelectedFrame] = useState<FlameGraphDatum | undefined>()
   const [selectedStack, setSelectedStack] = useState<readonly string[]>([])
+  const [frameConnector, setFrameConnector] = useState<FrameConnector | undefined>()
 
   const selectedContract = useMemo(() => {
     if (selectedContractName === undefined) {
@@ -350,26 +406,10 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
 
   const flameData = useMemo(() => selectedTree && toFlameGraphDatum(selectedTree), [selectedTree])
 
-  const hottestPath = useMemo(() => {
-    if (selectedTree === undefined) {
-      return []
-    }
-
-    return findHottestLeafPath(selectedTree)
-  }, [selectedTree])
-
-  const hottestNode = hottestPath.at(-1)
-
   useEffect(() => {
-    if (hottestNode === undefined) {
-      setSelectedFrame(undefined)
-      setSelectedStack([])
-      return
-    }
-
-    setSelectedFrame(toFlameGraphDatum(hottestNode))
-    setSelectedStack(hottestPath.map(node => node.name))
-  }, [hottestNode, hottestPath])
+    setSelectedFrame(undefined)
+    setSelectedStack([])
+  }, [selectedTree])
 
   useEffect(() => {
     const element = flameChartRef.current
@@ -434,6 +474,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
     selectedNode === undefined ? 0 : flameDatumNumber(selectedNode, "totalGas")
   const selectedNodeSelfGas =
     selectedNode === undefined ? 0 : flameDatumNumber(selectedNode, "selfGas")
+  const selectedNodeId = selectedNode === undefined ? "" : flameDatumString(selectedNode, "id")
   const selectedNodeName = selectedNode === undefined ? "" : flameDatumString(selectedNode, "name")
   const selectedNodeUrl = selectedNode === undefined ? "" : flameDatumString(selectedNode, "url")
   const selectedNodeSource =
@@ -468,6 +509,55 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
     ? formatPercent(selectedNodeValue, selectedContract.total_gas)
     : "0.0%"
 
+  useEffect(() => {
+    const viewer = viewerRef.current
+    const flameContainer = flameContainerRef.current
+    const flameChartElement = flameChartRef.current
+    const details = detailsRef.current
+
+    if (
+      viewer === null ||
+      flameContainer === null ||
+      flameChartElement === null ||
+      details === null ||
+      selectedNodeId === ""
+    ) {
+      setFrameConnector(undefined)
+      return
+    }
+
+    let animationFrame = 0
+    const scheduleConnectorUpdate = () => {
+      if (animationFrame !== 0) {
+        cancelAnimationFrame(animationFrame)
+      }
+
+      animationFrame = requestAnimationFrame(() => {
+        animationFrame = 0
+        setFrameConnector(buildFrameConnector(viewer, flameChartElement, details, selectedNodeId))
+      })
+    }
+
+    const resizeObserver = new ResizeObserver(scheduleConnectorUpdate)
+    resizeObserver.observe(viewer)
+    resizeObserver.observe(flameContainer)
+    resizeObserver.observe(details)
+    window.addEventListener("resize", scheduleConnectorUpdate)
+    flameContainer.addEventListener("scroll", scheduleConnectorUpdate, {passive: true})
+
+    scheduleConnectorUpdate()
+
+    return () => {
+      if (animationFrame !== 0) {
+        cancelAnimationFrame(animationFrame)
+      }
+
+      resizeObserver.disconnect()
+      window.removeEventListener("resize", scheduleConnectorUpdate)
+      flameContainer.removeEventListener("scroll", scheduleConnectorUpdate)
+    }
+  }, [flameWidth, selectedNodeId])
+
   if (profile.contracts.length === 0 || profile.total_gas === 0) {
     return <div className={styles.emptyState}>No gas profile samples were recorded.</div>
   }
@@ -493,7 +583,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
       </div>
 
       <div className={styles.workspace}>
-        <section className={styles.viewer}>
+        <section className={styles.viewer} ref={viewerRef}>
           {selectedContract === undefined || selectedTree === undefined ? (
             <div className={styles.emptyState}>Select a contract to inspect its gas profile.</div>
           ) : (
@@ -512,37 +602,55 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
               </div>
 
               {selectedNode !== undefined && (
-                <div className={styles.details}>
-                  <nav className={styles.stackPath} aria-label="Call stack">
-                    {selectedStack.map((part, index) => (
-                      <span key={`${part}-${index}`} className={styles.stackPart}>
-                        {part}
-                      </span>
-                    ))}
-                  </nav>
-                  <div className={styles.detailsHeader}>
-                    <div className={styles.detailsTitle} title={selectedNodeName}>
-                      {selectedNodeName}
+                <>
+                  {frameConnector !== undefined && (
+                    <svg className={styles.connectorLayer} aria-hidden="true">
+                      <line
+                        x1={frameConnector.left.x1}
+                        y1={frameConnector.left.y1}
+                        x2={frameConnector.left.x2}
+                        y2={frameConnector.left.y2}
+                      />
+                      <line
+                        x1={frameConnector.right.x1}
+                        y1={frameConnector.right.y1}
+                        x2={frameConnector.right.x2}
+                        y2={frameConnector.right.y2}
+                      />
+                    </svg>
+                  )}
+                  <div className={styles.details} ref={detailsRef}>
+                    <nav className={styles.stackPath} aria-label="Call stack">
+                      {selectedStack.map((part, index) => (
+                        <span key={`${part}-${index}`} className={styles.stackPart}>
+                          {part}
+                        </span>
+                      ))}
+                    </nav>
+                    <div className={styles.detailsHeader}>
+                      <div className={styles.detailsTitle} title={selectedNodeName}>
+                        {selectedNodeName}
+                      </div>
+                      <div className={styles.detailsLocation} title={selectedNodeSourceUrl}>
+                        {selectedNodeLocation}
+                      </div>
                     </div>
-                    <div className={styles.detailsLocation} title={selectedNodeSourceUrl}>
-                      {selectedNodeLocation}
+                    <div className={styles.metricGrid}>
+                      <div className={styles.metric}>
+                        <span>Total</span>
+                        <strong>{formatGas(selectedNodeValue)}</strong>
+                      </div>
+                      <div className={styles.metric}>
+                        <span>Self</span>
+                        <strong>{formatGas(selectedNodeSelfGas)}</strong>
+                      </div>
+                      <div className={styles.metric}>
+                        <span>Contract Share</span>
+                        <strong>{selectedNodeShare}</strong>
+                      </div>
                     </div>
                   </div>
-                  <div className={styles.metricGrid}>
-                    <div className={styles.metric}>
-                      <span>Total</span>
-                      <strong>{formatGas(selectedNodeValue)}</strong>
-                    </div>
-                    <div className={styles.metric}>
-                      <span>Self</span>
-                      <strong>{formatGas(selectedNodeSelfGas)}</strong>
-                    </div>
-                    <div className={styles.metric}>
-                      <span>Contract Share</span>
-                      <strong>{selectedNodeShare}</strong>
-                    </div>
-                  </div>
-                </div>
+                </>
               )}
             </>
           )}
