@@ -133,6 +133,15 @@ export interface V3TransactionsResponse {
   readonly transactions: readonly V3TransactionListItem[]
 }
 
+export type StreamingFinality = "pending" | "confirmed" | "finalized"
+
+export interface StreamingTransactionsEvent {
+  readonly type: "transactions"
+  readonly finality: StreamingFinality
+  readonly trace_external_hash_norm?: string
+  readonly transactions: readonly V3Transaction[]
+}
+
 export interface V3TransactionListItem {
   readonly account: string
   readonly hash: string

@@ -11,6 +11,7 @@ import type {
   LocalnetNodeInfo,
   NftItem,
   StartupWallet,
+  StreamingTransactionsEvent,
   Transaction,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
@@ -29,6 +30,11 @@ interface FaucetResponse {
   readonly ok?: boolean
   readonly success?: boolean
   readonly error?: string
+}
+
+interface TransactionStreamHandlers {
+  readonly onTransactions: (event: StreamingTransactionsEvent) => void
+  readonly onError?: (error: Error) => void
 }
 
 export class TonClient {
@@ -68,6 +74,12 @@ export class TonClient {
     url.searchParams.append("address", address)
     url.searchParams.append("limit", limit.toString())
     return this.request(url, "Failed to fetch transactions")
+  }
+
+  subscribeAccountTransactions(address: string, handlers: TransactionStreamHandlers): () => void {
+    const controller = new AbortController()
+    void this.readAccountTransactionStream(address, handlers, controller.signal)
+    return () => controller.abort()
   }
 
   async getJettonMasters(address?: string[], limit = 100, offset = 0): Promise<JettonMaster[]> {
@@ -371,6 +383,112 @@ export class TonClient {
     return new URL(`${fullBase}${path}`)
   }
 
+  private buildStreamingSseUrl(): URL {
+    const url = this.buildUrl(this.v2BaseUrl, "")
+    const apiRoot = url.pathname.replace(/\/$/, "").replace(/\/v2$/, "")
+    url.pathname = `${apiRoot}/streaming/v2/sse`
+    url.search = ""
+    url.hash = ""
+    return url
+  }
+
+  private async readAccountTransactionStream(
+    address: string,
+    handlers: TransactionStreamHandlers,
+    signal: AbortSignal,
+  ): Promise<void> {
+    try {
+      const url = this.buildStreamingSseUrl()
+      const response = await fetch(
+        url.toString(),
+        this.withToncenterApiKey(url, {
+          method: "POST",
+          headers: {
+            Accept: "text/event-stream",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            addresses: [address],
+            types: ["transactions"],
+            min_finality: "confirmed",
+          }),
+          signal,
+        }),
+      )
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "")
+        throw new Error(body || `Streaming subscription failed with status ${response.status}`)
+      }
+      if (!response.body) {
+        throw new Error("Streaming subscription returned an empty body")
+      }
+
+      await this.readSseEvents(response.body, value => {
+        if (isStreamingTransactionsEvent(value)) {
+          handlers.onTransactions(value)
+        }
+      })
+    } catch (error) {
+      if (signal.aborted) return
+      handlers.onError?.(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+
+  private async readSseEvents(
+    body: ReadableStream<Uint8Array>,
+    onEvent: (value: unknown) => void,
+  ): Promise<void> {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let dataLines: string[] = []
+
+    const dispatch = () => {
+      if (dataLines.length === 0) {
+        return
+      }
+
+      const data = dataLines.join("\n")
+      dataLines = []
+      try {
+        onEvent(JSON.parse(data) as unknown)
+      } catch (error) {
+        console.debug("Failed to parse streaming event", error)
+      }
+    }
+
+    const processLine = (line: string) => {
+      if (line.length === 0) {
+        dispatch()
+        return
+      }
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart())
+      }
+    }
+
+    while (true) {
+      const {value, done} = await reader.read()
+      if (done) {
+        buffer += decoder.decode()
+        break
+      }
+
+      buffer += decoder.decode(value, {stream: true})
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        processLine(line)
+      }
+    }
+
+    if (buffer.length > 0) {
+      processLine(buffer)
+    }
+    dispatch()
+  }
+
   private async request<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
     const dedupeKey = this.pendingRequestKey(url, options)
     if (dedupeKey) {
@@ -519,4 +637,19 @@ export class TonClient {
       return undefined
     }
   }
+}
+
+function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const event = value as Partial<StreamingTransactionsEvent>
+  return (
+    event.type === "transactions" &&
+    (event.finality === "pending" ||
+      event.finality === "confirmed" ||
+      event.finality === "finalized") &&
+    Array.isArray(event.transactions)
+  )
 }

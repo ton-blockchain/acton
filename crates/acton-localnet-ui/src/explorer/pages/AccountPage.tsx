@@ -4,6 +4,7 @@ import {useLocation, useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {
+  AccountStatesResponse,
   AccountStateTokenInfo,
   FullAccountState,
   JettonMaster,
@@ -26,6 +27,7 @@ interface AccountPageProps {
 }
 
 const NFT_PLACEHOLDER_IMAGE = "/token-placeholder.svg"
+const ACCOUNT_TRANSACTION_HISTORY_LIMIT = 1000
 type AccountTab = "history" | "contract" | "tokens" | "nfts" | "holders"
 
 export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
@@ -104,15 +106,12 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         const [state, stateV3, txs] = await Promise.all([
           client.getAddressInformation(formattedAddress),
           client.getAccountStates([formattedAddress], false).catch(() => {}),
-          client.getTransactions(formattedAddress),
+          client.getTransactions(formattedAddress, ACCOUNT_TRANSACTION_HISTORY_LIMIT),
         ])
-        const currentAccount = stateV3?.accounts[0]
-        const currentTokenInfo = currentAccount
-          ? (stateV3?.metadata[currentAccount.address]?.token_info ?? [])
-          : []
+        const currentTokenInfo = getAccountTokenInfo(stateV3)
         if (!isActive) return
         setAccountState(state)
-        setAccountStateV3(stateV3?.accounts[0])
+        setAccountStateV3(stateV3 ? stateV3.accounts[0] : undefined)
         setTransactions(txs)
         setAccountTokenInfo(currentTokenInfo)
       } catch (error) {
@@ -141,6 +140,75 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     void load()
     return () => {
       isActive = false
+    }
+  }, [client, formattedAddress])
+
+  useEffect(() => {
+    if (!formattedAddress) {
+      return
+    }
+
+    let isActive = true
+    let refreshInFlight = false
+    let refreshQueued = false
+    const seenTransactionHashes = new Set<string>()
+
+    const refreshAccount = async () => {
+      if (refreshInFlight) {
+        refreshQueued = true
+        return
+      }
+
+      refreshInFlight = true
+      try {
+        do {
+          refreshQueued = false
+          const [nextState, nextStateV3, nextTransactions] = await Promise.all([
+            client.getAddressInformation(formattedAddress),
+            client.getAccountStates([formattedAddress], false).catch(() => {}),
+            client.getTransactions(formattedAddress, ACCOUNT_TRANSACTION_HISTORY_LIMIT),
+          ])
+          if (!isActive) return
+          setAccountState(nextState)
+          setAccountStateV3(nextStateV3 ? nextStateV3.accounts[0] : undefined)
+          setAccountTokenInfo(getAccountTokenInfo(nextStateV3))
+          setTransactions(nextTransactions)
+        } while (refreshQueued && isActive)
+      } catch (error) {
+        if (isActive) {
+          console.error("Failed to refresh account data", error)
+        }
+      } finally {
+        refreshInFlight = false
+      }
+    }
+
+    const unsubscribe = client.subscribeAccountTransactions(formattedAddress, {
+      onTransactions: event => {
+        if (event.finality === "pending") {
+          return
+        }
+
+        const hashes = event.transactions.map(tx => tx.hash).filter(Boolean)
+        const hasUnseenTransaction = hashes.some(hash => !seenTransactionHashes.has(hash))
+        for (const hash of hashes) {
+          seenTransactionHashes.add(hash)
+        }
+
+        if (hasUnseenTransaction) {
+          void refreshAccount()
+        }
+      },
+      onError: error => {
+        if (isActive) {
+          console.debug("Account transaction stream closed", error)
+        }
+      },
+    })
+
+    return () => {
+      isActive = false
+      unsubscribe()
     }
   }, [client, formattedAddress])
 
@@ -653,6 +721,14 @@ function formatJettonAmount(value: string, decimals?: string): string {
   return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
     maximumFractionDigits: decimalsNumber,
   })
+}
+
+function getAccountTokenInfo(
+  stateV3: AccountStatesResponse | void,
+): readonly AccountStateTokenInfo[] {
+  if (!stateV3) return []
+  const currentAccount = stateV3.accounts[0]
+  return currentAccount ? (stateV3.metadata[currentAccount.address]?.token_info ?? []) : []
 }
 
 function tokenInfoString(info: AccountStateTokenInfo | undefined, key: string): string | undefined {

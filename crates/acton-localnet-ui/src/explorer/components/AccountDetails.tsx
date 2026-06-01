@@ -18,6 +18,7 @@ import {
   Filter,
   Image,
   MessageSquare,
+  MoreHorizontal,
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
@@ -68,6 +69,7 @@ interface AccountDetailsProps {
 }
 
 const ITEMS_PER_PAGE = 10
+type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 
 export const AccountDetails: React.FC<AccountDetailsProps> = ({
   transactions,
@@ -232,11 +234,16 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
 
   const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const paginationItems = useMemo(
+    () => getPaginationItems(safeCurrentPage, totalPages),
+    [safeCurrentPage, totalPages],
+  )
 
   useEffect(() => {
     setCurrentPage(1)
@@ -245,6 +252,16 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   useEffect(() => {
     setCurrentPage(page => Math.min(page, totalPages))
   }, [totalPages])
+
+  useEffect(() => {
+    if (activeTab !== "history" || transactions.length === 0) return
+
+    const updateNow = () => setNowSeconds(Math.floor(Date.now() / 1000))
+    updateNow()
+
+    const interval = globalThis.setInterval(updateNow, 5000)
+    return () => globalThis.clearInterval(interval)
+  }, [activeTab, transactions.length])
 
   const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
   const messageNamesByAddress = useMemo(() => {
@@ -330,7 +347,14 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
               {paginatedTransactions.map(tx => {
                 const inMsg = tx.in_msg
                 const inMsgSrc = parseAddress(inMsg.source || "")
-                const isIncoming = inMsgSrc && browsedAddr ? !inMsgSrc.equals(browsedAddr) : false
+                const inMsgDest = parseAddress(inMsg.destination || "")
+                const isInboundToAccount =
+                  inMsgDest && browsedAddr ? inMsgDest.equals(browsedAddr) : false
+                const isIncoming =
+                  isInboundToAccount &&
+                  browsedAddr !== undefined &&
+                  inMsgSrc !== undefined &&
+                  (!inMsgSrc.equals(browsedAddr) || tx.out_msgs.length === 0)
 
                 const inValue = BigInt(tx.in_msg.value || "0")
                 const outValue = tx.out_msgs.reduce(
@@ -371,7 +395,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                     }}
                   >
                     <TableCell className={`${styles.time} ${styles.timeColumn}`}>
-                      {formatTimeAgo(tx.utime)}
+                      {formatTimeAgo(tx.utime, nowSeconds)}
                     </TableCell>
                     <TableCell className={styles.actionColumn}>
                       <div className={styles.action}>
@@ -433,23 +457,25 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                   <ChevronLeft size={16} />
                   Previous
                 </button>
-                {Array.from({length: totalPages}, (_, index) => {
-                  const page = index + 1
-
-                  return (
+                {paginationItems.map(item =>
+                  typeof item === "number" ? (
                     <button
-                      key={page}
+                      key={item}
                       type="button"
                       className={`${styles.paginationPage} ${
-                        page === safeCurrentPage ? styles.paginationPageActive : ""
+                        item === safeCurrentPage ? styles.paginationPageActive : ""
                       }`}
-                      onClick={() => setCurrentPage(page)}
-                      aria-current={page === safeCurrentPage ? "page" : undefined}
+                      onClick={() => setCurrentPage(item)}
+                      aria-current={item === safeCurrentPage ? "page" : undefined}
                     >
-                      {page}
+                      {item}
                     </button>
+                  ) : (
+                    <span key={item} className={styles.paginationEllipsis} aria-hidden="true">
+                      <MoreHorizontal size={16} />
+                    </span>
                   )
-                })}
+                )}
                 <button
                   type="button"
                   className={styles.paginationButton}
@@ -563,6 +589,38 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       )}
     </Card>
   )
+}
+
+function getPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({length: totalPages}, (_, index) => index + 1)
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages]
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "ellipsis-left",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ]
+  }
+
+  return [
+    1,
+    "ellipsis-left",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis-right",
+    totalPages,
+  ]
 }
 
 function resolveMessageName(

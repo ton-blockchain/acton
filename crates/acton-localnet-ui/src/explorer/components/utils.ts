@@ -92,10 +92,13 @@ export function formatNano(nano: string | number): string {
   })
 }
 
-export function formatTimeAgo(utime: number): string {
-  const now = Math.floor(Date.now() / 1000)
-  const diff = now - utime
+export function formatTimeAgo(
+  utime: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): string {
+  const diff = Math.max(0, nowSeconds - utime)
 
+  if (diff === 0) return "right now"
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`
