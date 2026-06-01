@@ -14,6 +14,9 @@ use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
 use tycho_types::cell::HashBytes;
+use tycho_types::models::{
+    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
+};
 
 #[allow(clippy::ptr_arg)]
 pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
@@ -240,6 +243,7 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         .filter(|msg| msg.hash.0 != [0; 32])
         .map(|msg| map_v3_message(msg, &tx.hash, tx.utime, false))
         .collect::<Vec<_>>();
+    let fallback_action_result_code = if tx.success { 0 } else { tx.exit_code };
 
     serde_json::json!({
         "account": tx.address.to_string(),
@@ -254,45 +258,20 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
-            "aborted": !tx.success,
-            "destroyed": false,
-            "credit_first": false,
+            "aborted": tx_details.aborted.unwrap_or(!tx.success),
+            "destroyed": tx_details.destroyed.unwrap_or(false),
+            "credit_first": tx_details.credit_first.unwrap_or(false),
             "is_tock": false,
             "installed": false,
-            "storage_ph": {
-                "storage_fees_collected": tx.storage_fees.to_string(),
-                "status_change": "unchanged",
-            },
-            "compute_ph": {
-                "skipped": false,
-                "success": tx.success,
-                "msg_state_used": false,
-                "account_activated": false,
-                "gas_fees": "0",
-                "gas_used": "0",
-                "gas_limit": "0",
-                "mode": 0,
-                "exit_code": tx.exit_code,
-                "vm_steps": 0,
-                "vm_init_state_hash": zero_hash_base64(),
-                "vm_final_state_hash": zero_hash_base64(),
-            },
-            "action": {
-                "success": tx.success,
-                "valid": true,
-                "no_funds": false,
-                "status_change": "unchanged",
-                "result_code": if tx.success { 0 } else { tx.exit_code },
-                "tot_actions": tx.out_msgs.len(),
-                "spec_actions": 0,
-                "skipped_actions": 0,
-                "msgs_created": tx.out_msgs.len(),
-                "action_list_hash": zero_hash_base64(),
-                "tot_msg_size": {
-                    "cells": "0",
-                    "bits": "0",
-                },
-            }
+            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
+                default_storage_phase(tx.storage_fees)
+            }),
+            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
+                default_compute_phase(false, tx.success, tx.exit_code)
+            }),
+            "action": tx_details.action_phase.unwrap_or_else(|| {
+                default_action_phase(tx.success, fallback_action_result_code, tx.out_msgs.len())
+            })
         },
         "in_msg": in_msg,
         "out_msgs": out_msgs,
@@ -825,6 +804,9 @@ fn map_trace_node(tn: &TraceNode, emulated: bool) -> Value {
 fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
     let tx_details = transaction_details(&tx.tx_boc);
     let trace_external_hash = tx.meta.in_msg_hash.unwrap_or(tx.meta.tx_hash).to_base64();
+    let compute_phase_skipped = tx.meta.compute_exit_code.is_none();
+    let compute_phase_success = tx.meta.compute_exit_code == Some(0);
+    let action_phase_success = tx.meta.action_result_code == Some(0);
 
     serde_json::json!({
         "account": tx.meta.account.to_string(),
@@ -839,45 +821,28 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
         "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
-            "aborted": !tx.meta.success,
-            "destroyed": false,
-            "credit_first": false,
+            "aborted": tx_details.aborted.unwrap_or(!tx.meta.success),
+            "destroyed": tx_details.destroyed.unwrap_or(false),
+            "credit_first": tx_details.credit_first.unwrap_or(false),
             "is_tock": false,
             "installed": false,
-            "storage_ph": {
-                "storage_fees_collected": tx.meta.storage_fees.unwrap_or(0).to_string(),
-                "status_change": "unchanged",
-            },
-            "compute_ph": {
-                "skipped": tx.meta.compute_exit_code.is_none(),
-                "success": tx.meta.compute_exit_code == Some(0),
-                "msg_state_used": false,
-                "account_activated": false,
-                "gas_fees": "0",
-                "gas_used": "0",
-                "gas_limit": "0",
-                "mode": 0,
-                "exit_code": tx.meta.compute_exit_code.unwrap_or(0),
-                "vm_steps": 0,
-                "vm_init_state_hash": zero_hash_base64(),
-                "vm_final_state_hash": zero_hash_base64(),
-            },
-            "action": {
-                "success": tx.meta.action_result_code == Some(0),
-                "valid": true,
-                "no_funds": false,
-                "status_change": "unchanged",
-                "result_code": tx.meta.action_result_code.unwrap_or(0),
-                "tot_actions": tx.out_msgs.len(),
-                "spec_actions": 0,
-                "skipped_actions": 0,
-                "msgs_created": tx.out_msgs.len(),
-                "action_list_hash": zero_hash_base64(),
-                "tot_msg_size": {
-                    "cells": "0",
-                    "bits": "0",
-                },
-            }
+            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
+                default_storage_phase(tx.meta.storage_fees.unwrap_or(0))
+            }),
+            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
+                default_compute_phase(
+                    compute_phase_skipped,
+                    compute_phase_success,
+                    tx.meta.compute_exit_code.unwrap_or(0),
+                )
+            }),
+            "action": tx_details.action_phase.unwrap_or_else(|| {
+                default_action_phase(
+                    action_phase_success,
+                    tx.meta.action_result_code.unwrap_or(0),
+                    tx.out_msgs.len(),
+                )
+            })
         },
         "in_msg": tx.in_msg.as_ref().map(|m| {
             map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, true)
@@ -915,6 +880,12 @@ struct TransactionDetails {
     end_status: &'static str,
     account_state_before_hash: String,
     account_state_after_hash: String,
+    aborted: Option<bool>,
+    destroyed: Option<bool>,
+    credit_first: Option<bool>,
+    storage_phase: Option<Value>,
+    compute_phase: Option<Value>,
+    action_phase: Option<Value>,
 }
 
 impl Default for TransactionDetails {
@@ -926,6 +897,12 @@ impl Default for TransactionDetails {
             end_status: "active",
             account_state_before_hash: zero_hash_base64(),
             account_state_after_hash: zero_hash_base64(),
+            aborted: None,
+            destroyed: None,
+            credit_first: None,
+            storage_phase: None,
+            compute_phase: None,
+            action_phase: None,
         }
     }
 }
@@ -939,6 +916,11 @@ fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
     };
 
     let state_update = transaction.state_update.load().ok();
+    let tx_info = transaction.info.load().ok();
+    let ordinary_info = match tx_info {
+        Some(TxInfo::Ordinary(info)) => Some(info),
+        _ => None,
+    };
 
     TransactionDetails {
         prev_trans_hash: hash_bytes_base64(&transaction.prev_trans_hash),
@@ -951,6 +933,184 @@ fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
         account_state_after_hash: state_update
             .as_ref()
             .map_or_else(zero_hash_base64, |update| hash_bytes_base64(&update.new)),
+        aborted: ordinary_info.as_ref().map(|info| info.aborted),
+        destroyed: ordinary_info.as_ref().map(|info| info.destroyed),
+        credit_first: ordinary_info.as_ref().map(|info| info.credit_first),
+        storage_phase: ordinary_info
+            .as_ref()
+            .map(|info| map_storage_phase(info.storage_phase.as_ref())),
+        compute_phase: ordinary_info
+            .as_ref()
+            .map(|info| map_compute_phase(&info.compute_phase)),
+        action_phase: ordinary_info
+            .as_ref()
+            .and_then(|info| info.action_phase.as_ref())
+            .map(map_action_phase),
+    }
+}
+
+fn default_storage_phase(storage_fees_collected: u128) -> Value {
+    serde_json::json!({
+        "storage_fees_collected": storage_fees_collected.to_string(),
+        "status_change": "unchanged",
+    })
+}
+
+fn map_storage_phase(phase: Option<&tycho_types::models::StoragePhase>) -> Value {
+    let Some(phase) = phase else {
+        return default_storage_phase(0);
+    };
+
+    let mut value = serde_json::json!({
+        "storage_fees_collected": u128::from(phase.storage_fees_collected).to_string(),
+        "status_change": map_account_status_change(phase.status_change),
+    });
+
+    if let Some(storage_fees_due) = phase.storage_fees_due
+        && let Some(root) = value.as_object_mut()
+    {
+        root.insert(
+            "storage_fees_due".to_string(),
+            Value::String(u128::from(storage_fees_due).to_string()),
+        );
+    }
+
+    value
+}
+
+fn default_compute_phase(skipped: bool, success: bool, exit_code: i32) -> Value {
+    serde_json::json!({
+        "skipped": skipped,
+        "success": success,
+        "msg_state_used": false,
+        "account_activated": false,
+        "gas_fees": "0",
+        "gas_used": "0",
+        "gas_limit": "0",
+        "mode": 0,
+        "exit_code": exit_code,
+        "vm_steps": 0,
+        "vm_init_state_hash": zero_hash_base64(),
+        "vm_final_state_hash": zero_hash_base64(),
+    })
+}
+
+fn map_compute_phase(phase: &ComputePhase) -> Value {
+    match phase {
+        ComputePhase::Skipped(phase) => serde_json::json!({
+            "skipped": true,
+            "success": false,
+            "reason": map_compute_skip_reason(phase.reason),
+            "exit_code": 0,
+        }),
+        ComputePhase::Executed(phase) => {
+            let mut value = serde_json::json!({
+                "skipped": false,
+                "success": phase.success,
+                "msg_state_used": phase.msg_state_used,
+                "account_activated": phase.account_activated,
+                "gas_fees": u128::from(phase.gas_fees).to_string(),
+                "gas_used": u64::from(phase.gas_used).to_string(),
+                "gas_limit": u64::from(phase.gas_limit).to_string(),
+                "mode": phase.mode,
+                "exit_code": phase.exit_code,
+                "vm_steps": phase.vm_steps,
+                "vm_init_state_hash": hash_bytes_base64(&phase.vm_init_state_hash),
+                "vm_final_state_hash": hash_bytes_base64(&phase.vm_final_state_hash),
+            });
+
+            if let Some(root) = value.as_object_mut() {
+                if let Some(gas_credit) = phase.gas_credit {
+                    root.insert(
+                        "gas_credit".to_string(),
+                        Value::String(u32::from(gas_credit).to_string()),
+                    );
+                }
+
+                if let Some(exit_arg) = phase.exit_arg {
+                    root.insert("exit_arg".to_string(), Value::from(exit_arg));
+                }
+            }
+
+            value
+        }
+    }
+}
+
+fn default_action_phase(success: bool, result_code: i32, out_msgs_len: usize) -> Value {
+    serde_json::json!({
+        "success": success,
+        "valid": true,
+        "no_funds": false,
+        "status_change": "unchanged",
+        "result_code": result_code,
+        "tot_actions": out_msgs_len,
+        "spec_actions": 0,
+        "skipped_actions": 0,
+        "msgs_created": out_msgs_len,
+        "action_list_hash": zero_hash_base64(),
+        "tot_msg_size": {
+            "cells": "0",
+            "bits": "0",
+        },
+    })
+}
+
+fn map_action_phase(phase: &ActionPhase) -> Value {
+    let mut value = serde_json::json!({
+        "success": phase.success,
+        "valid": phase.valid,
+        "no_funds": phase.no_funds,
+        "status_change": map_account_status_change(phase.status_change),
+        "result_code": phase.result_code,
+        "tot_actions": phase.total_actions,
+        "spec_actions": phase.special_actions,
+        "skipped_actions": phase.skipped_actions,
+        "msgs_created": phase.messages_created,
+        "action_list_hash": hash_bytes_base64(&phase.action_list_hash),
+        "tot_msg_size": {
+            "cells": u64::from(phase.total_message_size.cells).to_string(),
+            "bits": u64::from(phase.total_message_size.bits).to_string(),
+        },
+    });
+
+    if let Some(root) = value.as_object_mut() {
+        if let Some(total_fwd_fees) = phase.total_fwd_fees {
+            root.insert(
+                "total_fwd_fees".to_string(),
+                Value::String(u128::from(total_fwd_fees).to_string()),
+            );
+        }
+
+        if let Some(total_action_fees) = phase.total_action_fees {
+            root.insert(
+                "total_action_fees".to_string(),
+                Value::String(u128::from(total_action_fees).to_string()),
+            );
+        }
+
+        if let Some(result_arg) = phase.result_arg {
+            root.insert("result_arg".to_string(), Value::from(result_arg));
+        }
+    }
+
+    value
+}
+
+const fn map_account_status_change(change: AccountStatusChange) -> &'static str {
+    match change {
+        AccountStatusChange::Unchanged => "unchanged",
+        AccountStatusChange::Frozen => "frozen",
+        AccountStatusChange::Deleted => "deleted",
+    }
+}
+
+const fn map_compute_skip_reason(reason: ComputePhaseSkipReason) -> &'static str {
+    match reason {
+        ComputePhaseSkipReason::NoState => "no_state",
+        ComputePhaseSkipReason::BadState => "bad_state",
+        ComputePhaseSkipReason::NoGas => "no_gas",
+        ComputePhaseSkipReason::Suspended => "suspended",
     }
 }
 

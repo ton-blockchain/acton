@@ -6,7 +6,7 @@ import type {Cell} from "@ton/core"
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {DataBlock, fmt} from "@/index"
-import {decodeStateInitData} from "@/utils/messageBody"
+import {decodeMessageBody, decodeStateInitData} from "@/utils/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -109,6 +109,9 @@ export function TransactionDetails({
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const parsedBody =
+    tx.parsedBody ??
+    (inMessage ? decodeMessageBody(inMessage, contracts, tx.address?.toString()) : undefined)
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
     targetContract,
@@ -258,10 +261,10 @@ export function TransactionDetails({
                 </div>
               </div>
             </div>
-            {tx.parsedBody && hasMessageBody && (
+            {parsedBody && hasMessageBody && (
               <ParsedBodySection
                 key={tx.lt}
-                parsedBody={tx.parsedBody}
+                parsedBody={parsedBody}
                 contracts={contracts}
                 onContractClick={onContractClick}
               />
@@ -499,7 +502,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Total Actions</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                  {fmt.formatNumber(tx.outActions.length)}
+                  {fmt.formatNumber(actionPhase.totalActions)}
                   {tx.outActions.length > 0 && (
                     <button
                       type="button"
