@@ -22,10 +22,10 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), feature = "ui"))]
 use include_dir::{Dir, include_dir};
 use serde_json::json;
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, feature = "ui"))]
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,11 +35,11 @@ use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-#[cfg(debug_assertions)]
+#[cfg(all(debug_assertions, feature = "ui"))]
 use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), feature = "ui"))]
 static UI_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/../acton-localnet-ui/dist");
 
 pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router {
@@ -159,7 +159,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
-    #[cfg(debug_assertions)]
+    #[cfg(all(debug_assertions, feature = "ui"))]
     let app = {
         let dist_path = PathBuf::from(concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -170,7 +170,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         )
     };
 
-    #[cfg(not(debug_assertions))]
+    #[cfg(all(not(debug_assertions), feature = "ui"))]
     let app = app.fallback(handle_embedded_ui);
 
     app.layer(CompressionLayer::new())
@@ -261,7 +261,7 @@ fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -
     }
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(all(not(debug_assertions), feature = "ui"))]
 async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() { "index.html" } else { path };
