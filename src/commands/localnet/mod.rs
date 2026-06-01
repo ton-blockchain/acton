@@ -135,33 +135,48 @@ async fn setup_startup_accounts(
             .collect::<Vec<_>>();
         let version = wallet_version_to_string(wallet.wallet.version).to_owned();
 
-        node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
+        let has_history = node
+            .get_transactions(address.clone(), 1, None, None, None)
             .await
-            .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
+            .ok()
+            .is_some_and(|transactions| !transactions.is_empty());
 
-        let wallet_state = node
-            .get_address_state(address.clone(), None)
-            .await
-            .with_context(|| format!("Failed to fetch state for wallet '{wallet_name}'"))?;
-
-        if wallet_state == AccountStatus::Active {
+        if has_history {
             println!(
-                "      {} wallet {} {}",
-                "Funded".green().bold(),
+                "       {} wallet {} {}",
+                "Found".green().bold(),
                 wallet_name.cyan(),
                 address.as_str().dimmed(),
             );
         } else {
-            let deploy_boc = build_wallet_deploy_message(&wallet)?;
-            node.send_boc(deploy_boc)
+            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
                 .await
-                .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
-            println!(
-                "       {} wallet {} {}",
-                "Ready".green().bold(),
-                wallet_name.cyan(),
-                address.as_str().dimmed(),
-            );
+                .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
+
+            let wallet_state = node
+                .get_address_state(address.clone(), None)
+                .await
+                .with_context(|| format!("Failed to fetch state for wallet '{wallet_name}'"))?;
+
+            if wallet_state == AccountStatus::Active {
+                println!(
+                    "      {} wallet {} {}",
+                    "Funded".green().bold(),
+                    wallet_name.cyan(),
+                    address.as_str().dimmed(),
+                );
+            } else {
+                let deploy_boc = build_wallet_deploy_message(&wallet)?;
+                node.send_boc(deploy_boc)
+                    .await
+                    .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
+                println!(
+                    "       {} wallet {} {}",
+                    "Ready".green().bold(),
+                    wallet_name.cyan(),
+                    address.as_str().dimmed(),
+                );
+            }
         }
 
         startup_wallets.push(StartupWallet {
