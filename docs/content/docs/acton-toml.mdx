@@ -290,6 +290,9 @@ Configures the behavior of `acton test`.
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `gas-profile`               | `string`   | -             | Path to write a gas-weighted execution profile.                        |
+| `gas-profile-format`        | `string`   | `cpuprofile`  | Gas profile output format: `cpuprofile` or `collapsed`.                |
+| `gas-profile-include-tests` | `boolean`  | `false`       | Include `.test.tolk` unit-test get-method execution in the profile.    |
 | `ui`                        | `boolean`  | `false`       | Enable the browser test UI server.                                     |
 | `ui-port`                   | `integer`  | `12344`       | Port for the browser test UI server.                                   |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
@@ -351,6 +354,9 @@ Example:
 reporter = ["console", "junit"]
 fail-fast = true
 fail-on-diff = true
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 
 [test.coverage]
 enabled = true
@@ -374,7 +380,7 @@ rules-file = "mutation-rules.json"
 
 CLI flags such as `--mutation-diff`, `--mutation-diff-ref`, `--mutation-levels`, `--mutation-minimum-percent`, `--mutation-disable-rules`, and `--mutation-rules-file` override these defaults for the current run.
 
-The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
+The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`). Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
 
 ## `[lint]`
 

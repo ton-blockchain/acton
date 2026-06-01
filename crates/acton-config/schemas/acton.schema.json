@@ -350,6 +350,25 @@
         }
       }
     },
+    "GasProfileFormat": {
+      "description": "Gas profile output formats supported by `acton test`",
+      "oneOf": [
+        {
+          "description": "Chrome `DevTools` `.cpuprofile` output",
+          "type": "string",
+          "enum": [
+            "cpuprofile"
+          ]
+        },
+        {
+          "description": "Folded stack output for flamegraph-style tooling",
+          "type": "string",
+          "enum": [
+            "collapsed"
+          ]
+        }
+      ]
+    },
     "LintConfig": {
       "description": "Linter configuration for the project",
       "type": "object",
@@ -798,6 +817,22 @@
               "$ref": "#/definitions/TestFuzzSettings"
             }
           ]
+        },
+        "gas-profile": {
+          "description": "Output path for gas-weighted execution profiling",
+          "type": "string"
+        },
+        "gas-profile-format": {
+          "description": "Export format for gas-weighted execution profiling",
+          "allOf": [
+            {
+              "$ref": "#/definitions/GasProfileFormat"
+            }
+          ]
+        },
+        "gas-profile-include-tests": {
+          "description": "Include `.test.tolk` unit-test execution in the generated gas profile",
+          "type": "boolean"
         },
         "include": {
           "description": "Glob patterns to include in testing",

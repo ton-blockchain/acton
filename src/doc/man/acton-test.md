@@ -155,6 +155,23 @@ Exit non-zero when the current run differs from the baseline snapshot.
 Requires `--baseline-snapshot`.
 {{/option}}
 
+{{#option "`--gas-profile` _path_" }}
+Write a gas-weighted execution profile.
+
+By default, Acton records contract transactions produced by test messages.
+{{/option}}
+
+{{#option "`--gas-profile-format` _format_" }}
+Execution profile output format.
+
+Possible values: `cpuprofile`, `collapsed`.
+Defaults to `cpuprofile`.
+{{/option}}
+
+{{#option "`--gas-profile-include-tests`" }}
+Include `.test.tolk` unit-test get-method execution in the gas profile.
+{{/option}}
+
 {{/options}}
 
 ### Reporting Options
@@ -402,6 +419,11 @@ Acton discovers tests by finding files that end with `.test.tolk`.
   `--save-test-trace` is otherwise absent
 - gas snapshot files are written only to the explicit paths passed to
   `--snapshot` or `--baseline-snapshot`
+- gas execution profiles are written only to the explicit path passed to
+  `--gas-profile`; relative paths are resolved from the project root
+- `--gas-profile-format cpuprofile` writes Chrome DevTools-compatible JSON;
+  `--gas-profile-format collapsed` writes folded stacks for flamegraph-style
+  tooling
 - `[test.fuzz]` applies only to parameterized tests that explicitly opt in with
   `@test.fuzz`, `@test.fuzz(<runs>)`, or `@test.fuzz({ ... })`
 - `--fuzz-seed` overrides `[test.fuzz].seed` for the current run
@@ -447,6 +469,9 @@ reporter = ["console"]
 filter = ".*jetton.*"
 junit-path = "reports"
 junit-merge = false
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 
 [test.fuzz]
 runs = 512
@@ -475,6 +500,8 @@ CLI flags override config values for the current invocation.
 - If both `--snapshot` and `--baseline-snapshot` are provided, Acton runs in
   comparison mode and does not overwrite the snapshot file
 - `--fail-on-diff` requires `--baseline-snapshot`
+- `--gas-profile-format` and `--gas-profile-include-tests` affect output only
+  when `--gas-profile` or `[test].gas-profile` is configured
 - The UI and trace export features are useful for debugging failing tests and
   inspecting transaction trees
 - Test UI writes trace bundles to `build/traces` by default unless
@@ -556,51 +583,57 @@ CLI flags override config values for the current invocation.
    acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff
    ```
 
-8. Run mutation testing for one contract:
+8. Write a collapsed gas execution profile:
+
+   ```bash
+   acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+   ```
+
+9. Run mutation testing for one contract:
 
    ```bash
    acton test --mutate --mutate-contract Wallet
    ```
 
-9. Run mutation testing only for changed lines in the current worktree:
+10. Run mutation testing only for changed lines in the current worktree:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-diff worktree
    ```
 
-10. Run mutation testing for selected levels on the current branch:
+11. Run mutation testing for selected levels on the current branch:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-diff branch \
                                                 --mutation-levels critical,major
    ```
 
-11. Re-run one specific mutant from a previous report:
+12. Re-run one specific mutant from a previous report:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-id 2
    ```
 
-12. Resume an unfinished mutation session:
+13. Resume an unfinished mutation session:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-session-id wallet-pr-42 \
                                                 --mutation-diff worktree
    ```
 
-13. Fail the run when mutation score drops below 85%:
+14. Fail the run when mutation score drops below 85%:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-minimum-percent 85
    ```
 
-14. Limit mutation testing to four workers:
+15. Limit mutation testing to four workers:
 
    ```bash
    acton test --mutate --mutate-contract Wallet --mutation-workers 4
    ```
 
-15. Debug a forked-state failure with traces and the UI:
+16. Debug a forked-state failure with traces and the UI:
 
    ```bash
    acton test tests/wallet.test.tolk --fork-net testnet \
@@ -608,7 +641,7 @@ CLI flags override config values for the current invocation.
                                      --save-test-trace --ui
    ```
 
-16. Enforce a gas baseline in CI:
+17. Enforce a gas baseline in CI:
 
    ```bash
    acton test --baseline-snapshot build/gas-baseline.json --fail-on-diff \

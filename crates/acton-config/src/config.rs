@@ -1,5 +1,6 @@
 use crate::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use anyhow::{Result, anyhow};
 use path_absolutize::Absolutize;
@@ -294,6 +295,13 @@ pub struct TestSettings {
     pub coverage: Option<TestCoverageSettings>,
     /// Default fuzz settings for parameterized tests
     pub fuzz: Option<TestFuzzSettings>,
+    /// Output path for gas-weighted execution profiling
+    pub gas_profile: Option<String>,
+    /// Export format for gas-weighted execution profiling
+    #[schemars(with = "Option<GasProfileFormat>")]
+    pub gas_profile_format: Option<String>,
+    /// Include `.test.tolk` unit-test execution in the generated gas profile
+    pub gas_profile_include_tests: Option<bool>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
@@ -1261,6 +1269,9 @@ impl TestSettings {
         junit_merge_override: bool,
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
+        gas_profile_override: Option<String>,
+        gas_profile_format_override: Option<GasProfileFormat>,
+        gas_profile_include_tests_override: Option<bool>,
         fork_net_override: Option<Network>,
         fork_block_number_override: Option<u64>,
         fork_cache_enabled: bool,
@@ -1338,6 +1349,19 @@ impl TestSettings {
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
+            gas_profile: gas_profile_override.or_else(|| self.gas_profile.clone()),
+            gas_profile_format: gas_profile_format_override.unwrap_or_else(|| {
+                self.gas_profile_format
+                    .as_deref()
+                    .and_then(|format| match format.to_lowercase().as_str() {
+                        "cpuprofile" => Some(GasProfileFormat::Cpuprofile),
+                        "collapsed" => Some(GasProfileFormat::Collapsed),
+                        _ => None,
+                    })
+                    .unwrap_or_default()
+            }),
+            gas_profile_include_tests: gas_profile_include_tests_override
+                .unwrap_or_else(|| self.gas_profile_include_tests.unwrap_or(false)),
             fork_net: fork_net_override.or_else(|| {
                 self.fork_net
                     .as_deref()
@@ -1424,6 +1448,9 @@ mod tests {
             clear_cache_override,
             junit_path_override.map(str::to_owned),
             false,
+            None,
+            None,
+            None,
             None,
             None,
             fork_net_override,

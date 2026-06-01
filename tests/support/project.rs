@@ -71,6 +71,9 @@ pub(crate) struct TestConfig {
     pub coverage_minimum_percent: Option<f64>,
     pub coverage_include_wrappers: Option<bool>,
     pub coverage_include_tests: Option<bool>,
+    pub gas_profile: Option<String>,
+    pub gas_profile_format: Option<String>,
+    pub gas_profile_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
     pub fuzz_runs: Option<usize>,
@@ -85,7 +88,7 @@ pub(crate) struct TestConfig {
 fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+        .is_some_and(|ext| matches!(ext, "json" | "sarif" | "cpuprofile"))
 }
 
 #[allow(dead_code)]
@@ -1058,6 +1061,24 @@ version = "0.1.0"
                 let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
             }
 
+            if let Some(gas_profile) = &config.gas_profile {
+                let _ = writeln!(toml_content, "gas-profile = \"{gas_profile}\"");
+            }
+
+            if let Some(gas_profile_format) = &config.gas_profile_format {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-format = \"{gas_profile_format}\""
+                );
+            }
+
+            if let Some(gas_profile_include_tests) = config.gas_profile_include_tests {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-include-tests = {gas_profile_include_tests}"
+                );
+            }
+
             if config.fuzz_runs.is_some()
                 || config.fuzz_max_test_rejects.is_some()
                 || config.fuzz_seed.is_some()
@@ -1607,6 +1628,24 @@ impl ActonCommand {
     /// Include files under `tests/` and `.test.tolk` files in coverage reports.
     pub(crate) fn with_coverage_include_tests(mut self) -> Self {
         self.cmd = self.cmd.arg("--coverage-include-tests");
+        self
+    }
+
+    /// Write a gas-weighted execution profile.
+    pub(crate) fn with_gas_profile(mut self, file: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile").arg(file);
+        self
+    }
+
+    /// Select the gas profile export format (e.g. "cpuprofile", "collapsed").
+    pub(crate) fn with_gas_profile_format(mut self, format: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-format").arg(format);
+        self
+    }
+
+    /// Include `.test.tolk` unit-test execution in the generated gas profile.
+    pub(crate) fn with_gas_profile_include_tests(mut self) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-include-tests");
         self
     }
 

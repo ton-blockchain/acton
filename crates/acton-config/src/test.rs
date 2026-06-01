@@ -62,6 +62,29 @@ impl std::fmt::Display for CoverageFormat {
     }
 }
 
+/// Gas profile output formats supported by `acton test`
+#[derive(
+    clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema,
+)]
+#[clap(rename_all = "kebab-case")]
+#[serde(rename_all = "kebab-case")]
+pub enum GasProfileFormat {
+    /// Chrome `DevTools` `.cpuprofile` output
+    #[default]
+    Cpuprofile,
+    /// Folded stack output for flamegraph-style tooling
+    Collapsed,
+}
+
+impl std::fmt::Display for GasProfileFormat {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GasProfileFormat::Cpuprofile => write!(f, "cpuprofile"),
+            GasProfileFormat::Collapsed => write!(f, "collapsed"),
+        }
+    }
+}
+
 /// Mutation levels supported by mutation testing filters
 #[derive(
     clap::ValueEnum, Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema, Hash,
@@ -148,6 +171,9 @@ pub struct TestConfig {
     pub junit_merge: bool,
     pub snapshot: Option<String>,
     pub baseline_snapshot: Option<String>,
+    pub gas_profile: Option<String>,
+    pub gas_profile_format: GasProfileFormat,
+    pub gas_profile_include_tests: bool,
     pub fail_on_diff: bool,
     pub fork_net: Option<Network>,
     pub fork_block_number: Option<u64>,
@@ -196,6 +222,9 @@ impl Default for TestConfig {
             junit_merge: false,
             snapshot: None,
             baseline_snapshot: None,
+            gas_profile: None,
+            gas_profile_format: GasProfileFormat::default(),
+            gas_profile_include_tests: false,
             fail_on_diff: false,
             fork_net: None,
             fork_block_number: None,

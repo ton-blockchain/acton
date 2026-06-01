@@ -1,5 +1,7 @@
 use crate::commands::test::TestRunner;
 use acton_config::color::{OwoColorize, colors_enabled};
+use acton_config::test::GasProfileFormat;
+use acton_debug::replayer::{CallFrameInfo, StepMode, Tick, TolkReplayer};
 use chrono;
 use comfy_table::{Cell as TableCell, CellAlignment, Color, ContentArrangement, Table};
 use serde::{Deserialize, Serialize};
@@ -7,61 +9,87 @@ use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tolk_compiler::SourceMap;
 use ton_emulator::emulator::SendMessageResultSuccess;
+use ton_executor::get::DEFAULT_GET_METHOD_GAS_LIMIT;
+use ton_retrace::trace::{Trace, TraceStep};
+use tycho_types::boc::Boc;
 use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
 const SIGNIFICANT_PERCENT_CHANGE: f64 = 5.0;
 
 pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<()> {
-    let gas_per_opcode = collect_opcode_gas(runner);
-    let trace_chain_stats = collect_trace_chain_stats(runner);
+    let collect_snapshot_stats =
+        runner.config.snapshot.is_some() || runner.config.baseline_snapshot.is_some();
 
-    if gas_per_opcode.is_empty() && trace_chain_stats.is_empty() {
-        return Ok(());
+    if collect_snapshot_stats {
+        let gas_per_opcode = collect_opcode_gas(runner);
+        let trace_chain_stats = collect_trace_chain_stats(runner);
+
+        if gas_per_opcode.is_empty() && trace_chain_stats.is_empty() {
+            if runner.config.gas_profile.is_none() {
+                return Ok(());
+            }
+        } else {
+            let current_snapshot = create_gas_snapshot(&gas_per_opcode, &trace_chain_stats)
+                .map_err(|err| anyhow::anyhow!("Failed to create gas snapshot: {err}"))?;
+
+            let baseline_snapshot = if let Some(baseline_path) = &runner.config.baseline_snapshot {
+                Some(
+                    load_gas_snapshot(&runner.project_root, baseline_path).map_err(|err| {
+                        anyhow::anyhow!(
+                            "Failed to load baseline gas snapshot '{baseline_path}': {err}"
+                        )
+                    })?,
+                )
+            } else {
+                None
+            };
+
+            print_opcode_gas_table(
+                &gas_per_opcode,
+                baseline_snapshot.as_ref(),
+                runner.config.baseline_snapshot.as_deref(),
+            );
+            print_trace_chain_table(
+                &trace_chain_stats,
+                baseline_snapshot.as_ref(),
+                runner.config.baseline_snapshot.as_deref(),
+            );
+
+            // we don't want to override previous snapshot in compare mode
+            if let Some(snapshot_filename) = &runner.config.snapshot
+                && runner.config.baseline_snapshot.is_none()
+                && let Err(err) =
+                    save_gas_snapshot(&current_snapshot, &runner.project_root, snapshot_filename)
+            {
+                anyhow::bail!("Failed to save gas snapshot: {err}")
+            }
+
+            if runner.config.fail_on_diff
+                && let (Some(baseline_path), Some(baseline_snapshot)) = (
+                    runner.config.baseline_snapshot.as_deref(),
+                    baseline_snapshot.as_ref(),
+                )
+                && snapshots_differ(&current_snapshot, baseline_snapshot)
+            {
+                anyhow::bail!(
+                    "Profiling drift detected against baseline snapshot '{baseline_path}'"
+                );
+            }
+        }
     }
 
-    let current_snapshot = create_gas_snapshot(&gas_per_opcode, &trace_chain_stats)
-        .map_err(|err| anyhow::anyhow!("Failed to create gas snapshot: {err}"))?;
-
-    let baseline_snapshot = if let Some(baseline_path) = &runner.config.baseline_snapshot {
-        Some(
-            load_gas_snapshot(&runner.project_root, baseline_path).map_err(|err| {
-                anyhow::anyhow!("Failed to load baseline gas snapshot '{baseline_path}': {err}")
-            })?,
-        )
-    } else {
-        None
-    };
-
-    print_opcode_gas_table(
-        &gas_per_opcode,
-        baseline_snapshot.as_ref(),
-        runner.config.baseline_snapshot.as_deref(),
-    );
-    print_trace_chain_table(
-        &trace_chain_stats,
-        baseline_snapshot.as_ref(),
-        runner.config.baseline_snapshot.as_deref(),
-    );
-
-    // we don't want to override previous snapshot in compare mode
-    if let Some(snapshot_filename) = &runner.config.snapshot
-        && runner.config.baseline_snapshot.is_none()
-        && let Err(err) =
-            save_gas_snapshot(&current_snapshot, &runner.project_root, snapshot_filename)
-    {
-        anyhow::bail!("Failed to save gas snapshot: {err}")
-    }
-
-    if runner.config.fail_on_diff
-        && let (Some(baseline_path), Some(baseline_snapshot)) = (
-            runner.config.baseline_snapshot.as_deref(),
-            baseline_snapshot.as_ref(),
-        )
-        && snapshots_differ(&current_snapshot, baseline_snapshot)
-    {
-        anyhow::bail!("Profiling drift detected against baseline snapshot '{baseline_path}'");
+    if let Some(gas_profile_filename) = &runner.config.gas_profile {
+        let executions = collect_profile_executions(runner);
+        save_execution_profile(
+            &executions,
+            runner.config.gas_profile_format,
+            &runner.project_root,
+            gas_profile_filename,
+        )?;
     }
 
     Ok(())
@@ -827,6 +855,511 @@ fn resolve_snapshot_path(project_root: &Path, filename: &str) -> PathBuf {
     } else {
         project_root.join(path)
     }
+}
+
+fn save_execution_profile(
+    executions: &[ProfileExecutionInput],
+    format: GasProfileFormat,
+    project_root: &Path,
+    filename: &str,
+) -> anyhow::Result<()> {
+    let content = match format {
+        GasProfileFormat::Cpuprofile => {
+            serde_json::to_string_pretty(&build_devtools_cpu_profile(executions))?
+        }
+        GasProfileFormat::Collapsed => build_collapsed_profile(executions),
+    };
+    let path = resolve_snapshot_path(project_root, filename);
+    if let Some(parent) = path.parent()
+        && !parent.as_os_str().is_empty()
+    {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, content)?;
+    println!("Gas profile saved to {filename}");
+    Ok(())
+}
+
+fn build_devtools_cpu_profile(executions: &[ProfileExecutionInput]) -> DevToolsCpuProfile {
+    let mut builder = DevToolsCpuProfileBuilder::new();
+
+    for execution in executions {
+        for sample in collect_execution_samples(execution) {
+            builder.add_sample(&sample.frames, sample.weight);
+        }
+    }
+
+    builder.finish()
+}
+
+fn build_collapsed_profile(executions: &[ProfileExecutionInput]) -> String {
+    let mut samples_by_stack = BTreeMap::<(String, Vec<String>), u64>::new();
+
+    for execution in executions {
+        for sample in collect_execution_samples(execution) {
+            let stack = sample
+                .frames
+                .iter()
+                .map(|frame| sanitize_collapsed_name(&frame.function_name))
+                .collect::<Vec<_>>();
+
+            *samples_by_stack
+                .entry((sample.thread_name, stack))
+                .or_insert(0) += sample.weight;
+        }
+    }
+
+    let mut output = String::new();
+    for ((thread_name, frames), weight) in samples_by_stack {
+        output.push_str(&thread_name);
+        for frame in frames {
+            output.push(';');
+            output.push_str(&frame);
+        }
+        output.push(' ');
+        output.push_str(&weight.to_string());
+        output.push('\n');
+    }
+
+    output
+}
+
+fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput> {
+    let mut test_names = runner
+        .emulations
+        .results
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>();
+    test_names.sort();
+
+    let mut executions = Vec::new();
+
+    for test_name in test_names {
+        let Some(emulations) = runner.emulations.results.get(&test_name) else {
+            continue;
+        };
+
+        for trace_transactions in &emulations.messages {
+            for tx in trace_transactions {
+                let Some((_, build_result)) = runner.build_cache.result_for_code(&tx.code) else {
+                    continue;
+                };
+
+                executions.push(ProfileExecutionInput {
+                    vm_log: tx.vm_log.clone(),
+                    initial_gas: tx.initial_gas(),
+                    source_map: build_result.source_map.clone(),
+                    contract_display_name: Some(build_result.display_name),
+                });
+            }
+        }
+
+        if runner.config.gas_profile_include_tests {
+            for get_result in &emulations.get_methods {
+                let Ok(code) = Boc::decode_base64(get_result.code.as_ref()) else {
+                    continue;
+                };
+                let Some((_, build_result)) = runner.build_cache.result_for_code(&Some(code))
+                else {
+                    continue;
+                };
+
+                executions.push(ProfileExecutionInput {
+                    vm_log: get_result.vm_log.clone(),
+                    initial_gas: Some(DEFAULT_GET_METHOD_GAS_LIMIT as u64),
+                    source_map: build_result.source_map.clone(),
+                    contract_display_name: None,
+                });
+            }
+        }
+    }
+
+    executions
+}
+
+fn collect_execution_samples(execution: &ProfileExecutionInput) -> Vec<ProfileSample> {
+    let trace = Trace::new(
+        &execution.vm_log,
+        execution
+            .initial_gas
+            .and_then(|gas| usize::try_from(gas).ok()),
+    );
+    let execute_steps = trace
+        .steps
+        .iter()
+        .filter_map(|step| match step {
+            TraceStep::Execute { instr, gas, .. } => Some(InstructionGasStep {
+                instr_name: instr.clone(),
+                gas: *gas as u64,
+            }),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    if execute_steps.is_empty() {
+        return Vec::new();
+    }
+
+    let Ok(mut replayer) = TolkReplayer::new(execution.source_map.as_ref(), &execution.vm_log)
+    else {
+        return Vec::new();
+    };
+    let mut samples = Vec::new();
+    let mut execute_idx = 0usize;
+
+    replayer.step_with_callback(StepMode::RunUntilBreakpoint, |tick, state| match tick {
+        Tick::TvmImplicitJmpRef => {
+            if let Some(sample) = record_execution_sample(
+                execution,
+                &execute_steps,
+                &mut execute_idx,
+                state,
+                Some("implicit JMPREF"),
+            ) {
+                samples.push(sample);
+            }
+        }
+        Tick::TvmBeforeExecute => {
+            while execute_steps
+                .get(execute_idx)
+                .is_some_and(|step| step.instr_name == "implicit JMPREF")
+            {
+                if let Some(sample) = record_execution_sample(
+                    execution,
+                    &execute_steps,
+                    &mut execute_idx,
+                    state,
+                    Some("implicit JMPREF"),
+                ) {
+                    samples.push(sample);
+                }
+            }
+
+            if let Some(sample) =
+                record_execution_sample(execution, &execute_steps, &mut execute_idx, state, None)
+            {
+                samples.push(sample);
+            }
+        }
+        _ => {}
+    });
+
+    samples
+}
+
+fn record_execution_sample(
+    execution: &ProfileExecutionInput,
+    execute_steps: &[InstructionGasStep],
+    execute_idx: &mut usize,
+    replayer: &TolkReplayer,
+    expected_instr: Option<&str>,
+) -> Option<ProfileSample> {
+    let step = execute_steps.get(*execute_idx)?;
+
+    if let Some(expected_instr) = expected_instr
+        && step.instr_name != expected_instr
+    {
+        return None;
+    }
+
+    *execute_idx += 1;
+
+    if step.gas == 0 {
+        return None;
+    }
+
+    let frames = build_profile_frames(execution.contract_display_name.as_deref(), replayer);
+
+    if frames.is_empty() {
+        return None;
+    }
+
+    Some(ProfileSample {
+        thread_name: "acton".to_string(),
+        frames,
+        weight: step.gas,
+    })
+}
+
+fn build_profile_frames(
+    contract_display_name: Option<&str>,
+    replayer: &TolkReplayer,
+) -> Vec<ProfileFrameSpec> {
+    replayer
+        .call_stack()
+        .iter()
+        .map(|frame| ProfileFrameSpec::from_call_frame(frame, contract_display_name, replayer))
+        .collect()
+}
+
+#[derive(Debug, Clone)]
+struct ProfileExecutionInput {
+    vm_log: Arc<str>,
+    initial_gas: Option<u64>,
+    source_map: Arc<SourceMap>,
+    contract_display_name: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct InstructionGasStep {
+    instr_name: String,
+    gas: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ProfileSample {
+    thread_name: String,
+    frames: Vec<ProfileFrameSpec>,
+    weight: u64,
+}
+
+#[derive(Debug, Clone)]
+struct ProfileFrameSpec {
+    function_name: String,
+    url: String,
+    line_number: i64,
+    column_number: i64,
+}
+
+impl ProfileFrameSpec {
+    fn from_call_frame(
+        frame: &CallFrameInfo,
+        contract_display_name: Option<&str>,
+        replayer: &TolkReplayer,
+    ) -> Self {
+        let location = frame
+            .definition_loc
+            .as_ref()
+            .or(frame.call_site_loc.as_ref());
+        let (url, line_number, column_number) = location.map_or_else(
+            || (String::new(), -1, -1),
+            |loc| frame_location(replayer, loc),
+        );
+
+        Self {
+            function_name: format_profile_function_name(
+                frame.f_name.as_str(),
+                contract_display_name,
+            ),
+            url,
+            line_number,
+            column_number,
+        }
+    }
+}
+
+fn format_profile_function_name(
+    function_name: &str,
+    contract_display_name: Option<&str>,
+) -> String {
+    if matches!(
+        function_name,
+        "onInternalMessage" | "onExternalMessage" | "onBouncedMessage" | "onRunTickTock"
+    ) && let Some(contract_display_name) = contract_display_name
+    {
+        return format!("{contract_display_name}:{function_name}");
+    }
+
+    function_name.to_string()
+}
+
+fn frame_location(
+    replayer: &TolkReplayer,
+    range: &tolk_compiler::source_map::SrcRange,
+) -> (String, i64, i64) {
+    let url = replayer.file_full_path(range.file_id()).unwrap_or_default();
+
+    (
+        url.to_string(),
+        zero_based_line(range.start_line()),
+        zero_based_column(range.start_col()),
+    )
+}
+
+fn sanitize_collapsed_name(name: &str) -> String {
+    name.chars()
+        .map(|ch| match ch {
+            ';' => ':',
+            '\n' | '\r' | '\t' => ' ',
+            _ => ch,
+        })
+        .collect()
+}
+
+fn zero_based_line(line: usize) -> i64 {
+    line.checked_sub(1).map_or(-1, |line| line as i64)
+}
+
+fn zero_based_column(column: usize) -> i64 {
+    column.checked_sub(1).map_or(-1, |column| column as i64)
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DevToolsFrameKey {
+    function_name: String,
+    script_id: String,
+    url: String,
+    line_number: i64,
+    column_number: i64,
+}
+
+#[derive(Debug)]
+struct DevToolsCpuProfileBuilder {
+    nodes: Vec<DevToolsNodeState>,
+    samples: Vec<u32>,
+    time_deltas: Vec<u64>,
+    next_script_id: u32,
+    script_ids_by_url: HashMap<String, String>,
+    total_gas: u64,
+}
+
+impl DevToolsCpuProfileBuilder {
+    fn new() -> Self {
+        let root = DevToolsNodeState {
+            id: 1,
+            frame: DevToolsFrameKey {
+                function_name: "(root)".to_string(),
+                script_id: "0".to_string(),
+                url: String::new(),
+                line_number: -1,
+                column_number: -1,
+            },
+            hit_count: 0,
+            children: Vec::new(),
+            child_lookup: HashMap::new(),
+        };
+
+        Self {
+            nodes: vec![root],
+            samples: Vec::new(),
+            time_deltas: Vec::new(),
+            next_script_id: 1,
+            script_ids_by_url: HashMap::new(),
+            total_gas: 0,
+        }
+    }
+
+    fn add_sample(&mut self, frames: &[ProfileFrameSpec], gas: u64) {
+        let mut current_id = 1u32;
+
+        for frame in frames {
+            let frame_key = self.materialize_frame_key(frame);
+            current_id = self.ensure_child(current_id, frame_key);
+        }
+
+        let leaf_idx = current_id as usize - 1;
+        self.nodes[leaf_idx].hit_count += 1;
+        self.samples.push(current_id);
+        self.time_deltas.push(gas);
+        self.total_gas += gas;
+    }
+
+    fn materialize_frame_key(&mut self, frame: &ProfileFrameSpec) -> DevToolsFrameKey {
+        let script_id = if frame.url.is_empty() {
+            "0".to_string()
+        } else if let Some(script_id) = self.script_ids_by_url.get(&frame.url) {
+            script_id.clone()
+        } else {
+            let script_id = self.next_script_id.to_string();
+            self.next_script_id += 1;
+            self.script_ids_by_url
+                .insert(frame.url.clone(), script_id.clone());
+            script_id
+        };
+
+        DevToolsFrameKey {
+            function_name: frame.function_name.clone(),
+            script_id,
+            url: frame.url.clone(),
+            line_number: frame.line_number,
+            column_number: frame.column_number,
+        }
+    }
+
+    fn ensure_child(&mut self, parent_id: u32, frame: DevToolsFrameKey) -> u32 {
+        let parent_idx = parent_id as usize - 1;
+        if let Some(existing) = self.nodes[parent_idx].child_lookup.get(&frame).copied() {
+            return existing;
+        }
+
+        let child_id = self.nodes.len() as u32 + 1;
+        self.nodes[parent_idx].children.push(child_id);
+        self.nodes[parent_idx]
+            .child_lookup
+            .insert(frame.clone(), child_id);
+        self.nodes.push(DevToolsNodeState {
+            id: child_id,
+            frame,
+            hit_count: 0,
+            children: Vec::new(),
+            child_lookup: HashMap::new(),
+        });
+        child_id
+    }
+
+    fn finish(self) -> DevToolsCpuProfile {
+        DevToolsCpuProfile {
+            nodes: self
+                .nodes
+                .into_iter()
+                .map(|node| DevToolsCpuProfileNode {
+                    id: node.id,
+                    call_frame: DevToolsCpuProfileCallFrame {
+                        function_name: node.frame.function_name,
+                        script_id: node.frame.script_id,
+                        url: node.frame.url,
+                        line_number: node.frame.line_number,
+                        column_number: node.frame.column_number,
+                    },
+                    hit_count: node.hit_count,
+                    children: node.children,
+                })
+                .collect(),
+            start_time: 0,
+            end_time: self.total_gas,
+            samples: self.samples,
+            time_deltas: self.time_deltas,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct DevToolsNodeState {
+    id: u32,
+    frame: DevToolsFrameKey,
+    hit_count: u64,
+    children: Vec<u32>,
+    child_lookup: HashMap<DevToolsFrameKey, u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DevToolsCpuProfile {
+    nodes: Vec<DevToolsCpuProfileNode>,
+    start_time: u64,
+    end_time: u64,
+    samples: Vec<u32>,
+    time_deltas: Vec<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DevToolsCpuProfileNode {
+    id: u32,
+    call_frame: DevToolsCpuProfileCallFrame,
+    hit_count: u64,
+    children: Vec<u32>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DevToolsCpuProfileCallFrame {
+    function_name: String,
+    script_id: String,
+    url: String,
+    line_number: i64,
+    column_number: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

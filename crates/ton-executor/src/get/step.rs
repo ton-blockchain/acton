@@ -37,7 +37,9 @@
 //! # }
 //! ```
 
-use crate::get::{GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
+use crate::get::{
+    DEFAULT_GET_METHOD_GAS_LIMIT, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs,
+};
 use crate::{BaseExecutor, ExtMethodCallback, MissingLibraryCallback, get};
 use anyhow::Context;
 use std::collections::HashSet;
@@ -94,7 +96,7 @@ impl StepGetExecutor {
             // We set a very high gas limit by default for get-methods,
             // as they are typically executed off-chain and for some reason,
             // Tolk compilation consumes gas :D
-            get::tvm_emulator_set_gas_limit(self.inner.as_ptr(), i64::MAX - 1000);
+            get::tvm_emulator_set_gas_limit(self.inner.as_ptr(), DEFAULT_GET_METHOD_GAS_LIMIT);
 
             tvm_emulator_sbs_run_get_method(self.inner.as_ptr(), method_id, stack_b64_cstr.as_ptr())
         };

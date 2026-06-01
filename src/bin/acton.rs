@@ -35,7 +35,8 @@ use acton_config::config::{
     project_root as configured_project_root,
 };
 use acton_config::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -320,6 +321,25 @@ enum Commands {
             requires = "baseline_snapshot"
         )]
         fail_on_diff: bool,
+        #[arg(
+            long,
+            help = "Write a gas-weighted execution profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Output gas profile in specified format",
+            help_heading = "Profiling"
+        )]
+        gas_profile_format: Option<GasProfileFormat>,
+        #[arg(
+            long,
+            help = "Include .test.tolk unit-test execution in the gas profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile_include_tests: bool,
 
         // Reporting
         #[arg(
@@ -1909,6 +1929,9 @@ fn main() {
             snapshot,
             baseline_snapshot,
             fail_on_diff,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             save_test_trace,
             mutate,
@@ -1955,6 +1978,13 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    gas_profile,
+                    gas_profile_format,
+                    if gas_profile_include_tests {
+                        Some(true)
+                    } else {
+                        None
+                    },
                     fail_on_diff,
                     fork_net,
                     fork_block_number,
@@ -2662,6 +2692,9 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    gas_profile: Option<String>,
+    gas_profile_format: Option<GasProfileFormat>,
+    gas_profile_include_tests: Option<bool>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
@@ -2727,6 +2760,9 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             fork_block_number,
             fork_cache_enabled,
@@ -2778,6 +2814,9 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        gas_profile,
+        gas_profile_format: gas_profile_format.unwrap_or_default(),
+        gas_profile_include_tests: gas_profile_include_tests.unwrap_or(false),
         fail_on_diff,
         fork_block_number,
         fork_cache_enabled,
@@ -2819,6 +2858,14 @@ fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
     if let Some(fork_net) = test_settings.fork_net.as_deref() {
         Network::from_str(fork_net)
             .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
+    }
+
+    if let Some(format) = test_settings.gas_profile_format.as_deref()
+        && !matches!(format.to_lowercase().as_str(), "cpuprofile" | "collapsed")
+    {
+        anyhow::bail!(
+            "Invalid [test].gas-profile-format '{format}': expected 'cpuprofile' or 'collapsed'"
+        );
     }
 
     Ok(())
@@ -2952,6 +2999,9 @@ mod tests {
             None,
             None,
             false,
+            None,
+            None,
+            None,
             None,
             None,
             None,

@@ -3,7 +3,7 @@ title: "Gas profiling with snapshots"
 description: "Learn how to profile gas and fees of transaction chains with --snapshot and baseline comparison"
 ---
 
-Gas profiling records gas and fee metrics for message opcodes and transaction chains. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs.
+Gas profiling records gas and fee metrics for message opcodes and transaction chains. Performance regressions show up in the `--snapshot` and `--baseline-snapshot` outputs. For source-level hot paths, Acton can also write gas-weighted execution profiles with `--gas-profile`.
 
 ## What gets profiled
 
@@ -102,6 +102,23 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
 <Callout type="idea" title="How to read row groups">
   In comparison tables, changed chains are shown as baseline row, current row, and diff row.
 </Callout>
+
+### Write a source-level execution profile
+
+```bash
+acton test --gas-profile build/gas.cpuprofile
+```
+
+This writes a Chrome DevTools-compatible `.cpuprofile` where sample weights are
+gas deltas. For flamegraph-style tooling, use folded stacks:
+
+```bash
+acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+```
+
+Execution profiles record contract message transactions by default. Add
+`--gas-profile-include-tests` if you also need `.test.tolk` unit-test get-method
+execution in the profile.
 
 ### Fail CI on drift
 

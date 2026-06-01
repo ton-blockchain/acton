@@ -247,8 +247,8 @@ impl<'a> TestRunner<'a> {
                 max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStackVerbose);
         }
 
-        if self.config.coverage {
-            // for coverage, we need at least locations to map to actual source code
+        if self.config.coverage || self.config.gas_profile.is_some() {
+            // coverage and gas profiling need source locations and stack data
             verbosity = max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStack);
         }
 
@@ -367,7 +367,8 @@ impl<'a> TestRunner<'a> {
                 known_code_cells: &mut self.known_code_cells,
                 need_debug_info: self.config.debug
                     || self.config.backtrace == Some(BacktraceMode::Full)
-                    || self.config.coverage,
+                    || self.config.coverage
+                    || self.config.gas_profile.is_some(),
                 backtrace: self.config.backtrace,
             },
             debug: DebugCtx::Disabled,
@@ -424,8 +425,10 @@ impl<'a> TestRunner<'a> {
         let mut captured_stdout = captured_stdout;
         Self::append_debug_output(&mut captured_stdout, &result, verbosity);
 
-        let executed_get_methods = if self.config.coverage {
-            // save results for coverage only in coverage mode since cloning is expensive due to logs
+        let executed_get_methods = if self.config.coverage
+            || (self.config.gas_profile.is_some() && self.config.gas_profile_include_tests)
+        {
+            // save results only when coverage or gas profiling needs unit-test execution metadata
             match &result {
                 GetMethodResult::Success(success) => vec![success.clone()],
                 GetMethodResult::Error(_) => Vec::new(),
@@ -752,14 +755,29 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
 
     runner.reporter_manager.finalize()?;
 
-    if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
+    if config.snapshot.is_some()
+        || config.baseline_snapshot.is_some()
+        || config.gas_profile.is_some()
+    {
         if total_failed == 0 {
+            if config.gas_profile.is_some() {
+                let project_root = configured_project_root().to_path_buf();
+                compile_project_contracts(
+                    &mut runner.build_cache,
+                    runner.file_build_cache,
+                    &runner.acton_config,
+                    &project_root,
+                    true,
+                )?;
+            }
             profiling::collect_profile(&runner)?;
         } else {
-            println!(
-                "\n{} Gas profiling snapshot and comparison tables were skipped because tests failed.",
-                "Note:".yellow()
-            );
+            let skipped_outputs = if config.gas_profile.is_some() {
+                "Gas profiling outputs were skipped because tests failed."
+            } else {
+                "Gas profiling snapshot and comparison tables were skipped because tests failed."
+            };
+            println!("\n{} {skipped_outputs}", "Note:".yellow(),);
         }
     }
 
@@ -1108,8 +1126,10 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let tests = find_all_test(filepath, &file, &content);
 
     let config = &runner.config;
-    let need_debug_info =
-        config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
+    let need_debug_info = config.debug
+        || config.backtrace == Some(BacktraceMode::Full)
+        || config.coverage
+        || config.gas_profile.is_some();
 
     let now = Instant::now();
     let compilation_result = compile_test_file(
@@ -1404,9 +1424,10 @@ fn run_file_tests(
 
         runner.reporter_manager.on_test_finished(&test_report)?;
 
-        if runner.config.coverage {
-            // For coverage, we need to process test logs as well for unit tests coverage,
-            // so register it here manually
+        if runner.config.coverage
+            || (runner.config.gas_profile.is_some() && runner.config.gas_profile_include_tests)
+        {
+            // Coverage and opt-in gas profiling both need unit-test execution metadata.
             if !executed_get_methods.is_empty() {
                 for get_result in executed_get_methods {
                     runner.emulations.save_get_method(&test.name, get_result);

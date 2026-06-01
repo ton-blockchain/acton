@@ -699,6 +699,21 @@ impl SendMessageResultSuccess {
         };
         Some(info.gas_used.into())
     }
+
+    /// Returns the initial gas base used to execute the computation phase.
+    #[must_use]
+    pub fn initial_gas(&self) -> Option<u64> {
+        let info = self.transaction.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let ComputePhase::Executed(info) = info.compute_phase else {
+            return None;
+        };
+        let gas_limit = u64::from(info.gas_limit);
+        let gas_credit = info.gas_credit.map(u32::from).map_or(0, u64::from);
+        Some(gas_limit.saturating_add(gas_credit))
+    }
 }
 
 fn to_cell<T: Store + ?Sized>(obj: &T) -> anyhow::Result<Cell> {
