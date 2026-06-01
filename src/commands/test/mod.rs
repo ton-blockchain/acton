@@ -672,6 +672,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
 
     let mut coverage_lcov = None;
     let mut coverage_threshold_failed = false;
+    let mut gas_profile_report = None;
 
     if config.coverage {
         let project_root = configured_project_root().to_path_buf();
@@ -770,7 +771,7 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
                     true,
                 )?;
             }
-            profiling::collect_profile(&runner)?;
+            gas_profile_report = profiling::collect_profile(&runner)?;
         } else {
             let skipped_outputs = if config.gas_profile.is_some() {
                 "Gas profiling outputs were skipped because tests failed."
@@ -801,7 +802,15 @@ pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
             .enable_all()
             .build()?;
         rt.block_on(async {
-            start_ui_server(reports, trace_dir, project_root, coverage_lcov, listener).await
+            start_ui_server(
+                reports,
+                trace_dir,
+                project_root,
+                coverage_lcov,
+                gas_profile_report,
+                listener,
+            )
+            .await
         })?;
     }
 

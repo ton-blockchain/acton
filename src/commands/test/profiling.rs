@@ -20,9 +20,10 @@ use tycho_types::models::{ComputePhase, MsgInfo, TxInfo};
 
 const SIGNIFICANT_PERCENT_CHANGE: f64 = 5.0;
 
-pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<()> {
+pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<Option<UiGasProfileReport>> {
     let collect_snapshot_stats =
         runner.config.snapshot.is_some() || runner.config.baseline_snapshot.is_some();
+    let mut ui_gas_profile = None;
 
     if collect_snapshot_stats {
         let gas_per_opcode = collect_opcode_gas(runner);
@@ -30,7 +31,7 @@ pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<()> {
 
         if gas_per_opcode.is_empty() && trace_chain_stats.is_empty() {
             if runner.config.gas_profile.is_none() {
-                return Ok(());
+                return Ok(None);
             }
         } else {
             let current_snapshot = create_gas_snapshot(&gas_per_opcode, &trace_chain_stats)
@@ -84,15 +85,19 @@ pub(super) fn collect_profile(runner: &TestRunner) -> anyhow::Result<()> {
 
     if let Some(gas_profile_filename) = &runner.config.gas_profile {
         let executions = collect_profile_executions(runner);
+        let execution_samples = collect_profile_execution_samples(&executions);
         save_execution_profile(
-            &executions,
+            &execution_samples,
             runner.config.gas_profile_format,
             &runner.project_root,
             gas_profile_filename,
         )?;
+        if runner.config.ui {
+            ui_gas_profile = Some(build_ui_gas_profile(&execution_samples));
+        }
     }
 
-    Ok(())
+    Ok(ui_gas_profile)
 }
 
 fn collect_opcode_gas(runner: &TestRunner) -> HashMap<String, Vec<u64>> {
@@ -858,16 +863,16 @@ fn resolve_snapshot_path(project_root: &Path, filename: &str) -> PathBuf {
 }
 
 fn save_execution_profile(
-    executions: &[ProfileExecutionInput],
+    execution_samples: &[ProfileExecutionSamples],
     format: GasProfileFormat,
     project_root: &Path,
     filename: &str,
 ) -> anyhow::Result<()> {
     let content = match format {
         GasProfileFormat::Cpuprofile => {
-            serde_json::to_string_pretty(&build_devtools_cpu_profile(executions))?
+            serde_json::to_string_pretty(&build_devtools_cpu_profile(execution_samples))?
         }
-        GasProfileFormat::Collapsed => build_collapsed_profile(executions),
+        GasProfileFormat::Collapsed => build_collapsed_profile(execution_samples),
     };
     let path = resolve_snapshot_path(project_root, filename);
     if let Some(parent) = path.parent()
@@ -880,11 +885,11 @@ fn save_execution_profile(
     Ok(())
 }
 
-fn build_devtools_cpu_profile(executions: &[ProfileExecutionInput]) -> DevToolsCpuProfile {
+fn build_devtools_cpu_profile(execution_samples: &[ProfileExecutionSamples]) -> DevToolsCpuProfile {
     let mut builder = DevToolsCpuProfileBuilder::new();
 
-    for execution in executions {
-        for sample in collect_execution_samples(execution) {
+    for execution in execution_samples {
+        for sample in &execution.samples {
             builder.add_sample(&sample.frames, sample.weight);
         }
     }
@@ -892,11 +897,11 @@ fn build_devtools_cpu_profile(executions: &[ProfileExecutionInput]) -> DevToolsC
     builder.finish()
 }
 
-fn build_collapsed_profile(executions: &[ProfileExecutionInput]) -> String {
+fn build_collapsed_profile(execution_samples: &[ProfileExecutionSamples]) -> String {
     let mut samples_by_stack = BTreeMap::<(String, Vec<String>), u64>::new();
 
-    for execution in executions {
-        for sample in collect_execution_samples(execution) {
+    for execution in execution_samples {
+        for sample in &execution.samples {
             let stack = sample
                 .frames
                 .iter()
@@ -904,7 +909,7 @@ fn build_collapsed_profile(executions: &[ProfileExecutionInput]) -> String {
                 .collect::<Vec<_>>();
 
             *samples_by_stack
-                .entry((sample.thread_name, stack))
+                .entry((sample.thread_name.clone(), stack))
                 .or_insert(0) += sample.weight;
         }
     }
@@ -922,6 +927,67 @@ fn build_collapsed_profile(executions: &[ProfileExecutionInput]) -> String {
     }
 
     output
+}
+
+fn build_ui_gas_profile(execution_samples: &[ProfileExecutionSamples]) -> UiGasProfileReport {
+    let mut contracts = BTreeMap::<String, UiGasProfileContract>::new();
+
+    for execution in execution_samples {
+        if execution.samples.is_empty() {
+            continue;
+        }
+
+        let contract_name = execution
+            .contract_display_name
+            .clone()
+            .unwrap_or_else(|| "Tests".to_string());
+        let contract_prefix = format!("{contract_name}:");
+
+        let contract =
+            contracts
+                .entry(contract_name.clone())
+                .or_insert_with(|| UiGasProfileContract {
+                    name: contract_name.clone(),
+                    total_gas: 0,
+                    sample_count: 0,
+                    samples: Vec::new(),
+                });
+
+        for sample in &execution.samples {
+            contract.total_gas += sample.weight;
+            contract.sample_count += 1;
+            contract.samples.push(UiGasProfileSample {
+                weight: sample.weight,
+                frames: sample
+                    .frames
+                    .iter()
+                    .map(|frame| UiGasProfileFrame {
+                        function_name: frame
+                            .function_name
+                            .strip_prefix(&contract_prefix)
+                            .unwrap_or(&frame.function_name)
+                            .to_string(),
+                        url: frame.url.clone(),
+                        line_number: frame.line_number,
+                        column_number: frame.column_number,
+                    })
+                    .collect(),
+            });
+        }
+    }
+
+    let total_gas = contracts.values().map(|contract| contract.total_gas).sum();
+    let mut contracts = contracts.into_values().collect::<Vec<_>>();
+    contracts.sort_by(|a, b| {
+        b.total_gas
+            .cmp(&a.total_gas)
+            .then_with(|| a.name.cmp(&b.name))
+    });
+
+    UiGasProfileReport {
+        total_gas,
+        contracts,
+    }
 }
 
 fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput> {
@@ -976,6 +1042,18 @@ fn collect_profile_executions(runner: &TestRunner) -> Vec<ProfileExecutionInput>
     }
 
     executions
+}
+
+fn collect_profile_execution_samples(
+    executions: &[ProfileExecutionInput],
+) -> Vec<ProfileExecutionSamples> {
+    executions
+        .iter()
+        .map(|execution| ProfileExecutionSamples {
+            contract_display_name: execution.contract_display_name.clone(),
+            samples: collect_execution_samples(execution),
+        })
+        .collect()
 }
 
 fn collect_execution_samples(execution: &ProfileExecutionInput) -> Vec<ProfileSample> {
@@ -1102,6 +1180,12 @@ struct ProfileExecutionInput {
 }
 
 #[derive(Debug, Clone)]
+struct ProfileExecutionSamples {
+    contract_display_name: Option<String>,
+    samples: Vec<ProfileSample>,
+}
+
+#[derive(Debug, Clone)]
 struct InstructionGasStep {
     instr_name: String,
     gas: u64,
@@ -1120,6 +1204,34 @@ struct ProfileFrameSpec {
     url: String,
     line_number: i64,
     column_number: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct UiGasProfileReport {
+    pub total_gas: u64,
+    pub contracts: Vec<UiGasProfileContract>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct UiGasProfileContract {
+    pub name: String,
+    pub total_gas: u64,
+    pub sample_count: usize,
+    pub samples: Vec<UiGasProfileSample>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct UiGasProfileSample {
+    pub weight: u64,
+    pub frames: Vec<UiGasProfileFrame>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct UiGasProfileFrame {
+    pub function_name: String,
+    pub url: String,
+    pub line_number: i64,
+    pub column_number: i64,
 }
 
 impl ProfileFrameSpec {

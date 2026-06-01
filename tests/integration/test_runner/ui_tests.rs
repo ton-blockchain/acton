@@ -15,6 +15,47 @@ fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
+const GAS_PROFILED_DEEP_STACK_CONTRACT: &str = r"
+@noinline
+fun profileLeaf(seed: int): int {
+    var acc = seed;
+    repeat (5) {
+        acc += seed;
+        acc *= 2;
+    }
+    return acc;
+}
+
+@noinline
+fun profileLevelFour(seed: int): int {
+    return profileLeaf(seed + 4);
+}
+
+@noinline
+fun profileLevelThree(seed: int): int {
+    return profileLevelFour(seed + 3);
+}
+
+@noinline
+fun profileLevelTwo(seed: int): int {
+    return profileLevelThree(seed + 2);
+}
+
+@noinline
+fun profileLevelOne(seed: int): int {
+    return profileLevelTwo(seed + 1);
+}
+
+fun onInternalMessage(_: InMessage) {
+    val result = profileLevelOne(1);
+    if (result == 0) {
+        throw 701;
+    }
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
 const UI_DEPLOY_TEST_TEMPLATE: &str = r#"
 import "../../lib/testing/expect"
 import "../../lib/build"
@@ -39,6 +80,38 @@ get fun `__TEST_NAME__`() {
 
     val txs = net.send(deployer.address, msg);
     expect(txs).toHaveSuccessfulDeploy({ to: address });
+}
+"#;
+
+const GAS_PROFILED_DEEP_STACK_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test ui gas profile deep stack`() {
+    val init = ContractState {
+        code: build("deep"),
+        data: createEmptyCell(),
+    };
+
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployer = testing.treasury("deployer");
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    })).size()).toEqual(1);
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    })).size()).toEqual(1);
 }
 "#;
 
@@ -104,6 +177,10 @@ impl Drop for UiTestProcess {
 }
 
 fn spawn_test_ui(project: &Project, port: u16) -> UiTestProcess {
+    spawn_test_ui_with_args(project, port, &[])
+}
+
+fn spawn_test_ui_with_args(project: &Project, port: u16, extra_args: &[&str]) -> UiTestProcess {
     let mut command = Command::new(acton_exe());
     command
         .current_dir(project.path())
@@ -114,6 +191,7 @@ fn spawn_test_ui(project: &Project, port: u16) -> UiTestProcess {
         .env("NO_COLOR", "1")
         .env("ACTON_INTERNAL_SKIP_BROWSER", "1")
         .args(["test", "--ui", "--ui-port", &port.to_string()])
+        .args(extra_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
@@ -359,6 +437,64 @@ fn ui_api_returns_no_content_for_missing_or_empty_trace_file() {
             "missing_trace_status: {missing_trace_status}\nmissing_trace_body: {missing_trace_body:?}\nempty_trace_status: {empty_trace_status}\nempty_trace_body: {empty_trace_body:?}\n"
         ),
         "integration/snapshots/test-runner/test_runner_ui/ui_api_returns_no_content_for_missing_or_empty_trace_file.txt",
+    );
+}
+
+#[test]
+fn ui_api_serves_gas_profile_when_enabled() {
+    let project = ProjectBuilder::new("f-ui-gas-profile")
+        .contract("deep", GAS_PROFILED_DEEP_STACK_CONTRACT)
+        .test_file("profile", GAS_PROFILED_DEEP_STACK_TEST)
+        .build();
+
+    let port = unused_ui_port();
+    let base_url = format!("http://127.0.0.1:{port}");
+    let mut process = spawn_test_ui_with_args(&project, port, &["--gas-profile", "gas.cpuprofile"]);
+    wait_for_test_ui(&mut process, &base_url);
+
+    let client = reqwest::blocking::Client::new();
+    let response = client
+        .get(format!("{base_url}/api/gas-profile"))
+        .send()
+        .expect("should fetch UI gas profile");
+    let status = response.status();
+    let profile: Value = response
+        .json()
+        .expect("gas profile response should be JSON");
+    let contracts = profile["contracts"]
+        .as_array()
+        .expect("gas profile should include contracts");
+    let first_contract = contracts
+        .first()
+        .expect("gas profile should include a contract");
+    let samples = first_contract["samples"]
+        .as_array()
+        .expect("gas profile contract should include samples");
+    let frame_names = samples
+        .iter()
+        .flat_map(|sample| sample["frames"].as_array().into_iter().flatten())
+        .filter_map(|frame| frame["function_name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert_ui_api_snapshot(
+        format!(
+            "status: {status}\ntotal_gas_positive: {}\ncontracts: {}\nfirst_contract_name: {}\nfirst_contract_gas_positive: {}\nfirst_contract_sample_count_positive: {}\nframes_include_entrypoint: {}\nframes_include_prefixed_entrypoint: {}\nframes_include_level_one: {}\nframes_include_leaf: {}\nprofile_file_exists: {}\n",
+            profile["total_gas"].as_u64().is_some_and(|gas| gas > 0),
+            contracts.len(),
+            first_contract["name"].as_str().unwrap_or("<missing>"),
+            first_contract["total_gas"]
+                .as_u64()
+                .is_some_and(|gas| gas > 0),
+            first_contract["sample_count"]
+                .as_u64()
+                .is_some_and(|samples| samples > 0),
+            frame_names.contains(&"onInternalMessage"),
+            frame_names.contains(&"deep:onInternalMessage"),
+            frame_names.contains(&"profileLevelOne"),
+            frame_names.contains(&"profileLeaf"),
+            project.path().join("gas.cpuprofile").exists(),
+        ),
+        "integration/snapshots/test-runner/test_runner_ui/ui_api_serves_gas_profile_when_enabled.txt",
     );
 }
 

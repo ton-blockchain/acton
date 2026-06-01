@@ -1,0 +1,11 @@
+status: 200 OK
+total_gas_positive: true
+contracts: 1
+first_contract_name: deep
+first_contract_gas_positive: true
+first_contract_sample_count_positive: true
+frames_include_entrypoint: true
+frames_include_prefixed_entrypoint: false
+frames_include_level_one: true
+frames_include_leaf: true
+profile_file_exists: true

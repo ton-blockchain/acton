@@ -6,10 +6,13 @@ import type {TestReport, Trace} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"
+import {GasProfile, type GasProfileReport} from "./components/GasProfile/GasProfile"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
 
 const RUNNER_HEALTH_POLL_INTERVAL_MS = 1500
+
+type ActiveView = "tests" | "coverage" | "profile"
 
 const formatResponseError = (response: Response, body: string): string => {
   const status = `${response.status} ${response.statusText}`.trim()
@@ -73,10 +76,12 @@ export const App: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [coverageLcov, setCoverageLcov] = useState<string | undefined>()
   const [coverageLoaded, setCoverageLoaded] = useState(false)
+  const [gasProfile, setGasProfile] = useState<GasProfileReport | undefined>()
+  const [gasProfileLoaded, setGasProfileLoaded] = useState(false)
   const [connectionLost, setConnectionLost] = useState(false)
-  const [activeView, setActiveView] = useState<"tests" | "coverage">(() => {
+  const [activeView, setActiveView] = useState<ActiveView>(() => {
     const saved = localStorage.getItem("activeMainView")
-    return saved === "coverage" ? "coverage" : "tests"
+    return saved === "coverage" || saved === "profile" ? saved : "tests"
   })
 
   useEffect(() => {
@@ -87,7 +92,7 @@ export const App: React.FC = () => {
   const toggleTheme = useCallback(() => {
     setTheme(prev => (prev === "light" ? "dark" : "light"))
   }, [])
-  const handleActiveViewChange = useCallback((view: "tests" | "coverage") => {
+  const handleActiveViewChange = useCallback((view: ActiveView) => {
     setActiveView(view)
     localStorage.setItem("activeMainView", view)
   }, [])
@@ -192,6 +197,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     const coverageController = new AbortController()
+    const gasProfileController = new AbortController()
     const reportsController = new AbortController()
     const configController = new AbortController()
 
@@ -253,8 +259,37 @@ export const App: React.FC = () => {
         setCoverageLoaded(true)
       })
 
+    void fetch("/api/gas-profile", {signal: gasProfileController.signal})
+      .then(async response => {
+        if (response.status === 204) {
+          markRunnerConnected()
+          setGasProfile(undefined)
+          setGasProfileLoaded(true)
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(`Failed to fetch gas profile: ${response.status}`)
+        }
+
+        const profile = (await response.json()) as GasProfileReport
+        markRunnerConnected()
+        setGasProfile(profile)
+        setGasProfileLoaded(true)
+      })
+      .catch(error => {
+        if (error instanceof Error && error.name === "AbortError") {
+          return
+        }
+
+        console.error("Failed to fetch gas profile", error)
+        setGasProfile(undefined)
+        setGasProfileLoaded(true)
+      })
+
     return () => {
       coverageController.abort()
+      gasProfileController.abort()
       reportsController.abort()
       configController.abort()
     }
@@ -321,7 +356,17 @@ export const App: React.FC = () => {
     if (coverageLoaded && coverageLcov === undefined && activeView === "coverage") {
       handleActiveViewChange("tests")
     }
-  }, [activeView, coverageLcov, coverageLoaded, handleActiveViewChange])
+    if (gasProfileLoaded && gasProfile === undefined && activeView === "profile") {
+      handleActiveViewChange("tests")
+    }
+  }, [
+    activeView,
+    coverageLcov,
+    coverageLoaded,
+    gasProfile,
+    gasProfileLoaded,
+    handleActiveViewChange,
+  ])
 
   if (loading && reports.length === 0) {
     return <div className={styles.loadingContainer}>Loading...</div>
@@ -391,7 +436,7 @@ export const App: React.FC = () => {
       />
 
       <div className={styles.mainContent}>
-        {coverageLcov !== undefined && (
+        {(coverageLcov !== undefined || gasProfile !== undefined) && (
           <div className={styles.viewTabs}>
             <button
               type="button"
@@ -400,18 +445,35 @@ export const App: React.FC = () => {
             >
               Tests
             </button>
-            <button
-              type="button"
-              className={`${styles.viewTab} ${activeView === "coverage" ? styles.viewTabActive : ""}`}
-              onClick={() => handleActiveViewChange("coverage")}
-            >
-              Coverage
-            </button>
+            {coverageLcov !== undefined && (
+              <button
+                type="button"
+                className={`${styles.viewTab} ${
+                  activeView === "coverage" ? styles.viewTabActive : ""
+                }`}
+                onClick={() => handleActiveViewChange("coverage")}
+              >
+                Coverage
+              </button>
+            )}
+            {gasProfile !== undefined && (
+              <button
+                type="button"
+                className={`${styles.viewTab} ${
+                  activeView === "profile" ? styles.viewTabActive : ""
+                }`}
+                onClick={() => handleActiveViewChange("profile")}
+              >
+                Profile
+              </button>
+            )}
           </div>
         )}
 
         <div className={styles.mainPanel}>
-          {activeView === "coverage" && coverageLcov !== undefined ? (
+          {activeView === "profile" && gasProfile !== undefined ? (
+            <GasProfile profile={gasProfile} projectRoot={projectRoot} />
+          ) : activeView === "coverage" && coverageLcov !== undefined ? (
             <Coverage lcov={coverageLcov} projectRoot={projectRoot} />
           ) : selectedTest ? (
             <TestDetails

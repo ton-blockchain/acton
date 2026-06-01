@@ -1,0 +1,241 @@
+.gasProfile {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background-color: var(--bg-color);
+}
+
+.workspace {
+  min-height: 0;
+  flex: 1;
+}
+
+.viewer {
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--bg-color);
+  box-shadow: none;
+}
+
+.contractSelector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 8px 16px 8px 0;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.contractButton {
+  flex: 0 0 auto;
+  max-width: 260px;
+  overflow: hidden;
+  border: none;
+  border-radius: 4px;
+  background-color: var(--bg-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 4px var(--spacing-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s ease;
+}
+
+.contractButton:hover {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.contractButton:focus {
+  outline: 1px solid var(--border-color);
+}
+
+.contractButtonSelected,
+.contractButtonSelected:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-color);
+  font-weight: 600;
+}
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.flameWrap {
+  min-height: 220px;
+  max-height: 58%;
+  overflow: auto;
+  background-color: transparent;
+}
+
+.flameChart {
+  min-width: 100%;
+}
+
+.flameChart :global(.d3-flame-graph) {
+  display: block;
+}
+
+.flameChart :global(.d3-flame-graph rect) {
+  stroke: none !important;
+  stroke-width: 0 !important;
+  fill-opacity: 0.95;
+}
+
+.flameChart :global(.d3-flame-graph rect:hover) {
+  stroke: none !important;
+  stroke-width: 0 !important;
+}
+
+.flameChart :global(.gas-profile-frame-separator) {
+  stroke: var(--bg-color);
+  stroke-width: 1px;
+  pointer-events: none;
+  vector-effect: non-scaling-stroke;
+}
+
+.flameChart :global(.d3-flame-graph-label) {
+  color: #ffffff;
+  font-family: var(--font-family);
+  font-size: 12px;
+  font-weight: var(--font-weight-normal);
+  line-height: 22px;
+}
+
+:global(.d3-flame-graph-tip) {
+  border: 1px solid var(--border-color);
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-tooltip);
+  font-family: var(--font-family);
+  font-size: var(--font-size-xs);
+}
+
+.details {
+  width: fit-content;
+  max-width: 100%;
+  min-height: 0;
+  overflow: auto;
+  margin-top: var(--spacing-md);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 12px var(--spacing-md);
+}
+
+.detailsHeader {
+  min-width: 0;
+  margin-top: var(--spacing-xs);
+}
+
+.detailsTitle {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detailsLocation {
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metricGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin-top: var(--spacing-sm);
+}
+
+.metric {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  margin-right: var(--spacing-md);
+  padding-right: var(--spacing-md);
+  border-right: 1px solid var(--border-color);
+}
+
+.metric:last-child {
+  margin-right: 0;
+  padding-right: 0;
+  border-right: 0;
+}
+
+.metric span {
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 1.2;
+}
+
+.metric strong {
+  overflow: hidden;
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackPath {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0;
+  margin: 0;
+}
+
+.stackPart {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackPart + .stackPart::before {
+  content: "/";
+  padding: 0 var(--spacing-xs);
+  color: var(--text-muted);
+}
+
+.viewerState,
+.emptyState {
+  padding: var(--spacing-lg);
+  color: var(--text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 720px) {
+  .gasProfile {
+    padding: var(--spacing-sm);
+  }
+
+  .contractSelector {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .metric {
+    flex-basis: 100%;
+    margin-right: 0;
+    padding-right: 0;
+    border-right: 0;
+  }
+}
