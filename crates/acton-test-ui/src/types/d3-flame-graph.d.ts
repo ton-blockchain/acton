@@ -1,22 +1,22 @@
 declare module "d3-flame-graph" {
   export interface FlameGraphDatum {
-    name: string
-    value: number
-    children?: FlameGraphDatum[]
-    [key: string]: unknown
+    readonly name: string
+    readonly value: number
+    readonly children?: readonly FlameGraphDatum[]
+    readonly [key: string]: unknown
   }
 
   export interface FlameGraphNode {
-    data: FlameGraphDatum
-    depth: number
-    value?: number
-    x0: number
-    x1: number
-    ancestors(): FlameGraphNode[]
+    readonly data: FlameGraphDatum
+    readonly depth: number
+    readonly value?: number
+    readonly x0: number
+    readonly x1: number
+    ancestors(): readonly FlameGraphNode[]
   }
 
   export interface FlameGraphChart {
-    (selection: any): void
+    (selection: import("d3-selection").Selection<FlameGraphDatum>): void
     width(value: number): this
     minHeight(value: number): this
     cellHeight(value: number): this
@@ -46,5 +46,10 @@ declare module "d3-flame-graph" {
 }
 
 declare module "d3-selection" {
-  export function select(node: Element): any
+  export interface Selection<Datum = unknown> {
+    readonly datum: <NextDatum>(value: NextDatum) => Selection<NextDatum>
+    readonly call: (callback: (selection: Selection<Datum>) => void) => Selection<Datum>
+  }
+
+  export function select(node: Element): Selection
 }

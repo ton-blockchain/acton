@@ -1,10 +1,6 @@
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
-import flamegraph, {
-  tooltip as flamegraphTooltip,
-  type FlameGraphDatum,
-  type FlameGraphNode,
-} from "d3-flame-graph"
+import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
 import {select} from "d3-selection"
 
 import styles from "./GasProfile.module.css"
@@ -49,16 +45,19 @@ interface FlameNode {
   readonly children: FlameNode[]
 }
 
-interface MutableFlameNode {
-  id: string
-  name: string
-  url: string
-  lineNumber: number
-  columnNumber: number
-  selfGas: number
-  totalGas: number
-  children: MutableFlameNode[]
-  childrenByKey: Map<string, MutableFlameNode>
+class MutableFlameNode {
+  selfGas = 0
+  totalGas = 0
+  readonly children: MutableFlameNode[] = []
+  readonly childrenByKey = new Map<string, MutableFlameNode>()
+
+  constructor(
+    readonly id: string,
+    readonly name: string,
+    readonly url = "",
+    readonly lineNumber = -1,
+    readonly columnNumber = -1,
+  ) {}
 }
 
 const MIN_FLAME_WIDTH = 0.5
@@ -129,23 +128,13 @@ const createMutableNode = (
   url = "",
   lineNumber = -1,
   columnNumber = -1,
-): MutableFlameNode => ({
-  id,
-  name,
-  url,
-  lineNumber,
-  columnNumber,
-  selfGas: 0,
-  totalGas: 0,
-  children: [],
-  childrenByKey: new Map(),
-})
+): MutableFlameNode => new MutableFlameNode(id, name, url, lineNumber, columnNumber)
 
 const frameKey = (frame: GasProfileFrame) =>
   `${frame.function_name}\u0000${frame.url}\u0000${frame.line_number}\u0000${frame.column_number}`
 
 const freezeNode = (node: MutableFlameNode): FlameNode => {
-  const children = node.children.map(freezeNode)
+  const children = node.children.map(child => freezeNode(child))
   children.sort((a, b) => b.totalGas - a.totalGas || a.name.localeCompare(b.name))
   node.totalGas = node.selfGas + children.reduce((total, child) => total + child.totalGas, 0)
 
@@ -170,7 +159,7 @@ const toFlameGraphDatum = (node: FlameNode): FlameGraphDatum => ({
   url: node.url,
   lineNumber: node.lineNumber,
   columnNumber: node.columnNumber,
-  children: node.children.map(toFlameGraphDatum),
+  children: node.children.map(child => toFlameGraphDatum(child)),
 })
 
 const buildContractTree = (contract: GasProfileContract): FlameNode => {
@@ -279,7 +268,7 @@ const findHottestLeafPath = (root: FlameNode): FlameNode[] => {
   let hottestPath: FlameNode[] = [root]
 
   const visit = (node: FlameNode, path: FlameNode[]) => {
-    const currentHottest = hottestPath[hottestPath.length - 1]
+    const currentHottest = hottestPath.at(-1)
     if (currentHottest === undefined || node.selfGas > currentHottest.selfGas) {
       hottestPath = path
     }
@@ -342,21 +331,12 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
     return () => observer.disconnect()
   }, [])
 
-  const selectedTree = useMemo(() => {
-    if (selectedContract === undefined) {
-      return undefined
-    }
+  const selectedTree = useMemo(
+    () => selectedContract && buildContractTree(selectedContract),
+    [selectedContract],
+  )
 
-    return buildContractTree(selectedContract)
-  }, [selectedContract])
-
-  const flameData = useMemo(() => {
-    if (selectedTree === undefined) {
-      return undefined
-    }
-
-    return toFlameGraphDatum(selectedTree)
-  }, [selectedTree])
+  const flameData = useMemo(() => selectedTree && toFlameGraphDatum(selectedTree), [selectedTree])
 
   const hottestPath = useMemo(() => {
     if (selectedTree === undefined) {
@@ -366,7 +346,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
     return findHottestLeafPath(selectedTree)
   }, [selectedTree])
 
-  const hottestNode = hottestPath[hottestPath.length - 1]
+  const hottestNode = hottestPath.at(-1)
 
   useEffect(() => {
     if (hottestNode === undefined) {
@@ -422,10 +402,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
       .onClick(node => {
         setSelectedFrame(node.data)
         setSelectedStack(
-          node
-            .ancestors()
-            .reverse()
-            .map(ancestor => flameDatumString(ancestor.data, "name")),
+          [...node.ancestors()].reverse().map(ancestor => flameDatumString(ancestor.data, "name")),
         )
         scheduleFrameSeparatorsUpdate(element)
       })
