@@ -1087,31 +1087,14 @@ fn is_acton_profile_source(url: &str, acton_profile_roots: &[String]) -> bool {
 }
 
 fn acton_profile_roots(runner: &TestRunner) -> Vec<String> {
-    let mut roots = Vec::new();
-
-    if let Some(acton_mapping) = runner
+    runner
         .acton_config
         .mappings()
         .and_then(|mappings| mappings.get("@acton").cloned())
-    {
-        roots.push(acton_mapping);
-    }
-
-    roots.push(
-        runner
-            .project_root
-            .join(".acton")
-            .to_string_lossy()
-            .into_owned(),
-    );
-    let mut roots = roots
-        .into_iter()
         .map(|root| normalize_profile_path(&root))
         .filter(|root| !root.is_empty())
-        .collect::<Vec<_>>();
-    roots.sort();
-    roots.dedup();
-    roots
+        .into_iter()
+        .collect()
 }
 
 fn normalize_profile_path(path: &str) -> String {
