@@ -23,7 +23,7 @@ concurrency:
 permissions: { }
 
 jobs:
-  grammar-audit:
+  yarn-audit:
     name: Yarn audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 

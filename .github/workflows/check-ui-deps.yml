@@ -27,8 +27,8 @@ concurrency:
 permissions: { }
 
 jobs:
-  ui-audit:
-    name: UI audit
+  bun-audit:
+    name: Bun audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:

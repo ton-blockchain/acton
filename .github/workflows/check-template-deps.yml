@@ -23,8 +23,8 @@ concurrency:
 permissions: { }
 
 jobs:
-  template-audit:
-    name: Template audit
+  npm-audit:
+    name: NPM audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
