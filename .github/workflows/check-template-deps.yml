@@ -1,4 +1,4 @@
-name: Check UI Dependencies
+name: Check Template Dependencies
 
 on:
   workflow_call:
@@ -23,8 +23,8 @@ concurrency:
 permissions: { }
 
 jobs:
-  ui-audit:
-    name: UI audit
+  template-audit:
+    name: Template audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
