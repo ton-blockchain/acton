@@ -17,7 +17,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: check-ui-deps-${{ github.ref }}
+  group: check-template-deps-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
