@@ -264,9 +264,7 @@ fn collect_mutations<'a>(
 }
 
 fn mutation_worker_count(config: &TestConfig, total_mutations: usize) -> usize {
-    let available = thread::available_parallelism()
-        .map(std::num::NonZero::get)
-        .unwrap_or(1);
+    let available = thread::available_parallelism().map_or(1, std::num::NonZero::get);
     let configured = config.mutation_workers.unwrap_or(available);
 
     configured.max(1).min(total_mutations.max(1))
@@ -1250,9 +1248,8 @@ pub fn test_mutate_cmd(paths: &[String], config: &TestConfig) -> anyhow::Result<
 
     // Default behavior in mutation child test runs is to skip per-mutant rebuilds.
     // Any explicit value other than "1" turns this optimization off.
-    let skip_build_for_child_tests = std::env::var("ACTON_INTERNAL_SKIP_BUILD")
-        .map(|value| value.trim() == "1")
-        .unwrap_or(true);
+    let skip_build_for_child_tests =
+        std::env::var("ACTON_INTERNAL_SKIP_BUILD").map_or(true, |value| value.trim() == "1");
     let source_snapshots = sources
         .iter()
         .map(|source| MutationSourceSnapshot {

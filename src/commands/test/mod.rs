@@ -823,9 +823,7 @@ fn need_to_build() -> bool {
 }
 
 fn require_tests() -> bool {
-    std::env::var(INTERNAL_REQUIRE_TESTS_ENV)
-        .map(|value| value.trim() == "1")
-        .unwrap_or(false)
+    std::env::var(INTERNAL_REQUIRE_TESTS_ENV).is_ok_and(|value| value.trim() == "1")
 }
 
 fn empty_test_selection_message(

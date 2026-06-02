@@ -1563,55 +1563,53 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
 
         match info.action_phase {
-            None => {}
-            Some(action) => {
-                if action.result_code != 0 {
-                    result += &format!(" action_result_code={}", action.result_code)
-                        .red()
-                        .to_string();
+            Some(action) if action.result_code != 0 => {
+                result += &format!(" action_result_code={}", action.result_code)
+                    .red()
+                    .to_string();
 
-                    extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
+                extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
 
-                    if let Some(info) = exit_codes::find_for_phase(
-                        action.result_code,
-                        exit_codes::ExitCodePhase::Action,
-                    ) {
+                if let Some(info) = exit_codes::find_for_phase(
+                    action.result_code,
+                    exit_codes::ExitCodePhase::Action,
+                ) {
+                    extra_infos.push(FormattedExtraInfo::Tree(format!(
+                        "Description: {}",
+                        info.description.to_string().yellow()
+                    )));
+                }
+
+                // Trying to collect installed and executed out actions
+                let vm_logs = self.emulations.find_tx_logs(tx.lt);
+                let installed_actions = if let Some(vm_logs) = vm_logs {
+                    retrace::find_installed_actions(vm_logs)
+                } else {
+                    InstalledActions::empty()
+                };
+
+                let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
+                if let Some(logs) = executor_logs {
+                    if self.backtrace.is_none() {
                         extra_infos.push(FormattedExtraInfo::Tree(format!(
-                            "Description: {}",
-                            info.description.to_string().yellow()
+                            "Re-run with {} to get actions location",
+                            "--backtrace full".yellow()
                         )));
                     }
 
-                    // Trying to collect installed and executed out actions
-                    let vm_logs = self.emulations.find_tx_logs(tx.lt);
-                    let installed_actions = if let Some(vm_logs) = vm_logs {
-                        retrace::find_installed_actions(vm_logs)
-                    } else {
-                        InstalledActions::empty()
-                    };
-
-                    let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
-                    if let Some(logs) = executor_logs {
-                        if self.backtrace.is_none() {
-                            extra_infos.push(FormattedExtraInfo::Tree(format!(
-                                "Re-run with {} to get actions location",
-                                "--backtrace full".yellow()
-                            )));
-                        }
-
-                        let actions = self.format_actions_retrace(
-                            child_prefix,
-                            tx,
-                            installed_actions,
-                            logs,
-                            contract_letters,
-                        );
-                        if !actions.is_empty() {
-                            extra_infos.push(FormattedExtraInfo::Tree(actions));
-                        }
+                    let actions = self.format_actions_retrace(
+                        child_prefix,
+                        tx,
+                        installed_actions,
+                        logs,
+                        contract_letters,
+                    );
+                    if !actions.is_empty() {
+                        extra_infos.push(FormattedExtraInfo::Tree(actions));
                     }
                 }
             }
+            _ => {}
         }
 
         for ext_msg in &send_result.externals {

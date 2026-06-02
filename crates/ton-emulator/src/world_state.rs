@@ -803,20 +803,15 @@ fn shard_account_exists(account: &ShardAccount) -> bool {
     account
         .account
         .load()
-        .map(|loaded| loaded.0.is_some())
-        .unwrap_or(false)
+        .is_ok_and(|loaded| loaded.0.is_some())
 }
 
 fn shard_account_is_active(account: &ShardAccount) -> bool {
-    account
-        .account
-        .load()
-        .map(|loaded| {
-            loaded
-                .0
-                .is_some_and(|account| matches!(account.state, AccountState::Active(_)))
-        })
-        .unwrap_or(false)
+    account.account.load().is_ok_and(|loaded| {
+        loaded
+            .0
+            .is_some_and(|account| matches!(account.state, AccountState::Active(_)))
+    })
 }
 
 impl WorldState {

@@ -237,7 +237,7 @@ fn print_opcode_gas_table(
             (opcode.clone(), min_gas, max_gas, avg_gas)
         })
         .collect();
-    opcode_gas_stats.sort_by(|a, b| b.3.cmp(&a.3));
+    opcode_gas_stats.sort_by_key(|stats| std::cmp::Reverse(stats.3));
 
     if let Some(baseline) = baseline_with_opcodes {
         let mut comparisons: Vec<GasComparison> = opcode_gas_stats
@@ -255,7 +255,7 @@ fn print_opcode_gas_table(
             }
         }
 
-        comparisons.sort_by(|a, b| b.diff.abs().cmp(&a.diff.abs()));
+        comparisons.sort_by_key(|comparison| std::cmp::Reverse(comparison.diff.abs()));
 
         for comparison in comparisons {
             let color = color_by_percent(comparison.change_percent);
