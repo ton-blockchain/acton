@@ -90,12 +90,16 @@ check-templates-security:
   cd src/commands/new/templates/nft-app && npm audit --audit-level=moderate
   cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
 
-check-security: check-deny check-audit check-templates-security
-    bun audit --audit-level=moderate
+check-grammar-security:
     cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+
+check-ui-security:
+  bun audit --audit-level=moderate
+
+check-security: check-deny check-audit check-templates-security check-grammar-security check-ui-security
     cd crates/ton-ls/editors/code && yarn npm audit --all --recursive --severity=moderate
 
 check-tolk:

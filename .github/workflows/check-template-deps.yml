@@ -1,4 +1,4 @@
-name: Check Grammar Dependencies
+name: Check UI Dependencies
 
 on:
   workflow_call:
@@ -6,25 +6,25 @@ on:
     branches:
       - master
     paths:
-      - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/**"
+      - ".github/workflows/check-template-deps.yml"
+      - "src/commands/new/templates/**-app"
   push:
     branches:
       - master
     paths:
-      - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/**"
+      - ".github/workflows/check-template-deps.yml"
+      - "src/commands/new/templates/**-app"
   workflow_dispatch:
 
 concurrency:
-  group: check-grammar-deps-${{ github.ref }}
+  group: check-ui-deps-${{ github.ref }}
   cancel-in-progress: true
 
 permissions: { }
 
 jobs:
-  grammar-audit:
-    name: Yarn audit
+  ui-audit:
+    name: UI audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
     permissions:
@@ -50,5 +50,5 @@ jobs:
         with:
           node-version: 22.x
 
-      - name: Run Yarn audits
-        run: just check-grammar-security
+      - name: Run npm audit
+        run: just check-templates-security

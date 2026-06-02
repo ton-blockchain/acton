@@ -40,8 +40,14 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        with:
+          tool: just@1.49.0
+          fallback: none
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
       - name: Run Bun audit
-        run: bun audit --audit-level=moderate
+        run: just check-ui-security
