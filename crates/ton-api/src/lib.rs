@@ -54,6 +54,7 @@ fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
 pub enum SendBocErrorKind {
     MissingAccountState,
     RejectedBeforeExecution,
+    TransportFailure,
     Other,
 }
 
@@ -387,7 +388,9 @@ impl TonApiClient {
                 || self.build_post_request(&url).json(&json),
                 "Failed to send BOC",
             )
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+            .map_err(|err| {
+                SendBocError::new(SendBocErrorKind::TransportFailure, format!("{err:#}"))
+            })?;
 
         if !response.status().is_success() {
             return Err(Self::handle_send_boc_fail(response));

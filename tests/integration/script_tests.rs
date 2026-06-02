@@ -8,9 +8,11 @@ use crate::support::toncenter::{
     toncenter_v2_send_boc_ok_response, toncenter_v2_seqno_ok_response,
     write_fork_account_cache_summary,
 };
+use acton_config::color::ColorMode;
 
 use base64::Engine;
 use std::fs;
+use std::net::TcpListener;
 use std::thread;
 use std::time::{Duration, Instant};
 use ton_executor::DEFAULT_CONFIG_DICT;
@@ -18,6 +20,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
 
 const WAIT_FOR_TRACE_MESSAGES: &str = r"
 struct (0x91000001) TriggerForward {
@@ -403,6 +406,14 @@ keys = { mnemonic-file = "mnemonic.txt" }
     .expect("failed to write wallets.toml");
 
     project
+}
+
+fn find_unused_local_port() -> u16 {
+    TcpListener::bind(("127.0.0.1", 0))
+        .expect("failed to reserve an unused local port")
+        .local_addr()
+        .expect("failed to inspect reserved local port")
+        .port()
 }
 
 fn script_body_project(project_name: &str) -> ProjectBuilder {
@@ -3534,6 +3545,64 @@ fn test_script_broadcast_missing_account_state_without_state_init_shows_wallet_s
     );
 
     mock_handle.join().expect("mock toncenter v2 must finish");
+}
+
+#[test]
+fn test_script_broadcast_localnet_unavailable_shows_start_hint() {
+    let project = build_broadcast_wallet_error_project("script-broadcast-localnet-unavailable");
+    let port = find_unused_local_port();
+    append_localnet_network(project.path(), &format!("http://127.0.0.1:{port}/api/v2"));
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("localnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_localnet_unavailable_shows_start_hint.stdout.txt",
+    );
+}
+
+#[test]
+fn test_script_broadcast_localnet_unavailable_colors_start_hint() {
+    let project =
+        build_broadcast_wallet_error_project("script-broadcast-localnet-unavailable-color");
+    let port = find_unused_local_port();
+    append_localnet_network(project.path(), &format!("http://127.0.0.1:{port}/api/v2"));
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("localnet")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .run()
+        .failure();
+
+    output.assert_stdout_svg_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_localnet_unavailable_colors_start_hint.stdout.svg",
+    );
+}
+
+#[test]
+fn test_script_broadcast_testnet_unavailable_shows_doctor_hint() {
+    let project = build_broadcast_wallet_error_project("script-broadcast-testnet-unavailable");
+    let port = find_unused_local_port();
+    let testnet_v2_url = format!("http://127.0.0.1:{port}/api/v2");
+
+    let output = project
+        .acton()
+        .script("scripts/deploy.tolk")
+        .verify_network("testnet")
+        .env(TEST_TONCENTER_TESTNET_V2_URL_ENV, &testnet_v2_url)
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_broadcast_testnet_unavailable_shows_doctor_hint.stdout.txt",
+    );
 }
 
 #[test]
