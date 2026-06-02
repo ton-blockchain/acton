@@ -196,8 +196,7 @@ fn is_npm_available() -> bool {
     Command::new("npm")
         .arg("--version")
         .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+        .is_ok_and(|output| output.status.success())
 }
 
 #[cfg(unix)]
