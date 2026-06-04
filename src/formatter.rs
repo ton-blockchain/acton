@@ -1410,8 +1410,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 continue;
             }
 
-            let Ok(data) = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, body_ty_idx)
-            else {
+            let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, abi, body_ty_idx) else {
                 continue;
             };
             if parser.size_bits() != 0 || parser.size_refs() != 0 {

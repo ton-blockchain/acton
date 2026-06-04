@@ -434,7 +434,7 @@ fn decode_storage_json(
         .or(abi.storage.storage_ty_idx)
         .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
     let mut parser = data.as_slice_allow_exotic();
-    let decoded = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, storage_ty_idx)
+    let decoded = dynamic_unpack::unpack_from_slice(&mut parser, abi, storage_ty_idx)
         .context("Failed to decode storage with compiler ABI")?;
     if parser.size_bits() != 0 || parser.size_refs() != 0 {
         anyhow::bail!(
