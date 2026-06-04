@@ -5353,6 +5353,7 @@ dependencies = [
  "anyhow",
  "base64",
  "crc",
+ "expect-test",
  "num-bigint",
  "serde_json",
  "sha2",
