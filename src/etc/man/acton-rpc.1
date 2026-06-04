@@ -91,6 +91,89 @@ the same \fBcode_hash\fR
 .sp
 If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
+.SS "acton rpc call"
+Call a contract get\-method through TonCenter.
+.SS "Synopsis"
+\fBacton rpc call\fR [\fIoptions\fR] \fIaddress\fR \fImethod\fR [\fIargs\fR\[u2026]]
+.SS "Options"
+.sp
+\fIaddress\fR
+.RS 4
+Contract address in friendly or raw format.
+.RE
+.sp
+\fImethod\fR
+.RS 4
+Get\-method name or numeric TVM method id.
+.RE
+.sp
+\fIargs\fR
+.RS 4
+Arguments to pass to the get\-method.
+.RE
+.sp
+\fB\-\-net\fR \fInetwork\fR
+.RS 4
+Network to query.
+.sp
+Defaults to \fBtestnet\fR\&.
+.sp
+Supported values include \fBmainnet\fR, \fBtestnet\fR, \fBlocalnet\fR, and
+\fBcustom:<name>\fR\&.
+.RE
+.sp
+\fB\-\-json\fR
+.RS 4
+Print machine\-readable JSON output.
+.RE
+.sp
+\fB\-\-raw\fR
+.RS 4
+Print the raw TonCenter stack without ABI decoding.
+.RE
+.SS "ABI Arguments"
+When Acton finds local or bundled ABI metadata for the remote contract,
+get\-method arguments are parsed against that ABI.
+.sp
+The \fImethod\fR argument can be either an ABI get\-method name or a numeric TVM
+method id. When the numeric id is present in the ABI, Acton still uses ABI
+metadata for arguments and result decoding. When the numeric id is not present
+in the ABI, Acton sends the call as a raw get\-method request.
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'integers use Tolk integer literal syntax such as \fB42\fR, \fB\-1\fR, \fB0xff\fR, and
+\fB0b1010\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBbool\fR accepts \fBtrue\fR and \fBfalse\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'nullable supported types accept \fBnull\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBcell\fR, \fBslice\fR, and \fBbitsN\fR accept plain BoC hex without \fBC{}\fR or \fBCS{}\fR
+prefixes
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
+.RE
+.sp
+Without ABI metadata, \fBacton rpc call\fR builds a raw stack from CLI arguments.
+Raw arguments support Tolk integer literals, \fBtrue\fR, \fBfalse\fR, \fBnull\fR, internal
+addresses, \fBaddr_none\fR, plain BoC hex as \fBcell\fR, and explicit \fBcell:\fR, \fBslice:\fR,
+\fBbuilder:\fR, and \fBstring:\fR prefixes.
+.SS "Output"
+When ABI metadata is available and the result stack width matches the
+get\-method return type, Acton prints the decoded Tolk value. Otherwise it prints
+the raw TonCenter stack in a compact field\-per\-line format.
 .SS "acton rpc block"
 Print the latest masterchain block info returned by TonCenter.
 .SS "Synopsis"
@@ -319,7 +402,37 @@ acton rpc info EQC... \-\-net localnet
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Use a custom network defined in another manifest:
+\h'-04' 4.\h'+01'Call a get\-method with ABI\-parsed arguments:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... get_wallet_data \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 5.\h'+01'Call a get\-method by numeric TVM method id:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... 85143 \-\-net mainnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Pass \fBaddr_none\fR to an \fBany_address\fR get\-method argument:
+.sp
+.RS 4
+.nf
+acton rpc call EQC... accepts_any_address addr_none \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 7.\h'+01'Use a custom network defined in another manifest:
 .sp
 .RS 4
 .nf
@@ -329,7 +442,7 @@ acton \-\-manifest\-path ../incident/Acton.toml rpc info EQC... \-\-net custom:s
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Print the latest mainnet masterchain block JSON:
+\h'-04' 8.\h'+01'Print the latest mainnet masterchain block JSON:
 .sp
 .RS 4
 .nf
@@ -339,7 +452,7 @@ acton rpc block \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Print the latest mainnet masterchain block number:
+\h'-04' 9.\h'+01'Print the latest mainnet masterchain block number:
 .sp
 .RS 4
 .nf
@@ -349,13 +462,13 @@ acton rpc block\-number \-\-net mainnet
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Print a transaction trace from localnet:
+\h'-04' 10.\h'+01'Print a transaction trace from localnet:
+.RE
 .sp
 .RS 4
 .nf
 acton rpc trace <tx\-hash> \-\-net localnet
 .fi
-.RE
 .RE
 .SH "SEE ALSO"
 .sp

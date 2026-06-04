@@ -216,8 +216,14 @@ get fun unsupportedStruct(arg: Storage): int {
     return arg.id;
 }
 
-get fun unsupportedAnyAddress(arg: any_address): int {
-    return 0;
+get fun acceptAnyAddress(arg: any_address): int {
+    if (arg.isNone()) {
+        return 1;
+    }
+    if (arg.isInternal()) {
+        return 2;
+    }
+    return 3;
 }
 "#;
 
@@ -298,6 +304,24 @@ fn test_rpc_call_runs_counter_methods_from_localnet() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_call_localnet_argument.stdout.txt",
+        );
+
+    let double_method_id = get_method_id(project.path(), "double").to_string();
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(&counter_address)
+        .arg(&double_method_id)
+        .arg("--net")
+        .arg("localnet")
+        .arg("21")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_numeric_method_id_localnet.stdout.txt",
         );
 
     project
@@ -441,7 +465,7 @@ fn test_rpc_call_decodes_abi_return_types_from_localnet() {
 }
 
 #[test]
-fn test_rpc_call_rejects_abi_errors_from_localnet() {
+fn test_rpc_call_parses_and_rejects_abi_arguments_from_localnet() {
     let (project, node, log_dir, contract_address) =
         deploy_types_contract_to_localnet("rpc-call-localnet-abi-errors");
 
@@ -514,15 +538,32 @@ fn test_rpc_call_rejects_abi_errors_from_localnet() {
         .arg("rpc")
         .arg("call")
         .arg(&contract_address)
-        .arg("unsupportedAnyAddress")
+        .arg("acceptAnyAddress")
         .arg("--net")
         .arg("localnet")
         .arg(MATCHED_INFO_OWNER_ADDRESS)
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_any_address_argument_type.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_any_address_argument_internal.stdout.txt",
+        );
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(&contract_address)
+        .arg("acceptAnyAddress")
+        .arg("--net")
+        .arg("localnet")
+        .arg("addr_none")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_any_address_argument_none.stdout.txt",
         );
 
     node.stop();
@@ -810,12 +851,16 @@ fn test_rpc_call_without_abi_allows_zero_arg_raw_call() {
     mock_handle.join().expect("mock server thread must finish");
 }
 
+#[allow(clippy::significant_drop_tightening)]
 #[test]
-fn test_rpc_call_rejects_arguments_without_abi() {
+fn test_rpc_call_without_abi_parses_raw_arguments() {
     let project = ProjectBuilder::new("rpc-call-args-no-abi").build();
     let log_dir = prepare_log_dir(project.path());
-    let (mock_url, mock_handle) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_with_code_ok_response(
+    let cell_arg = test_cell_boc_hex(0x0102_0304);
+    let slice_arg = test_cell_boc_hex(0x1122_3344);
+    let slice_arg = format!("slice:{slice_arg}");
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_account_info_with_code_ok_response(
             777_000_000,
             &test_cell_boc64(0xdead_beef),
             &test_cell_boc64(0x1234_5678),
@@ -823,7 +868,9 @@ fn test_rpc_call_rejects_arguments_without_abi() {
             "",
             "17",
             "deadbeef",
-        )]);
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(123.into())], 0),
+    ]);
     append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
@@ -836,14 +883,81 @@ fn test_rpc_call_rejects_arguments_without_abi() {
         .arg("--net")
         .arg("custom:mock")
         .arg("1")
+        .arg("0x2a")
+        .arg("true")
+        .arg("null")
+        .arg(MATCHED_INFO_OWNER_ADDRESS)
+        .arg("addr_none")
+        .arg(&cell_arg)
+        .arg(&slice_arg)
+        .arg("string:hello")
         .env("ACTON_LOG_DIR", &log_dir)
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_args_without_abi.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_args_without_abi.stdout.txt",
         );
 
     mock_handle.join().expect("mock server thread must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured requests mutex should not be poisoned");
+    assert_eq!(captured.len(), 2, "expected account info and runGetMethod");
+    assert_json_request_body_snapshot(
+        &captured[1],
+        "integration/snapshots/rpc/test_rpc_call_args_without_abi.request.json",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_call_unknown_numeric_method_id_with_abi_uses_raw_arguments() {
+    let (project, log_dir, code_boc64) = build_rpc_call_project(
+        "rpc-call-numeric-id-raw-with-abi",
+        RPC_CALL_COUNTER_CONTRACT,
+    );
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock_with_capture(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(321.into())], 0),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("123456")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("1")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_unknown_numeric_method_id_with_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured requests mutex should not be poisoned");
+    assert_eq!(captured.len(), 2, "expected account info and runGetMethod");
+    assert_json_request_body_snapshot(
+        &captured[1],
+        "integration/snapshots/rpc/test_rpc_call_unknown_numeric_method_id_with_abi.request.json",
+    );
 }
 
 fn assert_localnet_call_snapshot(
@@ -957,6 +1071,19 @@ fn build_rpc_call_project(name: &str, contract: &str) -> (Project, String, Strin
         .to_owned();
 
     (project, log_dir, code_boc64)
+}
+
+fn get_method_id(project_root: &Path, method_name: &str) -> i64 {
+    let abi_path = project_root.join("build/abi/counter.json");
+    let abi = fs::read_to_string(&abi_path).expect("ABI artifact must exist");
+    let abi: JsonValue = serde_json::from_str(&abi).expect("ABI artifact must be valid json");
+    abi["get_methods"]
+        .as_array()
+        .expect("ABI artifact must contain get_methods")
+        .iter()
+        .find(|method| method["name"].as_str() == Some(method_name))
+        .and_then(|method| method["tvm_method_id"].as_i64())
+        .unwrap_or_else(|| panic!("get-method `{method_name}` must exist in ABI"))
 }
 
 fn test_cell_boc64(value: u32) -> String {

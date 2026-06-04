@@ -165,10 +165,12 @@ SCRIPT ARGUMENTS
        o  cell, slice, and bitsN accept plain BoC hex without C{} or CS{}
           prefixes
 
+       o  any_address accepts an internal address or the addr_none literal
+
        o  arrays accept [item1, item2]
 
        Unsupported parameter types currently include structs, tuple, map, dict,
-       builder, any_address and other complex types.
+       builder and other complex types.
 
 SIDE EFFECTS
        acton script always compiles and executes the selected script. With

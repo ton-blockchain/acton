@@ -73,6 +73,79 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 If no ABI match is found, Acton still prints the raw remote account information
 and reports that decoded storage is unavailable.
 
+### acton rpc call
+
+Call a contract get-method through TonCenter.
+
+#### Synopsis
+
+`acton rpc call` [_options_] _address_ _method_ [_args_...]
+
+#### Options
+
+{{#options command="acton rpc call"}}
+
+{{#option "_address_" }}
+Contract address in friendly or raw format.
+{{/option}}
+
+{{#option "_method_" }}
+Get-method name or numeric TVM method id.
+{{/option}}
+
+{{#option "_args_" }}
+Arguments to pass to the get-method.
+{{/option}}
+
+{{#option "`--net` _network_" }}
+Network to query.
+
+Defaults to `testnet`.
+
+Supported values include `mainnet`, `testnet`, `localnet`, and
+`custom:<name>`.
+{{/option}}
+
+{{#option "`--json`" }}
+Print machine-readable JSON output.
+{{/option}}
+
+{{#option "`--raw`" }}
+Print the raw TonCenter stack without ABI decoding.
+{{/option}}
+
+{{/options}}
+
+#### ABI Arguments
+
+When Acton finds local or bundled ABI metadata for the remote contract,
+get-method arguments are parsed against that ABI.
+
+The _method_ argument can be either an ABI get-method name or a numeric TVM
+method id. When the numeric id is present in the ABI, Acton still uses ABI
+metadata for arguments and result decoding. When the numeric id is not present
+in the ABI, Acton sends the call as a raw get-method request.
+
+- integers use Tolk integer literal syntax such as `42`, `-1`, `0xff`, and
+  `0b1010`
+- `bool` accepts `true` and `false`
+- nullable supported types accept `null`
+- `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}`
+  prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
+- arrays accept `[item1, item2]`
+
+Without ABI metadata, `acton rpc call` builds a raw stack from CLI arguments.
+Raw arguments support Tolk integer literals, `true`, `false`, `null`, internal
+addresses, `addr_none`, plain BoC hex as `cell`, and explicit `cell:`, `slice:`,
+`builder:`, and `string:` prefixes.
+
+#### Output
+
+When ABI metadata is available and the result stack width matches the
+get-method return type, Acton prints the decoded Tolk value. Otherwise it prints
+the raw TonCenter stack in a compact field-per-line format.
+
 ### acton rpc block
 
 Print the latest masterchain block info returned by TonCenter.
@@ -261,25 +334,43 @@ catalog.
    acton rpc info EQC... --net localnet
    ```
 
-4. Use a custom network defined in another manifest:
+4. Call a get-method with ABI-parsed arguments:
+
+   ```bash
+   acton rpc call EQC... get_wallet_data --net mainnet
+   ```
+
+5. Call a get-method by numeric TVM method id:
+
+   ```bash
+   acton rpc call EQC... 85143 --net mainnet
+   ```
+
+6. Pass `addr_none` to an `any_address` get-method argument:
+
+   ```bash
+   acton rpc call EQC... accepts_any_address addr_none --net localnet
+   ```
+
+7. Use a custom network defined in another manifest:
 
    ```bash
    acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
    ```
 
-5. Print the latest mainnet masterchain block JSON:
+8. Print the latest mainnet masterchain block JSON:
 
    ```bash
    acton rpc block --net mainnet
    ```
 
-6. Print the latest mainnet masterchain block number:
+9. Print the latest mainnet masterchain block number:
 
    ```bash
    acton rpc block-number --net mainnet
    ```
 
-7. Print a transaction trace from localnet:
+10. Print a transaction trace from localnet:
 
    ```bash
    acton rpc trace <tx-hash> --net localnet

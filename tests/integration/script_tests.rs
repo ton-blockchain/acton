@@ -2183,13 +2183,18 @@ fn test_script_builder_arg_reports_unsupported_type() {
 }
 
 #[test]
-fn test_script_any_address_arg_reports_unsupported_type() {
+fn test_script_with_any_address_arg() {
     let project = ProjectBuilder::new("script-any-address-arg")
         .script_file(
             "address",
-            r"
-            fun main(a: any_address) {}
-        ",
+            r#"
+            import "../../lib/io"
+
+            fun main(a: any_address, none: any_address) {
+                println("internal: {}", a.isInternal());
+                println("none: {}", none.isNone());
+            }
+        "#,
         )
         .build();
 
@@ -2197,10 +2202,11 @@ fn test_script_any_address_arg_reports_unsupported_type() {
         .acton()
         .script("scripts/address.tolk")
         .arg("EQBvDB_H7FFBs0nF4ap_DBdcOrwY_rMIpNVVOR6SWYFHByMJ")
+        .arg("addr_none")
         .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/script/test_script_any_address_arg_reports_unsupported_type.stderr.txt",
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/script/test_script_with_any_address_arg.stdout.txt",
         );
 }
 

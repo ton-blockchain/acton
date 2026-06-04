@@ -53,6 +53,64 @@ pub fn parse_abi_parameters(
     Ok(Tuple(items))
 }
 
+pub fn parse_raw_stack_args(args: &[String]) -> anyhow::Result<Tuple> {
+    let mut items = Vec::with_capacity(args.len());
+    for arg in args {
+        items.push(parse_raw_stack_arg(arg).map_err(|_| {
+            anyhow!(
+                "Cannot parse raw get-method argument: {}",
+                format_arg_value(arg).yellow()
+            )
+        })?);
+    }
+    Ok(Tuple(items))
+}
+
+fn parse_raw_stack_arg(raw: &str) -> Result<TupleItem, ScriptArgParseError> {
+    let trimmed = raw.trim();
+    if trimmed == "null" {
+        return Ok(TupleItem::Null);
+    }
+    if trimmed == "true" {
+        return Ok(TupleItem::Int(BigInt::from(-1)));
+    }
+    if trimmed == "false" {
+        return Ok(TupleItem::Int(BigInt::from(0)));
+    }
+    if trimmed == "addr_none" {
+        return addr_none_tuple_item();
+    }
+    if let Some(value) = trimmed.strip_prefix("string:") {
+        return string_tuple_item(value);
+    }
+    if let Some(value) = trimmed.strip_prefix("cell:") {
+        return Boc::decode_hex(value)
+            .map(TupleItem::Cell)
+            .map_err(|_| ScriptArgParseError::Invalid);
+    }
+    if let Some(value) = trimmed.strip_prefix("slice:") {
+        return Boc::decode_hex(value)
+            .map(TupleItem::Slice)
+            .map_err(|_| ScriptArgParseError::Invalid);
+    }
+    if let Some(value) = trimmed.strip_prefix("builder:") {
+        return Boc::decode_hex(value)
+            .map(TupleItem::Builder)
+            .map_err(|_| ScriptArgParseError::Invalid);
+    }
+    if let Some(value) = parse_number(trimmed) {
+        return Ok(TupleItem::Int(value));
+    }
+    if let Ok(item) = address_tuple_item(trimmed) {
+        return Ok(item);
+    }
+    if let Ok(cell) = Boc::decode_hex(trimmed) {
+        return Ok(TupleItem::Cell(cell));
+    }
+
+    Err(ScriptArgParseError::Invalid)
+}
+
 fn parse_abi_parameter(
     abi: &ContractABI,
     param: &ABIFunctionParameter,
@@ -120,6 +178,7 @@ fn validate_script_arg_ty(abi: &ContractABI, ty_idx: TyIdx) -> Result<(), Script
         | Ty::String
         | Ty::Address
         | Ty::AddressExt
+        | Ty::AddressAny
         | Ty::AddressOpt
         | Ty::NullLiteral => Ok(()),
         _ => Err(unsupported_ty(abi, ty_idx)),
@@ -211,6 +270,7 @@ impl<'a> ScriptArgParser<'a> {
             Ty::Slice | Ty::BitsN { .. } => self.parse_cell().map(TupleItem::Slice),
             Ty::String => self.parse_string(),
             Ty::Address | Ty::AddressExt => self.parse_address(),
+            Ty::AddressAny => self.parse_any_address(),
             Ty::AddressOpt => {
                 if self.consume_exact_token("null") {
                     Ok(TupleItem::Null)
@@ -266,6 +326,14 @@ impl<'a> ScriptArgParser<'a> {
     fn parse_address(&mut self) -> Result<TupleItem, ScriptArgParseError> {
         let token = self.parse_token()?;
         address_tuple_item(token)
+    }
+
+    fn parse_any_address(&mut self) -> Result<TupleItem, ScriptArgParseError> {
+        if self.consume_exact_token("addr_none") {
+            return addr_none_tuple_item();
+        }
+
+        self.parse_address()
     }
 
     fn parse_array(&mut self, inner_ty_idx: TyIdx) -> Result<TupleItem, ScriptArgParseError> {
@@ -354,7 +422,7 @@ impl<'a> ScriptArgParser<'a> {
     }
 }
 
-fn parse_number(raw: &str) -> Option<BigInt> {
+pub(crate) fn parse_number(raw: &str) -> Option<BigInt> {
     let (negative, raw) = raw
         .strip_prefix('-')
         .map_or((false, raw), |raw| (true, raw));
@@ -380,6 +448,17 @@ fn address_tuple_item(value: &str) -> Result<TupleItem, ScriptArgParseError> {
     .map_err(|_| ScriptArgParseError::Invalid)?;
     let mut builder = CellBuilder::new();
     addr.store_into(&mut builder, Cell::empty_context())
+        .map_err(|_| ScriptArgParseError::Invalid)?;
+    builder
+        .build()
+        .map(TupleItem::Slice)
+        .map_err(|_| ScriptArgParseError::Invalid)
+}
+
+fn addr_none_tuple_item() -> Result<TupleItem, ScriptArgParseError> {
+    let mut builder = CellBuilder::new();
+    builder
+        .store_uint(0, 2)
         .map_err(|_| ScriptArgParseError::Invalid)?;
     builder
         .build()

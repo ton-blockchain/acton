@@ -2,7 +2,7 @@ use super::{
     LocalContractMatch, find_local_contract_match, format_int_address, format_std_address,
     load_rpc_config, resolve_rpc_network,
 };
-use crate::commands::abi_args::parse_abi_parameters;
+use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
 use crate::context::code_lookup_hash;
 use acton_config::color::OwoColorize;
@@ -12,6 +12,7 @@ use acton_debug::{
 };
 use anyhow::{Context, anyhow};
 use log::warn;
+use num_traits::ToPrimitive;
 use std::io::{Write, stderr, stdout};
 use std::process;
 use tolk_compiler::abi::{ABIGetMethod, ContractABI};
@@ -52,19 +53,15 @@ pub(super) fn rpc_call_cmd(
     let abi = contract_match
         .as_ref()
         .and_then(|matched| matched.abi.as_deref());
-    let get_method = match abi {
-        Some(abi) => Some(resolve_get_method(abi, method)?),
-        None if args.is_empty() => None,
-        None => anyhow::bail!(
-            "Cannot parse get-method arguments without ABI for remote contract {}",
-            address.to_string().yellow()
-        ),
-    };
+    let get_method = abi
+        .map(|abi| resolve_get_method(abi, method))
+        .transpose()?
+        .flatten();
 
     let stack = if let (Some(abi), Some(get_method)) = (abi, get_method) {
         parse_abi_parameters(abi, &get_method.parameters, args)?
     } else {
-        Tuple::empty()
+        parse_raw_stack_args(args)?
     };
     let stack_json = legacy_stack_to_json(&stack).context("Failed to encode get-method stack")?;
 
@@ -152,28 +149,43 @@ fn find_contract_match_for_rpc_call(
     Ok(local_match)
 }
 
-fn resolve_get_method<'a>(abi: &'a ContractABI, method: &str) -> anyhow::Result<&'a ABIGetMethod> {
-    abi.get_methods
+fn resolve_get_method<'a>(
+    abi: &'a ContractABI,
+    method: &str,
+) -> anyhow::Result<Option<&'a ABIGetMethod>> {
+    if let Some(get_method) = abi
+        .get_methods
         .iter()
         .find(|get_method| get_method.name == method)
-        .ok_or_else(|| {
-            let available = abi
-                .get_methods
-                .iter()
-                .map(|method| format!(" {}", method.name.yellow()))
-                .collect::<Vec<_>>()
-                .join("\n");
-            anyhow!(
-                "Get method {} not found in ABI for {}\nAvailable get methods:\n{}",
-                method.yellow(),
-                abi.contract_name.green(),
-                if available.is_empty() {
-                    " none".dimmed().to_string()
-                } else {
-                    available
-                }
-            )
-        })
+    {
+        return Ok(Some(get_method));
+    }
+
+    if let Some(method_id) = parse_get_method_id(method) {
+        return Ok(abi.find_get_method_by_id(method_id));
+    }
+
+    let available = abi
+        .get_methods
+        .iter()
+        .map(|method| format!(" {}", method.name.yellow()))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    anyhow::bail!(
+        "Get method {} not found in ABI for {}\nAvailable get methods:\n{}",
+        method.yellow(),
+        abi.contract_name.green(),
+        if available.is_empty() {
+            " none".dimmed().to_string()
+        } else {
+            available
+        }
+    )
+}
+
+fn parse_get_method_id(method: &str) -> Option<i32> {
+    parse_number(method)?.to_i32()
 }
 
 struct DecodedResult {

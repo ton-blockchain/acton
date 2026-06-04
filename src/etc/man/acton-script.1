@@ -214,11 +214,15 @@ Forwarded arguments are parsed against the ABI for \fBmain()\fR\&.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
 .RE
 .sp
 Unsupported parameter types currently include \fBstructs\fR, \fBtuple\fR, \fBmap\fR,
-\fBdict\fR, \fBbuilder\fR, \fBany_address\fR and other complex types.
+\fBdict\fR, \fBbuilder\fR and other complex types.
 .SH "SIDE EFFECTS"
 \fBacton script\fR always compiles and executes the selected script. With
 \fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution

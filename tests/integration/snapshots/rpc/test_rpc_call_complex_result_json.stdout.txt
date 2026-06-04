@@ -4,7 +4,7 @@
   "exitCode": 0,
   "method": "basicReply",
   "network": "localnet",
-  "rawAddress": "0:4972e7cf398408ef65ad1e0ca195cea17cb6ba3f21f6c36622d894afacab2332",
+  "rawAddress": "0:d6394e155363069fef7e28b963b17ad0c461bd68849f9531837fa0b32a51a925",
   "rawStack": [
     [
       "num",

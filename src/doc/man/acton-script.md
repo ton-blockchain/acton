@@ -189,10 +189,11 @@ Forwarded arguments are parsed against the ABI for `main()`.
 - `bool` accepts `true` and `false`
 - nullable supported types accept `null`
 - `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}` prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
 - arrays accept `[item1, item2]`
 
 Unsupported parameter types currently include `structs`, `tuple`, `map`,
-`dict`, `builder`, `any_address` and other complex types.
+`dict`, `builder` and other complex types.
 
 ## Side Effects
 
