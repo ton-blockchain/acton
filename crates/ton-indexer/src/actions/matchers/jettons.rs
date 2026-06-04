@@ -9,7 +9,7 @@ impl BaseMatcher for JettonTransferMatcher {
             return None;
         }
 
-        let internal_transfer = root.find_descendant_by_opcode("JettonInternalTransfer")?;
+        let internal_transfer = root.find_child_by_opcode("JettonInternalTransfer")?;
         let excess = internal_transfer.find_child_by_opcode("Excess");
         let notify = internal_transfer.find_child_by_opcode("JettonNotify");
 
@@ -38,9 +38,22 @@ impl BaseMatcher for JettonMintMatcher {
             return None;
         }
 
+        let internal_transfer = root.find_child_by_opcode("JettonInternalTransfer")?;
+        let notification =
+            internal_transfer.find_child_by_opcode("JettonWalletTransferNotification");
+        let excess = internal_transfer.find_child_by_opcode("Excess");
+
+        let mut nodes = BTreeSet::from([root.id, internal_transfer.id]);
+        if let Some(notification) = notification {
+            nodes.insert(notification.id);
+        }
+        if let Some(excess) = excess {
+            nodes.insert(excess.id);
+        }
+
         Some(BaseMatch {
             kind: BaseActionKind::JettonMint,
-            nodes: BTreeSet::from([root.id]),
+            nodes,
             root_node: root.id,
             user_facing: true,
         })

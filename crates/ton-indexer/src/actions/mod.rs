@@ -3,7 +3,7 @@ mod matchers;
 use matchers::{
     DedustNativeSwapLegMatcher, DedustSwapMatcher, JettonMintMatcher, JettonTransferMatcher,
 };
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 pub type NodeId = u64;
 pub type BaseActionId = u64;
@@ -79,8 +79,58 @@ pub struct CompositeMatch {
     pub nodes: BTreeSet<NodeId>,
 }
 
+#[derive(Debug)]
+pub struct BaseActionGraph<'a> {
+    base_actions: &'a [BaseAction],
+    children: BTreeMap<BaseActionId, BTreeSet<BaseActionId>>,
+}
+
+impl<'a> BaseActionGraph<'a> {
+    fn new(trace: &Trace, base_actions: &'a [BaseAction]) -> Self {
+        let node_owners = base_actions
+            .iter()
+            .flat_map(|action| {
+                action
+                    .nodes
+                    .iter()
+                    .map(move |node_id| (*node_id, action.id))
+            })
+            .collect::<BTreeMap<_, _>>();
+        let mut children = base_actions
+            .iter()
+            .map(|action| (action.id, BTreeSet::new()))
+            .collect();
+
+        collect_base_action_graph_edges(&trace.root, &node_owners, &mut children);
+
+        Self {
+            base_actions,
+            children,
+        }
+    }
+
+    #[must_use]
+    pub const fn base_actions(&self) -> &[BaseAction] {
+        self.base_actions
+    }
+
+    pub fn children_of(&self, action_id: BaseActionId) -> impl Iterator<Item = &BaseAction> + '_ {
+        self.children
+            .get(&action_id)
+            .into_iter()
+            .flat_map(|children| children.iter())
+            .filter_map(|child_id| self.action(*child_id))
+    }
+
+    fn action(&self, action_id: BaseActionId) -> Option<&BaseAction> {
+        self.base_actions
+            .iter()
+            .find(|action| action.id == action_id)
+    }
+}
+
 pub trait CompositeMatcher {
-    fn try_match(&self, trace: &Trace, base_actions: &[BaseAction]) -> Vec<CompositeMatch>;
+    fn try_match(&self, graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch>;
 }
 
 #[must_use]
@@ -88,7 +138,8 @@ pub fn extract_actions(trace: &Trace) -> Extraction {
     let mut base_actions = extract_base_actions(trace);
     add_fallback_base_actions(&trace.root, &mut base_actions);
 
-    let composite_actions = extract_composite_actions(trace, &base_actions);
+    let base_action_graph = BaseActionGraph::new(trace, &base_actions);
+    let composite_actions = extract_composite_actions(&base_action_graph);
     let consumed_base_actions = composite_actions
         .iter()
         .flat_map(|action| action.base_actions.iter().copied())
@@ -204,14 +255,14 @@ fn add_fallback_base_actions(root: &TraceNode, base_actions: &mut Vec<BaseAction
     }
 }
 
-fn extract_composite_actions(trace: &Trace, base_actions: &[BaseAction]) -> Vec<CompositeMatch> {
+fn extract_composite_actions(graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch> {
     let matchers: &[&dyn CompositeMatcher] = &[&DedustSwapMatcher];
 
     let mut composite_actions = Vec::new();
     let mut consumed_base_actions = BTreeSet::new();
 
     for matcher in matchers {
-        for composite_match in matcher.try_match(trace, base_actions) {
+        for composite_match in matcher.try_match(graph) {
             if composite_match
                 .base_actions
                 .iter()
@@ -226,6 +277,28 @@ fn extract_composite_actions(trace: &Trace, base_actions: &[BaseAction]) -> Vec<
     }
 
     composite_actions
+}
+
+fn collect_base_action_graph_edges(
+    node: &TraceNode,
+    node_owners: &BTreeMap<NodeId, BaseActionId>,
+    children: &mut BTreeMap<BaseActionId, BTreeSet<BaseActionId>>,
+) {
+    let parent_owner = node_owners.get(&node.id).copied();
+
+    for child in &node.children {
+        let child_owner = node_owners.get(&child.id).copied();
+        if let (Some(parent_owner), Some(child_owner)) = (parent_owner, child_owner)
+            && parent_owner != child_owner
+        {
+            children
+                .entry(parent_owner)
+                .or_default()
+                .insert(child_owner);
+        }
+
+        collect_base_action_graph_edges(child, node_owners, children);
+    }
 }
 
 const fn next_base_action_id(base_actions: &[BaseAction]) -> BaseActionId {
@@ -251,41 +324,10 @@ impl TraceNode {
         nodes
     }
 
-    pub(super) fn find_descendant_by_opcode(&self, opcode: &str) -> Option<&Self> {
-        self.children.iter().find_map(|child| {
-            if opcode_matches(child, opcode) {
-                Some(child)
-            } else {
-                child.find_descendant_by_opcode(opcode)
-            }
-        })
-    }
-
     pub(super) fn find_child_by_opcode(&self, opcode: &str) -> Option<&Self> {
         self.children
             .iter()
             .find(|child| opcode_matches(child, opcode))
-    }
-
-    pub(super) fn contains_descendant(&self, ancestor_id: NodeId, descendant_id: NodeId) -> bool {
-        let Some(ancestor) = self.find_by_id(ancestor_id) else {
-            return false;
-        };
-
-        ancestor
-            .descendants_preorder()
-            .into_iter()
-            .any(|node| node.id == descendant_id)
-    }
-
-    fn find_by_id(&self, node_id: NodeId) -> Option<&Self> {
-        if self.id == node_id {
-            return Some(self);
-        }
-
-        self.children
-            .iter()
-            .find_map(|child| child.find_by_id(node_id))
     }
 }
 

@@ -1,6 +1,6 @@
 use super::super::{
-    ActionKind, BaseAction, BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch,
-    CompositeMatcher, Trace, TraceNode, opcode_matches,
+    ActionKind, BaseActionGraph, BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch,
+    CompositeMatcher, TraceNode, opcode_matches,
 };
 use std::collections::BTreeSet;
 
@@ -12,9 +12,9 @@ impl BaseMatcher for DedustNativeSwapLegMatcher {
             return None;
         }
 
-        let pool_swap = root.find_descendant_by_opcode("DedustPoolV2SwapExternal")?;
-        let payout = pool_swap.find_descendant_by_opcode("DedustPoolV2PayOutFromPool")?;
-        let swap_event = pool_swap.find_descendant_by_opcode("DedustPoolV2SwapEvent");
+        let pool_swap = root.find_child_by_opcode("DedustPoolV2SwapExternal")?;
+        let payout = pool_swap.find_child_by_opcode("DedustPoolV2PayOutFromPool")?;
+        let swap_event = pool_swap.find_child_by_opcode("DedustPoolV2SwapEvent");
 
         let mut nodes = BTreeSet::from([root.id, pool_swap.id, payout.id]);
         if let Some(swap_event) = swap_event {
@@ -33,19 +33,15 @@ impl BaseMatcher for DedustNativeSwapLegMatcher {
 pub(in crate::actions) struct DedustSwapMatcher;
 
 impl CompositeMatcher for DedustSwapMatcher {
-    fn try_match(&self, trace: &Trace, base_actions: &[BaseAction]) -> Vec<CompositeMatch> {
-        base_actions
+    fn try_match(&self, graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch> {
+        graph
+            .base_actions()
             .iter()
             .filter(|action| action.kind == BaseActionKind::DedustNativeSwapLeg)
             .filter_map(|swap_leg| {
-                let jetton_transfer = base_actions
-                    .iter()
-                    .filter(|action| action.kind == BaseActionKind::JettonTransfer)
-                    .find(|action| {
-                        swap_leg.nodes.iter().any(|node_id| {
-                            trace.root.contains_descendant(*node_id, action.root_node)
-                        })
-                    })?;
+                let jetton_transfer = graph
+                    .children_of(swap_leg.id)
+                    .find(|action| action.kind == BaseActionKind::JettonTransfer)?;
 
                 let mut nodes = swap_leg.nodes.clone();
                 nodes.extend(jetton_transfer.nodes.iter().copied());
