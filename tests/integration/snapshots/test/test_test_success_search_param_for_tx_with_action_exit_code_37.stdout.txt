@@ -11,7 +11,7 @@
   ✗ foo [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── 0x00000001 1 TON -> simple B                                                gas=836 aborted action_result_code=37
+        └── GetgemsDeployerAcceptDeploy 1 TON -> simple B                               gas=836 aborted action_result_code=37
             ├── account created
             ├── Action phase failed
             ├── Description: Not enough Toncoin

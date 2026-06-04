@@ -777,6 +777,8 @@ fn render_cell_address(
     ty_idx: TyIdx,
     cell: &CellLike,
 ) -> RenderedValue {
+    // TonCenter returns address stack values as cells, so ABI address fields
+    // need this decode path before falling back to generic cell rendering.
     if let Some(address) = decode_cell_like(cell).and_then(|cell| cell.parse::<IntAddr>().ok()) {
         render_int_address(type_name, &address)
     } else {
@@ -2558,6 +2560,7 @@ fn debug_format(
         },
 
         Ty::Address | Ty::AddressOpt | Ty::AddressExt | Ty::AddressAny => match r.read_slot() {
+            // TonCenter encodes get-method address values as cells in legacy stack JSON.
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 render_cell_address(symbols, ty_name, ty_idx, cell)
             }
@@ -2780,14 +2783,6 @@ fn debug_format(
 }
 
 pub(crate) fn debug_print_from_stack(
-    symbols: &SourceMap,
-    slots: &[SlotValue],
-    ty_idx: TyIdx,
-) -> RenderedValue {
-    debug_print_from_stack_impl(symbols, slots, ty_idx)
-}
-
-fn debug_print_from_stack_impl(
     symbols: &dyn UnpackSchema,
     slots: &[SlotValue],
     ty_idx: TyIdx,
@@ -2817,31 +2812,15 @@ fn tuple_items_to_vm_stack_values(tuple: &Tuple) -> Vec<VmStackValue> {
     tuple.iter().map(tuple_item_to_vm_stack_value).collect()
 }
 
-pub fn render_tuple_as_tolk_type(
-    symbols: &SourceMap,
-    tuple: &Tuple,
-    ty_idx: TyIdx,
-) -> RenderedValue {
-    render_tuple_as_tolk_type_impl(symbols, tuple, ty_idx)
-}
-
 #[must_use]
-pub fn render_abi_tuple_as_tolk_type(
-    abi: &ContractABI,
-    tuple: &Tuple,
-    ty_idx: TyIdx,
-) -> RenderedValue {
-    render_tuple_as_tolk_type_impl(abi, tuple, ty_idx)
-}
-
-fn render_tuple_as_tolk_type_impl(
+pub fn render_tuple_as_tolk_type(
     symbols: &dyn UnpackSchema,
     tuple: &Tuple,
     ty_idx: TyIdx,
 ) -> RenderedValue {
     let stack_values = tuple_items_to_vm_stack_values(tuple);
     let slots: Vec<SlotValue<'_>> = stack_values.iter().map(SlotValue::Live).collect();
-    debug_print_from_stack_impl(symbols, &slots, ty_idx)
+    debug_print_from_stack(symbols, &slots, ty_idx)
 }
 
 pub fn render_tuple_item_as_tolk_type(
@@ -2856,7 +2835,7 @@ pub fn render_tuple_item_as_tolk_type(
         _ => {
             let stack_value = tuple_item_to_vm_stack_value(item);
             let slots = [SlotValue::Live(&stack_value)];
-            debug_print_from_stack_impl(symbols, &slots, ty_idx)
+            debug_print_from_stack(symbols, &slots, ty_idx)
         }
     }
 }

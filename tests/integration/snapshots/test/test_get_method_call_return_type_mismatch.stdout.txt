@@ -10,6 +10,6 @@
  > tests/test.test.tolk (1 test)
   ✓ foo [TIME]
     └─ Test output:
-       Counter: not a TVM slice
+       Counter: cell{[BOC_HEX]}
 
  ✓ 1 passed in 1 file

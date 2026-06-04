@@ -8,7 +8,7 @@ use crate::context::code_lookup_hash;
 use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use acton_debug::{
-    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, render_abi_tuple_as_tolk_type,
+    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type,
 };
 use anyhow::{Context, anyhow};
 use log::warn;
@@ -204,7 +204,7 @@ fn decode_get_method_result(
         });
     }
 
-    let rendered = render_abi_tuple_as_tolk_type(abi, tuple, return_ty_idx);
+    let rendered = render_tuple_as_tolk_type(abi, tuple, return_ty_idx);
     let options = PrettyRenderOptions {
         address_format: pretty_address_format(network),
         address_labels: Default::default(),

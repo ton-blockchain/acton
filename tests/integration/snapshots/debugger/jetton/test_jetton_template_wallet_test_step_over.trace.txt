@@ -7,3 +7,40 @@ Step 1 (before):
      15|     val transferAmount = ton("5");
   Registers:
     c4 (storage): cell = empty cell
+
+Step 2 (step_over):
+  Code:
+     13| get fun `test wallet: owner can send jettons`() {
+     14|     val (minter, deployer, notDeployer) = setupTest();
+     15|     val transferAmount = ton("5");
+                                  ^^^^^^^^
+     16|     val senderWallet = mintTo(minter, deployer, deployer.address, ton("20"));
+  Variables:
+    minter: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+  Registers:
+    c4 (storage): cell = empty cell
+
+Step 3 (step_over):
+  Code:
+     14|     val (minter, deployer, notDeployer) = setupTest();
+     15|     val transferAmount = ton("5");
+     16|     val senderWallet = mintTo(minter, deployer, deployer.address, ton("20"));
+                                                                           ^^^^^^^^^
+     17|     val receiverWallet = userWallet(minter, notDeployer.address);
+  Variables:
+    minter: JettonMinter
+      address: address = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
+      stateInit = <optimized out>
+    deployer: Treasury
+      address: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
+    notDeployer: Treasury
+      address: address = 0:4842fbab22edb5bcffb2b5310593f42b977523db304f175166b2e5fcc88d2a45
+    transferAmount: coins = 5000000000
+  Registers:
+    c4 (storage): cell = empty cell

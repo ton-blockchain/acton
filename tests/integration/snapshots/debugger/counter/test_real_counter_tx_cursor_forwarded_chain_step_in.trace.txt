@@ -4044,7 +4044,7 @@ Step 192 (step_in):
     175| }
   Variables:
     self: Receiver
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState = (last seen)
     (return value): int = 43
   Registers:
@@ -4064,7 +4064,7 @@ Step 193 (step_in):
       address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
       init: ContractState
     receiver: Receiver
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState = (last seen)
     trigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
@@ -4097,7 +4097,7 @@ Step 194 (step_in):
       address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
       init: ContractState
     receiver: Receiver = (last seen)
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState
     trigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
@@ -4130,7 +4130,7 @@ Step 195 (step_in):
       address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
       init: ContractState
     receiver: Receiver = (last seen)
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState
     trigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
@@ -4163,7 +4163,7 @@ Step 196 (step_in):
       address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
       init: ContractState
     receiver: Receiver = (last seen)
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState
     trigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
@@ -4196,7 +4196,7 @@ Step 197 (step_in):
       address: address = 0:40b6012b35c96f8c1f483e88fd7416a38c7ef6504ef7cc5e099d32665fc69fa4
       init: ContractState
     receiver: Receiver = (last seen)
-      address: address = not a TVM slice
+      address: address = cell{[BOC_HEX]}
       init: ContractState
     trigger: OutMessage = (last seen)
       messageCell: cell = 779 bits, 0 refs, hash: [HASH]
