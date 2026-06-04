@@ -1,7 +1,8 @@
 mod matchers;
 
 use matchers::{
-    DedustNativeSwapLegMatcher, DedustSwapMatcher, JettonMintMatcher, JettonTransferMatcher,
+    DedustJettonSwapLegMatcher, DedustNativeSwapLegMatcher, DedustPayoutMatcher, DedustSwapMatcher,
+    JettonMintMatcher, JettonTransferMatcher, PtonTransferMatcher, StonfiSwapMatcher,
 };
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -23,6 +24,10 @@ pub struct TraceNode {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BaseActionKind {
     DedustNativeSwapLeg,
+    DedustJettonSwapLeg,
+    DedustPayout,
+    StonfiSwap,
+    PtonTransfer,
     JettonTransfer,
     JettonMint,
     TonTransfer,
@@ -41,6 +46,9 @@ pub struct BaseAction {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActionKind {
     DedustSwap,
+    DedustPayout,
+    StonfiSwap,
+    PtonTransfer,
     JettonTransfer,
     JettonMint,
     TonTransfer,
@@ -176,6 +184,10 @@ pub fn extract_actions(trace: &Trace) -> Extraction {
 fn extract_base_actions(trace: &Trace) -> Vec<BaseAction> {
     let matchers: &[&dyn BaseMatcher] = &[
         &DedustNativeSwapLegMatcher,
+        &DedustJettonSwapLegMatcher,
+        &DedustPayoutMatcher,
+        &StonfiSwapMatcher,
+        &PtonTransferMatcher,
         &JettonTransferMatcher,
         &JettonMintMatcher,
     ];
@@ -256,7 +268,7 @@ fn add_fallback_base_actions(root: &TraceNode, base_actions: &mut Vec<BaseAction
 }
 
 fn extract_composite_actions(graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch> {
-    let matchers: &[&dyn CompositeMatcher] = &[&DedustSwapMatcher];
+    let matchers: &[&dyn CompositeMatcher] = &[&StonfiSwapMatcher, &DedustSwapMatcher];
 
     let mut composite_actions = Vec::new();
     let mut consumed_base_actions = BTreeSet::new();
@@ -307,7 +319,11 @@ const fn next_base_action_id(base_actions: &[BaseAction]) -> BaseActionId {
 
 const fn action_kind_for_base(kind: BaseActionKind) -> Option<ActionKind> {
     match kind {
-        BaseActionKind::DedustNativeSwapLeg => None,
+        BaseActionKind::DedustNativeSwapLeg
+        | BaseActionKind::DedustJettonSwapLeg
+        | BaseActionKind::StonfiSwap => None,
+        BaseActionKind::DedustPayout => Some(ActionKind::DedustPayout),
+        BaseActionKind::PtonTransfer => Some(ActionKind::PtonTransfer),
         BaseActionKind::JettonTransfer => Some(ActionKind::JettonTransfer),
         BaseActionKind::JettonMint => Some(ActionKind::JettonMint),
         BaseActionKind::TonTransfer => Some(ActionKind::TonTransfer),

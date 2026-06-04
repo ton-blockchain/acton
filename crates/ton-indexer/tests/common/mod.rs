@@ -66,11 +66,15 @@ pub(crate) fn parse_trace(source: &str) -> Trace {
 }
 
 fn parse_trace_line(line: &str) -> (usize, TraceNode) {
-    let Some(edge_start) = line.find(['├', '└']) else {
+    let Some((edge_start, edge_column)) = line
+        .char_indices()
+        .enumerate()
+        .find_map(|(column, (byte, char))| matches!(char, '├' | '└').then_some((byte, column)))
+    else {
         return (0, parse_trace_node(line));
     };
 
-    let depth = edge_start / 4 + 1;
+    let depth = edge_column / 4 + 1;
     let content = line[edge_start..]
         .trim_start_matches(['├', '└', '─'])
         .trim();
