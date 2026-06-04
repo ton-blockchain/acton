@@ -11,7 +11,7 @@
   ✗ foo [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── GetgemsDeployerAcceptDeploy 1 TON -> simple B                               gas=332 exit_code=10 aborted
+        └── 0x00000001 1 TON -> simple B                                                gas=332 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── account created
         

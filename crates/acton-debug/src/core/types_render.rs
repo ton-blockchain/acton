@@ -2503,6 +2503,18 @@ fn debug_format(
         },
 
         Ty::Slice | Ty::Remaining | Ty::BitsN { .. } => match r.read_slot() {
+            // TonCenter can encode get-method slice values as cells in legacy stack JSON.
+            SlotValue::Live(VmStackValue::Cell(cell)) => {
+                let (bits, refs, hash) = cell_like_meta(cell);
+                render_openable_cell_like(
+                    ty_name,
+                    render_cell_like(cell),
+                    bits,
+                    refs,
+                    hash,
+                    Some(cell.clone()),
+                )
+            }
             SlotValue::Live(VmStackValue::CellSlice(cs)) => {
                 let (bits, refs, hash) = slice_meta(cs);
                 render_openable_cell_like(

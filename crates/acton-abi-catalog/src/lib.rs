@@ -183,11 +183,18 @@ fn opcodes_from_abi(abi: &ContractABI) -> Vec<u32> {
     for declaration in &abi.declarations {
         let ABIDeclaration::Struct {
             prefix: Some(prefix),
+            fields,
             ..
         } = declaration
         else {
             continue;
         };
+
+        // A bare `0x00000001` body is too ambiguous for code-hash-free fallback.
+        // Keep entries like Getgems deploy code-hash matched only.
+        if prefix.prefix_len == 32 && prefix.prefix_num == 1 && fields.is_empty() {
+            continue;
+        }
 
         if prefix.prefix_len == 32
             && prefix.prefix_num != 0
@@ -254,6 +261,18 @@ mod tests {
         assert!(
             abis.is_empty(),
             "zero opcode is too ambiguous for global catalog fallback"
+        );
+    }
+
+    #[test]
+    fn does_not_index_empty_opcode_one_for_global_fallback() {
+        let abis = find_abis_by_opcode(1);
+
+        assert!(
+            !abis
+                .iter()
+                .any(|abi| abi.contract_name == "GetgemsDeployer"),
+            "empty opcode 1 must stay code-hash matched instead of a global fallback"
         );
     }
 

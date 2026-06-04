@@ -1200,7 +1200,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             return Some(decoded);
         }
 
-        let abis = self.with_opcode_fallback_abis(abis, opcode);
+        let abis = if Self::should_use_opcode_fallback(opcode, body_tail.as_ref()) {
+            self.with_opcode_fallback_abis(abis, opcode)
+        } else {
+            abis
+        };
         for abi in abis {
             let candidates = Self::compiler_message_candidates(&abi, direction, opcode);
             if let Some(decoded) = self.try_decode_message_body_types(
@@ -1214,6 +1218,18 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
 
         None
+    }
+
+    fn should_use_opcode_fallback(opcode: Option<u32>, body_tail: Option<&CellSlice<'_>>) -> bool {
+        // `0x00000001` with no payload is too common to decode through the
+        // global catalog. A code-hash matched ABI can still decode it earlier.
+        if opcode == Some(1)
+            && body_tail.is_some_and(|tail| tail.size_bits() == 0 && tail.size_refs() == 0)
+        {
+            return false;
+        }
+
+        true
     }
 
     fn compiler_message_candidates(

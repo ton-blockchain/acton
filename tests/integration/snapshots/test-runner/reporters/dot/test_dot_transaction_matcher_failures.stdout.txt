@@ -9,7 +9,7 @@ xx
 ✗ test dot missing successful tx tree
   expect(actual).toHaveSuccessfulTx(expected)
   N/A -> sender A
-  └── GetgemsDeployerAcceptDeploy 1 TON -> failing B                              gas=332 exit_code=77 aborted
+  └── 0x00000001 1 TON -> failing B                                               gas=332 exit_code=77 aborted
       └── account created
   
   Cannot find transaction from <any> to <any>
@@ -21,7 +21,7 @@ xx
 ✗ test dot unexpected failed tx tree
   expect(actual).toHaveAllSuccessfulTxs(expected)
   N/A -> sender A
-  └── GetgemsDeployerAcceptDeploy 1 TON -> failing B                              gas=332 exit_code=77 aborted
+  └── 0x00000001 1 TON -> failing B                                               gas=332 exit_code=77 aborted
       └── account created
   
   Unexpected transaction

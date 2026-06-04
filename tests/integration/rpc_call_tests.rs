@@ -77,6 +77,24 @@ get fun ownerReply(): OwnerReply {
 }
 "#;
 
+const RPC_CALL_EDGE_RETURN_CONTRACT: &str = r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+}
+
+fun onInternalMessage(_in: InMessage) {}
+
+get fun sliceReply(): slice {
+    return beginCell().storeUint(0x11223344, 32).endCell().beginParse();
+}
+
+get fun boolReply(): bool {
+    return true;
+}
+"#;
+
 const RPC_CALL_TYPES_CONTRACT: &str = r#"
 import "types"
 import "@stdlib/lisp-lists"
@@ -716,6 +734,84 @@ fn test_rpc_call_decodes_address_result_from_cell_stack_item() {
         .success()
         .assert_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_call_address_cell_result.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_decodes_slice_result_from_cell_stack_item() {
+    let (project, log_dir, code_boc64) =
+        build_rpc_call_project("rpc-call-slice-cell-result", RPC_CALL_EDGE_RETURN_CONTRACT);
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(
+            vec![TupleItem::Cell(test_cell(0x1122_3344, 32))],
+            0,
+        ),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("sliceReply")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_slice_cell_result.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_json_keeps_invalid_bool_leaf_as_string() {
+    let (project, log_dir, code_boc64) =
+        build_rpc_call_project("rpc-call-invalid-bool-json", RPC_CALL_EDGE_RETURN_CONTRACT);
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Cell(test_cell(1, 1))], 0),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("boolReply")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--json")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_invalid_bool_json.stdout.txt",
         );
 
     mock_handle.join().expect("mock server thread must finish");

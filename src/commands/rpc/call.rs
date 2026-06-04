@@ -295,7 +295,11 @@ fn leaf_value_to_json(value: &str, type_field: Option<&str>) -> serde_json::Valu
         return serde_json::Value::Null;
     }
     if type_field == Some("bool") {
-        return serde_json::Value::Bool(value == "true");
+        return match value {
+            "true" => serde_json::Value::Bool(true),
+            "false" => serde_json::Value::Bool(false),
+            _ => serde_json::Value::String(value.to_owned()),
+        };
     }
     if type_field == Some("string")
         && let Some(unquoted) = value.strip_prefix('"').and_then(|s| s.strip_suffix('"'))
@@ -310,9 +314,10 @@ fn rendered_address_value(
     fields: &[(String, RenderedValue)],
     network: &Network,
 ) -> String {
-    let field_name = match network {
-        Network::Mainnet => "mainnet",
-        Network::Testnet | Network::Localnet | Network::Custom(_) => "testnet",
+    let field_name = if network.uses_testnet_address_format() {
+        "testnet"
+    } else {
+        "mainnet"
     };
     fields
         .iter()
@@ -328,9 +333,10 @@ fn rendered_address_value(
 }
 
 const fn pretty_address_format(network: &Network) -> PrettyAddressFormat {
-    match network {
-        Network::Mainnet => PrettyAddressFormat::Mainnet,
-        Network::Testnet | Network::Localnet | Network::Custom(_) => PrettyAddressFormat::Testnet,
+    if network.uses_testnet_address_format() {
+        PrettyAddressFormat::Testnet
+    } else {
+        PrettyAddressFormat::Mainnet
     }
 }
 
@@ -450,4 +456,35 @@ fn format_get_method_signature(abi: &ContractABI, method: &ABIGetMethod) -> Stri
         params,
         abi.render_type(method.return_ty_idx)
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Arc;
+
+    #[test]
+    fn custom_network_uses_mainnet_address_format_for_decoded_results() {
+        let fields = vec![
+            ("mainnet".to_owned(), RenderedValue::leaf("mainnet-address")),
+            ("testnet".to_owned(), RenderedValue::leaf("testnet-address")),
+        ];
+
+        assert_eq!(
+            rendered_address_value("raw-address", &fields, &Network::Custom(Arc::from("mock"))),
+            "mainnet-address"
+        );
+        assert!(matches!(
+            pretty_address_format(&Network::Custom(Arc::from("mock"))),
+            PrettyAddressFormat::Mainnet
+        ));
+    }
+
+    #[test]
+    fn invalid_bool_leaf_stays_string_in_json() {
+        assert_eq!(
+            leaf_value_to_json("not a TVM int", Some("bool")),
+            serde_json::Value::String("not a TVM int".to_owned())
+        );
+    }
 }
