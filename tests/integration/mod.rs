@@ -33,6 +33,7 @@ mod println_tests;
 mod prompt_wallet_tests;
 mod reporters_tests;
 mod retrace_tests;
+mod rpc_call_tests;
 mod rpc_tests;
 mod run_tests;
 mod scenarios;

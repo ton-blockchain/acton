@@ -1,16 +1,16 @@
 use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::{ActonCommand, Project, ProjectBuilder};
+use crate::support::toncenter::{
+    ToncenterV2MockResponse, append_custom_network, append_custom_network_with_urls,
+    append_localnet_network, spawn_toncenter_v2_mock_with_capture as spawn_toncenter_v2_mock,
+    toncenter_v2_account_info_with_code_ok_response as toncenter_v2_account_info_ok_response,
+    toncenter_v2_masterchain_info_ok_response,
+};
 use serde_json::Value as JsonValue;
 use std::fs;
-use std::io::{BufRead, BufReader, ErrorKind, Write};
-use std::net::TcpListener;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-use std::{thread, vec};
-use tvm_ffi::json_stack::legacy_stack_to_json;
-use tvm_ffi::stack::{Tuple, TupleItem};
+use std::time::Duration;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::message::IntAddr;
@@ -184,45 +184,6 @@ contract Precompiled {
     storage: Storage
 }
 ";
-const RPC_CALL_COUNTER_CONTRACT: &str = r#"
-import "types"
-
-contract Counter {
-    storage: Storage
-}
-
-fun onInternalMessage(_in: InMessage) {}
-
-get fun currentCounter(): int {
-    val storage = lazy Storage.load();
-
-    return storage.counter;
-}
-
-get fun double(value: uint32): int {
-    return value * 2;
-}
-"#;
-const RPC_CALL_ADDRESS_CONTRACT: &str = r#"
-import "types"
-
-struct OwnerReply {
-    owner: address
-}
-
-contract Counter {
-    storage: Storage
-}
-
-fun onInternalMessage(_in: InMessage) {}
-
-get fun ownerReply(): OwnerReply {
-    val storage = lazy Storage.load();
-
-    return OwnerReply { owner: storage.owner };
-}
-"#;
-
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_rpc_info_prints_remote_account_without_local_abi_match() {
@@ -238,7 +199,7 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
             "17",
             "deadbeef",
         )]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     let output = project
         .acton()
@@ -317,7 +278,7 @@ fn test_rpc_info_decodes_storage_when_local_code_hash_matches() {
             "999",
             "c0ffee",
         )]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
         .acton()
@@ -388,7 +349,7 @@ fn test_rpc_info_decodes_storage_for_boc_contract_with_types() {
             "999",
             "c0ffee",
         )]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
         .acton()
@@ -449,7 +410,7 @@ fn test_rpc_info_skips_broken_contract_candidates_and_matches_later_contract() {
             "999",
             "c0ffee",
         )]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
         .acton()
@@ -509,360 +470,6 @@ fn test_rpc_info_rejects_invalid_address() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_info_invalid_address.stderr.txt",
         );
-}
-
-#[allow(clippy::significant_drop_tightening)]
-#[test]
-fn test_rpc_call_runs_zero_arg_get_method_with_local_abi() {
-    let project = ProjectBuilder::new("rpc-call-local-abi")
-        .file("contracts/types", TRACE_COUNTER_TYPES)
-        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
-        .build();
-    let log_dir = prepare_log_dir(project.path());
-
-    project
-        .acton()
-        .build()
-        .contract("counter")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success();
-
-    let artifact_path = project.path().join("build/counter.json");
-    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
-    let artifact: JsonValue =
-        serde_json::from_str(&artifact).expect("build artifact must be valid json");
-    let code_boc64 = artifact["code_boc64"]
-        .as_str()
-        .expect("build artifact must contain code_boc64");
-
-    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_account_info_ok_response(
-            1_234_000_000,
-            code_boc64,
-            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
-            "active",
-            "",
-            "999",
-            "c0ffee",
-        ),
-        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 0),
-    ]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(MATCHED_INFO_ADDRESS)
-        .arg("currentCounter")
-        .arg("--net")
-        .arg("custom:mock")
-        .env("MOCK_API_KEY", "custom-mock-api-key")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success()
-        .assert_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_zero_arg_local_abi.stdout.txt",
-        );
-
-    mock_handle.join().expect("mock server thread must finish");
-
-    let captured = captured
-        .lock()
-        .expect("captured requests mutex should not be poisoned");
-    assert_eq!(captured.len(), 2, "expected account info and runGetMethod");
-    assert_eq!(captured[0].method, "GET");
-    assert_eq!(captured[1].method, "POST");
-    assert_eq!(captured[1].path, "/api/v2/jsonRPC");
-    assert_eq!(
-        header_value(&captured[1].headers, "X-API-Key"),
-        Some("custom-mock-api-key"),
-        "rpc call should send TonCenter API keys for custom networks from MOCK_API_KEY",
-    );
-}
-
-#[test]
-fn test_rpc_call_parses_abi_arguments_and_prints_json() {
-    let project = ProjectBuilder::new("rpc-call-args-json")
-        .file("contracts/types", TRACE_COUNTER_TYPES)
-        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
-        .build();
-    let log_dir = prepare_log_dir(project.path());
-
-    project
-        .acton()
-        .build()
-        .contract("counter")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success();
-
-    let artifact_path = project.path().join("build/counter.json");
-    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
-    let artifact: JsonValue =
-        serde_json::from_str(&artifact).expect("build artifact must be valid json");
-    let code_boc64 = artifact["code_boc64"]
-        .as_str()
-        .expect("build artifact must contain code_boc64");
-
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_account_info_ok_response(
-            1_234_000_000,
-            code_boc64,
-            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
-            "active",
-            "",
-            "999",
-            "c0ffee",
-        ),
-        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(14.into())], 0),
-    ]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(MATCHED_INFO_ADDRESS)
-        .arg("double")
-        .arg("--net")
-        .arg("custom:mock")
-        .arg("--json")
-        .arg("7")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success()
-        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_call_args_json.stdout.txt");
-
-    mock_handle.join().expect("mock server thread must finish");
-}
-
-#[test]
-fn test_rpc_call_decodes_address_result_from_cell_stack_item() {
-    let project = ProjectBuilder::new("rpc-call-address-cell-result")
-        .file("contracts/types", TRACE_COUNTER_TYPES)
-        .contract("counter", RPC_CALL_ADDRESS_CONTRACT)
-        .build();
-    let log_dir = prepare_log_dir(project.path());
-
-    project
-        .acton()
-        .build()
-        .contract("counter")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success();
-
-    let artifact_path = project.path().join("build/counter.json");
-    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
-    let artifact: JsonValue =
-        serde_json::from_str(&artifact).expect("build artifact must be valid json");
-    let code_boc64 = artifact["code_boc64"]
-        .as_str()
-        .expect("build artifact must contain code_boc64");
-
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_account_info_ok_response(
-            1_234_000_000,
-            code_boc64,
-            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
-            "active",
-            "",
-            "999",
-            "c0ffee",
-        ),
-        toncenter_v2_run_get_method_ok_response(
-            vec![TupleItem::Cell(address_cell(MATCHED_INFO_OWNER_ADDRESS))],
-            0,
-        ),
-    ]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(MATCHED_INFO_ADDRESS)
-        .arg("ownerReply")
-        .arg("--net")
-        .arg("custom:mock")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success()
-        .assert_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_address_cell_result.stdout.txt",
-        );
-
-    mock_handle.join().expect("mock server thread must finish");
-}
-
-#[test]
-fn test_rpc_call_prints_nonzero_exit_code_after_result() {
-    let project = ProjectBuilder::new("rpc-call-nonzero-exit-code")
-        .file("contracts/types", TRACE_COUNTER_TYPES)
-        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
-        .build();
-    let log_dir = prepare_log_dir(project.path());
-
-    project
-        .acton()
-        .build()
-        .contract("counter")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success();
-
-    let artifact_path = project.path().join("build/counter.json");
-    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
-    let artifact: JsonValue =
-        serde_json::from_str(&artifact).expect("build artifact must be valid json");
-    let code_boc64 = artifact["code_boc64"]
-        .as_str()
-        .expect("build artifact must contain code_boc64");
-
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_account_info_ok_response(
-            1_234_000_000,
-            code_boc64,
-            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
-            "active",
-            "",
-            "999",
-            "c0ffee",
-        ),
-        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 11),
-    ]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(MATCHED_INFO_ADDRESS)
-        .arg("currentCounter")
-        .arg("--net")
-        .arg("custom:mock")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .failure()
-        .assert_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_nonzero_exit_code.stdout.txt",
-        );
-
-    mock_handle.join().expect("mock server thread must finish");
-}
-
-#[test]
-fn test_rpc_call_without_abi_allows_zero_arg_raw_call() {
-    let project = ProjectBuilder::new("rpc-call-raw-no-abi").build();
-    let log_dir = prepare_log_dir(project.path());
-    let raw_cell =
-        Boc::decode_base64(test_cell_boc64(0x1234_5678)).expect("raw stack cell BoC must decode");
-    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
-        toncenter_v2_account_info_ok_response(
-            777_000_000,
-            &test_cell_boc64(0xdead_beef),
-            &test_cell_boc64(0x1234_5678),
-            "active",
-            "",
-            "17",
-            "deadbeef",
-        ),
-        toncenter_v2_run_get_method_ok_response(
-            vec![
-                TupleItem::Int(11.into()),
-                TupleItem::Cell(address_cell(MATCHED_INFO_OWNER_ADDRESS)),
-                TupleItem::Slice(addr_none_cell()),
-                TupleItem::Cell(raw_cell),
-                TupleItem::Int(20.into()),
-                TupleItem::Int(10.into()),
-                TupleItem::Int(0.into()),
-                TupleItem::Int(1.into()),
-                TupleItem::Int(2.into()),
-                TupleItem::Int(123.into()),
-            ],
-            0,
-        ),
-    ]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(RAW_INFO_ADDRESS)
-        .arg("seqno")
-        .arg("--net")
-        .arg("custom:mock")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success()
-        .assert_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_raw_without_abi.stdout.txt",
-        );
-
-    mock_handle.join().expect("mock server thread must finish");
-}
-
-#[test]
-fn test_rpc_call_rejects_unknown_get_method_when_abi_is_known() {
-    let project = ProjectBuilder::new("rpc-call-unknown-method")
-        .file("contracts/types", TRACE_COUNTER_TYPES)
-        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
-        .build();
-    let log_dir = prepare_log_dir(project.path());
-
-    project
-        .acton()
-        .build()
-        .contract("counter")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .success();
-
-    let artifact_path = project.path().join("build/counter.json");
-    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
-    let artifact: JsonValue =
-        serde_json::from_str(&artifact).expect("build artifact must be valid json");
-    let code_boc64 = artifact["code_boc64"]
-        .as_str()
-        .expect("build artifact must contain code_boc64");
-
-    let (mock_url, mock_handle, _) =
-        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
-            1_234_000_000,
-            code_boc64,
-            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
-            "active",
-            "",
-            "999",
-            "c0ffee",
-        )]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
-
-    project
-        .acton()
-        .current_dir(project.path())
-        .arg("rpc")
-        .arg("call")
-        .arg(MATCHED_INFO_ADDRESS)
-        .arg("missing")
-        .arg("--net")
-        .arg("custom:mock")
-        .env("ACTON_LOG_DIR", &log_dir)
-        .run()
-        .failure()
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/rpc/test_rpc_call_unknown_get_method.stderr.txt",
-        );
-
-    mock_handle.join().expect("mock server thread must finish");
 }
 
 #[test]
@@ -925,7 +532,7 @@ fn test_rpc_info_decodes_storage_from_localnet() {
         .before_start(ActonCommand::build)
         .args(["--accounts", "deployer"])
         .start();
-    append_localnet_network(project.path(), &node.base_url());
+    append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
     let log_dir = prepare_log_dir(project.path());
 
     let deploy_output = project
@@ -938,7 +545,7 @@ fn test_rpc_info_decodes_storage_from_localnet() {
     deploy_output.success();
 
     let counter_address = extract_marker_value(&deploy_stdout, "COUNTER_ADDRESS=");
-    wait_until_address_state_active(&node, &counter_address, Duration::from_secs(12));
+    node.wait_until_address_state_active(&counter_address, Duration::from_secs(12));
 
     let output = project
         .acton()
@@ -966,7 +573,7 @@ fn test_rpc_block_prints_full_toncenter_masterchain_info() {
     let log_dir = prepare_log_dir(project.path());
     let (mock_url, mock_handle, captured) =
         spawn_toncenter_v2_mock(vec![toncenter_v2_masterchain_info_ok_response(123_456)]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
         .acton()
@@ -1008,7 +615,7 @@ fn test_rpc_block_number_uses_custom_network_and_api_key() {
     let log_dir = prepare_log_dir(project.path());
     let (mock_url, mock_handle, captured) =
         spawn_toncenter_v2_mock(vec![toncenter_v2_masterchain_info_ok_response(123_456)]);
-    write_custom_network_config(project.path(), "mock", &mock_url);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
 
     project
         .acton()
@@ -1090,7 +697,12 @@ fn test_rpc_trace_uses_v3_traces_and_formatter_context() {
             code_boc64,
         ),
     ]);
-    write_custom_network_config_with_v3(project.path(), "mock", &mock_url);
+    append_custom_network_with_urls(
+        project.path(),
+        "mock",
+        &format!("{mock_url}/api/v2"),
+        &format!("{mock_url}/api/v3"),
+    );
 
     let output = project
         .acton()
@@ -1173,7 +785,12 @@ fn test_rpc_trace_formats_v3_trace_without_in_msg() {
         spawn_toncenter_v2_mock(vec![toncenter_v3_trace_without_in_msg_response(
             MATCHED_INFO_ADDRESS,
         )]);
-    write_custom_network_config_with_v3(project.path(), "mock", &mock_url);
+    append_custom_network_with_urls(
+        project.path(),
+        "mock",
+        &format!("{mock_url}/api/v2"),
+        &format!("{mock_url}/api/v3"),
+    );
 
     project
         .acton()
@@ -1204,220 +821,6 @@ fn test_rpc_trace_formats_v3_trace_without_in_msg() {
         format!("/api/v3/traces?tx_hash={TRACE_ROOT_HASH}&limit=1"),
         "unexpected trace request path"
     );
-}
-
-#[derive(Debug, Clone)]
-struct ToncenterV2MockResponse {
-    status: u16,
-    body: String,
-}
-
-#[derive(Debug, Clone)]
-struct CapturedToncenterV2Request {
-    method: String,
-    path: String,
-    headers: Vec<(String, String)>,
-}
-
-fn spawn_toncenter_v2_mock(
-    responses: Vec<ToncenterV2MockResponse>,
-) -> (
-    String,
-    thread::JoinHandle<()>,
-    Arc<Mutex<Vec<CapturedToncenterV2Request>>>,
-) {
-    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("failed to bind TonCenter mock");
-    listener
-        .set_nonblocking(true)
-        .expect("failed to set TonCenter mock non-blocking");
-    let addr = listener
-        .local_addr()
-        .expect("failed to get TonCenter mock address");
-
-    let captured_requests = Arc::new(Mutex::new(Vec::<CapturedToncenterV2Request>::new()));
-    let captured_requests_thread = Arc::clone(&captured_requests);
-
-    let handle = thread::spawn(move || {
-        for response in responses {
-            let wait_until = Instant::now() + Duration::from_secs(30);
-            let mut stream = loop {
-                match listener.accept() {
-                    Ok((stream, _)) => break stream,
-                    Err(err) if err.kind() == ErrorKind::WouldBlock => {
-                        assert!(
-                            Instant::now() <= wait_until,
-                            "timed out waiting for TonCenter request"
-                        );
-                        thread::sleep(Duration::from_millis(10));
-                    }
-                    Err(err) => panic!("TonCenter mock accept failed: {err}"),
-                }
-            };
-
-            stream
-                .set_read_timeout(Some(Duration::from_secs(2)))
-                .expect("failed to set TonCenter mock read timeout");
-
-            let mut reader = BufReader::new(
-                stream
-                    .try_clone()
-                    .expect("failed to clone TonCenter mock stream"),
-            );
-
-            let request_line = read_request_line(&mut reader);
-            let mut parts = request_line.split_whitespace();
-            let method = parts.next().unwrap_or_default().to_owned();
-            let path = parts.next().unwrap_or_default().to_owned();
-            let headers = read_headers(&mut reader);
-
-            captured_requests_thread
-                .lock()
-                .expect("captured requests mutex should not be poisoned")
-                .push(CapturedToncenterV2Request {
-                    method,
-                    path,
-                    headers,
-                });
-
-            let raw_response = format!(
-                "HTTP/1.1 {} {}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
-                response.status,
-                status_text(response.status),
-                response.body.len(),
-                response.body
-            );
-            stream
-                .write_all(raw_response.as_bytes())
-                .expect("failed to write TonCenter response");
-            stream.flush().expect("failed to flush TonCenter response");
-        }
-    });
-
-    (format!("http://{addr}"), handle, captured_requests)
-}
-
-fn read_request_line(reader: &mut BufReader<std::net::TcpStream>) -> String {
-    let mut request_line = String::new();
-    let read_deadline = Instant::now() + Duration::from_secs(2);
-    loop {
-        request_line.clear();
-        match reader.read_line(&mut request_line) {
-            Ok(0) => {
-                assert!(
-                    Instant::now() <= read_deadline,
-                    "timed out waiting for TonCenter request line"
-                );
-                thread::sleep(Duration::from_millis(10));
-            }
-            Ok(_) => return request_line,
-            Err(err) if matches!(err.kind(), ErrorKind::WouldBlock | ErrorKind::TimedOut) => {
-                assert!(
-                    Instant::now() <= read_deadline,
-                    "timed out waiting for TonCenter request line"
-                );
-                thread::sleep(Duration::from_millis(10));
-            }
-            Err(err) => panic!("failed to read TonCenter request line: {err}"),
-        }
-    }
-}
-
-fn read_headers(reader: &mut BufReader<std::net::TcpStream>) -> Vec<(String, String)> {
-    let mut headers = Vec::new();
-    loop {
-        let mut header_line = String::new();
-        let read = reader
-            .read_line(&mut header_line)
-            .expect("failed to read TonCenter header line");
-        if read == 0 || header_line == "\r\n" {
-            return headers;
-        }
-
-        if let Some((name, value)) = header_line.split_once(':') {
-            headers.push((name.trim().to_owned(), value.trim().to_owned()));
-        }
-    }
-}
-
-fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
-    headers
-        .iter()
-        .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
-        .map(|(_, value)| value.as_str())
-}
-
-fn status_text(status: u16) -> &'static str {
-    match status {
-        200 => "OK",
-        400 => "Bad Request",
-        404 => "Not Found",
-        429 => "Too Many Requests",
-        500 => "Internal Server Error",
-        _ => "Unknown",
-    }
-}
-
-fn toncenter_v2_account_info_ok_response(
-    balance: i64,
-    code_boc64: &str,
-    data_boc64: &str,
-    state: &str,
-    frozen_hash: &str,
-    lt: &str,
-    hash: &str,
-) -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "balance": balance.to_string(),
-                "code": code_boc64,
-                "data": data_boc64,
-                "state": state,
-                "frozen_hash": frozen_hash,
-                "last_transaction_id": {
-                    "lt": lt,
-                    "hash": hash,
-                }
-            }
-        })
-        .to_string(),
-    }
-}
-
-fn toncenter_v2_run_get_method_ok_response(
-    stack: Vec<TupleItem>,
-    exit_code: i32,
-) -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "stack": legacy_stack_to_json(&Tuple(stack)).expect("stack must serialize to legacy json"),
-                "exit_code": exit_code
-            }
-        })
-        .to_string(),
-    }
-}
-
-fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "last": {
-                    "@type": "ton.blockIdExt",
-                    "workchain": -1,
-                    "shard": "-9223372036854775808",
-                    "seqno": seqno,
-                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
-                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-                }
-            }
-        })
-        .to_string(),
-    }
 }
 
 fn toncenter_v3_trace_ok_response(
@@ -1600,13 +1003,6 @@ fn toncenter_v3_trace_without_in_msg_response(account: &str) -> ToncenterV2MockR
     }
 }
 
-fn test_cell_boc64(value: u32) -> String {
-    let mut builder = CellBuilder::new();
-    builder.store_u32(value).expect("must store u32");
-    let cell = builder.build().expect("must build cell");
-    Boc::encode_base64(&cell)
-}
-
 fn counter_increase_body_boc64(increase_by: u32) -> String {
     let mut builder = CellBuilder::new();
     builder
@@ -1645,43 +1041,11 @@ fn counter_storage_boc64(id: u32, owner_address: &str, counter: u32) -> String {
     Boc::encode_base64(&cell)
 }
 
-fn address_cell(address: &str) -> Cell {
-    let address = address.parse::<IntAddr>().expect("address must parse");
+fn test_cell_boc64(value: u32) -> String {
     let mut builder = CellBuilder::new();
-    address
-        .store_into(&mut builder, Cell::empty_context())
-        .expect("must store address");
-    builder.build().expect("must build address cell")
-}
-
-fn addr_none_cell() -> Cell {
-    let mut builder = CellBuilder::new();
-    builder.store_uint(0, 2).expect("must store addr_none");
-    builder.build().expect("must build addr_none cell")
-}
-
-fn write_custom_network_config(project_root: &Path, name: &str, url: &str) {
-    use std::fmt::Write as _;
-
-    let config_path = project_root.join("Acton.toml");
-    let mut config = fs::read_to_string(&config_path).expect("Acton.toml must exist");
-    let _ = write!(
-        config,
-        "\n[networks.{name}]\napi = {{ v2 = \"{url}/api/v2\" }}\n"
-    );
-    fs::write(config_path, config).expect("failed to update Acton.toml");
-}
-
-fn write_custom_network_config_with_v3(project_root: &Path, name: &str, url: &str) {
-    use std::fmt::Write as _;
-
-    let config_path = project_root.join("Acton.toml");
-    let mut config = fs::read_to_string(&config_path).expect("Acton.toml must exist");
-    let _ = write!(
-        config,
-        "\n[networks.{name}]\napi = {{ v2 = \"{url}/api/v2\", v3 = \"{url}/api/v3\" }}\n"
-    );
-    fs::write(config_path, config).expect("failed to update Acton.toml");
+    builder.store_u32(value).expect("must store u32");
+    let cell = builder.build().expect("must build cell");
+    Boc::encode_base64(&cell)
 }
 
 fn write_deployer_wallets(project_root: &Path) {
@@ -1691,25 +1055,8 @@ fn write_deployer_wallets(project_root: &Path) {
 
 fn start_localnet_with_localnet(project: &Project) -> crate::support::localnet::LocalnetHandle {
     let node = project.localnet().args(["--accounts", "deployer"]).start();
-    append_localnet_network(project.path(), &node.base_url());
+    append_localnet_network(project.path(), &format!("{}/api/v2", node.base_url()));
     node
-}
-
-fn append_localnet_network(project_path: &Path, base_url: &str) {
-    use std::fmt::Write as _;
-
-    let acton_toml_path = project_path.join("Acton.toml");
-    let mut acton_toml =
-        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    let _ = write!(
-        acton_toml,
-        r#"
-
-[networks.localnet]
-api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
-"#
-    );
-    fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
 }
 
 fn stdout(output: &crate::support::assertions::TestOutput) -> String {
@@ -1726,25 +1073,11 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
         .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"))
 }
 
-fn wait_until_address_state_active(
-    node: &crate::support::localnet::LocalnetHandle,
-    address: &str,
-    timeout: Duration,
-) {
-    let query = format!("/api/v2/getAddressState?address={address}");
-    let deadline = Instant::now() + timeout;
-    loop {
-        let response = node.get_json(&query);
-        if response["ok"].as_bool() == Some(true) && response["result"].as_str() == Some("active") {
-            return;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Timed out waiting for address `{address}` to become active:\n{}",
-            serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-        thread::sleep(Duration::from_millis(200));
-    }
+fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
+    headers
+        .iter()
+        .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
+        .map(|(_, value)| value.as_str())
 }
 
 fn prepare_log_dir(project_root: &Path) -> String {

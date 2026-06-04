@@ -315,6 +315,53 @@ pub(crate) fn toncenter_v2_account_info_ok_response(
     }
 }
 
+pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
+    balance: i64,
+    code_boc64: &str,
+    data_boc64: &str,
+    state: &str,
+    frozen_hash: &str,
+    lt: &str,
+    hash: &str,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "balance": balance.to_string(),
+                "code": code_boc64,
+                "data": data_boc64,
+                "state": state,
+                "frozen_hash": frozen_hash,
+                "last_transaction_id": {
+                    "lt": lt,
+                    "hash": hash,
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "last": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
 pub(crate) fn toncenter_v2_shard_account_cell_ok_response(
     shard_account: &ShardAccount,
 ) -> ToncenterV2MockResponse {

@@ -1,0 +1,37 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "contract": "counter",
+  "exitCode": 0,
+  "method": "basicReply",
+  "network": "localnet",
+  "rawAddress": "0:4972e7cf398408ef65ad1e0ca195cea17cb6ba3f21f6c36622d894afacab2332",
+  "rawStack": [
+    [
+      "num",
+      "-0x1"
+    ],
+    [
+      "cell",
+      {
+        "bytes": "te6ccgEBAQEABwAACmhlbGxv"
+      }
+    ],
+    [
+      "slice",
+      {
+        "bytes": "te6ccgEBAQEAJAAAQ4AKJ9kvYYwFIDh54pWBVLEFJI0S05maGwlJh/cDz/EvU5A="
+      }
+    ],
+    [
+      "null",
+      null
+    ]
+  ],
+  "result": {
+    "maybeOwner": null,
+    "ok": true,
+    "owner": "[WALLET_ADDRESS_BASE]",
+    "title": "hello"
+  },
+  "signature": "basicReply(): BasicReply"
+}
