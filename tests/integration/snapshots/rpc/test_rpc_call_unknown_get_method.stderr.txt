@@ -1,0 +1,4 @@
+Error: Get method missing not found in ABI for Counter
+Available get methods:
+ currentCounter
+ double

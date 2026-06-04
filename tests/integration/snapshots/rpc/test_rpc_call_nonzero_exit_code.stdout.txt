@@ -1,0 +1,3 @@
+42
+
+Error: Get method currentCounter not found ([EXIT_STATUS] 11)

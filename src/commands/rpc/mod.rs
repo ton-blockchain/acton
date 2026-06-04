@@ -22,6 +22,7 @@ use tycho_types::models::{
     Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
 };
 
+mod call;
 mod trace;
 
 #[derive(Subcommand, Clone)]
@@ -35,6 +36,27 @@ pub enum RpcCommand {
             help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
         )]
         net: Option<String>,
+    },
+    #[command(about = "Call a contract get-method through TonCenter")]
+    Call {
+        #[arg(help = "Contract address in friendly or raw format")]
+        address: String,
+        #[arg(help = "Get-method name")]
+        method: String,
+        #[arg(
+            help = "Arguments to pass to the get-method",
+            allow_hyphen_values = true
+        )]
+        args: Vec<String>,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
+        raw: bool,
     },
     #[command(about = "Print the latest masterchain block info returned by TonCenter")]
     Block {
@@ -87,6 +109,14 @@ pub enum RpcCommand {
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
         RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
+        RpcCommand::Call {
+            address,
+            method,
+            args,
+            net,
+            json,
+            raw,
+        } => call::rpc_call_cmd(&address, &method, &args, net, json, raw),
         RpcCommand::Block { net } => rpc_block_cmd(net),
         RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
         RpcCommand::Trace {
@@ -235,14 +265,14 @@ fn rpc_block_number_cmd(net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
+pub(super) fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
     net.as_deref()
         .map(Network::from_str)
         .transpose()
         .map(|network| network.unwrap_or(Network::Testnet))
 }
 
-fn load_rpc_config() -> anyhow::Result<ActonConfig> {
+pub(super) fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     let manifest_path = acton_config::config::manifest_path();
     match ActonConfig::load() {
         Ok(config) => Ok(config),
@@ -256,13 +286,12 @@ fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     }
 }
 
-#[derive(Clone)]
-struct LocalContractMatch {
-    contract_name: String,
-    abi: Option<Arc<ContractABI>>,
+pub(super) struct LocalContractMatch {
+    pub(super) contract_name: String,
+    pub(super) abi: Option<Arc<ContractABI>>,
 }
 
-fn find_local_contract_match(
+pub(super) fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
 ) -> anyhow::Result<Option<LocalContractMatch>> {
@@ -466,20 +495,20 @@ fn compiler_data_to_json(data: &UnpackedValue, network: &Network) -> serde_json:
     }
 }
 
-fn format_int_address(address: &IntAddr, network: &Network) -> String {
+pub(super) fn format_int_address(address: &IntAddr, network: &Network) -> String {
     match address {
         IntAddr::Std(address) => format_std_address(address, network),
         IntAddr::Var(address) => IntAddr::Var(address.clone()).to_string(),
     }
 }
 
-fn format_std_address(address: &StdAddr, network: &Network) -> String {
+pub(super) fn format_std_address(address: &StdAddr, network: &Network) -> String {
     DisplayBase64StdAddr {
         addr: address,
         flags: Base64StdAddrFlags {
             testnet: network.uses_testnet_address_format(),
             bounceable: true,
-            base64_url: false,
+            base64_url: true,
         },
     }
     .to_string()
@@ -487,11 +516,11 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
 
 const LABEL_WIDTH: usize = 18;
 
-fn print_section(title: &str) {
+pub(super) fn print_section(title: &str) {
     println!("\n{}", title.bold().cyan());
 }
 
-fn print_kv(label: &str, value: impl AsRef<str>) {
+pub(super) fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!(
         "  {} {}",
@@ -513,7 +542,7 @@ fn format_hash(hash: &HashBytes) -> String {
     format!("0x{hash}").yellow().to_string()
 }
 
-fn print_yaml_value(key: Option<&str>, value: &serde_json::Value, indent: usize) {
+pub(super) fn print_yaml_value(key: Option<&str>, value: &serde_json::Value, indent: usize) {
     let prefix = " ".repeat(indent);
     match value {
         serde_json::Value::Null

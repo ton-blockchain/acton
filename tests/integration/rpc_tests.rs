@@ -9,6 +9,8 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use std::{thread, vec};
+use tvm_ffi::json_stack::legacy_stack_to_json;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::message::IntAddr;
@@ -182,6 +184,44 @@ contract Precompiled {
     storage: Storage
 }
 ";
+const RPC_CALL_COUNTER_CONTRACT: &str = r#"
+import "types"
+
+contract Counter {
+    storage: Storage
+}
+
+fun onInternalMessage(_in: InMessage) {}
+
+get fun currentCounter(): int {
+    val storage = lazy Storage.load();
+
+    return storage.counter;
+}
+
+get fun double(value: uint32): int {
+    return value * 2;
+}
+"#;
+const RPC_CALL_ADDRESS_CONTRACT: &str = r#"
+import "types"
+
+struct OwnerReply {
+    owner: address
+}
+
+contract Counter {
+    storage: Storage
+}
+
+fun onInternalMessage(_in: InMessage) {}
+
+get fun ownerReply(): OwnerReply {
+    val storage = lazy Storage.load();
+
+    return OwnerReply { owner: storage.owner };
+}
+"#;
 
 #[allow(clippy::significant_drop_tightening)]
 #[test]
@@ -469,6 +509,360 @@ fn test_rpc_info_rejects_invalid_address() {
         .assert_stderr_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_info_invalid_address.stderr.txt",
         );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_call_runs_zero_arg_get_method_with_local_abi() {
+    let project = ProjectBuilder::new("rpc-call-local-abi")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .build()
+        .contract("counter")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+
+    let artifact_path = project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 0),
+    ]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("currentCounter")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("MOCK_API_KEY", "custom-mock-api-key")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_zero_arg_local_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured requests mutex should not be poisoned");
+    assert_eq!(captured.len(), 2, "expected account info and runGetMethod");
+    assert_eq!(captured[0].method, "GET");
+    assert_eq!(captured[1].method, "POST");
+    assert_eq!(captured[1].path, "/api/v2/jsonRPC");
+    assert_eq!(
+        header_value(&captured[1].headers, "X-API-Key"),
+        Some("custom-mock-api-key"),
+        "rpc call should send TonCenter API keys for custom networks from MOCK_API_KEY",
+    );
+}
+
+#[test]
+fn test_rpc_call_parses_abi_arguments_and_prints_json() {
+    let project = ProjectBuilder::new("rpc-call-args-json")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .build()
+        .contract("counter")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+
+    let artifact_path = project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(14.into())], 0),
+    ]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("double")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--json")
+        .arg("7")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_call_args_json.stdout.txt");
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_decodes_address_result_from_cell_stack_item() {
+    let project = ProjectBuilder::new("rpc-call-address-cell-result")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", RPC_CALL_ADDRESS_CONTRACT)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .build()
+        .contract("counter")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+
+    let artifact_path = project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(
+            vec![TupleItem::Cell(address_cell(MATCHED_INFO_OWNER_ADDRESS))],
+            0,
+        ),
+    ]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("ownerReply")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_address_cell_result.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_prints_nonzero_exit_code_after_result() {
+    let project = ProjectBuilder::new("rpc-call-nonzero-exit-code")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .build()
+        .contract("counter")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+
+    let artifact_path = project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(42.into())], 11),
+    ]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("currentCounter")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_nonzero_exit_code.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_without_abi_allows_zero_arg_raw_call() {
+    let project = ProjectBuilder::new("rpc-call-raw-no-abi").build();
+    let log_dir = prepare_log_dir(project.path());
+    let raw_cell =
+        Boc::decode_base64(test_cell_boc64(0x1234_5678)).expect("raw stack cell BoC must decode");
+    let (mock_url, mock_handle, _) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_ok_response(
+            777_000_000,
+            &test_cell_boc64(0xdead_beef),
+            &test_cell_boc64(0x1234_5678),
+            "active",
+            "",
+            "17",
+            "deadbeef",
+        ),
+        toncenter_v2_run_get_method_ok_response(
+            vec![
+                TupleItem::Int(11.into()),
+                TupleItem::Cell(address_cell(MATCHED_INFO_OWNER_ADDRESS)),
+                TupleItem::Slice(addr_none_cell()),
+                TupleItem::Cell(raw_cell),
+                TupleItem::Int(20.into()),
+                TupleItem::Int(10.into()),
+                TupleItem::Int(0.into()),
+                TupleItem::Int(1.into()),
+                TupleItem::Int(2.into()),
+                TupleItem::Int(123.into()),
+            ],
+            0,
+        ),
+    ]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(RAW_INFO_ADDRESS)
+        .arg("seqno")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_raw_without_abi.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_rejects_unknown_get_method_when_abi_is_known() {
+    let project = ProjectBuilder::new("rpc-call-unknown-method")
+        .file("contracts/types", TRACE_COUNTER_TYPES)
+        .contract("counter", RPC_CALL_COUNTER_CONTRACT)
+        .build();
+    let log_dir = prepare_log_dir(project.path());
+
+    project
+        .acton()
+        .build()
+        .contract("counter")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+
+    let artifact_path = project.path().join("build/counter.json");
+    let artifact = fs::read_to_string(&artifact_path).expect("build artifact must exist");
+    let artifact: JsonValue =
+        serde_json::from_str(&artifact).expect("build artifact must be valid json");
+    let code_boc64 = artifact["code_boc64"]
+        .as_str()
+        .expect("build artifact must contain code_boc64");
+
+    let (mock_url, mock_handle, _) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            1_234_000_000,
+            code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        )]);
+    write_custom_network_config(project.path(), "mock", &mock_url);
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("missing")
+        .arg("--net")
+        .arg("custom:mock")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_unknown_get_method.stderr.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
 }
 
 #[test]
@@ -991,6 +1385,22 @@ fn toncenter_v2_account_info_ok_response(
     }
 }
 
+fn toncenter_v2_run_get_method_ok_response(
+    stack: Vec<TupleItem>,
+    exit_code: i32,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "stack": legacy_stack_to_json(&Tuple(stack)).expect("stack must serialize to legacy json"),
+                "exit_code": exit_code
+            }
+        })
+        .to_string(),
+    }
+}
+
 fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
@@ -1233,6 +1643,21 @@ fn counter_storage_boc64(id: u32, owner_address: &str, counter: u32) -> String {
     builder.store_u32(counter).expect("must store counter");
     let cell = builder.build().expect("must build storage cell");
     Boc::encode_base64(&cell)
+}
+
+fn address_cell(address: &str) -> Cell {
+    let address = address.parse::<IntAddr>().expect("address must parse");
+    let mut builder = CellBuilder::new();
+    address
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("must store address");
+    builder.build().expect("must build address cell")
+}
+
+fn addr_none_cell() -> Cell {
+    let mut builder = CellBuilder::new();
+    builder.store_uint(0, 2).expect("must store addr_none");
+    builder.build().expect("must build addr_none cell")
 }
 
 fn write_custom_network_config(project_root: &Path, name: &str, url: &str) {
