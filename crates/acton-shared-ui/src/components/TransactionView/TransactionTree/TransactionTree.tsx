@@ -328,7 +328,12 @@ export function TransactionTree({
       const isSuccess = isComputeSuccess && isActionSuccess
       const exitCode = computePhase?.type === "vm" ? computePhase.exitCode : undefined
 
-      const value = inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined
+      const value =
+        inMessage?.info.type === "external-in"
+          ? "—"
+          : fmt.formatCurrency(
+              inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
+            )
 
       const opcode = getTransactionOpcode(tx.transaction)
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
@@ -368,7 +373,7 @@ export function TransactionTree({
           lt,
           success: isSuccess ? "✓" : "✗",
           exitCode: exitCode?.toString() ?? "0",
-          value: fmt.formatCurrency(value),
+          value,
           opcode: opcodeHex,
           outMsgs: tx.transaction.outMessagesCount.toString(),
           withInitCode,

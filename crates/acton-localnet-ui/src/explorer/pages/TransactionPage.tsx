@@ -9,8 +9,8 @@ import {
 import {Address} from "@ton/core"
 import {Activity, AlertCircle, ArrowLeft, CheckCircle2, List, Loader2, XCircle} from "lucide-react"
 import type React from "react"
-import {useEffect, useState} from "react"
-import {useNavigate, useParams} from "react-router-dom"
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
@@ -33,9 +33,20 @@ interface TransactionPageProps {
 
 type TabType = "transactions" | "value-flow"
 
+const parseTabType = (tab: string | null): TabType => {
+  return tab === "transactions" ? "transactions" : "value-flow"
+}
+
 interface ValueFlowAccumulator extends ValueFlowItem {
   readonly before: bigint
   readonly after: bigint
+}
+
+interface TraceTransactionNodeProps {
+  readonly tx: TransactionInfo
+  readonly contracts: Map<string, ContractData>
+  readonly isIntermediateSibling?: boolean
+  readonly onContractClick: (address: string) => void
 }
 
 const buildTransactionsHexIndex = (
@@ -55,11 +66,12 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const {hash: routeHash = ""} = useParams<{hash: string}>()
   const hash = hashToHex(routeHash) ?? routeHash
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [traces, setTraces] = useState<TransactionInfo[]>([])
   const [contracts, setContracts] = useState<Map<string, ContractData>>(new Map())
   const [error, setError] = useState<string | undefined>()
-  const [activeTab, setActiveTab] = useState<TabType>("value-flow")
+  const [activeTab, setActiveTab] = useState<TabType>(() => parseTabType(searchParams.get("tab")))
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const {fetchName} = useAddressBook()
   const addressFormat = useAddressFormat()
@@ -68,6 +80,22 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
     const formattedAddr = normalizeAddress(address, addressFormat)
     void navigate(`/explorer/address/${encodeURIComponent(formattedAddr)}`)
   }
+
+  const handleActiveTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    setSearchParams(
+      currentSearchParams => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams)
+        nextSearchParams.set("tab", tab)
+        return nextSearchParams
+      },
+      {replace: true},
+    )
+  }
+
+  useEffect(() => {
+    setActiveTab(parseTabType(searchParams.get("tab")))
+  }, [searchParams])
 
   useEffect(() => {
     if (!hash) return
@@ -180,6 +208,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const firstTrace = traces[0]
   const traceAddress = firstTrace?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
+  const rootTraceTransactions = [...traces]
+    .filter(tx => !tx.parent)
+    .sort(compareTransactionInfoByLt)
 
   return (
     <div className={styles.container}>
@@ -196,72 +227,70 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                 {label: hash, isHash: true},
               ]}
             />
-            <div className={styles.overviewCard}>
-              <div className={styles.overviewHeader}>
-                <div
-                  className={`${styles.status} ${firstTrace.transaction.description.type === "generic" && firstTrace.transaction.description.computePhase.type === "vm" && firstTrace.transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
-                >
-                  {firstTrace.transaction.description.type === "generic" &&
-                  firstTrace.transaction.description.computePhase.type === "vm" &&
-                  firstTrace.transaction.description.computePhase.success ? (
-                    <>
-                      <CheckCircle2 size={18} /> Confirmed transaction
-                    </>
-                  ) : (
-                    <>
-                      <XCircle size={18} /> Failed transaction
-                    </>
+            <div className={styles.preTreeContent}>
+              <div className={styles.overviewCard}>
+                <div className={styles.overviewHeader}>
+                  <div
+                    className={`${styles.status} ${firstTrace.transaction.description.type === "generic" && firstTrace.transaction.description.computePhase.type === "vm" && firstTrace.transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
+                  >
+                    {firstTrace.transaction.description.type === "generic" &&
+                    firstTrace.transaction.description.computePhase.type === "vm" &&
+                    firstTrace.transaction.description.computePhase.success ? (
+                      <>
+                        <CheckCircle2 size={18} /> Confirmed transaction
+                      </>
+                    ) : (
+                      <>
+                        <XCircle size={18} /> Failed transaction
+                      </>
+                    )}
+                  </div>
+                  <div className={styles.value}>
+                    {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className={styles.tabsContainer}>
+                <div className={styles.tabs}>
+                  <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
+                    onClick={() => handleActiveTabChange("value-flow")}
+                  >
+                    <Activity size={16} /> Value Flow
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
+                    onClick={() => handleActiveTabChange("transactions")}
+                  >
+                    <List size={16} /> Transactions
+                  </button>
+                </div>
+
+                <div className={styles.tabContent}>
+                  {activeTab === "value-flow" && (
+                    <ValueFlowTable
+                      items={valueFlow}
+                      contracts={contracts}
+                      onContractClick={handleContractClick}
+                    />
+                  )}
+
+                  {activeTab === "transactions" && (
+                    <div className={styles.detailsList}>
+                      {rootTraceTransactions.map(tx => (
+                        <TraceTransactionNode
+                          key={tx.lt}
+                          tx={tx}
+                          contracts={contracts}
+                          onContractClick={handleContractClick}
+                        />
+                      ))}
+                    </div>
                   )}
                 </div>
-                <div className={styles.value}>
-                  {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.tabsContainer}>
-              <div className={styles.tabs}>
-                <button
-                  type="button"
-                  className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
-                  onClick={() => setActiveTab("value-flow")}
-                >
-                  <Activity size={16} /> Value Flow
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
-                  onClick={() => setActiveTab("transactions")}
-                >
-                  <List size={16} /> Transactions
-                </button>
-              </div>
-
-              <div className={styles.tabContent}>
-                {activeTab === "value-flow" && (
-                  <ValueFlowTable
-                    items={valueFlow}
-                    contracts={contracts}
-                    onContractClick={handleContractClick}
-                  />
-                )}
-
-                {activeTab === "transactions" && (
-                  <div className={styles.detailsList}>
-                    {traces
-                      .sort((a, b) => Number(BigInt(a.lt) - BigInt(b.lt)))
-                      .map(tx => (
-                        <div key={tx.lt} className={styles.detailCard}>
-                          <TransactionDetails
-                            tx={tx}
-                            contracts={contracts}
-                            allContracts={[]}
-                            onContractClick={handleContractClick}
-                          />
-                        </div>
-                      ))}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -276,6 +305,116 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           </>
         )}
       </div>
+    </div>
+  )
+}
+
+const TraceTransactionNode: React.FC<TraceTransactionNodeProps> = ({
+  tx,
+  contracts,
+  isIntermediateSibling = false,
+  onContractClick,
+}) => {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const childrenRef = useRef<HTMLDivElement>(null)
+  const [connectorHeight, setConnectorHeight] = useState(24)
+  const children = useMemo(() => [...tx.children].sort(compareTransactionInfoByLt), [tx.children])
+
+  useLayoutEffect(() => {
+    if (children.length === 0) {
+      return
+    }
+
+    let animationFrame = 0
+
+    const updateConnectorHeight = () => {
+      cancelAnimationFrame(animationFrame)
+      animationFrame = requestAnimationFrame(() => {
+        const card = cardRef.current
+        const childrenContainer = childrenRef.current
+        const lastChildCard = childrenContainer?.querySelector<HTMLElement>(
+          `:scope > .${styles.traceNode}:last-child > .${styles.traceTransaction}`,
+        )
+
+        if (!card || !lastChildCard) {
+          return
+        }
+
+        const cardRect = card.getBoundingClientRect()
+        const lastChildRect = lastChildCard.getBoundingClientRect()
+        const nextConnectorHeight = Math.max(
+          24,
+          Math.round(lastChildRect.top + 12 - cardRect.bottom),
+        )
+
+        setConnectorHeight(currentHeight =>
+          currentHeight === nextConnectorHeight ? currentHeight : nextConnectorHeight,
+        )
+      })
+    }
+
+    updateConnectorHeight()
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateConnectorHeight)
+    if (resizeObserver) {
+      if (cardRef.current) {
+        resizeObserver.observe(cardRef.current)
+      }
+      if (childrenRef.current) {
+        resizeObserver.observe(childrenRef.current)
+      }
+    }
+
+    window.addEventListener("resize", updateConnectorHeight)
+
+    return () => {
+      cancelAnimationFrame(animationFrame)
+      resizeObserver?.disconnect()
+      window.removeEventListener("resize", updateConnectorHeight)
+    }
+  }, [children.length])
+
+  return (
+    <div className={styles.traceNode}>
+      <div ref={cardRef} className={styles.traceTransaction}>
+        {isIntermediateSibling && <div className={styles.traceSiblingCurve} aria-hidden="true" />}
+        <div className={styles.detailCard}>
+          <TransactionDetails
+            tx={tx}
+            contracts={contracts}
+            allContracts={[]}
+            onContractClick={onContractClick}
+          />
+        </div>
+        {children.length > 0 && (
+          <div
+            className={styles.traceConnectorAnchor}
+            style={
+              {
+                "--trace-connector-height": `${connectorHeight}px`,
+              } as React.CSSProperties
+            }
+            aria-hidden="true"
+          >
+            <div className={styles.traceConnectorRail} />
+            <div className={styles.traceTerminalCurve} />
+          </div>
+        )}
+      </div>
+      {children.length > 0 && (
+        <div ref={childrenRef} className={styles.traceChildren}>
+          {children.map((child, index) => (
+            <TraceTransactionNode
+              key={child.lt}
+              tx={child}
+              contracts={contracts}
+              isIntermediateSibling={index < children.length - 1}
+              onContractClick={onContractClick}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
