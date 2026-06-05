@@ -1526,6 +1526,65 @@ fn test_wrapper_generation_imports_both_storage_and_deployment_storage_types() {
 }
 
 #[test]
+fn test_wrapper_generation_with_storage_alias_union() {
+    let project = ProjectBuilder::new("wrapper_storage_alias_union")
+        .mapping("acton", ".acton")
+        .contract(
+            "my_contract",
+            r#"
+                import "storage"
+
+                contract MyContract {
+                    storage: ContractStorage
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            "#,
+        )
+        .file(
+            "contracts/storage",
+            r"
+                struct (0b0) ActiveStorage {
+                    counter: uint32
+                }
+
+                struct (0b1) FrozenStorage {
+                    reason: uint32
+                }
+
+                type ContractStorage = ActiveStorage | FrozenStorage;
+            ",
+        )
+        .build();
+
+    project
+        .acton()
+        .wrapper("my_contract")
+        .generate_test_stub()
+        .run()
+        .success()
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("wrappers/MyContract.gen.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_storage_alias_union/wrapper.tolk.txt",
+        )
+        .assert_file_snapshot_matches(
+            project
+                .path()
+                .join("tests/my_contract.test.tolk")
+                .to_str()
+                .expect(""),
+            "integration/snapshots/wrapper/test_wrapper_generation_with_storage_alias_union/test.tolk.txt",
+        );
+
+    project.acton().test().run().success().assert_passed(1);
+}
+
+#[test]
 fn test_wrapper_generation_imports_generic_message_field_type_arguments() {
     let project = ProjectBuilder::new("wrapper_generic_field_type_arguments")
         .mapping("acton", ".acton")
