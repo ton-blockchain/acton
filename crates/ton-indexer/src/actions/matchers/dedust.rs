@@ -63,9 +63,20 @@ impl BaseMatcher for DedustPayoutMatcher {
             return None;
         }
 
+        let ton_excesses = root.find_child_by_opcode("DedustTonExcesses");
+        let ton_pay = root.find_child_by_opcode("DedustTonPay");
+
+        let mut nodes = BTreeSet::from([root.id]);
+        if let Some(ton_excesses) = ton_excesses {
+            nodes.insert(ton_excesses.id);
+        }
+        if let Some(ton_pay) = ton_pay {
+            nodes.insert(ton_pay.id);
+        }
+
         Some(BaseMatch {
             kind: BaseActionKind::DedustPayout,
-            nodes: BTreeSet::from([root.id]),
+            nodes,
             root_node: root.id,
             user_facing: true,
         })

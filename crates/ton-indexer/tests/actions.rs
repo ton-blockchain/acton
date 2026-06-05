@@ -192,6 +192,40 @@ fn dedust_jetton_swap_can_pay_out_native_ton() {
 }
 
 #[test]
+fn dedust_jetton_swap_consumes_native_ton_payout_tail() {
+    let trace = trace!(
+        r"
+        WalletV5r1IncomingExternalMessage #1
+        └── JettonTransfer #2
+            └── JettonInternalTransfer #3
+                ├── JettonNotify #4
+                │   └── DedustPoolV2SwapExternal #5
+                │       └── DedustPoolV2PayOutFromPool #6
+                │           └── DedustPayout #7
+                │               ├── DedustTonExcesses #8
+                │               └── DedustTonPay #9
+                └── Excess #10
+        "
+    );
+
+    check_extraction(
+        trace,
+        expect![[r"
+            actions:
+            DedustSwap nodes={5, 6, 7, 8, 9} base_actions=[1, 2]
+            JettonTransfer nodes={2, 3, 4, 10} base_actions=[0]
+            ContractCall nodes={1} base_actions=[3]
+
+            base_actions:
+            #0 JettonTransfer nodes={2, 3, 4, 10} root=2 user_facing=true
+            #1 DedustJettonSwapLeg nodes={5, 6} root=5 user_facing=false
+            #2 DedustPayout nodes={7, 8, 9} root=7 user_facing=true
+            #3 ContractCall nodes={1} root=1 user_facing=true
+        "]],
+    );
+}
+
+#[test]
 fn dedust_jetton_swap_trace_extracts_native_payout_swap() {
     let trace = trace!(
         r"
@@ -234,6 +268,98 @@ fn dedust_jetton_swap_trace_extracts_native_payout_swap() {
             #4 DedustPayout nodes={14} root=14 user_facing=true
             #5 ContractCall nodes={1} root=1 user_facing=true
             #6 ContractCall nodes={5} root=5 user_facing=true
+        "]],
+    );
+}
+
+#[test]
+fn mixed_dedust_stonfi_poolv3_route_trace() {
+    let trace = trace!(
+        r"
+        WalletV5r1IncomingExternalMessage #1
+        ├── JettonTransfer #2
+        │   └── JettonInternalTransfer #3
+        │       ├── JettonNotify #4
+        │       │   └── DedustPoolV2SwapExternal #5
+        │       │       └── DedustPoolV2PayOutFromPool #6
+        │       │           └── DedustPayout #7
+        │       │               └── PtonTonTransfer #8
+        │       │                   └── JettonNotify #9
+        │       │                       └── StonfiSwapV2 #10
+        │       │                           ├── StonfiPayVaultV2 #11
+        │       │                           │   └── StonfiDepositRefFeeV2 #12
+        │       │                           │       └── Excess #13
+        │       │                           └── StonfiPayToV2 #14
+        │       │                               └── JettonTransfer #15
+        │       │                                   └── JettonInternalTransfer #16
+        │       │                                       └── Excess #17
+        │       └── Excess #18
+        └── JettonTransfer #19
+            └── JettonInternalTransfer #20
+                ├── JettonNotify #21
+                │   └── PoolV3Swap #22
+                │       └── PayTo #23
+                │           └── JettonTransfer #24
+                │               └── PtonTonTransfer #25
+                │                   └── DedustVaultNativeV2Swap #26
+                │                       └── DedustPoolV2SwapExternal #27
+                │                           └── DedustPoolV2PayOutFromPool #28
+                │                               └── JettonTransfer #29
+                │                                   └── JettonInternalTransfer #30
+                │                                       ├── JettonNotify #31
+                │                                       │   ├── 0x6d82d2a4 #32
+                │                                       │   │   └── Excess #33
+                │                                       │   └── JettonTransfer #34
+                │                                       │       └── JettonInternalTransfer #35
+                │                                       │           └── Excess #36
+                │                                       └── Excess #37
+                └── Excess #38
+        "
+    );
+
+    check_extraction(
+        trace,
+        expect![[r"
+            actions:
+            StonfiSwap nodes={10, 14, 15, 16, 17} base_actions=[3, 4]
+            DedustSwap nodes={5, 6, 7} base_actions=[1, 2]
+            DedustSwap nodes={26, 27, 28, 29, 30, 31, 37} base_actions=[7, 8]
+            JettonTransfer nodes={2, 3, 4, 18} base_actions=[0]
+            JettonTransfer nodes={19, 20, 21, 38} base_actions=[5]
+            PtonTransfer nodes={24, 25} base_actions=[6]
+            JettonTransfer nodes={34, 35, 36} base_actions=[9]
+            ContractCall nodes={1} base_actions=[10]
+            ContractCall nodes={8} base_actions=[11]
+            ContractCall nodes={9} base_actions=[12]
+            ContractCall nodes={11} base_actions=[13]
+            ContractCall nodes={12} base_actions=[14]
+            ContractCall nodes={13} base_actions=[15]
+            ContractCall nodes={22} base_actions=[16]
+            ContractCall nodes={23} base_actions=[17]
+            ContractCall nodes={32} base_actions=[18]
+            ContractCall nodes={33} base_actions=[19]
+
+            base_actions:
+            #0 JettonTransfer nodes={2, 3, 4, 18} root=2 user_facing=true
+            #1 DedustJettonSwapLeg nodes={5, 6} root=5 user_facing=false
+            #2 DedustPayout nodes={7} root=7 user_facing=true
+            #3 StonfiSwap nodes={10, 14} root=10 user_facing=false
+            #4 JettonTransfer nodes={15, 16, 17} root=15 user_facing=true
+            #5 JettonTransfer nodes={19, 20, 21, 38} root=19 user_facing=true
+            #6 PtonTransfer nodes={24, 25} root=24 user_facing=true
+            #7 DedustNativeSwapLeg nodes={26, 27, 28} root=26 user_facing=false
+            #8 JettonTransfer nodes={29, 30, 31, 37} root=29 user_facing=true
+            #9 JettonTransfer nodes={34, 35, 36} root=34 user_facing=true
+            #10 ContractCall nodes={1} root=1 user_facing=true
+            #11 ContractCall nodes={8} root=8 user_facing=true
+            #12 ContractCall nodes={9} root=9 user_facing=true
+            #13 ContractCall nodes={11} root=11 user_facing=true
+            #14 ContractCall nodes={12} root=12 user_facing=true
+            #15 ContractCall nodes={13} root=13 user_facing=true
+            #16 ContractCall nodes={22} root=22 user_facing=true
+            #17 ContractCall nodes={23} root=23 user_facing=true
+            #18 ContractCall nodes={32} root=32 user_facing=true
+            #19 ContractCall nodes={33} root=33 user_facing=true
         "]],
     );
 }
