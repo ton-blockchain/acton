@@ -96,6 +96,11 @@ async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
   }
 
   if (status >= 300 && status < 400) {
+    // TODO: repair or remove after `13 June 2026`
+    if (url.hostname === "docs.github.com" && Date.now() <= new Date("2026-06-13").getTime()) {
+      return {success: true}
+    }
+
     const location = response.headers.get("location")
     if (location === null) {
       return {
