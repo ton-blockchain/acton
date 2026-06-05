@@ -105,7 +105,7 @@ The output includes:
 - structured SARIF fixes with Acton-specific applicability metadata.
 
 <Callout type="warn" title="Private GitHub repositories">
-  GitHub shows uploaded SARIF files through [code scanning](https://docs.github.com/en/code-security/concepts/code-scanning/about-code-scanning). For private and internal repositories, [SARIF upload](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/integrate-with-existing-tools/uploading-a-sarif-file-to-github) works only when GitHub Code Security or GitHub Advanced Security is enabled for the repository. If it is not enabled, `upload-sarif` fails and the SARIF file will not create pull request annotations.
+  GitHub shows uploaded SARIF files through [code scanning](https://docs.github.com/en/code-security/concepts/code-scanning/code-scanning). For private and internal repositories, [SARIF upload](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/integrate-with-existing-tools/uploading-a-sarif-file-to-github) works only when GitHub Code Security or GitHub Advanced Security is enabled for the repository. If it is not enabled, `upload-sarif` fails and the SARIF file will not create pull request annotations.
 
 In that setup, keep SARIF only when another CI step or external tool consumes it. For GitHub pull request feedback without code scanning, use `acton check --output-format github` or an annotation layer such as [reviewdog](https://github.com/reviewdog/reviewdog).
 

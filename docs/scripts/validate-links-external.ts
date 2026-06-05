@@ -63,6 +63,14 @@ function checkLocalhostPort(url: URL): ExternalLinkResult {
   }
 }
 
+function formatRedirectLocation(baseUrl: URL, location: string): string {
+  try {
+    return new URL(location, baseUrl).href
+  } catch {
+    return location
+  }
+}
+
 async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
   if (url.hostname === "localhost") {
     return checkLocalhostPort(url)
@@ -88,9 +96,18 @@ async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
   }
 
   if (status >= 300 && status < 400) {
+    const location = response.headers.get("location")
+    if (location === null) {
+      return {
+        success: false,
+        message: `redirect status ${status} returned without 'Location' header`,
+      }
+    }
+
+    const redirectUrl = formatRedirectLocation(url, location)
     return {
       success: false,
-      message: `redirected to '${response.headers.get("location")}'`,
+      message: `redirect status ${status} redirected to '${redirectUrl}'`,
     }
   }
 
