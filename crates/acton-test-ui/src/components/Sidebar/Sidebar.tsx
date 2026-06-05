@@ -13,6 +13,7 @@ import {AppIcon, type TestReport, TestStatus, ThemeSwitch, type ThemeMode} from 
 
 import {Summary} from "../Summary/Summary"
 
+import {DocsSidebarIcon} from "./DocsSidebarIcon"
 import styles from "./Sidebar.module.css"
 
 const DOCS_URL = "https://ton-blockchain.github.io/acton/docs/testing/test-ui/overview"
@@ -23,6 +24,8 @@ interface SidebarProps {
   readonly onSelectTest: (test: TestReport) => void
   readonly width?: number
   readonly onCollapse?: () => void
+  readonly isCollapsed?: boolean
+  readonly className?: string
   readonly theme?: ThemeMode
   readonly onToggleTheme?: () => void
 }
@@ -33,6 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTest,
   width,
   onCollapse,
+  isCollapsed = false,
+  className,
   theme,
   onToggleTheme,
 }) => {
@@ -135,7 +140,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <div className={styles.sidebar} style={width ? {width: `${width}px`} : undefined}>
+    <div
+      className={`${styles.sidebar} ${className ?? ""}`}
+      style={width ? {width: `${width}px`} : undefined}
+    >
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>
@@ -153,8 +161,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 type="button"
                 onClick={onCollapse}
                 className={styles.collapseButton}
-                title="Collapse sidebar"
-                aria-label="Collapse Sidebar"
+                title={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}
+                aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
               >
                 <DocsSidebarIcon />
               </button>
@@ -271,24 +279,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
     </div>
   )
 }
-
-const DocsSidebarIcon: React.FC = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <rect width="18" height="18" x="3" y="3" rx="2" />
-    <path d="M9 3v18" />
-  </svg>
-)
 
 const DocsSearchIcon: React.FC = () => (
   <svg

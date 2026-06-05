@@ -47,6 +47,7 @@ import {
 
 import {useContracts} from "../../hooks/useContracts"
 import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
+import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
 
 import styles from "./TestDetails.module.css"
 
@@ -60,6 +61,8 @@ interface TestDetailsProps {
   readonly projectRoot?: string
   readonly gasProfile?: GasProfileData
   readonly gasProfileLoaded?: boolean
+  readonly isSidebarCollapsed?: boolean
+  readonly onExpandSidebar?: () => void
 }
 
 interface IDEConfig {
@@ -150,6 +153,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   projectRoot,
   gasProfile,
   gasProfileLoaded = true,
+  isSidebarCollapsed = false,
+  onExpandSidebar,
 }) => {
   const [activeTab, setActiveTab] = useState<TestDetailsTab>(() => {
     const saved = localStorage.getItem("activeTab")
@@ -1146,6 +1151,17 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     <div className={styles.details}>
       <div className={styles.header}>
         <div className={styles.titleInfo}>
+          {isSidebarCollapsed && onExpandSidebar && (
+            <button
+              type="button"
+              onClick={onExpandSidebar}
+              className={styles.expandButton}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <DocsSidebarIcon />
+            </button>
+          )}
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>

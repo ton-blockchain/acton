@@ -23,6 +23,44 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.expandButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  opacity: 1;
+  transition:
+    background-color 0.1s,
+    color 0.1s,
+    opacity 0.18s ease;
+}
+
+.expandButton:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.expandButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.expandButton svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
 }
 
 .statusIcon {
