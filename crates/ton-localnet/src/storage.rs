@@ -291,6 +291,8 @@ pub struct AccountStatePreview {
     pub status: AccountStatus,
     pub code_hash: Option<Hash256>,
     pub data_hash: Option<Hash256>,
+    pub code_boc: Option<BocBytes>,
+    pub data_boc: Option<BocBytes>,
     pub frozen_hash: Option<Hash256>,
 }
 

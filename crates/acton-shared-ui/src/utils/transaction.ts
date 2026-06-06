@@ -100,6 +100,7 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
       actions: actionsCell,
       outActions,
       contractName: tx.dest_contract_info,
+      contractAbi: undefined,
       shardAccountBefore: tx.shard_account_before,
       shardAccountAfter: tx.shard_account,
       parsedBody: undefined,
@@ -138,8 +139,8 @@ export function buildValueFlowItems(transactions: readonly TransactionInfo[]): V
       continue
     }
 
-    const before = getShardAccountBalance(tx.shardAccountBefore)
-    const after = getShardAccountBalance(tx.shardAccountAfter)
+    const before = tx.accountBalanceBefore ?? getShardAccountBalance(tx.shardAccountBefore)
+    const after = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
     if (before === undefined || after === undefined) {
       continue
     }

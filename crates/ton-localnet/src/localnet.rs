@@ -1210,7 +1210,11 @@ fn process_loop_request(node: &mut Node, req: Request) {
         Request::GetCompilerAbis { code_hashes, resp } => {
             let res = code_hashes
                 .iter()
-                .map(|code_hash| node.history.get_compiler_abi(code_hash))
+                .map(|code_hash| {
+                    node.history
+                        .get_compiler_abi(code_hash)
+                        .or_else(|| catalog_compiler_abi(code_hash))
+                })
                 .collect();
             let _ = resp.send(Ok(res));
         }
@@ -1223,6 +1227,11 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let _ = resp.send(res);
         }
     }
+}
+
+fn catalog_compiler_abi(code_hash: &Hash256) -> Option<Value> {
+    let abi = acton_abi_catalog::find_abi_by_code_hash(&code_hash.to_hex())?;
+    serde_json::to_value(abi.as_ref()).ok()
 }
 
 fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {

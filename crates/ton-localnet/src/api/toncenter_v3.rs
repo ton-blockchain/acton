@@ -1120,7 +1120,7 @@ fn map_transaction_account_state(
     fallback_status: &str,
 ) -> Value {
     if let Some(preview) = preview {
-        return map_emulation_account_state(
+        let mut value = map_emulation_account_state(
             fallback_hash,
             &preview.balance.to_string(),
             map_account_state_status(&preview.status),
@@ -1128,9 +1128,24 @@ fn map_transaction_account_state(
             preview.data_hash.as_ref(),
             preview.code_hash.as_ref(),
         );
+        insert_account_state_bocs(&mut value, preview);
+        return value;
     }
 
     map_emulation_account_state(fallback_hash, "0", fallback_status, None, None, None)
+}
+
+fn insert_account_state_bocs(value: &mut Value, preview: &AccountStatePreview) {
+    let Some(mapped) = value.as_object_mut() else {
+        return;
+    };
+
+    if let Some(code_boc) = &preview.code_boc {
+        mapped.insert("code_boc".to_string(), Value::String(code_boc.to_base64()));
+    }
+    if let Some(data_boc) = &preview.data_boc {
+        mapped.insert("data_boc".to_string(), Value::String(data_boc.to_base64()));
+    }
 }
 
 fn map_emulation_account_state(

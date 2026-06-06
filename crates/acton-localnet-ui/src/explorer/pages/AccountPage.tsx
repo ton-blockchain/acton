@@ -1,4 +1,5 @@
 import type React from "react"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {useEffect, useMemo, useState} from "react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 
@@ -54,6 +55,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const [transactionsError, setTransactionsError] = useState<string | undefined>()
   const [accountLoading, setAccountLoading] = useState(true)
   const [accountError, setAccountError] = useState<string | undefined>()
+  const [compilerAbi, setCompilerAbi] = useState<ContractABI | undefined>()
+  const [compilerAbiLoading, setCompilerAbiLoading] = useState(false)
+  const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
 
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
@@ -64,6 +68,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     return isAccountTab(tab) ? tab : "history"
   }, [location.hash])
   const accountInterfaces = accountStateV3?.interfaces ?? []
+  const accountCodeHash = accountStateV3?.code_hash
   const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
   const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
   const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
@@ -179,6 +184,40 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       isActive = false
     }
   }, [client, formattedAddress])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadCompilerAbi = async () => {
+      if (!accountCodeHash) {
+        setCompilerAbi(undefined)
+        setCompilerAbiLoading(false)
+        setCompilerAbiError(undefined)
+        return
+      }
+
+      setCompilerAbi(undefined)
+      setCompilerAbiLoading(true)
+      setCompilerAbiError(undefined)
+
+      try {
+        const abis = await client.getCompilerAbis([accountCodeHash])
+        if (!isActive) return
+        setCompilerAbi(abis[accountCodeHash] ?? undefined)
+        setCompilerAbiLoading(false)
+      } catch (error) {
+        if (!isActive) return
+        setCompilerAbi(undefined)
+        setCompilerAbiLoading(false)
+        setCompilerAbiError(error instanceof Error ? error.message : "Failed to load compiler ABI")
+      }
+    }
+
+    void loadCompilerAbi()
+    return () => {
+      isActive = false
+    }
+  }, [accountCodeHash, client])
 
   useEffect(() => {
     if (!formattedAddress) {
@@ -500,6 +539,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
             <AccountInfo
               address={formattedAddress}
               state={accountState}
+              compilerAbi={compilerAbi}
               contractInterfaces={accountStateV3?.interfaces}
               jettonWallets={jettonWallets}
               accountLoading={accountLoading}
@@ -736,7 +776,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
           <AccountDetails
             transactions={transactions}
             accountState={accountState}
-            accountCodeHash={accountStateV3?.code_hash}
+            compilerAbi={compilerAbi}
+            compilerAbiLoading={compilerAbiLoading}
+            compilerAbiError={compilerAbiError}
             ownerAddress={formattedAddress}
             jettonWallets={jettonWallets}
             nftItems={nftItems}

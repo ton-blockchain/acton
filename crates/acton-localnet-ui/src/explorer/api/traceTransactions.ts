@@ -38,8 +38,11 @@ export const buildTraceTransactionInfos = (
       actions: undefined,
       outActions: [],
       contractName: undefined,
+      contractAbi: undefined,
       shardAccountBefore: "",
       shardAccountAfter: "",
+      accountBalanceBefore: parseOptionalBigInt(tx.account_state_before?.balance),
+      accountBalanceAfter: parseOptionalBigInt(tx.account_state_after?.balance),
       parsedBody: undefined,
       parsedStorageBefore: undefined,
       parsedStorageAfter: undefined,
@@ -144,6 +147,15 @@ const parseBigInt = (value: string | number | bigint | undefined, fallback = 0n)
     return BigInt(value)
   } catch {
     return fallback
+  }
+}
+
+const parseOptionalBigInt = (value: string | number | bigint | undefined): bigint | undefined => {
+  if (value === undefined) return undefined
+  try {
+    return BigInt(value)
+  } catch {
+    return undefined
   }
 }
 

@@ -69,8 +69,11 @@ export interface TransactionInfo {
   readonly actions: Cell | undefined
   readonly outActions: readonly OutAction[]
   readonly contractName: string | undefined
+  contractAbi: ContractABI | undefined
   readonly shardAccountBefore: string
   readonly shardAccountAfter: string
+  readonly accountBalanceBefore?: bigint
+  readonly accountBalanceAfter?: bigint
   parsedBody: ParsedTransactionBody | undefined
   parsedStorageBefore: ParsedContractStorage | undefined
   parsedStorageAfter: ParsedContractStorage | undefined

@@ -33,6 +33,7 @@ import styles from "./TransactionDetails.module.css"
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
@@ -41,6 +42,7 @@ export interface TransactionDetailsProps {
 export function TransactionDetails({
   tx,
   contracts,
+  compilerAbisByCodeHash,
   allContracts,
   onContractClick,
   renderSourceLocation,
@@ -99,6 +101,11 @@ export function TransactionDetails({
 
   const inMessage = tx.transaction.inMessage ?? undefined
   const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
+  const targetAbi = tx.contractAbi ?? targetContract?.abi
+  const targetContractWithAbi =
+    targetContract && targetAbi && targetContract.abi !== targetAbi
+      ? {...targetContract, abi: targetAbi}
+      : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
     inMessage != undefined &&
@@ -109,12 +116,16 @@ export function TransactionDetails({
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const stateInitCodeHash = stateInitCode?.hash().toString("hex")
+  const stateInitAbiName = stateInitCodeHash
+    ? compilerAbisByCodeHash?.get(stateInitCodeHash)?.contract_name?.trim()
+    : undefined
   const parsedBody =
     tx.parsedBody ??
     (inMessage ? decodeMessageBody(inMessage, contracts, tx.address?.toString()) : undefined)
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
-    targetContract,
+    targetContractWithAbi,
     tx.contractName,
     allContracts,
   )
@@ -128,7 +139,7 @@ export function TransactionDetails({
       accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
     0n,
   )
-  const endBalance = getShardAccountBalance(tx.shardAccountAfter)
+  const endBalance = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
   const tickTockStorageFeesDue = tickTockDescription?.storagePhase.storageFeesDue
   const hasAccountStatusChange = tx.transaction.oldStatus !== tx.transaction.endStatus
   const storageDiff = buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter)
@@ -215,12 +226,14 @@ export function TransactionDetails({
                   {fmt.formatCurrency(inMessage.info.value.coins)}
                 </div>
               </div>
-              <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Send Mode</div>
-                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                  <SendModeViewer mode={sendMode} />
+              {sendMode !== undefined && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Send Mode</div>
+                  <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                    <SendModeViewer mode={sendMode} />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Bounced</div>
                 <div className={styles.multiColumnItemValue}>
@@ -295,6 +308,12 @@ export function TransactionDetails({
                         <div className={styles.multiColumnItemTitle}>Code</div>
                         <DataBlock data={stateInitCodeBocHex!} />
                         <DisasmSection bocHex={stateInitCodeBocHex!} title="Code Disassembly" />
+                      </div>
+                    )}
+                    {stateInitAbiName && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>ABI</div>
+                        <div className={styles.multiColumnItemValue}>{stateInitAbiName}</div>
                       </div>
                     )}
                     {stateInitData && (
@@ -459,7 +478,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
+                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetAbi} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -501,7 +520,7 @@ export function TransactionDetails({
                 <div className={styles.multiColumnItemValue}>
                   <ExitCodeChip
                     exitCode={actionPhase.resultCode}
-                    abi={targetContract?.abi}
+                    abi={targetAbi}
                     phase="action"
                   />
                 </div>

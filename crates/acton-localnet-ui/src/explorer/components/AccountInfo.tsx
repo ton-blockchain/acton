@@ -1,4 +1,5 @@
 import {Card, CardContent, CardHeader} from "@acton/shared-ui"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Check, Copy, Edit2} from "lucide-react"
 import type React from "react"
 import {useEffect, useRef, useState} from "react"
@@ -14,6 +15,7 @@ import {formatAddress, formatNano, normalizeAddress} from "./utils"
 interface AccountInfoProps {
   readonly address: string
   readonly state?: FullAccountState
+  readonly compilerAbi?: ContractABI
   readonly contractInterfaces?: readonly string[]
   readonly jettonWallets: JettonWallet[]
   readonly accountLoading?: boolean
@@ -25,6 +27,7 @@ interface AccountInfoProps {
 export const AccountInfo: React.FC<AccountInfoProps> = ({
   address,
   state,
+  compilerAbi,
   contractInterfaces,
   jettonWallets,
   accountLoading = false,
@@ -120,7 +123,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
     setCopied(true)
   }
 
-  const contractTypeLabel = getContractTypeLabel(contractInterfaces)
+  const contractTypeLabel = getContractTypeLabel(compilerAbi, contractInterfaces)
   const isNameUnchanged = editValue.trim() === (customName || "")
   const statePending = !state
   const stateLoading = accountLoading || statePending
@@ -294,7 +297,15 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
   )
 }
 
-function getContractTypeLabel(interfaces?: readonly string[]): string {
+function getContractTypeLabel(
+  compilerAbi?: ContractABI,
+  interfaces?: readonly string[],
+): string {
+  const abiContractName = compilerAbi?.contract_name?.trim()
+  if (abiContractName) {
+    return abiContractName
+  }
+
   const primaryInterface = interfaces?.find(iface => iface.length > 0)
 
   if (!primaryInterface) {

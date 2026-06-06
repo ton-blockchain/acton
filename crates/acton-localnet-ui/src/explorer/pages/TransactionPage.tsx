@@ -4,6 +4,7 @@ import {
   type TransactionInfo,
   TransactionTree,
   ValueFlowTable,
+  decodeStorageDataCell,
   type ValueFlowItem,
 } from "@acton/shared-ui"
 import {Address} from "@ton/core"
@@ -45,6 +46,7 @@ interface ValueFlowAccumulator extends ValueFlowItem {
 interface TraceTransactionNodeProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash: ReadonlyMap<string, ContractData["abi"]>
   readonly isIntermediateSibling?: boolean
   readonly onContractClick: (address: string) => void
 }
@@ -70,6 +72,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const [loading, setLoading] = useState(true)
   const [traces, setTraces] = useState<TransactionInfo[]>([])
   const [contracts, setContracts] = useState<Map<string, ContractData>>(new Map())
+  const [compilerAbisByCodeHash, setCompilerAbisByCodeHash] = useState<
+    Map<string, ContractData["abi"]>
+  >(new Map())
   const [error, setError] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<TabType>(() => parseTabType(searchParams.get("tab")))
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
@@ -111,10 +116,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const trace = data.traces[0]
           const transactionsMap = trace.transactions
           const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
+          const transactionsByLt = new Map(
+            Object.values(transactionsMap).map(tx => [tx.lt, tx] as const),
+          )
 
           const processed = buildTraceTransactionInfos(transactionsMap, trace.trace)
-          if (!isActive) return
-          setTraces(processed)
 
           const contractsMap = new Map<string, ContractData>()
           const addresses = new Set<string>()
@@ -135,8 +141,24 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
             }
           }
 
+          const codeHashesToFetch = new Set(addressToCodeHash.values())
+          for (const tx of Object.values(transactionsMap)) {
+            if (tx.account_state_before?.code_hash) {
+              codeHashesToFetch.add(tx.account_state_before.code_hash)
+            }
+            if (tx.account_state_after?.code_hash) {
+              codeHashesToFetch.add(tx.account_state_after.code_hash)
+            }
+          }
+          for (const tx of processed) {
+            const stateInitCodeHash = tx.transaction.inMessage?.init?.code?.hash().toString("hex")
+            if (stateInitCodeHash) {
+              codeHashesToFetch.add(stateInitCodeHash)
+            }
+          }
+
           const abiByCodeHash = new Map<string, ContractData["abi"]>()
-          const codeHashes = [...new Set(addressToCodeHash.values())]
+          const codeHashes = [...codeHashesToFetch]
           const fetchedAbis =
             codeHashes.length > 0
               ? await client
@@ -145,6 +167,27 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               : {}
           for (const codeHash of codeHashes) {
             abiByCodeHash.set(codeHash, fetchedAbis[codeHash] ?? undefined)
+          }
+
+          for (const tx of processed) {
+            const sourceTx = transactionsByLt.get(tx.lt)
+            const fallbackCodeHash = tx.address
+              ? addressToCodeHash.get(addressKey(tx.address.toString()))
+              : undefined
+            const beforeCodeHash = sourceTx?.account_state_before?.code_hash ?? fallbackCodeHash
+            const afterCodeHash = sourceTx?.account_state_after?.code_hash ?? fallbackCodeHash
+            const contractCodeHash = beforeCodeHash ?? afterCodeHash
+            tx.contractAbi = contractCodeHash
+              ? (abiByCodeHash.get(contractCodeHash) ?? undefined)
+              : undefined
+            tx.parsedStorageBefore = decodeStorageDataCell(
+              sourceTx?.account_state_before?.data_boc,
+              beforeCodeHash ? abiByCodeHash.get(beforeCodeHash) : undefined,
+            )
+            tx.parsedStorageAfter = decodeStorageDataCell(
+              sourceTx?.account_state_after?.data_boc,
+              afterCodeHash ? abiByCodeHash.get(afterCodeHash) : undefined,
+            )
           }
 
           let nextLetterCode = 65
@@ -162,10 +205,14 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               })
             }),
           )
-          if (!isActive) return
-          setContracts(contractsMap)
 
-          setValueFlow(buildValueFlowItems(transactionsByHex, processed))
+          const nextValueFlow = buildValueFlowItems(transactionsByHex, processed)
+          if (isActive) {
+            setTraces(processed)
+            setContracts(contractsMap)
+            setCompilerAbisByCodeHash(abiByCodeHash)
+            setValueFlow(nextValueFlow)
+          }
         } else {
           if (isActive) setError("Transaction not found or has no trace yet.")
         }
@@ -285,6 +332,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                           key={tx.lt}
                           tx={tx}
                           contracts={contracts}
+                          compilerAbisByCodeHash={compilerAbisByCodeHash}
                           onContractClick={handleContractClick}
                         />
                       ))}
@@ -298,6 +346,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               <TransactionTree
                 transactions={traces}
                 contracts={contracts}
+                compilerAbisByCodeHash={compilerAbisByCodeHash}
                 allContracts={[]}
                 onContractClick={handleContractClick}
               />
@@ -312,6 +361,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
 const TraceTransactionNode: React.FC<TraceTransactionNodeProps> = ({
   tx,
   contracts,
+  compilerAbisByCodeHash,
   isIntermediateSibling = false,
   onContractClick,
 }) => {
@@ -383,6 +433,7 @@ const TraceTransactionNode: React.FC<TraceTransactionNodeProps> = ({
           <TransactionDetails
             tx={tx}
             contracts={contracts}
+            compilerAbisByCodeHash={compilerAbisByCodeHash}
             allContracts={[]}
             onContractClick={onContractClick}
           />
@@ -409,6 +460,7 @@ const TraceTransactionNode: React.FC<TraceTransactionNodeProps> = ({
               key={child.lt}
               tx={child}
               contracts={contracts}
+              compilerAbisByCodeHash={compilerAbisByCodeHash}
               isIntermediateSibling={index < children.length - 1}
               onContractClick={onContractClick}
             />

@@ -707,6 +707,21 @@ const tryDecodeStorageCellWithAbi = (
   return tryDecodeStorageSliceWithAbi(dataCell.beginParse(), abi)
 }
 
+export const decodeStorageDataCell = (
+  dataCellBase64: string | null | undefined,
+  abi: ContractABI | undefined,
+): ParsedContractStorage | undefined => {
+  if (!dataCellBase64 || !abi) {
+    return undefined
+  }
+
+  try {
+    return tryDecodeStorageCellWithAbi(Cell.fromBase64(dataCellBase64), abi)
+  } catch {
+    return undefined
+  }
+}
+
 export const resolveMessageOpcodeName = (
   message: ParsableMessage,
   contracts: Map<string, ContractData>,
