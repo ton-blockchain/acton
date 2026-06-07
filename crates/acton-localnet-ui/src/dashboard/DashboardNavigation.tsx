@@ -9,6 +9,8 @@ import {
   KeyRound,
   LayoutGrid,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search as SearchIcon,
   Settings2,
   Wallet,
@@ -31,6 +33,9 @@ interface DashboardNavigationProps {
   readonly client: TonClient
   readonly theme: ThemeMode
   readonly setTheme: (theme: ThemeMode) => void
+  readonly onToggleSidebar?: () => void
+  readonly isSidebarCollapsed?: boolean
+  readonly className?: string
 }
 
 interface SidebarItem {
@@ -74,6 +79,9 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
   client,
   theme,
   setTheme,
+  onToggleSidebar,
+  isSidebarCollapsed = false,
+  className,
 }) => {
   const location = useLocation()
   const navigate = useNavigate()
@@ -149,7 +157,7 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
       />
 
       <aside
-        className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ""}`}
+        className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ""} ${className ?? ""}`}
         aria-label="Main navigation"
       >
         <div className={styles.sidebarHeader}>
@@ -231,10 +239,28 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
                 })}
               </div>
 
-              <ThemeSwitch
-                theme={theme}
-                onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
-              />
+              <div className={styles.navUtilityRow}>
+                {onToggleSidebar && (
+                  <button
+                    type="button"
+                    className={styles.sidebarToggleButton}
+                    onClick={onToggleSidebar}
+                    title={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
+                    aria-label={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
+                  >
+                    {isSidebarCollapsed ? (
+                      <PanelLeftOpen size={18} />
+                    ) : (
+                      <PanelLeftClose size={18} />
+                    )}
+                  </button>
+                )}
+
+                <ThemeSwitch
+                  theme={theme}
+                  onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+                />
+              </div>
             </div>
           </nav>
         </div>
