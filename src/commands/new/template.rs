@@ -46,14 +46,14 @@ struct TemplateRenderContext<'a> {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) enum ProjectLayout {
+pub(crate) enum ProjectLayout {
     Standard,
     App,
 }
 
 impl ProjectLayout {
     #[must_use]
-    pub(super) const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Standard => "standard",
             Self::App => "app",
@@ -61,7 +61,7 @@ impl ProjectLayout {
     }
 
     #[must_use]
-    pub(super) const fn contracts_mapping(self) -> &'static str {
+    pub(crate) const fn contracts_mapping(self) -> &'static str {
         match self {
             Self::Standard => "contracts",
             Self::App => "contracts/src",
@@ -69,7 +69,7 @@ impl ProjectLayout {
     }
 
     #[must_use]
-    pub(super) const fn tests_mapping(self) -> &'static str {
+    pub(crate) const fn tests_mapping(self) -> &'static str {
         match self {
             Self::Standard => "tests",
             Self::App => "contracts/tests",
@@ -77,7 +77,7 @@ impl ProjectLayout {
     }
 
     #[must_use]
-    pub(super) const fn wrappers_mapping(self) -> &'static str {
+    pub(crate) const fn wrappers_mapping(self) -> &'static str {
         match self {
             Self::Standard => "wrappers",
             Self::App => "contracts/wrappers",
@@ -85,11 +85,11 @@ impl ProjectLayout {
     }
 
     #[must_use]
-    pub(super) const fn includes_typescript_app(self) -> bool {
+    pub(crate) const fn includes_typescript_app(self) -> bool {
         matches!(self, Self::App)
     }
 
-    pub(super) fn remap_path(self, path: &str) -> String {
+    pub(crate) fn remap_path(self, path: &str) -> String {
         match self {
             Self::Standard => path.to_owned(),
             Self::App => {
@@ -111,7 +111,7 @@ impl ProjectLayout {
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct ContractTemplate {
+pub(crate) struct ContractTemplate {
     pub id: &'static str,
     pub name: &'static str,
     pub src: &'static str,
@@ -119,14 +119,14 @@ pub(super) struct ContractTemplate {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct ExtraScript {
+pub(crate) struct ExtraScript {
     pub alias: &'static str,
     pub script: &'static str,
     pub net: Option<&'static str>,
 }
 
 #[derive(Clone, Copy, Debug)]
-pub(super) struct ProjectScaffold {
+pub(crate) struct ProjectScaffold {
     base_dir: &'static Dir<'static>,
     app_overlay_dir: Option<&'static Dir<'static>>,
     layout: ProjectLayout,
@@ -137,27 +137,27 @@ pub(super) struct ProjectScaffold {
 
 impl ProjectScaffold {
     #[must_use]
-    pub(super) const fn layout(self) -> ProjectLayout {
+    pub(crate) const fn layout(self) -> ProjectLayout {
         self.layout
     }
 
     #[must_use]
-    pub(super) const fn contracts(self) -> &'static [ContractTemplate] {
+    pub(crate) const fn contracts(self) -> &'static [ContractTemplate] {
         self.contracts
     }
 
     #[must_use]
-    pub(super) fn deploy_script_path(&self) -> String {
+    pub(crate) fn deploy_script_path(&self) -> String {
         self.layout.remap_path(self.deploy_script)
     }
 
     #[must_use]
-    pub(super) fn contract_src(&self, contract: &ContractTemplate) -> String {
+    pub(crate) fn contract_src(&self, contract: &ContractTemplate) -> String {
         self.layout.remap_path(contract.src)
     }
 
     #[must_use]
-    pub(super) fn extra_scripts(&self) -> Vec<(String, String)> {
+    pub(crate) fn extra_scripts(&self) -> Vec<(String, String)> {
         self.extra_scripts
             .iter()
             .map(|script| {
@@ -179,7 +179,7 @@ struct TemplateDefinition {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub(super) struct TemplateCatalog {
+pub(crate) struct TemplateCatalog {
     schema_version: u8,
     templates: Vec<TemplateCatalogEntry>,
 }
@@ -527,7 +527,7 @@ const fn template_definition(template: ProjectTemplate) -> &'static TemplateDefi
     }
 }
 
-pub(super) fn get_available_templates() -> Vec<ProjectTemplate> {
+pub(crate) fn get_available_templates() -> Vec<ProjectTemplate> {
     vec![
         ProjectTemplate::Empty,
         ProjectTemplate::Counter,
@@ -537,7 +537,7 @@ pub(super) fn get_available_templates() -> Vec<ProjectTemplate> {
     ]
 }
 
-pub(super) fn template_catalog() -> TemplateCatalog {
+pub(crate) fn template_catalog() -> TemplateCatalog {
     let templates = get_available_templates()
         .into_iter()
         .map(|template| {
@@ -564,11 +564,11 @@ pub(super) fn template_catalog() -> TemplateCatalog {
     }
 }
 
-pub(super) const fn template_supports_app(template: ProjectTemplate) -> bool {
+pub(crate) const fn template_supports_app(template: ProjectTemplate) -> bool {
     template_definition(template).app_scaffold.is_some()
 }
 
-pub(super) const fn project_scaffold(
+pub(crate) const fn project_scaffold(
     template: ProjectTemplate,
     include_app: bool,
 ) -> Option<ProjectScaffold> {
@@ -636,7 +636,7 @@ pub fn extract_standalone_app_scaffold(
     )
 }
 
-pub(super) fn create_project_from_scaffold(
+pub(crate) fn create_project_from_scaffold(
     scaffold: ProjectScaffold,
     target_dir: &Path,
     include_agents: bool,
@@ -669,7 +669,7 @@ pub(super) fn create_project_from_scaffold(
     Ok(())
 }
 
-pub(super) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: bool) -> Vec<PathBuf> {
+pub(crate) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: bool) -> Vec<PathBuf> {
     let mut paths = Vec::new();
 
     if let Some(overlay_dir) = scaffold.app_overlay_dir {
@@ -696,6 +696,54 @@ pub(super) fn scaffold_file_paths(scaffold: ProjectScaffold, include_agents: boo
     paths
 }
 
+pub(crate) fn contract_scaffold_file_paths(
+    scaffold: ProjectScaffold,
+    target_layout: ProjectLayout,
+    namespace: &str,
+) -> Vec<PathBuf> {
+    let mut paths = template_files(scaffold.base_dir)
+        .into_iter()
+        .filter_map(|path| contract_scaffold_target_path(&path, target_layout, namespace))
+        .collect::<Vec<_>>();
+
+    paths.sort();
+    paths.dedup();
+    paths
+}
+
+pub(crate) fn create_contract_files_from_scaffold(
+    scaffold: ProjectScaffold,
+    target_dir: &Path,
+    target_layout: ProjectLayout,
+    namespace: &str,
+    author: &str,
+) -> std::io::Result<Vec<PathBuf>> {
+    let render_context = TemplateRenderContext {
+        npm_package_name: None,
+        author: Some(author),
+    };
+    let mut written = Vec::new();
+    extract_contract_files_from_dir(
+        scaffold.base_dir,
+        target_dir,
+        target_layout,
+        namespace,
+        render_context,
+        &mut written,
+    )?;
+    written.sort();
+    Ok(written)
+}
+
+pub(crate) fn namespaced_scaffold_path(path: &str, namespace: &str) -> String {
+    for prefix in ["contracts/", "scripts/", "tests/", "wrappers/"] {
+        if let Some(rest) = path.strip_prefix(prefix) {
+            return format!("{prefix}{namespace}/{rest}");
+        }
+    }
+    path.to_owned()
+}
+
 fn template_files(dir: &Dir<'static>) -> Vec<PathBuf> {
     let mut paths = dir
         .files()
@@ -707,6 +755,68 @@ fn template_files(dir: &Dir<'static>) -> Vec<PathBuf> {
     }
 
     paths
+}
+
+fn extract_contract_files_from_dir(
+    dir: &Dir<'static>,
+    base_path: &Path,
+    target_layout: ProjectLayout,
+    namespace: &str,
+    render_context: TemplateRenderContext<'_>,
+    written: &mut Vec<PathBuf>,
+) -> std::io::Result<()> {
+    for entry in dir.entries() {
+        if let Some(subdir) = entry.as_dir() {
+            extract_contract_files_from_dir(
+                subdir,
+                base_path,
+                target_layout,
+                namespace,
+                render_context,
+                written,
+            )?;
+            continue;
+        }
+
+        if let Some(file) = entry.as_file() {
+            let Some(relative_path) =
+                contract_scaffold_target_path(entry.path(), target_layout, namespace)
+            else {
+                continue;
+            };
+
+            let target = base_path.join(&relative_path);
+            write_template_file_with_import_namespace(
+                &target,
+                entry.path(),
+                file.contents(),
+                render_context,
+                namespace,
+            )?;
+            written.push(relative_path);
+        }
+    }
+    Ok(())
+}
+
+fn contract_scaffold_target_path(
+    path: &Path,
+    target_layout: ProjectLayout,
+    namespace: &str,
+) -> Option<PathBuf> {
+    let path_str = path.to_str()?;
+    if !is_contract_scaffold_path(path_str) {
+        return None;
+    }
+
+    let namespaced = namespaced_scaffold_path(path_str, namespace);
+    Some(PathBuf::from(target_layout.remap_path(&namespaced)))
+}
+
+fn is_contract_scaffold_path(path: &str) -> bool {
+    ["contracts/", "scripts/", "tests/", "wrappers/"]
+        .iter()
+        .any(|prefix| path.starts_with(prefix))
 }
 
 fn extract_base_for_app_layout(
@@ -799,6 +909,32 @@ fn write_template_file(
     }
 }
 
+fn write_template_file_with_import_namespace(
+    target: &Path,
+    template_path: &Path,
+    contents: &[u8],
+    render_context: TemplateRenderContext<'_>,
+    namespace: &str,
+) -> std::io::Result<()> {
+    if let Some(parent) = target.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    if template_path
+        .extension()
+        .is_some_and(|ext| ext == OsStr::new("tolk"))
+    {
+        let mut rendered = render_template_file(template_path, contents, render_context)
+            .unwrap_or_else(|| String::from_utf8_lossy(contents).into_owned());
+        rendered = namespace_template_imports(&rendered, namespace);
+        fs::write(target, rendered)
+    } else if let Some(rendered) = render_template_file(template_path, contents, render_context) {
+        fs::write(target, rendered)
+    } else {
+        fs::write(target, contents)
+    }
+}
+
 fn render_template_file(
     path: &Path,
     contents: &[u8],
@@ -823,6 +959,12 @@ fn render_template_file(
     }
 
     rendered
+}
+
+fn namespace_template_imports(content: &str, namespace: &str) -> String {
+    content
+        .replace("@contracts/", &format!("@contracts/{namespace}/"))
+        .replace("@wrappers/", &format!("@wrappers/{namespace}/"))
 }
 
 fn escape_tolk_string_content(value: &str) -> String {

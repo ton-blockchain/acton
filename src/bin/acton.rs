@@ -1,4 +1,5 @@
 use acton::commands;
+use acton::commands::add::{AddCommand, add_cmd};
 use acton::commands::build::{BuildCommandOptions, build_cmd};
 use acton::commands::check::check_cmd;
 use acton::commands::compile::compile_cmd;
@@ -166,6 +167,15 @@ enum Commands {
             ]
         )]
         templates: bool,
+    },
+    #[command(
+        about = "Add resources to the current project",
+        long_about = "Add resources, such as contracts from templates, to the current Acton project.",
+        after_help = detailed_help_pointer("add")
+    )]
+    Add {
+        #[command(subcommand)]
+        command: AddCommand,
     },
     #[command(
         about = "Show top-level or command-specific help",
@@ -1463,7 +1473,7 @@ fn root_help(show_global_options: bool) -> StyledStr {
         .fg_color(Some(Color::Ansi(AnsiColor::BrightWhite)))
         .bold();
 
-    let core_commands = vec![("new", "[PATH]"), ("init", "")];
+    let core_commands = vec![("new", "[PATH]"), ("add", "<COMMAND>"), ("init", "")];
     let build_and_test_commands = vec![
         ("test", "[PATH]"),
         ("build", "[CONTRACT_NAME]"),
@@ -1913,6 +1923,7 @@ fn main() {
             overwrite,
             templates,
         ),
+        Commands::Add { command } => add_cmd(command),
         Commands::Test {
             paths,
             filter,

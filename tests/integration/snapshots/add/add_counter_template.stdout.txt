@@ -1,0 +1,4 @@
+✓ Added contract template
+  Template: counter
+  Contracts: Counter
+  Updated: [ROOT]/Acton.toml

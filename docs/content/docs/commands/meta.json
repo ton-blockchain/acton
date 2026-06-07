@@ -4,6 +4,7 @@
   "pages": [
     "overview",
     "new",
+    "add",
     "init",
     "test",
     "build",

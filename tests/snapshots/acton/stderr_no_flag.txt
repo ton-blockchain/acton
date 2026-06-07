@@ -4,6 +4,7 @@ Usage: acton[EXE] <command> [...flags] [...args]
 
 Commands:
   new              [PATH]              Create a new project from a template
+  add              <COMMAND>           Add resources to the current project
   init                                 Add Acton support to current directory
 
   test             [PATH]              Run tests from files or directories

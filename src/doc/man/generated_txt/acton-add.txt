@@ -1,0 +1,98 @@
+ACTON-ADD(1)
+
+NAME
+       acton-add — Add resources to the current Acton project
+
+SYNOPSIS
+       acton add [options] command
+
+DESCRIPTION
+       Add reusable resources to an existing Acton project.
+
+       The first supported flow is adding contracts from built-in templates.
+       This copies the selected template’s contract sources, wrappers, tests,
+       and scripts into the current project and registers the template
+       contracts in Acton.toml.
+
+       Template files are copied into a template-specific namespace such as
+       contracts/counter/ or contracts/jetton/. Imports inside copied Tolk
+       files are rewritten to point at that namespace, so template support
+       files such as types.tolk, errors.tolk, and wrapper utilities do not
+       collide with files already present in the project.
+
+       The command refuses to overwrite existing files unless --overwrite is
+       passed. It also refuses to add a template when any of its contract ids
+       already exist in Acton.toml.
+
+SUBCOMMANDS
+   acton add contract
+       Add a contract and its supporting template files to the current project.
+
+      Synopsis
+          acton add contract [options] --from template [template]
+
+      Options
+          --from source
+              Source to add the contract from.
+
+              Currently only template is supported.
+
+          template
+              Template to add.
+
+              If omitted in an interactive terminal, Acton asks which template
+              to use. In non-interactive mode, this argument is required.
+
+          --overwrite
+              Overwrite existing files whose paths collide with the template.
+
+              This only applies to files on disk. Existing contract ids in
+              Acton.toml are not overwritten.
+
+DISPLAY OPTIONS
+       --color when
+           Control when to use colored output.
+
+           Possible values: auto, always, never
+
+PROJECT OPTIONS
+       --manifest-path path
+           Path to the Acton.toml file to use for this invocation.
+
+           Use this when running the command outside the project directory or
+           when the manifest lives at a non-default location.
+
+       --project-root path
+           Path to the project root to use for configuration discovery and
+           relative defaults.
+
+           This conflicts with --manifest-path.
+
+TEMPLATES
+       Supported template values are the same built-in contract templates used
+       by acton new:
+
+       o  empty
+
+       o  counter
+
+       o  jetton
+
+       o  nft
+
+       o  w5-extension
+
+EXAMPLES
+       1. Add the counter template to the current project:
+
+              acton add contract --from template counter
+
+       2. Add the jetton template and build its minter contract:
+
+              acton add contract --from template jetton
+              acton build JettonMinter
+
+       3. Run tests copied from a template:
+
+              acton test tests/counter/counter.test.tolk
+

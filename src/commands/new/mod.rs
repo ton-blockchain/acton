@@ -15,7 +15,7 @@ use std::io::{IsTerminal, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 
 mod licenses;
-mod template;
+pub(crate) mod template;
 use template::ProjectLayout;
 pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 

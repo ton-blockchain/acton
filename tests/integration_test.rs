@@ -14,6 +14,7 @@ use std::{fs, process::Command};
 const MANUAL_COMMANDS: &[&str] = &[
     "init",
     "new",
+    "add",
     "build",
     "help",
     "hooks",

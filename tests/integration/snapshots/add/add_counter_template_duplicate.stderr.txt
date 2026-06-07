@@ -1,0 +1,1 @@
+Error: Contract id Counter already exists in Acton.toml

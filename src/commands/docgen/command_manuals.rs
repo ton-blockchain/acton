@@ -23,6 +23,13 @@ pub(super) const COMMAND_MANUALS: &[CommandManualSpec] = &[
         docs_description: "Reference manual for the acton new command",
     },
     CommandManualSpec {
+        command: "add",
+        source_name: "acton-add.md",
+        docs_slug: "add",
+        docs_title: "acton add",
+        docs_description: "Reference manual for the acton add command",
+    },
+    CommandManualSpec {
         command: "init",
         source_name: "acton-init.md",
         docs_slug: "init",
