@@ -6,6 +6,7 @@ use super::{
 use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
 use crate::context::code_lookup_hash;
+use crate::formatter::FormatterContext;
 use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::ActonConfig;
 #[cfg(test)]
@@ -71,6 +72,17 @@ pub(super) fn rpc_call_cmd(
         .with_context(|| {
             format!("Failed to run get method {method} on {address} from {network}")
         })?;
+    if !json && result.exit_code != 0 {
+        println!(
+            "{} {}",
+            "Error:".red(),
+            get_method_exit_error(method, result.exit_code, abi)
+        );
+        let _ = stdout().flush();
+        let _ = stderr().flush();
+        process::exit(1);
+    }
+
     let result_tuple = result
         .parse_stack_tuple()
         .context("Failed to parse runGetMethod result stack")?;
@@ -106,21 +118,10 @@ pub(super) fn rpc_call_cmd(
                 print_raw_stack(&result_tuple, &network);
             }
         }
-
-        if result.exit_code != 0 {
-            println!(
-                "\n{} {}",
-                "Error:".red(),
-                get_method_exit_error(method, result.exit_code)
-            );
-            let _ = stdout().flush();
-            let _ = stderr().flush();
-            process::exit(1);
-        }
     }
 
     if result.exit_code != 0 {
-        anyhow::bail!("{}", get_method_exit_error(method, result.exit_code));
+        anyhow::bail!("{}", get_method_exit_error(method, result.exit_code, abi));
     }
 
     Ok(())
@@ -443,7 +444,7 @@ fn format_raw_stack_tuple(tuple: &Tuple, network: &Network) -> String {
     format!("[{items}]")
 }
 
-fn get_method_exit_error(method: &str, exit_code: i32) -> String {
+fn get_method_exit_error(method: &str, exit_code: i32, abi: Option<&ContractABI>) -> String {
     if exit_code == 11 {
         return format!(
             "Get method {} not found (exit code {exit_code})",
@@ -451,7 +452,24 @@ fn get_method_exit_error(method: &str, exit_code: i32) -> String {
         );
     }
 
-    format!("Get method {method} exited with code {exit_code}")
+    let Some(info) = FormatterContext::find_custom_exit_code_info(exit_code, abi) else {
+        return format!(
+            "Get method {} failed (exit code {exit_code})",
+            method.yellow()
+        );
+    };
+
+    let exit_name = info.symbolic_name.yellow();
+    let exit_info = if info.description == info.symbolic_name {
+        exit_name.to_string()
+    } else {
+        format!("{}: {}", exit_name, info.description.dimmed())
+    };
+
+    format!(
+        "Get method {} failed: {exit_info} (exit code {exit_code})",
+        method.yellow()
+    )
 }
 
 #[cfg(test)]

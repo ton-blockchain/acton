@@ -57,6 +57,24 @@ get fun double(value: uint32): int {
 }
 "#;
 
+const RPC_CALL_EXIT_CODE_CONTRACT: &str = r#"
+import "types"
+
+enum Errors {
+    VoteProposalMissing = 133
+}
+
+contract Counter {
+    storage: Storage
+}
+
+fun onInternalMessage(_in: InMessage) {}
+
+get fun listVoters(proposalHash: uint256): int {
+    throw Errors.VoteProposalMissing;
+}
+"#;
+
 const RPC_CALL_ADDRESS_CONTRACT: &str = r#"
 import "types"
 
@@ -849,6 +867,44 @@ fn test_rpc_call_prints_nonzero_exit_code_after_result() {
         .failure()
         .assert_snapshot_matches(
             "integration/snapshots/rpc/test_rpc_call_nonzero_exit_code.stdout.txt",
+        );
+
+    mock_handle.join().expect("mock server thread must finish");
+}
+
+#[test]
+fn test_rpc_call_resolves_nonzero_exit_code_from_abi() {
+    let (project, log_dir, code_boc64) =
+        build_rpc_call_project("rpc-call-resolve-exit-code", RPC_CALL_EXIT_CODE_CONTRACT);
+    let (mock_url, mock_handle) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_account_info_with_code_ok_response(
+            1_234_000_000,
+            &code_boc64,
+            &counter_storage_boc64(7, MATCHED_INFO_OWNER_ADDRESS, 42),
+            "active",
+            "",
+            "999",
+            "c0ffee",
+        ),
+        toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(0.into())], 133),
+    ]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("call")
+        .arg(MATCHED_INFO_ADDRESS)
+        .arg("listVoters")
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("1")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .failure()
+        .assert_snapshot_matches(
+            "integration/snapshots/rpc/test_rpc_call_resolves_nonzero_exit_code.stdout.txt",
         );
 
     mock_handle.join().expect("mock server thread must finish");
