@@ -169,6 +169,21 @@ escape hatch, but it should stay unset for normal contributor builds. When set
 to anything other than `0` / `false`, build-time archive verification is
 disabled.
 
+### Bundled mainnet config
+
+Acton embeds a default mainnet blockchain config for local emulation in
+`crates/ton-executor/src/default_config.boc64`. Refresh it from TonCenter with:
+
+```bash
+cargo xtask update-default-config
+```
+
+The task fetches `getConfigAll`, validates that `result.config.bytes` is a valid
+BOC, and writes the base64 string into the bundled config file. The
+`ton-executor` test suite also checks the bundled value against TonCenter when
+the endpoint is available; network, HTTP, or invalid-response failures are
+reported as a skipped check rather than a failing test.
+
 ### Option 1: sync prebuilt `objs` with xtask
 
 Use the built-in sync task instead of downloading release assets manually:

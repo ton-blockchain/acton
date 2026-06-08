@@ -22,5 +22,8 @@ num-bigint = { workspace = true }
 tvm-ffi = { workspace = true }
 parking_lot = { workspace = true }
 
+[dev-dependencies]
+reqwest = { workspace = true }
+
 [lints]
 workspace = true
