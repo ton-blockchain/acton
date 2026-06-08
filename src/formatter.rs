@@ -356,13 +356,36 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
     }
 
-    fn format_annotation_address(&self, address: &IntAddr) -> String {
+    fn format_annotation_address(
+        &self,
+        address: &IntAddr,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let rendered = self.address_to_string(address);
-        let Some(contract_type) = self.get_contract_type(address) else {
-            return rendered;
-        };
+        match (
+            self.get_contract_type(address),
+            contract_letters.get(address),
+        ) {
+            (Some(contract_type), Some(letter)) => {
+                format!(
+                    "{rendered} ({contract_type} {})",
+                    Self::bold_without_reset(letter)
+                )
+            }
+            (Some(contract_type), None) => format!("{rendered} ({contract_type})"),
+            (None, Some(letter)) => format!("{rendered} {}", Self::bold_without_reset(letter)),
+            (None, None) => rendered,
+        }
+    }
 
-        format!("{rendered} ({contract_type})")
+    fn bold_without_reset(value: &str) -> String {
+        if colors_enabled() {
+            // Annotation rows are styled outside this string. A local reset here would drop
+            // that outer style before the closing punctuation.
+            format!("\x1b[1m{value}")
+        } else {
+            value.to_owned()
+        }
     }
 
     /// Format transaction list as a tree
@@ -913,13 +936,17 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         format!("{amount} TON").green().to_string()
     }
 
-    fn format_inbound_message_body(&self, tx: &Transaction) -> Option<String> {
+    fn format_inbound_message_body(
+        &self,
+        tx: &Transaction,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> Option<String> {
         if !self.show_bodies {
             return None;
         }
 
         let body = self.resolve_transaction_inbound_message_body(tx)?;
-        Some(self.format_decoded_message_body(&body))
+        Some(self.format_decoded_message_body(&body, contract_letters))
     }
 
     pub(crate) fn transaction_inbound_message_name(&self, tx: &Transaction) -> Option<String> {
@@ -1008,6 +1035,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         &self,
         tx: &Transaction,
         msg: &RelaxedMessage,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> Option<Vec<FormattedExtraInfo>> {
         let RelaxedMsgInfo::ExtOut(info) = &msg.info else {
             return None;
@@ -1044,7 +1072,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             && let Some(body) = resolved_body
         {
             infos.push(FormattedExtraInfo::Annotation(
-                self.format_decoded_message_body(&body),
+                self.format_decoded_message_body(&body, contract_letters),
             ));
         }
 
@@ -1535,15 +1563,25 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
     }
 
-    fn format_decoded_message_body(&self, body: &DecodedMessageBody) -> String {
-        self.format_annotation_body(&body.data)
+    fn format_decoded_message_body(
+        &self,
+        body: &DecodedMessageBody,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        self.format_annotation_body(&body.data, contract_letters)
     }
 
-    fn format_annotation_body(&self, data: &UnpackedValue) -> String {
+    fn format_annotation_body(
+        &self,
+        data: &UnpackedValue,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
-            UnpackedValue::Object { fields, .. } => self.format_annotation_object(fields, 0, true),
-            _ => self.format_annotation_value(data, 0),
+            UnpackedValue::Object { fields, .. } => {
+                self.format_annotation_object(fields, 0, true, contract_letters)
+            }
+            _ => self.format_annotation_value(data, 0, contract_letters),
         }
     }
 
@@ -1552,6 +1590,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         fields: &[(String, UnpackedValue)],
         indent: usize,
         is_root: bool,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
         if fields.is_empty() {
             return "{}".to_owned();
@@ -1564,7 +1603,13 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         {
             let inner = fields
                 .iter()
-                .map(|(name, value)| format!("{}: {}", name, self.format_annotation_scalar(value)))
+                .map(|(name, value)| {
+                    format!(
+                        "{}: {}",
+                        name,
+                        self.format_annotation_scalar(value, contract_letters)
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             return if is_root {
@@ -1586,7 +1631,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             vec!["{".to_owned()]
         };
         for (name, field_value) in fields {
-            let value = self.format_annotation_value(field_value, indent + 1);
+            let value = self.format_annotation_value(field_value, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{field_indent}{name}: {first}"));
@@ -1599,19 +1644,33 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         lines.join("\n")
     }
 
-    fn format_annotation_value(&self, data: &UnpackedValue, indent: usize) -> String {
+    fn format_annotation_value(
+        &self,
+        data: &UnpackedValue,
+        indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Object { fields, .. } => {
-                self.format_annotation_object(fields, indent, false)
+                self.format_annotation_object(fields, indent, false, contract_letters)
             }
-            UnpackedValue::Array(items) => self.format_annotation_array(items, indent),
-            UnpackedValue::Map(entries) => self.format_annotation_map(entries, indent),
-            _ => self.format_annotation_scalar(data),
+            UnpackedValue::Array(items) => {
+                self.format_annotation_array(items, indent, contract_letters)
+            }
+            UnpackedValue::Map(entries) => {
+                self.format_annotation_map(entries, indent, contract_letters)
+            }
+            _ => self.format_annotation_scalar(data, contract_letters),
         }
     }
 
-    fn format_annotation_array(&self, items: &[UnpackedValue], indent: usize) -> String {
+    fn format_annotation_array(
+        &self,
+        items: &[UnpackedValue],
+        indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         if items.is_empty() {
             return "[]".to_owned();
         }
@@ -1619,7 +1678,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if items.len() <= 3 && items.iter().all(Self::is_annotation_scalar) {
             let inner = items
                 .iter()
-                .map(|item| self.format_annotation_scalar(item))
+                .map(|item| self.format_annotation_scalar(item, contract_letters))
                 .collect::<Vec<_>>()
                 .join(", ");
             return format!("[{inner}]");
@@ -1629,7 +1688,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let item_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["[".to_owned()];
         for item in items {
-            let value = self.format_annotation_value(item, indent + 1);
+            let value = self.format_annotation_value(item, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{item_indent}{first}"));
@@ -1644,6 +1703,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         &self,
         entries: &[(UnpackedValue, UnpackedValue)],
         indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
         if entries.is_empty() {
             return "{}".to_owned();
@@ -1653,8 +1713,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let entry_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["{".to_owned()];
         for (key, value) in entries {
-            let key = self.format_annotation_value(key, indent + 1);
-            let value = self.format_annotation_value(value, indent + 1);
+            let key = self.format_annotation_value(key, indent + 1, contract_letters);
+            let value = self.format_annotation_value(value, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{entry_indent}{key} => {first}"));
@@ -1665,7 +1725,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         lines.join("\n")
     }
 
-    fn format_annotation_scalar(&self, data: &UnpackedValue) -> String {
+    fn format_annotation_scalar(
+        &self,
+        data: &UnpackedValue,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Null => "null".to_owned(),
@@ -1674,7 +1738,9 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             UnpackedValue::Bool(value) => value.to_string(),
             UnpackedValue::String(value) => format!("{value:?}"),
             UnpackedValue::AddressNone => "addr_none".to_owned(),
-            UnpackedValue::Address(value) => self.format_annotation_address(value),
+            UnpackedValue::Address(value) => {
+                self.format_annotation_address(value, contract_letters)
+            }
             UnpackedValue::ExtAddress(value) => value.to_string(),
             UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
                 Boc::encode_hex(value)
@@ -1688,7 +1754,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 }
             }
             UnpackedValue::Object { .. } | UnpackedValue::Array(_) | UnpackedValue::Map(_) => {
-                self.format_annotation_value(data, 0)
+                self.format_annotation_value(data, 0, contract_letters)
             }
         }
     }
@@ -1748,7 +1814,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let mut result = String::new();
         let mut extra_infos = vec![];
 
-        if let Some(body) = self.format_inbound_message_body(tx) {
+        if let Some(body) = self.format_inbound_message_body(tx, contract_letters) {
             extra_infos.push(FormattedExtraInfo::Annotation(body));
         }
 
@@ -1863,7 +1929,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 continue;
             };
 
-            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg) else {
+            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg, contract_letters)
+            else {
                 continue;
             };
 

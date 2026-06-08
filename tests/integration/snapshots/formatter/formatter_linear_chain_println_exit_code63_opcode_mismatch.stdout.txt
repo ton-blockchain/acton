@@ -17,7 +17,7 @@
        N/A -> sender A
        └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1782
            │   queryId: 102
-           │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid)
+           │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid C)
            │   sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
            └── FmDelivered 0.199933333 TON -> fm_linear_mid C                          gas=435 exit_code=63 aborted
                queryId: 102, hop: 1

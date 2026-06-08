@@ -2,6 +2,6 @@
 N/A -> sender A
 └── ScriptBodyMsg 0.1 TON -> script_body_sink B                                 gas=333
         queryId: 11
-        recipient: [WALLET_ADDRESS_BASE] (sender)
+        recipient: [WALLET_ADDRESS_BASE] (sender A)
         amount: 20000000
 

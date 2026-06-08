@@ -13,7 +13,7 @@
                queryId: 42
                amount: 1250000000
                destination: [WALLET_ADDRESS_BASE] (recipient)
-               responseDestination: [WALLET_ADDRESS_BASE] (sender)
+               responseDestination: [WALLET_ADDRESS_BASE] (sender A)
                customPayload: null
                forwardTonAmount: 50000000
                forwardPayload: [BOC_HEX]
