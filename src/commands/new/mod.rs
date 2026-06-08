@@ -21,77 +21,11 @@ pub use template::{ProjectTemplate, extract_standalone_app_scaffold};
 
 const DEFAULT_PROJECT_DESCRIPTION: &str = "A TON blockchain project";
 const DEFAULT_PROJECT_LICENSE: &str = "MIT";
-const BASE_GITIGNORE: &str = "
-# Acton main directory
-.acton/
+const BASE_GITIGNORE: &str = include_str!("templates/base/gitignore");
 
-# Build directory
-build/
-dist/
+const BASE_ENV_EXAMPLE: &str = include_str!("templates/base/env.example");
 
-.DS_Store
-node_modules/
-
-# VS Code
-.vscode/*
-.history/
-*.vsix
-
-# IDEA files
-.idea
-
-# Vim
-Session.vim
-.vim/
-
-# Other private editor folders
-.nvim/
-.emacs/
-.helix/
-
-# Acton related
-.env
-*.mnemonic
-wallets.toml
-global.wallets.toml
-global.libraries.toml
-
-# coverage
-lcov.info
-gen/
-";
-
-const BASE_ENV_EXAMPLE: &str = "
-# Copy this file to .env for local Toncenter API keys.
-# Acton loads .env automatically.
-# App templates also let Vite read the TONCENTER_ variables.
-# Acton uses Toncenter to access blockchain data and send messages.
-# Since there's a 1 RPS limit in key-less mode, some operations require additional waiting to avoid
-# exceeding the limit. We recommend obtaining a key to speed up your transactions in Acton.
-# You can obtain a key in the bot at https://t.me/toncenter.
-# Acton ignores HTTP_PROXY, HTTPS_PROXY, ALL_PROXY and system proxy settings by default
-# to avoid macOS sandbox proxy autodetection crashes. Set ACTON_USE_PROXY=1 or
-# ACTON_USE_PROXY=true if you need Acton CLI HTTP requests to use those proxies.
-# Uncomment the network keys you need:
-# TONCENTER_MAINNET_API_KEY=\"your-mainnet-key-here\"
-# TONCENTER_TESTNET_API_KEY=\"your-testnet-key-here\"
-";
-
-const BASE_EDITORCONFIG: &str = "
-root = true
-
-[*]
-charset = utf-8
-end_of_line = lf
-indent_style = space
-indent_size = 2
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.tolk]
-indent_size = 4
-max_line_length = 100
-";
+const BASE_EDITORCONFIG: &str = include_str!("templates/base/editorconfig");
 
 const ACTON_TOML_REFERENCE_FOOTER: &str = "
 # Check full Acton.toml reference and all available keys:
