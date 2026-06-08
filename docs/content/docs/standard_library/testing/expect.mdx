@@ -55,7 +55,7 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L38" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L39" />
 
 ## `Expectation<T>.create`
 
@@ -72,7 +72,7 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L56" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L57" />
 
 ## `Expectation<T>.fail`
 
@@ -92,7 +92,7 @@ fun Expectation<int>.toBeTen(self) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L71" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L72" />
 
 ## `Expectation<T>.toEqual`
 
@@ -107,7 +107,7 @@ Example:
 expect(10).toEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L81" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L82" />
 
 ## `Expectation<T>.toEqualDecimal`
 
@@ -126,7 +126,7 @@ Example:
 expect(ton("1.5")).toEqualDecimal(ton("1.5"), 9);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L95" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L96" />
 
 ## `Expectation<T>.toNotEqual`
 
@@ -141,7 +141,7 @@ Example:
 expect(10).toNotEqual(20);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L105" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L106" />
 
 ## `Expectation<T>.toBeLess`
 
@@ -156,7 +156,7 @@ Example:
 expect(5).toBeLess(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L115" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L116" />
 
 ## `Expectation<T>.toBeGreater`
 
@@ -171,7 +171,7 @@ Example:
 expect(10).toBeGreater(5);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L131" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L132" />
 
 ## `Expectation<T>.toBeLessOrEqual`
 
@@ -187,7 +187,7 @@ expect(5).toBeLessOrEqual(10);
 expect(10).toBeLessOrEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L148" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L149" />
 
 ## `Expectation<T>.toBeGreaterOrEqual`
 
@@ -203,7 +203,7 @@ expect(10).toBeGreaterOrEqual(5);
 expect(10).toBeGreaterOrEqual(10);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L165" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L166" />
 
 ## `Expectation<int>.toBeApproxEqAbs`
 
@@ -219,7 +219,7 @@ expect(10).toBeApproxEqAbs(15, 10); // ok, difference is 5, which is less than m
 expect(10).toBeApproxEqAbs(20, 5); // error, difference is 10, which is greater than maximum allowed difference of 5
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L182" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L183" />
 
 ## `Expectation<int>.toBeApproxEqRel`
 
@@ -242,7 +242,7 @@ expect(1000).toBeApproxEqRel(1099, 9);
 expect(0).toBeApproxEqRel(0, 0);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L211" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L212" />
 
 ## `Expectation<T?>.toBeNull`
 
@@ -257,7 +257,7 @@ Example:
 expect(null).toBeNull();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L248" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L249" />
 
 ## `Expectation<T?>.toBeNotNull`
 
@@ -273,7 +273,7 @@ val someValue: int? = cond ? 10 : null;
 expect(someValue).toBeNotNull();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L261" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L262" />
 
 ## `Expectation<slice>.toBeNonEmpty`
 
@@ -288,7 +288,7 @@ Example:
 expect(someSlice).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L273" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L274" />
 
 ## `Expectation<slice>.toBeEmpty`
 
@@ -303,7 +303,7 @@ Example:
 expect(someSlice).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L285" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L286" />
 
 ## `Expectation<int>.toBeNaN`
 
@@ -318,7 +318,7 @@ Example:
 expect(nan()).toBeNaN();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L297" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L298" />
 
 ## `Expectation<int>.toBeNonNaN`
 
@@ -333,7 +333,7 @@ Example:
 expect(0).toBeNonNaN();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L307" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L308" />
 
 ## `Expectation<bool>.toBeTrue`
 
@@ -348,7 +348,7 @@ Example:
 expect(true).toBeTrue();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L317" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L318" />
 
 ## `Expectation<bool>.toBeFalse`
 
@@ -363,7 +363,7 @@ Example:
 expect(false).toBeFalse();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L327" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L328" />
 
 ## `Expectation<any_address>.toBeInternalAddress`
 
@@ -378,7 +378,7 @@ Example:
 expect(addr).toBeInternalAddress();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L337" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L338" />
 
 ## `Expectation<any_address>.toBeNoneAddress`
 
@@ -393,7 +393,7 @@ Example:
 expect(addr).toBeNoneAddress();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L349" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L350" />
 
 ## `Expectation<any_address>.toBeExternalAddress`
 
@@ -408,7 +408,7 @@ Example:
 expect(addr).toBeExternalAddress();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L361" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L362" />
 
 ## `Expectation<array<E>>.toContain`
 
@@ -424,7 +424,7 @@ val arr = [1, 2, 3];
 expect(arr).toContain(2);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L374" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L375" />
 
 ## `Expectation<array<E>>.toNotContain`
 
@@ -440,7 +440,7 @@ val arr = [1, 2, 3];
 expect(arr).toNotContain(4);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L393" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L394" />
 
 ## `Expectation<array<E>>.toBeEmpty`
 
@@ -456,7 +456,7 @@ val arr = array<int> [];
 expect(arr).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L411" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L412" />
 
 ## `Expectation<BigArray<E>>.toBeEmpty`
 
@@ -472,7 +472,7 @@ val txs = net.send(deployer.address, msg);
 expect(txs).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L424" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L425" />
 
 ## `Expectation<array<E>>.toBeNonEmpty`
 
@@ -488,7 +488,7 @@ val arr = [1, 2, 3];
 expect(arr).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L437" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L438" />
 
 ## `Expectation<BigArray<E>>.toBeNonEmpty`
 
@@ -504,7 +504,7 @@ val txs = net.send(deployer.address, msg);
 expect(txs).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L450" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L451" />
 
 ## `Expectation<array<E>>.toHaveLength`
 
@@ -520,7 +520,7 @@ val arr = [1, 2, 3];
 expect(arr).toHaveLength(3);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L463" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L464" />
 
 ## `Expectation<BigArray<E>>.toHaveLength`
 
@@ -536,7 +536,87 @@ val txs = net.send(deployer.address, msg);
 expect(txs).toHaveLength(3);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L479" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L480" />
+
+## `Expectation<lisp_list<E>>.toContain`
+
+```tolk
+fun Expectation<lisp_list<E>>.toContain<U>(self, expected: U): void
+```
+
+Asserts that a lisp list contains the expected value.
+
+Example:
+```tolk
+val list = lisp_list<int> [1, 2, 3];
+expect(list).toContain(2);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L496" />
+
+## `Expectation<lisp_list<E>>.toNotContain`
+
+```tolk
+fun Expectation<lisp_list<E>>.toNotContain<U>(self, expected: U): void
+```
+
+Asserts that a lisp list does not contain the expected value.
+
+Example:
+```tolk
+val list = lisp_list<int> [1, 2, 3];
+expect(list).toNotContain(4);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L520" />
+
+## `Expectation<lisp_list<E>>.toBeEmpty`
+
+```tolk
+fun Expectation<lisp_list<E>>.toBeEmpty(self): void
+```
+
+Asserts that a lisp list is empty.
+
+Example:
+```tolk
+val list = lisp_list<int> [];
+expect(list).toBeEmpty();
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L543" />
+
+## `Expectation<lisp_list<E>>.toBeNonEmpty`
+
+```tolk
+fun Expectation<lisp_list<E>>.toBeNonEmpty(self): void
+```
+
+Asserts that a lisp list is not empty.
+
+Example:
+```tolk
+val list = lisp_list<int> [1, 2, 3];
+expect(list).toBeNonEmpty();
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L556" />
+
+## `Expectation<lisp_list<E>>.toHaveLength`
+
+```tolk
+fun Expectation<lisp_list<E>>.toHaveLength(self, length: int): void
+```
+
+Asserts that a lisp list has the expected length.
+
+Example:
+```tolk
+val list = lisp_list<int> [1, 2, 3];
+expect(list).toHaveLength(3);
+```
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L569" />
 
 ## `Expectation<map<K, V>>.toContainKey`
 
@@ -554,7 +634,7 @@ map.set(2, 3);
 expect(map).toContainKey(2);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L497" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L587" />
 
 ## `Expectation<map<K, V>>.toNotContainKey`
 
@@ -572,7 +652,7 @@ map.set(2, 3);
 expect(map).toNotContainKey(4);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L518" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L608" />
 
 ## `Expectation<map<K, V>>.toContainValue`
 
@@ -590,7 +670,7 @@ map.set(2, 3);
 expect(map).toContainValue(2);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L539" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L629" />
 
 ## `Expectation<map<K, V>>.toNotContainValue`
 
@@ -608,7 +688,7 @@ map.set(2, 3);
 expect(map).toNotContainValue(4);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L566" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L656" />
 
 ## `Expectation<map<K, V>>.toBeEmpty`
 
@@ -624,7 +704,7 @@ var map = map<int32, int32> [];
 expect(map).toBeEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L589" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L679" />
 
 ## `Expectation<map<K, V>>.toBeNonEmpty`
 
@@ -642,7 +722,7 @@ map.set(2, 3);
 expect(map).toBeNonEmpty();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L604" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L694" />
 
 ## `Expectation<map<K, V>>.toHaveLength`
 
@@ -660,7 +740,7 @@ map.set(2, 3);
 expect(map).toHaveLength(2);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L619" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L709" />
 
 ## `expect`
 
@@ -681,7 +761,7 @@ Optional location can be provided to specify the location of the expectation to
 be printed in the error message. You likely don't want to set this manually,
 as the location will be automatically set by the test framework.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L642" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L732" />
 
 ## `expectToEndWithExitCode`
 
@@ -709,5 +789,5 @@ get fun `test fail with`() {
 
 This function is more flexible and can be used conditionally in the test.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L669" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L759" />
 

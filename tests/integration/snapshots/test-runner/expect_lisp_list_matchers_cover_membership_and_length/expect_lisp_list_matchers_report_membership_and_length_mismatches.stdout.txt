@@ -1,0 +1,30 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/expect_lisp_list.test.tolk (5 tests)
+  ✗ stdlib lisp list to contain missing [TIME]
+    └─ Error: expect(actual).toContain(expected): Value '99' not found in the list
+      └─ at tests/expect_lisp_list.test[LINE]
+  ✗ stdlib lisp list to not contain present [TIME]
+    └─ Error: expect(actual).toNotContain(expected): Value '2' is found in the list
+      └─ at tests/expect_lisp_list.test[LINE]
+  ✗ stdlib lisp list to be empty on non empty [TIME]
+    └─ Error: expect(actual).toBeEmpty(expected): list is not empty
+      └─ at tests/expect_lisp_list.test[LINE]
+  ✗ stdlib lisp list to be non empty on empty [TIME]
+    └─ Error: expect(actual).toBeNonEmpty(expected): list is empty
+      └─ at tests/expect_lisp_list.test[LINE]
+  ✗ stdlib lisp list to have length mismatch [TIME]
+    └─ Error: expect(actual).toHaveLength(expected)
+        (
+            3,
+            4
+        )
+      └─ at tests/expect_lisp_list.test[LINE]
+
+ ✗ 5 failed in 1 file
+
+Some tests failed.
