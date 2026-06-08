@@ -903,6 +903,7 @@ fn identifier_word_boundary(prev: char, current: char, next: Option<char>) -> bo
 #[derive(Debug, Clone, Copy)]
 enum MapScalarType {
     Int { bits: u16, signed: bool },
+    Bits { bits: u16 },
     VarInt { len_bits: u8, signed: bool },
     Bool,
     Address,
@@ -913,7 +914,7 @@ enum MapScalarType {
 impl MapScalarType {
     const fn bit_len(self) -> u16 {
         match self {
-            Self::Int { bits, .. } => bits,
+            Self::Int { bits, .. } | Self::Bits { bits } => bits,
             Self::Bool => 1,
             Self::Address => StdAddr::BITS_WITHOUT_ANYCAST,
             Self::VarInt { .. } | Self::Cell | Self::String => 0,
@@ -1517,6 +1518,9 @@ fn render_map_raw(type_name: String, root: Option<&Cell>) -> RenderedValue {
 fn parse_map_key_type(ty: &Ty) -> Option<MapScalarType> {
     match ty {
         Ty::Bool => Some(MapScalarType::Bool),
+        Ty::BitsN { n } => u16::try_from(*n)
+            .is_ok()
+            .then_some(MapScalarType::Bits { bits: *n as u16 }),
         Ty::Address | Ty::AddressAny => Some(MapScalarType::Address),
         Ty::Int => Some(MapScalarType::Int {
             bits: 257,
@@ -1582,6 +1586,13 @@ fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
 
 fn format_map_scalar(slice: &mut TyCellSlice<'_>, ty: MapScalarType) -> Result<String, String> {
     match ty {
+        MapScalarType::Bits { bits } => {
+            let mut bytes = vec![0u8; usize::from(bits).div_ceil(8)];
+            slice
+                .load_raw(&mut bytes, bits)
+                .map_err(|e| e.to_string())?;
+            Ok(format_abi_bits(&bytes, usize::from(bits)))
+        }
         MapScalarType::Int { bits, signed } => {
             if !signed && bits == 256 {
                 return Ok(format!(
@@ -3805,7 +3816,9 @@ mod tests {
         AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
     use tolk_compiler::types_kernel::UnionVariant;
-    use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
+    use tycho_types::cell::{CellDataBuilder, CellFamily, HashBytes, Lazy, Store};
+    use tycho_types::dict::{Dict, DictKey, StoreDictKey};
+    use tycho_types::error::Error;
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
     use tycho_types::models::{ReserveCurrencyFlags, StdAddr};
 
@@ -4004,6 +4017,53 @@ mod tests {
         };
         assert_eq!(type_name, "map<int32, bool>");
         assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn render_map_with_bits264_key_and_void_value() {
+        #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+        struct Bits264([u8; 33]);
+
+        impl DictKey for Bits264 {
+            const BITS: u16 = 264;
+        }
+
+        impl StoreDictKey for Bits264 {
+            fn store_into_data(&self, data: &mut CellDataBuilder) -> Result<(), Error> {
+                data.store_raw(&self.0, Self::BITS)
+            }
+        }
+
+        let mut unique_types = Vec::new();
+        let key_ty_idx = add_ty(&mut unique_types, Ty::BitsN { n: 264 });
+        let value_ty_idx = add_ty(&mut unique_types, Ty::Void);
+        let map_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::MapKV {
+                key_ty_idx,
+                value_ty_idx,
+            },
+        );
+        let mut map = Dict::<Bits264, ()>::new();
+        map.set(Bits264([0x11; 33]), ()).unwrap();
+
+        let root = map.into_root().unwrap();
+        let stack_value = VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&root)));
+        let slots = [SlotValue::Live(&stack_value)];
+        let rendered =
+            debug_print_from_stack(&source_map_with_types(unique_types), &slots, map_ty_idx);
+
+        let RenderedValue::MapKV { type_name, fields } = rendered else {
+            panic!("expected map");
+        };
+        assert_eq!(type_name, "map<bits264, void>");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(
+            fields[0].0,
+            "0x111111111111111111111111111111111111111111111111111111111111111111"
+        );
+        assert_eq!(fields[0].1.dap_parts().0, "(void)");
+        assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("void"));
     }
 
     #[test]
