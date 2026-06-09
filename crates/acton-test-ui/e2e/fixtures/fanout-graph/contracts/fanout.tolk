@@ -29,10 +29,7 @@ fun sendNotice(dest: address, queryId: int, branch: int) {
         bounce: false,
         value: ton("0.05"),
         dest,
-        body: FanoutNotice {
-            queryId,
-            branch,
-        },
+        body: FanoutNotice { queryId, branch },
     });
     notice.send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
@@ -42,10 +39,7 @@ fun sendChainStep(queryId: int, remaining: int) {
         bounce: false,
         value: ton("0.15"),
         dest: contract.getAddress(),
-        body: ChainStep {
-            queryId,
-            remaining,
-        },
+        body: ChainStep { queryId, remaining },
     });
     nextStep.send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
@@ -55,11 +49,7 @@ fun sendBinaryBranch(queryId: int, branch: int, target: address) {
         bounce: false,
         value: ton("0.2"),
         dest: contract.getAddress(),
-        body: BinaryBranch {
-            queryId,
-            branch,
-            target,
-        },
+        body: BinaryBranch { queryId, branch, target },
     });
     branchMessage.send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
@@ -69,11 +59,7 @@ fun sendAsymmetricStep(queryId: int, remaining: int, final: address) {
         bounce: false,
         value: ton("0.12"),
         dest: contract.getAddress(),
-        body: AsymmetricStep {
-            queryId,
-            remaining,
-            final,
-        },
+        body: AsymmetricStep { queryId, remaining, final },
     });
     nextStep.send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
@@ -83,13 +69,7 @@ fun sendBranchingNode(queryId: int, remaining: int, branch: int, left: address, 
         bounce: false,
         value: ton("0.2"),
         dest: contract.getAddress(),
-        body: BranchingNode {
-            queryId,
-            remaining,
-            branch,
-            left,
-            right,
-        },
+        body: BranchingNode { queryId, remaining, branch, left, right },
     });
     nextNode.send(SEND_MODE_PAY_FEES_SEPARATELY);
 }
@@ -178,7 +158,13 @@ fun onInternalMessage(in: InMessage) {
 
         BranchingNode => {
             if (msg.remaining > 0) {
-                sendBranchingNode(msg.queryId, msg.remaining - 1, msg.branch * 2, msg.left, msg.right);
+                sendBranchingNode(
+                    msg.queryId,
+                    msg.remaining - 1,
+                    msg.branch * 2,
+                    msg.left,
+                    msg.right,
+                );
                 sendBranchingNode(
                     msg.queryId,
                     msg.remaining - 1,

@@ -1,7 +1,7 @@
 import "@acton/build"
+import "@acton/io"
 import "@acton/emulation/network"
 import "@acton/emulation/testing"
-import "@acton/io"
 import "@acton/testing/expect"
 import "@contracts/messages"
 
@@ -24,9 +24,7 @@ fun deployFanout(sender: Treasury): Fanout {
     val deployMessage = createMessage({
         bounce: false,
         value: ton("1"),
-        dest: {
-            stateInit: fanout.init,
-        },
+        dest: { stateInit: fanout.init },
     });
 
     val deployResult = net.send(sender.address, deployMessage);
@@ -137,7 +135,13 @@ fun Fanout.sendAsymmetric(
     return net.send(from, triggerMessage);
 }
 
-fun Fanout.sendBranching(self, from: address, left: address, right: address, depth: int): SendResultList {
+fun Fanout.sendBranching(
+    self,
+    from: address,
+    left: address,
+    right: address,
+    depth: int,
+): SendResultList {
     val triggerMessage = createMessage({
         bounce: false,
         value: ton("6"),
@@ -301,7 +305,13 @@ get fun `test asymmetric graph mixes shallow leaves and tall branch`() {
     val final = testing.treasury("deep-final");
     val fanout = deployFanout(sender);
 
-    val result = fanout.sendAsymmetric(sender.address, first.address, second.address, final.address, 5);
+    val result = fanout.sendAsymmetric(
+        sender.address,
+        first.address,
+        second.address,
+        final.address,
+        5,
+    );
     result.giveName("asymmetric shallow plus deep");
 
     expect(result).toHaveSuccessfulTx({ from: sender.address, to: fanout.address });
