@@ -1,9 +1,9 @@
 ---
 title: "API Compatibility"
-description: "Coverage matrix for TonCenter v2/v3 endpoints in Acton local development node"
+description: "Coverage matrix for TonCenter v2/v3 and Streaming API endpoints in Acton local development node"
 ---
 
-This page tracks TonCenter v2 and v3 API coverage in Acton local development node.
+This page tracks TonCenter v2, v3, Streaming API v2, and Emulate API coverage in Acton local development node.
 
 ## TonCenter v2 Coverage Matrix
 
@@ -76,6 +76,22 @@ Acton local development node currently supports 11 TonCenter v3 endpoints:
 `/acton_sendInternalMessage` to inject a raw internal message in local tooling.
 
 No other v3 endpoints are exposed by the local development node at the moment.
+
+## Streaming API v2
+
+Acton local development node supports a TonCenter Streaming API v2-compatible
+subset for local tools and the bundled explorer UI. For protocol details,
+request fields, finality behavior, and notification schemas, use the
+[official TON Center Streaming API documentation](https://docs.ton.org/applications/api/toncenter/streaming/overview).
+
+| Transport   | Endpoint                 | Available in local node | Purpose                                      |
+|-------------|--------------------------|-------------------------|----------------------------------------------|
+| `SSE`       | `/api/streaming/v2/sse`  | ✅                       | Opens a `text/event-stream` subscription.    |
+| `WebSocket` | `/api/streaming/v2/ws`   | ✅                       | Opens a WebSocket subscription over JSON.    |
+
+Localnet emits transaction, account-state, jetton-state, and trace updates.
+Action extraction is not implemented yet, so action notifications should not be
+used for local indexing.
 
 ## Emulate API Coverage Matrix
 

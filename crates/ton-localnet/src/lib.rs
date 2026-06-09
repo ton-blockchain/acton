@@ -6,6 +6,7 @@ mod node_snapshot;
 pub mod remote;
 pub mod server;
 pub mod storage;
+pub mod streaming;
 pub mod types;
 pub use localnet::Localnet;
 pub use server::{ServerArgs, StartupWallet, run_server};

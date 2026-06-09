@@ -5,8 +5,7 @@ use crate::stack::{Tuple, TupleItem};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use thiserror::Error;
-use tycho_types::cell::Cell;
-use tycho_types::cell::HashBytes;
+use tycho_types::cell::{Cell, HashBytes, Load};
 use tycho_types::models::{IntAddr, ShardAccount, StdAddr};
 
 /// An error type for converting `TupleItem` to a Rust type.
@@ -14,6 +13,8 @@ use tycho_types::models::{IntAddr, ShardAccount, StdAddr};
 pub enum ArgError {
     #[error("stack underflow")]
     StackUnderflow,
+    #[error("tuple length mismatch: expected {expected}, actual {actual}")]
+    TupleLengthMismatch { expected: usize, actual: usize },
     #[error("type mismatch: expected {expected}")]
     TypeMismatch { expected: &'static str },
     #[error("cell parse error")]
@@ -26,6 +27,18 @@ pub enum ArgError {
 pub trait FromStack: Sized {
     /// Convert a `TupleItem` to a Rust type.
     fn from_item(item: TupleItem) -> Result<Self, ArgError>;
+}
+
+/// A trait for converting a TVM tuple stack to a Rust struct.
+pub trait FromStackTuple: Sized {
+    /// Convert a `Tuple` to a Rust type.
+    fn from_tuple(tuple: Tuple) -> Result<Self, ArgError>;
+}
+
+impl FromStackTuple for Tuple {
+    fn from_tuple(tuple: Tuple) -> Result<Self, ArgError> {
+        Ok(tuple)
+    }
 }
 
 /// Convert a `TupleItem` to a `TupleItem`.
@@ -201,8 +214,10 @@ impl FromStack for Tuple {
 impl FromStack for Cell {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
-            TupleItem::Cell(c) => Ok(c),
-            _ => Err(ArgError::TypeMismatch { expected: "Cell" }),
+            TupleItem::Cell(c) | TupleItem::Slice(c) => Ok(c),
+            _ => Err(ArgError::TypeMismatch {
+                expected: "Cell | Slice",
+            }),
         }
     }
 }
@@ -226,7 +241,8 @@ impl FromStack for IntAddr {
     fn from_item(item: TupleItem) -> Result<Self, ArgError> {
         match item {
             TupleItem::Cell(cell) | TupleItem::Slice(cell) => {
-                cell.parse::<IntAddr>().map_err(|_| ArgError::CellParse)
+                let mut slice = cell.as_slice_allow_exotic();
+                IntAddr::load_from(&mut slice).map_err(|_| ArgError::CellParse)
             }
             _ => Err(ArgError::TypeMismatch {
                 expected: "Slice(IntAddr)",
@@ -448,7 +464,9 @@ mod tests {
         let result = Cell::from_item(TupleItem::Int(BigInt::from(42)));
         assert!(matches!(
             result,
-            Err(ArgError::TypeMismatch { expected: "Cell" })
+            Err(ArgError::TypeMismatch {
+                expected: "Cell | Slice"
+            })
         ));
     }
 

@@ -1,0 +1,12 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/stdlib_io.test.tolk (1 test)
+live-stdout-1
+live-stdout-2
+  ✓ at stdlib no capture live output [TIME]
+
+ ✓ 1 passed in 1 file

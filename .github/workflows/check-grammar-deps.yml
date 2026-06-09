@@ -23,7 +23,7 @@ concurrency:
 permissions: { }
 
 jobs:
-  grammar-audit:
+  yarn-audit:
     name: Yarn audit
     runs-on: ubicloud-standard-2-ubuntu-2204
 
@@ -36,6 +36,12 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        with:
+          tool: just@1.49.0
+          fallback: none
+
       - name: Enable Corepack
         run: corepack enable
 
@@ -45,23 +51,4 @@ jobs:
           node-version: 22.x
 
       - name: Run Yarn audits
-        shell: bash
-        # language=Bash
-        run: |
-          set -uo pipefail
-          shopt -s nullglob
-
-          for dir in crates/tree-sitter-*; do
-            [ -d "$dir" ] || continue
-            [ -f "$dir/yarn.lock" ] || continue
-
-            echo "::group::yarn npm audit (${dir})"
-            if ! (
-              cd "$dir"
-              yarn npm audit --all --recursive --severity=moderate
-            ); then
-              echo "::endgroup::"
-              exit 1
-            fi
-            echo "::endgroup::"
-          done
+        run: just check-grammar-security

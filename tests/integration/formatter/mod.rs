@@ -1,6 +1,7 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
 use acton::formatter::FormatterContext;
+use std::fs;
 use tycho_types::models::{ReserveCurrencyFlags, SendMsgFlags};
 
 const LINEAR_MESSAGES: &str = r"
@@ -19,6 +20,11 @@ struct (0xF1000003) FmDelivered {
     queryId: uint64
     hop: uint8
 }
+";
+
+const CATALOG_FALLBACK_SINK_CONTRACT: &str = r"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
 ";
 
 const LINEAR_ROOT_CONTRACT: &str = r#"
@@ -1139,6 +1145,21 @@ fn run_success_case_verbose(project: ProjectBuilder, snapshot_path: &str) {
         .assert_snapshot_matches(snapshot_path);
 }
 
+fn compiled_formatter_catalog_sink_boc_bytes() -> Vec<u8> {
+    let source_project = ProjectBuilder::new("formatter-catalog-fallback-source")
+        .contract_with_output(
+            "catalog_sink",
+            CATALOG_FALLBACK_SINK_CONTRACT,
+            "contracts/catalog_sink.boc",
+        )
+        .build();
+
+    source_project.acton().build().run().success();
+
+    fs::read(source_project.path().join("contracts/catalog_sink.boc"))
+        .expect("must read compiled catalog fallback sink BoC bytes")
+}
+
 fn linear_formatter_project(project_name: &str, test_body: &str) -> ProjectBuilder {
     let source = format!("{LINEAR_IMPORTS}\n{test_body}\n");
     ProjectBuilder::new(project_name)
@@ -1301,6 +1322,215 @@ get fun `test-formatter-linear-chain-println`() {
         ),
         "integration/snapshots/formatter/formatter_linear_chain_println_nested_tree.stdout.txt",
     );
+}
+
+#[test]
+fn formatter_catalog_opcode_fallback_decodes_manual_jetton_transfer() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-catalog-opcode-fallback-jetton-transfer")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_catalog_opcode_fallback",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter catalog opcode fallback decodes manual jetton transfer`() {
+                val sender = testing.treasury("sender");
+                val recipient = testing.treasury("recipient");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                val transferBody = beginCell()
+                    .storeUint(0x0f8a7ea5, 32)
+                    .storeUint(42, 64)
+                    .storeCoins(ton("1.25"))
+                    .storeAddress(recipient.address)
+                    .storeAddress(sender.address)
+                    .storeUint(0, 1)
+                    .storeCoins(ton("0.05"))
+                    .storeUint(0, 1)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: sinkAddress,
+                    body: transferBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                println(txs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_catalog_opcode_fallback_decodes_manual_jetton_transfer.stdout.txt",
+        );
+}
+
+#[test]
+fn formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-catalog-opcode-fallback-prefixless-payload")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_catalog_opcode_fallback_prefixless_payload",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter catalog opcode fallback does not name prefixless payloads`() {
+                val sender = testing.treasury("sender");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                var liquidityDict: map<uint32, int32> = [];
+                val prefixlessPayloadBody = beginCell()
+                    .storeUint(0xd1b02ea5, 32)
+                    .storeDict(liquidityDict.toLowLevelDict())
+                    .storeInt(0, 32)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: sinkAddress,
+                    body: prefixlessPayloadBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                println(txs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads.stdout.txt",
+        );
+}
+
+#[test]
+fn formatter_zero_opcode_text_comment_shows_tail() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-zero-opcode-text-comment")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_zero_opcode_text_comment",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter zero opcode text comment shows tail`() {
+                val sender = testing.treasury("sender");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                val commentBody = beginCell()
+                    .storeUint(0, 32)
+                    .storeString("approve")
+                    .endCell()
+                    .beginParse();
+                val longText = "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789";
+                val longCommentBody = beginCell()
+                    .storeUint(0, 32)
+                    .storeString(longText)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: sinkAddress,
+                    body: commentBody,
+                }));
+                val longTxs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: sinkAddress,
+                    body: longCommentBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                expect(longTxs).toHaveLength(1);
+                println(txs);
+                println(longTxs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_zero_opcode_text_comment_shows_tail.stdout.txt",
+        );
 }
 
 #[test]
@@ -1826,6 +2056,13 @@ fn formatter_println_renders_bounced_and_compute_skipped_transactions() {
             r#"
 get fun `test formatter println bounced and compute skipped`() {
     val (sender, echoAddress) = deployFmBounceHarness();
+    val bouncedBody = beginCell()
+        .storeUint(0xFFFFFFFF, 32)
+        .storeAny(FmBouncePing {
+            queryId: 401,
+        })
+        .endCell()
+        .beginParse();
 
     val bounced = net.send(
         sender.address,
@@ -1833,9 +2070,7 @@ get fun `test formatter println bounced and compute skipped`() {
             bounce: false,
             value: ton("0.2"),
             dest: echoAddress,
-            body: FmBouncePing {
-                queryId: 401,
-            },
+            body: bouncedBody,
         }).bounced(),
     );
 

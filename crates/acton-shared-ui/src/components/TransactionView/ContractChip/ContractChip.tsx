@@ -98,6 +98,8 @@ export function ContractChip({
 
   const contractInfo = contracts.get(address)
   const isClickable = onContractClick !== undefined
+  const shortAddress = `${address.slice(0, 6)}…${address.slice(-6)}`
+  const fallbackAddress = trimSoloAddress ? shortAddress : address
 
   const chipContent = (
     <>
@@ -105,14 +107,13 @@ export function ContractChip({
         <>
           <span className={styles.contractLetter}>{contractInfo.letter}</span>
           <span className={styles.contractName}>{contractInfo.displayName}</span>
-          <span className={styles.contractAddress}>
-            ({address.slice(0, 6)}…{address.slice(-6)})
-          </span>
+          <span className={styles.contractAddress}>({shortAddress})</span>
         </>
       ) : (
-        <span className={styles.singleContractAddress}>
-          {trimSoloAddress ? `${address.slice(0, 6)}…${address.slice(-6)}` : address}
-        </span>
+        <>
+          <span className={styles.contractLetter}>?</span>
+          <span className={styles.contractName}>{fallbackAddress}</span>
+        </>
       )}
       <div
         onClick={handleCopy}

@@ -88,6 +88,14 @@ Example:
 acton = "{{ acton_version }}"
 ```
 
+For preview-channel builds installed with `acton up --trunk`, set the pin to
+`trunk` instead of the numbered stable release:
+
+```acton-toml title="Acton.toml"
+[toolchain]
+acton = "trunk"
+```
+
 `acton up` remains available when the configured version does not match, so the
 expected version can be installed from the same project directory.
 
@@ -238,13 +246,14 @@ CLI flags still override config values for a single run (for example `acton fmt 
 
 Configures defaults for `acton localnet`.
 
-| Field               | Type       | Default | Description                                                                         |
-|:--------------------|:-----------|:--------|:------------------------------------------------------------------------------------|
-| `port`              | `integer`  | `5411`  | Port used by `acton localnet` commands when `--port` is omitted.                    |
-| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                |
-| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.     |
-| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.     |
-| `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow). |
+| Field               | Type       | Default | Description                                                                                                     |
+|:--------------------|:-----------|:--------|:----------------------------------------------------------------------------------------------------------------|
+| `port`              | `integer`  | `5411`  | Port used by `acton localnet` commands when `--port` is omitted.                                                |
+| `fork-net`          | `string`   | -       | Network used by `acton localnet start` when `--fork-net` is omitted.                                            |
+| `fork-block-number` | `integer`  | -       | Block sequence number used by `acton localnet start` for historical state fork.                                 |
+| `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.                                 |
+| `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow).                             |
+| `response-delay-ms` | `integer`  | -       | Response delay for `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints; streaming/control/UI are not delayed. |
 
 Example:
 
@@ -255,9 +264,10 @@ fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
+response-delay-ms = 300
 ```
 
-`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, and `--rate-limit <RPS>` override these values for a single run.
+`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, and `--response-delay-ms <MS>` override these values for a single run.
 
 ## `[test]`
 
@@ -280,6 +290,9 @@ Configures the behavior of `acton test`.
 | `fork-block-number`         | `integer`  | -             | Specific block number to fork from.                                    |
 | `fail-fast`                 | `boolean`  | `false`       | Stop execution after the first test failure.                           |
 | `fail-on-diff`              | `boolean`  | `false`       | Exit with non-zero code when profiling differs from baseline snapshot. |
+| `gas-profile`               | `string`   | -             | Path to write a gas-weighted execution profile.                        |
+| `gas-profile-format`        | `string`   | `cpuprofile`  | Gas profile output format: `cpuprofile` or `collapsed`.                |
+| `gas-profile-include-tests` | `boolean`  | `false`       | Include `.test.tolk` unit-test get-method execution in the profile.    |
 | `ui`                        | `boolean`  | `false`       | Enable the browser test UI server.                                     |
 | `ui-port`                   | `integer`  | `12344`       | Port for the browser test UI server.                                   |
 | `mutation`                  | `object`   | -             | Configuration for mutation testing (see below).                        |
@@ -341,6 +354,9 @@ Example:
 reporter = ["console", "junit"]
 fail-fast = true
 fail-on-diff = true
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 
 [test.coverage]
 enabled = true
@@ -364,7 +380,11 @@ rules-file = "mutation-rules.json"
 
 CLI flags such as `--mutation-diff`, `--mutation-diff-ref`, `--mutation-levels`, `--mutation-minimum-percent`, `--mutation-disable-rules`, and `--mutation-rules-file` override these defaults for the current run.
 
-The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`).
+The `fail-on-diff` is used together with baseline comparison mode (`acton test --baseline-snapshot <FILE>`). Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
+
+Combine them with `ui = true` or `acton test --gas-profile <FILE> --ui` to
+browse flamegraphs in Test UI. Set `gas-profile-include-tests = true` when
+`.test.tolk` unit-test get methods contain the hot path you want to inspect.
 
 ## `[lint]`
 

@@ -14,7 +14,7 @@
         └── empty 1 TON -> harness B                                                    gas=351
             └── account created
         
-        Cannot find transaction from <any> to harness B EQCLlS..c1L6Hl
+        Cannot find transaction from <any> to harness B kQCLlS..c1Lxpv
         with:
           deploy=true
           send_mode=SEND_MODE_REGULAR

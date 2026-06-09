@@ -2,18 +2,25 @@ import {
   ArrowUpRight,
   BookOpen,
   Boxes,
+  Braces,
+  FileJson,
   Github,
   Image,
   KeyRound,
   LayoutGrid,
-  Moon,
+  Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Search as SearchIcon,
-  Sun,
+  Settings2,
   Wallet,
+  X,
 } from "lucide-react"
 import type {LucideIcon} from "lucide-react"
 import * as React from "react"
 import {useLocation, useNavigate} from "react-router-dom"
+import {ThemeSwitch} from "@acton/shared-ui"
+import type {ThemeMode} from "@acton/shared-ui"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
@@ -24,8 +31,11 @@ import styles from "./DashboardPage.module.css"
 
 interface DashboardNavigationProps {
   readonly client: TonClient
-  readonly theme: string
-  readonly setTheme: (theme: string) => void
+  readonly theme: ThemeMode
+  readonly setTheme: (theme: ThemeMode) => void
+  readonly onToggleSidebar?: () => void
+  readonly isSidebarCollapsed?: boolean
+  readonly className?: string
 }
 
 interface SidebarItem {
@@ -44,6 +54,18 @@ const mainItems: SidebarItem[] = [
   {label: "NFTs", icon: Image, path: "/nfts"},
 ]
 
+const apiItems: SidebarItem[] = [
+  {label: "API Calls", icon: Braces, path: "/api-calls"},
+  {label: "v2 API", icon: FileJson, path: "/api-reference/v2"},
+  {label: "v3 API", icon: Braces, path: "/api-reference/v3"},
+  {label: "Control API", icon: Settings2, path: "/api-reference/control"},
+]
+
+const navigationSections: Array<{readonly id: string; readonly items: readonly SidebarItem[]}> = [
+  {id: "main", items: mainItems},
+  {id: "api", items: apiItems},
+]
+
 const footerItems: SidebarItem[] = [
   {
     label: "Documentation",
@@ -57,12 +79,17 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
   client,
   theme,
   setTheme,
+  onToggleSidebar,
+  isSidebarCollapsed = false,
+  className,
 }) => {
   const location = useLocation()
   const navigate = useNavigate()
   const {forkNetwork} = useNetworkInfo()
   const [explorerPath, setExplorerPath] = React.useState(() => readExplorerLastPath())
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
   const forkBadgeLabel = React.useMemo(() => formatForkNetworkLabel(forkNetwork), [forkNetwork])
+  const closeMobileMenu = React.useCallback(() => setMobileMenuOpen(false), [])
 
   React.useEffect(() => {
     if (!location.pathname.startsWith("/explorer")) {
@@ -74,103 +101,171 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
     setExplorerPath(nextPath)
   }, [location.hash, location.pathname, location.search])
 
+  React.useEffect(() => {
+    closeMobileMenu()
+  }, [closeMobileMenu, location.hash, location.pathname, location.search])
+
+  React.useEffect(() => {
+    if (!mobileMenuOpen) {
+      return
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeMobileMenu()
+      }
+    }
+
+    globalThis.addEventListener("keydown", onKeyDown)
+    return () => globalThis.removeEventListener("keydown", onKeyDown)
+  }, [closeMobileMenu, mobileMenuOpen])
+
+  const renderWorkspaceHeader = () => (
+    <div className={styles.workspaceHeader}>
+      <span className={styles.workspaceMark} />
+      <span className={styles.workspaceBody}>
+        <span className={styles.workspaceTitleRow}>
+          <span className={styles.workspaceName}>TON Localnet</span>
+          {forkBadgeLabel && <span className={styles.workspaceForkBadge}>{forkBadgeLabel}</span>}
+        </span>
+        <span className={styles.workspaceMeta}>by Acton</span>
+      </span>
+    </div>
+  )
+
   return (
-    <aside className={styles.sidebar}>
-      <div className={styles.sidebarHeader}>
-        <div className={styles.workspaceHeader}>
-          <span className={styles.workspaceMark} />
-          <span className={styles.workspaceBody}>
-            <span className={styles.workspaceTitleRow}>
-              <span className={styles.workspaceName}>TON Localnet</span>
-              {forkBadgeLabel && (
-                <span className={styles.workspaceForkBadge}>{forkBadgeLabel}</span>
-              )}
-            </span>
-            <span className={styles.workspaceMeta}>by Acton</span>
-          </span>
+    <>
+      <header className={styles.mobileTopbar}>
+        {renderWorkspaceHeader()}
+        <button
+          type="button"
+          className={styles.mobileMenuButton}
+          aria-label="Open navigation menu"
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen(true)}
+        >
+          <Menu size={20} />
+        </button>
+      </header>
+
+      <button
+        type="button"
+        className={`${styles.mobileBackdrop} ${mobileMenuOpen ? styles.mobileBackdropOpen : ""}`}
+        aria-label="Close navigation menu"
+        tabIndex={mobileMenuOpen ? 0 : -1}
+        onClick={closeMobileMenu}
+      />
+
+      <aside
+        className={`${styles.sidebar} ${mobileMenuOpen ? styles.sidebarOpen : ""} ${className ?? ""}`}
+        aria-label="Main navigation"
+      >
+        <div className={styles.sidebarHeader}>
+          {renderWorkspaceHeader()}
+          <button
+            type="button"
+            className={styles.mobileCloseButton}
+            aria-label="Close navigation menu"
+            onClick={closeMobileMenu}
+          >
+            <X size={20} />
+          </button>
         </div>
-      </div>
 
-      <div className={styles.topControls}>
-        <DashboardSearch client={client} />
-      </div>
+        <div className={styles.topControls}>
+          <DashboardSearch client={client} />
+        </div>
 
-      <div className={styles.navScroll}>
-        <nav className={styles.nav}>
-          <div className={styles.navSection}>
-            {mainItems.map(item => {
-              const Icon = item.icon
-              const targetPath = item.path === "/explorer" ? explorerPath : item.path
-              const isActive =
-                item.path === "/explorer"
-                  ? location.pathname.startsWith("/explorer")
-                  : item.path === location.pathname
+        <div className={styles.navScroll}>
+          <nav className={styles.nav}>
+            {navigationSections.map((section, index) => (
+              <React.Fragment key={section.id}>
+                {index > 0 && <div className={styles.navDivider} />}
+                <div className={styles.navSection}>
+                  {section.items.map(item => {
+                    const Icon = item.icon
+                    const targetPath = item.path === "/explorer" ? explorerPath : item.path
+                    const isActive =
+                      item.path === "/explorer"
+                        ? location.pathname.startsWith("/explorer")
+                        : item.path === location.pathname
 
-              return (
-                <button
-                  type="button"
-                  key={item.label}
-                  className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
-                  onClick={() => {
-                    if (targetPath) {
-                      void navigate(targetPath)
-                    }
-                  }}
-                >
-                  <span className={styles.navItemMain}>
-                    <Icon size={18} />
-                    <span>{item.label}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
+                    return (
+                      <button
+                        type="button"
+                        key={item.label}
+                        className={`${styles.navItem} ${isActive ? styles.navItemActive : ""}`}
+                        onClick={() => {
+                          if (targetPath) {
+                            void navigate(targetPath)
+                          }
+                          closeMobileMenu()
+                        }}
+                      >
+                        <span className={styles.navItemMain}>
+                          <Icon size={18} />
+                          <span>{item.label}</span>
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </React.Fragment>
+            ))}
 
-          <div className={styles.navDivider} />
+            <div className={styles.navDivider} />
 
-          <div className={styles.navFooter}>
-            <div className={styles.navSection}>
-              {footerItems.map(item => {
-                const Icon = item.icon
+            <div className={styles.navFooter}>
+              <div className={styles.navSection}>
+                {footerItems.map(item => {
+                  const Icon = item.icon
 
-                return (
-                  <a
-                    key={item.label}
-                    className={styles.navItem}
-                    href={item.href}
-                    target="_blank"
-                    rel="noreferrer"
+                  return (
+                    <a
+                      key={item.label}
+                      className={styles.navItem}
+                      href={item.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={closeMobileMenu}
+                    >
+                      <span className={styles.navItemMain}>
+                        <Icon size={18} />
+                        <span>{item.label}</span>
+                      </span>
+                      <ArrowUpRight size={14} />
+                    </a>
+                  )
+                })}
+              </div>
+
+              <div className={styles.navUtilityRow}>
+                {onToggleSidebar && (
+                  <button
+                    type="button"
+                    className={styles.sidebarToggleButton}
+                    onClick={onToggleSidebar}
+                    title={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
+                    aria-label={isSidebarCollapsed ? "Pin navigation" : "Collapse navigation"}
                   >
-                    <span className={styles.navItemMain}>
-                      <Icon size={18} />
-                      <span>{item.label}</span>
-                    </span>
-                    <ArrowUpRight size={14} />
-                  </a>
-                )
-              })}
-            </div>
+                    {isSidebarCollapsed ? (
+                      <PanelLeftOpen size={18} />
+                    ) : (
+                      <PanelLeftClose size={18} />
+                    )}
+                  </button>
+                )}
 
-            <button
-              type="button"
-              className={styles.themeSwitch}
-              aria-label="Toggle Theme"
-              data-theme-toggle=""
-              onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-            >
-              <Sun
-                fill="currentColor"
-                className={`${styles.themeSwitchItem} ${theme === "light" ? styles.themeSwitchItemActive : ""}`}
-              />
-              <Moon
-                fill="currentColor"
-                className={`${styles.themeSwitchItem} ${theme === "dark" ? styles.themeSwitchItemActive : ""}`}
-              />
-            </button>
-          </div>
-        </nav>
-      </div>
-    </aside>
+                <ThemeSwitch
+                  theme={theme}
+                  onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
+                />
+              </div>
+            </div>
+          </nav>
+        </div>
+      </aside>
+    </>
   )
 }
 

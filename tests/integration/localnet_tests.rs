@@ -147,6 +147,8 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const CATALOG_WALLET_V4R2_CODE_HASH: &str =
+    "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 
 const V3_GETTER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -260,7 +262,7 @@ fun main() {
         dest: {
             stateInit: counterInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("DEPLOY_NULL");
         return;
     }
@@ -275,7 +277,7 @@ fun main() {
         body: IncreaseCounter {
             increaseBy: 5,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("INCREASE_NULL");
         return;
     }
@@ -458,6 +460,53 @@ fn localnet_starts_and_serves_masterchain_info() {
 }
 
 #[test]
+fn localnet_records_api_calls_for_dashboard() {
+    let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
+    let node = project.localnet().start();
+
+    let mut initial_log = node.get_json("/acton_getApiCalls");
+    normalize_api_calls_for_snapshot(&mut initial_log);
+
+    let _admin_wallets = node.get_json("/acton_getStartupWallets");
+    let _admin_status = node.get_json("/acton_nodeInfo");
+    let _v2_status = node.get_json("/api/v2/getMasterchainInfo");
+    let _successful_rpc = node.post_json(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getMasterchainInfo",
+            "params": {}
+        }),
+    );
+    let (failed_status, _failed_rpc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "missing",
+            "method": "missingMethod",
+            "params": {}
+        }),
+    );
+
+    let mut logged_calls = node.get_json("/acton_getApiCalls?limit=10");
+    normalize_api_calls_for_snapshot(&mut logged_calls);
+
+    let snapshot = json!({
+        "initial_log": initial_log,
+        "failed_status": failed_status,
+        "logged_calls": logged_calls,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_api_calls_dashboard.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_serves_get_shard_account_cell_for_empty_account() {
     let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
     let node = project.localnet().start();
@@ -616,6 +665,41 @@ fn localnet_serves_embedded_ui_and_spa_routes() {
 }
 
 #[test]
+fn localnet_batches_address_name_lookup() {
+    let project = ProjectBuilder::new("localnet-address-name-batch").build();
+    let node = project.localnet().start();
+    let named_address = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let unnamed_address = "0:3333333333333333333333333333333333333333333333333333333333333333";
+
+    node.post_json(
+        "/acton_setAddressName",
+        &json!({
+            "address": named_address,
+            "name": "treasury"
+        }),
+    );
+
+    let mut response = node.get_json(&format!(
+        "/acton_getAddressName?address={}&address={}",
+        encode_query_component(named_address),
+        encode_query_component(unnamed_address)
+    ));
+    normalize_extra_for_snapshot(&mut response);
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&response)
+            .expect("Failed to serialize address name batch response")
+    );
+
+    assertion().eq(
+        response_json,
+        snapbox::file!("snapshots/localnet/test_localnet_address_name_batch.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let project = ProjectBuilder::new("localnet-pre-start-commands")
         .contract("child", CHILD_CONTRACT)
@@ -701,6 +785,79 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
         serde_json::to_string_pretty(&tx_std_response).unwrap_or_default()
     );
 
+    let parent_transaction = transactions
+        .iter()
+        .find(|tx| {
+            tx.get("out_msgs")
+                .and_then(Value::as_array)
+                .is_some_and(|out| !out.is_empty())
+        })
+        .expect("deployer trace must include a parent transaction with out messages");
+    let parent_tx_hash = parent_transaction
+        .pointer("/transaction_id/hash")
+        .and_then(Value::as_str)
+        .expect("parent transaction hash must be present");
+    let traces = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/traces?hash={}",
+            encode_query_component(parent_tx_hash)
+        ),
+        Duration::from_secs(12),
+    );
+    let trace_payload = response_payload(&traces);
+    let trace = trace_payload["traces"]
+        .as_array()
+        .and_then(|items| items.first())
+        .expect("v3 traces must contain a first trace");
+    let transactions_map = trace["transactions"]
+        .as_object()
+        .expect("v3 trace must include transactions map");
+    let parent_v3_tx = transactions_map
+        .get(parent_tx_hash)
+        .unwrap_or_else(|| panic!("v3 trace must include parent transaction {parent_tx_hash}"));
+    let legacy_child_lts = parent_v3_tx["child_transactions"]
+        .as_array()
+        .expect("v3 transaction entry must include legacy child_transactions");
+    let trace_root_children = trace["trace"]["children"].as_array();
+    let parent_trace_node = find_trace_node(&trace["trace"], parent_tx_hash);
+    let parent_trace_children = parent_trace_node
+        .and_then(|node| node.get("children"))
+        .and_then(Value::as_array);
+    let first_tree_child_lt = parent_trace_children
+        .and_then(|children| children.first())
+        .and_then(|child| child.get("tx_hash"))
+        .and_then(Value::as_str)
+        .and_then(|child_hash| transactions_map.get(child_hash))
+        .and_then(|tx| tx.get("lt"))
+        .and_then(Value::as_str);
+    let first_legacy_child_lt = legacy_child_lts.first().and_then(Value::as_str);
+    let parent_account_state_after = &parent_v3_tx["account_state_after"];
+
+    let trace_legacy_summary = json!({
+        "trace_root_children_count": trace_root_children.map_or(0, Vec::len),
+        "parent_trace_node_present": parent_trace_node.is_some(),
+        "parent_trace_node_children_count": parent_trace_children.map_or(0, Vec::len),
+        "parent_legacy_child_transactions_count": legacy_child_lts.len(),
+        "first_child_lt_matches_legacy_child_transaction": first_tree_child_lt.is_some()
+            && first_tree_child_lt == first_legacy_child_lt,
+        "parent_account_state_after_has_code_boc": parent_account_state_after["code_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+        "parent_account_state_after_has_data_boc": parent_account_state_after["data_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+    });
+    let trace_legacy_summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&trace_legacy_summary)
+            .expect("Failed to serialize v3 trace compatibility summary")
+    );
+    assertion().eq(
+        trace_legacy_summary_json,
+        snapbox::file!("snapshots/localnet/test_localnet_v3_trace_children.summary.json"),
+    );
+
     let mut tx_std_response = tx_std_response;
     normalize_transactions_std_for_snapshot(&mut tx_std_response);
 
@@ -761,6 +918,61 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         "Expected API requests to recover after rate-limit window"
     );
     assert_eq!(api_after_window["ok"].as_bool(), Some(true));
+
+    node.stop();
+}
+
+#[test]
+fn localnet_can_update_response_delay_while_running() {
+    let project = ProjectBuilder::new("localnet-response-delay-runtime").build();
+    let node = project.localnet().start();
+
+    let initial_info_response = node.get_json("/acton_nodeInfo");
+    let initial_info = response_payload(&initial_info_response);
+    let initial_response_delay_ms = initial_info["network_conditions"]["response_delay_ms"].clone();
+
+    let set_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 250 }),
+    );
+    let set_conditions = response_payload(&set_conditions_response);
+    let set_response_delay_ms = set_conditions["response_delay_ms"].clone();
+
+    let info_after_set_response = node.get_json("/acton_nodeInfo");
+    let info_after_set = response_payload(&info_after_set_response);
+    let node_info_response_delay_ms =
+        info_after_set["network_conditions"]["response_delay_ms"].clone();
+
+    let started_at = Instant::now();
+    let delayed_api_response = node.get_json("/api/v2/getMasterchainInfo");
+    let delayed_api_elapsed = started_at.elapsed();
+
+    let reset_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 0 }),
+    );
+    let reset_conditions = response_payload(&reset_conditions_response);
+    let reset_response_delay_ms = reset_conditions["response_delay_ms"].clone();
+
+    let info_after_reset_response = node.get_json("/acton_nodeInfo");
+    let info_after_reset = response_payload(&info_after_reset_response);
+    let node_info_after_reset_response_delay_ms =
+        info_after_reset["network_conditions"]["response_delay_ms"].clone();
+
+    let summary = json!({
+        "initial_response_delay_ms": initial_response_delay_ms,
+        "set_response_delay_ms": set_response_delay_ms,
+        "node_info_response_delay_ms": node_info_response_delay_ms,
+        "api_delay_observed": delayed_api_elapsed >= Duration::from_millis(220),
+        "api_request_ok": delayed_api_response["ok"].as_bool(),
+        "reset_response_delay_ms": reset_response_delay_ms,
+        "node_info_after_reset_response_delay_ms": node_info_after_reset_response_delay_ms,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_response_delay_runtime.summary.json"),
+    );
 
     node.stop();
 }
@@ -3115,33 +3327,75 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .expect("accountStates code_hash must be valid base64")
         .to_hex();
 
+    let missing_code_hash = "1111111111111111111111111111111111111111111111111111111111111111";
     let abi_response = wait_for_ok_response(
         &node,
-        &format!("/acton_getCompilerAbi?code_hash={code_hash_hex}"),
+        &format!(
+            "/acton_getCompilerAbi?code_hash={}&code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={missing_code_hash}",
+            encode_query_component(&code_hash_hex)
+        ),
         Duration::from_secs(12),
     );
-    let abi = response_payload(&abi_response);
+    let abi_payload = response_payload(&abi_response);
+    let abi = &abi_payload[&code_hash_hex];
+    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH];
 
-    assert_eq!(abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(abi["contract_name"].as_str(), Some("getter"));
-    assert!(
-        abi["get_methods"].as_array().is_some_and(|methods| {
+    let register_override_response = node.post_json(
+        "/acton_registerCompilerAbis",
+        &json!({
+            "entries": [
+                {
+                    "code_hash": CATALOG_WALLET_V4R2_CODE_HASH,
+                    "compiler_abi": {
+                        "compiler_name": "tolk",
+                        "contract_name": "LocalOverride"
+                    }
+                }
+            ]
+        }),
+    );
+    assert_eq!(
+        register_override_response["ok"].as_bool(),
+        Some(true),
+        "registerCompilerAbis failed: {}",
+        serde_json::to_string_pretty(&register_override_response).unwrap_or_default()
+    );
+    let override_response = wait_for_ok_response(
+        &node,
+        &format!("/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}"),
+        Duration::from_secs(12),
+    );
+    let override_payload = response_payload(&override_response);
+
+    let abi_summary = json!({
+        "compiler_name": abi["compiler_name"],
+        "contract_name": abi["contract_name"],
+        "has_add_ten_get_method": abi["get_methods"].as_array().is_some_and(|methods| {
             methods
                 .iter()
                 .any(|method| method["name"].as_str() == Some("addTen"))
         }),
-        "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(abi).unwrap_or_default()
+        "catalog_contract_name": catalog_abi["contract_name"],
+        "catalog_has_seqno_get_method": catalog_abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("seqno"))
+        }),
+        "local_registration_overrides_catalog": override_payload[CATALOG_WALLET_V4R2_CODE_HASH]
+            ["contract_name"]
+            .as_str()
+            == Some("LocalOverride"),
+        "missing_code_hash_is_null": abi_payload[missing_code_hash].is_null(),
+    });
+    let abi_summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&abi_summary)
+            .expect("Failed to serialize compiler ABI batch summary")
     );
 
-    let missing_response = node.get_json(
-        "/acton_getCompilerAbi?code_hash=1111111111111111111111111111111111111111111111111111111111111111",
-    );
-    assert_eq!(missing_response["ok"].as_bool(), Some(true));
-    assert!(
-        response_payload(&missing_response).is_null(),
-        "Unknown code hash must return null result:\n{}",
-        serde_json::to_string_pretty(&missing_response).unwrap_or_default()
+    assertion().eq(
+        abi_summary_json,
+        snapbox::file!("snapshots/localnet/test_localnet_compiler_abi_batch.summary.json"),
     );
 
     node.stop();
@@ -3690,6 +3944,17 @@ fn contains_tx_hash(transactions: &[Value], hash: &str) -> bool {
         .any(|tx| tx["hash"].as_str() == Some(hash))
 }
 
+fn find_trace_node<'a>(node: &'a Value, tx_hash: &str) -> Option<&'a Value> {
+    if node.get("tx_hash").and_then(Value::as_str) == Some(tx_hash) {
+        return Some(node);
+    }
+
+    node.get("children")
+        .and_then(Value::as_array)?
+        .iter()
+        .find_map(|child| find_trace_node(child, tx_hash))
+}
+
 fn assert_transactions_sorted_by_lt_asc(transactions: &[Value]) {
     for window in transactions.windows(2) {
         let left = window[0]["lt"]
@@ -3823,6 +4088,24 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 if let Some(seqno) = id.get_mut("seqno") {
                     *seqno = json!("[SEQNO]");
                 }
+            }
+        }
+    }
+}
+
+fn normalize_api_calls_for_snapshot(response: &mut Value) {
+    normalize_extra_for_snapshot(response);
+
+    if let Some(calls) = response
+        .pointer_mut("/result/calls")
+        .and_then(Value::as_array_mut)
+    {
+        for call in calls {
+            if let Some(timestamp_ms) = call.get_mut("timestamp_ms") {
+                *timestamp_ms = json!("[TIMESTAMP_MS]");
+            }
+            if let Some(duration_ms) = call.get_mut("duration_ms") {
+                *duration_ms = json!("[DURATION_MS]");
             }
         }
     }

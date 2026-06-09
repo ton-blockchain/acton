@@ -35,7 +35,8 @@ use acton_config::config::{
     project_root as configured_project_root,
 };
 use acton_config::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use clap::ArgAction;
 use clap::builder::styling::{AnsiColor, Color, Style};
@@ -199,12 +200,17 @@ enum Commands {
         command: RpcCommand,
     },
     #[command(
-        about = "Run tests from a file or directory",
+        about = "Run tests from files or directories",
         after_help = detailed_help_pointer("test")
     )]
     Test {
-        #[arg(help = "Test file or directory containing test files (default: project root)", add = ArgValueCompleter::new(PathCompleter::any()))]
-        path: Option<String>,
+        #[arg(
+            help = "Test files or directories containing test files (default: project root)",
+            value_name = "PATH",
+            num_args = 0..,
+            add = ArgValueCompleter::new(PathCompleter::any())
+        )]
+        paths: Vec<String>,
         // Filtering
         #[arg(
             short,
@@ -258,6 +264,13 @@ enum Commands {
         debug_port: Option<u16>,
         #[arg(long, help = "Enable backtraces", help_heading = "Debugging")]
         backtrace: Option<BacktraceMode>,
+        #[arg(
+            long,
+            help = "Print test stdout/stderr immediately while still capturing it for reporters",
+            help_heading = "Debugging",
+            conflicts_with = "mutate"
+        )]
+        no_capture: bool,
 
         // Coverage
         #[arg(long, help = "Generate a coverage profile", help_heading = "Coverage")]
@@ -315,6 +328,25 @@ enum Commands {
             requires = "baseline_snapshot"
         )]
         fail_on_diff: bool,
+        #[arg(
+            long,
+            help = "Write a gas-weighted execution profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile: Option<String>,
+        #[arg(
+            long,
+            value_enum,
+            help = "Output gas profile in specified format",
+            help_heading = "Profiling"
+        )]
+        gas_profile_format: Option<GasProfileFormat>,
+        #[arg(
+            long,
+            help = "Include .test.tolk unit-test execution in the gas profile",
+            help_heading = "Profiling"
+        )]
+        gas_profile_include_tests: bool,
 
         // Reporting
         #[arg(
@@ -368,6 +400,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Tracing
         #[arg(
@@ -609,6 +647,12 @@ enum Commands {
             help_heading = "Remote"
         )]
         fork_block_number: Option<u64>,
+        #[arg(
+            long,
+            help = "Disable persistent fork account cache for pinned fork block numbers",
+            help_heading = "Remote"
+        )]
+        no_fork_cache: bool,
 
         // Broadcasting
         #[arg(
@@ -1078,6 +1122,13 @@ pub enum LocalnetCommand {
             help = "Maximum API requests per second to simulate provider rate limits (default: [localnet].rate-limit)"
         )]
         rate_limit: Option<u32>,
+        #[arg(
+            long,
+            value_name = "MS",
+            value_parser = clap::value_parser!(u64).range(1..),
+            help = "Delay TonCenter v2/v3 and Emulate API responses, in milliseconds (default: [localnet].response-delay-ms)"
+        )]
+        response_delay_ms: Option<u64>,
         #[arg(
             long,
             help = "Load Localnet state from JSON snapshot before startup",
@@ -1863,7 +1914,7 @@ fn main() {
             templates,
         ),
         Commands::Test {
-            path,
+            paths,
             filter,
             reporter,
             show_bodies,
@@ -1871,6 +1922,7 @@ fn main() {
             debug,
             debug_port,
             backtrace,
+            no_capture,
             coverage,
             coverage_format,
             coverage_file,
@@ -1885,6 +1937,9 @@ fn main() {
             snapshot,
             baseline_snapshot,
             fail_on_diff,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             save_test_trace,
             mutate,
@@ -1902,6 +1957,7 @@ fn main() {
             fail_fast,
             fuzz_seed,
             fork_block_number,
+            no_fork_cache,
             ui,
             ui_port,
         } => match (
@@ -1916,6 +1972,7 @@ fn main() {
                     debug,
                     debug_port,
                     backtrace,
+                    no_capture,
                     coverage,
                     coverage_format,
                     coverage_file,
@@ -1930,9 +1987,17 @@ fn main() {
                     junit_merge,
                     snapshot,
                     baseline_snapshot,
+                    gas_profile,
+                    gas_profile_format,
+                    if gas_profile_include_tests {
+                        Some(true)
+                    } else {
+                        None
+                    },
                     fail_on_diff,
                     fork_net,
                     fork_block_number,
+                    !no_fork_cache,
                     save_test_trace,
                     mutate,
                     mutate_overrides,
@@ -1953,9 +2018,9 @@ fn main() {
                 ) {
                     Ok(config) => {
                         if mutate {
-                            mutation::test_mutate_cmd(path.as_deref(), &config)
+                            mutation::test_mutate_cmd(&paths, &config)
                         } else {
-                            test_cmd(path, &config)
+                            test_cmd(paths, &config)
                         }
                     }
                     Err(err) => Err(err),
@@ -2002,6 +2067,7 @@ fn main() {
             clear_cache,
             fork_net,
             fork_block_number,
+            no_fork_cache,
             net,
             tonconnect,
             tonconnect_port,
@@ -2018,6 +2084,7 @@ fn main() {
                 clear_cache,
                 fork_net,
                 fork_block_number,
+                !no_fork_cache,
                 net,
                 explorer,
                 show_bodies,
@@ -2304,6 +2371,7 @@ fn main() {
                 accounts,
                 db_path,
                 rate_limit,
+                response_delay_ms,
                 load_state,
                 dump_state,
             } => {
@@ -2313,6 +2381,7 @@ fn main() {
                     fork_block_number,
                     accounts,
                     rate_limit,
+                    response_delay_ms,
                 );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -2326,6 +2395,7 @@ fn main() {
                         resolved_localnet.fork_block_number,
                         resolved_localnet.accounts,
                         resolved_localnet.rate_limit,
+                        resolved_localnet.response_delay_ms,
                         load_state,
                         dump_state,
                     )
@@ -2410,8 +2480,14 @@ fn validate_project_toolchain_version() -> anyhow::Result<()> {
         return Ok(());
     }
 
+    let suggested_config_acton = if acton::build_info::is_trunk_build() {
+        "trunk"
+    } else {
+        installed
+    };
+
     anyhow::bail!(
-        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update [toolchain].acton if this project supports acton {installed}."
+        "Acton CLI version mismatch for this project.\n\nActon.toml expects [toolchain].acton = \"{expected}\"\nInstalled acton version is \"{installed}\".\n\nInstall the expected version:\n  acton up {expected}\n\nOr update Acton.toml if this project supports the installed Acton CLI:\n\n[toolchain]\nacton = \"{suggested_config_acton}\""
     );
 }
 
@@ -2451,10 +2527,11 @@ struct ResolvedLocalnetSettings {
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
     rate_limit: Option<u32>,
+    response_delay_ms: Option<u64>,
 }
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
-    resolve_localnet_settings(cli_port, None, None, None, None).port
+    resolve_localnet_settings(cli_port, None, None, None, None, None).port
 }
 
 fn resolve_localnet_settings(
@@ -2463,6 +2540,7 @@ fn resolve_localnet_settings(
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
     cli_rate_limit: Option<u32>,
+    cli_response_delay_ms: Option<u64>,
 ) -> ResolvedLocalnetSettings {
     let config = load_localnet_settings_from_config();
     ResolvedLocalnetSettings {
@@ -2471,6 +2549,7 @@ fn resolve_localnet_settings(
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
         rate_limit: cli_rate_limit.or(config.rate_limit),
+        response_delay_ms: cli_response_delay_ms.or(config.response_delay_ms),
     }
 }
 
@@ -2608,6 +2687,7 @@ fn create_test_config(
     debug: bool,
     debug_port: Option<u16>,
     backtrace: Option<BacktraceMode>,
+    no_capture: bool,
     coverage: bool,
     coverage_format: Option<CoverageFormat>,
     coverage_file: Option<String>,
@@ -2622,9 +2702,13 @@ fn create_test_config(
     junit_merge: bool,
     snapshot: Option<String>,
     baseline_snapshot: Option<String>,
+    gas_profile: Option<String>,
+    gas_profile_format: Option<GasProfileFormat>,
+    gas_profile_include_tests: Option<bool>,
     fail_on_diff: bool,
     fork_net: Option<Network>,
     fork_block_number: Option<u64>,
+    fork_cache_enabled: bool,
     save_test_trace: Option<String>,
     mutate: bool,
     mutate_overrides: Option<String>,
@@ -2686,8 +2770,12 @@ fn create_test_config(
             junit_merge,
             snapshot,
             baseline_snapshot,
+            gas_profile,
+            gas_profile_format,
+            gas_profile_include_tests,
             fork_net,
             fork_block_number,
+            fork_cache_enabled,
             save_test_trace,
             mutate,
             mutate_overrides,
@@ -2704,6 +2792,7 @@ fn create_test_config(
             ui_port,
         );
         config.verbosity = verbosity;
+        config.no_capture = no_capture;
         config.mutation_ids = mutation_ids;
         if mutation_rules_file.is_some() {
             config.mutation_rules_file = mutation_rules_file;
@@ -2721,6 +2810,7 @@ fn create_test_config(
         debug,
         debug_port: debug_port.unwrap_or(12345),
         backtrace,
+        no_capture,
         coverage,
         coverage_minimum_percent,
         coverage_include_wrappers,
@@ -2736,8 +2826,12 @@ fn create_test_config(
         junit_merge,
         snapshot,
         baseline_snapshot,
+        gas_profile,
+        gas_profile_format: gas_profile_format.unwrap_or_default(),
+        gas_profile_include_tests: gas_profile_include_tests.unwrap_or(false),
         fail_on_diff,
         fork_block_number,
+        fork_cache_enabled,
         save_test_trace,
         mutate,
         mutate_overrides,
@@ -2776,6 +2870,14 @@ fn validate_test_settings(test_settings: &TestSettings) -> anyhow::Result<()> {
     if let Some(fork_net) = test_settings.fork_net.as_deref() {
         Network::from_str(fork_net)
             .map_err(|err| anyhow::anyhow!("Invalid [test].fork-net '{fork_net}': {err}"))?;
+    }
+
+    if let Some(format) = test_settings.gas_profile_format.as_deref()
+        && !matches!(format.to_lowercase().as_str(), "cpuprofile" | "collapsed")
+    {
+        anyhow::bail!(
+            "Invalid [test].gas-profile-format '{format}': expected 'cpuprofile' or 'collapsed'"
+        );
     }
 
     Ok(())
@@ -2913,6 +3015,10 @@ mod tests {
             None,
             None,
             None,
+            None,
+            None,
+            None,
+            true,
             save_test_trace_override.map(str::to_owned),
             false,
             None,

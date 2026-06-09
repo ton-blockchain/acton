@@ -1,0 +1,18 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling random_probe
+    Finished in [TIME]
+   Compiling random_tick_tock
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/testing_random_seed.test.tolk (1 test)
+  ✓ testing set random seed controls current and emulated vm seed [TIME]
+    └─ Test output:
+       seed before: 0x1234
+       seed after: 0x5678
+
+ ✓ 1 passed in 1 file

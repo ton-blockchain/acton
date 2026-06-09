@@ -3,7 +3,8 @@ use crate::commands::common::error_fmt;
 use crate::context::{
     AssertFailure, CompilationResult, Context, DebugStopRequested, FailedSendMessageResult,
     GetMethodAssertFailure, KnownAddress, MessageIterState, ParsedSearchParams, PendingMessageStep,
-    SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache, to_cell,
+    SearchField, Wallet, code_lookup_hash, compile_project_contract_with_cache,
+    is_treasury_code_hash, to_cell,
 };
 use crate::contract_interface::{
     compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
@@ -23,12 +24,13 @@ use log::{debug, info, warn};
 use num_bigint::{BigInt, Sign};
 use num_traits::ToPrimitive;
 use path_absolutize::Absolutize;
+use rand::RngCore;
 use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 use std::time::{Duration, Instant, UNIX_EPOCH};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
@@ -40,10 +42,10 @@ use ton_api::{
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
-use ton_executor::BaseExecutor;
 use ton_executor::get::step::StepGetExecutor;
-use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
 use ton_executor::message::step::StepExecutor;
+use ton_executor::{BaseExecutor, ExecutorVerbosity};
 use ton_executor::{MissingLibrariesContext, missing_library_callback};
 use tvm_ffi::serde::serialize_tuple;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
@@ -60,14 +62,8 @@ use tycho_types::models::{
 };
 use tycho_types::num::{Tokens, Uint15};
 
-// Keep in sync with `impl.treasuryCode()` in `lib/emulation/testing.tolk`.
-const TREASURY_CODE_BOC64: &str = "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe";
-
-static TREASURY_CODE_HASH: LazyLock<HashBytes> = LazyLock::new(|| {
-    let code =
-        Boc::decode_base64(TREASURY_CODE_BOC64).expect("testing.treasury code BoC must be valid");
-    code_lookup_hash(&code)
-});
+const ZERO_RANDOM_SEED_HEX: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 /// Resolve the unix time to use for a get method invocation.
 ///
@@ -84,6 +80,33 @@ fn resolve_get_method_unixtime(world_state: &WorldState) -> anyhow::Result<i64> 
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
     Ok(duration_since_epoch.as_secs().try_into()?)
+}
+
+fn resolve_get_method_random_seed(world_state: &WorldState) -> String {
+    world_state
+        .get_random_seed()
+        .map_or_else(|| ZERO_RANDOM_SEED_HEX.to_owned(), hex::encode)
+}
+
+fn random_seed_from_bigint(seed: &BigInt) -> anyhow::Result<[u8; 32]> {
+    let (sign, bytes) = seed.to_bytes_be();
+    anyhow::ensure!(
+        sign != Sign::Minus,
+        "random seed must be a non-negative uint256"
+    );
+    anyhow::ensure!(
+        bytes.len() <= 32,
+        "random seed must fit into uint256, got {} bytes",
+        bytes.len()
+    );
+
+    let mut seed_bytes = [0u8; 32];
+    seed_bytes[32 - bytes.len()..].copy_from_slice(&bytes);
+    Ok(seed_bytes)
+}
+
+fn random_seed_to_bigint(seed: [u8; 32]) -> BigInt {
+    BigInt::from_bytes_be(Sign::Plus, &seed)
 }
 
 fn run_nested_executor_until_finished(
@@ -227,7 +250,7 @@ fn build_impl(ctx: &mut Context, stk: &mut Tuple, path: String, id: String) -> a
         }
 
         let code_boc64 = Boc::encode_base64(&cell);
-        let code_hash = *cell.repr_hash();
+        let code_hash = code_lookup_hash(&cell);
 
         let interface = if let Some(contract_config) = &contract_config {
             compile_optional_contract_interface(
@@ -388,7 +411,7 @@ pub(crate) fn compilation_result_for_code(
     // match that cell against local project contracts so debug/backtrace and
     // formatter paths can still use their source maps or ABI.
     let target_hash = code_lookup_hash(&code);
-    if target_hash == *TREASURY_CODE_HASH {
+    if is_treasury_code_hash(&target_hash) {
         return None;
     }
 
@@ -2322,7 +2345,7 @@ fn make_predicate_executor(ctx: &mut Context) -> anyhow::Result<GetExecutor> {
         address: "0:0000000000000000000000000000000000000000000000000000000000000000".to_string(),
         unixtime,
         balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id: 0,
         debug_enabled: false,
@@ -2508,7 +2531,7 @@ fn run_get_method_impl(
         address: addr_str,
         unixtime,
         balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id,
         debug_enabled: true,
@@ -3374,6 +3397,22 @@ fn get_now_impl(ctx: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
     Ok(())
 }
 
+extension!(set_random_seed in (Context) with (seed: BigInt) using set_random_seed_impl);
+fn set_random_seed_impl(ctx: &mut Context, _: &mut Tuple, seed: BigInt) -> anyhow::Result<()> {
+    ctx.chain
+        .world_state
+        .set_random_seed(Some(random_seed_from_bigint(&seed)?));
+    Ok(())
+}
+
+extension!(generate_random_seed in (Context) using generate_random_seed_impl);
+fn generate_random_seed_impl(_: &mut Context, stack: &mut Tuple) -> anyhow::Result<()> {
+    let mut seed = [0u8; 32];
+    rand::thread_rng().fill_bytes(&mut seed);
+    stack.push(TupleItem::Int(random_seed_to_bigint(seed)));
+    Ok(())
+}
+
 extension!(get_shard_account in (Context) with (addr: StdAddr) using get_shard_account_impl);
 fn get_shard_account_impl(
     ctx: &mut Context,
@@ -3407,14 +3446,13 @@ fn set_shard_account_impl(
     Ok(())
 }
 
-extension!(call_tolk_function in (Context) with (addr: StdAddr, arg: TupleItem, function: TupleItem) using call_tolk_function_impl);
-fn call_tolk_function_impl(
+pub(super) fn run_tolk_continuation(
     ctx: &mut Context,
-    stack: &mut Tuple,
     addr: StdAddr,
     args: TupleItem,
     function: TupleItem,
-) -> anyhow::Result<()> {
+    verbosity: ExecutorVerbosity,
+) -> anyhow::Result<GetMethodResultSuccess> {
     let TupleItem::Cont(cont) = function else {
         anyhow::bail!("Expected Cont, got {function:?}");
     };
@@ -3472,12 +3510,12 @@ fn call_tolk_function_impl(
     let params = RunGetMethodArgs {
         code,
         data,
-        verbosity: ctx.env.default_log_level,
+        verbosity,
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
         unixtime,
         balance: "10".to_string(),
-        rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+        rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id: 0,
         debug_enabled: true,
@@ -3491,32 +3529,43 @@ fn call_tolk_function_impl(
         .context("Cannot run continuation")?;
 
     match result {
-        GetMethodResult::Success(result) => {
-            // NOTE: Intentionally not saving this result into `emulations.get_methods`.
-            // `GetMethodResultSuccess.code` is `#[serde(skip)]` and is only populated by
-            // `run_get_method` (which has the contract code at hand). `run_continuation`
-            // cannot fill it, so stored continuation results would have an empty `code`
-            // and break downstream consumers that look it up (coverage + failed-get-method
-            // exception source-map resolution in `src/formatter.rs`). Continuation
-            // executions are out of scope for coverage anyway.
-            let cell =
-                Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
-            let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
-
-            if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
-                anyhow::bail!(
-                    "Continuation execution failed with exit code {}",
-                    result.vm_exit_code
-                );
-            }
-
-            stack.push(TupleItem::Tuple(tuple));
-            Ok(())
-        }
+        GetMethodResult::Success(result) => Ok(result),
         GetMethodResult::Error(err) => {
             anyhow::bail!("Continuation execution error: {}", err.error);
         }
     }
+}
+
+extension!(call_tolk_function in (Context) with (addr: StdAddr, arg: TupleItem, function: TupleItem) using call_tolk_function_impl);
+fn call_tolk_function_impl(
+    ctx: &mut Context,
+    stack: &mut Tuple,
+    addr: StdAddr,
+    args: TupleItem,
+    function: TupleItem,
+) -> anyhow::Result<()> {
+    let verbosity = ctx.env.default_log_level;
+    let result = run_tolk_continuation(ctx, addr, args, function, verbosity)?;
+
+    // NOTE: Intentionally not saving this result into `emulations.get_methods`.
+    // `GetMethodResultSuccess.code` is `#[serde(skip)]` and is only populated by
+    // `run_get_method` (which has the contract code at hand). `run_continuation`
+    // cannot fill it, so stored continuation results would have an empty `code`
+    // and break downstream consumers that look it up (coverage + failed-get-method
+    // exception source-map resolution in `src/formatter.rs`). Continuation
+    // executions are out of scope for coverage anyway.
+    let cell = Boc::decode_base64(result.stack.as_ref()).context("Failed to decode stack BoC")?;
+    let tuple = Tuple::deserialize(&cell).context("Failed to deserialize tuple")?;
+
+    if result.vm_exit_code != 0 && result.vm_exit_code != 1 {
+        anyhow::bail!(
+            "Continuation execution failed with exit code {}",
+            result.vm_exit_code
+        );
+    }
+
+    stack.push(TupleItem::Tuple(tuple));
+    Ok(())
 }
 
 extension!(save_world_state_snapshot in (Context) with (path: String) using save_world_state_snapshot_impl);
@@ -3607,6 +3656,8 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         56 => send_external_message : 1,
         57 => parse_cell_from_base64 : 1,
         58 => hide_trace_from_ui : 1,
+        59 => set_random_seed : 1,
+        60 => generate_random_seed : 0,
         501 => call_tolk_function : 3,
     });
 }
@@ -3614,6 +3665,7 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::{TREASURY_CODE_BOC64, is_treasury_code};
     use anyhow::anyhow;
     use rustc_hash::FxHashSet;
     use std::sync::Arc;
@@ -3627,7 +3679,7 @@ mod tests {
     fn treasury_code_hash_is_recognized() {
         let code = Boc::decode_base64(TREASURY_CODE_BOC64).expect("treasury code must decode");
 
-        assert_eq!(code_lookup_hash(&code), *TREASURY_CODE_HASH);
+        assert!(is_treasury_code(&code));
     }
 
     #[test]
@@ -3636,7 +3688,7 @@ mod tests {
         builder.store_uint(0xcafe, 16).expect("bits must fit");
         let code = builder.build().expect("cell must build");
 
-        assert_ne!(code_lookup_hash(&code), *TREASURY_CODE_HASH);
+        assert!(!is_treasury_code(&code));
     }
 
     fn test_transaction(lt: u64) -> Transaction {

@@ -18,10 +18,11 @@ import {
   Filter,
   Image,
   MessageSquare,
+  MoreHorizontal,
   RefreshCw,
 } from "lucide-react"
 import type React from "react"
-import {useMemo, useState, useEffect} from "react"
+import {lazy, Suspense, useEffect, useMemo, useState} from "react"
 import {useNavigate} from "react-router-dom"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
@@ -37,23 +38,35 @@ import {TonClient} from "../api/client"
 import {addressKey, buildMessageNamesByOpcodeHex} from "../api/compilerAbi"
 
 import {AddressLabel} from "./AddressLabel"
-import {ContractCode} from "./ContractCode"
 import {Nfts} from "./Nfts"
 import {Tokens} from "./Tokens"
 import styles from "./AccountDetails.module.css"
 import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"
+const ContractCode = lazy(async () => {
+  const module = await import("./ContractCode")
+  return {default: module.ContractCode}
+})
 
 interface AccountDetailsProps {
   readonly transactions: Transaction[]
-  readonly accountState: FullAccountState
-  readonly accountCodeHash?: string
+  readonly accountState?: FullAccountState
+  readonly compilerAbi?: ContractABI
+  readonly compilerAbiLoading?: boolean
+  readonly compilerAbiError?: string
   readonly ownerAddress: string
   readonly jettonWallets: JettonWallet[]
   readonly nftItems: NftItem[]
   readonly jettonMaster?: JettonMaster
   readonly holders?: JettonWallet[]
+  readonly tokensLoading?: boolean
+  readonly nftsLoading?: boolean
+  readonly holdersLoading?: boolean
+  readonly transactionsLoading?: boolean
+  readonly transactionsError?: string
+  readonly accountLoading?: boolean
+  readonly showHoldersTab?: boolean
   readonly client: TonClient
   readonly onAddressClick?: (addr: string) => void
   readonly activeTabHash?: string
@@ -61,16 +74,26 @@ interface AccountDetailsProps {
 }
 
 const ITEMS_PER_PAGE = 10
+type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 
 export const AccountDetails: React.FC<AccountDetailsProps> = ({
   transactions,
   accountState,
-  accountCodeHash,
+  compilerAbi,
+  compilerAbiLoading = false,
+  compilerAbiError,
   ownerAddress,
   jettonWallets,
   nftItems,
   jettonMaster,
   holders,
+  tokensLoading = false,
+  nftsLoading = false,
+  holdersLoading = false,
+  transactionsLoading = false,
+  transactionsError,
+  accountLoading = false,
+  showHoldersTab = false,
   client,
   onAddressClick,
   activeTabHash,
@@ -78,8 +101,6 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 }) => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tabs>("history")
-  const [compilerAbi, setCompilerAbi] = useState<ContractABI | null | undefined>()
-  const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
   const [compilerAbiByAddress, setCompilerAbiByAddress] = useState<
     Map<string, ContractABI | undefined>
   >(new Map())
@@ -100,37 +121,11 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   useEffect(() => {
     let isActive = true
 
-    const loadCompilerAbi = async () => {
-      if (!accountCodeHash) {
-        setCompilerAbi(undefined)
-        setCompilerAbiError(undefined)
+    const loadRelatedCompilerAbis = async () => {
+      if (activeTab !== "history") {
         return
       }
 
-      setCompilerAbi(undefined)
-      setCompilerAbiError(undefined)
-
-      try {
-        const abi = await client.getCompilerAbi(accountCodeHash)
-        if (!isActive) return
-        setCompilerAbi(abi)
-      } catch (error) {
-        if (!isActive) return
-        setCompilerAbi(undefined)
-        setCompilerAbiError(error instanceof Error ? error.message : "Failed to load compiler ABI")
-      }
-    }
-
-    void loadCompilerAbi()
-    return () => {
-      isActive = false
-    }
-  }, [accountCodeHash, client])
-
-  useEffect(() => {
-    let isActive = true
-
-    const loadRelatedCompilerAbis = async () => {
       const addresses = new Set<string>()
       addresses.add(ownerAddress)
 
@@ -151,12 +146,18 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 
       const next = new Map<string, ContractABI | undefined>()
       const ownerKey = addressKey(ownerAddress)
-      if (compilerAbi !== undefined) {
-        next.set(ownerKey, compilerAbi ?? undefined)
-      }
+      const stateRequestAddresses = requestedAddresses.filter(
+        address => addressKey(address) !== ownerKey,
+      )
 
-      const states = await client.getAccountStates(requestedAddresses, false).catch(() => {})
+      const states =
+        stateRequestAddresses.length > 0
+          ? await client.getAccountStates(stateRequestAddresses, false).catch(() => {})
+          : undefined
       const addressToCodeHash = new Map<string, string>()
+      if (compilerAbi) {
+        next.set(ownerKey, compilerAbi)
+      }
       for (const account of states?.accounts ?? []) {
         if (account.code_hash) {
           addressToCodeHash.set(addressKey(account.address), account.code_hash)
@@ -164,34 +165,28 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       }
 
       const codeHashesToFetch = new Set<string>()
-      for (const [address, codeHash] of addressToCodeHash) {
-        if (
-          address === ownerKey &&
-          accountCodeHash &&
-          compilerAbi !== undefined &&
-          codeHash === accountCodeHash
-        ) {
-          continue
-        }
+      for (const codeHash of addressToCodeHash.values()) {
         codeHashesToFetch.add(codeHash)
       }
 
-      const fetchedAbis = await Promise.all(
-        [...codeHashesToFetch].map(async codeHash => {
-          try {
-            return [codeHash, await client.getCompilerAbi(codeHash)] as const
-          } catch {
-            return [codeHash, undefined] as const
-          }
-        }),
-      )
-      const abiByCodeHash = new Map<string, ContractABI | undefined>(fetchedAbis)
-      if (accountCodeHash && compilerAbi !== undefined) {
-        abiByCodeHash.set(accountCodeHash, compilerAbi ?? undefined)
+      const codeHashes = [...codeHashesToFetch]
+      const fetchedAbis =
+        codeHashes.length > 0
+          ? await client
+              .getCompilerAbis(codeHashes)
+              .catch((): Record<string, ContractABI | null> => ({}))
+          : {}
+      const abiByCodeHash = new Map<string, ContractABI | undefined>()
+      for (const codeHash of codeHashes) {
+        abiByCodeHash.set(codeHash, fetchedAbis[codeHash] ?? undefined)
       }
 
       for (const address of requestedAddresses) {
         const key = addressKey(address)
+        if (key === ownerKey) {
+          next.set(key, compilerAbi)
+          continue
+        }
         const codeHash = addressToCodeHash.get(key)
         next.set(
           key,
@@ -207,7 +202,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
     return () => {
       isActive = false
     }
-  }, [transactions, ownerAddress, accountCodeHash, compilerAbi, client])
+  }, [transactions, ownerAddress, compilerAbi, activeTab, client])
 
   const handleTabClick = (tab: Tabs) => {
     setActiveTab(tab)
@@ -216,11 +211,16 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 
   const [currentPage, setCurrentPage] = useState(1)
   const [hoveredAddress, setHoveredAddress] = useState<string | undefined>()
+  const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
 
   const totalPages = Math.max(1, Math.ceil(transactions.length / ITEMS_PER_PAGE))
   const safeCurrentPage = Math.min(currentPage, totalPages)
   const startIndex = (safeCurrentPage - 1) * ITEMS_PER_PAGE
   const paginatedTransactions = transactions.slice(startIndex, startIndex + ITEMS_PER_PAGE)
+  const paginationItems = useMemo(
+    () => getPaginationItems(safeCurrentPage, totalPages),
+    [safeCurrentPage, totalPages],
+  )
 
   useEffect(() => {
     setCurrentPage(1)
@@ -229,6 +229,16 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   useEffect(() => {
     setCurrentPage(page => Math.min(page, totalPages))
   }, [totalPages])
+
+  useEffect(() => {
+    if (activeTab !== "history" || transactions.length === 0) return
+
+    const updateNow = () => setNowSeconds(Math.floor(Date.now() / 1000))
+    updateNow()
+
+    const interval = globalThis.setInterval(updateNow, 5000)
+    return () => globalThis.clearInterval(interval)
+  }, [activeTab, transactions.length])
 
   const browsedAddr = useMemo(() => parseAddress(ownerAddress), [ownerAddress])
   const messageNamesByAddress = useMemo(() => {
@@ -259,7 +269,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
         >
           <Coins size={14} /> Tokens
         </button>
-        {jettonMaster && (
+        {(showHoldersTab || jettonMaster) && (
           <button
             type="button"
             className={`${styles.tab} ${activeTab === "holders" ? styles.tabActive : ""}`}
@@ -311,228 +321,355 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
               </TableRow>
             </TableHeader>
             <TableBody>
-              {paginatedTransactions.map(tx => {
-                const inMsg = tx.in_msg
-                const inMsgSrc = parseAddress(inMsg.source || "")
-                const isIncoming = inMsgSrc && browsedAddr ? !inMsgSrc.equals(browsedAddr) : false
-
-                const inValue = BigInt(tx.in_msg.value || "0")
-                const outValue = tx.out_msgs.reduce(
-                  (acc, msg) => acc + BigInt(msg.value || "0"),
-                  BigInt(0),
-                )
-
-                const displayValue = isIncoming ? inValue : outValue
-                const valueStr = formatNano(displayValue.toString())
-
-                const address = isIncoming
-                  ? tx.in_msg.source || ""
-                  : tx.out_msgs.find(m => m.destination)?.destination || ""
-
-                const displayAddressFallback = isIncoming ? "External" : "Contract"
-
-                const displayMessage = isIncoming
-                  ? tx.in_msg
-                  : tx.out_msgs.find(m => m.destination) ||
-                    tx.out_msgs.find(m => m.opcode) ||
-                    tx.out_msgs[0]
-                const displayOpcode =
-                  resolveMessageName(displayMessage, messageNamesByAddress) ||
-                  displayMessage?.opcode ||
-                  undefined
-
-                const isAddressHovered =
-                  hoveredAddress && address ? isSameAddress(address, hoveredAddress) : false
-
-                return (
-                  <TableRow
-                    key={tx.hash}
-                    className={`${styles.row} ${styles.clickableRow}`}
-                    onClick={() => {
-                      const txHash = hashToHex(tx.hash)
-                      if (!txHash) return
-                      void navigate(`/explorer/tx/${txHash}`)
-                    }}
-                  >
+              {transactionsLoading ? (
+                Array.from({length: ITEMS_PER_PAGE}, (_, index) => (
+                  <TableRow key={`transaction-skeleton-${index}`} className={styles.skeletonRow}>
                     <TableCell className={`${styles.time} ${styles.timeColumn}`}>
-                      {formatTimeAgo(tx.utime)}
+                      <div className={`${styles.skeleton} ${styles.historySkeletonTime}`} />
                     </TableCell>
                     <TableCell className={styles.actionColumn}>
                       <div className={styles.action}>
-                        {isIncoming ? (
-                          <ArrowDownLeft
-                            className={`${styles.actionIcon} ${styles.statusSuccess}`}
-                          />
-                        ) : (
-                          <ArrowUpRight className={`${styles.actionIcon} ${styles.statusFailed}`} />
-                        )}
-                        {displayOpcode ? (
-                          <span className={`${styles.actionText} ${styles.opcode}`}>
-                            {displayOpcode}
-                          </span>
-                        ) : (
-                          <span className={styles.actionText}>
-                            {isIncoming ? "Received TON" : "Sent TON"}
-                          </span>
-                        )}
+                        <div className={`${styles.skeleton} ${styles.historySkeletonIcon}`} />
+                        <div className={`${styles.skeleton} ${styles.historySkeletonAction}`} />
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className={styles.addressWrapper}>
-                        <button
-                          type="button"
-                          className={`${styles.address} ${isAddressHovered ? styles.addressHighlighted : ""}`}
-                          onClick={e => {
-                            e.stopPropagation()
-                            if (address) onAddressClick?.(address)
-                          }}
-                          onMouseEnter={() => address && setHoveredAddress(address)}
-                          onMouseLeave={() => setHoveredAddress(undefined)}
-                        >
-                          <AddressLabel address={address} fallback={displayAddressFallback} />
-                        </button>
-                      </div>
+                      <div className={`${styles.skeleton} ${styles.historySkeletonAddress}`} />
                     </TableCell>
                     <TableCell className={styles.valueContainer}>
-                      <div className={isIncoming ? styles.valuePositive : styles.valueNegative}>
-                        {isIncoming ? "+" : "-"} {Number.parseFloat(valueStr).toLocaleString()} TON
-                      </div>
+                      <div className={`${styles.skeleton} ${styles.historySkeletonValue}`} />
                     </TableCell>
                   </TableRow>
-                )
-              })}
+                ))
+              ) : transactionsError ? (
+                <TableRow className={styles.emptyRow}>
+                  <TableCell colSpan={4} className={styles.emptyCell}>
+                    <div className={`${styles.tableState} ${styles.tableStateError}`}>
+                      Failed to load transactions: {transactionsError}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : paginatedTransactions.length === 0 ? (
+                <TableRow className={styles.emptyRow}>
+                  <TableCell colSpan={4} className={styles.emptyCell}>
+                    <div className={styles.tableState}>No transactions found.</div>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginatedTransactions.map(tx => {
+                  const inMsg = tx.in_msg
+                  const inMsgSrc = parseAddress(inMsg.source || "")
+                  const inMsgDest = parseAddress(inMsg.destination || "")
+                  const isInboundToAccount =
+                    inMsgDest && browsedAddr ? inMsgDest.equals(browsedAddr) : false
+                  const isIncoming =
+                    isInboundToAccount &&
+                    browsedAddr !== undefined &&
+                    inMsgSrc !== undefined &&
+                    (!inMsgSrc.equals(browsedAddr) || tx.out_msgs.length === 0)
+
+                  const inValue = BigInt(tx.in_msg.value || "0")
+                  const outValue = tx.out_msgs.reduce(
+                    (acc, msg) => acc + BigInt(msg.value || "0"),
+                    BigInt(0),
+                  )
+
+                  const displayValue = isIncoming ? inValue : outValue
+                  const valueStr = formatNano(displayValue.toString())
+
+                  const address = isIncoming
+                    ? tx.in_msg.source || ""
+                    : tx.out_msgs.find(m => m.destination)?.destination || ""
+
+                  const displayAddressFallback = isIncoming ? "External" : "Contract"
+
+                  const displayMessage = isIncoming
+                    ? tx.in_msg
+                    : tx.out_msgs.find(m => m.destination) ||
+                      tx.out_msgs.find(m => m.opcode) ||
+                      tx.out_msgs[0]
+                  const displayOpcode =
+                    resolveMessageName(displayMessage, messageNamesByAddress) ||
+                    displayMessage?.opcode ||
+                    undefined
+
+                  const isAddressHovered =
+                    hoveredAddress && address ? isSameAddress(address, hoveredAddress) : false
+
+                  return (
+                    <TableRow
+                      key={tx.hash}
+                      className={`${styles.row} ${styles.clickableRow}`}
+                      onClick={() => {
+                        const txHash = hashToHex(tx.hash)
+                        if (!txHash) return
+                        void navigate(`/explorer/tx/${txHash}`)
+                      }}
+                    >
+                      <TableCell className={`${styles.time} ${styles.timeColumn}`}>
+                        {formatTimeAgo(tx.utime, nowSeconds)}
+                      </TableCell>
+                      <TableCell className={styles.actionColumn}>
+                        <div className={styles.action}>
+                          {isIncoming ? (
+                            <ArrowDownLeft
+                              className={`${styles.actionIcon} ${styles.statusSuccess}`}
+                            />
+                          ) : (
+                            <ArrowUpRight
+                              className={`${styles.actionIcon} ${styles.statusFailed}`}
+                            />
+                          )}
+                          {displayOpcode ? (
+                            <span className={`${styles.actionText} ${styles.opcode}`}>
+                              {displayOpcode}
+                            </span>
+                          ) : (
+                            <span className={styles.actionText}>
+                              {isIncoming ? "Received TON" : "Sent TON"}
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className={styles.addressWrapper}>
+                          <button
+                            type="button"
+                            className={`${styles.address} ${isAddressHovered ? styles.addressHighlighted : ""}`}
+                            onClick={e => {
+                              e.stopPropagation()
+                              if (address) onAddressClick?.(address)
+                            }}
+                            onMouseEnter={() => address && setHoveredAddress(address)}
+                            onMouseLeave={() => setHoveredAddress(undefined)}
+                          >
+                            <AddressLabel address={address} fallback={displayAddressFallback} />
+                          </button>
+                        </div>
+                      </TableCell>
+                      <TableCell className={styles.valueContainer}>
+                        <div
+                          className={`${isIncoming ? styles.valuePositive : styles.valueNegative} ${styles.historyValue}`}
+                        >
+                          {isIncoming ? "+" : "-"} {Number.parseFloat(valueStr).toLocaleString()}{" "}
+                          TON
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
+              )}
             </TableBody>
           </Table>
 
-          {totalPages > 1 && (
+          {transactionsLoading ? (
             <div className={styles.pagination}>
-              <div className={styles.paginationControls}>
-                <button
-                  type="button"
-                  className={styles.paginationButton}
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={safeCurrentPage === 1}
-                  aria-label="Previous page"
-                >
-                  <ChevronLeft size={16} />
-                  Previous
-                </button>
-                {Array.from({length: totalPages}, (_, index) => {
-                  const page = index + 1
-
-                  return (
-                    <button
-                      key={page}
-                      type="button"
-                      className={`${styles.paginationPage} ${
-                        page === safeCurrentPage ? styles.paginationPageActive : ""
-                      }`}
-                      onClick={() => setCurrentPage(page)}
-                      aria-current={page === safeCurrentPage ? "page" : undefined}
-                    >
-                      {page}
-                    </button>
-                  )
-                })}
-                <button
-                  type="button"
-                  className={styles.paginationButton}
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={safeCurrentPage === totalPages}
-                  aria-label="Next page"
-                >
-                  Next
-                  <ChevronRight size={16} />
-                </button>
+              <div className={styles.paginationControls} aria-hidden="true">
+                <div
+                  className={`${styles.paginationButton} ${styles.paginationSkeletonButton} ${styles.skeleton}`}
+                />
+                {Array.from({length: 5}, (_, index) => (
+                  <div
+                    key={`pagination-skeleton-${index}`}
+                    className={`${styles.paginationPage} ${styles.paginationSkeletonPage} ${styles.skeleton}`}
+                  />
+                ))}
+                <div
+                  className={`${styles.paginationButton} ${styles.paginationSkeletonButton} ${styles.skeleton}`}
+                />
               </div>
             </div>
+          ) : (
+            !transactionsError &&
+            totalPages > 1 && (
+              <div className={styles.pagination}>
+                <div className={styles.paginationControls}>
+                  <button
+                    type="button"
+                    className={styles.paginationButton}
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage === 1}
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={16} />
+                    Previous
+                  </button>
+                  {paginationItems.map(item =>
+                    typeof item === "number" ? (
+                      <button
+                        key={item}
+                        type="button"
+                        className={`${styles.paginationPage} ${
+                          item === safeCurrentPage ? styles.paginationPageActive : ""
+                        }`}
+                        onClick={() => setCurrentPage(item)}
+                        aria-current={item === safeCurrentPage ? "page" : undefined}
+                      >
+                        {item}
+                      </button>
+                    ) : (
+                      <span key={item} className={styles.paginationEllipsis} aria-hidden="true">
+                        <MoreHorizontal size={16} />
+                      </span>
+                    ),
+                  )}
+                  <button
+                    type="button"
+                    className={styles.paginationButton}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    aria-label="Next page"
+                  >
+                    Next
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )
           )}
         </CardContent>
       ) : activeTab === "tokens" ? (
         <CardContent className={styles.tokensContent}>
-          <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
+          {tokensLoading ? (
+            <div className={styles.emptyState}>Loading tokens...</div>
+          ) : (
+            <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
+          )}
         </CardContent>
       ) : activeTab === "nfts" ? (
         <CardContent className={styles.tokensContent}>
-          <Nfts items={nftItems} onAddressClick={onAddressClick} />
+          {nftsLoading ? (
+            <div className={styles.emptyState}>Loading NFTs...</div>
+          ) : (
+            <Nfts items={nftItems} onAddressClick={onAddressClick} />
+          )}
         </CardContent>
       ) : activeTab === "holders" ? (
         <CardContent className={styles.historyContent}>
-          <Table>
-            <TableHeader className={styles.historyHeaderGroup}>
-              <TableRow className={styles.historyHeaderRow}>
-                <TableHead className={styles.tableHeader}>Owner</TableHead>
-                <TableHead className={styles.tableHeader}>Wallet</TableHead>
-                <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
-                  Balance
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(holders || []).map(holder => {
-                const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
-                const balance = Number(holder.balance) / 10 ** decimals
-                const symbol = jettonMaster?.jetton_content?.symbol || ""
+          {holdersLoading ? (
+            <div className={styles.emptyState}>Loading holders...</div>
+          ) : (
+            <Table>
+              <TableHeader className={styles.historyHeaderGroup}>
+                <TableRow className={styles.historyHeaderRow}>
+                  <TableHead className={styles.tableHeader}>Owner</TableHead>
+                  <TableHead className={styles.tableHeader}>Wallet</TableHead>
+                  <TableHead className={`${styles.tableHeader} ${styles.valueContainer}`}>
+                    Balance
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {(holders || []).map(holder => {
+                  const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
+                  const balance = Number(holder.balance) / 10 ** decimals
+                  const symbol = jettonMaster?.jetton_content?.symbol || ""
 
-                return (
-                  <TableRow
-                    key={holder.address}
-                    className={`${styles.row} ${styles.clickableRow}`}
-                    onClick={() => onAddressClick?.(holder.owner)}
-                  >
-                    <TableCell>
-                      <button
-                        type="button"
-                        className={styles.address}
-                        onClick={e => {
-                          e.stopPropagation()
-                          onAddressClick?.(holder.owner)
-                        }}
-                      >
-                        <AddressLabel address={holder.owner} />
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        type="button"
-                        className={styles.address}
-                        onClick={e => {
-                          e.stopPropagation()
-                          onAddressClick?.(holder.address)
-                        }}
-                      >
-                        <AddressLabel address={holder.address} />
-                      </button>
-                    </TableCell>
-                    <TableCell className={styles.valueContainer}>
-                      <div className={styles.valuePositive}>
-                        {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
-                        {symbol}
-                      </div>
+                  return (
+                    <TableRow
+                      key={holder.address}
+                      className={`${styles.row} ${styles.clickableRow}`}
+                      onClick={() => onAddressClick?.(holder.owner)}
+                    >
+                      <TableCell>
+                        <button
+                          type="button"
+                          className={styles.address}
+                          onClick={e => {
+                            e.stopPropagation()
+                            onAddressClick?.(holder.owner)
+                          }}
+                        >
+                          <AddressLabel address={holder.owner} />
+                        </button>
+                      </TableCell>
+                      <TableCell>
+                        <button
+                          type="button"
+                          className={styles.address}
+                          onClick={e => {
+                            e.stopPropagation()
+                            onAddressClick?.(holder.address)
+                          }}
+                        >
+                          <AddressLabel address={holder.address} />
+                        </button>
+                      </TableCell>
+                      <TableCell className={styles.valueContainer}>
+                        <div className={styles.valuePositive}>
+                          {balance.toLocaleString(undefined, {maximumFractionDigits: decimals})}{" "}
+                          {symbol}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+                {(!holders || holders.length === 0) && (
+                  <TableRow className={styles.emptyRow}>
+                    <TableCell colSpan={3} className={styles.emptyCell}>
+                      <div className={styles.emptyState}>No holders found.</div>
                     </TableCell>
                   </TableRow>
-                )
-              })}
-              {(!holders || holders.length === 0) && (
-                <TableRow className={styles.emptyRow}>
-                  <TableCell colSpan={3} className={styles.emptyCell}>
-                    <div className={styles.emptyState}>No holders found.</div>
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          )}
         </CardContent>
       ) : (
-        <ContractCode
-          codeBoc={accountState.code}
-          compilerAbi={compilerAbi}
-          compilerAbiLoading={compilerAbi === undefined}
-          compilerAbiError={compilerAbiError}
-        />
+        <CardContent className={styles.tokensContent}>
+          {accountLoading && !accountState ? (
+            <div className={styles.contractSkeleton}>
+              <div className={`${styles.skeleton} ${styles.contractSkeletonTabs}`} />
+              <div className={`${styles.skeleton} ${styles.contractSkeletonBlock}`} />
+            </div>
+          ) : (
+            <Suspense fallback={<div className={styles.emptyState}>Loading contract code...</div>}>
+              <ContractCode
+                codeBoc={accountState?.code ?? ""}
+                dataBoc={accountState?.data}
+                compilerAbi={compilerAbi}
+                compilerAbiLoading={compilerAbiLoading}
+                compilerAbiError={compilerAbiError}
+                onContractClick={onAddressClick}
+              />
+            </Suspense>
+          )}
+        </CardContent>
       )}
     </Card>
   )
+}
+
+function getPaginationItems(currentPage: number, totalPages: number): PaginationItem[] {
+  if (totalPages <= 7) {
+    return Array.from({length: totalPages}, (_, index) => index + 1)
+  }
+
+  if (currentPage <= 4) {
+    return [1, 2, 3, 4, 5, "ellipsis-right", totalPages]
+  }
+
+  if (currentPage >= totalPages - 3) {
+    return [
+      1,
+      "ellipsis-left",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ]
+  }
+
+  return [
+    1,
+    "ellipsis-left",
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    "ellipsis-right",
+    totalPages,
+  ]
 }
 
 function resolveMessageName(

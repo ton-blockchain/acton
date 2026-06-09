@@ -42,7 +42,7 @@ use regex::Regex;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -53,7 +53,8 @@ use tolk_compiler::abi::ContractABI;
 use tolk_syntax::{AstNode, HasName, SourceFile};
 use ton_emulator::emulator::Emulator;
 use ton_emulator::world_state::{
-    AccountsState, LocalAccountsState, RemoteAccountState, RemoteSnapshotCache, WorldState,
+    AccountsState, LocalAccountsState, RemoteAccountState, RemoteLibraryCache, RemoteSnapshotCache,
+    WorldState,
 };
 use ton_executor::get::step::StepGetExecutor;
 use ton_executor::get::{GetExecutor, GetMethodResult, GetMethodResultSuccess, RunGetMethodArgs};
@@ -92,6 +93,7 @@ pub struct TestResult {
     pub get_result: GetMethodResult,
     pub captured_stdout: String,
     pub captured_stderr: String,
+    pub captured_debug_output: String,
     pub assert_failure: Option<AssertFailure>,
     pub expected_exit_code: Option<i32>,
     pub accounts: FxHashMap<StdAddr, ShardAccount>,
@@ -113,6 +115,7 @@ pub struct TestRunner<'a> {
     reporter_manager: &'a mut ReporterManager,
     mutation_overrides: BTreeMap<String, Cell>,
     remote_cache: RemoteSnapshotCache,
+    remote_library_cache: RemoteLibraryCache,
     fuzz_seed: u64,
     /// Contracts used as `library_ref` dependency. We need to register it for correct
     /// work of dependent contracts.
@@ -196,6 +199,7 @@ impl<'a> TestRunner<'a> {
             mutation_overrides,
             ref_contracts,
             remote_cache: RemoteSnapshotCache::new(),
+            remote_library_cache: RemoteLibraryCache::new(),
             fuzz_seed,
         })
     }
@@ -210,7 +214,7 @@ impl<'a> TestRunner<'a> {
             || config.report_formats.contains(&ReportFormat::Console)
         {
             let console_config = ConsoleConfig {
-                show_output: true,
+                show_output: !config.no_capture,
                 project_root: project_root.to_path_buf(),
             };
             reporter_manager.add_reporter(Box::new(ConsoleReporter::new(console_config)));
@@ -234,7 +238,7 @@ impl<'a> TestRunner<'a> {
         }
 
         if config.report_formats.contains(&ReportFormat::Dot) {
-            reporter_manager.add_reporter(Box::new(DotReporter::new()));
+            reporter_manager.add_reporter(Box::new(DotReporter::new(!config.no_capture)));
         }
     }
 
@@ -247,8 +251,8 @@ impl<'a> TestRunner<'a> {
                 max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStackVerbose);
         }
 
-        if self.config.coverage {
-            // for coverage, we need at least locations to map to actual source code
+        if self.config.coverage || self.config.gas_profile.is_some() {
+            // coverage and gas profiling need source locations and stack data
             verbosity = max_executor_verbosity(verbosity, ExecutorVerbosity::FullLocationStack);
         }
 
@@ -306,11 +310,16 @@ impl<'a> TestRunner<'a> {
 
         let mut emulator = Emulator::new(verbosity, config_b64)?;
         let state = match &self.config.fork_net {
-            Some(net) => AccountsState::Remote(RemoteAccountState::new(
-                net.clone(),
-                self.config.fork_block_number,
-                self.remote_cache.clone(),
-            )),
+            Some(net) => {
+                let remote = RemoteAccountState::new(
+                    net.clone(),
+                    self.config.fork_block_number,
+                    self.remote_cache.clone(),
+                    self.remote_library_cache.clone(),
+                    self.config.fork_cache_enabled,
+                );
+                AccountsState::Remote(remote)
+            }
             None => AccountsState::Local(LocalAccountsState::new()),
         };
         let mut world_state = WorldState::new(state, config_b64)?;
@@ -345,6 +354,7 @@ impl<'a> TestRunner<'a> {
                 stdout_buffer: String::new(),
                 stderr_buffer: String::new(),
                 capture_output: true,
+                live_output: self.config.no_capture,
             },
             asserts: AssertsContext {
                 assert_failure: &mut assert_failure,
@@ -363,7 +373,8 @@ impl<'a> TestRunner<'a> {
                 known_code_cells: &mut self.known_code_cells,
                 need_debug_info: self.config.debug
                     || self.config.backtrace == Some(BacktraceMode::Full)
-                    || self.config.coverage,
+                    || self.config.coverage
+                    || self.config.gas_profile.is_some(),
                 backtrace: self.config.backtrace,
             },
             debug: DebugCtx::Disabled,
@@ -418,10 +429,13 @@ impl<'a> TestRunner<'a> {
             };
 
         let mut captured_stdout = captured_stdout;
-        Self::append_debug_output(&mut captured_stdout, &result, verbosity);
+        let captured_debug_output = Self::debug_output(&result, verbosity);
+        append_output_block(&mut captured_stdout, &captured_debug_output);
 
-        let executed_get_methods = if self.config.coverage {
-            // save results for coverage only in coverage mode since cloning is expensive due to logs
+        let executed_get_methods = if self.config.coverage
+            || (self.config.gas_profile.is_some() && self.config.gas_profile_include_tests)
+        {
+            // save results only when coverage or gas profiling needs unit-test execution metadata
             match &result {
                 GetMethodResult::Success(success) => vec![success.clone()],
                 GetMethodResult::Error(_) => Vec::new(),
@@ -434,6 +448,7 @@ impl<'a> TestRunner<'a> {
             get_result: result,
             captured_stdout,
             captured_stderr,
+            captured_debug_output,
             assert_failure,
             expected_exit_code,
             accounts: world_state.take_accounts(),
@@ -442,37 +457,35 @@ impl<'a> TestRunner<'a> {
         })
     }
 
-    fn append_debug_output(
-        stdout: &mut String,
-        get_result: &GetMethodResult,
-        verbosity: ExecutorVerbosity,
-    ) {
+    fn debug_output(get_result: &GetMethodResult, verbosity: ExecutorVerbosity) -> String {
         if matches!(verbosity, ExecutorVerbosity::Off) {
-            return;
+            return String::new();
         }
 
         let GetMethodResult::Success(result) = get_result else {
-            return;
+            return String::new();
         };
 
-        let debug_output = result
+        result
             .vm_log
             .lines()
             .filter_map(|line| line.strip_prefix("#DEBUG#:"))
             .map(str::trim_start)
             .collect::<Vec<_>>()
-            .join("\n");
+            .join("\n")
+    }
+}
 
-        if debug_output.is_empty() {
-            return;
-        }
+fn append_output_block(stdout: &mut String, output: &str) {
+    if output.is_empty() {
+        return;
+    }
 
-        if !stdout.is_empty() && !stdout.ends_with('\n') {
-            stdout.push('\n');
-        }
-        stdout.push_str(&debug_output);
+    if !stdout.is_empty() && !stdout.ends_with('\n') {
         stdout.push('\n');
     }
+    stdout.push_str(output);
+    stdout.push('\n');
 }
 
 fn dump_trace_if_available(
@@ -485,12 +498,6 @@ fn dump_trace_if_available(
     };
 
     let Some(emulations) = ctx.chain.emulations.results_of(&test.name) else {
-        eprintln!(
-            "Warning: trace export is enabled for test '{}', but no emulated transactions were recorded; {} will not be written to {}",
-            test.name,
-            trace::trace_file_name(&test.name),
-            trace_dir,
-        );
         return Ok(());
     };
 
@@ -547,7 +554,7 @@ fn evaluate_test_case(
     }
 }
 
-pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()> {
+pub fn test_cmd(paths: Vec<String>, config: &TestConfig) -> anyhow::Result<()> {
     let project_root = configured_project_root();
     let mut config = config.clone();
     resolve_test_output_paths_from_project_root(&mut config, project_root);
@@ -563,45 +570,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
     }
     println!("     {} tests", "Running".green().bold());
 
-    // If path is omitted, default to project root.
-    let path = path.unwrap_or_else(|| project_root.to_string_lossy().to_string());
-
-    if !fs::exists(&path).unwrap_or(false) {
-        anyhow::bail!(error_fmt::file_not_found(&path));
-    }
-
-    let metadata = match fs::metadata(&path) {
-        Ok(metadata) => metadata,
-        Err(err) => {
-            anyhow::bail!("Cannot access '{path}': {err}")
-        }
-    };
-    let test_files = if metadata.is_file() {
-        if !path.ends_with(".test.tolk") {
-            anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
-        }
-        vec![
-            dunce::canonicalize(&path)
-                .unwrap_or_else(|_| PathBuf::from(&path))
-                .to_string_lossy()
-                .to_string(),
-        ]
-    } else if metadata.is_dir() {
-        let search_root = dunce::canonicalize(&path).unwrap_or_else(|_| PathBuf::from(&path));
-        let project_root_abs =
-            dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
-        find_test_files_recursively(
-            &search_root,
-            &project_root_abs,
-            &config.exclude_patterns,
-            &config.include_patterns,
-        )?
-        .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect()
-    } else {
-        anyhow::bail!("Path '{path}' is neither a file nor a directory");
-    };
+    let test_files = collect_test_files(&paths, project_root, &config)?;
 
     let acton_config = ActonConfig::load()?;
     let debug_listener = if config.debug {
@@ -703,6 +672,7 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     let mut coverage_lcov = None;
     let mut coverage_threshold_failed = false;
+    let mut gas_profile_report = None;
 
     if config.coverage {
         let project_root = configured_project_root().to_path_buf();
@@ -786,14 +756,29 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
 
     runner.reporter_manager.finalize()?;
 
-    if config.snapshot.is_some() || config.baseline_snapshot.is_some() {
+    if config.snapshot.is_some()
+        || config.baseline_snapshot.is_some()
+        || config.gas_profile.is_some()
+    {
         if total_failed == 0 {
-            profiling::collect_profile(&runner)?;
+            if config.gas_profile.is_some() {
+                let project_root = configured_project_root().to_path_buf();
+                compile_project_contracts(
+                    &mut runner.build_cache,
+                    runner.file_build_cache,
+                    &runner.acton_config,
+                    &project_root,
+                    true,
+                )?;
+            }
+            gas_profile_report = profiling::collect_profile(&runner)?;
         } else {
-            println!(
-                "\n{} Gas profiling snapshot and comparison tables were skipped because tests failed.",
-                "Note:".yellow()
-            );
+            let skipped_outputs = if config.gas_profile.is_some() {
+                "Gas profiling outputs were skipped because tests failed."
+            } else {
+                "Gas profiling snapshot and comparison tables were skipped because tests failed."
+            };
+            println!("\n{} {skipped_outputs}", "Note:".yellow(),);
         }
     }
 
@@ -817,7 +802,15 @@ pub fn test_cmd(path: Option<String>, config: &TestConfig) -> anyhow::Result<()>
             .enable_all()
             .build()?;
         rt.block_on(async {
-            start_ui_server(reports, trace_dir, project_root, coverage_lcov, listener).await
+            start_ui_server(
+                reports,
+                trace_dir,
+                project_root,
+                coverage_lcov,
+                gas_profile_report,
+                listener,
+            )
+            .await
         })?;
     }
 
@@ -836,9 +829,7 @@ fn need_to_build() -> bool {
 }
 
 fn require_tests() -> bool {
-    std::env::var(INTERNAL_REQUIRE_TESTS_ENV)
-        .map(|value| value.trim() == "1")
-        .unwrap_or(false)
+    std::env::var(INTERNAL_REQUIRE_TESTS_ENV).is_ok_and(|value| value.trim() == "1")
 }
 
 fn empty_test_selection_message(
@@ -852,9 +843,9 @@ fn empty_test_selection_message(
 
     if test_files.is_empty() {
         let hint = if config.include_patterns.is_empty() && config.exclude_patterns.is_empty() {
-            "Check the test path or add a *.test.tolk file."
+            "Check the test paths or add a *.test.tolk file."
         } else {
-            "Check the test path or --include/--exclude patterns."
+            "Check the test paths or --include/--exclude patterns."
         };
         return Some(format!("No test files found. {hint}"));
     }
@@ -874,6 +865,83 @@ fn empty_test_selection_message(
     }
 
     Some("No tests found in selected test files. Add tests or adjust the selection.".to_string())
+}
+
+fn collect_test_files(
+    paths: &[String],
+    project_root: &Path,
+    config: &TestConfig,
+) -> anyhow::Result<Vec<String>> {
+    let project_root_abs =
+        dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
+    let mut test_files = Vec::new();
+    let mut seen = HashSet::new();
+
+    if paths.is_empty() {
+        let default_path = project_root.to_string_lossy();
+        collect_test_files_from_path(
+            default_path.as_ref(),
+            &project_root_abs,
+            config,
+            &mut test_files,
+            &mut seen,
+        )?;
+        return Ok(test_files);
+    }
+
+    for path in paths {
+        collect_test_files_from_path(path, &project_root_abs, config, &mut test_files, &mut seen)?;
+    }
+
+    Ok(test_files)
+}
+
+fn collect_test_files_from_path(
+    path: &str,
+    project_root_abs: &Path,
+    config: &TestConfig,
+    test_files: &mut Vec<String>,
+    seen: &mut HashSet<PathBuf>,
+) -> anyhow::Result<()> {
+    if !fs::exists(path).unwrap_or(false) {
+        anyhow::bail!(error_fmt::file_not_found(path));
+    }
+
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(err) => {
+            anyhow::bail!("Cannot access '{path}': {err}")
+        }
+    };
+
+    let mut add_test_file = |path: PathBuf| {
+        if seen.insert(path.clone()) {
+            test_files.push(path.to_string_lossy().to_string());
+        }
+    };
+
+    if metadata.is_file() {
+        if !path.ends_with(".test.tolk") {
+            anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
+        }
+        add_test_file(dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path)));
+        return Ok(());
+    }
+
+    if metadata.is_dir() {
+        let search_root = dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path));
+        for file in find_test_files_recursively(
+            &search_root,
+            project_root_abs,
+            &config.exclude_patterns,
+            &config.include_patterns,
+        )? {
+            add_test_file(file);
+        }
+        return Ok(());
+    }
+
+    anyhow::bail!("Path '{path}' is neither a file nor a directory");
 }
 
 fn resolve_test_output_paths_from_project_root(config: &mut TestConfig, project_root: &Path) {
@@ -1065,8 +1133,10 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let tests = find_all_test(filepath, &file, &content);
 
     let config = &runner.config;
-    let need_debug_info =
-        config.debug || config.backtrace == Some(BacktraceMode::Full) || config.coverage;
+    let need_debug_info = config.debug
+        || config.backtrace == Some(BacktraceMode::Full)
+        || config.coverage
+        || config.gas_profile.is_some();
 
     let now = Instant::now();
     let compilation_result = compile_test_file(
@@ -1091,6 +1161,19 @@ fn run_tests_for_file(runner: &mut TestRunner, filepath: &str) -> anyhow::Result
     let code_cell = Boc::decode_base64(&result.code_boc64)?;
     let source_map = Arc::new(result.source_map.unwrap_or_default());
     let abi = result.abi.map(Arc::new);
+    if config.coverage || (config.gas_profile.is_some() && config.gas_profile_include_tests) {
+        let build_path = Path::new(filepath).absolutize()?.to_path_buf();
+        let display_name = extract_suite_name(&build_path);
+        runner.build_cache.memoize(
+            display_name.as_ref(),
+            display_name.as_ref(),
+            &build_path,
+            &result.code_boc64,
+            *code_cell.repr_hash(),
+            source_map.clone(),
+            abi.clone(),
+        );
+    }
     let tests = attach_test_parameter_metadata(tests, abi.as_deref());
     let stats = run_file_tests(runner, filepath, tests, &code_cell, abi, source_map)?;
     Ok(stats)
@@ -1221,6 +1304,7 @@ fn run_file_tests(
         let TestResult {
             captured_stdout,
             captured_stderr,
+            captured_debug_output,
             assert_failure,
             expected_exit_code: dyn_expected_exit_code,
             accounts,
@@ -1282,6 +1366,7 @@ fn run_file_tests(
             gas_used,
             stdout: captured_stdout,
             stderr: captured_stderr,
+            debug_output: captured_debug_output,
             vm_log,
             assert_failure: assert_failure.clone(),
             expected_exit_code,
@@ -1361,25 +1446,14 @@ fn run_file_tests(
 
         runner.reporter_manager.on_test_finished(&test_report)?;
 
-        if runner.config.coverage {
-            // For coverage, we need to process test logs as well for unit tests coverage,
-            // so register it here manually
+        if runner.config.coverage
+            || (runner.config.gas_profile.is_some() && runner.config.gas_profile_include_tests)
+        {
+            // Coverage and opt-in gas profiling both need unit-test execution metadata.
             if !executed_get_methods.is_empty() {
                 for get_result in executed_get_methods {
                     runner.emulations.save_get_method(&test.name, get_result);
                 }
-
-                // TODO: remove this memoize somehow
-                let code_boc64 = Boc::encode_base64(code);
-                runner.build_cache.memoize(
-                    &test.name,
-                    &test.name,
-                    &file_path,
-                    &code_boc64,
-                    *code.repr_hash(),
-                    source_map.clone(),
-                    abi.clone(),
-                );
             }
         }
 

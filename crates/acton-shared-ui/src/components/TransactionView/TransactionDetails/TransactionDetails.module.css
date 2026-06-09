@@ -242,6 +242,64 @@
   min-width: 0;
 }
 
+.storageSummaryRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.storageSummaryMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--spacing-sm);
+  row-gap: var(--spacing-xs);
+  min-width: 0;
+  padding-right: var(--spacing-xs);
+}
+
+.storageChangeBadge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-primary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.storageAccountStatus {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-secondary);
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.storageUnavailable {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs);
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.storageDiffDetails {
+  width: 100%;
+  min-width: 0;
+  max-height: 260px;
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.storageToggleButton {
+  margin-left: 0;
+  padding-left: 0;
+}
+
 .parsedContainer {
   display: flex;
   flex-direction: column;
@@ -369,6 +427,11 @@
 
   .multiColumnItemTitle {
     white-space: normal;
+  }
+
+  .storageSummaryRow {
+    flex-wrap: wrap;
+    align-items: flex-start;
   }
 
   .parsedEntryKey {

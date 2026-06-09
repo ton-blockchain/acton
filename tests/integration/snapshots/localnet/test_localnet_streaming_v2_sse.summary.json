@@ -1,0 +1,41 @@
+[
+  {
+    "event": "connected",
+    "id": "sse-1",
+    "status": "subscribed"
+  },
+  {
+    "address_book_len": 2,
+    "event": "event",
+    "finality": "confirmed",
+    "first_account": "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79",
+    "trace_external_hash_norm_present": true,
+    "transactions_len": 1,
+    "type": "transactions"
+  },
+  {
+    "address_book_len": 2,
+    "event": "event",
+    "finality": "finalized",
+    "first_account": "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79",
+    "trace_external_hash_norm_present": true,
+    "transactions_len": 1,
+    "type": "transactions"
+  },
+  {
+    "account": "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79",
+    "balance_nonzero": true,
+    "event": "event",
+    "finality": "confirmed",
+    "state_status": "uninit",
+    "type": "account_state_change"
+  },
+  {
+    "account": "0:84545d4d2cada0ce811705d534c298ca42d29315d03a16eee794cefd191dfa79",
+    "balance_nonzero": true,
+    "event": "event",
+    "finality": "finalized",
+    "state_status": "uninit",
+    "type": "account_state_change"
+  }
+]

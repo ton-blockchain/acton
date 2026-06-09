@@ -86,6 +86,7 @@ get fun `test load world state snapshot invalid inputs`() {{
     expect(testing.loadSnapshot("invalid-address-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("invalid-config-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("invalid-library-world-state.json")).toBeFalse();
+    expect(testing.loadSnapshot("invalid-random-seed-world-state.json")).toBeFalse();
     expect(testing.loadSnapshot("duplicate-accounts-world-state.json")).toBeFalse();
 }}
 "#
@@ -424,6 +425,14 @@ fn world_state_snapshot_load_replaces_current_runner_state_and_rejects_invalid_i
         &invalid_library_snapshot,
     );
 
+    let mut invalid_random_seed_snapshot =
+        read_world_state_snapshot(&project.path().join("world-state.json"));
+    invalid_random_seed_snapshot.random_seed = Some("42".to_owned());
+    write_world_state_snapshot(
+        &project.path().join("invalid-random-seed-world-state.json"),
+        &invalid_random_seed_snapshot,
+    );
+
     let mut duplicate_accounts_snapshot =
         read_world_state_snapshot(&project.path().join("world-state.json"));
     let duplicate_entry = duplicate_accounts_snapshot.accounts[0].clone();
@@ -661,6 +670,7 @@ fn world_state_snapshot_helpers_reject_absolute_and_parent_escape_paths() {
         version: 1,
         current_lt: 0,
         current_now: 123,
+        random_seed: None,
         config_boc64: DEFAULT_CONFIG.to_owned(),
         libraries_boc64: Vec::new(),
         accounts: Vec::new(),

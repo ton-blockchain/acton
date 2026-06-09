@@ -463,11 +463,11 @@ It provides the expected source-level debugging features:
 
 The `--debug` flag is available on three commands:
 
-| Command | What gets debugged |
-|---------|--------------------|
-| `acton test [path] --debug` | A live local test session — combine with `--filter` to narrow down to one test |
-| `acton script <path> --debug` | A locally executing script |
-| `acton retrace <HASH> --contract <NAME> --debug` | Debug a real on-chain transaction |
+| Command                                          | What gets debugged                                                                                               |
+|--------------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `acton test [path...] --debug`                   | A live local test session for one or more files/directories — combine with `--filter` to narrow down to one test |
+| `acton script <path> --debug`                    | A locally executing script                                                                                       |
+| `acton retrace <HASH> --contract <NAME> --debug` | Debug a real on-chain transaction                                                                                |
 
 See the [debugging guide](/docs/debug) for more.
 

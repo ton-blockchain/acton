@@ -306,11 +306,21 @@ acton script query.tolk --fork-net mainnet
 TONCENTER_TESTNET_API_KEY=YOUR_API_KEY acton script query.tolk --fork-net testnet
 ```
 
-When `--fork-net` is enabled, Acton automatically fetches account state from the real blockchain and caches it locally for the script execution. This allows to:
+When `--fork-net` is enabled, Acton automatically fetches account state from
+the real blockchain and caches it locally for the script execution. This allows
+to:
 
 - Query real contract state
 - Test interactions with deployed contracts
 - Verify contract behavior against live data
+
+If the script also passes `--fork-block-number`, fetched account states are
+persisted under
+`build/cache/<network>/<seqno>/<workchain>_<address-hash>.json`. Later script
+runs with the same fork network, block number, and address reuse that file
+before calling the remote API. Use `--no-fork-cache` to force fresh remote
+account reads for a run, or `--clear-cache` to remove the persisted entries with
+the rest of `build/cache`.
 
 When the script runs with `--net`, the selected network already becomes the default remote read network. This means deploy scripts can send a transaction, wait for it, and immediately call `net.runGetMethod()` or wrapper getters against the same chain without passing `--fork-net`.
 

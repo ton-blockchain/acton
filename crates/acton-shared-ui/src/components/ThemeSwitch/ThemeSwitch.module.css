@@ -1,0 +1,34 @@
+.themeSwitch {
+  display: inline-flex;
+  width: max-content;
+  margin-left: auto;
+  align-items: center;
+  overflow: hidden;
+  padding: 4px;
+  border: 1px solid var(--litenode-border-control, var(--border-color));
+  border-radius: 9999px;
+  background: transparent;
+  color: var(--litenode-text-muted, var(--text-muted));
+  cursor: pointer;
+  font: inherit;
+}
+
+.themeSwitch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px
+    var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
+}
+
+.themeSwitchItem {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
+  border-radius: 9999px;
+  box-sizing: border-box;
+  color: var(--litenode-text-muted, var(--text-muted));
+}
+
+.themeSwitchItemActive {
+  background: var(--litenode-surface-active, var(--bg-secondary-color));
+  color: var(--litenode-text, var(--text-primary));
+}

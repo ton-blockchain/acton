@@ -1,6 +1,6 @@
 use super::{
     format_nanotons, format_std_address, load_local_contract_candidates, load_rpc_config, print_kv,
-    print_section, resolve_rpc_network,
+    resolve_rpc_network,
 };
 use crate::context::{BuildCache, KnownAddresses};
 use crate::ffi::emulation::{
@@ -10,6 +10,7 @@ use crate::formatter::FormatterContext;
 use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::{Context, anyhow};
+use chrono::{TimeZone, Utc};
 use log::warn;
 use num_bigint::BigInt;
 use rustc_hash::FxHashMap;
@@ -59,20 +60,30 @@ pub(super) fn rpc_trace_cmd(
             anyhow::bail!("Trace references missing transaction {tx_hash}");
         }
     };
-    print_rpc_trace_summary(hash, &trace);
     let formatter = rpc_trace_formatter(&trace_txs, &client, &network, &config, show_bodies)?;
 
-    print_section("Trace Tree");
     let send_result_list: Vec<TupleItem> = trace_txs
         .iter()
         .map(V3TraceTransaction::to_send_result_tuple)
         .collect();
     let formatted_tree = formatter.format_transaction_list(&send_result_list);
     println!("{}", formatted_tree.trim_end());
+    println!();
+
+    print_rpc_trace_summary(hash, &trace);
 
     if verbose {
-        print_section("Trace Details");
+        println!();
         print_rpc_trace_details(&trace_txs, Some(&formatter), &network);
+    }
+
+    if !show_bodies {
+        println!();
+        println!(
+            "{}",
+            "Hint: pass --show-bodies to include decoded message bodies when local ABI matches."
+                .dimmed()
+        );
     }
 
     Ok(())
@@ -108,19 +119,19 @@ fn rpc_trace_formatter(
 }
 
 fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
-    println!("{}", "Trace Summary".bold().cyan());
-    print_kv("Query Hash", query_hash);
-    print_kv("Trace ID", trace.trace_id.as_str());
+    print_kv("Query Hash", format_trace_hash(query_hash));
+    print_kv("Trace ID", format_trace_hash(&trace.trace_id));
+    print_kv("Time", format_trace_time_range(trace));
+    print_kv("Block", format_trace_block_range(trace));
+    print_kv("Trace Complete", format_trace_bool(!trace.is_incomplete));
     print_kv(
-        "Root Tx Hash",
-        trace
-            .transactions_order
-            .first()
-            .map_or("<none>", String::as_str),
+        "Total Txs",
+        format_trace_count(trace.transactions_order.len()),
     );
-    print_kv("Trace Complete", (!trace.is_incomplete).to_string());
-    print_kv("Total Txs", trace.transactions_order.len().to_string());
-    print_kv("Total Messages", trace_message_count(trace).to_string());
+    print_kv(
+        "Total Messages",
+        format_trace_count(trace_message_count(trace)),
+    );
 }
 
 fn trace_message_count(trace: &V3Trace) -> usize {
@@ -157,8 +168,8 @@ fn print_rpc_trace_details(
     for (idx, tx) in trace_txs.iter().enumerate() {
         let prefix = format!("tx[{}]", idx + 1);
         println!("  {prefix}:");
-        println!("    hash: {}", tx.hash);
-        println!("    lt: {}", tx.transaction.lt);
+        println!("    hash: {}", format_trace_hash(&tx.hash));
+        println!("    lt: {}", format_trace_u64(tx.transaction.lt));
         println!(
             "    account: {}",
             format_trace_address(&tx.summary.account, network)
@@ -182,21 +193,27 @@ fn print_rpc_trace_details(
                 "    opcode: {}",
                 format_message_opcode(message, message_name.as_deref())
             );
-            println!("    bounced: {}", message.bounced.unwrap_or(false));
+            println!(
+                "    bounced: {}",
+                format_trace_bool(message.bounced.unwrap_or(false))
+            );
             println!(
                 "    branch: {}",
-                trace_branch_kind(&tx.summary, message, message_name.as_deref())
+                trace_branch_kind(&tx.summary, message, message_name.as_deref()).cyan()
             );
         } else {
-            println!("    from: <none>");
-            println!("    to: <none>");
-            println!("    value: <none>");
-            println!("    opcode: <none>");
-            println!("    bounced: false");
-            println!("    branch: system");
+            println!("    from: {}", format_trace_none());
+            println!("    to: {}", format_trace_none());
+            println!("    value: {}", format_trace_none());
+            println!("    opcode: {}", format_trace_none());
+            println!("    bounced: {}", format_trace_bool(false));
+            println!("    branch: {}", "system".cyan());
         }
 
-        println!("    success: {}", trace_tx_success(&tx.summary));
+        println!(
+            "    success: {}",
+            format_trace_bool(trace_tx_success(&tx.summary))
+        );
         println!("    exit_code: {}", format_compute_exit_code(&tx.summary));
         println!(
             "    action_result_code: {}",
@@ -206,18 +223,18 @@ fn print_rpc_trace_details(
 }
 
 fn format_optional_u64(value: Option<u64>) -> String {
-    value.map_or_else(|| "null".to_owned(), |value| value.to_string())
+    value.map_or_else(format_trace_null, format_trace_u64)
 }
 
 fn format_child_lts(child_lts: &[u64]) -> String {
     if child_lts.is_empty() {
-        return "[]".to_owned();
+        return "[]".dimmed().to_string();
     }
     format!(
         "[{}]",
         child_lts
             .iter()
-            .map(ToString::to_string)
+            .map(|value| format_trace_u64(*value))
             .collect::<Vec<_>>()
             .join(", ")
     )
@@ -248,7 +265,7 @@ fn format_compute_exit_code(tx: &V3TransactionSummary) -> String {
         .as_ref()
         .and_then(|description| description.compute_ph.as_ref())
         .and_then(|compute| compute.exit_code)
-        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+        .map_or_else(format_trace_null, format_trace_code)
 }
 
 fn format_action_result_code(tx: &V3TransactionSummary) -> String {
@@ -256,7 +273,7 @@ fn format_action_result_code(tx: &V3TransactionSummary) -> String {
         .as_ref()
         .and_then(|description| description.action.as_ref())
         .and_then(|action| action.result_code)
-        .map_or_else(|| "null".to_owned(), |code| code.to_string())
+        .map_or_else(format_trace_null, format_trace_code)
 }
 
 fn trace_branch_kind(
@@ -289,8 +306,8 @@ fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>)
     };
     let name = message_name.or_else(|| (opcode == 0).then_some("empty"));
     match name {
-        Some(name) => format!("{opcode_text} ({name})"),
-        None => opcode_text,
+        Some(name) => format!("{} ({})", opcode_text.yellow(), name.cyan()),
+        None => opcode_text.yellow().to_string(),
     }
 }
 
@@ -315,26 +332,113 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
 
 fn format_message_value(message: &V3MessageSummary) -> String {
     let Some(value) = message.value.as_deref() else {
-        return "<none>".to_owned();
+        return format_trace_none();
     };
     match BigInt::from_str(value) {
-        Ok(value) => format_nanotons(&value),
-        Err(_) => value.to_owned(),
+        Ok(value) => format_nanotons(&value).white().to_string(),
+        Err(_) => value.yellow().to_string(),
     }
 }
 
 fn format_optional_address(address: Option<&str>, network: &Network) -> String {
-    address.map_or_else(
-        || "<none>".to_owned(),
-        |address| format_trace_address(address, network),
-    )
+    address.map_or_else(format_trace_none, |address| {
+        format_trace_address(address, network)
+    })
 }
 
 fn format_trace_address(address: &str, network: &Network) -> String {
     StdAddr::from_str_ext(address, StdAddrFormat::any()).map_or_else(
-        |_| address.to_owned(),
-        |(address, _)| format_std_address(&address, network),
+        |_| address.yellow().to_string(),
+        |(address, _)| format_std_address(&address, network).cyan().to_string(),
     )
+}
+
+fn format_trace_hash(hash: &str) -> String {
+    hash.yellow().to_string()
+}
+
+fn format_trace_time_range(trace: &V3Trace) -> String {
+    let timestamps = trace
+        .transactions_order
+        .iter()
+        .filter_map(|tx_hash| trace.transactions.get(tx_hash))
+        .filter_map(|tx| (tx.now != 0).then_some(u64::from(tx.now)));
+    let range = trace_u64_range(timestamps);
+
+    match range {
+        Some((start, end)) => format_trace_range(format_trace_time(start), format_trace_time(end)),
+        None => format_trace_range(format_trace_null(), format_trace_null()),
+    }
+}
+
+fn format_trace_time(timestamp: u64) -> String {
+    Utc.timestamp_opt(timestamp as i64, 0)
+        .single()
+        .map_or_else(
+            || timestamp.to_string(),
+            |datetime| datetime.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+        )
+        .white()
+        .to_string()
+}
+
+fn format_trace_block_range(trace: &V3Trace) -> String {
+    let blocks = trace
+        .transactions_order
+        .iter()
+        .filter_map(|tx_hash| trace.transactions.get(tx_hash))
+        .filter_map(|tx| tx.mc_block_seqno.map(u64::from));
+    let range = trace_u64_range(blocks);
+
+    match range {
+        Some((start, end)) => format_trace_range(format_trace_u64(start), format_trace_u64(end)),
+        None => format_trace_range(format_trace_null(), format_trace_null()),
+    }
+}
+
+fn trace_u64_range(values: impl IntoIterator<Item = u64>) -> Option<(u64, u64)> {
+    values.into_iter().fold(None, |range, value| {
+        Some(match range {
+            Some((start, end)) => (start.min(value), end.max(value)),
+            None => (value, value),
+        })
+    })
+}
+
+fn format_trace_range(start: String, end: String) -> String {
+    format!("{start} {} {end}", "—".dimmed())
+}
+
+fn format_trace_bool(value: bool) -> String {
+    if value {
+        "true".green().to_string()
+    } else {
+        "false".red().to_string()
+    }
+}
+
+fn format_trace_count(value: usize) -> String {
+    value.to_string().white().to_string()
+}
+
+fn format_trace_u64(value: u64) -> String {
+    value.to_string().white().to_string()
+}
+
+fn format_trace_code(value: i32) -> String {
+    if value == 0 {
+        value.to_string().green().to_string()
+    } else {
+        value.to_string().red().to_string()
+    }
+}
+
+fn format_trace_null() -> String {
+    "null".dimmed().to_string()
+}
+
+fn format_trace_none() -> String {
+    "<none>".dimmed().to_string()
 }
 
 fn fetch_trace_accounts(

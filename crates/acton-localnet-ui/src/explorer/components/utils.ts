@@ -75,6 +75,12 @@ export function normalizeAddress(address: string, options?: AddressFormatOptions
   return toDisplayAddress(address, options) ?? address
 }
 
+export function toRawAddress(address: string): string {
+  const parsed = parseAddress(address)
+  const rawString = (parsed as {toRawString?: () => string} | undefined)?.toRawString
+  return typeof rawString === "function" ? rawString.call(parsed) : address
+}
+
 export function isSameAddress(a: string, b: string): boolean {
   if (!a || !b) return false
   const parsedA = parseAddress(a)
@@ -92,10 +98,13 @@ export function formatNano(nano: string | number): string {
   })
 }
 
-export function formatTimeAgo(utime: number): string {
-  const now = Math.floor(Date.now() / 1000)
-  const diff = now - utime
+export function formatTimeAgo(
+  utime: number,
+  nowSeconds: number = Math.floor(Date.now() / 1000),
+): string {
+  const diff = Math.max(0, nowSeconds - utime)
 
+  if (diff === 0) return "right now"
   if (diff < 60) return `${diff}s ago`
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
   if (diff < 86_400) return `${Math.floor(diff / 3600)}h ago`

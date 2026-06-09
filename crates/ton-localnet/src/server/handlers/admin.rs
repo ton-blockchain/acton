@@ -2,14 +2,21 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
 use crate::server::models::{
-    FaucetRequest, GetAddressNameQuery, GetCompilerAbiQuery, RegisterCompilerAbisRequest,
-    SendBocRequest, SetAddressNameRequest, SetShardAccountRequest, StatePathRequest,
+    FaucetRequest, GetApiCallsRequest, RegisterCompilerAbisRequest, SendBocRequest,
+    SetAddressNameRequest, SetNetworkConditionsRequest, SetShardAccountRequest, StatePathRequest,
 };
-use crate::server::{StartupWallet, StateSourceInfo};
+use crate::server::{
+    ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
+};
 use crate::types::Hash256;
-use axum::{Json, extract::State};
+use axum::{
+    Json,
+    extract::Query,
+    extract::{RawQuery, State},
+};
 use serde::Serialize;
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 pub async fn faucet(
@@ -28,11 +35,13 @@ struct LocalnetAdminStatus {
     last_block_seqno: u64,
     #[serde(flatten)]
     state_source: StateSourceInfo,
+    network_conditions: NetworkConditionsInfo,
 }
 
 pub async fn get_status(
     State(node): State<Arc<Localnet>>,
     State(state_source): State<Arc<StateSourceInfo>>,
+    State(network_conditions): State<NetworkConditions>,
 ) -> Json<Value> {
     handle_result(
         async move {
@@ -42,6 +51,7 @@ pub async fn get_status(
                 uptime_seconds: node.uptime_seconds(),
                 last_block_seqno: u64::from(masterchain_info.last.seqno),
                 state_source: state_source.as_ref().clone(),
+                network_conditions: network_conditions.info(),
             })
         },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
@@ -54,6 +64,29 @@ pub async fn get_startup_wallets(
 ) -> Json<Value> {
     handle_result(
         async move { Ok::<_, anyhow::Error>(startup_wallets.as_ref().clone()) },
+        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+    )
+    .await
+}
+
+pub async fn set_network_conditions(
+    State(network_conditions): State<NetworkConditions>,
+    Json(payload): Json<SetNetworkConditionsRequest>,
+) -> Json<Value> {
+    network_conditions.set_response_delay_ms(payload.response_delay_ms);
+    handle_result(
+        async move { Ok::<_, anyhow::Error>(network_conditions.info()) },
+        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+    )
+    .await
+}
+
+pub async fn get_api_calls(
+    State(api_calls): State<ApiCallLog>,
+    Query(payload): Query<GetApiCallsRequest>,
+) -> Json<Value> {
+    handle_result(
+        async move { Ok::<_, anyhow::Error>(api_calls.snapshot(payload.limit)) },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
     )
     .await
@@ -107,10 +140,20 @@ pub async fn set_address_name(
 
 pub async fn get_address_name(
     State(node): State<Arc<Localnet>>,
-    axum::extract::Query(payload): axum::extract::Query<GetAddressNameQuery>,
+    RawQuery(query): RawQuery,
 ) -> Json<Value> {
-    handle_result(node.get_address_name(payload.address), |res| {
-        serde_json::to_value(res).unwrap_or(Value::Null)
+    let addresses = query
+        .as_deref()
+        .map(|query| {
+            url::form_urlencoded::parse(query.as_bytes())
+                .filter_map(|(key, value)| (key == "address").then(|| value.into_owned()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    handle_result(node.get_address_names(addresses), |entries| {
+        serde_json::to_value(entries.iter().cloned().collect::<BTreeMap<_, _>>())
+            .unwrap_or(Value::Null)
     })
     .await
 }
@@ -135,15 +178,21 @@ pub async fn register_compiler_abis(
 
 pub async fn get_compiler_abi(
     State(node): State<Arc<Localnet>>,
-    axum::extract::Query(payload): axum::extract::Query<GetCompilerAbiQuery>,
+    RawQuery(query): RawQuery,
 ) -> Json<Value> {
-    handle_result(
-        async move {
-            let code_hash = parse_hash_any(&payload.code_hash)?;
-            node.get_compiler_abi(code_hash).await
-        },
-        |res| res.clone().unwrap_or(Value::Null),
-    )
+    let code_hashes = query
+        .as_deref()
+        .map(|query| {
+            url::form_urlencoded::parse(query.as_bytes())
+                .filter_map(|(key, value)| (key == "code_hash").then(|| value.into_owned()))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    handle_result(node.get_compiler_abis(code_hashes), |entries| {
+        serde_json::to_value(entries.iter().cloned().collect::<BTreeMap<_, _>>())
+            .unwrap_or(Value::Null)
+    })
     .await
 }
 

@@ -45,6 +45,36 @@ Then target the same port for CLI helpers:
 acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
+## Simulate API Latency
+
+Use `--response-delay-ms` when you need local API requests to behave more like
+a slower remote provider:
+
+```bash
+acton localnet start --response-delay-ms 300
+```
+
+This delays `/api/v2`, `/api/v3`, and `/api/emulate/v1` responses. Streaming
+subscriptions, control endpoints, and the explorer UI are not delayed.
+
+You can change the delay while the node is running:
+
+```bash
+curl -s -X POST "http://127.0.0.1:5411/acton_setNetworkConditions" \
+  -H "content-type: application/json" \
+  -d '{"response_delay_ms":300}'
+```
+
+Use `{"response_delay_ms":0}` to disable the delay. The current value is
+included in `/acton_nodeInfo`.
+
+You can also store the same default in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+response-delay-ms = 300
+```
+
 ## Stop the Node
 
 Press `Ctrl+C` in the terminal where the node is running.

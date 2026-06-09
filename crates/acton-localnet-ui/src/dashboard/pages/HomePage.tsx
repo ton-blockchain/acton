@@ -1,18 +1,23 @@
 import {
   ArrowUpRight,
+  BookOpen,
   ChartNoAxesColumn,
+  Check,
   CircleUserRound,
+  Copy,
   Link2,
   SquareStack,
   Wallet,
 } from "lucide-react"
 import * as React from "react"
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@acton/shared-ui"
+import {Card, CardContent, CardDescription, CardHeader, CardTitle, useToast} from "@acton/shared-ui"
 import {useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../../explorer/api/client"
-import type {LocalnetNodeInfo, V3TransactionListItem} from "../../explorer/api/types"
+import type {V3TransactionListItem} from "../../explorer/api/types"
 import {formatDuration, formatNano, formatTimeAgo, hashToHex} from "../../explorer/components/utils"
+import {useAddressBook} from "../../explorer/hooks/useAddressBook"
+import {useNetworkInfo} from "../../explorer/hooks/useNetworkInfo"
 import {collectRecentAccounts} from "../dashboardUtils"
 import {HomeAddressLabel} from "../HomeAddressLabel"
 
@@ -23,7 +28,6 @@ interface HomePageProps {
 }
 
 interface HomeState {
-  readonly nodeInfo?: LocalnetNodeInfo
   readonly transactions: readonly V3TransactionListItem[]
   readonly accountBalances: Readonly<Record<string, string>>
   readonly isLoading: boolean
@@ -32,6 +36,10 @@ interface HomeState {
 
 export const HomePage: React.FC<HomePageProps> = ({client}) => {
   const navigate = useNavigate()
+  const {showToast} = useToast()
+  const {nodeInfo} = useNetworkInfo()
+  const {prefetchNames} = useAddressBook()
+  const [copiedEndpoint, setCopiedEndpoint] = React.useState<string>()
   const [homeState, setHomeState] = React.useState<HomeState>({
     transactions: [],
     accountBalances: {},
@@ -41,8 +49,9 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
   const endpointRows = React.useMemo(
     () =>
       [
-        {label: "V2 API", value: endpoints.apiV2},
-        {label: "V3 API", value: endpoints.apiV3},
+        {label: "V2 API", value: endpoints.apiV2, referencePath: "/api-reference/v2"},
+        {label: "V3 API", value: endpoints.apiV3, referencePath: "/api-reference/v3"},
+        {label: "Control API", value: endpoints.admin, referencePath: "/api-reference/control"},
       ].filter(endpoint => endpoint.value.length > 0),
     [endpoints],
   )
@@ -50,6 +59,19 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
     () => collectRecentAccounts(homeState.transactions),
     [homeState.transactions],
   )
+  const displayedAddresses = React.useMemo(() => {
+    const addresses = new Set<string>()
+    for (const transaction of homeState.transactions) {
+      addresses.add(transaction.account)
+      if (transaction.in_msg?.source) {
+        addresses.add(transaction.in_msg.source)
+      }
+    }
+    for (const account of recentAccounts) {
+      addresses.add(account)
+    }
+    return [...addresses]
+  }, [homeState.transactions, recentAccounts])
 
   React.useEffect(() => {
     let cancelled = false
@@ -62,10 +84,7 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
       }))
 
       try {
-        const [nodeInfo, transactionsResponse] = await Promise.all([
-          client.getNodeInfo(),
-          client.getRecentTransactions(8),
-        ])
+        const transactionsResponse = await client.getRecentTransactions(8)
         const transactions = transactionsResponse.transactions
         const accounts = collectRecentAccounts(transactions)
         let accountBalances: Record<string, string> = {}
@@ -86,7 +105,6 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
         }
 
         setHomeState({
-          nodeInfo,
           transactions,
           accountBalances,
           isLoading: false,
@@ -109,6 +127,38 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
       cancelled = true
     }
   }, [client])
+
+  React.useEffect(() => {
+    void prefetchNames(displayedAddresses)
+  }, [displayedAddresses, prefetchNames])
+
+  React.useEffect(() => {
+    if (!copiedEndpoint) {
+      return
+    }
+
+    const timeoutId = globalThis.setTimeout(() => setCopiedEndpoint(undefined), 2000)
+    return () => {
+      globalThis.clearTimeout(timeoutId)
+    }
+  }, [copiedEndpoint])
+
+  const copyEndpoint = React.useCallback(
+    async (endpoint: string) => {
+      try {
+        await navigator.clipboard.writeText(endpoint)
+        setCopiedEndpoint(endpoint)
+      } catch (error) {
+        console.error("Failed to copy endpoint", error)
+        showToast({
+          variant: "error",
+          title: "Copy failed",
+          description: "Failed to copy endpoint URL.",
+        })
+      }
+    },
+    [showToast],
+  )
 
   return (
     <>
@@ -264,11 +314,11 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
             </CardHeader>
             <CardContent className={styles.dashboardCardContent}>
               <div className={styles.metricValue}>
-                {homeState.nodeInfo ? `#${homeState.nodeInfo.last_block_seqno}` : "—"}
+                {nodeInfo ? `#${nodeInfo.last_block_seqno}` : "—"}
               </div>
               <div className={styles.metricMeta}>
-                {homeState.nodeInfo
-                  ? `${formatDuration(homeState.nodeInfo.uptime_seconds)} uptime`
+                {nodeInfo
+                  ? `${formatDuration(nodeInfo.uptime_seconds)} uptime`
                   : "Waiting for node info"}
               </div>
             </CardContent>
@@ -289,23 +339,40 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
               </div>
             </CardHeader>
             <CardContent className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
-              {endpointRows.map(endpoint => (
-                <a
-                  key={endpoint.label}
-                  className={styles.endpointRow}
-                  href={endpoint.value}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  <span className={styles.endpointText}>
-                    <span className={styles.endpointLabel}>{endpoint.label}</span>
-                    <span className={styles.endpointValue}>{endpoint.value}</span>
-                  </span>
-                  <span className={styles.endpointAction}>
-                    <ArrowUpRight size={14} />
-                  </span>
-                </a>
-              ))}
+              {endpointRows.map(endpoint => {
+                const isCopied = copiedEndpoint === endpoint.value
+
+                return (
+                  <div key={endpoint.label} className={styles.endpointRow}>
+                    <span className={styles.endpointText}>
+                      <span className={styles.endpointLabel}>{endpoint.label}</span>
+                      <span className={styles.endpointValue}>{endpoint.value}</span>
+                    </span>
+                    <span className={styles.endpointActions}>
+                      <button
+                        type="button"
+                        className={`${styles.endpointButton} ${isCopied ? styles.endpointButtonCopied : ""}`}
+                        aria-label={
+                          isCopied ? "Endpoint copied" : `Copy ${endpoint.label} endpoint`
+                        }
+                        title={isCopied ? "Copied" : "Copy endpoint"}
+                        onClick={() => void copyEndpoint(endpoint.value)}
+                      >
+                        {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.endpointButton}
+                        aria-label={`Open ${endpoint.label} reference`}
+                        title="Open API reference"
+                        onClick={() => void navigate(endpoint.referencePath)}
+                      >
+                        <BookOpen size={14} />
+                      </button>
+                    </span>
+                  </div>
+                )
+              })}
             </CardContent>
           </Card>
         </aside>

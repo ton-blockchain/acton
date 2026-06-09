@@ -1,0 +1,18 @@
+{
+  "address": "[WALLET_ADDRESS_BASE]",
+  "contract": "counter",
+  "exitCode": 0,
+  "method": "boolReply",
+  "network": "mock",
+  "rawAddress": "0:2222222222222222222222222222222222222222222222222222222222222222",
+  "rawStack": [
+    [
+      "cell",
+      {
+        "bytes": "te6ccgEBAQEAAwAAAcA="
+      }
+    ]
+  ],
+  "result": "not a TVM int",
+  "signature": "boolReply(): bool"
+}

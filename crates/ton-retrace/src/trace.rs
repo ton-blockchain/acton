@@ -423,6 +423,8 @@ impl Trace {
         start_gas: Option<usize>,
     ) -> Trace {
         let start_gas = start_gas.unwrap_or(1_000_000);
+        let mut gas_base = start_gas;
+        let mut gas_consumed = 0usize;
         let mut gas_remaining = start_gas;
 
         let mut steps = Vec::<TraceStep>::new();
@@ -451,7 +453,9 @@ impl Trace {
                 }
                 VmLine::VmGasRemaining { gas } => {
                     let new_gas = gas.parse::<usize>().unwrap_or(gas_remaining);
-                    let gas_cost = gas_remaining.saturating_sub(new_gas);
+                    let new_gas_consumed = gas_base.saturating_sub(new_gas);
+                    let gas_cost = new_gas_consumed.saturating_sub(gas_consumed);
+                    gas_consumed = new_gas_consumed;
                     gas_remaining = new_gas;
 
                     let instr = current_instr.take().unwrap_or_default();
@@ -499,7 +503,10 @@ impl Trace {
                     steps.push(TraceStep::FinalC5 { cell });
                 }
                 VmLine::VmLimitChanged { limit } => {
-                    gas_remaining = limit.parse().unwrap_or(gas_remaining);
+                    if let Ok(new_limit) = limit.parse::<usize>() {
+                        gas_base = new_limit;
+                        gas_remaining = gas_base.saturating_sub(gas_consumed);
+                    }
                 }
                 VmLine::VmUnknown { .. } => {}
             }
@@ -1042,6 +1049,33 @@ gas remaining: 997
         );
         let mismatched = ExecutedActions::from(&mismatched_executor_logs);
         assert!(!actions.actions[1].matches_executed_action(&mismatched.actions[0]));
+    }
+
+    #[test]
+    fn gas_cost_preserves_consumed_gas_when_limit_changes() {
+        let logs = r"
+stack: [ ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 0
+execute DROP
+gas remaining: 90
+stack: [ ]
+code cell hash: 734EFDF436945A5CB58154AAFB58A8258087B27EE31E98876254E4385F47B51D offset: 1
+execute ACCEPT
+changing gas limit to 1000
+gas remaining: 980
+        ";
+
+        let trace = Trace::new(logs, Some(100));
+        let gas_costs = trace
+            .steps
+            .iter()
+            .filter_map(|step| match step {
+                TraceStep::Execute { gas, .. } => Some(*gas),
+                _ => None,
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(gas_costs, vec![10, 10]);
     }
 }
 

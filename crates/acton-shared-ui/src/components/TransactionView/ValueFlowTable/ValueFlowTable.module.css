@@ -1,0 +1,71 @@
+.valueFlowContainer {
+  background: var(--tonscan-card-bg, var(--bg-color));
+  border: 1px solid var(--tonscan-border, var(--border-color));
+  border-radius: var(--border-radius-lg);
+  padding: 0;
+  overflow: hidden;
+}
+
+.flowList {
+  display: flex;
+  flex-direction: column;
+}
+
+.flowHeader {
+  display: flex;
+  background: var(--tonscan-row-hover, var(--bg-secondary-color));
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--tonscan-border, var(--border-color));
+  font-weight: var(--font-weight-semibold);
+  color: var(--tonscan-text-secondary, var(--text-secondary));
+  text-transform: uppercase;
+}
+
+.flowHeader .flowCol {
+  font-size: 13px;
+}
+
+.flowRow {
+  display: flex;
+  padding: 12px 20px;
+  align-items: center;
+}
+
+.flowFooter {
+  display: flex;
+  align-items: center;
+  margin: 0 20px;
+  padding: 8px 0;
+  border-top: 1px solid var(--tonscan-border, var(--border-color));
+}
+
+.flowCol {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-sm);
+}
+
+.amountCol,
+.feeCol {
+  text-align: right;
+}
+
+.changeValue {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.positive {
+  color: var(--tonscan-success, var(--color-passed));
+}
+
+.negative {
+  color: var(--tonscan-text-primary, var(--text-primary));
+}
+
+.totalFee {
+  color: var(--tonscan-text-primary, var(--text-primary));
+}

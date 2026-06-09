@@ -1,0 +1,17 @@
+{
+  "invalid_event_type": {
+    "error": "invalid event type: trace_invalidated",
+    "id": "invalid-type",
+    "status": 400
+  },
+  "missing_trace_hash": {
+    "error": "trace_external_hash_norms are required for trace subscription",
+    "id": "missing-trace",
+    "status": 400
+  },
+  "missing_types": {
+    "error": "types are required for subscription",
+    "id": "missing-types",
+    "status": 400
+  }
+}

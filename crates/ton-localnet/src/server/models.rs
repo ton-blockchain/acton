@@ -187,8 +187,13 @@ pub struct SetAddressNameRequest {
 }
 
 #[derive(Deserialize)]
-pub struct GetAddressNameQuery {
-    pub address: String,
+pub struct SetNetworkConditionsRequest {
+    pub response_delay_ms: u64,
+}
+
+#[derive(Deserialize)]
+pub struct GetApiCallsRequest {
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -200,11 +205,6 @@ pub struct CompilerAbiRegistration {
 #[derive(Deserialize)]
 pub struct RegisterCompilerAbisRequest {
     pub entries: Vec<CompilerAbiRegistration>,
-}
-
-#[derive(Deserialize)]
-pub struct GetCompilerAbiQuery {
-    pub code_hash: String,
 }
 
 #[derive(Deserialize)]

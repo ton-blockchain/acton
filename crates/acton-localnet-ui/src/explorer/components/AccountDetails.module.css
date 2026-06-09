@@ -2,6 +2,10 @@
   border-bottom: 1px solid var(--tonscan-border) !important;
 }
 
+.historyHeaderRow:hover {
+  background-color: transparent !important;
+}
+
 .historyHeaderGroup {
   border-bottom: none !important;
 }
@@ -96,6 +100,15 @@
   background-color: var(--tonscan-row-hover) !important;
 }
 
+.skeletonRow:hover {
+  background-color: transparent !important;
+}
+
+.skeletonRow > td {
+  padding-top: calc(var(--spacing-md) + 0.25px) !important;
+  padding-bottom: calc(var(--spacing-md) + 0.25px) !important;
+}
+
 .emptyRow:hover {
   background: transparent !important;
 }
@@ -113,6 +126,102 @@
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
+}
+
+.tableState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.tableStateError {
+  color: var(--tonscan-error);
+}
+
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--tonscan-row-hover) 0%,
+    var(--litenode-control-hover) 45%,
+    var(--tonscan-row-hover) 90%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.historySkeletonTime {
+  width: 54px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.historySkeletonIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.historySkeletonAction {
+  width: 96px;
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.historySkeletonAddress {
+  width: min(100%, 126px);
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.historySkeletonValue {
+  width: 96px;
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.contractSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.contractSkeletonTabs {
+  width: 260px;
+  max-width: 100%;
+  height: 34px;
+  border-radius: var(--border-radius-md);
+}
+
+.contractSkeletonBlock {
+  width: 100%;
+  height: 260px;
+  border-radius: var(--border-radius-md);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }
 
 .clickableRow {
@@ -233,6 +342,11 @@ th.valueContainer {
   font-weight: var(--font-weight-medium);
 }
 
+.historyValue {
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
 .tokenValue {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
@@ -256,7 +370,7 @@ th.valueContainer {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  padding: 10px 12px;
+  padding: 6px 12px;
   border-top: 1px solid var(--tonscan-border);
 }
 
@@ -324,4 +438,82 @@ th.valueContainer {
   border-color: var(--litenode-border-control);
   background: var(--litenode-surface-active);
   color: var(--tonscan-text-primary);
+}
+
+.paginationEllipsis {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tonscan-text-tertiary);
+}
+
+.paginationSkeletonButton {
+  width: 101px;
+  height: 32px;
+  min-height: 32px;
+  box-sizing: border-box;
+  border-color: transparent;
+  cursor: default;
+}
+
+.paginationSkeletonPage {
+  box-sizing: border-box;
+  border-color: transparent;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+  }
+
+  .historyContent,
+  .tokensContent {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .historyContent table,
+  .tokensContent table {
+    min-width: 620px;
+  }
+
+  .pagination {
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 520px) {
+  .tableCard {
+    border-radius: 14px !important;
+  }
+
+  .tabs {
+    padding: 6px;
+  }
+
+  .tab {
+    min-height: 32px;
+    padding: 0 9px;
+    gap: 6px;
+  }
+
+  .historyContent table,
+  .tokensContent table {
+    min-width: 580px;
+  }
 }

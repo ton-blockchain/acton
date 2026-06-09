@@ -263,6 +263,44 @@ fun testing.getNow(): uint32 {
     return ffi.getNow();
 }
 
+/// Set the VM random seed used by the current test/script and future emulated execution.
+///
+/// Pass a `uint256` seed for fully reproducible randomness. If [seed] is omitted,
+/// Acton generates a host-random 256-bit seed and returns it so you can print it
+/// and reuse it later.
+///
+/// `testing.setRandomSeed()` synchronizes randomness in two places:
+/// - the current VM context, so [random.getSeed], [random.uint256], and
+///   [random.range] immediately use the new seed
+/// - the emulated world state, so future `net.send`, `testing.runTickTock`,
+///   and `net.runGetMethod` calls use the same deterministic seed source
+///
+/// This function does not affect [crypto.getSecureRandomBytes], which uses
+/// host-side secure randomness.
+///
+/// Example:
+/// ```tolk
+/// // Reproducible seed
+/// testing.setRandomSeed(42);
+/// val a = random.uint256();
+/// testing.setRandomSeed(42);
+/// val b = random.uint256(); // same as `a`
+///
+/// // Host-random seed, returned for logging/reproduction
+/// val seed = testing.setRandomSeed();
+/// println("random seed: {:X}", seed);
+/// ```
+fun testing.setRandomSeed(seed: uint256? = null): uint256 {
+    if (seed == null) {
+        seed = ffi.generateRandomSeed();
+    }
+
+    val resolvedSeed = seed as uint256;
+    random.setSeed(resolvedSeed);
+    ffi.setRandomSeed(resolvedSeed);
+    return resolvedSeed;
+}
+
 /// Topup an address with a specified amount of TON.
 ///
 /// Example:
@@ -542,6 +580,12 @@ fun ffi.setNow(now: int): void
 
 fun ffi.getNow(): int
     asm "29 EXTCALL"
+
+fun ffi.setRandomSeed(seed: uint256): void
+    asm "59 EXTCALL"
+
+fun ffi.generateRandomSeed(): uint256
+    asm "60 EXTCALL"
 
 fun ffi.setConfig(config: dict): bool
     asm "32 EXTCALL"

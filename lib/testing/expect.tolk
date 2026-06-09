@@ -20,6 +20,7 @@
 /// expect(balances.mustGet(userAddress)).toEqual(ton("50"));
 /// ```
 
+import "@stdlib/lisp-lists"
 import "@stdlib/reflection"
 import "assert"
 import "../ffi"
@@ -170,6 +171,42 @@ fun Expectation<T>.toBeGreaterOrEqual<U>(self, expected: U): void {
         "expect(<actual>).toBeGreaterOrEqual(<expected>)",
         self.location,
     );
+}
+
+/// Asserts that actual value is in the inclusive range `[min, max]`.
+///
+/// Example:
+/// ```tolk
+/// expect(7).toBeInRange(5, 10);
+/// expect(5).toBeInRange(5, 10);
+/// expect(10).toBeInRange(5, 10);
+/// ```
+fun Expectation<T>.toBeInRange<U, V>(self, min: U, max: V): void {
+    val isAtLeastMin = ffi.assertBin(
+        ">=",
+        reflect.typeUniqueIdxOfObject(self.value),
+        self.value.toTuple(),
+        reflect.typeUniqueIdxOfObject(min),
+        min.toTuple(),
+        "",
+        self.location,
+    );
+    if (!isAtLeastMin) {
+        self.fail(format("{} is not in range [{}, {}]", self.value, min, max));
+    }
+
+    val isAtMostMax = ffi.assertBin(
+        "<=",
+        reflect.typeUniqueIdxOfObject(self.value),
+        self.value.toTuple(),
+        reflect.typeUniqueIdxOfObject(max),
+        max.toTuple(),
+        "",
+        self.location,
+    );
+    if (!isAtMostMax) {
+        self.fail(format("{} is not in range [{}, {}]", self.value, min, max));
+    }
 }
 
 /// Asserts that actual value is approximately equal to expected value using absolute difference.
@@ -479,6 +516,95 @@ fun Expectation<array<E>>.toHaveLength(self, length: int): void {
 fun Expectation<BigArray<E>>.toHaveLength(self, length: int): void {
     Assert.equal(
         self.value.size(),
+        length,
+        "expect(<actual>).toHaveLength(<expected>)",
+        self.location,
+    );
+}
+
+/// Asserts that a lisp list contains the expected value.
+///
+/// Example:
+/// ```tolk
+/// val list = lisp_list<int> [1, 2, 3];
+/// expect(list).toContain(2);
+/// ```
+fun Expectation<lisp_list<E>>.toContain<U>(self, expected: U): void {
+    var ptr = self.value;
+    while (!ptr.isEmpty()) {
+        val item = ptr.getHead() as U;
+        if (item == expected) {
+            return;
+        }
+        ptr = ptr.getTail();
+    }
+    self.fail(
+        format(
+            "expect(<actual>).toContain(<expected>): Value '{}' not found in the list",
+            expected,
+        ),
+    );
+}
+
+/// Asserts that a lisp list does not contain the expected value.
+///
+/// Example:
+/// ```tolk
+/// val list = lisp_list<int> [1, 2, 3];
+/// expect(list).toNotContain(4);
+/// ```
+fun Expectation<lisp_list<E>>.toNotContain<U>(self, expected: U): void {
+    var ptr = self.value;
+    while (!ptr.isEmpty()) {
+        val item = ptr.getHead() as U;
+        if (item == expected) {
+            self.fail(
+                format(
+                    "expect(<actual>).toNotContain(<expected>): Value '{}' is found in the list",
+                    expected,
+                ),
+            );
+        }
+        ptr = ptr.getTail();
+    }
+}
+
+/// Asserts that a lisp list is empty.
+///
+/// Example:
+/// ```tolk
+/// val list = lisp_list<int> [];
+/// expect(list).toBeEmpty();
+/// ```
+fun Expectation<lisp_list<E>>.toBeEmpty(self): void {
+    if (!self.value.isEmpty()) {
+        self.fail("expect(<actual>).toBeEmpty(<expected>): list is not empty");
+    }
+}
+
+/// Asserts that a lisp list is not empty.
+///
+/// Example:
+/// ```tolk
+/// val list = lisp_list<int> [1, 2, 3];
+/// expect(list).toBeNonEmpty();
+/// ```
+fun Expectation<lisp_list<E>>.toBeNonEmpty(self): void {
+    if (self.value.isEmpty()) {
+        self.fail("expect(<actual>).toBeNonEmpty(<expected>): list is empty");
+    }
+}
+
+/// Asserts that a lisp list has the expected length.
+///
+/// Example:
+/// ```tolk
+/// val list = lisp_list<int> [1, 2, 3];
+/// expect(list).toHaveLength(3);
+/// ```
+fun Expectation<lisp_list<E>>.toHaveLength(self, length: int): void {
+    Assert.equal(
+        self.value.calculateSize(),
         length,
         "expect(<actual>).toHaveLength(<expected>)",
         self.location,

@@ -1,19 +1,23 @@
-
 Remote Account
   Network:           mock
-  Address:           [WALLET_ADDRESS_BASE]
   Raw Address:       0:2222222222222222222222222222222222222222222222222222222222222222
   Status:            active
+  Contract:          counter
   Balance:           1.234 TON
   Last Tx LT:        999
   Last Tx Hash:      c0ffee
   Code Hash:         0x15407004a66e0cf95a67c39edbb54a531dfdb6df93fb7d365fae57a34b874747
   Data Hash:         0x14b1b536ff08a2e98a9767b0b177e691dd70b69aa437f2c44f438e2a19fc3928
 
-Local Match
-  Contract:          counter (counter)
-
 Decoded Storage
-  counter: 42
-  id: 7
-  owner: [WALLET_ADDRESS_BASE]
+  Storage {
+      id: 7,
+      owner: [WALLET_ADDRESS_BASE],
+      counter: 42,
+  }
+
+Get Methods
+  currentCounter(): int
+  owner(): address
+
+hint: To run get method: acton rpc call --net custom:mock 0:2222222222222222222222222222222222222222222222222222222222222222 <METHOD> [ARGS...]

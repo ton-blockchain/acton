@@ -1,10 +1,8 @@
 .container {
-  padding: var(--spacing-lg) var(--spacing-md);
+  padding: 24px 32px 40px;
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
-  max-width: 1400px;
-  margin: 0 auto;
 }
 
 .title {
@@ -27,6 +25,15 @@
   gap: var(--spacing-lg);
   flex: 1;
   min-height: 0;
+}
+
+.preTreeContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  align-self: flex-start;
+  width: 100%;
+  max-width: 1400px;
 }
 
 .overviewCard {
@@ -98,6 +105,7 @@
 
 .tabs {
   display: flex;
+  align-items: flex-end;
   gap: 8px;
   border-bottom: 1px solid var(--tonscan-border);
   padding-bottom: 0;
@@ -116,6 +124,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  margin-bottom: -1px;
 }
 
 .tab:hover {
@@ -137,12 +146,95 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  width: 100%;
+  min-width: 0;
+  --trace-step: 24px;
+  --trace-connector-offset: 12px;
+  --trace-line-thickness: 1px;
+  --trace-line-color: var(--text-muted);
+}
+
+.traceNode {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.traceTransaction {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+}
+
+.traceChildren {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding-left: var(--trace-step);
+}
+
+.traceConnectorAnchor {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.traceConnectorRail {
+  position: absolute;
+  top: 0;
+  left: var(--trace-connector-offset);
+  width: var(--trace-line-thickness);
+  height: var(--trace-connector-height);
+  background: var(--trace-line-color);
+}
+
+.traceTerminalCurve,
+.traceSiblingCurve {
+  position: absolute;
+  width: var(--trace-connector-offset);
+  height: var(--trace-connector-offset);
+  box-sizing: border-box;
+  border-left: var(--trace-line-thickness) solid var(--trace-line-color);
+  border-bottom: var(--trace-line-thickness) solid var(--trace-line-color);
+  border-radius: 0 0 0 9px;
+  pointer-events: none;
+}
+
+.traceTerminalCurve {
+  top: var(--trace-connector-height);
+  left: var(--trace-connector-offset);
+}
+
+.traceSiblingCurve {
+  top: var(--trace-connector-offset);
+  left: calc(-1 * var(--trace-connector-offset));
 }
 
 .detailCard {
-  background: var(--tonscan-card-bg);
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
   padding: 0;
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: 0;
+}
+
+.detailCard > :global(*) {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
 }
 
 .transactionsList {
@@ -187,54 +279,6 @@
   font-weight: 600;
   margin-bottom: 16px;
   color: var(--tonscan-text-primary);
-}
-
-.valueFlowContainer {
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--tonscan-border);
-  border-radius: 12px;
-  padding: 0;
-  overflow: hidden;
-}
-
-.flowList {
-  display: flex;
-  flex-direction: column;
-}
-
-.flowHeader {
-  display: flex;
-  background: var(--tonscan-row-hover);
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--tonscan-border);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--tonscan-text-secondary);
-  text-transform: uppercase;
-}
-
-.flowRow {
-  display: flex;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--tonscan-border);
-  align-items: center;
-}
-
-.flowRow:last-child {
-  border-bottom: none;
-}
-
-.flowCol {
-  flex: 1;
-  min-width: 0;
-  font-size: var(--font-size-sm);
-}
-
-.changeValue {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-sm);
 }
 
 .contractHeader {
@@ -319,6 +363,12 @@
   }
 }
 
+@media (max-width: 1100px) {
+  .container {
+    padding: 20px;
+  }
+}
+
 @media (max-width: 1024px) {
   .content {
     grid-template-columns: 1fr;
@@ -326,5 +376,20 @@
 
   .detailsSection {
     height: 500px;
+  }
+}
+
+@media (max-width: 520px) {
+  .container {
+    padding: 12px;
+    gap: 12px;
+  }
+
+  .content {
+    gap: 12px;
+  }
+
+  .overviewCard {
+    margin-top: 4px;
   }
 }

@@ -25,7 +25,7 @@ pub use multi::{
 pub use single::serve_single_replayer_dap;
 pub use types_render::{
     PrettyAddressFormat, PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type,
-    render_tuple_item_as_tolk_type,
+    render_tuple_item_as_tolk_type, render_unpacked_value_as_tolk_type,
 };
 
 pub(crate) use core::types_render;

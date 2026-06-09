@@ -6,7 +6,7 @@ Commands:
   new              [PATH]              Create a new project from a template
   init                                 Add Acton support to current directory
 
-  test             [PATH]              Run tests from a file or directory
+  test             [PATH]              Run tests from files or directories
   build            [CONTRACT_NAME]     Build one contract or every contract
   check            [TARGET]            Check project Tolk sources for errors
   script           <PATH> [ARGS...]    Run a standalone Tolk script file

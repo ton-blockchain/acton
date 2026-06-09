@@ -490,7 +490,7 @@ fn save_test_trace_without_path_uses_default_directory() {
 }
 
 #[test]
-fn save_test_trace_reports_missing_emulations_to_test_stderr() {
+fn save_test_trace_skips_missing_emulations_without_warning() {
     let project = trace_project(
         "h-save-trace-empty-test-stderr",
         r"
@@ -511,10 +511,8 @@ fn save_test_trace_reports_missing_emulations_to_test_stderr() {
         .assert_passed(1)
         .assert_snapshot_matches(
             "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_reports_missing_emulations_to_test_stderr.stdout.txt",
-        )
-        .assert_stderr_snapshot_matches(
-            "integration/snapshots/test-runner/cmd_agent_h/save_test_trace_reports_missing_emulations_to_test_stderr.stderr.txt",
         );
+    assert_eq!(output.get_stderr(), "", "expected no stderr output");
 
     assert!(
         !project
@@ -895,12 +893,22 @@ fn save_test_trace_skips_traces_hidden_from_ui() {
                 .to_string()
         })
         .collect::<Vec<_>>();
+    let treasury_deploy_flags = traces
+        .iter()
+        .map(|item| {
+            item["is_treasury_deploy"]
+                .as_bool()
+                .unwrap_or(false)
+                .to_string()
+        })
+        .collect::<Vec<_>>();
     let summary = format!(
-        "trace_count: {}\nskipped_traces_count: {}\ntrace_names: {}\ntransaction_counts: {}\n",
+        "trace_count: {}\nskipped_traces_count: {}\ntrace_names: {}\ntransaction_counts: {}\ntreasury_deploy_flags: {}\n",
         traces.len(),
         trace["skipped_traces_count"].as_u64().unwrap_or(0),
         trace_names.join(","),
         tx_counts.join(","),
+        treasury_deploy_flags.join(","),
     );
 
     assert_trace_summary_snapshot(

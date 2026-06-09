@@ -220,22 +220,34 @@ seed = 42
 
 ### Profiling options
 
-| Configuration  | CLI Flag         | Type    | Description                                                           |
-|----------------|------------------|---------|-----------------------------------------------------------------------|
-| `fail-on-diff` | `--fail-on-diff` | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+| Configuration               | CLI Flag                      | Type    | Description                                                           |
+|-----------------------------|-------------------------------|---------|-----------------------------------------------------------------------|
+| `fail-on-diff`              | `--fail-on-diff`              | Boolean | Exit with non-zero code when profiling differs from baseline snapshot |
+| `gas-profile`               | `--gas-profile`               | String  | Path to write a gas-weighted execution profile                        |
+| `gas-profile-format`        | `--gas-profile-format`        | String  | Gas profile output format (`cpuprofile`, `collapsed`)                 |
+| `gas-profile-include-tests` | `--gas-profile-include-tests` | Boolean | Include `.test.tolk` unit-test get-method execution in the profile    |
 
 `fail-on-diff` is applied when running baseline comparison mode with
 `--baseline-snapshot <FILE>`.
+Gas profile options apply when `gas-profile` or `--gas-profile <FILE>` is set.
+Combine `--gas-profile <FILE>` with `--ui` to browse the profile as a
+flamegraph in Test UI. Add `--gas-profile-include-tests` when the expensive
+work is executed directly from `.test.tolk` unit-test get methods.
 
 Examples:
 
 ```acton-toml title="Acton.toml"
 [test]
 fail-on-diff = true
+gas-profile = "build/gas.cpuprofile"
+gas-profile-format = "cpuprofile"
+gas-profile-include-tests = false
 ```
 
 ```bash
 acton test --baseline-snapshot gas-baseline.json --fail-on-diff
+acton test --gas-profile build/gas.collapsed --gas-profile-format collapsed
+acton test --gas-profile build/gas.cpuprofile --gas-profile-include-tests --ui
 ```
 
 ### Mutation testing options

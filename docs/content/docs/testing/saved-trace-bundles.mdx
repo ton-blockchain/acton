@@ -72,6 +72,7 @@ Each `<test-name>_trace.json` file has this top-level structure:
 - `contracts`: contract names that can be resolved in the sibling `contracts/` directory.
 - `wallets`: known-address map used to preserve local wallet names such as `deployer` or `sender`.
 - `traces`: logical transaction chains captured during the test.
+- `skipped_traces_count`: optional count of trace chains hidden from the saved bundle with `hideTraceFromUi()`. The field is omitted when the count is zero.
 
 ## Trace chains
 
@@ -89,6 +90,22 @@ txs.giveName("deploy-counter");
 ```
 
 That custom name appears in `traces[].name` and in the Test UI.
+
+## Skipping traces
+
+Use [`SendResultList.hideTraceFromUi()`](/docs/standard_library/emulation/network#sendresultlisthidetracefromui) when a transaction chain is useful for test setup but should not appear in saved trace bundles or the Test UI:
+
+```tolk
+val setupTxs = net.send(deployer.address, setupMsg);
+setupTxs.hideTraceFromUi();
+
+val userTxs = net.send(deployer.address, userMsg);
+userTxs.giveName("user-flow");
+```
+
+Hidden traces are omitted from `traces[]`, while the exported root file records how many chains were skipped in `skipped_traces_count`. The transactions still run normally and remain available to the test code for assertions before they are hidden.
+
+For accepted external messages, use [`ExternalSendResult.hideTraceFromUi()`](/docs/standard_library/emulation/network#externalsendresulthidetracefromui). If the external message was not accepted, this helper fails with the same external-error diagnostics as other `ExternalSendResult` helpers.
 
 ## Transactions
 

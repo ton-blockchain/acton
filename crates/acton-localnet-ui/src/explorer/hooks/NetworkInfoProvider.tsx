@@ -37,20 +37,25 @@ export const NetworkInfoProvider: React.FC<NetworkInfoProviderProps> = ({client,
     }
   }, [client])
 
-  const value = useMemo<NetworkInfoContextValue>(() => {
-    const forkNetwork = nodeInfo?.fork_network?.trim()
-    const normalizedForkNetwork = forkNetwork?.toLocaleLowerCase()
-    const isFork = nodeInfo?.state_source === "remote" && Boolean(forkNetwork)
-    const isMainnetFork = isFork && normalizedForkNetwork === "mainnet"
+  const forkNetwork = nodeInfo?.fork_network?.trim()
+  const normalizedForkNetwork = forkNetwork?.toLocaleLowerCase()
+  const isFork = nodeInfo?.state_source === "remote" && Boolean(forkNetwork)
+  const isMainnetFork = isFork && normalizedForkNetwork === "mainnet"
+  const addressFormat = useMemo(
+    () => ({
+      testOnly: !isMainnetFork,
+    }),
+    [isMainnetFork],
+  )
 
+  const value = useMemo<NetworkInfoContextValue>(() => {
     return {
+      nodeInfo,
       forkNetwork: isFork ? forkNetwork : undefined,
       isMainnetFork,
-      addressFormat: {
-        testOnly: !isMainnetFork,
-      },
+      addressFormat,
     }
-  }, [nodeInfo])
+  }, [addressFormat, forkNetwork, isFork, isMainnetFork, nodeInfo])
 
   return <NetworkInfoContext.Provider value={value}>{children}</NetworkInfoContext.Provider>
 }

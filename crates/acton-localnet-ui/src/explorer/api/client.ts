@@ -5,12 +5,14 @@ import type {
   AccountStatesResponse,
   ApiResponse,
   FullAccountState,
+  ApiCallLogResponse,
   JettonMaster,
   JettonWallet,
   JettonWalletData,
   LocalnetNodeInfo,
   NftItem,
   StartupWallet,
+  StreamingTransactionsEvent,
   Transaction,
   V3RunGetMethodResponse,
   V3RunGetMethodStackEntry,
@@ -22,6 +24,7 @@ interface TonClientOptions {
   readonly v2BaseUrl: string
   readonly v3BaseUrl: string
   readonly addressNameBaseUrl: string
+  readonly toncenterApiKey?: string
 }
 
 interface FaucetResponse {
@@ -30,15 +33,23 @@ interface FaucetResponse {
   readonly error?: string
 }
 
+interface TransactionStreamHandlers {
+  readonly onTransactions: (event: StreamingTransactionsEvent) => void
+  readonly onError?: (error: Error) => void
+}
+
 export class TonClient {
   private readonly v2BaseUrl: string
   private readonly v3BaseUrl: string
   private readonly addressNameBaseUrl: string
+  private readonly toncenterApiKey: string | undefined
+  private readonly pendingGetRequests = new Map<string, Promise<unknown>>()
 
-  constructor({v2BaseUrl, v3BaseUrl, addressNameBaseUrl}: TonClientOptions) {
+  constructor({v2BaseUrl, v3BaseUrl, addressNameBaseUrl, toncenterApiKey}: TonClientOptions) {
     this.v2BaseUrl = v2BaseUrl
     this.v3BaseUrl = v3BaseUrl
     this.addressNameBaseUrl = addressNameBaseUrl
+    this.toncenterApiKey = toncenterApiKey?.trim() || undefined
   }
 
   async getAddressInformation(address: string, seqno?: number): Promise<FullAccountState> {
@@ -64,6 +75,12 @@ export class TonClient {
     url.searchParams.append("address", address)
     url.searchParams.append("limit", limit.toString())
     return this.request(url, "Failed to fetch transactions")
+  }
+
+  subscribeAccountTransactions(address: string, handlers: TransactionStreamHandlers): () => void {
+    const controller = new AbortController()
+    void this.readAccountTransactionStream(address, handlers, controller.signal)
+    return () => controller.abort()
   }
 
   async getJettonMasters(address?: string[], limit = 100, offset = 0): Promise<JettonMaster[]> {
@@ -269,21 +286,50 @@ export class TonClient {
     return buildAndFetch()
   }
 
-  async getAddressName(address: string): Promise<string | undefined> {
+  async getAddressNames(addresses: readonly string[]): Promise<Record<string, string | undefined>> {
+    const uniqueAddresses = [...new Set(addresses.filter(Boolean))]
+    if (uniqueAddresses.length === 0) {
+      return {}
+    }
+
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getAddressName")
-    url.searchParams.append("address", address)
-    return this.request(url, "Failed to fetch address name")
+    for (const address of uniqueAddresses) {
+      url.searchParams.append("address", address)
+    }
+    const response = await this.request<Record<string, string | null>>(
+      url,
+      "Failed to fetch address names",
+    )
+
+    return Object.fromEntries(
+      Object.entries(response).map(([address, name]) => [address, name ?? undefined]),
+    )
   }
 
-  async getCompilerAbi(codeHash: string): Promise<ContractABI | undefined> {
+  async getCompilerAbis(
+    codeHashes: readonly string[],
+  ): Promise<Record<string, ContractABI | null>> {
+    const uniqueCodeHashes = [...new Set(codeHashes.filter(Boolean))]
+    if (uniqueCodeHashes.length === 0) {
+      return {}
+    }
+
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getCompilerAbi")
-    url.searchParams.append("code_hash", codeHash)
-    return this.request(url, "Failed to fetch compiler ABI")
+    for (const codeHash of uniqueCodeHashes) {
+      url.searchParams.append("code_hash", codeHash)
+    }
+    return this.request<Record<string, ContractABI | null>>(url, "Failed to fetch compiler ABI")
   }
 
   async getNodeInfo(): Promise<LocalnetNodeInfo> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_nodeInfo")
     return this.request(url, "Failed to fetch node info")
+  }
+
+  async getApiCalls(limit = 200): Promise<ApiCallLogResponse> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getApiCalls")
+    url.searchParams.append("limit", limit.toString())
+    return this.request(url, "Failed to fetch API calls")
   }
 
   async getStartupWallets(): Promise<StartupWallet[]> {
@@ -344,9 +390,133 @@ export class TonClient {
     return new URL(`${fullBase}${path}`)
   }
 
+  private buildStreamingSseUrl(): URL {
+    const url = this.buildUrl(this.v2BaseUrl, "")
+    const apiRoot = url.pathname.replace(/\/$/, "").replace(/\/v2$/, "")
+    url.pathname = `${apiRoot}/streaming/v2/sse`
+    url.search = ""
+    url.hash = ""
+    return url
+  }
+
+  private async readAccountTransactionStream(
+    address: string,
+    handlers: TransactionStreamHandlers,
+    signal: AbortSignal,
+  ): Promise<void> {
+    try {
+      const url = this.buildStreamingSseUrl()
+      const response = await fetch(
+        url.toString(),
+        this.withToncenterApiKey(url, {
+          method: "POST",
+          headers: {
+            Accept: "text/event-stream",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            addresses: [address],
+            types: ["transactions"],
+            min_finality: "confirmed",
+          }),
+          signal,
+        }),
+      )
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "")
+        throw new Error(body || `Streaming subscription failed with status ${response.status}`)
+      }
+      if (!response.body) {
+        throw new Error("Streaming subscription returned an empty body")
+      }
+
+      await this.readSseEvents(response.body, value => {
+        if (isStreamingTransactionsEvent(value)) {
+          handlers.onTransactions(value)
+        }
+      })
+    } catch (error) {
+      if (signal.aborted) return
+      handlers.onError?.(error instanceof Error ? error : new Error(String(error)))
+    }
+  }
+
+  private async readSseEvents(
+    body: ReadableStream<Uint8Array>,
+    onEvent: (value: unknown) => void,
+  ): Promise<void> {
+    const reader = body.getReader()
+    const decoder = new TextDecoder()
+    let buffer = ""
+    let dataLines: string[] = []
+
+    const dispatch = () => {
+      if (dataLines.length === 0) {
+        return
+      }
+
+      const data = dataLines.join("\n")
+      dataLines = []
+      try {
+        onEvent(JSON.parse(data) as unknown)
+      } catch (error) {
+        console.debug("Failed to parse streaming event", error)
+      }
+    }
+
+    const processLine = (line: string) => {
+      if (line.length === 0) {
+        dispatch()
+        return
+      }
+      if (line.startsWith("data:")) {
+        dataLines.push(line.slice(5).trimStart())
+      }
+    }
+
+    while (true) {
+      const {value, done} = await reader.read()
+      if (done) {
+        buffer += decoder.decode()
+        break
+      }
+
+      buffer += decoder.decode(value, {stream: true})
+      const lines = buffer.split(/\r?\n/)
+      buffer = lines.pop() ?? ""
+      for (const line of lines) {
+        processLine(line)
+      }
+    }
+
+    if (buffer.length > 0) {
+      processLine(buffer)
+    }
+    dispatch()
+  }
+
   private async request<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(url.toString(), options)
-    const raw = (await response.json()) as unknown
+    const dedupeKey = this.pendingRequestKey(url, options)
+    if (dedupeKey) {
+      const pending = this.pendingGetRequests.get(dedupeKey)
+      if (pending) {
+        return pending as Promise<T>
+      }
+
+      const request = this.fetchRequest<T>(url, errorMessage, options).finally(() => {
+        this.clearPendingGetRequest(dedupeKey, request)
+      })
+      this.pendingGetRequests.set(dedupeKey, request)
+      return request
+    }
+
+    return this.fetchRequest<T>(url, errorMessage, options)
+  }
+
+  private async fetchRequest<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
+    const response = await fetch(url.toString(), this.withToncenterApiKey(url, options))
+    const raw = await this.parseResponseJson(response, errorMessage)
 
     if (this.isApiResponse<T>(raw)) {
       if (!raw.ok) {
@@ -364,6 +534,17 @@ export class TonClient {
     }
 
     return raw as T
+  }
+
+  private pendingRequestKey(url: URL, options?: RequestInit): string | undefined {
+    const method = options?.method?.toUpperCase() ?? "GET"
+    return method === "GET" ? url.toString() : undefined
+  }
+
+  private clearPendingGetRequest(key: string, request: Promise<unknown>): void {
+    if (this.pendingGetRequests.get(key) === request) {
+      this.pendingGetRequests.delete(key)
+    }
   }
 
   private dedupNftItems(items: NftItem[]): NftItem[] {
@@ -397,6 +578,46 @@ export class TonClient {
     return typeof error === "string" ? error : undefined
   }
 
+  private async parseResponseJson(response: Response, errorMessage: string): Promise<unknown> {
+    const text = await response.text()
+    if (text.length === 0) {
+      return undefined
+    }
+
+    try {
+      return JSON.parse(text) as unknown
+    } catch {
+      throw new Error(
+        `${errorMessage}: received non-JSON response from ${new URL(response.url).pathname}`,
+      )
+    }
+  }
+
+  private withToncenterApiKey(url: URL, options?: RequestInit): RequestInit | undefined {
+    if (!this.toncenterApiKey || !this.isToncenterApiUrl(url)) {
+      return options
+    }
+
+    const headers = new Headers(options?.headers)
+    headers.set("X-API-Key", this.toncenterApiKey)
+    return {...options, headers}
+  }
+
+  private isToncenterApiUrl(url: URL): boolean {
+    return (
+      this.isUrlWithinBase(url, this.buildUrl(this.v2BaseUrl, "")) ||
+      this.isUrlWithinBase(url, this.buildUrl(this.v3BaseUrl, ""))
+    )
+  }
+
+  private isUrlWithinBase(url: URL, baseUrl: URL): boolean {
+    const basePath = baseUrl.pathname.replace(/\/$/, "")
+    return (
+      url.origin === baseUrl.origin &&
+      (url.pathname === basePath || url.pathname.startsWith(`${basePath}/`))
+    )
+  }
+
   private stackNumber(entry: V3RunGetMethodStackEntry | undefined): string | undefined {
     if (entry?.type !== "num") return undefined
     if (typeof entry.value === "string") {
@@ -423,4 +644,19 @@ export class TonClient {
       return undefined
     }
   }
+}
+
+function isStreamingTransactionsEvent(value: unknown): value is StreamingTransactionsEvent {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const event = value as Partial<StreamingTransactionsEvent>
+  return (
+    event.type === "transactions" &&
+    (event.finality === "pending" ||
+      event.finality === "confirmed" ||
+      event.finality === "finalized") &&
+    Array.isArray(event.transactions)
+  )
 }

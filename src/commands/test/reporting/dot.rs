@@ -10,13 +10,15 @@ use std::path::Path;
 use ton_executor::get::GetMethodResult;
 
 pub(crate) struct DotReporter {
+    show_output: bool,
     tests: Vec<TestReport>,
     count_suites: usize,
 }
 
 impl DotReporter {
-    pub(crate) const fn new() -> Self {
+    pub(crate) const fn new(show_output: bool) -> Self {
         Self {
+            show_output,
             tests: Vec::new(),
             count_suites: 0,
         }
@@ -287,7 +289,14 @@ impl TestReporter for DotReporter {
 
     fn on_test_finished(&mut self, test: &TestReport) -> anyhow::Result<()> {
         self.print_status_dot(&test.status);
-        self.tests.push(test.clone());
+        let mut test = test.clone();
+        if !self.show_output
+            && let Some(execution) = test.execution.as_mut()
+        {
+            execution.stdout.clone_from(&execution.debug_output);
+            execution.stderr.clear();
+        }
+        self.tests.push(test);
         Ok(())
     }
 

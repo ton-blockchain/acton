@@ -1,5 +1,6 @@
 use crate::support::TestOutputExt;
 use crate::support::project::ProjectBuilder;
+use acton_config::color::ColorMode;
 
 const TEST_IMPORTS: &str = r#"
 import "../../lib/io"
@@ -39,6 +40,68 @@ fn println_and_println1_support_hex_and_ton_formatters() {
         "#,
         "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println_and_println1_support_hex_and_ton_formatters.stdout.txt",
     );
+}
+
+#[test]
+fn println_supports_constant_width_and_padding() {
+    run_stdlib_io_case(
+        "v-stdlib-println-width-padding",
+        r#"
+        get fun `test println width padding`() {
+            println("flag={{:5}} value=|{:5}|", "hi");
+            println("flag={{:>5}} value=|{:>5}|", "hi");
+            println("flag={{:_>5}} value=|{:_>5}|", "hi");
+            println("flag={{:>>5}} value=|{:>>5}|", "hi");
+            println("flag={{:.^7}} value=|{:.^7}|", "hi");
+            println("flag={{:05}} value=|{:05}|", 42);
+            println("flag={{:06x}} value=|{:06x}|", 255);
+            println("flag={{:X}} value=|{:X}|", 255);
+            println("flag={{:08X}} value=|{:08X}|", 255);
+            println("flag={{:b}} value=|{:b}|", 10);
+            println("flag={{:B}} value=|{:B}|", 10);
+            println("flag={{:08B}} value=|{:08B}|", 10);
+            println("flag={{:0>6x}} value=|{:0>6x}|", -255);
+            println("flag={{:>12ton}} value=|{:>12ton}|", 1500000000);
+            println("flag={{:0>8:x}} value=|{:0>8:x}|", 255);
+            println("flag={{:*>6}} value=|{:*>6}|", "ok", "after");
+            println("missing {{:_>6}} -> {:_>6}");
+        }
+        "#,
+        "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println_supports_constant_width_and_padding.stdout.txt",
+    );
+}
+
+#[test]
+fn println_width_padding_uses_visible_length_for_colored_default_values() {
+    let script_body = r#"
+        println("flag={{:>6}} value=|{:>6}|", 42);
+        println("flag={{:06}} value=|{:06}|", 42);
+        println("flag={{:06}} value=|{:06}|", -42);
+        println("flag={{:<6}} value=|{:<6}|", true);
+        println("flag={{:^6}} value=|{:^6}|", false);
+    "#;
+    let script_code = format!(
+        r"
+        {TEST_IMPORTS}
+
+        fun main() {{
+            {script_body}
+        }}
+        "
+    );
+
+    ProjectBuilder::new("v-stdlib-println-colored-width-padding")
+        .script_file("stdlib_io", &script_code)
+        .build()
+        .acton()
+        .script("scripts/stdlib_io.tolk")
+        .keep_color_env()
+        .color_mode(ColorMode::Always)
+        .run()
+        .success()
+        .assert_stdout_svg_snapshot_matches(
+            "integration/snapshots/test-runner/println_and_println1_support_hex_and_ton_formatters/println_width_padding_uses_visible_length_for_colored_default_values.stdout.svg",
+        );
 }
 
 #[test]

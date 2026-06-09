@@ -16,7 +16,7 @@
         └── RouteToSink 0.5 TON -> source B                                             gas=1748
             └── SourceOnlyNotice 0.1 TON -> sink C                                      gas=261
         
-        Cannot find transaction from source B EQDYqW..18DlxC to sink C EQDaMa..A/3ZY/
+        Cannot find transaction from source B kQDYqW..18DufI to sink C kQDaMa..A_3S21
         with:
           opcode=0xae220002 SourceOnlyNotice
           value=200000000

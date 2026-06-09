@@ -6,7 +6,7 @@ import type {Cell} from "@ton/core"
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, TransactionInfo} from "@/types/transaction"
 import {DataBlock, fmt} from "@/index"
-import {decodeStateInitData} from "@/utils/messageBody"
+import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -24,6 +24,8 @@ import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
+import {StorageDiffView} from "../TransactionTree/StorageDiffView"
+import {buildStorageDiff} from "../TransactionTree/storageDiff"
 
 import {ActionsSummary} from "./ActionsSummary"
 import styles from "./TransactionDetails.module.css"
@@ -31,6 +33,7 @@ import styles from "./TransactionDetails.module.css"
 export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
@@ -39,12 +42,14 @@ export interface TransactionDetailsProps {
 export function TransactionDetails({
   tx,
   contracts,
+  compilerAbisByCodeHash,
   allContracts,
   onContractClick,
   renderSourceLocation,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
   const [showStateInit, setShowStateInit] = useState(false)
+  const [expandedStorageLt, setExpandedStorageLt] = useState<string | undefined>()
 
   const description = tx.transaction.description
   if (description.type !== "generic" && description.type !== "tick-tock") {
@@ -96,6 +101,11 @@ export function TransactionDetails({
 
   const inMessage = tx.transaction.inMessage ?? undefined
   const targetContract = tx.address ? contracts.get(tx.address.toString()) : undefined
+  const targetAbi = tx.contractAbi ?? targetContract?.abi
+  const targetContractWithAbi =
+    targetContract && targetAbi && targetContract.abi !== targetAbi
+      ? {...targetContract, abi: targetAbi}
+      : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
     inMessage != undefined &&
@@ -106,9 +116,16 @@ export function TransactionDetails({
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
   const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const stateInitCodeHash = stateInitCode?.hash().toString("hex")
+  const stateInitAbiName = stateInitCodeHash
+    ? compilerAbisByCodeHash?.get(stateInitCodeHash)?.contract_name?.trim()
+    : undefined
+  const parsedBody =
+    tx.parsedBody ??
+    (inMessage ? decodeMessageBody(inMessage, contracts, tx.address?.toString()) : undefined)
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
-    targetContract,
+    targetContractWithAbi,
     tx.contractName,
     allContracts,
   )
@@ -122,7 +139,18 @@ export function TransactionDetails({
       accumulator + (message.info.type === "internal" ? message.info.value.coins : 0n),
     0n,
   )
+  const actionFee = actionPhase?.totalActionFees ?? undefined
+  const endBalance = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
   const tickTockStorageFeesDue = tickTockDescription?.storagePhase.storageFeesDue
+  const hasAccountStatusChange = tx.transaction.oldStatus !== tx.transaction.endStatus
+  const storageDiff = buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter)
+  const showStorageDiff = expandedStorageLt === tx.lt
+  const storageChangeLabel =
+    storageDiff === undefined
+      ? undefined
+      : storageDiff.status === "unchanged"
+        ? "Intact"
+        : "Changed"
 
   return (
     <div className={styles.transactionDetailsContainer}>
@@ -199,12 +227,14 @@ export function TransactionDetails({
                   {fmt.formatCurrency(inMessage.info.value.coins)}
                 </div>
               </div>
-              <div className={styles.multiColumnItem}>
-                <div className={styles.multiColumnItemTitle}>Send Mode</div>
-                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                  <SendModeViewer mode={sendMode} />
+              {sendMode !== undefined && (
+                <div className={styles.multiColumnItem}>
+                  <div className={styles.multiColumnItemTitle}>Send Mode</div>
+                  <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                    <SendModeViewer mode={sendMode} />
+                  </div>
                 </div>
-              </div>
+              )}
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Bounced</div>
                 <div className={styles.multiColumnItemValue}>
@@ -250,10 +280,10 @@ export function TransactionDetails({
                 </div>
               </div>
             </div>
-            {tx.parsedBody && hasMessageBody && (
+            {parsedBody && hasMessageBody && (
               <ParsedBodySection
                 key={tx.lt}
-                parsedBody={tx.parsedBody}
+                parsedBody={parsedBody}
                 contracts={contracts}
                 onContractClick={onContractClick}
               />
@@ -285,6 +315,12 @@ export function TransactionDetails({
                         <DisasmSection bocHex={stateInitCodeBocHex!} title="Code Disassembly" />
                       </div>
                     )}
+                    {stateInitAbiName && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.multiColumnItemTitle}>ABI</div>
+                        <div className={styles.multiColumnItemValue}>{stateInitAbiName}</div>
+                      </div>
+                    )}
                     {stateInitData && (
                       <div className={styles.stateInitField}>
                         <div className={styles.multiColumnItemTitle}>Data</div>
@@ -313,6 +349,55 @@ export function TransactionDetails({
       )}
 
       <div className={styles.labeledSectionRow}>
+        <div className={styles.labeledSectionTitle}>Storage</div>
+        <div className={styles.labeledSectionContent}>
+          <div className={styles.storageSummaryRow}>
+            <div className={styles.storageSummaryMain}>
+              {storageChangeLabel && (
+                <span className={styles.storageChangeBadge}>{storageChangeLabel}</span>
+              )}
+              {!storageDiff && (
+                <span className={styles.storageUnavailable}>Storage data unavailable</span>
+              )}
+              {hasAccountStatusChange && (
+                <span className={styles.storageAccountStatus}>
+                  {formatAccountStatus(tx.transaction.oldStatus)} →{" "}
+                  {formatAccountStatus(tx.transaction.endStatus)}
+                </span>
+              )}
+            </div>
+            {storageDiff && (
+              <button
+                type="button"
+                onClick={() => {
+                  setExpandedStorageLt(showStorageDiff ? undefined : tx.lt)
+                }}
+                className={`${styles.actionsToggleButton} ${styles.storageToggleButton}`}
+                aria-label={
+                  showStorageDiff ? "Hide storage state change" : "Show storage state change"
+                }
+              >
+                {showStorageDiff ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                <span className={styles.actionsToggleText}>
+                  {showStorageDiff ? "Hide" : "Show"}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {showStorageDiff && storageDiff && (
+            <div className={styles.storageDiffDetails}>
+              <StorageDiffView
+                diff={storageDiff}
+                contracts={contracts}
+                onContractClick={onContractClick}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Fees & Sent</div>
         <div className={styles.labeledSectionContent}>
           <div className={styles.multiColumnRow}>
@@ -323,17 +408,25 @@ export function TransactionDetails({
               </div>
             </div>
             <div className={styles.multiColumnItem}>
+              <div className={styles.multiColumnItemTitle}>End Balance</div>
+              <div className={`${styles.multiColumnItemValue}`}>
+                {endBalance === undefined ? "—" : fmt.formatCurrency(endBalance)}
+              </div>
+            </div>
+            <div className={styles.multiColumnItem}>
               <div className={styles.multiColumnItemTitle}>Total Fee</div>
               <div className={`${styles.multiColumnItemValue}`}>
                 {fmt.formatCurrency(tx.transaction.totalFees.coins)}
               </div>
             </div>
-            <div className={styles.multiColumnItem}>
-              <div className={styles.multiColumnItemTitle}>Gas Fee</div>
-              <div className={`${styles.multiColumnItemValue}`}>
-                {computePhase.type === "skipped" ? "N/A" : fmt.formatCurrency(computePhase.gasFees)}
+            {actionPhase && (
+              <div className={styles.multiColumnItem}>
+                <div className={styles.multiColumnItemTitle}>Action Fee</div>
+                <div className={`${styles.multiColumnItemValue}`}>
+                  {actionFee === undefined ? "—" : fmt.formatCurrency(actionFee)}
+                </div>
               </div>
-            </div>
+            )}
             {tx.transaction.inMessage?.info.type === "internal" && (
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Forward Fee</div>
@@ -392,7 +485,7 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetContract?.abi} />
+                  <ExitCodeChip exitCode={computePhase.exitCode} abi={targetAbi} />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
@@ -432,17 +525,13 @@ export function TransactionDetails({
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Exit Code</div>
                 <div className={styles.multiColumnItemValue}>
-                  <ExitCodeChip
-                    exitCode={actionPhase.resultCode}
-                    abi={targetContract?.abi}
-                    phase="action"
-                  />
+                  <ExitCodeChip exitCode={actionPhase.resultCode} abi={targetAbi} phase="action" />
                 </div>
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Total Actions</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
-                  {fmt.formatNumber(tx.outActions.length)}
+                  {fmt.formatNumber(actionPhase.totalActions)}
                   {tx.outActions.length > 0 && (
                     <button
                       type="button"
@@ -494,6 +583,26 @@ export function TransactionDetails({
       </div>
     </div>
   )
+}
+
+function formatAccountStatus(status: string): string {
+  switch (status) {
+    case "non-existing": {
+      return "Non-existing"
+    }
+    case "uninitialized": {
+      return "Uninitialized"
+    }
+    case "active": {
+      return "Active"
+    }
+    case "frozen": {
+      return "Frozen"
+    }
+    default: {
+      return status
+    }
+  }
 }
 
 function formatCellBocHex(cell: Cell): string {

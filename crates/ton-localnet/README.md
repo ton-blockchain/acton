@@ -106,6 +106,20 @@ The response includes:
   - NFT item addresses (`type: "nft_items"`, includes `nft_index`, optional `name/description/image/symbol`, `extra`)
   - collection addresses (`type: "nft_collections"`)
 
+## `/api/streaming/v2/sse` and `/api/streaming/v2/ws`
+
+The local node exposes a TonCenter Streaming API v2-compatible subset for
+real-time local tooling. Use the official TON Center Streaming API
+documentation for protocol details:
+https://docs.ton.org/applications/api/toncenter/streaming/overview
+
+- `POST /api/streaming/v2/sse` opens an SSE subscription and returns
+  `text/event-stream`.
+- `GET /api/streaming/v2/ws` opens a WebSocket connection.
+
+Localnet emits transaction, account-state, jetton-state, and trace updates.
+Action extraction is not implemented yet.
+
 ## `/api/emulate/v1/emulateTrace`
 
 `/api/emulate/v1/emulateTrace` is implemented to mimic `ton-emulate-go` contract.

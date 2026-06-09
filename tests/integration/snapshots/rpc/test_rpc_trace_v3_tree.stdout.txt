@@ -1,13 +1,14 @@
-Trace Summary
+N/A -> kQAzMz..MzMw8H A
+└── IncreaseCounter 0.1 TON -> counter B                                        gas=123
+    ├── empty 0.000000001 TON -> kQAzMz..MzMw8H A                               gas=123
+    └── ReturnExcessesBack 0.000000002 TON -> counter B                         gas=123
+
   Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-  Root Tx Hash:      aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  Time:              2023-11-14 22:13:20 UTC — 2023-11-14 22:13:22 UTC
+  Block:             10000 — 10002
   Trace Complete:    true
   Total Txs:         3
   Total Messages:    3
 
-Trace Tree
-N/A -> EQAzMz..MzM7SN A
-└── IncreaseCounter 0.1 TON -> counter B                                        gas=123
-    ├── empty 0.000000001 TON -> EQAzMz..MzM7SN A                               gas=123
-    └── ReturnExcessesBack 0.000000002 TON -> counter B                         gas=123
+Hint: pass --show-bodies to include decoded message bodies when local ABI matches.

@@ -45,6 +45,34 @@ get fun `test y stdlib format1 format2 specifiers`() {
 }
 
 #[test]
+fn format_supports_constant_width_and_padding() {
+    run_fmt_success(
+        "y-stdlib-format-width-padding",
+        r#"
+get fun `test y stdlib format width padding`() {
+    println(format("flag={{:5}} value=|{:5}|", "hi"));
+    println(format("flag={{:>5}} value=|{:>5}|", "hi"));
+    println(format("flag={{:_>5}} value=|{:_>5}|", "hi"));
+    println(format("flag={{:>>5}} value=|{:>>5}|", "hi"));
+    println(format("flag={{:.^7}} value=|{:.^7}|", "hi"));
+    println(format("flag={{:05}} value=|{:05}|", 42));
+    println(format("flag={{:06x}} value=|{:06x}|", 255));
+    println(format("flag={{:X}} value=|{:X}|", 255));
+    println(format("flag={{:08X}} value=|{:08X}|", 255));
+    println(format("flag={{:b}} value=|{:b}|", 10));
+    println(format("flag={{:B}} value=|{:B}|", 10));
+    println(format("flag={{:08B}} value=|{:08B}|", 10));
+    println(format("flag={{:0>6x}} value=|{:0>6x}|", -255));
+    println(format("flag={{:>12ton}} value=|{:>12ton}|", 1500000000));
+    println(format("flag={{:0>8:x}} value=|{:0>8:x}|", 255));
+    println(format("flag={{:*>6}} value=|{:*>6}|", "ok"));
+}
+"#,
+        "integration/snapshots/test-runner/format1_and_format2_support_plain_hex_and_ton_specifiers/format_supports_constant_width_and_padding.stdout.txt",
+    );
+}
+
+#[test]
 fn format3_and_format4_support_mixed_plain_hex_and_ton() {
     run_fmt_success(
         "y-stdlib-format3-format4-mixed-specifiers",

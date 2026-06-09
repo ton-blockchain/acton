@@ -136,6 +136,19 @@ fn test_acton_compile_rejects_conflicting_stdout_formats() {
 }
 
 #[test]
+fn test_acton_test_rejects_no_capture_with_mutation_mode() {
+    let assert = snapbox::cmd::Command::acton_ui()
+        .args(["test", "--mutate", "--no-capture"])
+        .assert()
+        .failure()
+        .stdout_eq(snapbox::str![""]);
+    assert_stderr_contains_all(
+        &assert,
+        &["cannot be used with", "--mutate", "--no-capture"],
+    );
+}
+
+#[test]
 fn test_acton_doctor_ignores_project_toolchain_mismatch() {
     let temp_dir = tempfile::tempdir().expect("failed to create temp dir");
     write_minimal_acton_toml(

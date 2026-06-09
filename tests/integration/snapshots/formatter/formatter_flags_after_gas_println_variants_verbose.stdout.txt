@@ -29,7 +29,7 @@
                └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON
        
        N/A -> sender A
-       └── FmFlagsOk 0.2 TON -> EQAAAA..ALrXfh B                                       compute phase skipped aborted
+       └── FmFlagsOk 0.2 TON -> kQAAAA..ALrcxr B                                       compute phase skipped aborted
            queryId: 4
 
  ✓ 1 passed in 1 file

@@ -59,6 +59,7 @@ interface NodeTransactionTooltipData {
 interface TransactionTreeProps {
   readonly transactions: TransactionInfo[]
   readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
@@ -170,6 +171,7 @@ function NodeTransactionTooltipContent({
 export function TransactionTree({
   transactions,
   contracts,
+  compilerAbisByCodeHash,
   allContracts,
   onContractClick,
   renderSourceLocation,
@@ -328,7 +330,12 @@ export function TransactionTree({
       const isSuccess = isComputeSuccess && isActionSuccess
       const exitCode = computePhase?.type === "vm" ? computePhase.exitCode : undefined
 
-      const value = inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined
+      const value =
+        inMessage?.info.type === "external-in"
+          ? "—"
+          : fmt.formatCurrency(
+              inMessage?.info.type === "internal" ? inMessage.info.value.coins : undefined,
+            )
 
       const opcode = getTransactionOpcode(tx.transaction)
       const targetContract = thisAddress ? contracts.get(thisAddress.toString()) : undefined
@@ -368,7 +375,7 @@ export function TransactionTree({
           lt,
           success: isSuccess ? "✓" : "✗",
           exitCode: exitCode?.toString() ?? "0",
-          value: fmt.formatCurrency(value),
+          value,
           opcode: opcodeHex,
           outMsgs: tx.transaction.outMessagesCount.toString(),
           withInitCode,
@@ -554,6 +561,13 @@ export function TransactionTree({
     const isSelected = nodeDatum.attributes?.isSelected as boolean
     const lt = nodeDatum.attributes?.lt as string
     const tx = transactionMap.get(lt)
+    const isFailed = nodeDatum.attributes?.success !== "✓"
+    const nodeCircleClassName = [
+      styles.nodeCircle,
+      isSelected ? styles.nodeCircleSelected : undefined,
+    ]
+      .filter(Boolean)
+      .join(" ")
 
     return (
       <g>
@@ -584,14 +598,14 @@ export function TransactionTree({
           tabIndex={0}
           aria-label={`Transaction ${lt}`}
           fill={
-            isSelected
-              ? "var(--text-primary)"
-              : nodeDatum.attributes?.success === "✓"
-                ? "var(--bg-color)"
-                : "var(--transaction-tree-failed-node-fill)"
+            isFailed
+              ? "var(--transaction-tree-failed-node-fill)"
+              : isSelected
+                ? "var(--text-primary)"
+                : "var(--bg-color)"
           }
-          stroke={"var(--text-primary)"}
-          strokeWidth={1.5}
+          stroke={isFailed ? "var(--transaction-tree-failed-node-stroke)" : "var(--text-primary)"}
+          strokeWidth={isFailed ? 2 : 1.5}
           onClick={() => {
             handleNodeClick(lt)
           }}
@@ -607,11 +621,17 @@ export function TransactionTree({
           onMouseLeave={() => {
             hideTooltip()
           }}
-          className={isSelected ? styles.nodeCircleSelected : styles.nodeCircle}
+          className={nodeCircleClassName}
         />
 
         <text
-          fill={isSelected ? "var(--bg-color)" : "var(--text-primary)"}
+          fill={
+            isFailed
+              ? "var(--transaction-tree-failed-node-text)"
+              : isSelected
+                ? "var(--bg-color)"
+                : "var(--text-primary)"
+          }
           strokeWidth="0"
           x="0"
           y="5"
@@ -622,6 +642,36 @@ export function TransactionTree({
         >
           {nodeDatum.attributes?.contractLetter as string}
         </text>
+        {isFailed && (
+          <g className={styles.failedBadge} aria-hidden="true">
+            <circle
+              cx={10}
+              cy={10}
+              r={5.4}
+              fill="var(--transaction-tree-failed-badge-fill)"
+              stroke="var(--transaction-tree-failed-badge-stroke)"
+              strokeWidth={0.75}
+            />
+            <rect
+              x={9.05}
+              y={6.5}
+              width={1.9}
+              height={4.4}
+              rx={0.95}
+              strokeWidth={0}
+              fill="var(--transaction-tree-failed-badge-text)"
+              stroke="var(--transaction-tree-failed-badge-mark-stroke)"
+            />
+            <circle
+              cx={10}
+              cy={12.7}
+              r={0.9}
+              strokeWidth={0}
+              fill="var(--transaction-tree-failed-badge-text)"
+              stroke="var(--transaction-tree-failed-badge-mark-stroke)"
+            />
+          </g>
+        )}
         <foreignObject width="150" height="100" x="-180" y="-40">
           <div
             className={styles.edgeText}
@@ -737,6 +787,7 @@ export function TransactionTree({
           <TransactionDetails
             tx={selectedTransaction}
             contracts={contracts}
+            compilerAbisByCodeHash={compilerAbisByCodeHash}
             allContracts={allContracts}
             onContractClick={onContractClick}
             renderSourceLocation={renderSourceLocation}

@@ -17,13 +17,14 @@ import {
 
 import {hashToHex} from "../components/utils"
 
-import type {V3Transaction} from "./types"
+import type {V3TraceNode, V3Transaction} from "./types"
 
 export const buildTraceTransactionInfos = (
   transactionsMap: Record<string, V3Transaction>,
+  traceRoot?: V3TraceNode,
 ): TransactionInfo[] => {
   const txs = Object.values(transactionsMap)
-  const txByLt = new Map(txs.map(tx => [tx.lt, tx]))
+  const txByHash = buildTransactionsHashMap(transactionsMap)
   const infoByLt = new Map<string, TransactionInfo>()
 
   const txInfos = txs.map(tx => {
@@ -37,8 +38,11 @@ export const buildTraceTransactionInfos = (
       actions: undefined,
       outActions: [],
       contractName: undefined,
+      contractAbi: undefined,
       shardAccountBefore: "",
       shardAccountAfter: "",
+      accountBalanceBefore: parseOptionalBigInt(tx.account_state_before?.balance),
+      accountBalanceAfter: parseOptionalBigInt(tx.account_state_after?.balance),
       parsedBody: undefined,
       parsedStorageBefore: undefined,
       parsedStorageAfter: undefined,
@@ -50,27 +54,83 @@ export const buildTraceTransactionInfos = (
   })
 
   const parentByChildLt = new Map<string, string>()
+  addTraceTreeRelations(traceRoot, txByHash, parentByChildLt)
   for (const tx of txs) {
-    for (const childLt of tx.child_transactions) {
-      parentByChildLt.set(childLt, tx.lt)
+    for (const childLt of childTransactionLts(tx)) {
+      addParentRelation(parentByChildLt, tx.lt, childLt)
     }
   }
 
+  const childrenByParentLt = buildChildrenByParentLt(parentByChildLt)
   for (const [lt, info] of infoByLt) {
-    const tx = txByLt.get(lt)
-    if (!tx) continue
-
     const parentLt = parentByChildLt.get(lt)
     if (parentLt) {
       info.parent = infoByLt.get(parentLt)
     }
-    info.children = tx.child_transactions
+    info.children = (childrenByParentLt.get(lt) ?? [])
       .map(childLt => infoByLt.get(childLt))
       .filter((child): child is TransactionInfo => child !== undefined)
   }
 
   return txInfos
 }
+
+const buildTransactionsHashMap = (
+  transactionsMap: Record<string, V3Transaction>,
+): Map<string, V3Transaction> => {
+  const txByHash = new Map<string, V3Transaction>()
+  for (const [mapKey, tx] of Object.entries(transactionsMap)) {
+    txByHash.set(transactionHashKey(mapKey), tx)
+    txByHash.set(transactionHashKey(tx.hash), tx)
+  }
+  return txByHash
+}
+
+const addTraceTreeRelations = (
+  node: V3TraceNode | undefined,
+  txByHash: ReadonlyMap<string, V3Transaction>,
+  parentByChildLt: Map<string, string>,
+): void => {
+  if (!node) return
+
+  const parentTx = txByHash.get(transactionHashKey(node.tx_hash))
+  for (const childNode of node.children ?? []) {
+    const childTx = txByHash.get(transactionHashKey(childNode.tx_hash))
+    if (parentTx && childTx) {
+      addParentRelation(parentByChildLt, parentTx.lt, childTx.lt)
+    }
+    addTraceTreeRelations(childNode, txByHash, parentByChildLt)
+  }
+}
+
+const addParentRelation = (
+  parentByChildLt: Map<string, string>,
+  parentLt: string,
+  childLt: string,
+): void => {
+  if (parentLt !== childLt && !parentByChildLt.has(childLt)) {
+    parentByChildLt.set(childLt, parentLt)
+  }
+}
+
+const buildChildrenByParentLt = (
+  parentByChildLt: ReadonlyMap<string, string>,
+): Map<string, string[]> => {
+  const childrenByParentLt = new Map<string, string[]>()
+  for (const [childLt, parentLt] of parentByChildLt) {
+    childrenByParentLt.set(parentLt, [...(childrenByParentLt.get(parentLt) ?? []), childLt])
+  }
+  return childrenByParentLt
+}
+
+const childTransactionLts = (tx: V3Transaction): readonly string[] => {
+  const childTransactions: unknown = tx.child_transactions
+  return Array.isArray(childTransactions)
+    ? childTransactions.filter((childLt): childLt is string => typeof childLt === "string")
+    : []
+}
+
+const transactionHashKey = (hash: string): string => hashToHex(hash) ?? hash.trim()
 
 const parseTonAddress = (address: string | undefined): Address | undefined => {
   if (!address) return undefined
@@ -87,6 +147,15 @@ const parseBigInt = (value: string | number | bigint | undefined, fallback = 0n)
     return BigInt(value)
   } catch {
     return fallback
+  }
+}
+
+const parseOptionalBigInt = (value: string | number | bigint | undefined): bigint | undefined => {
+  if (value === undefined) return undefined
+  try {
+    return BigInt(value)
+  } catch {
+    return undefined
   }
 }
 

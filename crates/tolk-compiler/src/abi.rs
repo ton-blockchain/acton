@@ -404,18 +404,6 @@ impl ContractABI {
             .or_else(|| abi.and_then(|abi| abi.find_message_name_by_opcode(opcode)))
     }
 
-    pub fn resolve_storage_struct(&self) -> anyhow::Result<Option<ABIResolvedStruct>> {
-        let Some(storage_ty_idx) = self
-            .storage
-            .storage_at_deployment_ty_idx
-            .or(self.storage.storage_ty_idx)
-        else {
-            return Ok(None);
-        };
-
-        Ok(Some(self.resolve_single_struct(storage_ty_idx, "storage")?))
-    }
-
     pub fn resolve_incoming_message_structs(&self) -> anyhow::Result<Vec<ABIResolvedStruct>> {
         let mut resolved = Vec::new();
         let mut seen_structs = HashSet::new();
@@ -1098,44 +1086,6 @@ mod tests {
         assert_eq!(resolved.len(), 2);
         assert_eq!(resolved[0].name, "MsgA");
         assert_eq!(resolved[1].name, "MsgB");
-    }
-
-    #[test]
-    fn resolve_storage_struct_prefers_deployment_type() {
-        let mut abi = empty_abi();
-        let storage_ty_idx = struct_ref(&mut abi, "Storage");
-        let deployment_ty_idx = struct_ref(&mut abi, "DeploymentStorage");
-        abi.declarations = vec![
-            ABIDeclaration::Struct {
-                name: "Storage".to_owned(),
-                ty_idx: storage_ty_idx,
-                type_params: None,
-                prefix: None,
-                fields: vec![],
-                custom_pack_unpack: None,
-                description: String::new(),
-            },
-            ABIDeclaration::Struct {
-                name: "DeploymentStorage".to_owned(),
-                ty_idx: deployment_ty_idx,
-                type_params: None,
-                prefix: None,
-                fields: vec![],
-                custom_pack_unpack: None,
-                description: String::new(),
-            },
-        ];
-        abi.storage = ABIStorage {
-            storage_ty_idx: Some(storage_ty_idx),
-            storage_at_deployment_ty_idx: Some(deployment_ty_idx),
-        };
-
-        let resolved = abi
-            .resolve_storage_struct()
-            .expect("should resolve storage")
-            .expect("storage should exist");
-
-        assert_eq!(resolved.name, "DeploymentStorage");
     }
 
     #[test]

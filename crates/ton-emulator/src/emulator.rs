@@ -198,12 +198,23 @@ impl Emulator {
 
         let shard_account_before = state.get_account(&dst);
         let code = Self::get_code_cell(&msg, &shard_account_before);
+
+        let libs_owner = match &msg.info {
+            MsgInfo::Int(info) => match &info.src {
+                IntAddr::Std(src) => src.address,
+                IntAddr::Var(_) => dst.address,
+            },
+            MsgInfo::ExtIn(_) => dst.address,
+            MsgInfo::ExtOut(_) => unreachable!("external-out messages are rejected above"),
+        };
+        let libs = Self::execution_libs(libs, state, &libs_owner)?;
+
         let run_args = RunTransactionArgs {
-            libs: libs.clone().into_root().map(Boc::encode_base64),
+            libs: libs.into_root().map(Boc::encode_base64),
             shard_account: Boc::encode_base64(&to_cell(&shard_account_before)?),
             now: state.get_now(),
             lt: state.get_lt(),
-            random_seed: None,
+            random_seed: state.get_random_seed(),
             ignore_chksig: false,
             debug_enabled: true,
             prev_blocks_info: None,
@@ -370,13 +381,14 @@ impl Emulator {
 
         let shard_account_before = state.get_account(addr);
         let code = Self::get_address_code_cell(&shard_account_before);
+        let execution_libs = Self::execution_libs(libs, state, &addr.address)?;
 
         let args = RunTransactionArgs {
-            libs: libs.clone().into_root().map(Boc::encode_base64),
+            libs: execution_libs.into_root().map(Boc::encode_base64),
             shard_account: Boc::encode_base64(&to_cell(&shard_account_before)?),
             now: state.get_now(),
             lt: state.get_lt(),
-            random_seed: None,
+            random_seed: state.get_random_seed(),
             ignore_chksig: false,
             debug_enabled: true,
             prev_blocks_info: None,
@@ -621,6 +633,27 @@ impl Emulator {
             }
         }
     }
+
+    fn execution_libs(
+        libs: &Dict<HashBytes, LibDescr>,
+        state: &WorldState,
+        owner: &HashBytes,
+    ) -> anyhow::Result<Dict<HashBytes, LibDescr>> {
+        let mut libs = libs.clone();
+        for (hash, lib) in state.libs() {
+            let mut publishers = Dict::new();
+            publishers.add(owner, ())?;
+
+            libs.add(
+                hash,
+                LibDescr {
+                    lib: lib.clone(),
+                    publishers,
+                },
+            )?;
+        }
+        Ok(libs)
+    }
 }
 
 fn is_external_not_accepted_error(error: &str) -> bool {
@@ -698,6 +731,21 @@ impl SendMessageResultSuccess {
             return None;
         };
         Some(info.gas_used.into())
+    }
+
+    /// Returns the initial gas base used to execute the computation phase.
+    #[must_use]
+    pub fn initial_gas(&self) -> Option<u64> {
+        let info = self.transaction.info.load().ok()?;
+        let TxInfo::Ordinary(info) = info else {
+            return None;
+        };
+        let ComputePhase::Executed(info) = info.compute_phase else {
+            return None;
+        };
+        let gas_limit = u64::from(info.gas_limit);
+        let gas_credit = info.gas_credit.map(u32::from).map_or(0, u64::from);
+        Some(gas_limit.saturating_add(gas_credit))
     }
 }
 

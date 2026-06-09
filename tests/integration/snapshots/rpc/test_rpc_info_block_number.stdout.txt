@@ -1,0 +1,16 @@
+Remote Account
+  Network:           mock
+  Block:             123456
+  Raw Address:       0:1111111111111111111111111111111111111111111111111111111111111111
+  Status:            active
+  Contract:          unknown
+  Balance:           0.777 TON
+  Last Tx LT:        17
+  Last Tx Hash:      deadbeef
+  Code Hash:         0x270906fd171b9c43f37a353059a73fbc02e0568188ec30186af846caefd09b8c
+  Data Hash:         0xaa489eba2ad8e7d983fa6d16ccdb247e0ae9fb6caf8f8c45ea736db08b7c01ac
+
+Decoded Storage
+  <ABI not found>
+
+hint: To run get method: acton rpc call --net custom:mock --block-number 123456 0:1111111111111111111111111111111111111111111111111111111111111111 <METHOD> [ARGS...]

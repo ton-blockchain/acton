@@ -1,4 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
+use crate::context::is_treasury_code;
 use crate::context::{
     BuildCache, CompilationResult, Emulations, FailedSendMessageResult, KnownAddresses, to_cell,
 };
@@ -10,9 +11,11 @@ use std::path::Path;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use ton_emulator::SendMessageResultSuccess;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
+use tycho_types::models::AccountStatus;
 use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,6 +32,8 @@ pub(super) struct TestTrace {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TransactionList {
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_treasury_deploy: bool,
     pub transactions: Vec<TransactionInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failed_messages: Vec<FailedMessageInfo>,
@@ -80,6 +85,23 @@ pub(super) fn trace_file_name(test_name: &str) -> String {
 #[allow(clippy::trivially_copy_pass_by_ref)]
 const fn is_zero(value: &usize) -> bool {
     *value == 0
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn is_treasury_deploy_trace(trace_transactions: &[SendMessageResultSuccess]) -> bool {
+    let Some(root) = trace_transactions.first() else {
+        return false;
+    };
+
+    matches!(
+        root.transaction.orig_status,
+        AccountStatus::NotExists | AccountStatus::Uninit
+    ) && root.transaction.end_status == AccountStatus::Active
+        && root.code.as_ref().is_some_and(is_treasury_code)
 }
 
 fn safe_file_stem(name: &str, fallback: &str) -> String {
@@ -334,9 +356,11 @@ pub(super) fn dump_test_transactions(
                 || format!("Trace {}", visible_trace_index + 1),
                 ToString::to_string,
             );
+            let is_treasury_deploy = is_treasury_deploy_trace(trace_transactions);
 
             TransactionList {
                 name,
+                is_treasury_deploy,
                 transactions,
                 failed_messages,
             }

@@ -1,0 +1,2 @@
+field1: int = 42
+field2: int = 43

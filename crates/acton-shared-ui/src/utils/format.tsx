@@ -1,15 +1,30 @@
 import type React from "react"
 import {Address} from "@ton/core"
 
+const NANOTON_DECIMALS = 9
+
 export const formatCurrency = (value: bigint | undefined): string => {
   if (value === undefined || value === 0n) return "0 TON"
-  const numberValue = Number(value)
-  const displayValue = numberValue / 1_000_000_000
-  const formatted = displayValue
-    .toFixed(9)
-    .replace(/(\.\d*[1-9])0+$/, "$1")
-    .replace(/\.0+$/, "")
-  return `${formatted} TON`
+  const sign = value < 0n ? "-" : ""
+  const digits = (value < 0n ? -value : value).toString()
+  const formatted =
+    digits.length <= NANOTON_DECIMALS
+      ? trimNanotonFraction(`0.${digits.padStart(NANOTON_DECIMALS, "0")}`)
+      : trimNanotonFraction(
+          `${digits.slice(0, -NANOTON_DECIMALS)}.${digits.slice(-NANOTON_DECIMALS)}`,
+        )
+
+  return `${sign}${formatted} TON`
+}
+
+function trimNanotonFraction(value: string): string {
+  let result = value
+
+  while (result.endsWith("0")) {
+    result = result.slice(0, -1)
+  }
+
+  return result.endsWith(".") ? result.slice(0, -1) : result
 }
 
 export function formatAddress(address: string): string {

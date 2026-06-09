@@ -1,3 +1,5 @@
+pub mod common;
+mod content;
 pub mod jettons;
 pub mod nfts;
 

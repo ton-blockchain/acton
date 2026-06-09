@@ -16,7 +16,7 @@
     └─ Test output:
        N/A -> fm_linear_root A
        └── FmRelay 0.199902466 TON -> fm_linear_mid B                                  gas=1782
-           queryId: 909, sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
+           queryId: 909, sink: [WALLET_ADDRESS_BASE] (fm_linear_sink C)
            └── FmDelivered 0.1 TON -> fm_linear_sink C                                 gas=333
                queryId: 909, hop: 2
 

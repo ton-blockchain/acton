@@ -71,6 +71,9 @@ pub(crate) struct TestConfig {
     pub coverage_minimum_percent: Option<f64>,
     pub coverage_include_wrappers: Option<bool>,
     pub coverage_include_tests: Option<bool>,
+    pub gas_profile: Option<String>,
+    pub gas_profile_format: Option<String>,
+    pub gas_profile_include_tests: Option<bool>,
     pub junit_path: Option<String>,
     pub junit_merge: Option<bool>,
     pub fuzz_runs: Option<usize>,
@@ -85,7 +88,7 @@ pub(crate) struct TestConfig {
 fn is_json_like_snapshot_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| matches!(ext, "json" | "sarif"))
+        .is_some_and(|ext| matches!(ext, "json" | "sarif" | "cpuprofile"))
 }
 
 #[allow(dead_code)]
@@ -1058,6 +1061,24 @@ version = "0.1.0"
                 let _ = writeln!(toml_content, "fail-on-diff = {fail_on_diff}");
             }
 
+            if let Some(gas_profile) = &config.gas_profile {
+                let _ = writeln!(toml_content, "gas-profile = \"{gas_profile}\"");
+            }
+
+            if let Some(gas_profile_format) = &config.gas_profile_format {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-format = \"{gas_profile_format}\""
+                );
+            }
+
+            if let Some(gas_profile_include_tests) = config.gas_profile_include_tests {
+                let _ = writeln!(
+                    toml_content,
+                    "gas-profile-include-tests = {gas_profile_include_tests}"
+                );
+            }
+
             if config.fuzz_runs.is_some()
                 || config.fuzz_max_test_rejects.is_some()
                 || config.fuzz_seed.is_some()
@@ -1141,7 +1162,7 @@ impl Project {
             project: Arc::new(ProjectRef {
                 path: self.path.clone(),
             }),
-            test_path: None,
+            test_paths: Vec::new(),
             filter: None,
             build_contract: None,
             build_clear_cache: false,
@@ -1173,6 +1194,7 @@ impl Project {
             verify_wallet: None,
             verify_network: None,
             test_fail_fast: false,
+            test_no_capture: false,
             script_fork_net: None,
             build_info: false,
             force_no_color_env: true,
@@ -1198,7 +1220,7 @@ pub(crate) struct ProjectRef {
 pub(crate) struct ActonCommand {
     pub(crate) cmd: ProcessCommandBuilder,
     pub(crate) project: Arc<ProjectRef>,
-    pub(crate) test_path: Option<String>,
+    pub(crate) test_paths: Vec<String>,
     pub(crate) filter: Option<String>,
     pub(crate) build_contract: Option<String>,
     pub(crate) build_clear_cache: bool,
@@ -1230,6 +1252,7 @@ pub(crate) struct ActonCommand {
     pub(crate) verify_wallet: Option<String>,
     pub(crate) verify_network: Option<String>,
     pub(crate) test_fail_fast: bool,
+    pub(crate) test_no_capture: bool,
     pub(crate) script_fork_net: Option<String>,
     pub(crate) build_info: bool,
     pub(crate) force_no_color_env: bool,
@@ -1523,7 +1546,13 @@ impl ActonCommand {
     /// .test().path("tests/")              // Specific directory
     /// ```
     pub(crate) fn path(mut self, path: &str) -> Self {
-        self.test_path = Some(path.to_string());
+        self.test_paths = vec![path.to_string()];
+        self
+    }
+
+    /// Specify several paths to test files or directories.
+    pub(crate) fn paths(mut self, paths: &[&str]) -> Self {
+        self.test_paths = paths.iter().map(ToString::to_string).collect();
         self
     }
 
@@ -1604,6 +1633,24 @@ impl ActonCommand {
         self
     }
 
+    /// Write a gas-weighted execution profile.
+    pub(crate) fn with_gas_profile(mut self, file: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile").arg(file);
+        self
+    }
+
+    /// Select the gas profile export format (e.g. "cpuprofile", "collapsed").
+    pub(crate) fn with_gas_profile_format(mut self, format: &str) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-format").arg(format);
+        self
+    }
+
+    /// Include `.test.tolk` unit-test execution in the generated gas profile.
+    pub(crate) fn with_gas_profile_include_tests(mut self) -> Self {
+        self.cmd = self.cmd.arg("--gas-profile-include-tests");
+        self
+    }
+
     /// Add test reporter
     ///
     /// # Examples
@@ -1620,6 +1667,11 @@ impl ActonCommand {
     /// Enable fail-fast mode
     pub(crate) fn fail_fast(mut self) -> Self {
         self.test_fail_fast = true;
+        self
+    }
+
+    pub(crate) fn no_capture(mut self) -> Self {
+        self.test_no_capture = true;
         self
     }
 
@@ -1837,7 +1889,7 @@ impl ActonCommand {
     }
 
     fn into_prepared_command(mut self) -> ProcessCommandBuilder {
-        if let Some(path) = self.test_path {
+        for path in self.test_paths {
             self.cmd = self.cmd.arg(path);
         }
 
@@ -1865,6 +1917,10 @@ impl ActonCommand {
 
         if self.test_fail_fast {
             self.cmd = self.cmd.arg("--fail-fast");
+        }
+
+        if self.test_no_capture {
+            self.cmd = self.cmd.arg("--no-capture");
         }
 
         if let Some(contract) = self.build_contract {
@@ -2007,6 +2063,11 @@ impl ActonCommand {
         if self.force_no_color_env {
             self.cmd = self.cmd.env("NO_COLOR", "1");
         }
+
+        self.cmd = self
+            .cmd
+            .env("ACTON_TEST_TONCENTER_RETRY_BACKOFF_MS", "0")
+            .env("ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS", "0");
 
         self.cmd
     }

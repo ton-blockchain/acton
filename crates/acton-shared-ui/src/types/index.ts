@@ -111,6 +111,7 @@ export type BackendExecutorAction =
 
 export interface TransactionList {
   readonly name?: string
+  readonly is_treasury_deploy?: boolean
   readonly transactions: BackendTransaction[]
   readonly failed_messages?: FailedMessage[]
 }

@@ -51,6 +51,10 @@ Path to a SQLite database for persistent node state.
 Maximum `/api` requests per second to simulate provider rate limits.
 {{/option}}
 
+{{#option "`--response-delay-ms` _ms_" }}
+Delay TonCenter v2/v3 and Emulate API responses.
+{{/option}}
+
 {{#option "`--load-state` _path_" }}
 Load Localnet state from a JSON snapshot before startup.
 {{/option}}
@@ -122,6 +126,7 @@ fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
+response-delay-ms = 300
 ```
 
 CLI flags override config values for the current invocation.
@@ -160,6 +165,11 @@ one-off overrides or CI.
 - when `--port` and `[localnet].port` are both absent, the current runtime
   fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
+- `--response-delay-ms` applies only to `/api/v2`, `/api/v3`, and
+  `/api/emulate/v1` endpoints; streaming, control, and UI routes are not
+  delayed
+- `POST /acton_setNetworkConditions` can change the response delay while the
+  server is running, and `GET /acton_nodeInfo` reports the current value
 - `--dump-state` writes a snapshot during graceful shutdown
 
 ## Control Endpoints
@@ -178,6 +188,8 @@ tooling:
   account state with a base64-encoded `ShardAccount` BOC
 - `POST /acton_sendInternalMessage` with `{"boc":"<BASE64_BOC>"}` sends a
   base64-encoded internal message BOC through the local internal queue
+- `POST /acton_setNetworkConditions` with `{"response_delay_ms":300}` updates
+  simulated network latency; use `0` to disable response delay
 
 TonCenter-compatible message endpoints such as `/api/v2/sendBoc` and
 `/api/v3/message` accept external-in messages only. Use

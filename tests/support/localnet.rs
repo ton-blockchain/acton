@@ -217,6 +217,25 @@ impl LocalnetHandle {
         self.terminate();
     }
 
+    pub(crate) fn wait_until_address_state_active(&self, address: &str, timeout: Duration) {
+        let query = format!("/api/v2/getAddressState?address={address}");
+        let deadline = Instant::now() + timeout;
+        loop {
+            let response = self.get_json(&query);
+            if response["ok"].as_bool() == Some(true)
+                && response["result"].as_str() == Some("active")
+            {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "Timed out waiting for address `{address}` to become active:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            );
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
+
     fn wait_until_ready(&mut self, timeout: Duration) -> Result<String, String> {
         let deadline = Instant::now() + timeout;
         let probe_url = format!("http://127.0.0.1:{}/api/v2/getMasterchainInfo", self.port);

@@ -20,6 +20,23 @@ pub struct RemoteProvider {
     pub fork_block_number: Option<u64>,
 }
 
+pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {
+    let config = config::ActonConfig::load().unwrap_or_default();
+    let custom_networks = config.custom_networks();
+    let api_client = TonApiClient::new(provider.network.clone(), custom_networks)?;
+
+    let lib = api_client.get_library_by_hash(&HashBytes(hash.0))?;
+    let actual_hash = Hash256(*lib.repr_hash().as_array());
+    if actual_hash != *hash {
+        anyhow::bail!(
+            "Remote library hash mismatch: requested {}, got {}",
+            hash.to_hex(),
+            actual_hash.to_hex()
+        );
+    }
+    Ok(lib)
+}
+
 pub fn fetch_remote_shard_account(
     addr: &Addr,
     provider: &RemoteProvider,

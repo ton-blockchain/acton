@@ -1,0 +1,19 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_zero_opcode_text_comment.test.tolk (1 test)
+  ✓ formatter zero opcode text comment shows tail [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── text comment 0.2 TON -> catalog_sink B                                      gas=253
+           text: "approve"
+       
+       N/A -> sender A
+       └── text comment 0.2 TON -> catalog_sink B                                      gas=253
+           text: "abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789"
+
+ ✓ 1 passed in 1 file

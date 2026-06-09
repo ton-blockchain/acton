@@ -16,7 +16,7 @@
             └── at contracts/counter[LINE]
                    onInternalMessage   at contracts/counter[LINE]
         
-        Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+        Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
         with:
           success=true
           exit_code=0
@@ -29,7 +29,7 @@
             └── at contracts/counter[LINE]
                    onInternalMessage   at contracts/counter[LINE]
         
-        Cannot find transaction from deployer A EQBvDB..FHByMJ to Counter B EQANZp..QQ5GsV
+        Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
         with:
           success=true
           exit_code=0

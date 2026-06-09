@@ -5,17 +5,53 @@
 ///
 /// Supported placeholders:
 /// - `{}`: default formatting
-/// - `{:x}`: integer formatted as hexadecimal without `0x`
+/// - `{:x}`: int formatted as lowercase hexadecimal without `0x`
+/// - `{:X}`: same lowercase hexadecimal as `{:x}`, but with `0x`
+/// - `{:b}`: int formatted as binary without `0b`
+/// - `{:B}`: same binary as `{:b}`, but with `0b`
 /// - `{:ton}`: integer nanotons formatted as `<value> TON`
 /// - `{:cell-tree}`: cell/slice/builder/Cell<T> formatted as a tree of cell references
 ///
+/// Placeholder syntax:
+/// - A placeholder is either `{}` or `{:<format-spec>}`.
+/// - `<format-spec>` is `[fill][align][width][type]`; every part is optional,
+///   but `fill` is only recognized together with `align`.
+/// - Common forms are `{:x}` (type only), `{:8}` (width only), `{:>8}` (align
+///   and width), `{:_>8}` (fill, align, and width), `{:08}` (sign-aware zero
+///   padding), and `{:08x}` or `{:0>8:x}` (width plus type).
+/// - `align` is `<` (left), `>` (right), or `^` (center).
+/// - `fill` is one character and is only recognized when it is followed by `align`;
+///   for example `{:_>8}` uses `_` as fill and `>` as alignment.
+/// - `width` is a decimal constant and means minimum visible width; longer values
+///   are not truncated. Dynamic width is not supported.
+/// - `type` is one of `x`, `X`, `b`, `B`, `ton`, or `cell-tree`.
+///   `X` and `B` only add prefixes; they do not uppercase digits.
+/// - After a width, the type may be written directly (`{:08x}`, `{:>12ton}`)
+///   or after an extra colon (`{:0>8:x}`, `{:>12:ton}`).
+///
+/// Width, alignment, and padding:
+/// - Without explicit alignment, strings are left-aligned; int-like values and numeric
+///   formatters (`x`, `X`, `b`, `B`, `ton`) are right-aligned.
+/// - The default fill character is a space.
+/// - `{:05}` is shorthand for zero fill and right alignment. For this shorthand,
+///   zeroes are inserted after a sign and after `0x`/`0b` prefixes:
+///   `format("{:06}", -42)` returns `"-00042"` and `format("{:08X}", 255)`
+///   returns `"0x0000ff"`.
+/// - Explicit fill/alignment pads the whole rendered value. For example,
+///   `format("{:0>6x}", -255)` returns `"000-ff"`.
+/// - Width is measured in visible characters, so ANSI color escape sequences produced
+///   by colored output do not count toward the width.
+///
 /// Format rules and edge cases:
 /// - Escape literal braces with `{{` and `}}`.
-/// - Extra arguments are ignored.
-/// - Missing arguments leave placeholders unchanged in output (`{}`, `{:x}`, `{:ton}`, `{:cell-tree}`).
+/// - Extra arguments are ignored by `format`.
+/// - Missing arguments leave the full placeholder unchanged in output
+///   (`{}`, `{:x}`, `{:_>8}`, `{:cell-tree}`, etc.).
 /// - Invalid format strings (unknown modifier, unsupported placeholder, unmatched braces)
 ///   fail at runtime with a parser error that includes a byte offset.
-/// - For non-int arguments, `{:x}` and `{:ton}` fall back to default formatting.
+/// - Named arguments and dynamic width are not supported.
+/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, and `{:ton}` fall back
+///   to default formatting.
 /// - For non-cell/slice/builder/Cell<T> arguments, `{:cell-tree}` falls back to default formatting.
 ///
 /// Examples:
@@ -25,6 +61,12 @@
 ///
 /// // Formatting numbers
 /// val hex = format("Value in hex: 0x{:x}", 255); // "Value in hex: 0xff"
+/// val padded = format("Padded: {:0>8x}", 255); // "Padded: 000000ff"
+/// val prefixedHex = format("Prefixed: {:X}", 255); // "Prefixed: 0xff"
+/// val binary = format("Binary: {:B}", 5); // "Binary: 0b101"
+/// val right = format("|{:>6}|", "hi"); // "|    hi|"
+/// val centered = format("|{:.^7}|", "hi"); // "|..hi...|"
+/// val prefixedPadded = format("|{:08X}|", 255); // "|0x0000ff|"
 ///
 /// // Formatting TON amounts
 /// val balance = format("Balance: {:ton}", 500_000_000); // "Balance: 0.5 TON"
@@ -63,6 +105,8 @@ import "ffi"
 /// Non-int fallback examples:
 /// ```tolk
 /// format("{:x}", "abc");   // "abc"
+/// format("{:b}", "abc");   // "abc"
+/// format("{:X}", true);    // "true"
 /// format("{:ton}", true);  // "true"
 /// ```
 fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(

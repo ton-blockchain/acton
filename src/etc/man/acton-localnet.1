@@ -47,6 +47,11 @@ Path to a SQLite database for persistent node state.
 Maximum \fB/api\fR requests per second to simulate provider rate limits.
 .RE
 .sp
+\fB\-\-response\-delay\-ms\fR \fIms\fR
+.RS 4
+Delay TonCenter v2/v3 and Emulate API responses.
+.RE
+.sp
 \fB\-\-load\-state\fR \fIpath\fR
 .RS 4
 Load Localnet state from a JSON snapshot before startup.
@@ -104,6 +109,7 @@ fork\-net = "testnet"
 fork\-block\-number = 55000000
 accounts = ["deployer", "user"]
 rate\-limit = 1
+response\-delay\-ms = 300
 .fi
 .RE
 .sp
@@ -168,6 +174,17 @@ fallback is \fB5411\fR
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-response\-delay\-ms\fR applies only to \fB/api/v2\fR, \fB/api/v3\fR, and
+\fB/api/emulate/v1\fR endpoints; streaming, control, and UI routes are not
+delayed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR can change the response delay while the
+server is running, and \fBGET /acton_nodeInfo\fR reports the current value
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-dump\-state\fR writes a snapshot during graceful shutdown
 .RE
 .SH "CONTROL ENDPOINTS"
@@ -198,6 +215,11 @@ account state with a base64\-encoded \fBShardAccount\fR BOC
 .RS 4
 \h'-04'\(bu\h'+03'\fBPOST /acton_sendInternalMessage\fR with \fB{"boc":"<BASE64_BOC>"}\fR sends a
 base64\-encoded internal message BOC through the local internal queue
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR with \fB{"response_delay_ms":300}\fR updates
+simulated network latency; use \fB0\fR to disable response delay
 .RE
 .sp
 TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and

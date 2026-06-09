@@ -4,7 +4,7 @@ N/A -> sender A
 └── 0x01020304 1 TON -> simple B                                                gas=253
     └── account created
 
-Cannot find transaction from sender A EQAXTu..1D6wLK to simple B EQBS+c..jFM7dP
+Cannot find transaction from sender A kQAXTu..1D67lA to simple B kQBS-c..jFMwzF
 with:
     opcode=0xdeadbeef unknown
 at scripts/tx_not_found[LINE]

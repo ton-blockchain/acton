@@ -14,7 +14,7 @@
         └── empty 1 TON -> receiver B                                                   gas=253
             └── account created
         
-        Cannot find transaction from sender A EQAXTu..1D6wLK to EQBrCx..j2I4qY
+        Cannot find transaction from sender A kQAXTu..1D67lA to kQBrCx..j2IzES
         with:
           deploy=true
           success=true

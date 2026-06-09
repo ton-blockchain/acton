@@ -2,6 +2,7 @@ use crate::executor::TvmEmulatorAdapter;
 use crate::node::{Node, StateSource};
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, EMPTY_CELL_BASE64, MsgMeta, TransactionInfo};
+use crate::streaming::StreamingCommitEvent;
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
 use base64::Engine;
@@ -11,7 +12,7 @@ use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
@@ -326,17 +327,17 @@ pub(crate) enum Request {
         name: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    GetAddressName {
-        address: Addr,
-        resp: oneshot::Sender<anyhow::Result<Option<String>>>,
+    GetAddressNames {
+        addresses: Vec<Addr>,
+        resp: oneshot::Sender<anyhow::Result<Vec<Option<String>>>>,
     },
     RegisterCompilerAbis {
         entries: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    GetCompilerAbi {
-        code_hash: Hash256,
-        resp: oneshot::Sender<anyhow::Result<Option<Value>>>,
+    GetCompilerAbis {
+        code_hashes: Vec<Hash256>,
+        resp: oneshot::Sender<anyhow::Result<Vec<Option<Value>>>>,
     },
     DumpState {
         path: String,
@@ -350,6 +351,7 @@ pub(crate) enum Request {
 
 pub struct Localnet {
     tx: mpsc::Sender<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
     started_at: SystemTime,
 }
 
@@ -363,15 +365,21 @@ impl Localnet {
     #[must_use]
     pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
         let (tx, rx) = mpsc::channel(100);
+        let (events_tx, _) = broadcast::channel(1024);
         let started_at = SystemTime::now();
+        let node_events_tx = events_tx.clone();
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, state_source, db_path) {
+            if let Err(e) = run_node_loop(rx, node_events_tx, state_source, db_path) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
 
-        Self { tx, started_at }
+        Self {
+            tx,
+            events_tx,
+            started_at,
+        }
     }
 
     #[must_use]
@@ -379,6 +387,11 @@ impl Localnet {
         self.started_at
             .elapsed()
             .map_or(0, |duration| duration.as_secs())
+    }
+
+    #[must_use]
+    pub fn subscribe_streaming_events(&self) -> broadcast::Receiver<StreamingCommitEvent> {
+        self.events_tx.subscribe()
     }
 
     pub async fn send_boc(&self, boc_str: String) -> anyhow::Result<LocalnetBlockTransactions> {
@@ -849,13 +862,21 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn get_address_name(&self, address_str: String) -> anyhow::Result<Option<String>> {
-        let address = Self::parse_addr(&address_str)?;
+    pub async fn get_address_names(
+        &self,
+        address_strs: Vec<String>,
+    ) -> anyhow::Result<Vec<(String, Option<String>)>> {
+        let addresses = address_strs
+            .iter()
+            .map(|address| Self::parse_addr(address))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetAddressName { address, resp })
+            .send(Request::GetAddressNames { addresses, resp })
             .await?;
-        rx.await?
+        let names = rx.await??;
+
+        Ok(address_strs.into_iter().zip(names).collect())
     }
 
     pub async fn register_compiler_abis(
@@ -873,12 +894,23 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn get_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<Option<Value>> {
+    pub async fn get_compiler_abis(
+        &self,
+        code_hash_strs: Vec<String>,
+    ) -> anyhow::Result<Vec<(String, Option<Value>)>> {
+        let code_hashes = code_hash_strs
+            .iter()
+            .map(|code_hash| {
+                Hash256::from_hex(code_hash).or_else(|_| Hash256::from_base64(code_hash))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetCompilerAbi { code_hash, resp })
+            .send(Request::GetCompilerAbis { code_hashes, resp })
             .await?;
-        rx.await?
+        let abis = rx.await??;
+
+        Ok(code_hash_strs.into_iter().zip(abis).collect())
     }
 
     pub async fn dump_state(&self, path: String) -> anyhow::Result<()> {
@@ -893,7 +925,7 @@ impl Localnet {
         rx.await?
     }
 
-    fn parse_addr(s: &str) -> anyhow::Result<Addr> {
+    pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
         let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
             anyhow::anyhow!("Invalid address, only standard internal address is allowed")
         })?;
@@ -906,12 +938,14 @@ impl Localnet {
 
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
     state_source: StateSource,
     db_path: Option<String>,
 ) -> anyhow::Result<()> {
     let executor = Box::new(TvmEmulatorAdapter::new()?);
     let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
     let mut node = Node::with_db_path(executor, config_bytes.into(), state_source, db_path)?;
+    node.streaming_events = Some(events_tx);
 
     tracing::info!("TON localnet started");
 
@@ -1158,8 +1192,11 @@ fn process_loop_request(node: &mut Node, req: Request) {
             node.history.address_names.insert(address, name);
             let _ = resp.send(Ok(()));
         }
-        Request::GetAddressName { address, resp } => {
-            let res = node.history.address_names.get(&address).cloned();
+        Request::GetAddressNames { addresses, resp } => {
+            let res = addresses
+                .iter()
+                .map(|address| node.history.address_names.get(address).cloned())
+                .collect();
             let _ = resp.send(Ok(res));
         }
         Request::RegisterCompilerAbis { entries, resp } => {
@@ -1170,8 +1207,16 @@ fn process_loop_request(node: &mut Node, req: Request) {
                 });
             let _ = resp.send(res);
         }
-        Request::GetCompilerAbi { code_hash, resp } => {
-            let _ = resp.send(Ok(node.history.get_compiler_abi(&code_hash)));
+        Request::GetCompilerAbis { code_hashes, resp } => {
+            let res = code_hashes
+                .iter()
+                .map(|code_hash| {
+                    node.history
+                        .get_compiler_abi(code_hash)
+                        .or_else(|| catalog_compiler_abi(code_hash))
+                })
+                .collect();
+            let _ = resp.send(Ok(res));
         }
         Request::DumpState { path, resp } => {
             let res = node.dump_state_to_path(path);
@@ -1182,6 +1227,11 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let _ = resp.send(res);
         }
     }
+}
+
+fn catalog_compiler_abi(code_hash: &Hash256) -> Option<Value> {
+    let abi = acton_abi_catalog::find_abi_by_code_hash(&code_hash.to_hex())?;
+    serde_json::to_value(abi.as_ref()).ok()
 }
 
 fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {

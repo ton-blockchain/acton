@@ -11,6 +11,7 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+acton-abi-catalog = { workspace = true }
 ton-executor = { workspace = true }
 ton-networks = { workspace = true }
 ton-api = { workspace = true }
@@ -22,10 +23,11 @@ hex = { workspace = true }
 anyhow = { workspace = true }
 base64 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 axum = { workspace = true }
-tower-http = { workspace = true, features = ["cors", "trace", "fs"] }
+tower-http = { workspace = true, features = ["compression-br", "compression-gzip", "cors", "trace", "fs"] }
 tower_governor = { workspace = true }
 tracing = { workspace = true }
 rusqlite = { workspace = true }

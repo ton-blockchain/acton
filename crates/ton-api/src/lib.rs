@@ -21,6 +21,9 @@ const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
 const HTTP_CONNECT_TIMEOUT_SECS: u64 = 10;
 const HTTP_REQUEST_TIMEOUT_SECS: u64 = 30;
 const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
+const TEST_TONCENTER_RETRY_BACKOFF_MS_ENV: &str = "ACTON_TEST_TONCENTER_RETRY_BACKOFF_MS";
+const TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV: &str =
+    "ACTON_TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1100);
 static TONCENTER_REQUEST_GATE: LazyLock<Mutex<Option<Instant>>> =
     LazyLock::new(|| Mutex::new(None));
@@ -54,6 +57,7 @@ fn proxy_enabled_from_value(value: Option<&OsStr>) -> bool {
 pub enum SendBocErrorKind {
     MissingAccountState,
     RejectedBeforeExecution,
+    TransportFailure,
     Other,
 }
 
@@ -199,8 +203,9 @@ impl TonApiClient {
 
         if let Some(last) = *last_request {
             let elapsed = last.elapsed();
-            if elapsed < TONCENTER_MIN_REQUEST_INTERVAL {
-                let wait_for = TONCENTER_MIN_REQUEST_INTERVAL - elapsed;
+            let min_interval = toncenter_min_request_interval();
+            if elapsed < min_interval {
+                let wait_for = min_interval - elapsed;
                 log::debug!("throttle for {wait_for:?}");
                 std::thread::sleep(wait_for);
             }
@@ -220,6 +225,10 @@ impl TonApiClient {
     }
 
     fn http_retry_backoff(attempt: usize) -> Duration {
+        if let Some(duration) = test_retry_backoff_override() {
+            return duration;
+        }
+
         let index = attempt.min(HTTP_RETRY_BACKOFF_MS.len() - 1);
         Duration::from_millis(HTTP_RETRY_BACKOFF_MS[index])
     }
@@ -300,20 +309,36 @@ impl TonApiClient {
         method: &str,
         stack: &[serde_json::Value],
     ) -> anyhow::Result<GetMethodResult> {
+        self.run_get_method_at_block(address, method, stack, None)
+    }
+
+    /// Run get method on contract at a specific masterchain block, when provided.
+    pub fn run_get_method_at_block(
+        &self,
+        address: &str,
+        method: &str,
+        stack: &[serde_json::Value],
+        seqno: Option<u64>,
+    ) -> anyhow::Result<GetMethodResult> {
         let url = format!(
             "{}/jsonRPC",
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
+        let mut params = serde_json::json!({
+            "address": address,
+            "method": method,
+            "stack": stack
+        });
+        if let Some(seqno) = seqno {
+            params["seqno"] = serde_json::json!(seqno);
+        }
+
         let json = serde_json::json!({
             "id": "1",
             "jsonrpc": "2.0",
             "method": "runGetMethod",
-            "params": {
-                "address": address,
-                "method": method,
-                "stack": stack
-            }
+            "params": params
         });
 
         let response = self.send_with_retry(
@@ -387,7 +412,9 @@ impl TonApiClient {
                 || self.build_post_request(&url).json(&json),
                 "Failed to send BOC",
             )
-            .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
+            .map_err(|err| {
+                SendBocError::new(SendBocErrorKind::TransportFailure, format!("{err:#}"))
+            })?;
 
         if !response.status().is_success() {
             return Err(Self::handle_send_boc_fail(response));
@@ -755,6 +782,22 @@ impl TonApiClient {
     }
 }
 
+fn test_retry_backoff_override() -> Option<Duration> {
+    let value = env::var(TEST_TONCENTER_RETRY_BACKOFF_MS_ENV).ok()?;
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    value.parse::<u64>().ok().map(Duration::from_millis)
+}
+
+fn toncenter_min_request_interval() -> Duration {
+    env::var(TEST_TONCENTER_MIN_REQUEST_INTERVAL_MS_ENV)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .map_or(TONCENTER_MIN_REQUEST_INTERVAL, Duration::from_millis)
+}
+
 fn classify_toncenter_send_boc_error(raw_msg: &str) -> SendBocErrorKind {
     if raw_msg == "cannot apply external message to current state : Failed to unpack account state"
     {
@@ -910,6 +953,8 @@ pub struct V3TransactionSummary {
     pub lt: String,
     #[serde(default)]
     pub now: u32,
+    #[serde(default)]
+    pub mc_block_seqno: Option<u32>,
     #[serde(default)]
     pub prev_trans_hash: Option<String>,
     #[serde(default)]

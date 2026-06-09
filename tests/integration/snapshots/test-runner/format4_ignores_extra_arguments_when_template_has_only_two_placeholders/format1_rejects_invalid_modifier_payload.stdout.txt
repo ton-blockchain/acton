@@ -6,7 +6,7 @@
 
  > tests/fmt_behavior.test.tolk (1 test)
   ✗ eb stdlib format1 invalid modifier payload [TIME]
-    └─ Error: Invalid format string at byte 6: unknown format modifier 'x:' in {:x:} (supported: :x, :ton, :cell-tree)
+    └─ Error: Invalid format string at byte 6: unknown format modifier 'x:' in {:x:} (supported: :x, :X, :b, :B, :ton, :cell-tree)
 
  ✗ 1 failed in 1 file
 

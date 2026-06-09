@@ -162,7 +162,7 @@ What this does:
 ## Building from source
 
 Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
-upstream `ton-blockchain/ton` repository branch `pmakhnev/acton`.
+upstream `ton-blockchain/ton` repository branch `acton`.
 
 ### Artifact ownership and verification
 
@@ -181,6 +181,21 @@ The verification bypass `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY` exists as an
 escape hatch, but it should stay unset for normal contributor builds. When set
 to anything other than `0` / `false`, build-time archive verification is
 disabled.
+
+### Bundled mainnet config
+
+Acton embeds a default mainnet blockchain config for local emulation in
+`crates/ton-executor/src/default_config.boc64`. Refresh it from TonCenter with:
+
+```bash
+cargo xtask update-default-config
+```
+
+The task fetches `getConfigAll`, validates that `result.config.bytes` is a valid
+BOC, and writes the base64 string into the bundled config file. The
+`ton-executor` test suite also checks the bundled value against TonCenter when
+the endpoint is available; network, HTTP, or invalid-response failures are
+reported as a skipped check rather than a failing test.
 
 ### Option 1: sync prebuilt `objs` with xtask
 
@@ -217,7 +232,7 @@ just build-dev
 Clone the TON repository from the Acton repo root:
 
 ```bash
-git clone --branch pmakhnev/acton https://github.com/ton-blockchain/ton.git ton-repo --recurse-submodules
+git clone --branch acton https://github.com/ton-blockchain/ton.git ton-repo --recurse-submodules
 ```
 
 Build the static artifacts with the script for your platform.
@@ -638,6 +653,8 @@ Rules:
 
 - `TONCENTER_MAINNET_API_KEY`: API key for TonCenter mainnet requests.
 - `TONCENTER_TESTNET_API_KEY`: API key for TonCenter testnet requests.
+- `VITE_LOCALNET_TONCENTER_API_KEY`: API key sent by the localnet UI to
+  TonCenter-compatible `/api/v2` and `/api/v3` endpoints.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
 

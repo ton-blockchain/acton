@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/println_bits_map_keys.test.tolk (1 test)
+  ✓ println formats bits264 void map entries [TIME]
+    └─ Test output:
+       plugins=map<bits264, void> {
+           0x111111111111111111111111111111111111111111111111111111111111111111: (void),
+       }
+
+ ✓ 1 passed in 1 file

@@ -14,7 +14,7 @@
         └── Ping 0.5 TON -> harness B                                                   gas=583 exit_code=701 aborted
             └── Compute phase failed: ERR_FAIL
         
-        Cannot find transaction from sender A EQAXTu..1D6wLK to harness B EQAaaK..1fnTtj
+        Cannot find transaction from sender A kQAXTu..1D67lA to harness B kQAaaK..1fnYDp
         with:
           opcode=0xae110001 Ping
           success=true

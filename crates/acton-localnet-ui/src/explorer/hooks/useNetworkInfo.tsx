@@ -1,8 +1,10 @@
 import {createContext, useContext} from "react"
 
+import type {LocalnetNodeInfo} from "../api/types"
 import type {AddressFormatOptions} from "../components/utils"
 
 export interface NetworkInfoContextValue {
+  readonly nodeInfo?: LocalnetNodeInfo
   readonly forkNetwork?: string
   readonly isMainnetFork: boolean
   readonly addressFormat: AddressFormatOptions

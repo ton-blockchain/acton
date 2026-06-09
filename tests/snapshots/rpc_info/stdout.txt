@@ -6,8 +6,9 @@ Arguments:
   <ADDRESS>  Contract address in friendly or raw format
 
 Options:
-      --color <WHEN>          Control when to use colored output [default: auto] [possible values: auto, always, never]
-      --net <NET>             Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
-      --manifest-path <PATH>  Path to Acton.toml
-      --project-root <PATH>   Path to project root
-  -h, --help                  Print help
+      --block-number <BLOCK_NUMBER>  Masterchain block seqno to query account state at
+      --color <WHEN>                 Control when to use colored output [default: auto] [possible values: auto, always, never]
+      --manifest-path <PATH>         Path to Acton.toml
+      --net <NET>                    Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
+      --project-root <PATH>          Path to project root
+  -h, --help                         Print help

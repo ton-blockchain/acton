@@ -133,6 +133,15 @@ export interface V3TransactionsResponse {
   readonly transactions: readonly V3TransactionListItem[]
 }
 
+export type StreamingFinality = "pending" | "confirmed" | "finalized"
+
+export interface StreamingTransactionsEvent {
+  readonly type: "transactions"
+  readonly finality: StreamingFinality
+  readonly trace_external_hash_norm?: string
+  readonly transactions: readonly V3Transaction[]
+}
+
 export interface V3TransactionListItem {
   readonly account: string
   readonly hash: string
@@ -168,6 +177,33 @@ export interface LocalnetNodeInfo {
   readonly state_source: string
   readonly fork_network?: string | null
   readonly fork_block_number?: number | null
+  readonly network_conditions?: {
+    readonly response_delay_ms: number
+  }
+}
+
+export type ApiCallStatus = "success" | "failed"
+export type ApiCallType = "read" | "write"
+export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
+
+export interface ApiCallRecord {
+  readonly sequence: number
+  readonly status: ApiCallStatus
+  readonly status_code: number
+  readonly call_type: ApiCallType
+  readonly api_family: ApiCallFamily
+  readonly http_method: string
+  readonly path: string
+  readonly method: string
+  readonly request_id: unknown
+  readonly timestamp_ms: number
+  readonly duration_ms: number
+}
+
+export interface ApiCallLogResponse {
+  readonly calls: readonly ApiCallRecord[]
+  readonly total_retained: number
+  readonly max_retained: number
 }
 
 export interface StartupWallet {
@@ -194,7 +230,7 @@ export interface V3RunGetMethodResponse {
 
 export interface V3Trace {
   readonly trace_id: string
-  readonly external_hash: string
+  readonly external_hash?: string | null
   readonly mc_seqno_start: string
   readonly mc_seqno_end: string
   readonly start_lt: string
@@ -217,10 +253,10 @@ export interface V3Trace {
 
 export interface V3TraceNode {
   readonly tx_hash: string
-  readonly in_msg_hash: string
+  readonly in_msg_hash?: string
   readonly in_msg?: V3Message | null
-  readonly transaction: V3Transaction
-  readonly children: readonly V3TraceNode[]
+  readonly transaction?: V3Transaction
+  readonly children?: readonly V3TraceNode[]
 }
 
 export interface V3Transaction {
@@ -281,7 +317,21 @@ export interface V3Transaction {
     readonly seqno: number
   }
   readonly mc_block_seqno: number
-  readonly child_transactions: readonly string[]
+  readonly child_transactions?: readonly string[] | null
+  readonly account_state_before?: V3TransactionAccountState | null
+  readonly account_state_after?: V3TransactionAccountState | null
+}
+
+export interface V3TransactionAccountState {
+  readonly hash: string
+  readonly balance: string
+  readonly code_boc?: string | null
+  readonly extra_currencies: Record<string, string>
+  readonly account_status: string
+  readonly data_boc?: string | null
+  readonly frozen_hash?: string | null
+  readonly data_hash?: string | null
+  readonly code_hash?: string | null
 }
 
 export interface V3Message {

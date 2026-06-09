@@ -1,26 +1,17 @@
 import {
-  ContractChip,
   type ContractData,
-  fmt,
   TransactionDetails,
   type TransactionInfo,
   TransactionTree,
+  ValueFlowTable,
+  decodeStorageDataCell,
+  type ValueFlowItem,
 } from "@acton/shared-ui"
 import {Address} from "@ton/core"
-import {
-  Activity,
-  AlertCircle,
-  ArrowLeft,
-  CheckCircle2,
-  List,
-  Loader2,
-  TrendingDown,
-  TrendingUp,
-  XCircle,
-} from "lucide-react"
+import {Activity, AlertCircle, ArrowLeft, CheckCircle2, List, Loader2, XCircle} from "lucide-react"
 import type React from "react"
-import {useEffect, useState} from "react"
-import {useNavigate, useParams} from "react-router-dom"
+import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
@@ -43,12 +34,21 @@ interface TransactionPageProps {
 
 type TabType = "transactions" | "value-flow"
 
-interface ValueFlowItem {
-  readonly address: string
+const parseTabType = (tab: string | null): TabType => {
+  return tab === "transactions" ? "transactions" : "value-flow"
+}
+
+interface ValueFlowAccumulator extends ValueFlowItem {
   readonly before: bigint
   readonly after: bigint
-  readonly change: bigint
-  readonly fee: bigint
+}
+
+interface TraceTransactionNodeProps {
+  readonly tx: TransactionInfo
+  readonly contracts: Map<string, ContractData>
+  readonly compilerAbisByCodeHash: ReadonlyMap<string, ContractData["abi"]>
+  readonly isIntermediateSibling?: boolean
+  readonly onContractClick: (address: string) => void
 }
 
 const buildTransactionsHexIndex = (
@@ -64,38 +64,20 @@ const buildTransactionsHexIndex = (
   return indexed
 }
 
-const collectSeqnoBounds = (
-  processed: TransactionInfo[],
-  transactionsByHex: Record<string, V3Transaction>,
-) => {
-  let minSeqno = Number.MAX_SAFE_INTEGER
-  let maxSeqno = 0
-
-  for (const t of processed) {
-    const txHash = t.transaction.hash().toString("hex")
-    const v3Tx = transactionsByHex[txHash]
-    const seqno = v3Tx?.mc_block_seqno || 0
-
-    if (seqno > 0) {
-      minSeqno = Math.min(minSeqno, seqno)
-      maxSeqno = Math.max(maxSeqno, seqno)
-    }
-  }
-
-  return {minSeqno, maxSeqno}
-}
-
 export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const {hash: routeHash = ""} = useParams<{hash: string}>()
   const hash = hashToHex(routeHash) ?? routeHash
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [traces, setTraces] = useState<TransactionInfo[]>([])
   const [contracts, setContracts] = useState<Map<string, ContractData>>(new Map())
+  const [compilerAbisByCodeHash, setCompilerAbisByCodeHash] = useState<
+    Map<string, ContractData["abi"]>
+  >(new Map())
   const [error, setError] = useState<string | undefined>()
-  const [activeTab, setActiveTab] = useState<TabType>("value-flow")
+  const [activeTab, setActiveTab] = useState<TabType>(() => parseTabType(searchParams.get("tab")))
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
-  const [loadingFlow, setLoadingFlow] = useState(false)
   const {fetchName} = useAddressBook()
   const addressFormat = useAddressFormat()
 
@@ -103,6 +85,22 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
     const formattedAddr = normalizeAddress(address, addressFormat)
     void navigate(`/explorer/address/${encodeURIComponent(formattedAddr)}`)
   }
+
+  const handleActiveTabChange = (tab: TabType) => {
+    setActiveTab(tab)
+    setSearchParams(
+      currentSearchParams => {
+        const nextSearchParams = new URLSearchParams(currentSearchParams)
+        nextSearchParams.set("tab", tab)
+        return nextSearchParams
+      },
+      {replace: true},
+    )
+  }
+
+  useEffect(() => {
+    setActiveTab(parseTabType(searchParams.get("tab")))
+  }, [searchParams])
 
   useEffect(() => {
     if (!hash) return
@@ -118,10 +116,11 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           const trace = data.traces[0]
           const transactionsMap = trace.transactions
           const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
+          const transactionsByLt = new Map(
+            Object.values(transactionsMap).map(tx => [tx.lt, tx] as const),
+          )
 
-          const processed = buildTraceTransactionInfos(transactionsMap)
-          if (!isActive) return
-          setTraces(processed)
+          const processed = buildTraceTransactionInfos(transactionsMap, trace.trace)
 
           const contractsMap = new Map<string, ContractData>()
           const addresses = new Set<string>()
@@ -129,7 +128,6 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
           for (const t of processed) {
             if (t.address) addresses.add(t.address.toString())
           }
-          const {minSeqno, maxSeqno} = collectSeqnoBounds(processed, transactionsByHex)
 
           const requestedAddresses = [...addresses].sort()
           const states =
@@ -143,19 +141,53 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
             }
           }
 
+          const codeHashesToFetch = new Set(addressToCodeHash.values())
+          for (const tx of Object.values(transactionsMap)) {
+            if (tx.account_state_before?.code_hash) {
+              codeHashesToFetch.add(tx.account_state_before.code_hash)
+            }
+            if (tx.account_state_after?.code_hash) {
+              codeHashesToFetch.add(tx.account_state_after.code_hash)
+            }
+          }
+          for (const tx of processed) {
+            const stateInitCodeHash = tx.transaction.inMessage?.init?.code?.hash().toString("hex")
+            if (stateInitCodeHash) {
+              codeHashesToFetch.add(stateInitCodeHash)
+            }
+          }
+
           const abiByCodeHash = new Map<string, ContractData["abi"]>()
-          const codeHashes = [...new Set(addressToCodeHash.values())]
-          const fetchedAbis = await Promise.all(
-            codeHashes.map(async codeHash => {
-              try {
-                return [codeHash, await client.getCompilerAbi(codeHash)] as const
-              } catch {
-                return [codeHash, undefined] as const
-              }
-            }),
-          )
-          for (const [codeHash, abi] of fetchedAbis) {
-            abiByCodeHash.set(codeHash, abi)
+          const codeHashes = [...codeHashesToFetch]
+          const fetchedAbis =
+            codeHashes.length > 0
+              ? await client
+                  .getCompilerAbis(codeHashes)
+                  .catch((): Record<string, ContractData["abi"] | null> => ({}))
+              : {}
+          for (const codeHash of codeHashes) {
+            abiByCodeHash.set(codeHash, fetchedAbis[codeHash] ?? undefined)
+          }
+
+          for (const tx of processed) {
+            const sourceTx = transactionsByLt.get(tx.lt)
+            const fallbackCodeHash = tx.address
+              ? addressToCodeHash.get(addressKey(tx.address.toString()))
+              : undefined
+            const beforeCodeHash = sourceTx?.account_state_before?.code_hash ?? fallbackCodeHash
+            const afterCodeHash = sourceTx?.account_state_after?.code_hash ?? fallbackCodeHash
+            const contractCodeHash = beforeCodeHash ?? afterCodeHash
+            tx.contractAbi = contractCodeHash
+              ? (abiByCodeHash.get(contractCodeHash) ?? undefined)
+              : undefined
+            tx.parsedStorageBefore = decodeStorageDataCell(
+              sourceTx?.account_state_before?.data_boc,
+              beforeCodeHash ? abiByCodeHash.get(beforeCodeHash) : undefined,
+            )
+            tx.parsedStorageAfter = decodeStorageDataCell(
+              sourceTx?.account_state_after?.data_boc,
+              afterCodeHash ? abiByCodeHash.get(afterCodeHash) : undefined,
+            )
           }
 
           let nextLetterCode = 65
@@ -173,47 +205,13 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               })
             }),
           )
-          if (!isActive) return
-          setContracts(contractsMap)
 
-          if (addresses.size > 0 && minSeqno !== Number.MAX_SAFE_INTEGER) {
-            setLoadingFlow(true)
-            const flowItems: ValueFlowItem[] = []
-            const uniqueAddrs = [...addresses]
-
-            await Promise.all(
-              uniqueAddrs.map(async addr => {
-                try {
-                  // We fetch state before the trace (minSeqno - 1) and after (maxSeqno)
-                  const [beforeState, afterState] = await Promise.all([
-                    client.getAddressInformation(addr, minSeqno - 1),
-                    client.getAddressInformation(addr, maxSeqno),
-                  ])
-
-                  const before = BigInt(beforeState.balance)
-                  const after = BigInt(afterState.balance)
-
-                  // Calculate total fees paid by this account in this trace
-                  const accountFees = processed
-                    .filter(t => t.address?.toString() === addr)
-                    .reduce((acc, t) => acc + t.transaction.totalFees.coins, 0n)
-
-                  flowItems.push({
-                    address: addr,
-                    before,
-                    after,
-                    change: after - before,
-                    fee: accountFees,
-                  })
-                } catch (error) {
-                  console.warn(`Failed to fetch flow for ${addr}:`, error)
-                }
-              }),
-            )
-
-            if (!isActive) return
-            setValueFlow(flowItems.sort((a, b) => a.address.localeCompare(b.address)))
-            setLoadingFlow(false)
+          const nextValueFlow = buildValueFlowItems(transactionsByHex, processed)
+          if (isActive) {
+            setTraces(processed)
+            setContracts(contractsMap)
+            setCompilerAbisByCodeHash(abiByCodeHash)
+            setValueFlow(nextValueFlow)
           }
         } else {
           if (isActive) setError("Transaction not found or has no trace yet.")
@@ -257,6 +255,9 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const firstTrace = traces[0]
   const traceAddress = firstTrace?.address?.toString() ?? ""
   const traceAddressDisplay = normalizeAddress(traceAddress, addressFormat)
+  const rootTraceTransactions = [...traces]
+    .filter(tx => !tx.parent)
+    .sort(compareTransactionInfoByLt)
 
   return (
     <div className={styles.container}>
@@ -273,107 +274,71 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                 {label: hash, isHash: true},
               ]}
             />
-            <div className={styles.overviewCard}>
-              <div className={styles.overviewHeader}>
-                <div
-                  className={`${styles.status} ${firstTrace.transaction.description.type === "generic" && firstTrace.transaction.description.computePhase.type === "vm" && firstTrace.transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
-                >
-                  {firstTrace.transaction.description.type === "generic" &&
-                  firstTrace.transaction.description.computePhase.type === "vm" &&
-                  firstTrace.transaction.description.computePhase.success ? (
-                    <>
-                      <CheckCircle2 size={18} /> Confirmed transaction
-                    </>
-                  ) : (
-                    <>
-                      <XCircle size={18} /> Failed transaction
-                    </>
-                  )}
-                </div>
-                <div className={styles.value}>
-                  {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.tabsContainer}>
-              <div className={styles.tabs}>
-                <button
-                  type="button"
-                  className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
-                  onClick={() => setActiveTab("value-flow")}
-                >
-                  <Activity size={16} /> Value Flow
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
-                  onClick={() => setActiveTab("transactions")}
-                >
-                  <List size={16} /> Transactions
-                </button>
-              </div>
-
-              <div className={styles.tabContent}>
-                {activeTab === "value-flow" && (
-                  <div className={styles.valueFlowContainer}>
-                    {loadingFlow ? (
-                      <div className={styles.centered}>
-                        <Loader2 className={styles.spinner} />
-                        <p>Calculating value flow...</p>
-                      </div>
+            <div className={styles.preTreeContent}>
+              <div className={styles.overviewCard}>
+                <div className={styles.overviewHeader}>
+                  <div
+                    className={`${styles.status} ${firstTrace.transaction.description.type === "generic" && firstTrace.transaction.description.computePhase.type === "vm" && firstTrace.transaction.description.computePhase.success ? styles.statusSuccess : styles.statusError}`}
+                  >
+                    {firstTrace.transaction.description.type === "generic" &&
+                    firstTrace.transaction.description.computePhase.type === "vm" &&
+                    firstTrace.transaction.description.computePhase.success ? (
+                      <>
+                        <CheckCircle2 size={18} /> Confirmed transaction
+                      </>
                     ) : (
-                      <div className={styles.flowList}>
-                        <div className={styles.flowHeader}>
-                          <div className={styles.flowCol}>Account</div>
-                          <div className={styles.flowCol}>Balance Change</div>
-                          <div className={styles.flowCol}>Network Fee</div>
-                        </div>
-                        {valueFlow.map(item => (
-                          <div key={item.address} className={styles.flowRow}>
-                            <div className={styles.flowCol}>
-                              <ContractChip
-                                address={item.address}
-                                contracts={contracts}
-                                onContractClick={handleContractClick}
-                              />
-                            </div>
-                            <div
-                              className={`${styles.flowCol} ${item.change > 0n ? styles.statusSuccess : item.change < 0n ? styles.statusError : ""}`}
-                            >
-                              <div className={styles.changeValue}>
-                                {item.change > 0n ? (
-                                  <TrendingUp size={14} />
-                                ) : item.change < 0n ? (
-                                  <TrendingDown size={14} />
-                                ) : undefined}
-                                {fmt.formatCurrency(item.change)}
-                              </div>
-                            </div>
-                            <div className={styles.flowCol}>{fmt.formatCurrency(item.fee)}</div>
-                          </div>
-                        ))}
-                      </div>
+                      <>
+                        <XCircle size={18} /> Failed transaction
+                      </>
                     )}
                   </div>
-                )}
-
-                {activeTab === "transactions" && (
-                  <div className={styles.detailsList}>
-                    {traces
-                      .sort((a, b) => Number(BigInt(a.lt) - BigInt(b.lt)))
-                      .map(tx => (
-                        <div key={tx.lt} className={styles.detailCard}>
-                          <TransactionDetails
-                            tx={tx}
-                            contracts={contracts}
-                            allContracts={[]}
-                            onContractClick={handleContractClick}
-                          />
-                        </div>
-                      ))}
+                  <div className={styles.value}>
+                    {new Date(firstTrace.transaction.now * 1000).toLocaleString()}
                   </div>
-                )}
+                </div>
+              </div>
+
+              <div className={styles.tabsContainer}>
+                <div className={styles.tabs}>
+                  <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
+                    onClick={() => handleActiveTabChange("value-flow")}
+                  >
+                    <Activity size={16} /> Value Flow
+                  </button>
+                  <button
+                    type="button"
+                    className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
+                    onClick={() => handleActiveTabChange("transactions")}
+                  >
+                    <List size={16} /> Transactions
+                  </button>
+                </div>
+
+                <div className={styles.tabContent}>
+                  {activeTab === "value-flow" && (
+                    <ValueFlowTable
+                      items={valueFlow}
+                      contracts={contracts}
+                      onContractClick={handleContractClick}
+                    />
+                  )}
+
+                  {activeTab === "transactions" && (
+                    <div className={styles.detailsList}>
+                      {rootTraceTransactions.map(tx => (
+                        <TraceTransactionNode
+                          key={tx.lt}
+                          tx={tx}
+                          contracts={contracts}
+                          compilerAbisByCodeHash={compilerAbisByCodeHash}
+                          onContractClick={handleContractClick}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -381,6 +346,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
               <TransactionTree
                 transactions={traces}
                 contracts={contracts}
+                compilerAbisByCodeHash={compilerAbisByCodeHash}
                 allContracts={[]}
                 onContractClick={handleContractClick}
               />
@@ -390,4 +356,186 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
       </div>
     </div>
   )
+}
+
+const TraceTransactionNode: React.FC<TraceTransactionNodeProps> = ({
+  tx,
+  contracts,
+  compilerAbisByCodeHash,
+  isIntermediateSibling = false,
+  onContractClick,
+}) => {
+  const cardRef = useRef<HTMLDivElement>(null)
+  const childrenRef = useRef<HTMLDivElement>(null)
+  const [connectorHeight, setConnectorHeight] = useState(24)
+  const children = useMemo(() => [...tx.children].sort(compareTransactionInfoByLt), [tx.children])
+
+  useLayoutEffect(() => {
+    if (children.length === 0) {
+      return
+    }
+
+    let animationFrame = 0
+
+    const updateConnectorHeight = () => {
+      cancelAnimationFrame(animationFrame)
+      animationFrame = requestAnimationFrame(() => {
+        const card = cardRef.current
+        const childrenContainer = childrenRef.current
+        const lastChildCard = childrenContainer?.querySelector<HTMLElement>(
+          `:scope > .${styles.traceNode}:last-child > .${styles.traceTransaction}`,
+        )
+
+        if (!card || !lastChildCard) {
+          return
+        }
+
+        const cardRect = card.getBoundingClientRect()
+        const lastChildRect = lastChildCard.getBoundingClientRect()
+        const nextConnectorHeight = Math.max(
+          24,
+          Math.round(lastChildRect.top + 12 - cardRect.bottom),
+        )
+
+        setConnectorHeight(currentHeight =>
+          currentHeight === nextConnectorHeight ? currentHeight : nextConnectorHeight,
+        )
+      })
+    }
+
+    updateConnectorHeight()
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateConnectorHeight)
+    if (resizeObserver) {
+      if (cardRef.current) {
+        resizeObserver.observe(cardRef.current)
+      }
+      if (childrenRef.current) {
+        resizeObserver.observe(childrenRef.current)
+      }
+    }
+
+    window.addEventListener("resize", updateConnectorHeight)
+
+    return () => {
+      cancelAnimationFrame(animationFrame)
+      resizeObserver?.disconnect()
+      window.removeEventListener("resize", updateConnectorHeight)
+    }
+  }, [children.length])
+
+  return (
+    <div className={styles.traceNode}>
+      <div ref={cardRef} className={styles.traceTransaction}>
+        {isIntermediateSibling && <div className={styles.traceSiblingCurve} aria-hidden="true" />}
+        <div className={styles.detailCard}>
+          <TransactionDetails
+            tx={tx}
+            contracts={contracts}
+            compilerAbisByCodeHash={compilerAbisByCodeHash}
+            allContracts={[]}
+            onContractClick={onContractClick}
+          />
+        </div>
+        {children.length > 0 && (
+          <div
+            className={styles.traceConnectorAnchor}
+            style={
+              {
+                "--trace-connector-height": `${connectorHeight}px`,
+              } as React.CSSProperties
+            }
+            aria-hidden="true"
+          >
+            <div className={styles.traceConnectorRail} />
+            <div className={styles.traceTerminalCurve} />
+          </div>
+        )}
+      </div>
+      {children.length > 0 && (
+        <div ref={childrenRef} className={styles.traceChildren}>
+          {children.map((child, index) => (
+            <TraceTransactionNode
+              key={child.lt}
+              tx={child}
+              contracts={contracts}
+              compilerAbisByCodeHash={compilerAbisByCodeHash}
+              isIntermediateSibling={index < children.length - 1}
+              onContractClick={onContractClick}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function buildValueFlowItems(
+  transactionsByHex: Readonly<Record<string, V3Transaction>>,
+  processed: readonly TransactionInfo[],
+): ValueFlowItem[] {
+  const flowByAddress = new Map<string, ValueFlowAccumulator>()
+
+  for (const item of [...processed].sort(compareTransactionInfoByLt)) {
+    const address = item.address?.toString()
+    if (!address) {
+      continue
+    }
+
+    const txHash = item.transaction.hash().toString("hex")
+    const tx = transactionsByHex[txHash]
+    if (!tx) {
+      continue
+    }
+
+    const before = parseBalance(tx.account_state_before?.balance)
+    const after = parseBalance(tx.account_state_after?.balance)
+    if (before === undefined || after === undefined) {
+      continue
+    }
+
+    const initialBefore = flowByAddress.get(address)?.before ?? before
+
+    flowByAddress.set(address, {
+      address,
+      before: initialBefore,
+      after,
+      change: after - initialBefore,
+      fee: (flowByAddress.get(address)?.fee ?? 0n) + item.transaction.totalFees.coins,
+    })
+  }
+
+  return [...flowByAddress.values()]
+    .map(({address, change, fee}) => ({address, change, fee}))
+    .sort((a, b) => a.address.localeCompare(b.address))
+}
+
+function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInfo): number {
+  const leftLt = parseBigInt(left.lt)
+  const rightLt = parseBigInt(right.lt)
+  if (leftLt === rightLt) {
+    return 0
+  }
+  return leftLt < rightLt ? -1 : 1
+}
+
+function parseBalance(value: string | undefined): bigint | undefined {
+  if (!value) {
+    return undefined
+  }
+
+  try {
+    return BigInt(value)
+  } catch {
+    return undefined
+  }
+}
+
+function parseBigInt(value: string | undefined): bigint {
+  try {
+    return value === undefined ? 0n : BigInt(value)
+  } catch {
+    return 0n
+  }
 }

@@ -1,0 +1,55 @@
+<svg width="1348px" height="290px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .fg-cyan { fill: #00AAAA }
+    .fg-green { fill: #00AA00 }
+    .fg-yellow { fill: #AA5500 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    .bold { font-weight: bold; }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library [ACTON_VERSION]</tspan>
+</tspan>
+    <tspan x="10px" y="46px"><tspan>Script finished with [EXIT_STATUS] </tspan><tspan class="fg-yellow">100</tspan>
+</tspan>
+    <tspan x="10px" y="64px"><tspan>  Re-run with </tspan><tspan class="fg-yellow">--backtrace full</tspan><tspan> to get more information</tspan>
+</tspan>
+    <tspan x="10px" y="82px"><tspan>Failed to send message to real network: could not reach network </tspan><tspan class="fg-cyan">localnet</tspan><tspan> while sending external message from wallet </tspan><tspan class="fg-yellow">deployer</tspan><tspan>; likely causes:</tspan>
+</tspan>
+    <tspan x="10px" y="100px"><tspan>- network API endpoint is not running or is unreachable</tspan>
+</tspan>
+    <tspan x="10px" y="118px"><tspan>- configured </tspan><tspan class="fg-cyan">api.v2</tspan><tspan> URL points to the wrong host or port</tspan>
+</tspan>
+    <tspan x="10px" y="136px"><tspan>- a firewall, proxy, or temporary service outage blocked the request</tspan>
+</tspan>
+    <tspan x="10px" y="154px">
+</tspan>
+    <tspan x="10px" y="172px"><tspan>Possible fix:</tspan>
+</tspan>
+    <tspan x="10px" y="190px"><tspan>- start localnet with </tspan><tspan class="fg-yellow">acton localnet start</tspan>
+</tspan>
+    <tspan x="10px" y="208px"><tspan>- if localnet uses a custom port, check </tspan><tspan class="fg-cyan">[localnet].port</tspan><tspan> and </tspan><tspan class="fg-cyan">[networks.localnet].api.v2</tspan><tspan> in Acton.toml</tspan>
+</tspan>
+    <tspan x="10px" y="226px">
+</tspan>
+    <tspan x="10px" y="244px"><tspan>Details:</tspan>
+</tspan>
+    <tspan x="10px" y="262px"><tspan>Failed to send BOC: error sending request for url ([LOCALHOST_URL]/api/v2/sendBoc): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])</tspan>
+</tspan>
+    <tspan x="10px" y="280px">
+</tspan>
+  </text>
+
+</svg>

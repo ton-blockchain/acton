@@ -289,17 +289,20 @@ impl TestReporter for ConsoleReporter {
             }
         }
 
-        if self.config.show_output
-            && let Some(exec) = &test.execution
-        {
-            if !exec.stdout.trim().is_empty() {
+        if let Some(exec) = &test.execution {
+            if self.config.show_output && !exec.stdout.trim().is_empty() {
                 println!("    {} Test output:", "└─".dimmed());
                 for line in exec.stdout.trim().lines() {
                     println!("       {line}");
                 }
+            } else if !exec.debug_output.trim().is_empty() {
+                println!("    {} Test output:", "└─".dimmed());
+                for line in exec.debug_output.trim().lines() {
+                    println!("       {line}");
+                }
             }
 
-            if !exec.stderr.trim().is_empty() {
+            if self.config.show_output && !exec.stderr.trim().is_empty() {
                 println!("    {} Test stderr:", "└─".dimmed());
                 for line in exec.stderr.trim().lines() {
                     println!("       {}", line.bright_red());
