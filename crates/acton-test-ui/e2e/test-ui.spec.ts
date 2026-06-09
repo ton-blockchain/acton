@@ -7,7 +7,8 @@ import {
   type VisualSnapshotOptions,
 } from "./support/acton-test-ui"
 
-const visualSnapshotsEnabled = process.platform === "darwin"
+const visualSnapshotsEnabled =
+  process.platform === "darwin" && Boolean(process.env.CHECK_UI_SNAPSHOTS)
 
 interface StableScreenshotOptions extends VisualSnapshotOptions {
   readonly fitTestDetailsContent?: boolean
@@ -169,7 +170,10 @@ test.describe("Test UI", () => {
   })
 
   test.describe("visual snapshots", () => {
-    test.skip(!visualSnapshotsEnabled, "Visual snapshots are recorded on macOS")
+    test.skip(
+      !visualSnapshotsEnabled,
+      "Set CHECK_UI_SNAPSHOTS to run visual snapshot checks on macOS",
+    )
 
     test("matches primary states", async ({actonUi, page}) => {
       await page.goto(actonUi.baseUrl)

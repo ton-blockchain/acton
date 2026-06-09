@@ -98,6 +98,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Restore Playwright cache
+        id: test-ui-e2e-playwright-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-test-ui-e2e-playwright-cache-path |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-playwright-
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
@@ -115,6 +125,21 @@ jobs:
         run: |
           acton --help
 
+      - name: Run Test UI E2E
+        id: test-ui-e2e
+        env:
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
+        run: just test-ui-e2e-run
+
+      - name: Upload Test UI E2E artifacts
+        if: failure() && steps.test-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-ui-e2e-results
+          path: test-results/acton-test-ui-e2e
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Run tests
         run: |
           just test
@@ -125,6 +150,13 @@ jobs:
         with:
           path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+
+      - name: Save Playwright cache
+        if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-test-ui-e2e-playwright-cache-path
+          key: ${{ steps.test-ui-e2e-playwright-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -360,104 +392,9 @@ jobs:
             --binary "${GITHUB_WORKSPACE}/target/${TARGET_NAME}/release/acton" \
             --target "${TARGET_NAME}"
 
-  test-ui-e2e:
-    name: Test UI E2E (${{ matrix.sys }}-${{ matrix.arch }})
-    strategy: *runner_macos_strategy
-    runs-on: ${{ matrix.runner }}
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    env:
-      TARGET_NAME: ${{ matrix.arch }}-${{ matrix.vendor }}-${{ matrix.sys }}
-
-    permissions:
-      contents: read
-
-    steps:
-      - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          lfs: true
-          persist-credentials: false
-
-      - name: Cache Cargo
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          key: ${{ runner.os }}-${{ runner.arch }}-test-ui-e2e
-          save-if: ${{ github.ref == 'refs/heads/master' }}
-
-      - name: Install Rust
-        run: rustup toolchain install
-
-      - name: Install just
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
-        with:
-          tool: just@1.49.0
-          fallback: none
-
-      - name: Download TON objects archive
-        env:
-          GH_TOKEN: ${{ github.token }}
-        # language=Bash
-        run: |
-          ARCHIVE_NAME="ton-objs-${TARGET_NAME}.tar.gz"
-          mkdir -p objs
-          gh release download release-objs \
-            --repo "${GITHUB_REPOSITORY}" \
-            --pattern "${ARCHIVE_NAME}" \
-            --dir "${RUNNER_TEMP}"
-          tar -C objs -xzf "${RUNNER_TEMP}/${ARCHIVE_NAME}"
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
-
-      - name: Restore Bun cache
-        id: test-ui-e2e-bun-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: &test-ui-e2e-bun-cache-path |
-            ~/.bun/install/cache
-          key: ${{ runner.os }}-${{ runner.arch }}-test-ui-e2e-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-test-ui-e2e-
-
-      - name: Restore Playwright cache
-        id: test-ui-e2e-playwright-cache
-        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: &test-ui-e2e-playwright-cache-path |
-            ~/Library/Caches/ms-playwright
-          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('bun.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ runner.arch }}-playwright-
-
-      - name: Run Test UI E2E
-        run: just test-ui-e2e
-
-      - name: Upload Test UI E2E artifacts
-        if: failure()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: test-ui-e2e-results
-          path: test-results/acton-test-ui-e2e
-          retention-days: 7
-          if-no-files-found: ignore
-
-      - name: Save Bun cache
-        if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-bun-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: *test-ui-e2e-bun-cache-path
-          key: ${{ steps.test-ui-e2e-bun-cache.outputs.cache-primary-key }}
-
-      - name: Save Playwright cache
-        if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-playwright-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: *test-ui-e2e-playwright-cache-path
-          key: ${{ steps.test-ui-e2e-playwright-cache.outputs.cache-primary-key }}
-
   create-trunk-release:
     name: Create Trunk Release
-    needs: [ build-linux, build-macos, lint, ui, test-ui-e2e ]
+    needs: [ build-linux, build-macos, lint, ui ]
     runs-on: ubicloud-standard-2-ubuntu-2204
     if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
 
