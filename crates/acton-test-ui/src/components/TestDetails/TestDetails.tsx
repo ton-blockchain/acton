@@ -1063,8 +1063,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                       </TableRow>
                     )}
                     {shouldShowTreasuryDeployTraces &&
-                      treasuryDeployTraceFeeSummaries.map(renderTraceFeeSummaryRow)}
-                    {regularTraceFeeSummaries.map(renderTraceFeeSummaryRow)}
+                      treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+                        renderTraceFeeSummaryRow(traceFeeSummary),
+                      )}
+                    {regularTraceFeeSummaries.map(traceFeeSummary =>
+                      renderTraceFeeSummaryRow(traceFeeSummary),
+                    )}
                   </TableBody>
                 </Table>
               </div>
