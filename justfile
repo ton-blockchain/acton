@@ -37,7 +37,7 @@ test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
     CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
 
 _tree-sitter-test grammar:
-    cd crates/tree-sitter-{{ grammar }} && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter test
+    cd crates/tree-sitter-all && bun install --frozen-lockfile && bun run --cwd ../tree-sitter-{{ grammar }} generate && bun run --cwd ../tree-sitter-{{ grammar }} test:grammar
 
 test-tree-sitter-tolk:
     just _tree-sitter-test tolk
@@ -54,7 +54,7 @@ test-tree-sitter-tlb:
 test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter-tolk
 
 update-test-tree-sitter-tolk:
-    cd crates/tree-sitter-tolk && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter test -u
+    cd crates/tree-sitter-all && bun install --frozen-lockfile && bun run --cwd ../tree-sitter-tolk generate && bun run --cwd ../tree-sitter-tolk test:grammar:update
 
 test: test-workspace
 
@@ -104,10 +104,7 @@ check-templates-security:
   cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
 
 check-grammar-security:
-    cd crates/tree-sitter-fift && bun audit --audit-level=moderate
-    cd crates/tree-sitter-tasm && bun audit --audit-level=moderate
-    cd crates/tree-sitter-tlb && bun audit --audit-level=moderate
-    cd crates/tree-sitter-tolk && bun audit --audit-level=moderate
+    cd crates/tree-sitter-all && bun audit --audit-level=moderate
 
 check-ui-security:
   bun audit --audit-level=moderate
@@ -156,7 +153,7 @@ fmt-ui:
     bun run fmt
 
 play-tree-sitter:
-    cd crates/tree-sitter-tolk && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter build --wasm && bunx tree-sitter playground
+    cd crates/tree-sitter-all && bun install --frozen-lockfile && bun run --cwd ../tree-sitter-tolk generate && bun run --cwd ../tree-sitter-tolk build:wasm && bun run --cwd ../tree-sitter-tolk start
 
 update-template-wrappers:
     cargo xtask update-template-wrappers

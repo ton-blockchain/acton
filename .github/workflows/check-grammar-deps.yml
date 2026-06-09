@@ -7,14 +7,16 @@ on:
       - master
     paths:
       - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/bun.lock"
+      - "crates/tree-sitter-all/bun.lock"
+      - "crates/tree-sitter-all/package.json"
       - "crates/tree-sitter-**/package.json"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/bun.lock"
+      - "crates/tree-sitter-all/bun.lock"
+      - "crates/tree-sitter-all/package.json"
       - "crates/tree-sitter-**/package.json"
   workflow_dispatch:
 

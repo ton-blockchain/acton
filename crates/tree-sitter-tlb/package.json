@@ -35,20 +35,16 @@
         "*.wasm"
     ],
     "dependencies": {
-        "node-addon-api": "^8.5.0",
-        "node-gyp-build": "^4.8.4"
+        "node-addon-api": "catalog:",
+        "node-gyp-build": "catalog:"
     },
     "devDependencies": {
-        "prebuildify": "^6.0.1",
-        "tree-sitter": "^0.22.4",
-        "tree-sitter-cli": "^0.25.10"
+        "prebuildify": "catalog:",
+        "tree-sitter": "catalog:",
+        "tree-sitter-cli": "catalog:"
     },
-    "trustedDependencies": [
-        "tree-sitter",
-        "tree-sitter-cli"
-    ],
     "peerDependencies": {
-        "tree-sitter": "^0.22.4"
+        "tree-sitter": "catalog:"
     },
     "peerDependenciesMeta": {
         "tree-sitter": {
@@ -56,10 +52,13 @@
         }
     },
     "scripts": {
+        "build:wasm": "tree-sitter build --wasm",
+        "generate": "tree-sitter generate",
         "install": "node-gyp-build",
         "prestart": "tree-sitter build --wasm",
         "start": "tree-sitter playground",
-        "test": "node --test bindings/node/*_test.js"
-    },
-    "packageManager": "bun@1.3.14"
+        "test": "node --test bindings/node/*_test.js",
+        "test:grammar": "tree-sitter test",
+        "test:grammar:update": "tree-sitter test -u"
+    }
 }

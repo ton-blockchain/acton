@@ -20,6 +20,7 @@ exclude = [
   "crates/acton-test-ui",
   "crates/acton-shared-ui",
   "crates/acton-localnet-ui",
+  "crates/tree-sitter-all",
 ]
 
 [workspace.package]

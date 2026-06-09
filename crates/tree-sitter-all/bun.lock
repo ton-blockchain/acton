@@ -3,18 +3,79 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "tree-sitter-tolk",
+      "name": "tree-sitter-all",
+    },
+    "../tree-sitter-fift": {
+      "name": "tree-sitter-fift",
+      "version": "0.1.0",
       "dependencies": {
-        "node-addon-api": "^8.5.0",
-        "node-gyp-build": "^4.8.4",
+        "node-addon-api": "catalog:",
+        "node-gyp-build": "catalog:",
       },
       "devDependencies": {
-        "prebuildify": "^6.0.1",
-        "tree-sitter": "^0.22.4",
-        "tree-sitter-cli": "^0.25.10",
+        "prebuildify": "catalog:",
+        "tree-sitter": "catalog:",
+        "tree-sitter-cli": "catalog:",
       },
       "peerDependencies": {
-        "tree-sitter": "^0.22.4",
+        "tree-sitter": "catalog:",
+      },
+      "optionalPeers": [
+        "tree-sitter",
+      ],
+    },
+    "../tree-sitter-tasm": {
+      "name": "tree-sitter-tasm",
+      "version": "0.1.0",
+      "dependencies": {
+        "node-addon-api": "catalog:",
+        "node-gyp-build": "catalog:",
+      },
+      "devDependencies": {
+        "prebuildify": "catalog:",
+        "tree-sitter": "catalog:",
+        "tree-sitter-cli": "catalog:",
+      },
+      "peerDependencies": {
+        "tree-sitter": "catalog:",
+      },
+      "optionalPeers": [
+        "tree-sitter",
+      ],
+    },
+    "../tree-sitter-tlb": {
+      "name": "tree-sitter-tlb",
+      "version": "0.1.0",
+      "dependencies": {
+        "node-addon-api": "catalog:",
+        "node-gyp-build": "catalog:",
+      },
+      "devDependencies": {
+        "prebuildify": "catalog:",
+        "tree-sitter": "catalog:",
+        "tree-sitter-cli": "catalog:",
+      },
+      "peerDependencies": {
+        "tree-sitter": "catalog:",
+      },
+      "optionalPeers": [
+        "tree-sitter",
+      ],
+    },
+    "../tree-sitter-tolk": {
+      "name": "tree-sitter-tolk",
+      "version": "0.4.5",
+      "dependencies": {
+        "node-addon-api": "catalog:",
+        "node-gyp-build": "catalog:",
+      },
+      "devDependencies": {
+        "prebuildify": "catalog:",
+        "tree-sitter": "catalog:",
+        "tree-sitter-cli": "catalog:",
+      },
+      "peerDependencies": {
+        "tree-sitter": "catalog:",
       },
       "optionalPeers": [
         "tree-sitter",
@@ -25,6 +86,13 @@
     "tree-sitter",
     "tree-sitter-cli",
   ],
+  "catalog": {
+    "node-addon-api": "^8.5.0",
+    "node-gyp-build": "^4.8.4",
+    "prebuildify": "^6.0.1",
+    "tree-sitter": "^0.22.4",
+    "tree-sitter-cli": "^0.25.10",
+  },
   "packages": {
     "base64-js": ["base64-js@1.5.1", "", {}, "sha512-AKpaYlHn8t4SVbOHCy+b5+KKgvR4vrsD8vbvrbiQJps7fKDTkjkDry6ji0rUJjC0kzbNePLwzxq8iypo41qeWA=="],
 
@@ -77,6 +145,14 @@
     "tree-sitter": ["tree-sitter@0.22.4", "", { "dependencies": { "node-addon-api": "^8.3.0", "node-gyp-build": "^4.8.4" } }, "sha512-usbHZP9/oxNsUY65MQUsduGRqDHQOou1cagUSwjhoSYAmSahjQDAVsh9s+SlZkn8X8+O1FULRGwHu7AFP3kjzg=="],
 
     "tree-sitter-cli": ["tree-sitter-cli@0.25.10", "", { "bin": { "tree-sitter": "cli.js" } }, "sha512-KoebQguKMCIghisEOdA372TIbrUl0kdnfZ9YQIBRAeOvNSKe85XbU4LuFW7hduRUwJj0rAG7pX5wo9sZhbBF1g=="],
+
+    "tree-sitter-fift": ["tree-sitter-fift@workspace:../tree-sitter-fift"],
+
+    "tree-sitter-tasm": ["tree-sitter-tasm@workspace:../tree-sitter-tasm"],
+
+    "tree-sitter-tlb": ["tree-sitter-tlb@workspace:../tree-sitter-tlb"],
+
+    "tree-sitter-tolk": ["tree-sitter-tolk@workspace:../tree-sitter-tolk"],
 
     "util-deprecate": ["util-deprecate@1.0.2", "", {}, "sha512-EPD5q1uXyFxJpCrLnCc1nHnq3gOa6DZBocAIiI2TaSCA7VCJ1UJDMagCzIkXNsUYfD1daK//LTEQ8xiIbrHtcw=="],
 

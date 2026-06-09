@@ -1,0 +1,24 @@
+{
+  "name": "tree-sitter-all",
+  "private": true,
+  "packageManager": "bun@1.3.14",
+  "workspaces": {
+    "packages": [
+      "../tree-sitter-fift",
+      "../tree-sitter-tasm",
+      "../tree-sitter-tlb",
+      "../tree-sitter-tolk"
+    ],
+    "catalog": {
+      "node-addon-api": "^8.5.0",
+      "node-gyp-build": "^4.8.4",
+      "prebuildify": "^6.0.1",
+      "tree-sitter": "^0.22.4",
+      "tree-sitter-cli": "^0.25.10"
+    }
+  },
+  "trustedDependencies": [
+    "tree-sitter",
+    "tree-sitter-cli"
+  ]
+}
