@@ -277,6 +277,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             theme={currentTheme}
             onToggleTheme={onToggleTheme}
             title={`Switch to ${currentTheme === "light" ? "dark" : "light"} theme`}
+            aria-label={`Switch to ${currentTheme === "light" ? "dark" : "light"} theme`}
           />
         </div>
       )}

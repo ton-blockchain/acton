@@ -202,7 +202,7 @@ test.describe("Test UI", () => {
         fullPage: true,
       })
 
-      await page.getByRole("button", {name: "Trace 1"}).click()
+      await page.getByRole("button", {name: "Trace 4"}).click()
       await page.getByRole("tab", {name: "Logs"}).click()
       await expect(page.getByText("VM Log", {exact: true}).first()).toBeVisible()
       await expectStableScreenshot(page, "test-ui-logs.png")
