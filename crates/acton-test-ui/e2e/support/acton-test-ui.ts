@@ -48,11 +48,126 @@ const keepTemp = process.env.ACTON_E2E_KEEP_TEMP === "1"
 const serverUrlPattern = /Starting\s+UI server at (http:\/\/127\.0\.0\.1:\d+)/
 const startupTimeoutMs = 45_000
 const shutdownTimeoutMs = 2000
+export const unionStorageTestName =
+  "storage diff: union variant switch keeps overlapping fields visible"
 const jettonSmokeFilter = [
   "deploy should create minter without bounce",
   "owner can send jettons",
   "transfer minimal value edge",
+  unionStorageTestName,
 ].join("|")
+
+const unionStorageContractSource = `contract UnionStorage {
+    author: "Acton"
+    version: "1.0.0"
+    description: "Storage union fixture"
+    storage: StorageState
+    incomingMessages: AllowedMessage
+}
+
+type StorageState =
+    | LegacyStorage
+    | ActiveStorage
+
+type AllowedMessage =
+    | SwitchToActive
+
+struct (0x75010001) LegacyStorage {
+    version: uint32
+    owner: address
+    balance: uint32
+    quota: uint32
+}
+
+struct (0x75010002) ActiveStorage {
+    version: uint32
+    owner: address
+    balance: uint32
+    limit: uint32
+    enabled: bool
+}
+
+struct (0x75020001) SwitchToActive {
+    balance: uint32
+    limit: uint32
+    enabled: bool
+}
+
+fun StorageState.load(): StorageState {
+    return StorageState.fromCell(contract.getData());
+}
+
+fun StorageState.save(self) {
+    contract.setData(self.toCell());
+}
+
+fun onInternalMessage(in: InMessage) {
+    val msg = lazy AllowedMessage.fromSlice(in.body);
+
+    match (msg) {
+        SwitchToActive => {
+            val storage = lazy StorageState.load();
+
+            match (storage) {
+                LegacyStorage => {
+                    (ActiveStorage {
+                        version: storage.version + 1,
+                        owner: storage.owner,
+                        balance: msg.balance,
+                        limit: msg.limit,
+                        enabled: msg.enabled,
+                    } as StorageState).save();
+                }
+                ActiveStorage => {
+                    (ActiveStorage {
+                        version: storage.version + 1,
+                        owner: storage.owner,
+                        balance: msg.balance,
+                        limit: msg.limit,
+                        enabled: msg.enabled,
+                    } as StorageState).save();
+                }
+            }
+        }
+        else => {
+            assert (in.body.isEmpty()) throw 0xFFFF;
+        }
+    }
+}
+`
+
+const unionStorageTestSource = `import "@acton/emulation/network"
+import "@acton/emulation/testing"
+import "@acton/testing/expect"
+
+import "@contracts/UnionStorage"
+import "@wrappers/UnionStorage.gen"
+
+get fun \`test ${unionStorageTestName}\`() {
+    val deployer = testing.treasury("union deployer");
+    val contract = UnionStorage.fromStorage(
+        LegacyStorage {
+            version: 1,
+            owner: deployer.address,
+            balance: 100,
+            quota: 7,
+        } as StorageState,
+    );
+
+    val deployResult = contract.deploy(deployer.address, { value: ton("0.2") });
+    expect(deployResult).toHaveSuccessfulDeploy({
+        to: contract.address,
+    });
+
+    val switchResult = contract.sendSwitchToActive(deployer.address, 150, 42, true, {
+        value: ton("0.1"),
+    });
+    expect(switchResult).toHaveSuccessfulTx<SwitchToActive>({
+        from: deployer.address,
+        to: contract.address,
+    });
+}
+`
 
 export const stabilizeVisualSnapshot = async (
   page: Page,
@@ -83,6 +198,35 @@ const createFixtureProject = async (): Promise<FixtureProject> => {
   await fs.mkdir(homeDir, {recursive: true})
 
   return {tempDir, projectDir, homeDir}
+}
+
+const addUnionStorageFixture = async (fixture: FixtureProject): Promise<void> => {
+  const manifestPath = path.join(fixture.projectDir, "Acton.toml")
+  const manifest = await fs.readFile(manifestPath, "utf8")
+  await fs.writeFile(
+    manifestPath,
+    `${manifest.trimEnd()}
+
+[contracts.UnionStorage]
+display-name = "UnionStorage"
+src = "contracts/UnionStorage.tolk"
+depends = []
+`,
+  )
+
+  await fs.writeFile(
+    path.join(fixture.projectDir, "contracts", "UnionStorage.tolk"),
+    unionStorageContractSource,
+  )
+  await fs.writeFile(
+    path.join(fixture.projectDir, "tests", "union-storage.test.tolk"),
+    unionStorageTestSource,
+  )
+
+  await runCommand(actonBinary, ["wrapper", "UnionStorage"], {
+    cwd: fixture.projectDir,
+    env: actonEnv(fixture),
+  })
 }
 
 const actonEnv = (fixture: FixtureProject): NodeJS.ProcessEnv => ({
@@ -269,6 +413,7 @@ const startActonTestUi = async (): Promise<RunningActonUi> => {
       ["new", fixture.projectDir, "--template", "jetton", "--name", "jetton-ui-e2e"],
       {cwd: repositoryRoot, env: actonEnv(fixture)},
     )
+    await addUnionStorageFixture(fixture)
 
     const output = new ProcessOutput()
     child = spawn(

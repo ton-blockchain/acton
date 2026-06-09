@@ -386,7 +386,7 @@ export function TransactionDetails({
           </div>
 
           {showStorageDiff && storageDiff && (
-            <div className={styles.storageDiffDetails}>
+            <div className={styles.storageDiffDetails} data-testid="storage-diff-details">
               <StorageDiffView
                 diff={storageDiff}
                 contracts={contracts}

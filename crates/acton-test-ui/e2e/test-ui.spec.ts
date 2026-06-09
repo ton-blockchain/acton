@@ -4,6 +4,7 @@ import {
   expect,
   stabilizeVisualSnapshot,
   test,
+  unionStorageTestName,
   type VisualSnapshotOptions,
 } from "./support/acton-test-ui"
 
@@ -22,6 +23,8 @@ const waitForNextFrame = async (page: Page) => {
     })
   })
 }
+
+const escapeRegExp = (value: string) => value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`)
 
 const fitViewportToTestDetailsContent = async (page: Page) => {
   const viewport = page.viewportSize()
@@ -116,6 +119,49 @@ const openTrace4SendMessageAction = async (page: Page) => {
   await expect(page.getByText("To:", {exact: true})).toBeVisible()
 }
 
+const openUnionStorageDiff = async (page: Page) => {
+  await page.getByRole("button", {name: new RegExp(escapeRegExp(unionStorageTestName))}).click()
+  await expect(page.getByTestId("test-details-title")).toContainText(unionStorageTestName)
+
+  await page.getByRole("tab", {name: "Transactions"}).click()
+  await expect(page.getByRole("tab", {name: "Transactions"})).toHaveAttribute(
+    "aria-selected",
+    "true",
+  )
+
+  const traceButtons = page.getByRole("button", {name: /^Trace /})
+  const traceCount = await traceButtons.count()
+  const traceIndexes = Array.from({length: Math.max(traceCount, 1)}).keys()
+
+  for (const traceIndex of traceIndexes) {
+    if (traceCount > 0) {
+      await traceButtons.nth(traceIndex).click()
+    }
+
+    const transactions = page.getByRole("button", {name: /^Transaction /})
+    await expect(transactions.first()).toBeVisible()
+    const transactionCount = await transactions.count()
+
+    for (const transactionIndex of Array.from({length: transactionCount}).keys()) {
+      await transactions.nth(transactionIndex).click()
+
+      const storageToggle = page.getByRole("button", {name: "Show storage state change"})
+      if ((await storageToggle.count()) === 0) {
+        continue
+      }
+
+      await storageToggle.first().click()
+      const storageDiff = page.getByTestId("storage-diff-details")
+      if ((await storageDiff.getByText("ActiveStorage", {exact: true}).count()) > 0) {
+        await expect(storageDiff).toBeVisible()
+        return storageDiff
+      }
+    }
+  }
+
+  throw new Error("Expected union storage switch transaction to expose an ActiveStorage diff")
+}
+
 test.describe("Test UI", () => {
   test("opens a real jetton test run and navigates test details", async ({actonUi, page}) => {
     await page.goto(actonUi.baseUrl)
@@ -167,6 +213,28 @@ test.describe("Test UI", () => {
       page.getByRole("region", {name: "Coverage source"}).getByText(/JettonWallet\.tolk/),
     ).toBeVisible()
     await expect(page.getByText(/Score \d+\.\d%/)).toBeVisible()
+  })
+
+  test("shows storage diff for a union storage variant switch", async ({actonUi, page}) => {
+    await page.goto(actonUi.baseUrl)
+
+    const storageDiff = await openUnionStorageDiff(page)
+
+    await expect(storageDiff.getByText("ActiveStorage", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("version:", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("owner:", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("balance:", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("quota:", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("limit:", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("enabled:", {exact: true})).toBeVisible()
+
+    await expect(storageDiff.getByText("1", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("2", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("100", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("150", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("7", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("42", {exact: true})).toBeVisible()
+    await expect(storageDiff.getByText("true", {exact: true})).toBeVisible()
   })
 
   test.describe("visual snapshots", () => {
@@ -241,6 +309,16 @@ test.describe("Test UI", () => {
         fitTestDetailsContent: true,
         fullPage: true,
         theme: "dark",
+      })
+    })
+
+    test("matches union storage diff", async ({actonUi, page}) => {
+      await page.goto(actonUi.baseUrl)
+
+      await openUnionStorageDiff(page)
+      await expectStableScreenshot(page, "test-ui-union-storage-diff.png", {
+        fitTestDetailsContent: true,
+        fullPage: true,
       })
     })
   })
