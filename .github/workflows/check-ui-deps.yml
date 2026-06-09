@@ -7,17 +7,21 @@ on:
       - master
     paths:
       - ".github/workflows/check-ui-deps.yml"
+      - ".npmrc"
       - "bun.lock"
+      - "bunfig.toml"
       - "package.json"
-      - "crates/acton-**-ui/**"
+      - "crates/acton-**-ui/package.json"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/check-ui-deps.yml"
+      - ".npmrc"
       - "bun.lock"
+      - "bunfig.toml"
       - "package.json"
-      - "crates/acton-**-ui/**"
+      - "crates/acton-**-ui/package.json"
   workflow_dispatch:
 
 concurrency:
