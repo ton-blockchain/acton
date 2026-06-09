@@ -7,6 +7,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-template-deps.yml"
+      - "src/commands/new/templates/**-app/.npmrc"
       - "src/commands/new/templates/**-app/package.json"
       - "src/commands/new/templates/**-app/package-lock.json"
   push:
@@ -14,6 +15,7 @@ on:
       - master
     paths:
       - ".github/workflows/check-template-deps.yml"
+      - "src/commands/new/templates/**-app/.npmrc"
       - "src/commands/new/templates/**-app/package.json"
       - "src/commands/new/templates/**-app/package-lock.json"
   workflow_dispatch:
