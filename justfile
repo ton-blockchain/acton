@@ -37,7 +37,7 @@ test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
     CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
 
 _tree-sitter-test grammar:
-    cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
+    cd crates/tree-sitter-{{ grammar }} && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter test
 
 test-tree-sitter-tolk:
     just _tree-sitter-test tolk
@@ -54,7 +54,7 @@ test-tree-sitter-tlb:
 test-tree-sitter-all: test-tree-sitter-fift test-tree-sitter-tasm test-tree-sitter-tlb test-tree-sitter-tolk
 
 update-test-tree-sitter-tolk:
-    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test -u
+    cd crates/tree-sitter-tolk && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter test -u
 
 test: test-workspace
 
@@ -104,10 +104,10 @@ check-templates-security:
   cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
 
 check-grammar-security:
-    cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
-    cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+    cd crates/tree-sitter-fift && bun audit --audit-level=moderate
+    cd crates/tree-sitter-tasm && bun audit --audit-level=moderate
+    cd crates/tree-sitter-tlb && bun audit --audit-level=moderate
+    cd crates/tree-sitter-tolk && bun audit --audit-level=moderate
 
 check-ui-security:
   bun audit --audit-level=moderate
@@ -156,7 +156,7 @@ fmt-ui:
     bun run fmt
 
 play-tree-sitter:
-    cd crates/tree-sitter-tolk && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter build --wasm && yarn tree-sitter playground
+    cd crates/tree-sitter-tolk && bun install --frozen-lockfile && bunx tree-sitter generate && bunx tree-sitter build --wasm && bunx tree-sitter playground
 
 update-template-wrappers:
     cargo xtask update-template-wrappers

@@ -18,7 +18,7 @@ tree-sitter generate
 To play with parser, you can run interactive playground:
 
 ```bash
-yarn play
+bunx tree-sitter playground
 ```
 
 To manually test, create `tmp.tolk` with some content, and run:
@@ -45,7 +45,7 @@ produces colored output, just a pleasant feature, so keep this file up to date a
 Finally, to build wasm, run **in the project folder**:
 
 ```bash
-yarn grammar:wasm
+bunx tree-sitter build --wasm
 ```
 
 On finish, `tree-sitter-tolk.wasm` will be saved into the `server/` folder.
