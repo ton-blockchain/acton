@@ -918,7 +918,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         result += &message_name;
         result += " ";
 
-        result += self.format_ton_tokens(info.value.tokens).as_str();
+        result += self.format_gram_tokens(info.value.tokens).as_str();
         result += " -> ".dimmed().to_string().as_str();
 
         result += &self.format_address_with_letter(&info.dst, contract_letters, true);
@@ -926,14 +926,14 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         result
     }
 
-    fn format_ton_tokens(&self, tokens: Tokens) -> String {
+    fn format_gram_tokens(&self, tokens: Tokens) -> String {
         let amount = tokens.into_inner() as f64 / 1e9;
-        format!("{amount} TON").green().to_string()
+        format!("{amount} GRAM").green().to_string()
     }
 
-    fn format_ton(&self, amount: &BigInt) -> String {
+    fn format_grams(&self, amount: &BigInt) -> String {
         let amount = amount.to_f64().unwrap_or(0.0) / 1e9;
-        format!("{amount} TON").green().to_string()
+        format!("{amount} GRAM").green().to_string()
     }
 
     fn format_inbound_message_body(
@@ -2213,7 +2213,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                         ),
                         _ => "msg: ".to_owned() + hash,
                     };
-                    let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
+                    let balance_part = format!("balance: {}", self.format_grams(remaining_balance));
 
                     action_parts.push((message_part, balance_part, location_part));
                 }
@@ -2228,11 +2228,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                     let message_part = format!(
                         "{} {} {}",
                         "reserve".blue(),
-                        self.format_ton(reserve),
+                        self.format_grams(reserve),
                         Self::format_reserve_currency_flags(mode_flags).dimmed()
                     );
                     let balance_part =
-                        format!("balance: {}", self.format_ton(changed_remaining_balance));
+                        format!("balance: {}", self.format_grams(changed_remaining_balance));
 
                     action_parts.push((message_part, balance_part, location_part));
                 }

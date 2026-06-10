@@ -3,7 +3,7 @@ Remote Account
   Raw Address:       0:f608af54ae24f900b806d102eeb24e18d36e6fb081d1569230c4be2d6a2aecc8
   Status:            active
   Contract:          counter
-  Balance:           0.199953866 TON
+  Balance:           0.199953866 GRAM
   Last Tx LT:        5
   Last Tx Hash:      [TX_HASH]
   Code Hash:         0x15407004a66e0cf95a67c39edbb54a531dfdb6df93fb7d365fae57a34b874747

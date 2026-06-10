@@ -8,12 +8,12 @@
   ✓ cq register address duplicate symbolic name [TIME]
     └─ Test output:
        N/A -> cq_register_sender A
-       └── empty 0.2 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+       └── empty 0.2 GRAM -> cq_duplicate_name B                                       compute phase skipped aborted
        
        N/A -> cq_register_sender A
-       └── empty 0.3 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+       └── empty 0.3 GRAM -> cq_duplicate_name B                                       compute phase skipped aborted
        
        N/A -> cq_register_sender A
-       └── empty 0.4 TON -> cq_duplicate_name B                                        compute phase skipped aborted
+       └── empty 0.4 GRAM -> cq_duplicate_name B                                       compute phase skipped aborted
 
  ✓ 1 passed in 1 file

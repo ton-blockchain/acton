@@ -1,4 +1,4 @@
-use crate::commands::common::{error_fmt, format_nanotons};
+use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::code_lookup_hash;
 use crate::contract_interface::{
     compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
@@ -207,7 +207,7 @@ fn rpc_info_cmd(
     print_kv("Raw Address", address.to_string().cyan().to_string());
     print_kv("Status", format_account_status(&remote.state));
     print_kv("Contract", contract_name);
-    print_kv("Balance", format_nanotons(&balance).white().to_string());
+    print_kv("Balance", format_nanograms(&balance).white().to_string());
     print_kv("Last Tx LT", remote.last_transaction_id.lt.as_str());
     print_kv(
         "Last Tx Hash",

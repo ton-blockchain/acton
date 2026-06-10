@@ -83,7 +83,7 @@ Use a secure native store for mnemonic storage when available.
 {{/option}}
 
 {{#option "`--airdrop`" }}
-Request testnet TON after wallet creation.
+Request testnet GRAM after wallet creation.
 {{/option}}
 
 {{#option "`--faucet-url` _url_" }}

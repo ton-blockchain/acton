@@ -5,6 +5,6 @@
  TEST  [ROOT]
 
  > tests/out_actions.test.tolk (1 test)
-  ✓ cj parse out actions reserve zero nanoton kind [TIME]
+  ✓ cj parse out actions reserve zero nanogram kind [TIME]
 
  ✓ 1 passed in 1 file

@@ -11,7 +11,7 @@
   ✗ foo [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── EvaaMasterClassicSupplyMaster 1 TON -> simple B                             gas=332 exit_code=10 aborted
+        └── EvaaMasterClassicSupplyMaster 1 GRAM -> simple B                            gas=332 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── account created
         

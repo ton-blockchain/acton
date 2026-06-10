@@ -11,9 +11,9 @@
   ✓ formatter account destroyed println [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmDestroyNow 0.2 TON -> kQBstq..62kLMe B                                    gas=1557
+       └── FmDestroyNow 0.2 GRAM -> kQBstq..62kLMe B                                   gas=1557
            queryId: 1
            ├── account destroyed
-           └── empty 1.199807664 TON -> sender A                                       gas=309
+           └── empty 1.199807664 GRAM -> sender A                                      gas=309
 
  ✓ 1 passed in 1 file

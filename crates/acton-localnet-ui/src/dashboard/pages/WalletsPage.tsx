@@ -936,12 +936,12 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                 : "Testnet"}
             </MetaRow>
             <MetaRow label="Amount">
-              {formatTonBalance(
+              {formatGramBalance(
                 pendingTransactionRequest.request.messages
                   .reduce((sum, message) => sum + BigInt(message.amount), 0n)
                   .toString(),
               )}{" "}
-              TON
+              GRAM
             </MetaRow>
           </div>
 
@@ -955,7 +955,9 @@ export const WalletsPage: React.FC<WalletsPageProps> = ({client, host}) => {
                     copiedAddress={copiedAddress}
                     onCopy={handleCopyAddress}
                   />
-                  <div className={styles.messageValue}>{formatTonBalance(message.amount)} TON</div>
+                  <div className={styles.messageValue}>
+                    {formatGramBalance(message.amount)} GRAM
+                  </div>
                 </div>
               </div>
             ))}
@@ -1087,15 +1089,15 @@ function shortenAddress(address: string, visibleChars: number): string {
   return `${address.slice(0, visibleChars)}...${address.slice(-visibleChars)}`
 }
 
-function formatTonBalance(balance: string): string {
+function formatGramBalance(balance: string): string {
   return formatUnits(balance, 9)
 }
 
-function formatCompactTonBalance(balance: string): string {
-  const numericBalance = Number(formatTonBalance(balance))
+function formatCompactGramBalance(balance: string): string {
+  const numericBalance = Number(formatGramBalance(balance))
 
   if (!Number.isFinite(numericBalance)) {
-    return formatTonBalance(balance)
+    return formatGramBalance(balance)
   }
 
   if (numericBalance > 0 && numericBalance < 0.0001) {
@@ -1113,7 +1115,7 @@ function formatWalletBalanceLabel(balanceState: WalletBalanceState | undefined):
   }
 
   if (balanceState.value) {
-    const balance = `${formatCompactTonBalance(balanceState.value)} TON`
+    const balance = `${formatCompactGramBalance(balanceState.value)} GRAM`
     return balanceState.isLoading ? `${balance} · updating` : balance
   }
 

@@ -426,7 +426,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                             </span>
                           ) : (
                             <span className={styles.actionText}>
-                              {isIncoming ? "Received TON" : "Sent TON"}
+                              {isIncoming ? "Received GRAM" : "Sent GRAM"}
                             </span>
                           )}
                         </div>
@@ -452,7 +452,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                           className={`${isIncoming ? styles.valuePositive : styles.valueNegative} ${styles.historyValue}`}
                         >
                           {isIncoming ? "+" : "-"} {Number.parseFloat(valueStr).toLocaleString()}{" "}
-                          TON
+                          GRAM
                         </div>
                       </TableCell>
                     </TableRow>

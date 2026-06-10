@@ -11,7 +11,7 @@
   ✓ formatter decoded body supported compiler abi types [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmAbiMegaMessage 0.4 TON -> fm_abi_mega_sink B                              gas=297
+       └── FmAbiMegaMessage 0.4 GRAM -> fm_abi_mega_sink B                             gas=297
                flag: true
                amount: 777000000
                owner: [WALLET_ADDRESS_BASE] (sender A)

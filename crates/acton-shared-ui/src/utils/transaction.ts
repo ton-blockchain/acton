@@ -248,15 +248,15 @@ export function computeSendMode(tx: TransactionInfo): number | undefined {
 export const RESERVE_MODE_CONSTANTS = {
   0: {
     name: "ReserveExact",
-    description: "Reserves exactly the specified amount of nanoToncoin.",
+    description: "Reserves exactly the specified amount of nanograms.",
   },
   1: {
     name: "ReserveAllExcept",
-    description: "Reserves all but the specified amount of nanoToncoin.",
+    description: "Reserves all but the specified amount of nanograms.",
   },
   2: {
     name: "ReserveAtMost",
-    description: "Reserves at most the specified amount of nanoToncoin.",
+    description: "Reserves at most the specified amount of nanograms.",
   },
   4: {
     name: "ReserveAddOriginalBalance",

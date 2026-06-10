@@ -11,7 +11,7 @@
   ✗ send mode root transaction missing parent action [TIME]
     └─ Error: expect(actual).toHaveTx(expected)
         N/A -> sender A
-        └── empty 1 TON -> harness B                                                    gas=351
+        └── empty 1 GRAM -> harness B                                                   gas=351
             └── account created
         
         Cannot find transaction from <any> to harness B kQCLlS..c1Lxpv

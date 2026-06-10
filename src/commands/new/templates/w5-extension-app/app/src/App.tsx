@@ -47,7 +47,7 @@ import {
 } from './lib/w5';
 import {
   formatAddressForNetwork,
-  formatTonAmount,
+  formatGramAmount,
   getErrorMessage,
   normalizeAddress,
   sameAddress,
@@ -383,7 +383,7 @@ function ExtensionCard({
         <Separator />
 
         <div>
-          <Metric label="Balance" value={formatTonAmount(extension.balance)} />
+          <Metric label="Balance" value={formatGramAmount(extension.balance)} />
           {extensionInfo ? (
             <>
               <Metric label="Admin" value={extensionInfo.admin} mono />
@@ -394,7 +394,7 @@ function ExtensionCard({
               />
               <Metric
                 label="Subscription"
-                value={formatTonAmount(extensionInfo.subscriptionAmount)}
+                value={formatGramAmount(extensionInfo.subscriptionAmount)}
               />
               <Metric
                 label="Last Payment"
@@ -836,7 +836,7 @@ export default function App() {
                 <CardContent>
                   <Metric
                     label="Balance"
-                    value={formatTonAmount(inspection.data.balance)}
+                    value={formatGramAmount(inspection.data.balance)}
                   />
                   <Metric
                     label="Address"

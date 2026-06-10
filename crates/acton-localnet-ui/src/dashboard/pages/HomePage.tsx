@@ -225,7 +225,7 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
                             address={transaction.in_msg?.source}
                             className={styles.rowInlineAddress}
                           />{" "}
-                          · Value: {formatNano(transaction.in_msg?.value || "0")} TON
+                          · Value: {formatNano(transaction.in_msg?.value || "0")} GRAM
                         </div>
                       </div>
                       <div className={styles.rowMeta}>
@@ -284,7 +284,7 @@ export const HomePage: React.FC<HomePageProps> = ({client}) => {
                           <span className={styles.accountBalance}>
                             {balance === undefined
                               ? "Balance unavailable"
-                              : `${formatNano(balance)} TON`}
+                              : `${formatNano(balance)} GRAM`}
                           </span>
                         </span>
                         <ArrowUpRight size={14} className={styles.accountArrow} />

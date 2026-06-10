@@ -528,8 +528,8 @@ fn ensure_contract_matches_transaction(
     );
 }
 
-fn format_tokens(nanotons: u64) -> String {
-    format!("{:.9} TON", nanotons as f64 / 1_000_000_000.0)
+fn format_tokens(nanograms: u64) -> String {
+    format!("{:.9} GRAM", nanograms as f64 / 1_000_000_000.0)
 }
 
 fn format_action_title(action: &OutAction) -> String {

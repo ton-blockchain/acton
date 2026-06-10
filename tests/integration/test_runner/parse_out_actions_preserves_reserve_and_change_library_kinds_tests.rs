@@ -53,11 +53,11 @@ get fun `test cj parse out actions preserves kinds`() {
 }
 
 #[test]
-fn parse_out_actions_reserve_nanoton_is_misparsed_as_change_library_bug() {
+fn parse_out_actions_reserve_nanogram_is_misparsed_as_change_library_bug() {
     run_success(
-        "cj-stdlib-parse-out-actions-reserve-one-nanoton-kind-bug",
+        "cj-stdlib-parse-out-actions-reserve-one-nanogram-kind-bug",
         r#"
-get fun `test cj parse out actions reserve one nanoton kind bug`() {
+get fun `test cj parse out actions reserve one nanogram kind bug`() {
     reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = testing.outActions();
@@ -66,16 +66,16 @@ get fun `test cj parse out actions reserve one nanoton kind bug`() {
     expect(parsed.at(0).kind()).toEqual("reserve-currency");
 }
 "#,
-        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_nanoton_is_misparsed_as_change_library_bug.stdout.txt",
+        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_nanogram_is_misparsed_as_change_library_bug.stdout.txt",
     );
 }
 
 #[test]
-fn parse_out_actions_reserve_zero_nanoton_stays_reserve_currency() {
+fn parse_out_actions_reserve_zero_nanogram_stays_reserve_currency() {
     run_success(
-        "cj-stdlib-parse-out-actions-reserve-zero-nanoton-kind",
+        "cj-stdlib-parse-out-actions-reserve-zero-nanogram-kind",
         r#"
-get fun `test cj parse out actions reserve zero nanoton kind`() {
+get fun `test cj parse out actions reserve zero nanogram kind`() {
     reserveToncoinsOnBalance(0, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 
     val parsed = testing.outActions();
@@ -83,7 +83,7 @@ get fun `test cj parse out actions reserve zero nanoton kind`() {
     expect(parsed.at(0).kind()).toEqual("reserve-currency");
 }
 "#,
-        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_zero_nanoton_stays_reserve_currency.stdout.txt",
+        "integration/snapshots/test-runner/parse_out_actions_preserves_reserve_and_change_library_kinds/parse_out_actions_reserve_zero_nanogram_stays_reserve_currency.stdout.txt",
     );
 }
 

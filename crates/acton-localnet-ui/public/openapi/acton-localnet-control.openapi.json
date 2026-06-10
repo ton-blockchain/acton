@@ -617,7 +617,7 @@
           "amount": {
             "type": "integer",
             "minimum": 0,
-            "description": "Amount in nanotons."
+            "description": "Amount in nanograms."
           }
         }
       },

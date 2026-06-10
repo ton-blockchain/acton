@@ -13,8 +13,8 @@
   ✗ expected opcode name falls back to source abi [TIME]
     └─ Error: expect(actual).toHaveTx(expected)
         N/A -> sender A
-        └── RouteToSink 0.5 TON -> source B                                             gas=1748
-            └── SourceOnlyNotice 0.1 TON -> sink C                                      gas=261
+        └── RouteToSink 0.5 GRAM -> source B                                            gas=1748
+            └── SourceOnlyNotice 0.1 GRAM -> sink C                                     gas=261
         
         Cannot find transaction from source B kQDYqW..18DufI to sink C kQDaMa..A_3S21
         with:

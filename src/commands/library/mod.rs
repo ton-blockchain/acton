@@ -161,34 +161,34 @@ pub fn publish_cmd(
     let cell_price = 500_000u128;
     let bits_part = (u128::from(bits) * bit_price * u128::from(duration_seconds)) >> 16;
     let cells_part = (u128::from(cells) * cell_price * u128::from(duration_seconds)) >> 16;
-    let storage_fee_nanoton = bits_part + cells_part;
+    let storage_fee_nanogram = bits_part + cells_part;
 
-    // Suggest 120% of storage fee + 0.06 TON for gas/fees
-    let suggested_nanoton = (storage_fee_nanoton * 120 / 100) + 60_000_000;
+    // Suggest 120% of storage fee + 0.06 GRAM for gas/fees
+    let suggested_nanogram = (storage_fee_nanogram * 120 / 100) + 60_000_000;
 
-    let amount_to_send_nanoton = if let Some(amount_str) = amount_arg {
-        parse_ton_to_nanoton(&amount_str)?
+    let amount_to_send_nanogram = if let Some(amount_str) = amount_arg {
+        parse_gram_to_nanogram(&amount_str)?
     } else {
         let prompt = format!(
-            "Enter amount in TON (at least {} TON for {}):",
-            format_ton(suggested_nanoton),
+            "Enter amount in GRAM (at least {} GRAM for {}):",
+            format_gram_amount(suggested_nanogram),
             format_duration(duration_seconds)
         );
         let amount_str = Text::new(&prompt)
-            .with_default(&format_ton(suggested_nanoton))
+            .with_default(&format_gram_amount(suggested_nanogram))
             .prompt()?;
 
         if amount_str.trim().is_empty() {
             return Ok(());
         }
 
-        parse_ton_to_nanoton(amount_str.trim())?
+        parse_gram_to_nanogram(amount_str.trim())?
     };
 
     if !yes {
         let confirm_custom = inquire::Confirm::new(&format!(
-            "Send {} TON to publish library? Note that any extra TON will be refunded.",
-            format_ton(amount_to_send_nanoton)
+            "Send {} GRAM to publish library? Note that any extra GRAM will be refunded.",
+            format_gram_amount(amount_to_send_nanogram)
         ))
         .with_default(true)
         .prompt()?;
@@ -208,7 +208,7 @@ pub fn publish_cmd(
         bounced: false,
         src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(publisher_address.clone()),
-        value: CurrencyCollection::new(amount_to_send_nanoton),
+        value: CurrencyCollection::new(amount_to_send_nanogram),
         ihr_fee: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
@@ -730,9 +730,9 @@ pub fn info_cmd(name: Option<String>) -> anyhow::Result<()> {
 
     if let Some(balance_u128) = balance_u128 {
         println!(
-            "{:<w$} {} TON",
+            "{:<w$} {} GRAM",
             "Balance:".dimmed(),
-            format_ton(balance_u128)
+            format_gram_amount(balance_u128)
         );
     }
 
@@ -824,8 +824,8 @@ fn topup_library_entry(
     let sender =
         prepare_library_sender(config, &network, wallet_name, tonconnect, tonconnect_port)?;
 
-    let amount_to_send_nanoton = if let Some(amount_str) = amount_arg {
-        parse_ton_to_nanoton(&amount_str)?
+    let amount_to_send_nanogram = if let Some(amount_str) = amount_arg {
+        parse_gram_to_nanogram(&amount_str)?
     } else {
         let duration_seconds = if let Some(d) = duration_arg {
             parse_duration(&d)?
@@ -841,26 +841,26 @@ fn topup_library_entry(
         let cell_price = 500_000u128;
         let bits_part = (u128::from(lib.bits) * bit_price * u128::from(duration_seconds)) >> 16;
         let cells_part = (u128::from(lib.cells) * cell_price * u128::from(duration_seconds)) >> 16;
-        let storage_fee_nanoton = bits_part + cells_part;
+        let storage_fee_nanogram = bits_part + cells_part;
 
-        let suggested_nanoton = storage_fee_nanoton * 120 / 100;
+        let suggested_nanogram = storage_fee_nanogram * 120 / 100;
 
         let prompt = format!(
-            "Enter amount in TON (at least {} TON for {}):",
-            format_ton(suggested_nanoton),
+            "Enter amount in GRAM (at least {} GRAM for {}):",
+            format_gram_amount(suggested_nanogram),
             format_duration(duration_seconds)
         );
         let amount_str = Text::new(&prompt)
-            .with_default(&format_ton(suggested_nanoton))
+            .with_default(&format_gram_amount(suggested_nanogram))
             .prompt()?;
 
-        parse_ton_to_nanoton(amount_str.trim())?
+        parse_gram_to_nanogram(amount_str.trim())?
     };
 
     if !yes {
         let confirm = inquire::Confirm::new(&format!(
-            "Send {} TON to top-up library?",
-            format_ton(amount_to_send_nanoton),
+            "Send {} GRAM to top-up library?",
+            format_gram_amount(amount_to_send_nanogram),
         ))
         .with_default(true)
         .prompt()?;
@@ -882,7 +882,7 @@ fn topup_library_entry(
         bounced: false,
         src: IntAddr::Std(sender.address()),
         dst: IntAddr::Std(dest_address),
-        value: CurrencyCollection::new(amount_to_send_nanoton),
+        value: CurrencyCollection::new(amount_to_send_nanogram),
         ihr_fee: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
@@ -1016,32 +1016,32 @@ fn elapsed_seconds_since(timestamp_str: &str) -> Option<u128> {
 }
 
 #[must_use]
-pub fn format_ton(nanoton: u128) -> String {
-    let ton = nanoton / 1_000_000_000;
-    let fraction = nanoton % 1_000_000_000;
+pub fn format_gram_amount(nanograms: u128) -> String {
+    let grams = nanograms / 1_000_000_000;
+    let fraction = nanograms % 1_000_000_000;
 
     if fraction == 0 {
-        return ton.to_string();
+        return grams.to_string();
     }
 
     let fraction_str = format!("{fraction:09}");
     let trimmed_fraction = fraction_str.trim_end_matches('0');
-    format!("{ton}.{trimmed_fraction}")
+    format!("{grams}.{trimmed_fraction}")
 }
 
-pub fn parse_ton_to_nanoton(s: &str) -> anyhow::Result<u128> {
+pub fn parse_gram_to_nanogram(s: &str) -> anyhow::Result<u128> {
     let s = s.trim();
     let parts: Vec<&str> = s.split('.').collect();
     if parts.len() > 2 {
-        anyhow::bail!("Invalid TON format: multiple dots");
+        anyhow::bail!("Invalid GRAM format: multiple dots");
     }
 
     let int_part: u128 = parts[0]
         .parse()
-        .context("Invalid integer part of TON amount")?;
-    let mut nanoton = int_part
+        .context("Invalid integer part of GRAM amount")?;
+    let mut nanograms = int_part
         .checked_mul(1_000_000_000)
-        .ok_or_else(|| anyhow::anyhow!("TON amount too large"))?;
+        .ok_or_else(|| anyhow::anyhow!("GRAM amount too large"))?;
 
     if parts.len() == 2 {
         let mut frac_str = parts[1].to_string();
@@ -1050,12 +1050,12 @@ pub fn parse_ton_to_nanoton(s: &str) -> anyhow::Result<u128> {
         }
         let frac_val: u128 = frac_str
             .parse()
-            .context("Invalid fractional part of TON amount")?;
+            .context("Invalid fractional part of GRAM amount")?;
         let multiplier = 10u128.pow(9 - frac_str.len() as u32);
-        nanoton += frac_val * multiplier;
+        nanograms += frac_val * multiplier;
     }
 
-    Ok(nanoton)
+    Ok(nanograms)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1299,51 +1299,51 @@ mod tests {
     }
 
     #[test]
-    fn parse_ton_to_nanoton_accepts_integer_and_fractional_values() {
+    fn parse_gram_to_nanogram_accepts_integer_and_fractional_values() {
         assert_eq!(
-            parse_ton_to_nanoton("1").expect("must parse integer TON"),
+            parse_gram_to_nanogram("1").expect("must parse integer GRAM"),
             1_000_000_000
         );
         assert_eq!(
-            parse_ton_to_nanoton("1.5").expect("must parse fractional TON"),
+            parse_gram_to_nanogram("1.5").expect("must parse fractional GRAM"),
             1_500_000_000
         );
         assert_eq!(
-            parse_ton_to_nanoton("0.000000001").expect("must parse nanoton precision"),
+            parse_gram_to_nanogram("0.000000001").expect("must parse nanogram precision"),
             1
         );
     }
 
     #[test]
-    fn parse_ton_to_nanoton_truncates_extra_fraction_digits() {
+    fn parse_gram_to_nanogram_truncates_extra_fraction_digits() {
         assert_eq!(
-            parse_ton_to_nanoton("1.0000000009").expect("must parse and truncate"),
+            parse_gram_to_nanogram("1.0000000009").expect("must parse and truncate"),
             1_000_000_000
         );
     }
 
     #[test]
-    fn parse_ton_to_nanoton_rejects_invalid_inputs() {
-        let dots_err = parse_ton_to_nanoton("1.2.3").expect_err("must fail on multiple dots");
+    fn parse_gram_to_nanogram_rejects_invalid_inputs() {
+        let dots_err = parse_gram_to_nanogram("1.2.3").expect_err("must fail on multiple dots");
         assert!(
             dots_err
                 .to_string()
-                .contains("Invalid TON format: multiple dots"),
+                .contains("Invalid GRAM format: multiple dots"),
             "unexpected error: {dots_err}"
         );
 
-        let frac_err = parse_ton_to_nanoton("1.a").expect_err("must fail on invalid fraction");
+        let frac_err = parse_gram_to_nanogram("1.a").expect_err("must fail on invalid fraction");
         assert!(
             frac_err
                 .to_string()
-                .contains("Invalid fractional part of TON amount"),
+                .contains("Invalid fractional part of GRAM amount"),
             "unexpected error: {frac_err}"
         );
 
-        let overflow_err = parse_ton_to_nanoton("340282366920938463463374607432")
+        let overflow_err = parse_gram_to_nanogram("340282366920938463463374607432")
             .expect_err("must fail on multiplication overflow");
         assert!(
-            overflow_err.to_string().contains("TON amount too large"),
+            overflow_err.to_string().contains("GRAM amount too large"),
             "unexpected error: {overflow_err}"
         );
     }

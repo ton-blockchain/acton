@@ -11,15 +11,15 @@
   ✓ action metadata includes code and library updates [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── empty 0.2 TON -> simple B                                                   gas=3018 aborted action_result_code=37
+       └── empty 0.2 GRAM -> simple B                                                   gas=3018 aborted action_result_code=37
            ├── account created
            ├── Action phase failed
-           ├── Description: Not enough Toncoin
+           ├── Description: Not enough GRAM
            ├── Re-run with --backtrace full to get actions location
            └── Executed actions:
                ├── set code                                             
                ├── change library ADD_PUBLIC                            
-               └── reserve 100 TON BOUNCE_ON_ACTION_FAIL  balance: 0 TON  at contracts/simple[LINE]
+               └── reserve 100 GRAM BOUNCE_ON_ACTION_FAIL  balance: 0 GRAM  at contracts/simple[LINE]
 
  ✓ 1 passed in 1 file
 

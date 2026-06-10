@@ -529,7 +529,7 @@ test.describe("Test UI", () => {
     await expect(valueFlow.getByText("Account", {exact: true})).toBeVisible()
     await expect(valueFlow.getByText("Balance Change", {exact: true})).toBeVisible()
     await expect(valueFlow.getByText("Network Fee", {exact: true})).toBeVisible()
-    await expect(valueFlow.getByText(/TON/).first()).toBeVisible()
+    await expect(valueFlow.getByText(/GRAM/).first()).toBeVisible()
   })
 
   test("opens treasury deploy traces for a jetton transfer trace", async ({actonUi, page}) => {

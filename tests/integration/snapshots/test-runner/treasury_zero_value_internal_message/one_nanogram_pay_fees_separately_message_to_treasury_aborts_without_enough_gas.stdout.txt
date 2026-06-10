@@ -8,11 +8,11 @@
  TEST  [ROOT]
 
  > tests/treasury_zero_value.test.tolk (1 test)
-  ✓ one nanoton pay fees separately message to treasury aborts without enough gas [TIME]
+  ✓ one nanogram pay fees separately message to treasury aborts without enough gas [TIME]
     └─ Test output:
        N/A -> sender A
-       └── SendOwnershipAssigned 1 TON -> ownership_relay B                            gas=1831
-           └── OwnershipAssigned 0.000000001 TON -> recipient C                        compute phase skipped aborted
+       └── SendOwnershipAssigned 1 GRAM -> ownership_relay B                           gas=1831
+           └── OwnershipAssigned 0.000000001 GRAM -> recipient C                       compute phase skipped aborted
        
        txCount=2
 

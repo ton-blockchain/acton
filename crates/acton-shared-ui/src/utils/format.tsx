@@ -1,23 +1,23 @@
 import type React from "react"
 import {Address} from "@ton/core"
 
-const NANOTON_DECIMALS = 9
+const NANOGRAM_DECIMALS = 9
 
 export const formatCurrency = (value: bigint | undefined): string => {
-  if (value === undefined || value === 0n) return "0 TON"
+  if (value === undefined || value === 0n) return "0 GRAM"
   const sign = value < 0n ? "-" : ""
   const digits = (value < 0n ? -value : value).toString()
   const formatted =
-    digits.length <= NANOTON_DECIMALS
-      ? trimNanotonFraction(`0.${digits.padStart(NANOTON_DECIMALS, "0")}`)
-      : trimNanotonFraction(
-          `${digits.slice(0, -NANOTON_DECIMALS)}.${digits.slice(-NANOTON_DECIMALS)}`,
+    digits.length <= NANOGRAM_DECIMALS
+      ? trimNanogramFraction(`0.${digits.padStart(NANOGRAM_DECIMALS, "0")}`)
+      : trimNanogramFraction(
+          `${digits.slice(0, -NANOGRAM_DECIMALS)}.${digits.slice(-NANOGRAM_DECIMALS)}`,
         )
 
-  return `${sign}${formatted} TON`
+  return `${sign}${formatted} GRAM`
 }
 
-function trimNanotonFraction(value: string): string {
+function trimNanogramFraction(value: string): string {
   let result = value
 
   while (result.endsWith("0")) {

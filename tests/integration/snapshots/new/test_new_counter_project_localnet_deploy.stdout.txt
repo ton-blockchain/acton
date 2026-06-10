@@ -2,7 +2,7 @@ Awaiting trace... [Attempt 1/20]
 Trace settled with 2 transaction(s)
 N/A -> external
 └── [EXT_IN_OPCODE] -> kQBRPs..l6nM9M A                                       gas=3308
-    └── empty 0.005 TON -> kQAZX_..fo3aKf B                                     gas=692
+    └── empty 0.005 GRAM -> kQAZX_..fo3aKf B                                    gas=692
         └── account created
 
 Deployed counter to [WALLET_ADDRESS_BASE]

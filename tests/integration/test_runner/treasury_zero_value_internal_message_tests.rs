@@ -170,11 +170,11 @@ get fun `test nonzero value pay fees separately message to treasury is delivered
 }
 
 #[test]
-fn one_nanoton_pay_fees_separately_message_to_treasury_aborts_without_enough_gas() {
+fn one_nanogram_pay_fees_separately_message_to_treasury_aborts_without_enough_gas() {
     run_success(
-        "ag-treasury-one-nanoton-pay-fees-separately",
+        "ag-treasury-one-nanogram-pay-fees-separately",
         r#"
-get fun `test one nanoton pay fees separately message to treasury aborts without enough gas`() {
+get fun `test one nanogram pay fees separately message to treasury aborts without enough gas`() {
     val sender = testing.treasury("sender");
     val recipient = testing.treasury("recipient");
 
@@ -198,6 +198,6 @@ get fun `test one nanoton pay fees separately message to treasury aborts without
     println("txCount={}", txs.size());
 }
 "#,
-        "one_nanoton_pay_fees_separately_message_to_treasury_aborts_without_enough_gas",
+        "one_nanogram_pay_fees_separately_message_to_treasury_aborts_without_enough_gas",
     );
 }

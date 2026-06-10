@@ -4,7 +4,7 @@ Remote Account
   Raw Address:       0:1111111111111111111111111111111111111111111111111111111111111111
   Status:            active
   Contract:          unknown
-  Balance:           0.777 TON
+  Balance:           0.777 GRAM
   Last Tx LT:        17
   Last Tx Hash:      deadbeef
   Code Hash:         0x270906fd171b9c43f37a353059a73fbc02e0568188ec30186af846caefd09b8c

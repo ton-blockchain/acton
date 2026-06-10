@@ -11,8 +11,8 @@
   ✓ nonzero value pay fees separately message to treasury is delivered [TIME]
     └─ Test output:
        N/A -> sender A
-       └── SendOwnershipAssigned 1 TON -> ownership_relay B                            gas=1831
-           └── OwnershipAssigned 0.01 TON -> recipient C                               gas=309
+       └── SendOwnershipAssigned 1 GRAM -> ownership_relay B                           gas=1831
+           └── OwnershipAssigned 0.01 GRAM -> recipient C                              gas=309
        
        txCount=2
 

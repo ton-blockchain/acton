@@ -11,7 +11,7 @@
   ✗ ex show bodies any address none [TIME]
     └─ Error: expect(actual).toHaveTx(expected)
         N/A -> deployer A
-        └── RouteWithMaybeDest 0.1 TON -> receiver B                                    gas=333
+        └── RouteWithMaybeDest 0.1 GRAM -> receiver B                                   gas=333
             queryId: 1, maybeDest: addr_none
             └── account created
         

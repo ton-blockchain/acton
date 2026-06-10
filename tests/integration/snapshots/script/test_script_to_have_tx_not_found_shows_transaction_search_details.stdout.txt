@@ -1,7 +1,7 @@
   Installing standard library [ACTON_VERSION]
 expect(actual).toHaveTx(expected)
 N/A -> sender A
-└── 0x01020304 1 TON -> simple B                                                gas=253
+└── 0x01020304 1 GRAM -> simple B                                               gas=253
     └── account created
 
 Cannot find transaction from sender A kQAXTu..1D67lA to simple B kQBS-c..jFMwzF

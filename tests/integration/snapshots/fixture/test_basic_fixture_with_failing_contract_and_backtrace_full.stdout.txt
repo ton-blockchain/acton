@@ -11,7 +11,7 @@
   ✗ should increase counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1513 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── at contracts/counter[LINE]
                    onInternalMessage   at contracts/counter[LINE]
@@ -24,7 +24,7 @@
   ✗ should reset counter [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1513 exit_code=10 aborted
             ├── Compute phase failed: Dictionary error
             └── at contracts/counter[LINE]
                    onInternalMessage   at contracts/counter[LINE]

@@ -172,10 +172,10 @@ fun SendResult.allOutActions(self): OutActionList {
 /// Example output:
 /// ```acton-trace
 /// N/A -> sender A
-/// └── AskToTransfer 0.3 TON -> JettonWallet B                                  gas=5158
-///     └── InternalTransferStep 0.19 TON -> JettonWallet C                      gas=6974
-///         ├── TransferNotificationForRecipient 0.05 TON -> receiver D          gas=1234
-///         └── ReturnExcessesBack 0.13 TON -> sender A                          gas=4321
+/// └── AskToTransfer 0.3 GRAM -> JettonWallet B                                 gas=5158
+///     └── InternalTransferStep 0.19 GRAM -> JettonWallet C                     gas=6974
+///         ├── TransferNotificationForRecipient 0.05 GRAM -> receiver D         gas=1234
+///         └── ReturnExcessesBack 0.13 GRAM -> sender A                         gas=4321
 /// ```
 ///
 /// To get a single send result, use [SendResultList.at] method.
@@ -475,7 +475,7 @@ struct SearchParams {
     to: (address -> bool) | address | null = null
     /// Source address of the transaction.
     from: (address -> bool) | address | null = null
-    /// Value of the message in nanotons.
+    /// Value of the message in nanograms.
     value: (coins -> bool) | coins | null = null
     /// Exit code of the transaction.
     exitCode: (int32 -> bool) | int32 | null = null

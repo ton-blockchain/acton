@@ -15,11 +15,11 @@
   ✓ formatter-linear-chain-println-exit-code63-opcode-mismatch [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmRoute 0.6 TON -> fm_linear_root B                                         gas=1782
+       └── FmRoute 0.6 GRAM -> fm_linear_root B                                        gas=1782
            │   queryId: 102
            │   mid: [WALLET_ADDRESS_BASE] (fm_linear_mid C)
            │   sink: [WALLET_ADDRESS_BASE] (fm_linear_sink)
-           └── FmDelivered 0.199933333 TON -> fm_linear_mid C                          gas=435 exit_code=63 aborted
+           └── FmDelivered 0.199933333 GRAM -> fm_linear_mid C                         gas=435 exit_code=63 aborted
                queryId: 102, hop: 1
                └── Compute phase failed: Unable to load data from cell because prefix does not match
 

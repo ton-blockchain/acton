@@ -11,7 +11,7 @@
   ✗ ae successful tx failure shows abi [EXIT_STATUS] [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── Ping 0.5 TON -> harness B                                                   gas=583 exit_code=701 aborted
+        └── Ping 0.5 GRAM -> harness B                                                  gas=583 exit_code=701 aborted
             └── Compute phase failed: ERR_FAIL
         
         Cannot find transaction from sender A kQAXTu..1D67lA to harness B kQAaaK..1fnYDp

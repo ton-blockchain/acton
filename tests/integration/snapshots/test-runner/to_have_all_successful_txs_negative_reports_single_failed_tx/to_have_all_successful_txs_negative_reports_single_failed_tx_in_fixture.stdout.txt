@@ -11,7 +11,7 @@
   ✗ ce all successful negative fixture single failing tx [TIME]
     └─ Error: expect(actual).toHaveAllSuccessfulTxs(expected)
         N/A -> deployer A
-        └── IncreaseCounter 0.1 TON -> Counter B                                        gas=1513 exit_code=10 aborted
+        └── IncreaseCounter 0.1 GRAM -> Counter B                                       gas=1513 exit_code=10 aborted
             └── Compute phase failed: Dictionary error
         
         Unexpected transaction

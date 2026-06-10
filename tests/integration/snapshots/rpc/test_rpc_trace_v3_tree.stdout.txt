@@ -1,7 +1,7 @@
 N/A -> kQAzMz..MzMw8H A
-└── IncreaseCounter 0.1 TON -> counter B                                        gas=123
-    ├── empty 0.000000001 TON -> kQAzMz..MzMw8H A                               gas=123
-    └── ReturnExcessesBack 0.000000002 TON -> counter B                         gas=123
+└── IncreaseCounter 0.1 GRAM -> counter B                                       gas=123
+    ├── empty 0.000000001 GRAM -> kQAzMz..MzMw8H A                              gas=123
+    └── ReturnExcessesBack 0.000000002 GRAM -> counter B                        gas=123
 
   Query Hash:        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   Trace ID:          aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa

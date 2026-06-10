@@ -2391,7 +2391,7 @@ Step 105 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (not loaded)
-      tonAmount: coins = 0.3 TON (not loaded)
+      tonAmount: coins = 0.3 GRAM (not loaded)
       internalTransferMsg: Cell = <not loaded>
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
@@ -2420,7 +2420,7 @@ Step 106 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (not loaded)
-      tonAmount: coins = 0.3 TON (not loaded)
+      tonAmount: coins = 0.3 GRAM (not loaded)
       internalTransferMsg: Cell = <not loaded>
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
@@ -2449,7 +2449,7 @@ Step 107 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (not loaded)
-      tonAmount: coins = 0.3 TON (not loaded)
+      tonAmount: coins = 0.3 GRAM (not loaded)
       internalTransferMsg: Cell = <not loaded>
     storage: MinterStorage (lazy)
       totalSupply: coins = 0 (not loaded)
@@ -2507,7 +2507,7 @@ Step 109 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (not loaded)
-      tonAmount: coins = 0.3 TON (not loaded)
+      tonAmount: coins = 0.3 GRAM (not loaded)
       internalTransferMsg: Cell = <not loaded>
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2541,7 +2541,7 @@ Step 110 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2575,7 +2575,7 @@ Step 111 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2609,7 +2609,7 @@ Step 112 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2643,7 +2643,7 @@ Step 113 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2655,7 +2655,7 @@ Step 113 (step_in):
       jettonAmount: coins = 20000000000 (not loaded)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (not loaded)
+      forwardTonAmount: coins = 0.05 GRAM (not loaded)
       forwardPayload: ForwardPayloadRemainder = [BOC_HEX] (not loaded)
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
@@ -2684,7 +2684,7 @@ Step 114 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2696,9 +2696,9 @@ Step 114 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
-    forwardTonAmount: coins = 0.05 TON
+    forwardTonAmount: coins = 0.05 GRAM
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -2773,7 +2773,7 @@ Step 117 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -2785,9 +2785,9 @@ Step 117 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON
+    forwardTonAmount: coins = 0.05 GRAM
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3401,7 +3401,7 @@ Step 149 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 0
@@ -3413,9 +3413,9 @@ Step 149 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3443,7 +3443,7 @@ Step 150 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000
@@ -3455,9 +3455,9 @@ Step 150 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 273 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3506,7 +3506,7 @@ Step 152 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3518,9 +3518,9 @@ Step 152 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 313 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3548,7 +3548,7 @@ Step 153 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3560,9 +3560,9 @@ Step 153 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 313 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3590,7 +3590,7 @@ Step 154 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3602,9 +3602,9 @@ Step 154 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 313 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3632,7 +3632,7 @@ Step 155 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3644,9 +3644,9 @@ Step 155 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
   Registers:
     c4 (storage): Cell<MinterStorage> = 313 bits, 1 refs, hash: [HASH]
       decoded: MinterStorage
@@ -3674,7 +3674,7 @@ Step 156 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3686,9 +3686,9 @@ Step 156 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
     jettonWalletCode: cell = 80 bits, 1 refs, hash: [HASH]
       bits = 80
       refs = 1
@@ -3721,7 +3721,7 @@ Step 157 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -3733,9 +3733,9 @@ Step 157 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
     jettonWalletCode: cell = 80 bits, 1 refs, hash: [HASH]
       bits = 80
       refs = 1
@@ -4020,7 +4020,7 @@ Step 166 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707
-      tonAmount: coins = 0.3 TON
+      tonAmount: coins = 0.3 GRAM
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH]
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -4032,9 +4032,9 @@ Step 166 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
     jettonWalletCode: cell = 80 bits, 1 refs, hash: [HASH]
       bits = 80
       refs = 1
@@ -4067,7 +4067,7 @@ Step 167 (step_in):
     msg: MintNewJettons (lazy)
       queryId: uint64 = 0 (not loaded)
       mintRecipient: address = 0:6f0c1fc7ec5141b349c5e1aa7f0c175c3abc18feb308a4d555391e9259814707 (last seen)
-      tonAmount: coins = 0.3 TON (last seen)
+      tonAmount: coins = 0.3 GRAM (last seen)
       internalTransferMsg: Cell<InternalTransferStep> = 446 bits, 0 refs, hash: [HASH] (last seen)
     storage: MinterStorage (lazy)
       totalSupply: coins = 20000000000 (last seen)
@@ -4079,9 +4079,9 @@ Step 167 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
-    forwardTonAmount: coins = 0.05 TON (last seen)
+    forwardTonAmount: coins = 0.05 GRAM (last seen)
     jettonWalletCode: cell = 80 bits, 1 refs, hash: [HASH] (last seen)
       bits = 80
       refs = 1
@@ -4191,7 +4191,7 @@ Step 171 (step_in):
       jettonAmount: coins = 20000000000 (not loaded)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (not loaded)
+      forwardTonAmount: coins = 0.05 GRAM (not loaded)
       forwardPayload: ForwardPayloadRemainder = [BOC_HEX] (not loaded)
   Registers:
     c4 (storage): Cell<WalletStorage> = 538 bits, 0 refs, hash: [HASH]
@@ -4222,7 +4222,7 @@ Step 172 (step_in):
       jettonAmount: coins = 20000000000 (not loaded)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (not loaded)
+      forwardTonAmount: coins = 0.05 GRAM (not loaded)
       forwardPayload: ForwardPayloadRemainder = [BOC_HEX] (not loaded)
   Registers:
     c4 (storage): Cell<WalletStorage> = 538 bits, 0 refs, hash: [HASH]
@@ -4253,7 +4253,7 @@ Step 173 (step_in):
       jettonAmount: coins = 20000000000 (not loaded)
       transferInitiator: address? = null (not loaded)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (not loaded)
-      forwardTonAmount: coins = 0.05 TON (not loaded)
+      forwardTonAmount: coins = 0.05 GRAM (not loaded)
       forwardPayload: ForwardPayloadRemainder = [BOC_HEX] (not loaded)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 0 (not loaded)
@@ -4288,7 +4288,7 @@ Step 174 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 0
@@ -4323,7 +4323,7 @@ Step 175 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000
@@ -4378,7 +4378,7 @@ Step 177 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4413,7 +4413,7 @@ Step 178 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4448,7 +4448,7 @@ Step 179 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4483,7 +4483,7 @@ Step 180 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4518,7 +4518,7 @@ Step 181 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4553,7 +4553,7 @@ Step 182 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4588,7 +4588,7 @@ Step 183 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4623,7 +4623,7 @@ Step 184 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4658,7 +4658,7 @@ Step 185 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4693,7 +4693,7 @@ Step 186 (step_in):
       jettonAmount: coins = 20000000000
       transferInitiator: address? = null
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON
+      forwardTonAmount: coins = 0.05 GRAM
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH]
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4728,7 +4728,7 @@ Step 187 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4765,7 +4765,7 @@ Step 188 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4802,7 +4802,7 @@ Step 189 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4837,7 +4837,7 @@ Step 190 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4872,7 +4872,7 @@ Step 191 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4907,7 +4907,7 @@ Step 192 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -4942,7 +4942,7 @@ Step 193 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5070,7 +5070,7 @@ Step 200 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5106,7 +5106,7 @@ Step 201 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5142,7 +5142,7 @@ Step 202 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5178,7 +5178,7 @@ Step 203 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5214,7 +5214,7 @@ Step 204 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5250,7 +5250,7 @@ Step 205 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5286,7 +5286,7 @@ Step 206 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5322,7 +5322,7 @@ Step 207 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)
@@ -5358,7 +5358,7 @@ Step 208 (step_in):
       jettonAmount: coins = 20000000000 (last seen)
       transferInitiator: address? = null (last seen)
       sendExcessesTo: address? = 0:55260e4c760d080288961590a0da5265d2215aa47c92156cd2c2d6cf907dd588 (last seen)
-      forwardTonAmount: coins = 0.05 TON (last seen)
+      forwardTonAmount: coins = 0.05 GRAM (last seen)
       forwardPayload: RemainingBitsAndRefs = 1 bits, 0 refs, hash: [HASH] (last seen)
     storage: WalletStorage (lazy)
       jettonBalance: coins = 20000000000 (last seen)

@@ -9,7 +9,7 @@
   ✓ mainnet usdt wallet library ref transaction tree [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── MainnetUsdtTopUp 0.1 TON -> Mainnet USDT Wallet Code B                      gas=1000
+       └── MainnetUsdtTopUp 0.1 GRAM -> Mainnet USDT Wallet Code B                     gas=1000
            queryId: 0
            └── account created
 

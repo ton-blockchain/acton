@@ -10,8 +10,8 @@
   ✓ missing library ref is reported [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── EvaaMasterClassicSupplyMaster 1 TON -> main B                               gas=1790
-           └── empty 0.2 TON -> kQDYTI..ey1SpF C                                       gas=160 exit_code=9 aborted
+       └── EvaaMasterClassicSupplyMaster 1 GRAM -> main B                              gas=1790
+           └── empty 0.2 GRAM -> kQDYTI..ey1SpF C                                      gas=160 exit_code=9 aborted
                ├── Compute phase failed: Cell underflow
                ├── Library 96A296D224F285C67BEE93C30F8A309157F0DAA35DC5B87E410B78630A09CFC7 is missing, which is what causes this error
                ├── This most likely happened because the library is not registered in tests

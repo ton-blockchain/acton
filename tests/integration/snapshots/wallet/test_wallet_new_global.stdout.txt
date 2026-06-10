@@ -2,9 +2,9 @@
 [WALLET_CREATED_ADDED]
 ✓ [WALLET_ADDRESS]
 
-NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.
+NOTE: This is a testnet wallet. Testnet GRAM has NO VALUE.
 
-To get testnet coins run acton wallet airdrop or check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
+To get testnet GRAM run acton wallet airdrop or check official documentation: https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet
 
 To check wallet balances run acton wallet list --balance.
 

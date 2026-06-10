@@ -198,7 +198,7 @@ fun impl.treasuryCode(): cell asm """
 /// ```tolk
 /// val state = testing.getAccountState(contract.address);
 /// if (state != null) {
-///     println("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:gram}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -215,7 +215,7 @@ fun testing.getAccountState(addr: address): TlbAccountInfo? {
 /// ```tolk
 /// val storageFee = testing.getAccountStorageFee(contract.address, 86400); // 1 day
 /// if (storageFee != null) {
-///     println("Daily storage fee: {:ton}", storageFee);
+///     println("Daily storage fee: {:gram}", storageFee);
 /// }
 /// ```
 fun testing.getAccountStorageFee(addr: address, seconds: int): coins? {
@@ -301,7 +301,7 @@ fun testing.setRandomSeed(seed: uint256? = null): uint256 {
     return resolvedSeed;
 }
 
-/// Topup an address with a specified amount of TON.
+/// Topup an address with a specified amount of GRAM.
 ///
 /// Example:
 /// ```tolk
@@ -309,7 +309,7 @@ fun testing.setRandomSeed(seed: uint256? = null): uint256 {
 /// ```
 ///
 /// Note: This function for tests only!
-/// For testnet TON airdrop onto your wallet, use `acton wallet airdrop` command.
+/// For testnet GRAM airdrop onto your wallet, use `acton wallet airdrop` command.
 fun testing.topUp(to: address, amount: coins): void {
     val treasury = testing.treasury("treasury");
     val topupMsg = createMessage({
@@ -327,7 +327,7 @@ fun testing.topUp(to: address, amount: coins): void {
 /// Example:
 /// ```tolk
 /// val balance = testing.getAccountBalance(address);
-/// println("{:ton}", balance);
+/// println("{:gram}", balance);
 /// ```
 fun testing.getAccountBalance(of: address): coins {
     return impl.getAccountBalance(of);

@@ -54,7 +54,8 @@ import "ffi"
 /// - `{:X}` - same lowercase hexadecimal as `{:x}`, but with `0x` prefix
 /// - `{:b}` - formats an int as binary without `0b` prefix
 /// - `{:B}` - same binary as `{:b}`, but with `0b` prefix
-/// - `{:ton}` - formats an int amount in nanotons as `<value> TON`
+/// - `{:gram}` / `{:grams}` - formats an int amount in nanograms as `<value> GRAM`
+/// - `{:ton}` - legacy alias for `{:gram}` / `{:grams}`
 /// - `{:cell-tree}` - formats a cell/slice/builder/Cell<T> as a tree of cell references
 ///
 /// Placeholder syntax is the same as `format` from `fmt.tolk`:
@@ -71,8 +72,8 @@ import "ffi"
 /// - If the first string is an invalid format string, it is printed literally.
 /// - If placeholders outnumber arguments, the full unmatched placeholders stay in output as text.
 /// - If arguments outnumber placeholders, extra arguments are appended after the formatted text.
-/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, and `{:ton}` fall back
-///   to the same behavior as `{}`.
+/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, `{:gram}`, `{:grams}`,
+///   and `{:ton}` fall back to the same behavior as `{}`.
 /// - For non-cell/slice/builder/Cell<T> arguments, `{:cell-tree}` falls back to the same behavior as `{}`.
 fun println<
     T1,

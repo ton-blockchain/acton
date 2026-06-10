@@ -151,7 +151,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
     }
   }
 
-  const tonBalance = state ? formatNano(state.balance) : undefined
+  const gramBalance = state ? formatNano(state.balance) : undefined
 
   const copyToClipboard = () => {
     void navigator.clipboard.writeText(displayAddress)
@@ -302,7 +302,7 @@ export const AccountInfo: React.FC<AccountInfoProps> = ({
                 {stateLoading ? (
                   <div className={`${styles.skeleton} ${styles.skeletonValue}`} />
                 ) : state ? (
-                  <span className={styles.primaryValue}>{tonBalance} TON</span>
+                  <span className={styles.primaryValue}>{gramBalance} GRAM</span>
                 ) : (
                   <span className={styles.mutedValue}>-</span>
                 )}

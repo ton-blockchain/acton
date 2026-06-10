@@ -23,8 +23,8 @@ use tycho_types::models::{
     OwnedMessage, StdAddr,
 };
 
-const STARTUP_ACCOUNT_TOPUP_NANOTONS: u128 = 100_000_000_000; // 100 TON
-const STARTUP_DEPLOY_TRANSFER_NANOTONS: u128 = 50_000_000; // 0.05 TON
+const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
+const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 const WALLET_MSG_TTL_SECONDS: u64 = 600;
 pub use status::localnet_status_cmd;
 
@@ -151,7 +151,7 @@ async fn setup_startup_accounts(
                 address.as_str().dimmed(),
             );
         } else {
-            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOTONS)
+            node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOGRAMS)
                 .await
                 .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
 
@@ -227,7 +227,7 @@ fn build_wallet_deploy_message(wallet: &Wallet) -> anyhow::Result<String> {
         bounced: false,
         src: IntAddr::Std(wallet_addr.clone()),
         dst: IntAddr::Std(wallet_addr),
-        value: CurrencyCollection::new(STARTUP_DEPLOY_TRANSFER_NANOTONS),
+        value: CurrencyCollection::new(STARTUP_DEPLOY_TRANSFER_NANOGRAMS),
         ihr_fee: Default::default(),
         fwd_fee: Default::default(),
         created_at: 0,
@@ -261,16 +261,20 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
     .to_string()
 }
 
-pub async fn localnet_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> anyhow::Result<()> {
+pub async fn localnet_airdrop_cmd(
+    address: &str,
+    amount_grams: f64,
+    port: u16,
+) -> anyhow::Result<()> {
     let client = crate::http::client_builder()
         .user_agent(crate::build_info::user_agent())
         .build()?;
-    let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;
+    let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
     let res = client
         .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
         .json(&serde_json::json!({
             "address": address,
-            "amount": amount_nanotons
+            "amount": amount_nanograms
         }))
         .send()
         .await
@@ -288,9 +292,9 @@ pub async fn localnet_airdrop_cmd(address: &str, amount_ton: f64, port: u16) -> 
                 .unwrap_or(false)
         {
             println!(
-                "{} airdrop {} TON to {} on localnet",
+                "{} airdrop {} GRAM to {} on localnet",
                 "Successfully".green().bold(),
-                amount_ton,
+                amount_grams,
                 address
             );
         } else {

@@ -144,7 +144,7 @@ on-chain code-hash comparison against the target address before upload.
 ## Cost And Backend Notes
 
 - when `--dry-run` is not used, the final verification transaction sends
-  `0.1 TON`
+  `0.1 GRAM`
 - if the verifier backend reports that the contract is already verified, Acton
   exits successfully without sending another transaction
 - on successful verification, Acton prints a verifier link for the contract

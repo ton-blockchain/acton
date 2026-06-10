@@ -20,7 +20,7 @@
        flag={:B} value=|0b1010|
        flag={:08B} value=|0b001010|
        flag={:0>6x} value=|000-ff|
-       flag={:>12ton} value=|     1.5 TON|
+       flag={:>12ton} value=|    1.5 GRAM|
        flag={:0>8:x} value=|000000ff|
        flag={:*>6} value=|****ok|
 

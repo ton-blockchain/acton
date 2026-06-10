@@ -8,6 +8,6 @@
   ✓ transaction tree url friendly address [TIME]
     └─ Test output:
        N/A -> url_friendly_sender A
-       └── empty 0.1 TON -> kQD___..____Bi B                                           compute phase skipped aborted
+       └── empty 0.1 GRAM -> kQD___..____Bi B                                          compute phase skipped aborted
 
  ✓ 1 passed in 1 file

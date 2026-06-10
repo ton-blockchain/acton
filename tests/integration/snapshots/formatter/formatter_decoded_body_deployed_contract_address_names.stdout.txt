@@ -11,7 +11,7 @@
   ✓ formatter decoded body deployed contract addresses [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmKnownAddressBody 0.05 TON -> fm_known_address_sink B                      gas=333
+       └── FmKnownAddressBody 0.05 GRAM -> fm_known_address_sink B                     gas=333
            queryId: 0, newAdminAddress: [WALLET_ADDRESS_BASE] (fm_known_address_sink B)
 
  ✓ 1 passed in 1 file

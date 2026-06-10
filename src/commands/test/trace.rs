@@ -135,11 +135,11 @@ pub(super) fn contract_file_name(contract_name: &str) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExecutorActionFailureReasonInfo {
-    NotEnoughToncoinToSend {
+    NotEnoughGramsToSend {
         remaining_balance: String,
         required: String,
     },
-    CannotReserveToncoin {
+    CannotReserveGrams {
         requested: String,
         available: String,
     },
@@ -264,17 +264,17 @@ fn executor_action_info(
 #[must_use]
 fn convert_failure_reason(reason: ExecutedActionFailureReason) -> ExecutorActionFailureReasonInfo {
     match reason {
-        ExecutedActionFailureReason::NotEnoughToncoinToSend {
+        ExecutedActionFailureReason::NotEnoughGramsToSend {
             remaining_balance,
             required,
-        } => ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend {
+        } => ExecutorActionFailureReasonInfo::NotEnoughGramsToSend {
             remaining_balance: remaining_balance.to_string(),
             required: required.to_string(),
         },
-        ExecutedActionFailureReason::CannotReserveToncoin {
+        ExecutedActionFailureReason::CannotReserveGrams {
             requested,
             available,
-        } => ExecutorActionFailureReasonInfo::CannotReserveToncoin {
+        } => ExecutorActionFailureReasonInfo::CannotReserveGrams {
             requested: requested.to_string(),
             available: available.to_string(),
         },
@@ -465,9 +465,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::SendMessage {
                 failure_code: Some(37),
-                failure_reason: Some(
-                    ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend { .. }
-                ),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::NotEnoughGramsToSend { .. }),
                 location: None,
                 ..
             }
@@ -501,7 +499,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::ReserveCurrency {
                 failure_code: Some(37),
-                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveToncoin { .. }),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveGrams { .. }),
                 location: None,
                 ..
             }

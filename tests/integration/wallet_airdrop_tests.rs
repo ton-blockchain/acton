@@ -912,7 +912,7 @@ fn test_wallet_airdrop_localnet_json_success_omits_pow_fields() {
     assert_eq!(json["success"], true);
     assert_eq!(
         json["message"],
-        "Successfully airdropped 100 TON on localnet"
+        "Successfully airdropped 100 GRAM on localnet"
     );
     assert!(
         json["address"]
@@ -1165,7 +1165,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
 
     session.expect("interactive airdrop wait success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 2.2000 TON");
+    session.expect("Testnet funds are available: 2.2000 GRAM");
     session.expect(Eof);
 
     faucet_handle
@@ -1283,7 +1283,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
 
     session.expect("existing balance airdrop wait success");
     session.expect("Waiting for testnet balance to increase... Press Enter to skip waiting.");
-    session.expect("Testnet balance increased: 3.4000 TON (+1.2000 TON)");
+    session.expect("Testnet balance increased: 3.4000 GRAM (+1.2000 GRAM)");
     session.expect(Eof);
 
     faucet_handle
@@ -2422,7 +2422,7 @@ fn test_wallet_new_prompted_airdrop_yes_uses_cli_faucet_url() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("y", "failed to confirm prompted airdrop");
     session.expect("Requesting airdrop for wallet prompted-cli-wallet");
     session.expect("prompted cli faucet success");
@@ -2498,11 +2498,11 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("y", "failed to confirm prompted airdrop wait");
     session.expect("prompted wait success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 2.5000 TON");
+    session.expect("Testnet funds are available: 2.5000 GRAM");
     session.expect(Eof);
 
     faucet_handle
@@ -2598,7 +2598,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
 
     session.expect("interactive airdrop success");
     session.expect("Waiting for testnet funds to appear... Press Enter to skip waiting.");
-    session.expect("Testnet funds are available: 1.5000 TON");
+    session.expect("Testnet funds are available: 1.5000 GRAM");
     session.expect(Eof);
 
     faucet_handle

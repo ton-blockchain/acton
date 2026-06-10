@@ -13,13 +13,13 @@
   ✓ formatter action phase failure println verbose [TIME]
     └─ Test output:
        N/A -> sender A
-       └── empty 0.2 TON -> fm_action_fail B                                           gas=2347 aborted action_result_code=37
+       └── empty 0.2 GRAM -> fm_action_fail B                                          gas=2347 aborted action_result_code=37
            ├── account created
            ├── Action phase failed
-           ├── Description: Not enough Toncoin
+           ├── Description: Not enough GRAM
            ├── Re-run with --backtrace full to get actions location
            └── Executed actions:
-               ├── reserve 0.1 TON BOUNCE_ON_ACTION_FAIL                                  balance: 0.099843532 TON
-               └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3E690D84D58C05F1B39E195AB1CB99C00  balance: 0 TON
+               ├── reserve 0.1 GRAM BOUNCE_ON_ACTION_FAIL                                 balance: 0.099843532 GRAM
+               └── msg: 46F9C0B8D15E2DAFE7CBE4C19A6E59C3E690D84D58C05F1B39E195AB1CB99C00  balance: 0 GRAM
 
  ✓ 1 passed in 1 file

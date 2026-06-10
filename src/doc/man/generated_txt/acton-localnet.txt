@@ -49,7 +49,7 @@ SUBCOMMANDS
           --load-state and --db-path cannot be used together in the same run.
 
    acton localnet airdrop
-       Send TON from the local faucet to an address.
+       Send GRAM from the local faucet to an address.
 
       Synopsis
           acton localnet airdrop [options] address
@@ -58,8 +58,8 @@ SUBCOMMANDS
           address
               Recipient address.
 
-          -a, --amount ton
-              Amount of TON to request.
+          -a, --amount gram
+              Amount of GRAM to request.
 
           -p, --port port
               Localnet server port.

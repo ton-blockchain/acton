@@ -147,7 +147,8 @@ get fun `test format message`() {
 
 get fun `test format multiple arguments and modifiers`() {
     expect(format("{} {:x}", "hex", 255)).toEqual("hex ff");
-    expect(format("{} {} {:ton}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 TON");
+    expect(format("{} {} {:ton}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 GRAM");
+    expect(format("{} {} {:grams}", "value", 7, ton("1.5"))).toEqual("value 7 1.5 GRAM");
     expect(format("{{{}}} {} {} {}", 1, 2, 3, 4)).toEqual("{1} 2 3 4");
     expect(
         format(

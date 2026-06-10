@@ -1,6 +1,6 @@
 use super::{
-    format_nanotons, format_std_address, load_local_contract_candidates, load_rpc_config, print_kv,
-    resolve_rpc_network,
+    format_nanograms, format_std_address, load_local_contract_candidates, load_rpc_config,
+    print_kv, resolve_rpc_network,
 };
 use crate::context::{BuildCache, KnownAddresses};
 use crate::ffi::emulation::{
@@ -335,7 +335,7 @@ fn format_message_value(message: &V3MessageSummary) -> String {
         return format_trace_none();
     };
     match BigInt::from_str(value) {
-        Ok(value) => format_nanotons(&value).white().to_string(),
+        Ok(value) => format_nanograms(&value).white().to_string(),
         Err(_) => value.yellow().to_string(),
     }
 }

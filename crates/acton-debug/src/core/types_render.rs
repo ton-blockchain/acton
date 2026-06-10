@@ -182,7 +182,9 @@ impl RenderedValue {
                 value,
                 type_field: Some(type_field),
             } if type_field == "coins"
-                && name.is_some_and(|name| identifier_has_word(name, "ton")) =>
+                && name.is_some_and(|name| {
+                    identifier_has_word(name, "ton") || identifier_has_word(name, "gram")
+                }) =>
             {
                 format_coins_for_debug(value).unwrap_or_else(|| value.clone())
             }
@@ -231,7 +233,8 @@ impl RenderedValue {
                 value,
                 type_field: Some(type_field),
             } if type_field == "coins" => {
-                let value = if identifier_has_word(name, "ton") {
+                let value = if identifier_has_word(name, "ton") || identifier_has_word(name, "gram")
+                {
                     format_coins_for_debug(value).unwrap_or_else(|| value.clone())
                 } else {
                     value.clone()
@@ -843,12 +846,12 @@ fn format_coins_for_debug(tokens: &str) -> Option<String> {
     let whole = tokens / 1_000_000_000;
     let frac = tokens % 1_000_000_000;
     if frac == 0 {
-        return Some(format!("{whole} TON"));
+        return Some(format!("{whole} GRAM"));
     }
 
     let frac = format!("{frac:09}");
     let frac = frac.trim_end_matches('0');
-    Some(format!("{whole}.{frac} TON"))
+    Some(format!("{whole}.{frac} GRAM"))
 }
 
 fn identifier_has_word(name: &str, needle: &str) -> bool {
@@ -3681,7 +3684,7 @@ fn format_change_library_mode(mode: ChangeLibraryMode) -> String {
 fn format_tokens(tokens: u128) -> String {
     let whole = tokens / 1_000_000_000;
     let frac = tokens % 1_000_000_000;
-    format!("{whole}.{frac:09} TON")
+    format!("{whole}.{frac:09} GRAM")
 }
 
 fn format_currency_collection(currency: &CurrencyCollection) -> String {
@@ -4621,11 +4624,11 @@ mod tests {
 
         assert_eq!(
             rendered.dap_parts_for_client(Some("tonAmount")).0,
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("forward_ton_amount")).0,
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("jettonAmount")).0,
@@ -4645,7 +4648,7 @@ mod tests {
 
         assert_eq!(
             rendered.dap_parts_for_client(Some("forwardTonAmount")).0,
-            "1.022 TON (last seen)"
+            "1.022 GRAM (last seen)"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("jettonAmount")).0,
@@ -4657,10 +4660,10 @@ mod tests {
     fn legacy_named_dap_value_formats_coins_only_for_ton_word() {
         let rendered = RenderedValue::typed_leaf("1022000000", "coins");
 
-        assert_eq!(rendered.legacy_dap_value(Some("tonAmount")), "1.022 TON");
+        assert_eq!(rendered.legacy_dap_value(Some("tonAmount")), "1.022 GRAM");
         assert_eq!(
             rendered.legacy_dap_value(Some("forward_ton_amount")),
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.legacy_dap_value(Some("jettonAmount")),
@@ -4677,7 +4680,7 @@ mod tests {
 
         assert_eq!(
             rendered.legacy_dap_value(Some("forwardTonAmount")),
-            "1.022 TON (last seen)"
+            "1.022 GRAM (last seen)"
         );
         assert_eq!(
             rendered.legacy_dap_value(Some("jettonAmount")),
@@ -5124,12 +5127,12 @@ mod tests {
         assert_eq!(type_name, "OutAction");
         assert_eq!(
             variant_name,
-            "ReserveCurrency 2.500000000 TON with WITH_ORIGINAL_BALANCE"
+            "ReserveCurrency 2.500000000 GRAM with WITH_ORIGINAL_BALANCE"
         );
         assert_eq!(fields[0].0, "mode");
         assert_eq!(fields[0].1.dap_parts().0, "WITH_ORIGINAL_BALANCE");
         assert_eq!(fields[1].0, "value");
-        assert_eq!(fields[1].1.dap_parts().0, "2.500000000 TON");
+        assert_eq!(fields[1].1.dap_parts().0, "2.500000000 GRAM");
     }
 
     #[test]

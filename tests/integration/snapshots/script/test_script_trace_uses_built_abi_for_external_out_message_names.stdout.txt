@@ -1,6 +1,6 @@
   Installing standard library [ACTON_VERSION]
 N/A -> sender A
-└── TriggerExternalNotice 0.1 TON -> external_emitter B                         gas=2260
+└── TriggerExternalNotice 0.1 GRAM -> external_emitter B                        gas=2260
     queryId: 33
     └── ext-out ScriptOnlyExternalNotice -> none
     queryId: 33

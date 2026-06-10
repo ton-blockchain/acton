@@ -3,7 +3,7 @@ Remote Account
   Raw Address:       0:2222222222222222222222222222222222222222222222222222222222222222
   Status:            active
   Contract:          counter
-  Balance:           1.234 TON
+  Balance:           1.234 GRAM
   Last Tx LT:        999
   Last Tx Hash:      c0ffee
   Code Hash:         0x15407004a66e0cf95a67c39edbb54a531dfdb6df93fb7d365fae57a34b874747

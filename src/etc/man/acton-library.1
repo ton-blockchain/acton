@@ -87,9 +87,9 @@ Local TON Connect page port.
 Defaults to \fB52258\fR\&.
 .RE
 .sp
-\fB\-\-amount\fR \fIton\fR
+\fB\-\-amount\fR \fIgram\fR
 .RS 4
-Explicit TON amount to send.
+Explicit GRAM amount to send.
 .sp
 Overrides duration\-based estimation.
 .RE
@@ -176,9 +176,9 @@ Library name to top up.
 Requested additional storage duration such as \fB100d\fR or \fB1y\fR\&.
 .RE
 .sp
-\fB\-\-amount\fR \fIton\fR
+\fB\-\-amount\fR \fIgram\fR
 .RS 4
-Explicit TON amount to send.
+Explicit GRAM amount to send.
 .sp
 Overrides duration\-based estimation.
 .RE
@@ -270,7 +270,7 @@ library ID, Acton appends \fB\-1\fR, \fB\-2\fR, and so on to keep the existing r
 the destination file
 .RE
 .SH "AMOUNT ESTIMATION"
-For \fBpublish\fR and \fBtopup\fR, \fB\-\-duration\fR is used to estimate the required TON
+For \fBpublish\fR and \fBtopup\fR, \fB\-\-duration\fR is used to estimate the required GRAM
 amount from the library size and storage duration.
 .sp
 If \fB\-\-amount\fR is passed, it overrides that estimate completely.

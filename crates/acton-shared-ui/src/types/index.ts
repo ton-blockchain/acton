@@ -67,12 +67,12 @@ export interface FailedMessage {
 
 export type BackendExecutorActionFailureReason =
   | {
-      readonly type: "not_enough_toncoin_to_send"
+      readonly type: "not_enough_grams_to_send"
       readonly remaining_balance: string
       readonly required: string
     }
   | {
-      readonly type: "cannot_reserve_toncoin"
+      readonly type: "cannot_reserve_grams"
       readonly requested: string
       readonly available: string
     }

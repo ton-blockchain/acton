@@ -60,7 +60,7 @@ pub const GIVER_ADDR: Addr = Addr {
     addr: [0x55; 32],
 };
 
-pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
+pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B GRAM
 const EXOTIC_LIBRARY_TAG: u8 = 2;
 
 impl Node {

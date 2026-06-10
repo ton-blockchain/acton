@@ -8,7 +8,7 @@
             <failure message="expect(&lt;actual&gt;).toHaveSuccessfulTx(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]
 expect(actual).toHaveSuccessfulTx(expected)
 N/A -&gt; deployer A
-└── IncreaseCounter 0.1 TON -&gt; Counter B                                        gas=1513 exit_code=10 aborted
+└── IncreaseCounter 0.1 GRAM -&gt; Counter B                                       gas=1513 exit_code=10 aborted
     └── Compute phase failed: Dictionary error
 
 Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
@@ -21,7 +21,7 @@ at tests/counter.test[LINE]</failure>
             <failure message="expect(&lt;actual&gt;).toHaveSuccessfulTx(&lt;expected&gt;)" type="AssertionError">at [ROOT]/tests/counter.test[LINE]
 expect(actual).toHaveSuccessfulTx(expected)
 N/A -&gt; deployer A
-└── IncreaseCounter 0.1 TON -&gt; Counter B                                        gas=1513 exit_code=10 aborted
+└── IncreaseCounter 0.1 GRAM -&gt; Counter B                                       gas=1513 exit_code=10 aborted
     └── Compute phase failed: Dictionary error
 
 Cannot find transaction from deployer A kQBvDB..FHB5iD to Counter B kQANZp..QQ5NCf
