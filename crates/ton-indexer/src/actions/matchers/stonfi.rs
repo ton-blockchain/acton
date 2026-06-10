@@ -1,10 +1,31 @@
+use super::super::enrichment::{ActionInfo, ActionInfoBox, EnrichmentContext};
 use super::super::{
-    ActionKind, BaseActionGraph, BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch,
-    CompositeMatcher, TraceNode, opcode_matches, opcodes,
+    Action, ActionKind, ActionProvider, BaseActionGraph, BaseActionKind, BaseMatch, BaseMatcher,
+    CompositeMatch, CompositeMatcher, TraceNode, opcode_matches, opcodes,
 };
 use std::collections::BTreeSet;
 
-pub(in crate::actions) struct StonfiSwapMatcher;
+pub(in crate::actions) struct StonfiProvider;
+
+impl ActionProvider for StonfiProvider {
+    fn base_matchers(&self) -> &'static [&'static dyn BaseMatcher] {
+        &[&StonfiSwapMatcher]
+    }
+
+    fn composite_matchers(&self) -> &'static [&'static dyn CompositeMatcher] {
+        &[&StonfiSwapMatcher]
+    }
+
+    fn describe(&self, action: &Action, _ctx: &EnrichmentContext<'_>) -> Option<ActionInfoBox> {
+        if action.kind != ActionKind::StonfiSwap {
+            return None;
+        }
+
+        Some(Box::new(StonfiSwapInfo))
+    }
+}
+
+struct StonfiSwapMatcher;
 
 impl BaseMatcher for StonfiSwapMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
@@ -12,7 +33,7 @@ impl BaseMatcher for StonfiSwapMatcher {
             return None;
         }
 
-        let pay_to = root.find_child_by_opcode(opcodes::STONFI_PAY_TO_V2)?;
+        let pay_to = root.child(opcodes::STONFI_PAY_TO_V2)?;
 
         Some(BaseMatch {
             kind: BaseActionKind::StonfiSwap,
@@ -47,5 +68,14 @@ impl CompositeMatcher for StonfiSwapMatcher {
                 })
             })
             .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct StonfiSwapInfo;
+
+impl ActionInfo for StonfiSwapInfo {
+    fn render(&self) -> String {
+        "STON.fi swap".to_owned()
     }
 }

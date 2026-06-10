@@ -1,9 +1,14 @@
+mod enrichment;
+mod facts;
 mod matchers;
 
-use matchers::{
-    DedustJettonSwapLegMatcher, DedustNativeSwapLegMatcher, DedustPayoutMatcher, DedustSwapMatcher,
-    JettonMintMatcher, JettonTransferMatcher, PtonTransferMatcher, StonfiSwapMatcher,
+pub use enrichment::{
+    ActionInfo, Asset, AssetAmount, EnrichedAction, enrich_actions, render_action,
 };
+pub use facts::{
+    DecodedBody, DecodedStruct, DecodedValue, JettonTransferView, MessageFact, NodeFact, TraceFacts,
+};
+
 use std::collections::{BTreeMap, BTreeSet};
 
 pub type NodeId = u64;
@@ -106,7 +111,7 @@ pub struct BaseMatch {
     pub user_facing: bool,
 }
 
-pub trait BaseMatcher {
+pub trait BaseMatcher: Sync {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch>;
 }
 
@@ -167,8 +172,27 @@ impl<'a> BaseActionGraph<'a> {
     }
 }
 
-pub trait CompositeMatcher {
+pub trait CompositeMatcher: Sync {
     fn try_match(&self, graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch>;
+}
+
+pub(in crate::actions) trait ActionProvider: Sync {
+    fn base_matchers(&self) -> &'static [&'static dyn BaseMatcher] {
+        &[]
+    }
+
+    fn composite_matchers(&self) -> &'static [&'static dyn CompositeMatcher] {
+        &[]
+    }
+
+    fn describe(
+        &self,
+        action: &Action,
+        ctx: &enrichment::EnrichmentContext<'_>,
+    ) -> Option<enrichment::ActionInfoBox> {
+        let _ = (action, ctx);
+        None
+    }
 }
 
 #[must_use]
@@ -212,61 +236,47 @@ pub fn extract_actions(trace: &Trace) -> Extraction {
 }
 
 fn extract_base_actions(trace: &Trace) -> Vec<BaseAction> {
-    let matchers: &[&dyn BaseMatcher] = &[
-        &DedustNativeSwapLegMatcher,
-        &DedustJettonSwapLegMatcher,
-        &DedustPayoutMatcher,
-        &StonfiSwapMatcher,
-        &PtonTransferMatcher,
-        &JettonTransferMatcher,
-        &JettonMintMatcher,
-    ];
-
     let mut base_actions = Vec::new();
     let mut consumed_nodes = BTreeSet::new();
-    collect_base_actions(
-        &trace.root,
-        matchers,
-        &mut consumed_nodes,
-        &mut base_actions,
-    );
+    collect_base_actions(&trace.root, &mut consumed_nodes, &mut base_actions);
     base_actions
 }
 
 fn collect_base_actions(
     node: &TraceNode,
-    matchers: &[&dyn BaseMatcher],
     consumed_nodes: &mut BTreeSet<NodeId>,
     base_actions: &mut Vec<BaseAction>,
 ) {
     if !consumed_nodes.contains(&node.id) {
-        for matcher in matchers {
-            let Some(base_match) = matcher.try_match(node) else {
-                continue;
-            };
+        'matchers: for provider in matchers::providers() {
+            for matcher in provider.base_matchers() {
+                let Some(base_match) = matcher.try_match(node) else {
+                    continue;
+                };
 
-            if base_match
-                .nodes
-                .iter()
-                .any(|node_id| consumed_nodes.contains(node_id))
-            {
-                continue;
+                if base_match
+                    .nodes
+                    .iter()
+                    .any(|node_id| consumed_nodes.contains(node_id))
+                {
+                    continue;
+                }
+
+                consumed_nodes.extend(base_match.nodes.iter().copied());
+                base_actions.push(BaseAction {
+                    id: next_base_action_id(base_actions),
+                    kind: base_match.kind,
+                    nodes: base_match.nodes,
+                    root_node: base_match.root_node,
+                    user_facing: base_match.user_facing,
+                });
+                break 'matchers;
             }
-
-            consumed_nodes.extend(base_match.nodes.iter().copied());
-            base_actions.push(BaseAction {
-                id: next_base_action_id(base_actions),
-                kind: base_match.kind,
-                nodes: base_match.nodes,
-                root_node: base_match.root_node,
-                user_facing: base_match.user_facing,
-            });
-            break;
         }
     }
 
     for child in &node.children {
-        collect_base_actions(child, matchers, consumed_nodes, base_actions);
+        collect_base_actions(child, consumed_nodes, base_actions);
     }
 }
 
@@ -298,23 +308,23 @@ fn add_fallback_base_actions(root: &TraceNode, base_actions: &mut Vec<BaseAction
 }
 
 fn extract_composite_actions(graph: &BaseActionGraph<'_>) -> Vec<CompositeMatch> {
-    let matchers: &[&dyn CompositeMatcher] = &[&StonfiSwapMatcher, &DedustSwapMatcher];
-
     let mut composite_actions = Vec::new();
     let mut consumed_base_actions = BTreeSet::new();
 
-    for matcher in matchers {
-        for composite_match in matcher.try_match(graph) {
-            if composite_match
-                .base_actions
-                .iter()
-                .any(|id| consumed_base_actions.contains(id))
-            {
-                continue;
-            }
+    for provider in matchers::providers() {
+        for matcher in provider.composite_matchers() {
+            for composite_match in matcher.try_match(graph) {
+                if composite_match
+                    .base_actions
+                    .iter()
+                    .any(|id| consumed_base_actions.contains(id))
+                {
+                    continue;
+                }
 
-            consumed_base_actions.extend(composite_match.base_actions.iter().copied());
-            composite_actions.push(composite_match);
+                consumed_base_actions.extend(composite_match.base_actions.iter().copied());
+                composite_actions.push(composite_match);
+            }
         }
     }
 
@@ -370,7 +380,7 @@ impl TraceNode {
         nodes
     }
 
-    pub(super) fn find_child_by_opcode(&self, opcode: u32) -> Option<&Self> {
+    pub(super) fn child(&self, opcode: u32) -> Option<&Self> {
         self.children
             .iter()
             .find(|child| opcode_matches(child, opcode))

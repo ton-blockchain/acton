@@ -2,6 +2,103 @@ mod common;
 
 use common::{check_extraction, trace};
 use expect_test::expect;
+use std::collections::BTreeMap;
+use ton_indexer::actions::{
+    DecodedBody, DecodedValue, NodeFact, TraceFacts, enrich_actions, extract_actions, opcodes,
+    render_action,
+};
+
+#[test]
+fn enriched_jetton_transfer_reads_amount_from_decoded_node() {
+    let trace = trace!(
+        r"
+        JettonTransfer #1
+        └── JettonInternalTransfer #2
+        "
+    );
+    let extraction = extract_actions(&trace);
+    let mut facts = TraceFacts::new();
+    facts.insert(NodeFact {
+        id: 1,
+        opcode: Some(opcodes::JETTON_TRANSFER),
+        message: None,
+        decoded: Some(DecodedBody {
+            type_name: "JettonTransfer".to_owned(),
+            fields: BTreeMap::from([("amount".to_owned(), DecodedValue::Coins(10_000_000_000))]),
+        }),
+    });
+
+    let enriched = enrich_actions(&extraction, &facts);
+    let formatted = enriched
+        .iter()
+        .map(|item| {
+            format!(
+                "{:?}: {:?}\nrender: {}",
+                item.action.kind,
+                &item.info,
+                render_action(item)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    expect![
+        "JettonTransfer: JettonTransferInfo { amount: Some(10000000000), source: None, destination: None }\nrender: transferred 10000000000 jetton units"
+    ]
+    .assert_eq(&formatted);
+}
+
+#[test]
+fn enriched_dedust_native_swap_reads_ton_offer_and_jetton_ask() {
+    let trace = trace!(
+        r"
+        DedustVaultNativeV2Swap #1
+        └── DedustPoolV2SwapExternal #2
+            └── DedustPoolV2PayOutFromPool #3
+                └── JettonTransfer #4
+                    └── JettonInternalTransfer #5
+        "
+    );
+    let extraction = extract_actions(&trace);
+    let mut facts = TraceFacts::new();
+    facts.insert(NodeFact {
+        id: 1,
+        opcode: Some(opcodes::DEDUST_VAULT_NATIVE_V2_SWAP),
+        message: None,
+        decoded: Some(DecodedBody {
+            type_name: "DedustVaultNativeV2Swap".to_owned(),
+            fields: BTreeMap::from([("amount".to_owned(), DecodedValue::Coins(10_000_000_000))]),
+        }),
+    });
+    facts.insert(NodeFact {
+        id: 4,
+        opcode: Some(opcodes::JETTON_TRANSFER),
+        message: None,
+        decoded: Some(DecodedBody {
+            type_name: "JettonTransfer".to_owned(),
+            fields: BTreeMap::from([("amount".to_owned(), DecodedValue::Coins(123_000_000))]),
+        }),
+    });
+
+    let enriched = enrich_actions(&extraction, &facts);
+    let formatted = enriched
+        .iter()
+        .map(|item| {
+            format!(
+                "{:?}: {:?}\nrender: {}",
+                item.action.kind,
+                &item.info,
+                render_action(item)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    expect![
+        "DedustSwap: DedustSwapInfo { offer: Some(AssetAmount { asset: Ton, amount: 10000000000 }), ask: Some(AssetAmount { asset: Jetton { wallet: None }, amount: 123000000 }) }\nrender: swapped 10 TON to 123000000 jetton units via DeDust"
+    ]
+        .assert_eq(&formatted);
+}
 
 #[test]
 fn dedust_swap_consumes_nested_jetton_transfer() {
