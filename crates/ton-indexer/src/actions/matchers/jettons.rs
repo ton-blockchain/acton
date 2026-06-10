@@ -1,17 +1,17 @@
-use super::super::{BaseActionKind, BaseMatch, BaseMatcher, TraceNode, opcode_matches};
+use super::super::{BaseActionKind, BaseMatch, BaseMatcher, TraceNode, opcode_matches, opcodes};
 use std::collections::BTreeSet;
 
 pub(in crate::actions) struct JettonTransferMatcher;
 
 impl BaseMatcher for JettonTransferMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "JettonTransfer") {
+        if !opcode_matches(root, opcodes::JETTON_TRANSFER) {
             return None;
         }
 
-        let internal_transfer = root.find_child_by_opcode("JettonInternalTransfer")?;
-        let excess = internal_transfer.find_child_by_opcode("Excess");
-        let notify = internal_transfer.find_child_by_opcode("JettonNotify");
+        let internal_transfer = root.find_child_by_opcode(opcodes::JETTON_INTERNAL_TRANSFER)?;
+        let excess = internal_transfer.find_child_by_opcode(opcodes::EXCESS);
+        let notify = internal_transfer.find_child_by_opcode(opcodes::JETTON_NOTIFY);
 
         let mut nodes = BTreeSet::from([root.id, internal_transfer.id]);
         if let Some(excess) = excess {
@@ -34,14 +34,14 @@ pub(in crate::actions) struct JettonMintMatcher;
 
 impl BaseMatcher for JettonMintMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "JettonMint") {
+        if !opcode_matches(root, opcodes::JETTON_MINT) {
             return None;
         }
 
-        let internal_transfer = root.find_child_by_opcode("JettonInternalTransfer")?;
+        let internal_transfer = root.find_child_by_opcode(opcodes::JETTON_INTERNAL_TRANSFER)?;
         let notification =
-            internal_transfer.find_child_by_opcode("JettonWalletTransferNotification");
-        let excess = internal_transfer.find_child_by_opcode("Excess");
+            internal_transfer.find_child_by_opcode(opcodes::JETTON_WALLET_TRANSFER_NOTIFICATION);
+        let excess = internal_transfer.find_child_by_opcode(opcodes::EXCESS);
 
         let mut nodes = BTreeSet::from([root.id, internal_transfer.id]);
         if let Some(notification) = notification {

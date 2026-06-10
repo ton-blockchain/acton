@@ -1,6 +1,6 @@
 use super::super::{
     ActionKind, BaseActionGraph, BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch,
-    CompositeMatcher, TraceNode, opcode_matches,
+    CompositeMatcher, TraceNode, opcode_matches, opcodes,
 };
 use std::collections::BTreeSet;
 
@@ -8,11 +8,11 @@ pub(in crate::actions) struct StonfiSwapMatcher;
 
 impl BaseMatcher for StonfiSwapMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "StonfiSwapV2") {
+        if !opcode_matches(root, opcodes::STONFI_SWAP_V2) {
             return None;
         }
 
-        let pay_to = root.find_child_by_opcode("StonfiPayToV2")?;
+        let pay_to = root.find_child_by_opcode(opcodes::STONFI_PAY_TO_V2)?;
 
         Some(BaseMatch {
             kind: BaseActionKind::StonfiSwap,

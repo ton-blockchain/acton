@@ -9,6 +9,36 @@ use std::collections::{BTreeMap, BTreeSet};
 pub type NodeId = u64;
 pub type BaseActionId = u64;
 
+pub mod opcodes {
+    pub const EXCESS: u32 = 0xd532_76db;
+
+    pub const JETTON_TRANSFER: u32 = 0x0f8a_7ea5;
+    pub const JETTON_INTERNAL_TRANSFER: u32 = 0x178d_4519;
+    pub const JETTON_NOTIFY: u32 = 0x7362_d09c;
+    pub const JETTON_WALLET_TRANSFER_NOTIFICATION: u32 = JETTON_NOTIFY;
+    pub const JETTON_MINT: u32 = 0x0000_0015;
+
+    pub const DEDUST_VAULT_NATIVE_V2_SWAP: u32 = 0xea06_185d;
+    pub const DEDUST_POOL_V2_SWAP_EXTERNAL: u32 = 0x61ee_542d;
+    pub const DEDUST_POOL_V2_PAY_OUT_FROM_POOL: u32 = 0xad4e_b6f5;
+    pub const DEDUST_POOL_V2_SWAP_EVENT: u32 = 0x9c61_0de3;
+    pub const DEDUST_PAYOUT: u32 = 0x474f_86cf;
+    pub const DEDUST_TON_EXCESSES: u32 = 0x37d3_af9e;
+    pub const DEDUST_TON_PAY: u32 = 0x4c3e_12d7;
+
+    pub const PTON_WALLET_V2_TON_TRANSFER: u32 = 0x01f3_835d;
+
+    pub const STONFI_SWAP_V2: u32 = 0x6664_de2a;
+    pub const STONFI_PAY_TO_V2: u32 = 0x657b_54f5;
+    pub const STONFI_PAY_VAULT_V2: u32 = 0x6338_1632;
+    pub const STONFI_DEPOSIT_REF_FEE_V2: u32 = 0x0490_f09b;
+
+    pub const WALLET_SIGNED_EXTERNAL_V5R1: u32 = 0x7369_676e;
+    pub const TEXT_COMMENT: u32 = 0x0000_0000;
+    pub const POOL_V3_SWAP: u32 = 0xa7fb_58f8;
+    pub const ROUTER_V3_PAY_TO: u32 = 0xa1da_a96d;
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Trace {
     pub root: TraceNode,
@@ -17,7 +47,7 @@ pub struct Trace {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceNode {
     pub id: NodeId,
-    pub opcode_name: Option<String>,
+    pub opcode: Option<u32>,
     pub children: Vec<TraceNode>,
 }
 
@@ -251,7 +281,7 @@ fn add_fallback_base_actions(root: &TraceNode, base_actions: &mut Vec<BaseAction
             continue;
         }
 
-        let kind = if normalized_opcode(node).is_none() {
+        let kind = if node.opcode.is_none() {
             BaseActionKind::TonTransfer
         } else {
             BaseActionKind::ContractCall
@@ -340,22 +370,13 @@ impl TraceNode {
         nodes
     }
 
-    pub(super) fn find_child_by_opcode(&self, opcode: &str) -> Option<&Self> {
+    pub(super) fn find_child_by_opcode(&self, opcode: u32) -> Option<&Self> {
         self.children
             .iter()
             .find(|child| opcode_matches(child, opcode))
     }
 }
 
-pub(super) fn opcode_matches(node: &TraceNode, expected: &str) -> bool {
-    normalized_opcode(node).is_some_and(|opcode| opcode.eq_ignore_ascii_case(expected))
-}
-
-fn normalized_opcode(node: &TraceNode) -> Option<&str> {
-    let opcode = node.opcode_name.as_deref()?.trim();
-    if opcode.is_empty() {
-        None
-    } else {
-        Some(opcode)
-    }
+pub(super) fn opcode_matches(node: &TraceNode, expected: u32) -> bool {
+    node.opcode == Some(expected)
 }

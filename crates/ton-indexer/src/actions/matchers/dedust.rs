@@ -1,6 +1,6 @@
 use super::super::{
     ActionKind, BaseActionGraph, BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch,
-    CompositeMatcher, TraceNode, opcode_matches,
+    CompositeMatcher, TraceNode, opcode_matches, opcodes,
 };
 use std::collections::BTreeSet;
 
@@ -8,13 +8,13 @@ pub(in crate::actions) struct DedustNativeSwapLegMatcher;
 
 impl BaseMatcher for DedustNativeSwapLegMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "DedustVaultNativeV2Swap") {
+        if !opcode_matches(root, opcodes::DEDUST_VAULT_NATIVE_V2_SWAP) {
             return None;
         }
 
-        let pool_swap = root.find_child_by_opcode("DedustPoolV2SwapExternal")?;
-        let payout = pool_swap.find_child_by_opcode("DedustPoolV2PayOutFromPool")?;
-        let swap_event = pool_swap.find_child_by_opcode("DedustPoolV2SwapEvent");
+        let pool_swap = root.find_child_by_opcode(opcodes::DEDUST_POOL_V2_SWAP_EXTERNAL)?;
+        let payout = pool_swap.find_child_by_opcode(opcodes::DEDUST_POOL_V2_PAY_OUT_FROM_POOL)?;
+        let swap_event = pool_swap.find_child_by_opcode(opcodes::DEDUST_POOL_V2_SWAP_EVENT);
 
         let mut nodes = BTreeSet::from([root.id, pool_swap.id, payout.id]);
         if let Some(swap_event) = swap_event {
@@ -34,12 +34,12 @@ pub(in crate::actions) struct DedustJettonSwapLegMatcher;
 
 impl BaseMatcher for DedustJettonSwapLegMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "DedustPoolV2SwapExternal") {
+        if !opcode_matches(root, opcodes::DEDUST_POOL_V2_SWAP_EXTERNAL) {
             return None;
         }
 
-        let payout = root.find_child_by_opcode("DedustPoolV2PayOutFromPool")?;
-        let swap_event = root.find_child_by_opcode("DedustPoolV2SwapEvent");
+        let payout = root.find_child_by_opcode(opcodes::DEDUST_POOL_V2_PAY_OUT_FROM_POOL)?;
+        let swap_event = root.find_child_by_opcode(opcodes::DEDUST_POOL_V2_SWAP_EVENT);
 
         let mut nodes = BTreeSet::from([root.id, payout.id]);
         if let Some(swap_event) = swap_event {
@@ -59,12 +59,12 @@ pub(in crate::actions) struct DedustPayoutMatcher;
 
 impl BaseMatcher for DedustPayoutMatcher {
     fn try_match(&self, root: &TraceNode) -> Option<BaseMatch> {
-        if !opcode_matches(root, "DedustPayout") {
+        if !opcode_matches(root, opcodes::DEDUST_PAYOUT) {
             return None;
         }
 
-        let ton_excesses = root.find_child_by_opcode("DedustTonExcesses");
-        let ton_pay = root.find_child_by_opcode("DedustTonPay");
+        let ton_excesses = root.find_child_by_opcode(opcodes::DEDUST_TON_EXCESSES);
+        let ton_pay = root.find_child_by_opcode(opcodes::DEDUST_TON_PAY);
 
         let mut nodes = BTreeSet::from([root.id]);
         if let Some(ton_excesses) = ton_excesses {

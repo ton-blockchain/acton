@@ -1,5 +1,7 @@
 use expect_test::Expect;
-use ton_indexer::actions::{Extraction, Trace, TraceNode, extract_actions};
+use ton_indexer::actions::{Extraction, Trace, TraceNode, extract_actions, opcodes};
+
+const SYNTHETIC_CONTRACT_CALL_OPCODE: u32 = 0xffff_fffe;
 
 macro_rules! trace {
     ($source:literal) => {
@@ -94,9 +96,56 @@ fn parse_trace_node(content: &str) -> TraceNode {
 
     TraceNode {
         id,
-        opcode_name: (!opcode.is_empty()).then(|| opcode.to_string()),
+        opcode: normalize_opcode(opcode),
         children: Vec::new(),
     }
+}
+
+fn normalize_opcode(opcode: &str) -> Option<u32> {
+    let opcode = opcode.trim();
+    if opcode.is_empty() {
+        return None;
+    }
+
+    if let Some(hex) = opcode
+        .strip_prefix("0x")
+        .or_else(|| opcode.strip_prefix("0X"))
+    {
+        return Some(
+            u32::from_str_radix(hex, 16)
+                .unwrap_or_else(|_| panic!("trace line has invalid opcode literal: {opcode}")),
+        );
+    }
+
+    Some(match opcode {
+        "DedustVaultNativeV2Swap" => opcodes::DEDUST_VAULT_NATIVE_V2_SWAP,
+        "DedustPoolV2SwapExternal" => opcodes::DEDUST_POOL_V2_SWAP_EXTERNAL,
+        "DedustPoolV2PayOutFromPool" => opcodes::DEDUST_POOL_V2_PAY_OUT_FROM_POOL,
+        "DedustPoolV2SwapEvent" => opcodes::DEDUST_POOL_V2_SWAP_EVENT,
+        "DedustPayout" => opcodes::DEDUST_PAYOUT,
+        "DedustTonExcesses" => opcodes::DEDUST_TON_EXCESSES,
+        "DedustTonPay" => opcodes::DEDUST_TON_PAY,
+        "JettonTransfer" => opcodes::JETTON_TRANSFER,
+        "JettonInternalTransfer" => opcodes::JETTON_INTERNAL_TRANSFER,
+        "JettonNotify" => opcodes::JETTON_NOTIFY,
+        "JettonWalletTransferNotification" => opcodes::JETTON_WALLET_TRANSFER_NOTIFICATION,
+        "JettonMint" => opcodes::JETTON_MINT,
+        "Excess" => opcodes::EXCESS,
+        "PtonTonTransfer" => opcodes::PTON_WALLET_V2_TON_TRANSFER,
+        "StonfiSwapV2" => opcodes::STONFI_SWAP_V2,
+        "StonfiPayToV2" => opcodes::STONFI_PAY_TO_V2,
+        "StonfiPayVaultV2" => opcodes::STONFI_PAY_VAULT_V2,
+        "StonfiDepositRefFeeV2" => opcodes::STONFI_DEPOSIT_REF_FEE_V2,
+        "WalletV5r1IncomingExternalMessage" => opcodes::WALLET_SIGNED_EXTERNAL_V5R1,
+        "TextComment" => opcodes::TEXT_COMMENT,
+        "PoolV3Swap" => opcodes::POOL_V3_SWAP,
+        "PayTo" => opcodes::ROUTER_V3_PAY_TO,
+        "RouterCall"
+        | "SomeOtherCall"
+        | "UnknownProtocolCall"
+        | "WalletV4IncomingExternalMessage" => SYNTHETIC_CONTRACT_CALL_OPCODE,
+        _ => panic!("trace line has unknown opcode name: {opcode}"),
+    })
 }
 
 fn build_trace_node(
