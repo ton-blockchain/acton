@@ -325,8 +325,10 @@ export interface V3Transaction {
 export interface V3TransactionAccountState {
   readonly hash: string
   readonly balance: string
+  readonly code_boc?: string | null
   readonly extra_currencies: Record<string, string>
   readonly account_status: string
+  readonly data_boc?: string | null
   readonly frozen_hash?: string | null
   readonly data_hash?: string | null
   readonly code_hash?: string | null

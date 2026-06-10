@@ -17,7 +17,8 @@
     "fmt": "bun --filter '*' fmt",
     "fmt:check": "bun --filter '*' fmt:check",
     "lint": "bun --filter '*' lint",
-    "lint:fix": "bun --filter '*' lint:fix"
+    "lint:fix": "bun --filter '*' lint:fix",
+    "test:e2e:test-ui": "playwright test --config crates/acton-test-ui/playwright.config.ts"
   },
   "overrides": {
     "postcss": ">=8.5.10",
@@ -48,6 +49,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
+    "@playwright/test": "1.59.0",
     "eslint": "^9.25.0",
     "eslint-config-prettier": "^10.1.5",
     "eslint-import-resolver-typescript": "^4.3.4",

@@ -226,8 +226,8 @@ pub static EXIT_CODE_DESCRIPTIONS: LazyLock<HashMap<i32, ExitCodeInfo>> = LazyLo
     map.insert(
         37,
         ExitCodeInfo {
-            name: "Not Enough Toncoin",
-            description: "Not enough Toncoin",
+            name: "Not Enough GRAM",
+            description: "Not enough GRAM",
             phase: "Action phase",
         },
     );

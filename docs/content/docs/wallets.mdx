@@ -58,23 +58,23 @@ Acton merges wallet definitions from `global.wallets.toml` first and then from l
 
 ## Fund a wallet on testnet
 
-New wallets start with zero balance. To request testnet Toncoin, use the faucet provided by Acton. It works by performing a small cryptographic computation locally on device and confirming it with the remote endpoint.
+New wallets start with zero balance. To request testnet GRAM, use the faucet provided by Acton. It works by performing a small cryptographic computation locally on device and confirming it with the remote endpoint.
 
-Acton faucet can give 2 testnet Toncoin twice within the 24-hour span for a single IP, device, and a wallet.
+Acton faucet is limited to 2 requests of 2 testnet GRAM per hour for a single IP, device, and wallet.
 
 <Callout>
   To avoid local computational work and solve captcha instead, use the [Testgiver TON bot in Telegram](https://t.me/testgiver_ton_bot).
 
-  For larger allocations of up to 5000 Toncoin, submit a [request form](https://builders.ton.org/opportunities/testnet).
+  For larger allocations of up to 5000 GRAM, submit a [request form](https://builders.ton.org/opportunities/testnet).
 </Callout>
 
-Add `--airdrop` to request testnet Toncoin during creation:
+Add `--airdrop` to request testnet GRAM during creation:
 
 ```bash
 acton wallet new --name deployer --local --airdrop
 ```
 
-Use the `airdrop` subcommand to request testnet Toncoin later for an existing wallet:
+Use the `airdrop` subcommand to request testnet GRAM later for an existing wallet:
 
 ```bash
 acton wallet airdrop deployer --net testnet

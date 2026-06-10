@@ -15,8 +15,8 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice as TyCellSlice, Load};
 use tycho_types::dict;
 use tycho_types::models::{
-    Base64StdAddrFlags, ChangeLibraryMode, CurrencyCollection, DisplayBase64StdAddr, IntAddr,
-    LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
+    AnyAddr, Base64StdAddrFlags, ChangeLibraryMode, CurrencyCollection, DisplayBase64StdAddr,
+    IntAddr, LibRef, OutAction, OutActionsRevIter, OwnedRelaxedMessage, RelaxedMsgInfo,
     ReserveCurrencyFlags, SendMsgFlags, StateInit, StdAddr,
 };
 
@@ -182,7 +182,9 @@ impl RenderedValue {
                 value,
                 type_field: Some(type_field),
             } if type_field == "coins"
-                && name.is_some_and(|name| identifier_has_word(name, "ton")) =>
+                && name.is_some_and(|name| {
+                    identifier_has_word(name, "ton") || identifier_has_word(name, "gram")
+                }) =>
             {
                 format_coins_for_debug(value).unwrap_or_else(|| value.clone())
             }
@@ -231,7 +233,8 @@ impl RenderedValue {
                 value,
                 type_field: Some(type_field),
             } if type_field == "coins" => {
-                let value = if identifier_has_word(name, "ton") {
+                let value = if identifier_has_word(name, "ton") || identifier_has_word(name, "gram")
+                {
                     format_coins_for_debug(value).unwrap_or_else(|| value.clone())
                 } else {
                     value.clone()
@@ -843,12 +846,12 @@ fn format_coins_for_debug(tokens: &str) -> Option<String> {
     let whole = tokens / 1_000_000_000;
     let frac = tokens % 1_000_000_000;
     if frac == 0 {
-        return Some(format!("{whole} TON"));
+        return Some(format!("{whole} GRAM"));
     }
 
     let frac = format!("{frac:09}");
     let frac = frac.trim_end_matches('0');
-    Some(format!("{whole}.{frac} TON"))
+    Some(format!("{whole}.{frac} GRAM"))
 }
 
 fn identifier_has_word(name: &str, needle: &str) -> bool {
@@ -903,6 +906,7 @@ fn identifier_word_boundary(prev: char, current: char, next: Option<char>) -> bo
 #[derive(Debug, Clone, Copy)]
 enum MapScalarType {
     Int { bits: u16, signed: bool },
+    Bits { bits: u16 },
     VarInt { len_bits: u8, signed: bool },
     Bool,
     Address,
@@ -913,7 +917,7 @@ enum MapScalarType {
 impl MapScalarType {
     const fn bit_len(self) -> u16 {
         match self {
-            Self::Int { bits, .. } => bits,
+            Self::Int { bits, .. } | Self::Bits { bits } => bits,
             Self::Bool => 1,
             Self::Address => StdAddr::BITS_WITHOUT_ANYCAST,
             Self::VarInt { .. } | Self::Cell | Self::String => 0,
@@ -1083,7 +1087,7 @@ fn get_bits_u8(nibbles: &[u8], start: usize, count: usize) -> u8 {
     v
 }
 
-/// Try to parse `addr_std` from a `CellSlice`.
+/// Try to parse `addr_none` or `addr_std` from a `CellSlice`.
 /// Cell{hex} starts with 2 descriptor bytes (4 hex chars); cell data follows.
 /// `bits: start..end` are positions within cell data.
 /// `addr_std` = `10` (2b) + `0` (1b anycast) + workchain (8b) + hash (256b) = 267 bits.
@@ -1095,9 +1099,7 @@ fn try_parse_address(cs: &CellSlice) -> Option<String> {
     let (start_s, end_s) = cs.bits.as_ref()?;
     let start: usize = start_s.parse().ok()?;
     let end: usize = end_s.parse().ok()?;
-    if end - start != 267 {
-        return None;
-    }
+    let bit_len = end.checked_sub(start)?;
 
     let data_hex = cs.value.get(4..)?; // skip d1, d2
     let nibbles: Vec<u8> = data_hex
@@ -1108,23 +1110,32 @@ fn try_parse_address(cs: &CellSlice) -> Option<String> {
         return None;
     }
 
-    if get_bits_u8(&nibbles, start, 3) != 0b100 {
-        return None;
-    } // addr_std prefix no anycast
+    match bit_len {
+        2 if get_bits_u8(&nibbles, start, 2) == 0b00 => Some("addr_none".to_owned()),
+        267 => {
+            if get_bits_u8(&nibbles, start, 3) != 0b100 {
+                return None;
+            } // addr_std prefix no anycast
 
-    let wc = get_bits_u8(&nibbles, start + 3, 8) as i8;
-    let mut hash = String::with_capacity(64);
-    for i in 0..32 {
-        write!(hash, "{:02x}", get_bits_u8(&nibbles, start + 11 + i * 8, 8)).ok()?;
+            let wc = get_bits_u8(&nibbles, start + 3, 8) as i8;
+            let mut hash = String::with_capacity(64);
+            for i in 0..32 {
+                write!(hash, "{:02x}", get_bits_u8(&nibbles, start + 11 + i * 8, 8)).ok()?;
+            }
+            Some(format!("{wc}:{hash}"))
+        }
+        _ => None,
     }
-    Some(format!("{wc}:{hash}"))
 }
 
 fn try_parse_full_address_hex(hex: &str) -> Option<String> {
     let cell = Boc::decode_hex(hex).ok()?;
-    StdAddr::from_item(TupleItem::Slice(cell))
-        .ok()
-        .map(|addr| addr.to_string())
+    match cell.bit_len() {
+        2 if matches!(cell.parse::<AnyAddr>().ok()?, AnyAddr::None) => Some("addr_none".to_owned()),
+        _ => StdAddr::from_item(TupleItem::Slice(cell))
+            .ok()
+            .map(|addr| addr.to_string()),
+    }
 }
 
 fn render_std_address(type_name: String, legacy_value: String, addr: &StdAddr) -> RenderedValue {
@@ -1510,6 +1521,9 @@ fn render_map_raw(type_name: String, root: Option<&Cell>) -> RenderedValue {
 fn parse_map_key_type(ty: &Ty) -> Option<MapScalarType> {
     match ty {
         Ty::Bool => Some(MapScalarType::Bool),
+        Ty::BitsN { n } => u16::try_from(*n)
+            .is_ok()
+            .then_some(MapScalarType::Bits { bits: *n as u16 }),
         Ty::Address | Ty::AddressAny => Some(MapScalarType::Address),
         Ty::Int => Some(MapScalarType::Int {
             bits: 257,
@@ -1575,6 +1589,13 @@ fn parse_map_value_type(ty: &Ty) -> Option<MapScalarType> {
 
 fn format_map_scalar(slice: &mut TyCellSlice<'_>, ty: MapScalarType) -> Result<String, String> {
     match ty {
+        MapScalarType::Bits { bits } => {
+            let mut bytes = vec![0u8; usize::from(bits).div_ceil(8)];
+            slice
+                .load_raw(&mut bytes, bits)
+                .map_err(|e| e.to_string())?;
+            Ok(format_abi_bits(&bytes, usize::from(bits)))
+        }
         MapScalarType::Int { bits, signed } => {
             if !signed && bits == 256 {
                 return Ok(format!(
@@ -1790,12 +1811,22 @@ fn render_abi_data(
         UnpackedValue::Bits((bytes, bit_len)) => {
             typed_leaf(type_name, format_abi_bits(&bytes, bit_len))
         }
+        UnpackedValue::AddressNone => typed_leaf(type_name, "addr_none"),
         UnpackedValue::Null => typed_leaf(type_name, "null"),
         UnpackedValue::Void => typed_leaf(type_name, "(void)"),
         UnpackedValue::Number(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::Bool(value) => typed_leaf(type_name, value.to_string()),
         UnpackedValue::String(value) => typed_leaf(type_name, format!("\"{value}\"")),
     }
+}
+
+#[must_use]
+pub fn render_unpacked_value_as_tolk_type(
+    symbols: &dyn UnpackSchema,
+    data: UnpackedValue,
+    ty_idx: TyIdx,
+) -> RenderedValue {
+    render_abi_data(symbols, data, ty_idx)
 }
 
 fn render_abi_enum_data(
@@ -1890,6 +1921,7 @@ fn format_abi_map_key(
         UnpackedValue::Object { name, .. } if abi_object_is_enum(symbols, key_ty_idx) => {
             name.clone()
         }
+        UnpackedValue::AddressNone => "addr_none".to_owned(),
         UnpackedValue::Address(value) => value.to_string(),
         UnpackedValue::ExtAddress(value) => value.to_string(),
         UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
@@ -2376,6 +2408,38 @@ fn typed_leaf(type_name: impl Into<String>, value: impl Into<String>) -> Rendere
     RenderedValue::typed_leaf(value, type_name)
 }
 
+/// Toncenter v3 serializes empty dict/null stack values as `list: []`,
+/// which the legacy stack parser represents as an empty tuple.
+/// TODO: remove if fixed
+const fn slot_is_empty_tuple(slot: SlotValue<'_>) -> bool {
+    matches!(slot, SlotValue::Live(VmStackValue::Tuple(items)) if items.is_empty())
+}
+
+fn type_accepts_empty_toncenter_list_as_null(symbols: &dyn UnpackSchema, ty_idx: TyIdx) -> bool {
+    match symbols.ty_by_idx(ty_idx) {
+        Some(Ty::Cell | Ty::CellOf { .. } | Ty::MapKV { .. }) => true,
+        Some(Ty::AliasRef { .. }) => symbols.alias_target_for(ty_idx).is_some_and(|target| {
+            type_accepts_empty_toncenter_list_as_null(symbols, target.ty_idx)
+        }),
+        _ => false,
+    }
+}
+
+fn render_empty_map(
+    symbols: &dyn UnpackSchema,
+    key_ty_idx: TyIdx,
+    value_ty_idx: TyIdx,
+) -> RenderedValue {
+    RenderedValue::MapKV {
+        type_name: format!(
+            "map<{}, {}>",
+            render_ty(symbols, key_ty_idx),
+            render_ty(symbols, value_ty_idx)
+        ),
+        fields: vec![],
+    }
+}
+
 // ---------------------------------------------------------------------------
 // debug_format — recursive type-aware renderer (uses StackReader cursor)
 // ---------------------------------------------------------------------------
@@ -2591,20 +2655,18 @@ fn debug_format(
             key_ty_idx,
             value_ty_idx,
         } => match r.read_slot() {
-            SlotValue::Live(VmStackValue::Null) => RenderedValue::MapKV {
-                type_name: format!(
-                    "map<{}, {}>",
-                    render_ty(symbols, *key_ty_idx),
-                    render_ty(symbols, *value_ty_idx)
-                ),
-                fields: vec![],
-            },
+            SlotValue::Live(VmStackValue::Null) => {
+                render_empty_map(symbols, *key_ty_idx, *value_ty_idx)
+            }
             SlotValue::Live(VmStackValue::Cell(cell)) => {
                 if let Some(root) = decode_cell_like(cell) {
                     render_map_dict(symbols, Some(root), *key_ty_idx, *value_ty_idx)
                 } else {
                     typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell")
                 }
+            }
+            slot if slot_is_empty_tuple(slot) => {
+                render_empty_map(symbols, *key_ty_idx, *value_ty_idx)
             }
             _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM cell"),
         },
@@ -2658,6 +2720,12 @@ fn debug_format(
                 match r.peek_slot() {
                     SlotValue::Live(VmStackValue::Null)
                     | SlotValue::LastSeen(VmStackValue::Null) => {
+                        r.read_slot();
+                        typed_leaf(ty_name, "null")
+                    }
+                    slot if slot_is_empty_tuple(slot)
+                        && type_accepts_empty_toncenter_list_as_null(symbols, *inner_ty_idx) =>
+                    {
                         r.read_slot();
                         typed_leaf(ty_name, "null")
                     }
@@ -3616,7 +3684,7 @@ fn format_change_library_mode(mode: ChangeLibraryMode) -> String {
 fn format_tokens(tokens: u128) -> String {
     let whole = tokens / 1_000_000_000;
     let frac = tokens % 1_000_000_000;
-    format!("{whole}.{frac:09} TON")
+    format!("{whole}.{frac:09} GRAM")
 }
 
 fn format_currency_collection(currency: &CurrencyCollection) -> String {
@@ -3751,7 +3819,9 @@ mod tests {
         AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
     use tolk_compiler::types_kernel::UnionVariant;
-    use tycho_types::cell::{CellFamily, HashBytes, Lazy, Store};
+    use tycho_types::cell::{CellDataBuilder, CellFamily, HashBytes, Lazy, Store};
+    use tycho_types::dict::{Dict, DictKey, StoreDictKey};
+    use tycho_types::error::Error;
     use tycho_types::models::{RelaxedIntMsgInfo, SendMsgFlags};
     use tycho_types::models::{ReserveCurrencyFlags, StdAddr};
 
@@ -3925,6 +3995,98 @@ mod tests {
         assert_eq!(fields[0].0, "1");
         assert_eq!(fields[0].1.dap_parts().0, "true");
         assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("bool"));
+    }
+
+    #[test]
+    fn render_map_accepts_toncenter_empty_list_as_empty_map() {
+        let mut unique_types = Vec::new();
+        let key_ty_idx = add_ty(&mut unique_types, Ty::IntN { n: 32 });
+        let value_ty_idx = add_ty(&mut unique_types, Ty::Bool);
+        let map_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::MapKV {
+                key_ty_idx,
+                value_ty_idx,
+            },
+        );
+        let rendered = render_tuple_item_as_tolk_type(
+            &source_map_with_types(unique_types),
+            &TupleItem::Tuple(Tuple::empty()),
+            map_ty_idx,
+        );
+
+        let RenderedValue::MapKV { type_name, fields } = rendered else {
+            panic!("expected empty map");
+        };
+        assert_eq!(type_name, "map<int32, bool>");
+        assert!(fields.is_empty());
+    }
+
+    #[test]
+    fn render_map_with_bits264_key_and_void_value() {
+        #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+        struct Bits264([u8; 33]);
+
+        impl DictKey for Bits264 {
+            const BITS: u16 = 264;
+        }
+
+        impl StoreDictKey for Bits264 {
+            fn store_into_data(&self, data: &mut CellDataBuilder) -> Result<(), Error> {
+                data.store_raw(&self.0, Self::BITS)
+            }
+        }
+
+        let mut unique_types = Vec::new();
+        let key_ty_idx = add_ty(&mut unique_types, Ty::BitsN { n: 264 });
+        let value_ty_idx = add_ty(&mut unique_types, Ty::Void);
+        let map_ty_idx = add_ty(
+            &mut unique_types,
+            Ty::MapKV {
+                key_ty_idx,
+                value_ty_idx,
+            },
+        );
+        let mut map = Dict::<Bits264, ()>::new();
+        map.set(Bits264([0x11; 33]), ()).unwrap();
+
+        let root = map.into_root().unwrap();
+        let stack_value = VmStackValue::Cell(CellLike::Cell(Boc::encode_hex(&root)));
+        let slots = [SlotValue::Live(&stack_value)];
+        let rendered =
+            debug_print_from_stack(&source_map_with_types(unique_types), &slots, map_ty_idx);
+
+        let RenderedValue::MapKV { type_name, fields } = rendered else {
+            panic!("expected map");
+        };
+        assert_eq!(type_name, "map<bits264, void>");
+        assert_eq!(fields.len(), 1);
+        assert_eq!(
+            fields[0].0,
+            "0x111111111111111111111111111111111111111111111111111111111111111111"
+        );
+        assert_eq!(fields[0].1.dap_parts().0, "(void)");
+        assert_eq!(fields[0].1.dap_parts().1.as_deref(), Some("void"));
+    }
+
+    #[test]
+    fn render_nullable_cell_accepts_toncenter_empty_list_as_null() {
+        let unique_types = vec![
+            Ty::Cell,
+            Ty::Nullable {
+                inner_ty_idx: 0,
+                stack_type_id: None,
+                stack_width: None,
+            },
+        ];
+        let rendered = render_tuple_item_as_tolk_type(
+            &source_map_with_types(unique_types),
+            &TupleItem::Tuple(Tuple::empty()),
+            1,
+        );
+
+        assert_eq!(rendered.dap_parts().0, "null");
+        assert_eq!(rendered.dap_parts().1.as_deref(), Some("cell?"));
     }
 
     #[test]
@@ -4462,11 +4624,11 @@ mod tests {
 
         assert_eq!(
             rendered.dap_parts_for_client(Some("tonAmount")).0,
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("forward_ton_amount")).0,
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("jettonAmount")).0,
@@ -4486,7 +4648,7 @@ mod tests {
 
         assert_eq!(
             rendered.dap_parts_for_client(Some("forwardTonAmount")).0,
-            "1.022 TON (last seen)"
+            "1.022 GRAM (last seen)"
         );
         assert_eq!(
             rendered.dap_parts_for_client(Some("jettonAmount")).0,
@@ -4498,10 +4660,10 @@ mod tests {
     fn legacy_named_dap_value_formats_coins_only_for_ton_word() {
         let rendered = RenderedValue::typed_leaf("1022000000", "coins");
 
-        assert_eq!(rendered.legacy_dap_value(Some("tonAmount")), "1.022 TON");
+        assert_eq!(rendered.legacy_dap_value(Some("tonAmount")), "1.022 GRAM");
         assert_eq!(
             rendered.legacy_dap_value(Some("forward_ton_amount")),
-            "1.022 TON"
+            "1.022 GRAM"
         );
         assert_eq!(
             rendered.legacy_dap_value(Some("jettonAmount")),
@@ -4518,7 +4680,7 @@ mod tests {
 
         assert_eq!(
             rendered.legacy_dap_value(Some("forwardTonAmount")),
-            "1.022 TON (last seen)"
+            "1.022 GRAM (last seen)"
         );
         assert_eq!(
             rendered.legacy_dap_value(Some("jettonAmount")),
@@ -4555,6 +4717,29 @@ mod tests {
         assert_eq!(type_name, "address");
         assert_eq!(value, addr.to_string());
         assert_eq!(legacy_value, addr.to_string());
+    }
+
+    #[test]
+    fn render_address_any_none_from_slice_uses_addr_none() {
+        let mut builder = CellBuilder::new();
+        AnyAddr::None
+            .store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let none_cell = builder.build().unwrap();
+        let stack_values = [VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(&none_cell),
+            bits: None,
+            refs: None,
+        })];
+        let slots = [SlotValue::Live(&stack_values[0])];
+
+        let rendered =
+            debug_print_from_stack(&source_map_with_types(vec![Ty::AddressAny]), &slots, 0);
+
+        assert_eq!(
+            rendered.dap_parts(),
+            ("addr_none".to_owned(), Some("any_address".to_owned()))
+        );
     }
 
     #[test]
@@ -4942,12 +5127,12 @@ mod tests {
         assert_eq!(type_name, "OutAction");
         assert_eq!(
             variant_name,
-            "ReserveCurrency 2.500000000 TON with WITH_ORIGINAL_BALANCE"
+            "ReserveCurrency 2.500000000 GRAM with WITH_ORIGINAL_BALANCE"
         );
         assert_eq!(fields[0].0, "mode");
         assert_eq!(fields[0].1.dap_parts().0, "WITH_ORIGINAL_BALANCE");
         assert_eq!(fields[1].0, "value");
-        assert_eq!(fields[1].1.dap_parts().0, "2.500000000 TON");
+        assert_eq!(fields[1].1.dap_parts().0, "2.500000000 GRAM");
     }
 
     #[test]

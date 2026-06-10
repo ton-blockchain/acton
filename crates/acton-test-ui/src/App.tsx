@@ -1,18 +1,29 @@
 import * as React from "react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import {FiChevronRight, FiWifiOff} from "react-icons/fi"
+import {FiWifiOff} from "react-icons/fi"
 
-import type {TestReport, Trace} from "@acton/shared-ui"
+import type {TestReport, ThemeMode, Trace} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"
 import {GasProfile, type GasProfileReport} from "./components/GasProfile/GasProfile"
+import {DocsSidebarIcon} from "./components/Sidebar/DocsSidebarIcon"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
 
 const RUNNER_HEALTH_POLL_INTERVAL_MS = 1500
+const SIDEBAR_TRANSITION_MS = 250
 
 type ActiveView = "tests" | "coverage" | "profile"
+
+const readInitialTheme = (): ThemeMode => {
+  const storedTheme = localStorage.getItem("theme")
+  if (storedTheme === "dark" || storedTheme === "light") {
+    return storedTheme
+  }
+
+  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+}
 
 const formatResponseError = (response: Response, body: string): string => {
   const status = `${response.status} ${response.statusText}`.trim()
@@ -67,12 +78,7 @@ export const App: React.FC = () => {
   const [currentTraceError, setCurrentTraceError] = useState<string | undefined>()
   const [isCurrentTraceLoading, setIsCurrentTraceLoading] = useState(false)
   const [projectRoot, setProjectRoot] = useState<string>("")
-  const [theme, setTheme] = useState(() => {
-    return (
-      localStorage.getItem("theme") ||
-      (globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    )
-  })
+  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
   const [loading, setLoading] = useState(true)
   const [coverageLcov, setCoverageLcov] = useState<string | undefined>()
   const [coverageLoaded, setCoverageLoaded] = useState(false)
@@ -103,9 +109,19 @@ export const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem("isSidebarCollapsed") === "true"
   })
+  const [isSidebarPreviewOpen, setIsSidebarPreviewOpen] = useState(false)
+  const [isSidebarPinningFromPreview, setIsSidebarPinningFromPreview] = useState(false)
+  const [isSidebarResizing, setIsSidebarResizing] = useState(false)
+  const [isSidebarClosing, setIsSidebarClosing] = useState(false)
   const [isHoveredResizer, setIsHoveredResizer] = useState(false)
   const isResizing = useRef(false)
   const lastWidth = useRef(sidebarWidth)
+  const sidebarPinningTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | undefined>(
+    undefined,
+  )
+  const sidebarClosingTimeout = useRef<ReturnType<typeof globalThis.setTimeout> | undefined>(
+    undefined,
+  )
   const hasConnectedToRunner = useRef(false)
   const traceFetchController = useRef<AbortController | undefined>(undefined)
   const traceFetchId = useRef(0)
@@ -172,6 +188,7 @@ export const App: React.FC = () => {
 
   const stopResizing = useCallback(() => {
     isResizing.current = false
+    setIsSidebarResizing(false)
     document.removeEventListener("mousemove", handleMouseMove)
     document.removeEventListener("mouseup", stopResizing)
     document.body.style.cursor = ""
@@ -181,19 +198,114 @@ export const App: React.FC = () => {
   const startResizing = useCallback(() => {
     if (isSidebarCollapsed) return
     isResizing.current = true
+    setIsSidebarResizing(true)
     document.addEventListener("mousemove", handleMouseMove)
     document.addEventListener("mouseup", stopResizing)
     document.body.style.cursor = "col-resize"
     document.body.style.userSelect = "none"
   }, [handleMouseMove, stopResizing, isSidebarCollapsed])
 
-  const toggleSidebar = useCallback(() => {
-    setIsSidebarCollapsed(prev => {
-      const newState = !prev
-      localStorage.setItem("isSidebarCollapsed", newState.toString())
-      return newState
-    })
+  const clearSidebarPinningTimeout = useCallback(() => {
+    if (sidebarPinningTimeout.current === undefined) {
+      return
+    }
+
+    globalThis.clearTimeout(sidebarPinningTimeout.current)
+    sidebarPinningTimeout.current = undefined
   }, [])
+
+  const clearSidebarClosingTimeout = useCallback(() => {
+    if (sidebarClosingTimeout.current === undefined) {
+      return
+    }
+
+    globalThis.clearTimeout(sidebarClosingTimeout.current)
+    sidebarClosingTimeout.current = undefined
+  }, [])
+
+  const finishSidebarPinning = useCallback(() => {
+    clearSidebarPinningTimeout()
+    setIsSidebarPinningFromPreview(false)
+  }, [clearSidebarPinningTimeout])
+
+  const finishSidebarClosing = useCallback(() => {
+    clearSidebarClosingTimeout()
+    setIsSidebarClosing(false)
+  }, [clearSidebarClosingTimeout])
+
+  const startSidebarPinning = useCallback(() => {
+    clearSidebarPinningTimeout()
+    setIsSidebarPinningFromPreview(true)
+    sidebarPinningTimeout.current = globalThis.setTimeout(
+      finishSidebarPinning,
+      SIDEBAR_TRANSITION_MS,
+    )
+  }, [clearSidebarPinningTimeout, finishSidebarPinning])
+
+  const startSidebarClosing = useCallback(() => {
+    clearSidebarClosingTimeout()
+    setIsSidebarClosing(true)
+    sidebarClosingTimeout.current = globalThis.setTimeout(
+      finishSidebarClosing,
+      SIDEBAR_TRANSITION_MS,
+    )
+  }, [clearSidebarClosingTimeout, finishSidebarClosing])
+
+  const collapseSidebar = useCallback(() => {
+    clearSidebarPinningTimeout()
+    setIsSidebarPinningFromPreview(false)
+    setIsSidebarPreviewOpen(false)
+    startSidebarClosing()
+    setIsSidebarCollapsed(true)
+    localStorage.setItem("isSidebarCollapsed", "true")
+  }, [clearSidebarPinningTimeout, startSidebarClosing])
+
+  const expandSidebar = useCallback(() => {
+    clearSidebarClosingTimeout()
+    setIsSidebarClosing(false)
+
+    if (isSidebarCollapsed && isSidebarPreviewOpen) {
+      startSidebarPinning()
+    } else {
+      clearSidebarPinningTimeout()
+      setIsSidebarPinningFromPreview(false)
+    }
+
+    setIsSidebarPreviewOpen(false)
+    setIsSidebarCollapsed(false)
+    localStorage.setItem("isSidebarCollapsed", "false")
+  }, [
+    clearSidebarClosingTimeout,
+    clearSidebarPinningTimeout,
+    isSidebarCollapsed,
+    isSidebarPreviewOpen,
+    startSidebarPinning,
+  ])
+
+  const toggleSidebar = useCallback(() => {
+    if (isSidebarCollapsed) {
+      expandSidebar()
+    } else {
+      collapseSidebar()
+    }
+  }, [collapseSidebar, expandSidebar, isSidebarCollapsed])
+
+  const showSidebarPreview = useCallback(() => {
+    if (isSidebarCollapsed) {
+      setIsSidebarPreviewOpen(true)
+    }
+  }, [isSidebarCollapsed])
+
+  const hideSidebarPreview = useCallback(() => {
+    setIsSidebarPreviewOpen(false)
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      clearSidebarPinningTimeout()
+      clearSidebarClosingTimeout()
+    }
+  }, [clearSidebarClosingTimeout, clearSidebarPinningTimeout])
 
   useEffect(() => {
     const coverageController = new AbortController()
@@ -380,6 +492,12 @@ export const App: React.FC = () => {
     return <div className={styles.loadingContainer}>Loading...</div>
   }
 
+  const sidebarSlotStyle = {
+    "--sidebar-expanded-width": `${sidebarWidth}px`,
+    width: isSidebarCollapsed ? 0 : sidebarWidth,
+  } as React.CSSProperties
+  const isSidebarFloating = isSidebarCollapsed && isSidebarPreviewOpen
+
   return (
     <div className={styles.app}>
       {connectionLost && (
@@ -405,26 +523,51 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      {!isSidebarCollapsed && (
-        <Sidebar
-          reports={reports}
-          selectedTest={selectedTest}
-          onSelectTest={handleSelectTest}
-          width={sidebarWidth}
-          onCollapse={toggleSidebar}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      )}
+      <div
+        className={[
+          styles.sidebarSlot,
+          isSidebarCollapsed ? styles.sidebarSlotCollapsed : "",
+          isSidebarFloating ? styles.sidebarSlotFloating : "",
+          isSidebarPinningFromPreview ? styles.sidebarSlotPinning : "",
+          isSidebarResizing ? styles.sidebarSlotResizing : "",
+          isSidebarClosing ? styles.sidebarSlotClosing : "",
+        ].join(" ")}
+        style={sidebarSlotStyle}
+        aria-hidden={isSidebarCollapsed && !isSidebarPreviewOpen}
+        data-testid="sidebar-slot"
+      >
+        {isSidebarCollapsed && (
+          <div
+            className={styles.sidebarPeekTarget}
+            onPointerEnter={showSidebarPreview}
+            aria-hidden="true"
+            data-testid="sidebar-peek-target"
+          />
+        )}
+        <div className={styles.sidebarViewport} onPointerLeave={hideSidebarPreview}>
+          <Sidebar
+            reports={reports}
+            selectedTest={selectedTest}
+            onSelectTest={handleSelectTest}
+            width={sidebarWidth}
+            onCollapse={toggleSidebar}
+            isCollapsed={isSidebarCollapsed}
+            className={styles.floatingSidebar}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+          />
+        </div>
+      </div>
 
-      {isSidebarCollapsed && (
+      {isSidebarCollapsed && (activeView !== "tests" || !selectedTest) && (
         <button
           type="button"
-          onClick={toggleSidebar}
+          onClick={expandSidebar}
           className={styles.expandButton}
+          aria-label="Expand sidebar"
           title="Expand sidebar"
         >
-          <FiChevronRight size={20} />
+          <DocsSidebarIcon />
         </button>
       )}
 
@@ -445,9 +588,11 @@ export const App: React.FC = () => {
 
       <div className={styles.mainContent}>
         {(coverageLcov !== undefined || gasProfile !== undefined) && (
-          <div className={styles.viewTabs}>
+          <div className={styles.viewTabs} role="tablist" aria-label="Main view">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeView === "tests"}
               className={`${styles.viewTab} ${activeView === "tests" ? styles.viewTabActive : ""}`}
               onClick={() => handleActiveViewChange("tests")}
             >
@@ -456,6 +601,8 @@ export const App: React.FC = () => {
             {coverageLcov !== undefined && (
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeView === "coverage"}
                 className={`${styles.viewTab} ${
                   activeView === "coverage" ? styles.viewTabActive : ""
                 }`}
@@ -467,6 +614,8 @@ export const App: React.FC = () => {
             {gasProfile !== undefined && (
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeView === "profile"}
                 className={`${styles.viewTab} ${
                   activeView === "profile" ? styles.viewTabActive : ""
                 }`}
@@ -494,6 +643,8 @@ export const App: React.FC = () => {
               projectRoot={projectRoot}
               gasProfile={selectedTestGasProfile}
               gasProfileLoaded={gasProfileLoaded}
+              isSidebarCollapsed={isSidebarCollapsed}
+              onExpandSidebar={expandSidebar}
             />
           ) : (
             <div className={styles.noSelection}>Select a test to see details</div>

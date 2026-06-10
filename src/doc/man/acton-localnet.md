@@ -69,7 +69,7 @@ Dump Localnet state to a JSON snapshot on shutdown.
 
 ### acton localnet airdrop
 
-Send TON from the local faucet to an address.
+Send GRAM from the local faucet to an address.
 
 #### Synopsis
 
@@ -83,8 +83,8 @@ Send TON from the local faucet to an address.
 Recipient address.
 {{/option}}
 
-{{#option "`-a`, `--amount` _ton_" }}
-Amount of TON to request.
+{{#option "`-a`, `--amount` _gram_" }}
+Amount of GRAM to request.
 {{/option}}
 
 {{#option "`-p`, `--port` _port_" }}

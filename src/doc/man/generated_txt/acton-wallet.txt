@@ -74,7 +74,7 @@ SUBCOMMANDS
               Use a secure native store for mnemonic storage when available.
 
           --airdrop
-              Request testnet TON after wallet creation.
+              Request testnet GRAM after wallet creation.
 
           --faucet-url url
               Faucet URL for automatic testnet airdrop.

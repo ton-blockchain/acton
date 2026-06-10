@@ -431,12 +431,12 @@ fn print_trace_summary_table(
                             color,
                         ),
                         apply_optional_row_color(
-                            TableCell::new(format_ton(current.total_gas_fees))
+                            TableCell::new(format_grams(current.total_gas_fees))
                                 .set_alignment(CellAlignment::Right),
                             color,
                         ),
                         apply_optional_row_color(
-                            TableCell::new(format_ton(current.total_fees))
+                            TableCell::new(format_grams(current.total_fees))
                                 .set_alignment(CellAlignment::Right),
                             color,
                         ),
@@ -450,9 +450,9 @@ fn print_trace_summary_table(
                             .set_alignment(CellAlignment::Right),
                         TableCell::new(baseline.total_gas_used.to_string())
                             .set_alignment(CellAlignment::Right),
-                        TableCell::new(format_ton(baseline.total_gas_fees))
+                        TableCell::new(format_grams(baseline.total_gas_fees))
                             .set_alignment(CellAlignment::Right),
-                        TableCell::new(format_ton(baseline.total_fees))
+                        TableCell::new(format_grams(baseline.total_fees))
                             .set_alignment(CellAlignment::Right),
                     ]);
 
@@ -464,9 +464,9 @@ fn print_trace_summary_table(
                             .set_alignment(CellAlignment::Right),
                         TableCell::new(current.total_gas_used.to_string())
                             .set_alignment(CellAlignment::Right),
-                        TableCell::new(format_ton(current.total_gas_fees))
+                        TableCell::new(format_grams(current.total_gas_fees))
                             .set_alignment(CellAlignment::Right),
-                        TableCell::new(format_ton(current.total_fees))
+                        TableCell::new(format_grams(current.total_fees))
                             .set_alignment(CellAlignment::Right),
                     ]);
 
@@ -475,8 +475,8 @@ fn print_trace_summary_table(
                         diff_cell_usize(current.traces_count, baseline.traces_count),
                         diff_cell_usize(current.tx_count, baseline.tx_count),
                         diff_cell_u64(current.total_gas_used, baseline.total_gas_used),
-                        diff_cell_ton(current.total_gas_fees, baseline.total_gas_fees),
-                        diff_cell_ton(current.total_fees, baseline.total_fees),
+                        diff_cell_grams(current.total_gas_fees, baseline.total_gas_fees),
+                        diff_cell_grams(current.total_fees, baseline.total_fees),
                     ]);
                 }
             } else {
@@ -502,12 +502,12 @@ fn print_trace_summary_table(
                         color,
                     ),
                     apply_optional_row_color(
-                        TableCell::new(format_ton(current.total_gas_fees))
+                        TableCell::new(format_grams(current.total_gas_fees))
                             .set_alignment(CellAlignment::Right),
                         color,
                     ),
                     apply_optional_row_color(
-                        TableCell::new(format_ton(current.total_fees))
+                        TableCell::new(format_grams(current.total_fees))
                             .set_alignment(CellAlignment::Right),
                         color,
                     ),
@@ -538,11 +538,12 @@ fn print_trace_summary_table(
                 TableCell::new(current.tx_count.to_string()).set_alignment(CellAlignment::Right),
                 TableCell::new(current.total_gas_used.to_string())
                     .set_alignment(CellAlignment::Right),
-                TableCell::new(format_ton(current.total_gas_fees))
+                TableCell::new(format_grams(current.total_gas_fees))
                     .set_alignment(CellAlignment::Right),
-                TableCell::new(format_ton(current.total_forward_fees))
+                TableCell::new(format_grams(current.total_forward_fees))
                     .set_alignment(CellAlignment::Right),
-                TableCell::new(format_ton(current.total_fees)).set_alignment(CellAlignment::Right),
+                TableCell::new(format_grams(current.total_fees))
+                    .set_alignment(CellAlignment::Right),
             ]);
         }
     }
@@ -571,10 +572,10 @@ fn print_test_trace_table_current(test_name: &str, traces: &[&TraceChainStats]) 
             TableCell::new(&trace.trace_name).set_alignment(CellAlignment::Left),
             TableCell::new(trace.tx_count.to_string()).set_alignment(CellAlignment::Right),
             TableCell::new(trace.total_gas_used.to_string()).set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(trace.total_gas_fees)).set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(trace.total_forward_fees))
+            TableCell::new(format_grams(trace.total_gas_fees)).set_alignment(CellAlignment::Right),
+            TableCell::new(format_grams(trace.total_forward_fees))
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(trace.total_fees)).set_alignment(CellAlignment::Right),
+            TableCell::new(format_grams(trace.total_fees)).set_alignment(CellAlignment::Right),
         ]);
     }
 
@@ -630,17 +631,17 @@ fn print_test_trace_table_comparison(
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_gas_fees))
+                    TableCell::new(format_grams(comparison.current_total_gas_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_forward_fees))
+                    TableCell::new(format_grams(comparison.current_total_forward_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_fees))
+                    TableCell::new(format_grams(comparison.current_total_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
@@ -666,17 +667,17 @@ fn print_test_trace_table_comparison(
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_gas_fees))
+                    TableCell::new(format_grams(comparison.current_total_gas_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_forward_fees))
+                    TableCell::new(format_grams(comparison.current_total_forward_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
                 apply_optional_row_color(
-                    TableCell::new(format_ton(comparison.current_total_fees))
+                    TableCell::new(format_grams(comparison.current_total_fees))
                         .set_alignment(CellAlignment::Right),
                     color,
                 ),
@@ -695,10 +696,11 @@ fn print_test_trace_table_comparison(
             TableCell::new(&trace.trace_name).set_alignment(CellAlignment::Left),
             TableCell::new(baseline_tx_count.to_string()).set_alignment(CellAlignment::Right),
             TableCell::new(baseline_total_gas_used.to_string()).set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(baseline_total_gas_fees)).set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(baseline_total_forward_fees))
+            TableCell::new(format_grams(baseline_total_gas_fees))
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(baseline_total_fees)).set_alignment(CellAlignment::Right),
+            TableCell::new(format_grams(baseline_total_forward_fees))
+                .set_alignment(CellAlignment::Right),
+            TableCell::new(format_grams(baseline_total_fees)).set_alignment(CellAlignment::Right),
         ]);
 
         table.add_row(vec![
@@ -707,11 +709,11 @@ fn print_test_trace_table_comparison(
                 .set_alignment(CellAlignment::Right),
             TableCell::new(comparison.current_total_gas_used.to_string())
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(comparison.current_total_gas_fees))
+            TableCell::new(format_grams(comparison.current_total_gas_fees))
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(comparison.current_total_forward_fees))
+            TableCell::new(format_grams(comparison.current_total_forward_fees))
                 .set_alignment(CellAlignment::Right),
-            TableCell::new(format_ton(comparison.current_total_fees))
+            TableCell::new(format_grams(comparison.current_total_fees))
                 .set_alignment(CellAlignment::Right),
         ]);
 
@@ -719,12 +721,12 @@ fn print_test_trace_table_comparison(
             TableCell::new("").set_alignment(CellAlignment::Left),
             diff_cell_usize(comparison.current_tx_count, baseline_tx_count),
             diff_cell_u64(comparison.current_total_gas_used, baseline_total_gas_used),
-            diff_cell_ton(comparison.current_total_gas_fees, baseline_total_gas_fees),
-            diff_cell_ton(
+            diff_cell_grams(comparison.current_total_gas_fees, baseline_total_gas_fees),
+            diff_cell_grams(
                 comparison.current_total_forward_fees,
                 baseline_total_forward_fees,
             ),
-            diff_cell_ton(comparison.current_total_fees, baseline_total_fees),
+            diff_cell_grams(comparison.current_total_fees, baseline_total_fees),
         ]);
     }
 
@@ -1770,18 +1772,18 @@ impl TraceChainComparison {
     }
 }
 
-fn format_ton(nanotons: u128) -> String {
-    const NANO_PER_TON: u128 = 1_000_000_000;
+fn format_grams(nanograms: u128) -> String {
+    const NANO_PER_GRAM: u128 = 1_000_000_000;
 
-    let whole = nanotons / NANO_PER_TON;
-    let fraction = nanotons % NANO_PER_TON;
+    let whole = nanograms / NANO_PER_GRAM;
+    let fraction = nanograms % NANO_PER_GRAM;
     if fraction == 0 {
-        return format!("{whole} TON");
+        return format!("{whole} GRAM");
     }
 
     let fraction = format!("{fraction:09}");
     let fraction = fraction.trim_end_matches('0');
-    format!("{whole}.{fraction} TON")
+    format!("{whole}.{fraction} GRAM")
 }
 
 fn apply_optional_row_color(cell: TableCell, color: Option<Color>) -> TableCell {
@@ -1816,7 +1818,7 @@ fn diff_cell_u64(current: u64, baseline: u64) -> TableCell {
     }
 }
 
-fn diff_cell_ton(current: u128, baseline: u128) -> TableCell {
+fn diff_cell_grams(current: u128, baseline: u128) -> TableCell {
     match current.cmp(&baseline) {
         Ordering::Equal => TableCell::new("").set_alignment(CellAlignment::Right),
         Ordering::Greater => TableCell::new(format_signed_diff_u128(current, baseline))
@@ -1846,9 +1848,9 @@ fn format_signed_diff_u64(current: u64, baseline: u64) -> String {
 
 fn format_signed_diff_u128(current: u128, baseline: u128) -> String {
     if current >= baseline {
-        format!("+{}", format_ton(current - baseline))
+        format!("+{}", format_grams(current - baseline))
     } else {
-        format!("-{}", format_ton(baseline - current))
+        format!("-{}", format_grams(baseline - current))
     }
 }
 

@@ -47,7 +47,7 @@ fn format4_ignores_extra_arguments_when_template_has_only_two_placeholders() {
         r#"
 get fun `test eb stdlib format4 extra args ignored`() {
     val rendered = format("{}: {:ton}", "alpha", 2500000000, "unused", 255);
-    expect(rendered).toEqual("alpha: 2.5 TON");
+    expect(rendered).toEqual("alpha: 2.5 GRAM");
 }
 "#,
         "integration/snapshots/test-runner/format4_ignores_extra_arguments_when_template_has_only_two_placeholders/format4_ignores_extra_arguments_when_template_has_only_two_placeholders.stdout.txt",

@@ -52,7 +52,9 @@ const ContractCode = lazy(async () => {
 interface AccountDetailsProps {
   readonly transactions: Transaction[]
   readonly accountState?: FullAccountState
-  readonly accountCodeHash?: string
+  readonly compilerAbi?: ContractABI
+  readonly compilerAbiLoading?: boolean
+  readonly compilerAbiError?: string
   readonly ownerAddress: string
   readonly jettonWallets: JettonWallet[]
   readonly nftItems: NftItem[]
@@ -77,7 +79,9 @@ type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 export const AccountDetails: React.FC<AccountDetailsProps> = ({
   transactions,
   accountState,
-  accountCodeHash,
+  compilerAbi,
+  compilerAbiLoading = false,
+  compilerAbiError,
   ownerAddress,
   jettonWallets,
   nftItems,
@@ -97,9 +101,6 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 }) => {
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<Tabs>("history")
-  const [compilerAbi, setCompilerAbi] = useState<ContractABI | undefined>()
-  const [compilerAbiLoading, setCompilerAbiLoading] = useState(false)
-  const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
   const [compilerAbiByAddress, setCompilerAbiByAddress] = useState<
     Map<string, ContractABI | undefined>
   >(new Map())
@@ -116,40 +117,6 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
       setActiveTab(activeTabHash as Tabs)
     }
   }, [activeTabHash])
-
-  useEffect(() => {
-    let isActive = true
-
-    const loadCompilerAbi = async () => {
-      if (activeTab !== "contract" || !accountCodeHash) {
-        setCompilerAbi(undefined)
-        setCompilerAbiLoading(false)
-        setCompilerAbiError(undefined)
-        return
-      }
-
-      setCompilerAbi(undefined)
-      setCompilerAbiLoading(true)
-      setCompilerAbiError(undefined)
-
-      try {
-        const abis = await client.getCompilerAbis([accountCodeHash])
-        if (!isActive) return
-        setCompilerAbi(abis[accountCodeHash] ?? undefined)
-        setCompilerAbiLoading(false)
-      } catch (error) {
-        if (!isActive) return
-        setCompilerAbi(undefined)
-        setCompilerAbiLoading(false)
-        setCompilerAbiError(error instanceof Error ? error.message : "Failed to load compiler ABI")
-      }
-    }
-
-    void loadCompilerAbi()
-    return () => {
-      isActive = false
-    }
-  }, [accountCodeHash, activeTab, client])
 
   useEffect(() => {
     let isActive = true
@@ -188,8 +155,8 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
           ? await client.getAccountStates(stateRequestAddresses, false).catch(() => {})
           : undefined
       const addressToCodeHash = new Map<string, string>()
-      if (accountCodeHash) {
-        addressToCodeHash.set(ownerKey, accountCodeHash)
+      if (compilerAbi) {
+        next.set(ownerKey, compilerAbi)
       }
       for (const account of states?.accounts ?? []) {
         if (account.code_hash) {
@@ -216,6 +183,10 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
 
       for (const address of requestedAddresses) {
         const key = addressKey(address)
+        if (key === ownerKey) {
+          next.set(key, compilerAbi)
+          continue
+        }
         const codeHash = addressToCodeHash.get(key)
         next.set(
           key,
@@ -231,7 +202,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
     return () => {
       isActive = false
     }
-  }, [transactions, ownerAddress, accountCodeHash, activeTab, client])
+  }, [transactions, ownerAddress, compilerAbi, activeTab, client])
 
   const handleTabClick = (tab: Tabs) => {
     setActiveTab(tab)
@@ -455,7 +426,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                             </span>
                           ) : (
                             <span className={styles.actionText}>
-                              {isIncoming ? "Received TON" : "Sent TON"}
+                              {isIncoming ? "Received GRAM" : "Sent GRAM"}
                             </span>
                           )}
                         </div>
@@ -481,7 +452,7 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                           className={`${isIncoming ? styles.valuePositive : styles.valueNegative} ${styles.historyValue}`}
                         >
                           {isIncoming ? "+" : "-"} {Number.parseFloat(valueStr).toLocaleString()}{" "}
-                          TON
+                          GRAM
                         </div>
                       </TableCell>
                     </TableRow>
@@ -655,9 +626,11 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
             <Suspense fallback={<div className={styles.emptyState}>Loading contract code...</div>}>
               <ContractCode
                 codeBoc={accountState?.code ?? ""}
+                dataBoc={accountState?.data}
                 compilerAbi={compilerAbi}
                 compilerAbiLoading={compilerAbiLoading}
                 compilerAbiError={compilerAbiError}
+                onContractClick={onAddressClick}
               />
             </Suspense>
           )}

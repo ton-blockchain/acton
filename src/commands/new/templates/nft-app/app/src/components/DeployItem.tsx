@@ -329,7 +329,7 @@ export function DeployItem({
             <KV k="Item Index" v={idxValid ? idxNum : '—'} />
             <KV k="Content" v={effectiveContent || '—'} />
             <KV k="Full URI" v={fullUri || '—'} />
-            <KV k="Storage Fee" v="~0.03 TON" mono={false} />
+            <KV k="Storage Fee" v="~0.03 GRAM" mono={false} />
           </div>
         </CardContent>
       </Card>

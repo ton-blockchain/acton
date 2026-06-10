@@ -1394,6 +1394,70 @@ fn formatter_catalog_opcode_fallback_decodes_manual_jetton_transfer() {
 }
 
 #[test]
+fn formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads() {
+    let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
+
+    ProjectBuilder::new("formatter-catalog-opcode-fallback-prefixless-payload")
+        .contract_from_boc("catalog_sink", boc_bytes)
+        .test_file(
+            "formatter_catalog_opcode_fallback_prefixless_payload",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../../lib/testing/expect"
+
+            get fun `test formatter catalog opcode fallback does not name prefixless payloads`() {
+                val sender = testing.treasury("sender");
+
+                val init = ContractState {
+                    code: build("catalog_sink"),
+                    data: createEmptyCell(),
+                };
+                val sinkAddress = AutoDeployAddress { stateInit: init }.calculateAddress();
+
+                expect(net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                }))).toHaveSuccessfulDeploy({ to: sinkAddress });
+
+                var liquidityDict: map<uint32, int32> = [];
+                val prefixlessPayloadBody = beginCell()
+                    .storeUint(0xd1b02ea5, 32)
+                    .storeDict(liquidityDict.toLowLevelDict())
+                    .storeInt(0, 32)
+                    .endCell()
+                    .beginParse();
+
+                val txs = net.send(sender.address, createMessage({
+                    bounce: false,
+                    value: ton("0.2"),
+                    dest: sinkAddress,
+                    body: prefixlessPayloadBody,
+                }));
+
+                expect(txs).toHaveLength(1);
+                println(txs);
+            }
+        "#,
+        )
+        .build()
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/formatter/formatter_catalog_opcode_fallback_does_not_name_prefixless_payloads.stdout.txt",
+        );
+}
+
+#[test]
 fn formatter_zero_opcode_text_comment_shows_tail() {
     let boc_bytes = compiled_formatter_catalog_sink_boc_bytes();
 

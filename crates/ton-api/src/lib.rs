@@ -309,20 +309,36 @@ impl TonApiClient {
         method: &str,
         stack: &[serde_json::Value],
     ) -> anyhow::Result<GetMethodResult> {
+        self.run_get_method_at_block(address, method, stack, None)
+    }
+
+    /// Run get method on contract at a specific masterchain block, when provided.
+    pub fn run_get_method_at_block(
+        &self,
+        address: &str,
+        method: &str,
+        stack: &[serde_json::Value],
+        seqno: Option<u64>,
+    ) -> anyhow::Result<GetMethodResult> {
         let url = format!(
             "{}/jsonRPC",
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
+        let mut params = serde_json::json!({
+            "address": address,
+            "method": method,
+            "stack": stack
+        });
+        if let Some(seqno) = seqno {
+            params["seqno"] = serde_json::json!(seqno);
+        }
+
         let json = serde_json::json!({
             "id": "1",
             "jsonrpc": "2.0",
             "method": "runGetMethod",
-            "params": {
-                "address": address,
-                "method": method,
-                "stack": stack
-            }
+            "params": params
         });
 
         let response = self.send_with_retry(
@@ -937,6 +953,8 @@ pub struct V3TransactionSummary {
     pub lt: String,
     #[serde(default)]
     pub now: u32,
+    #[serde(default)]
+    pub mc_block_seqno: Option<u32>,
     #[serde(default)]
     pub prev_trans_hash: Option<String>,
     #[serde(default)]

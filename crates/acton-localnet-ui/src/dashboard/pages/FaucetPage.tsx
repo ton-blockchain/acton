@@ -8,7 +8,7 @@ import type {TonClient} from "../../explorer/api/client"
 import {formatAddress, parseAddress} from "../../explorer/components/utils"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {QUICK_AMOUNTS} from "../constants"
-import {parseTonAmount} from "../dashboardUtils"
+import {parseGramAmount} from "../dashboardUtils"
 import {
   buildJettonMintInternalMessageBoc,
   normalizeJettonDecimals,
@@ -31,7 +31,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
   const [jettonMinter, setJettonMinter] = React.useState("")
   const [amount, setAmount] = React.useState("1")
   const [isSubmitting, setIsSubmitting] = React.useState(false)
-  const amountNano = React.useMemo(() => parseTonAmount(amount), [amount])
+  const amountNano = React.useMemo(() => parseGramAmount(amount), [amount])
   const isJettonMode = mode === "jetton"
   const isSubmitDisabled =
     isSubmitting ||
@@ -71,7 +71,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
         showToast({
           variant: "success",
           title: "Transfer sent",
-          description: `Sent ${amount.trim()} TON to ${formatAddress(normalized, true, addressFormat)}.`,
+          description: `Sent ${amount.trim()} GRAM to ${formatAddress(normalized, true, addressFormat)}.`,
         })
       }
     } catch (submitError) {
@@ -83,7 +83,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
             ? submitError.message
             : isJettonMode
               ? "Failed to mint jettons."
-              : "Failed to send TON.",
+              : "Failed to send GRAM.",
       })
     } finally {
       setIsSubmitting(false)
@@ -142,7 +142,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
     })
   }
 
-  const symbolHint = isJettonMode ? "jettons" : "TON"
+  const symbolHint = isJettonMode ? "jettons" : "GRAM"
 
   function jettonSymbol(master: JettonMaster): string {
     const symbol = master.jetton_content.symbol
@@ -155,7 +155,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
         <div>
           <h1 className={styles.title}>Local faucet</h1>
           <p className={styles.subtitle}>
-            Top up any wallet address with test TON or mint local jettons from a minter.
+            Top up any wallet address with test GRAM or mint local jettons from a minter.
           </p>
         </div>
       </section>
@@ -188,7 +188,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
               onClick={() => setMode("ton")}
             >
               <Wallet size={15} />
-              TON
+              GRAM
             </button>
             <button
               type="button"
@@ -245,7 +245,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
               id="dashboard-amount"
               className={styles.fieldInput}
               inputMode="decimal"
-              placeholder={isJettonMode ? "0.0" : "0.0 TON"}
+              placeholder={isJettonMode ? "0.0" : "0.0 GRAM"}
               value={amount}
               autoComplete="off"
               autoCorrect="off"
@@ -276,7 +276,9 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
                 : "Use this faucet to fund wallets for testing."}
             </div>
             <Button type="submit" className={styles.sendButton} disabled={isSubmitDisabled}>
-              <span>{isSubmitting ? "Sending..." : isJettonMode ? "Mint Jetton" : "Send TON"}</span>
+              <span>
+                {isSubmitting ? "Sending..." : isJettonMode ? "Mint Jetton" : "Send GRAM"}
+              </span>
               <ArrowUpRight size={16} />
             </Button>
           </div>

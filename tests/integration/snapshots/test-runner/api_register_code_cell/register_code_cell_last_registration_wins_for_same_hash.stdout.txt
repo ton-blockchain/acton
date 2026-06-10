@@ -11,7 +11,7 @@
   ✓ register code cell last wins [TIME]
     └─ Test output:
        N/A -> q_deployer A
-       └── empty 1 TON -> q_alias_new B                                                gas=253
+       └── empty 1 GRAM -> q_alias_new B                                               gas=253
            └── account created
 
  ✓ 1 passed in 1 file

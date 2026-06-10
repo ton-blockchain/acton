@@ -1,0 +1,17 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/fmt_behavior.test.tolk (1 test)
+  ✓ y stdlib format ton precision [TIME]
+    └─ Test output:
+       i64_max=9223372036.854775807 GRAM
+       above_i64_max=9223372036.854775808 GRAM
+       huge=123456789012345678901234567890.123456789 GRAM
+       negative_huge=-123456789012345678901234567890.123456789 GRAM
+       one_nanogram=0.000000001 GRAM
+       trailing_zeros=1.2345 GRAM
+
+ ✓ 1 passed in 1 file

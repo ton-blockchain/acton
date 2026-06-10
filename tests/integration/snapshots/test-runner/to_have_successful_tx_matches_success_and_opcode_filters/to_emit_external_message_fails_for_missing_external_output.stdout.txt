@@ -11,7 +11,7 @@
   ✗ ae emit external message missing [TIME]
     └─ Error: expect(actual).toEmitExternalMessage<ExternalNotice>()
         N/A -> sender A
-        └── Ping 0.5 TON -> harness B                                                   gas=778
+        └── Ping 0.5 GRAM -> harness B                                                  gas=778
         
         Cannot find external message ExternalNotice
         with:

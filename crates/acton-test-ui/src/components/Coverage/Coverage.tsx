@@ -341,7 +341,7 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
           </div>
         </aside>
 
-        <section className={styles.viewer}>
+        <section className={styles.viewer} aria-label="Coverage source">
           {selectedFile === undefined ? (
             <div className={styles.emptyState}>Select a file to inspect its coverage.</div>
           ) : (

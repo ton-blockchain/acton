@@ -44,9 +44,9 @@ This runs tests and writes a JSON snapshot of opcode and trace-chain statistics:
 ──────────────────────────────────────────────────────────────────────────────────────────────────
  Test                    Traces   Tx   Gas Used   Gas Fee         Forward Fee       Total Fee
 ──────────────────────────────────────────────────────────────────────────────────────────────────
- test increase counter        4    4       2789   0.0011156 TON   0.002000284 TON   0.0011156 TON
- test reset counter           5    5       4138   0.0016552 TON   0.002266953 TON   0.0016552 TON
- test unknown message         5    5       2568   0.0010272 TON   0.002266953 TON   0.0010272 TON
+ test increase counter        4    4       2789   0.0011156 GRAM   0.002000284 GRAM   0.0011156 GRAM
+ test reset counter           5    5       4138   0.0016552 GRAM   0.002266953 GRAM   0.0016552 GRAM
+ test unknown message         5    5       2568   0.0010272 GRAM   0.002266953 GRAM   0.0010272 GRAM
 ```
 
 ### Compare current run with baseline
@@ -76,13 +76,13 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
 ──────────────────────────────────────────────────────────────────────────────────
  Test                    Traces   Tx   Gas Used   Gas Fee          Total Fee
 ──────────────────────────────────────────────────────────────────────────────────
- test increase counter        4    4       2789    0.0011156 TON    0.0011156 TON
-                              4    4       2651    0.0010604 TON    0.0010604 TON
-                                           -138   -0.0000552 TON   -0.0000552 TON
- test reset counter           5    5       4138    0.0016552 TON    0.0016552 TON
-                              5    5       4000       0.0016 TON       0.0016 TON
-                                           -138   -0.0000552 TON   -0.0000552 TON
- test unknown message         5    5       2568    0.0010272 TON    0.0010272 TON
+ test increase counter        4    4       2789    0.0011156 GRAM    0.0011156 GRAM
+                              4    4       2651    0.0010604 GRAM    0.0010604 GRAM
+                                           -138   -0.0000552 GRAM   -0.0000552 GRAM
+ test reset counter           5    5       4138    0.0016552 GRAM    0.0016552 GRAM
+                              5    5       4000       0.0016 GRAM       0.0016 GRAM
+                                           -138   -0.0000552 GRAM   -0.0000552 GRAM
+ test unknown message         5    5       2568    0.0010272 GRAM    0.0010272 GRAM
 ```
 
 ```acton-gas-report noCopy title="terminal"
@@ -91,14 +91,14 @@ Baseline: gas-baseline.json (14 traces, captured 2026-02-28 14:49:39 UTC)
 ────────────────────────────────────────────────────────────────────────────────────────────
  Trace             Tx Count   Gas Used   Gas Fee          Fwd Fee            Total Fee
 ────────────────────────────────────────────────────────────────────────────────────────────
- Trace 1                  1        309    0.0001236 TON    0.000539205 TON    0.0001236 TON
- Trace 2                  1        309    0.0001236 TON    0.000547738 TON    0.0001236 TON
- Trace 3                  1        635     0.000254 TON    0.000646672 TON     0.000254 TON
-                          1        635     0.000254 TON    0.000629605 TON     0.000254 TON
-                                                          -0.000017067 TON
- increase counter         1       1536    0.0006144 TON    0.000266669 TON    0.0006144 TON
-                          1       1398    0.0005592 TON    0.000266669 TON    0.0005592 TON
-                                  -138   -0.0000552 TON                      -0.0000552 TON
+ Trace 1                  1        309    0.0001236 GRAM    0.000539205 GRAM    0.0001236 GRAM
+ Trace 2                  1        309    0.0001236 GRAM    0.000547738 GRAM    0.0001236 GRAM
+ Trace 3                  1        635     0.000254 GRAM    0.000646672 GRAM     0.000254 GRAM
+                          1        635     0.000254 GRAM    0.000629605 GRAM     0.000254 GRAM
+                                                          -0.000017067 GRAM
+ increase counter         1       1536    0.0006144 GRAM    0.000266669 GRAM    0.0006144 GRAM
+                          1       1398    0.0005592 GRAM    0.000266669 GRAM    0.0005592 GRAM
+                                  -138   -0.0000552 GRAM                      -0.0000552 GRAM
 ```
 
 <Callout type="idea" title="How to read row groups">

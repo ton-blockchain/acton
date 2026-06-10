@@ -3,7 +3,13 @@
   border-radius: var(--border-radius-md);
   overflow: hidden;
   line-height: 1.6;
-  --transaction-tree-failed-node-fill: color-mix(in srgb, var(--color-failed) 58%, var(--bg-color));
+  --transaction-tree-failed-node-fill: #edb04d;
+  --transaction-tree-failed-node-stroke: var(--text-primary);
+  --transaction-tree-failed-node-text: #ffffff;
+  --transaction-tree-failed-badge-fill: var(--text-primary);
+  --transaction-tree-failed-badge-text: var(--bg-color);
+  --transaction-tree-failed-badge-stroke: var(--bg-color);
+  --transaction-tree-failed-badge-mark-stroke: var(--bg-color);
 }
 
 .treeContainer {
@@ -173,7 +179,7 @@
 .transactionDetails {
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
   background-color: var(--bg-color);
-  margin: 0 var(--spacing-md);
+  margin: 0 var(--spacing-md) var(--spacing-2xl);
 }
 
 .storageMeta {
@@ -230,6 +236,10 @@
 .nodeCircle,
 .nodeCircleSelected {
   cursor: pointer;
+}
+
+.failedBadge {
+  pointer-events: none;
 }
 
 .nodeCircleSelected:focus {

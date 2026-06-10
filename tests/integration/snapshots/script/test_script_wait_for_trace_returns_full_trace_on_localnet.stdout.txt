@@ -1,9 +1,9 @@
   Installing standard library [ACTON_VERSION]
 TRACE_OUTPUT_BEGIN
 N/A -> external
-└── [EXT_IN_OPCODE] -> EQBRPs..l6nHTG A                                       gas=3308
-    └── TriggerForward 0.4 TON -> EQDnzm..T3h1OM B                              gas=1701
-        └── empty 0.2 TON -> EQDGH2..HvQahs C                                   gas=1750
+└── [EXT_IN_OPCODE] -> kQBRPs..l6nM9M A                                       gas=3308
+    └── TriggerForward 0.4 GRAM -> kQDnzm..T3h-gG B                             gas=1701
+        └── empty 0.2 GRAM -> kQDGH2..HvQRPm C                                  gas=1750
 
 TRACE_OUTPUT_END
 TRACE_READY=true

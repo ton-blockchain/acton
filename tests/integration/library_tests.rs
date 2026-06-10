@@ -854,7 +854,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("No", "failed to send cancellation response");
     session.expect(Eof);
 
@@ -899,7 +899,7 @@ fn test_library_publish_prompts_to_topup_tracked_exact_match() {
     session.expect("Library with this hash is already tracked on testnet:");
     session.expect("Top up an existing tracked library instead of publishing a new one?");
     session.send_line("Yes", "failed to choose tracked library top-up");
-    session.expect("Send 1 TON to top-up library?");
+    session.expect("Send 1 GRAM to top-up library?");
     session.send_line("No", "failed to cancel tracked library top-up");
     session.expect(Eof);
     session.assert_file_snapshot_matches(
@@ -950,7 +950,7 @@ fn test_library_publish_prompts_to_topup_tracked_exact_match_from_global_librari
     session.expect("global-tracked-lib in global.libraries.toml");
     session.expect("Top up an existing tracked library instead of publishing a new one?");
     session.send_line("Yes", "failed to choose tracked library top-up");
-    session.expect("Send 1 TON to top-up library?");
+    session.expect("Send 1 GRAM to top-up library?");
     session.send_line("No", "failed to cancel tracked library top-up");
     session.expect(Eof);
 
@@ -1027,7 +1027,7 @@ fn test_library_publish_selects_specific_tracked_match_and_updates_global_topup_
         "global-tracked-lib",
         "failed to select global tracked library",
     );
-    session.expect("Send 1 TON to top-up library?");
+    session.expect("Send 1 GRAM to top-up library?");
     session.send_line("Yes", "failed to confirm selected tracked library top-up");
     session.expect("Top-up transaction sent successfully");
     session.expect(Eof);
@@ -1094,7 +1094,7 @@ fn test_library_publish_declines_tracked_topup_and_continues_publish() {
 
     session.expect("Top up an existing tracked library instead of publishing a new one?");
     session.send_line("No", "failed to decline tracked library top-up");
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("Yes", "failed to confirm publish after declining top-up");
     session.expect("Transaction sent successfully");
     session.expect("Library info saved");
@@ -1205,7 +1205,7 @@ fn test_library_publish_warns_on_onchain_match_and_continues_publish() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("Yes", "failed to confirm publish");
     session.expect("Library code with this hash is already available on-chain on mock-v2.");
     session.expect("Transaction sent successfully");
@@ -1306,7 +1306,7 @@ fn test_library_publish_ignores_onchain_check_error_and_continues_publish() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("Yes", "failed to confirm publish");
     session.expect("Transaction sent successfully");
     session.expect("Library info saved");
@@ -1355,7 +1355,7 @@ fn test_library_publish_same_hash_different_network_does_not_prompt_to_topup() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line(
         "No",
         "failed to cancel publish after skipping top-up prompt",
@@ -1407,7 +1407,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Send 1 TON to top-up library?");
+    session.expect("Send 1 GRAM to top-up library?");
     session.send_line("No", "failed to send cancellation response");
     session.expect(Eof);
     session.assert_file_snapshot_matches(
@@ -2323,7 +2323,7 @@ fn test_library_topup_happy_path_with_duration_and_prompted_amount() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to provide amount for duration-based topup");
     session.expect("Top-up transaction sent successfully");
     session.expect(Eof);
@@ -2696,7 +2696,7 @@ fn test_library_publish_interactive_empty_amount_exits_without_metadata_changes(
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line(
         "   ",
         "failed to submit whitespace amount input that should trim to empty",
@@ -3131,9 +3131,9 @@ fn test_library_publish_fully_interactive_happy_path_without_flags() {
 
     session.expect("Enter duration");
     session.send_line("1d", "failed to send duration for interactive publish");
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to send amount for interactive publish");
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("Yes", "failed to confirm interactive publish");
     session.expect("Save library info to:");
     session.send_line("", "failed to select default local storage");
@@ -3193,7 +3193,7 @@ fn test_library_topup_fully_interactive_happy_path_without_duration_or_amount_fl
     session.send_line("", "failed to select default wallet");
     session.expect("Enter duration to top up for");
     session.send_line("1d", "failed to send duration for interactive topup");
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to send amount for interactive topup");
     session.expect("Top-up transaction sent successfully");
     session.expect(Eof);

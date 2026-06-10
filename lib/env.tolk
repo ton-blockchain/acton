@@ -24,7 +24,7 @@
 /// // Read an integer configuration
 /// val iterations = env<int>("TEST_ITERATIONS") ?? 100;
 ///
-/// // Read TON amount in nanotons
+/// // Read GRAM amount in nanograms
 /// val minBalance = env<coins>("MIN_BALANCE") ?? ton("0.5");
 ///
 /// // Read a target address
@@ -49,7 +49,7 @@ import "testing/assert"
 ///
 /// Supported types:
 /// - `int`: parsed as decimal or hexadecimal (if prefixed with `0x`).
-/// - `coins`: parsed the same way as `int` and returned as TON amount in nanotons.
+/// - `coins`: parsed the same way as `int` and returned as GRAM amount in nanograms.
 /// - `bool`: for present variable, returns true if value is "true" or "1" (case-insensitive), otherwise false.
 /// - `string`: returns the raw string value, including empty and whitespace-only values.
 /// - `slice`: returns the raw string value as a slice, including empty and whitespace-only values.

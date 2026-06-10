@@ -11,7 +11,7 @@
   ✓ raw self call opcode before common info tail [TIME]
     └─ Test output:
        N/A -> sender A
-       └── empty 10 TON -> self_call_counter B                                         gas=2463 aborted action_result_code=34
+       └── empty 10 GRAM -> self_call_counter B                                        gas=2463 aborted action_result_code=34
            ├── Action phase failed
            ├── Description: Action is invalid or not supported
            └── Re-run with --backtrace full to get actions location

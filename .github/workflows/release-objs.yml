@@ -11,7 +11,7 @@ permissions: { }
 
 env:
   TON_REPOSITORY: ton-blockchain/ton
-  TON_BRANCH: pmakhnev/acton
+  TON_BRANCH: acton
 
 jobs:
   prepare:

@@ -1,0 +1,17 @@
+[package]
+name = "fanout-graph-ui-e2e"
+description = "Transaction graph rendering fixture for Test UI visual snapshots"
+version = "0.1.0"
+license = "MIT"
+
+[contracts.fanout]
+display-name = "Fanout"
+src = "contracts/fanout.tolk"
+depends = []
+
+[import-mappings]
+acton = ".acton"
+contracts = "contracts"
+tests = "tests"
+wrappers = "wrappers"
+gen = "gen"

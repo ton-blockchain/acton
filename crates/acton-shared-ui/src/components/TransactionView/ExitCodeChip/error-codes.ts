@@ -133,9 +133,9 @@ export const EXIT_CODE_DESCRIPTIONS = {
     phase: "Action phase",
   },
   37: {
-    docsAnchor: "#37-not-enough-toncoin",
-    name: "Not Enough Toncoin",
-    description: "Not enough Toncoin.",
+    docsAnchor: "#37-not-enough-grams",
+    name: "Not Enough GRAMs",
+    description: "Not enough GRAMs.",
     phase: "Action phase",
   },
   38: {

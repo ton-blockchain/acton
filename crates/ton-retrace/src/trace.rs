@@ -183,7 +183,7 @@ impl InstalledSendMessageAction {
 pub struct InstalledReserveAction {
     /// Reservation mode.
     pub mode: i32,
-    /// Amount of nanoton to reserve.
+    /// Amount of nanograms to reserve.
     pub amount: BigInt,
     /// Hash of the code cell where the instruction was executed.
     pub loc_hash: String,
@@ -228,15 +228,15 @@ pub struct InstalledChangeLibraryAction {
 /// These are extracted from the executor logs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExecutedActionFailureReason {
-    /// Send message failed because there were not enough funds to cover transfer + forwarding fees.
-    NotEnoughToncoinToSend {
+    /// Send message failed because there was not enough GRAM to cover transfer + forwarding fees.
+    NotEnoughGramsToSend {
         /// Remaining account balance when processing the action.
         remaining_balance: BigInt,
         /// Required amount including forwarding fees.
         required: BigInt,
     },
     /// Reserve action failed because requested amount exceeds available balance.
-    CannotReserveToncoin {
+    CannotReserveGrams {
         /// Requested reserve amount.
         requested: BigInt,
         /// Available balance at reservation time.
@@ -863,7 +863,7 @@ impl ExecutedActions {
                         && matches!(action, ExecutedAction::SendMessage { .. })
                     {
                         action.set_failure_reason(
-                            ExecutedActionFailureReason::NotEnoughToncoinToSend {
+                            ExecutedActionFailureReason::NotEnoughGramsToSend {
                                 remaining_balance: remaining_balance
                                     .parse::<BigInt>()
                                     .unwrap_or(BigInt::ZERO),
@@ -880,7 +880,7 @@ impl ExecutedActions {
                         && matches!(action, ExecutedAction::ReserveCurrency { .. })
                     {
                         action.set_failure_reason(
-                            ExecutedActionFailureReason::CannotReserveToncoin {
+                            ExecutedActionFailureReason::CannotReserveGrams {
                                 requested: requested.parse::<BigInt>().unwrap_or(BigInt::ZERO),
                                 available: available.parse::<BigInt>().unwrap_or(BigInt::ZERO),
                             },
@@ -1243,7 +1243,7 @@ execute FOO
             assert_eq!(failure_code, &Some(37));
             assert_eq!(
                 failure_reason.as_ref(),
-                Some(&ExecutedActionFailureReason::NotEnoughToncoinToSend {
+                Some(&ExecutedActionFailureReason::NotEnoughGramsToSend {
                     remaining_balance: BigInt::from(997_209_600u64),
                     required: BigInt::from(1_000_000_400_000u64),
                 })
@@ -1318,7 +1318,7 @@ execute FOO
             assert_eq!(failure_code, &Some(37));
             assert_eq!(
                 failure_reason.as_ref(),
-                Some(&ExecutedActionFailureReason::CannotReserveToncoin {
+                Some(&ExecutedActionFailureReason::CannotReserveGrams {
                     requested: BigInt::from(1_000_000_000_000u64),
                     available: BigInt::from(1_088_500_000u64),
                 })

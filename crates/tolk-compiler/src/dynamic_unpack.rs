@@ -14,6 +14,7 @@ pub enum UnpackedValue {
     Number(BigInt),
     Bool(bool),
     String(String),
+    AddressNone,
     Address(IntAddr),
     ExtAddress(ExtAddr),
     Cell(Cell),
@@ -320,7 +321,7 @@ fn unpack_type<S: UnpackSchema + ?Sized>(
             _ => anyhow::bail!("expected external address for addressExt"),
         }),
         Ty::AddressAny => Ok(match AnyAddr::load_from(data)? {
-            AnyAddr::None => UnpackedValue::String("none".to_owned()),
+            AnyAddr::None => UnpackedValue::AddressNone,
             AnyAddr::Ext(ext_addr) => UnpackedValue::ExtAddress(ext_addr),
             AnyAddr::Std(addr) => UnpackedValue::Address(IntAddr::Std(addr)),
             AnyAddr::Var(addr) => UnpackedValue::Address(IntAddr::Var(addr)),
@@ -1626,7 +1627,7 @@ mod tests {
     }
 
     #[test]
-    fn decodes_address_any_none_as_string_like_ts_dynamic_unpack() {
+    fn decodes_address_any_none() {
         let mut abi = empty_abi();
         let ty_idx = add_ty(&mut abi, Ty::AddressAny);
         let mut builder = CellBuilder::new();
@@ -1638,11 +1639,9 @@ mod tests {
 
         assert_unpacked_snapshot(
             &data,
-            expect![[r#"
-                String(
-                    "none",
-                )
-            "#]],
+            expect![[r"
+                AddressNone
+            "]],
         );
     }
 

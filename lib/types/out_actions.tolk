@@ -17,7 +17,7 @@
 /// // Get specific message body
 /// val transfer = actions.getSendMessageBodyAt<Transfer>(0);
 /// if (transfer != null) {
-///     println("Transferred: {:ton}", transfer.amount);
+///     println("Transferred: {:gram}", transfer.amount);
 /// }
 /// ```
 

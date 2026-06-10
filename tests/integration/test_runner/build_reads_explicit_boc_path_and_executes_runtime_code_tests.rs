@@ -42,6 +42,24 @@ contract Precompiled {
 }
 ";
 
+const MAINNET_USDT_WALLET_TYPES: &str = r"
+struct MainnetUsdtWalletStorage {
+    status: uint4
+    jettonBalance: coins
+    ownerAddress: address
+    minterAddress: address
+}
+
+struct (0xd372158c) MainnetUsdtTopUp {
+    queryId: uint64
+}
+
+contract MainnetUsdtWallet {
+    storage: MainnetUsdtWalletStorage
+    incomingMessages: MainnetUsdtTopUp
+}
+";
+
 fn compiled_runtime_boc_bytes() -> Vec<u8> {
     let source_project = ProjectBuilder::new("aw-stdlib-build-precompiled-source")
         .contract_with_output("simple", SIMPLE_RUNTIME_CONTRACT, "contracts/simple.boc")
@@ -68,6 +86,16 @@ fn compiled_precompiled_message_boc_bytes() -> Vec<u8> {
         .expect("must read compiled precompiled message boc bytes")
 }
 
+fn mainnet_usdt_wallet_boc_bytes() -> Vec<u8> {
+    fs::read("tests/integration/testdata/usdt/mainnet-wallet.code.boc")
+        .expect("must read mainnet USDT wallet BoC fixture")
+}
+
+fn mainnet_usdt_wallet_library_boc_bytes() -> Vec<u8> {
+    fs::read("tests/integration/testdata/usdt/mainnet-wallet-library.code.boc")
+        .expect("must read mainnet USDT wallet library BoC fixture")
+}
+
 fn point_precompiled_contract_to_uppercase_boc(project: &crate::support::project::Project) {
     fs::rename(
         project.path().join("contracts/precompiled.boc"),
@@ -82,6 +110,91 @@ fn point_precompiled_contract_to_uppercase_boc(project: &crate::support::project
         manifest.replace("contracts/precompiled.boc", "contracts/precompiled.BOC"),
     )
     .expect("should update Acton.toml");
+}
+
+#[test]
+fn mainnet_usdt_wallet_library_ref_contract_uses_manifest_metadata_in_transaction_tree() {
+    let project = ProjectBuilder::new("aw-stdlib-build-mainnet-usdt-wallet-library-ref")
+        .without_acton_toml()
+        .contract_from_boc_with_types(
+            "MainnetUsdtWallet",
+            mainnet_usdt_wallet_boc_bytes(),
+            "contracts/MainnetUsdtWallet.types.tolk",
+        )
+        .contract_from_boc(
+            "MainnetUsdtWalletLibrary",
+            mainnet_usdt_wallet_library_boc_bytes(),
+        )
+        .raw_file(
+            "contracts/MainnetUsdtWallet.types.tolk",
+            MAINNET_USDT_WALLET_TYPES,
+        )
+        .raw_file(
+            "Acton.toml",
+            r#"[package]
+name = "aw-stdlib-build-mainnet-usdt-wallet-library-ref"
+description = "A test project"
+version = "0.1.0"
+
+[contracts.MainnetUsdtWallet]
+display-name = "Mainnet USDT Wallet Code"
+src = "contracts/MainnetUsdtWallet.boc"
+types = "contracts/MainnetUsdtWallet.types.tolk"
+"#,
+        )
+        .test_file(
+            "build_mainnet_usdt_wallet_library_ref_transaction_tree",
+            r#"
+            import "../../lib/build"
+            import "../../lib/emulation/network"
+            import "../../lib/emulation/testing"
+            import "../../lib/io"
+            import "../contracts/MainnetUsdtWallet.types"
+
+            get fun `test mainnet usdt wallet library ref transaction tree`() {
+                testing.registerLibrary(build(
+                    "MainnetUsdtWalletLibrary",
+                    "contracts/MainnetUsdtWalletLibrary.boc",
+                ));
+
+                val deployer = testing.treasury("deployer");
+                val init = ContractState {
+                    code: build("MainnetUsdtWallet"),
+                    data: MainnetUsdtWalletStorage {
+                        status: 0,
+                        jettonBalance: 0,
+                        ownerAddress: deployer.address,
+                        minterAddress: deployer.address,
+                    }.toCell(),
+                };
+
+                val txs = net.send(deployer.address, createMessage({
+                    bounce: false,
+                    value: ton("0.1"),
+                    dest: {
+                        stateInit: init,
+                    },
+                    body: MainnetUsdtTopUp {
+                        queryId: 0,
+                    },
+                }));
+
+                println(txs);
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .show_bodies()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/build_reads_explicit_boc_path_and_executes_runtime_code/mainnet_usdt_wallet_library_ref_contract_uses_manifest_metadata_in_transaction_tree.stdout.txt",
+        );
 }
 
 #[test]

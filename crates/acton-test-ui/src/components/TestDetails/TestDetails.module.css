@@ -23,6 +23,44 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  min-width: 0;
+}
+
+.expandButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-sm);
+  background-color: var(--bg-color);
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  opacity: 1;
+  transition:
+    background-color 0.1s,
+    color 0.1s,
+    opacity 0.18s ease;
+}
+
+.expandButton:hover {
+  background-color: var(--hover-bg);
+  color: var(--text-primary);
+}
+
+.expandButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--text-muted) 70%, transparent);
+}
+
+.expandButton svg {
+  width: 1.125rem;
+  height: 1.125rem;
+  flex: 0 0 auto;
 }
 
 .statusIcon {
@@ -173,7 +211,16 @@
 
 .traceSelector {
   display: flex;
+  align-items: center;
   padding: 8px 16px;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.traceTabs {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
   gap: 8px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -204,6 +251,25 @@
   outline: 1px solid var(--border-color);
 }
 
+.treasuryDeployTraceToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--text-muted);
+  background-color: var(--bg-secondary-color);
+}
+
+.treasuryDeployTraceToggle svg {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+}
+
+.treasuryDeployTraceTab {
+  color: var(--text-muted);
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 72%, var(--bg-color));
+}
+
 .skippedTraceTab,
 .skippedTraceTab:hover {
   color: var(--text-muted);
@@ -220,6 +286,38 @@
   color: var(--text-primary);
   background-color: var(--bg-color);
   font-weight: 600;
+}
+
+.valueFlowToggle {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 8px;
+  border: none;
+  border-radius: var(--border-radius-sm);
+  background: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: normal;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
+}
+
+.valueFlowToggle svg {
+  display: block;
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+}
+
+.valueFlowToggle:hover {
+  color: var(--text-primary);
 }
 
 .tabsContainer {
@@ -281,6 +379,11 @@
   flex: 1;
   width: 100%;
   min-height: 0;
+}
+
+.valueFlowSection {
+  flex: 0 0 auto;
+  padding: var(--spacing-md) var(--spacing-md) var(--spacing-sm);
 }
 
 .profileTab {
@@ -499,6 +602,45 @@
 
 .traceLinkButton:hover {
   color: var(--text-primary);
+}
+
+.treasuryDeploySummaryRow {
+  background-color: var(--bg-secondary-color);
+}
+
+.treasuryDeploySummaryRow td {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.treasuryDeploySummaryToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.treasuryDeploySummaryToggle:hover {
+  color: var(--text-primary);
+}
+
+.treasuryDeploySummaryToggle svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+}
+
+.treasuryDeployTraceFeeRow {
+  background-color: color-mix(in srgb, var(--bg-secondary-color) 58%, var(--bg-color));
 }
 
 .traceLinkIcon {

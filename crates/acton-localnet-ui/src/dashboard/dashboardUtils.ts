@@ -1,6 +1,6 @@
 import type {JettonMaster, V3TransactionListItem} from "../explorer/api/types"
 
-export function parseTonAmount(value: string): number | undefined {
+export function parseGramAmount(value: string): number | undefined {
   const trimmed = value.trim()
   if (!trimmed || !/^\d+(\.\d{0,9})?$/.test(trimmed)) {
     return undefined

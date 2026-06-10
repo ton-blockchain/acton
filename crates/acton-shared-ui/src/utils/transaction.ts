@@ -9,8 +9,13 @@ import {
 } from "@ton/core"
 
 import type {BackendContractInfo, BackendTransaction, TransactionInfo} from "@/types"
-import type {ContractData} from "@/types/transaction"
-import {getMessageOpcode, resolveAbiOpcodeName} from "@/utils/messageBody"
+import type {ContractData, ValueFlowItem} from "@/types/transaction"
+import {getMessageOpcode, getShardAccountBalance, resolveAbiOpcodeName} from "@/utils/messageBody"
+
+interface ValueFlowAccumulator extends ValueFlowItem {
+  readonly before: bigint
+  readonly after: bigint
+}
 
 const bigintToAddress = (addr: bigint | undefined): Address | undefined => {
   if (addr === undefined) return undefined
@@ -50,6 +55,9 @@ export function resolveTransactionOpcodeName(
   const opcode = getTransactionOpcode(tx.transaction)
   if (opcode === undefined) {
     return undefined
+  }
+  if (opcode === 0) {
+    return "Text Comment"
   }
 
   const inMessage = tx.transaction.inMessage
@@ -95,6 +103,7 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
       actions: actionsCell,
       outActions,
       contractName: tx.dest_contract_info,
+      contractAbi: undefined,
       shardAccountBefore: tx.shard_account_before,
       shardAccountAfter: tx.shard_account,
       parsedBody: undefined,
@@ -122,6 +131,55 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
   }
 
   return txInfos
+}
+
+export function buildValueFlowItems(transactions: readonly TransactionInfo[]): ValueFlowItem[] {
+  const flowByAddress = new Map<string, ValueFlowAccumulator>()
+
+  for (const tx of [...transactions].sort(compareTransactionInfoByLt)) {
+    const address = tx.address?.toString()
+    if (!address) {
+      continue
+    }
+
+    const before = tx.accountBalanceBefore ?? getShardAccountBalance(tx.shardAccountBefore)
+    const after = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
+    if (before === undefined || after === undefined) {
+      continue
+    }
+
+    const previous = flowByAddress.get(address)
+    const initialBefore = previous?.before ?? before
+
+    flowByAddress.set(address, {
+      address,
+      before: initialBefore,
+      after,
+      change: after - initialBefore,
+      fee: (previous?.fee ?? 0n) + tx.transaction.totalFees.coins,
+    })
+  }
+
+  return [...flowByAddress.values()]
+    .map(({address, change, fee}) => ({address, change, fee}))
+    .sort((left, right) => left.address.localeCompare(right.address))
+}
+
+function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInfo): number {
+  const leftLt = parseBigInt(left.lt)
+  const rightLt = parseBigInt(right.lt)
+  if (leftLt === rightLt) {
+    return 0
+  }
+  return leftLt < rightLt ? -1 : 1
+}
+
+function parseBigInt(value: string | undefined): bigint {
+  try {
+    return value === undefined ? 0n : BigInt(value)
+  } catch {
+    return 0n
+  }
 }
 
 function findOpcodeNameInContracts(
@@ -190,15 +248,15 @@ export function computeSendMode(tx: TransactionInfo): number | undefined {
 export const RESERVE_MODE_CONSTANTS = {
   0: {
     name: "ReserveExact",
-    description: "Reserves exactly the specified amount of nanoToncoin.",
+    description: "Reserves exactly the specified amount of nanograms.",
   },
   1: {
     name: "ReserveAllExcept",
-    description: "Reserves all but the specified amount of nanoToncoin.",
+    description: "Reserves all but the specified amount of nanograms.",
   },
   2: {
     name: "ReserveAtMost",
-    description: "Reserves at most the specified amount of nanoToncoin.",
+    description: "Reserves at most the specified amount of nanograms.",
   },
   4: {
     name: "ReserveAddOriginalBalance",

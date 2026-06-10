@@ -78,8 +78,8 @@ Local TON Connect page port.
 Defaults to `52258`.
 {{/option}}
 
-{{#option "`--amount` _ton_" }}
-Explicit TON amount to send.
+{{#option "`--amount` _gram_" }}
+Explicit GRAM amount to send.
 
 Overrides duration-based estimation.
 {{/option}}
@@ -182,8 +182,8 @@ Library name to top up.
 Requested additional storage duration such as `100d` or `1y`.
 {{/option}}
 
-{{#option "`--amount` _ton_" }}
-Explicit TON amount to send.
+{{#option "`--amount` _gram_" }}
+Explicit GRAM amount to send.
 
 Overrides duration-based estimation.
 {{/option}}
@@ -250,7 +250,7 @@ one-off overrides or CI.
 
 ## Amount Estimation
 
-For `publish` and `topup`, `--duration` is used to estimate the required TON
+For `publish` and `topup`, `--duration` is used to estimate the required GRAM
 amount from the library size and storage duration.
 
 If `--amount` is passed, it overrides that estimate completely.

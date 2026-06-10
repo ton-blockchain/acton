@@ -1,4 +1,6 @@
 import type React from "react"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {Copy, X} from "lucide-react"
 import {useEffect, useMemo, useState} from "react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
 
@@ -17,7 +19,7 @@ import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {AccountDetails} from "../components/AccountDetails"
-import {normalizeAddress} from "../components/utils"
+import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountPage.module.css"
@@ -48,12 +50,18 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const [nftItems, setNftItems] = useState<NftItem[]>([])
   const [holders, setHolders] = useState<JettonWallet[]>([])
   const [jettonWalletsLoading, setJettonWalletsLoading] = useState(false)
+  const [jettonWalletLoading, setJettonWalletLoading] = useState(false)
   const [nftItemsLoading, setNftItemsLoading] = useState(false)
   const [holdersLoading, setHoldersLoading] = useState(false)
   const [transactionsLoading, setTransactionsLoading] = useState(true)
   const [transactionsError, setTransactionsError] = useState<string | undefined>()
   const [accountLoading, setAccountLoading] = useState(true)
   const [accountError, setAccountError] = useState<string | undefined>()
+  const [compilerAbi, setCompilerAbi] = useState<ContractABI | undefined>()
+  const [compilerAbiLoading, setCompilerAbiLoading] = useState(false)
+  const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
+  const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
+  const [jettonMetadataCopied, setJettonMetadataCopied] = useState(false)
 
   const formattedAddress = useMemo(
     () => normalizeAddress(address, addressFormat),
@@ -64,6 +72,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     return isAccountTab(tab) ? tab : "history"
   }, [location.hash])
   const accountInterfaces = accountStateV3?.interfaces ?? []
+  const accountCodeHash = accountStateV3?.code_hash
   const isJettonMasterAccount = hasAccountInterface(accountInterfaces, "jetton_master")
   const isJettonWalletAccount = hasAccountInterface(accountInterfaces, "jetton_wallet")
   const isNftItemAccount = hasAccountInterface(accountInterfaces, "nft_item")
@@ -86,6 +95,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         setNftItems([])
         setHolders([])
         setJettonWalletsLoading(false)
+        setJettonWalletLoading(false)
         setNftItemsLoading(false)
         setHoldersLoading(false)
         setTransactionsLoading(false)
@@ -111,6 +121,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       setNftItems([])
       setHolders([])
       setJettonWalletsLoading(false)
+      setJettonWalletLoading(false)
       setNftItemsLoading(false)
       setHoldersLoading(false)
 
@@ -141,6 +152,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
           setNftItems([])
           setHolders([])
           setJettonWalletsLoading(false)
+          setJettonWalletLoading(false)
           setNftItemsLoading(false)
           setHoldersLoading(false)
           setTransactionsLoading(false)
@@ -179,6 +191,40 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       isActive = false
     }
   }, [client, formattedAddress])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadCompilerAbi = async () => {
+      if (!accountCodeHash) {
+        setCompilerAbi(undefined)
+        setCompilerAbiLoading(false)
+        setCompilerAbiError(undefined)
+        return
+      }
+
+      setCompilerAbi(undefined)
+      setCompilerAbiLoading(true)
+      setCompilerAbiError(undefined)
+
+      try {
+        const abis = await client.getCompilerAbis([accountCodeHash])
+        if (!isActive) return
+        setCompilerAbi(abis[accountCodeHash] ?? undefined)
+        setCompilerAbiLoading(false)
+      } catch (error) {
+        if (!isActive) return
+        setCompilerAbi(undefined)
+        setCompilerAbiLoading(false)
+        setCompilerAbiError(error instanceof Error ? error.message : "Failed to load compiler ABI")
+      }
+    }
+
+    void loadCompilerAbi()
+    return () => {
+      isActive = false
+    }
+  }, [accountCodeHash, client])
 
   useEffect(() => {
     if (!formattedAddress) {
@@ -252,6 +298,35 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   }, [client, formattedAddress])
 
   useEffect(() => {
+    setJettonMetadataOpen(false)
+    setJettonMetadataCopied(false)
+  }, [formattedAddress])
+
+  useEffect(() => {
+    if (!jettonMetadataCopied) {
+      return
+    }
+
+    const timer = setTimeout(() => setJettonMetadataCopied(false), 1600)
+    return () => clearTimeout(timer)
+  }, [jettonMetadataCopied])
+
+  useEffect(() => {
+    if (!jettonMetadataOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setJettonMetadataOpen(false)
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => document.removeEventListener("keydown", handleKeyDown)
+  }, [jettonMetadataOpen])
+
+  useEffect(() => {
     let isActive = true
 
     const loadJettonMaster = async () => {
@@ -282,9 +357,11 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
       if (!formattedAddress || !isJettonWalletAccount) {
         setJettonWalletAccount(undefined)
         setJettonWalletMaster(undefined)
+        setJettonWalletLoading(false)
         return
       }
 
+      setJettonWalletLoading(true)
       try {
         const currentWallets = await client.getJettonWalletsByAddress([formattedAddress])
         const currentWallet = currentWallets[0]
@@ -295,7 +372,12 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
         setJettonWalletAccount(currentWallet)
         setJettonWalletMaster(currentWalletMasters[0])
       } catch (error) {
+        if (!isActive) return
         console.error("Failed to fetch jetton wallet", error)
+        setJettonWalletAccount(undefined)
+        setJettonWalletMaster(undefined)
+      } finally {
+        if (isActive) setJettonWalletLoading(false)
       }
     }
 
@@ -387,7 +469,9 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     let isActive = true
 
     const loadNftItems = async () => {
-      if (!formattedAddress || activeTab !== "nfts") {
+      if (!formattedAddress) {
+        setNftItems([])
+        setNftItemsLoading(false)
         return
       }
 
@@ -411,7 +495,7 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [activeTab, client, formattedAddress])
+  }, [client, formattedAddress])
 
   useEffect(() => {
     let isActive = true
@@ -454,6 +538,31 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
 
   const tokenInfo = jettonMaster ?? jettonWalletMaster
   const tokenSymbol = tokenInfo?.jetton_content.symbol
+  const tokenName = tokenInfo?.jetton_content.name || "Unknown Jetton"
+  const tokenDecimals = tokenInfo?.jetton_content.decimals
+  const tokenTotalSupply = jettonMaster
+    ? formatJettonAmount(jettonMaster.total_supply, tokenDecimals)
+    : undefined
+  const tokenTotalSupplyLabel = tokenTotalSupply
+    ? `${tokenTotalSupply}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
+    : undefined
+  const jettonWalletAmount =
+    jettonWalletAccount && jettonWalletMaster
+      ? formatJettonAmount(jettonWalletAccount.balance, jettonWalletMaster.jetton_content.decimals)
+      : undefined
+  const jettonWalletAmountLabel = jettonWalletAmount
+    ? `${jettonWalletAmount}${tokenSymbol ? ` ${tokenSymbol}` : ""}`
+    : undefined
+  const jettonMetadataJson = jettonMaster
+    ? JSON.stringify(
+        {
+          address: toRawAddress(jettonMaster.address),
+          ...jettonMaster.jetton_content,
+        },
+        undefined,
+        2,
+      )
+    : undefined
   const nftItemTokenInfo = accountTokenInfo.find(info => info.type === "nft_items")
   const nftCollectionTokenInfo = accountTokenInfo.find(info => info.type === "nft_collections")
   const nftItemName =
@@ -481,6 +590,23 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     tokenInfoString(nftCollectionTokenInfo, "image") ||
     contentString(collectionSample?.content, "collection_image") ||
     NFT_PLACEHOLDER_IMAGE
+  const collectiblePreviews = nftItems.slice(0, 8).map(item => ({
+    image:
+      contentString(item.content, "image") ||
+      contentString(item.content, "preview") ||
+      contentString(item.content, "image_url") ||
+      NFT_PLACEHOLDER_IMAGE,
+    name:
+      contentString(item.content, "name") ||
+      contentString(item.content, "collection_name") ||
+      `NFT #${item.index}`,
+  }))
+  const hasHeaderContextCard = Boolean(
+    accountState && (tokenInfo || currentNftItem || (nftCollectionName && !currentNftItem)),
+  )
+  const topSectionClassName = hasHeaderContextCard
+    ? styles.topSection
+    : `${styles.topSection} ${styles.topSectionSingle}`
 
   return (
     <div className={styles.container}>
@@ -496,247 +622,230 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
               },
             ]}
           />
-          <div className={styles.topSection}>
+          <div className={topSectionClassName}>
             <AccountInfo
               address={formattedAddress}
               state={accountState}
+              compilerAbi={compilerAbi}
               contractInterfaces={accountStateV3?.interfaces}
               jettonWallets={jettonWallets}
               accountLoading={accountLoading}
               assetsLoading={accountLoading || jettonWalletsLoading}
+              amount={jettonWalletAmountLabel}
+              amountLoading={isJettonWalletAccount && jettonWalletLoading}
               client={client}
               onMoreAssetsClick={() => handleTabChange("tokens")}
+              collectiblesCount={nftItems.length}
+              collectiblePreviews={collectiblePreviews}
+              collectiblesLoading={nftItemsLoading}
+              onCollectiblesClick={() => handleTabChange("nfts")}
+              hasContextCard={hasHeaderContextCard}
             />
-            {accountState && tokenInfo && (
-              <div className={styles.jettonInfo}>
-                <div className={styles.jettonHeader}>
-                  {tokenInfo.jetton_content.image && (
-                    <img
-                      src={tokenInfo.jetton_content.image}
-                      alt={tokenInfo.jetton_content.name}
-                      className={styles.jettonImage}
-                    />
-                  )}
-                  <div className={styles.jettonTitle}>
-                    <div className={styles.jettonName}>
-                      {tokenInfo.jetton_content.name || "Unknown Jetton"}
+            {hasHeaderContextCard && (
+              <div className={styles.contextColumn}>
+                {accountState && tokenInfo && (
+                  <div
+                    className={`${styles.jettonInfo} ${jettonMaster ? styles.jettonMasterInfo : ""}`}
+                  >
+                    <div className={styles.jettonHeader}>
+                      {tokenInfo.jetton_content.image && (
+                        <img
+                          src={tokenInfo.jetton_content.image}
+                          alt={tokenName}
+                          className={styles.jettonImage}
+                        />
+                      )}
+                      <div className={styles.jettonHeaderContent}>
+                        <div className={styles.jettonTitle}>
+                          <div className={styles.jettonName}>{tokenName}</div>
+                          {tokenSymbol && <div className={styles.jettonSymbol}>{tokenSymbol}</div>}
+                        </div>
+                        {jettonMaster && tokenTotalSupplyLabel && (
+                          <div className={styles.jettonSupply}>
+                            Max.supply: {tokenTotalSupplyLabel}
+                          </div>
+                        )}
+                        {jettonMaster && (
+                          <button
+                            type="button"
+                            className={styles.jettonMetadataButton}
+                            onClick={() => setJettonMetadataOpen(true)}
+                          >
+                            Metadata
+                          </button>
+                        )}
+                      </div>
                     </div>
-                    <div className={styles.jettonSymbol}>
-                      {tokenSymbol && `$${tokenSymbol}`}{" "}
-                      {jettonMaster ? "Jetton master" : "Jetton wallet"}
-                    </div>
-                  </div>
-                </div>
-                {tokenInfo.jetton_content.description && (
-                  <div className={styles.jettonDescription}>
-                    {tokenInfo.jetton_content.description}
+                    {!jettonMaster && jettonWalletAccount && jettonWalletMaster && (
+                      <>
+                        <div className={styles.jettonDivider} />
+                        <div className={styles.jettonDetails}>
+                          <div className={styles.jettonRow}>
+                            <span className={styles.jettonLabel}>Jetton master</span>
+                            <span
+                              className={`${styles.jettonValue} ${styles.jettonLink}`}
+                              onClick={() => handleSearch(jettonWalletAccount.jetton)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  handleSearch(jettonWalletAccount.jetton)
+                                }
+                              }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <AddressLabel address={jettonWalletAccount.jetton} />
+                            </span>
+                          </div>
+                          <div className={styles.jettonRow}>
+                            <span className={styles.jettonLabel}>Holder address</span>
+                            <span
+                              className={`${styles.jettonValue} ${styles.jettonLink}`}
+                              onClick={() => handleSearch(jettonWalletAccount.owner)}
+                              onKeyDown={e => {
+                                if (e.key === "Enter" || e.key === " ") {
+                                  handleSearch(jettonWalletAccount.owner)
+                                }
+                              }}
+                              role="button"
+                              tabIndex={0}
+                            >
+                              <AddressLabel address={jettonWalletAccount.owner} />
+                            </span>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
-                <div className={styles.jettonDetails}>
-                  {jettonMaster ? (
-                    <>
+                {accountState && currentNftItem && (
+                  <div className={styles.jettonInfo}>
+                    <div className={styles.jettonHeader}>
+                      <img src={nftItemImage} alt={nftItemName} className={styles.jettonImage} />
+                      <div className={styles.jettonTitle}>
+                        <div className={styles.jettonName}>{nftItemName}</div>
+                        <div className={styles.jettonSymbol}>NFT item</div>
+                      </div>
+                    </div>
+                    {nftItemDescription && (
+                      <div className={styles.jettonDescription}>{nftItemDescription}</div>
+                    )}
+                    <div className={styles.jettonDivider} />
+                    <div className={styles.jettonDetails}>
                       <div className={styles.jettonRow}>
-                        <span className={styles.jettonLabel}>Total supply</span>
-                        <span className={styles.jettonValue}>
-                          {formatJettonAmount(
-                            jettonMaster.total_supply,
-                            jettonMaster.jetton_content.decimals,
-                          )}
-                        </span>
+                        <span className={styles.jettonLabel}>Index</span>
+                        <span className={styles.jettonValue}>#{currentNftItem.index}</span>
                       </div>
                       <div className={styles.jettonRow}>
-                        <span className={styles.jettonLabel}>Mintable</span>
-                        <span className={styles.jettonValue}>
-                          {jettonMaster.mintable ? "Yes" : "No"}
-                        </span>
-                      </div>
-                      <div className={styles.jettonRow}>
-                        <span className={styles.jettonLabel}>Admin</span>
+                        <span className={styles.jettonLabel}>Owner</span>
                         <span
                           className={`${styles.jettonValue} ${styles.jettonLink}`}
-                          onClick={() => handleSearch(jettonMaster.admin_address)}
+                          onClick={() => {
+                            if (currentNftItem.owner_address) {
+                              handleSearch(currentNftItem.owner_address)
+                            }
+                          }}
                           onKeyDown={e => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              handleSearch(jettonMaster.admin_address)
+                            if (
+                              (e.key === "Enter" || e.key === " ") &&
+                              currentNftItem.owner_address
+                            ) {
+                              handleSearch(currentNftItem.owner_address)
                             }
                           }}
                           role="button"
                           tabIndex={0}
                         >
-                          <AddressLabel address={jettonMaster.admin_address} />
+                          {currentNftItem.owner_address ? (
+                            <AddressLabel address={currentNftItem.owner_address} />
+                          ) : (
+                            "No owner"
+                          )}
                         </span>
                       </div>
-                    </>
-                  ) : (
-                    jettonWalletAccount &&
-                    jettonWalletMaster && (
-                      <>
-                        <div className={styles.jettonRow}>
-                          <span className={styles.jettonLabel}>Wallet balance</span>
-                          <span className={styles.jettonValue}>
-                            {formatJettonAmount(
-                              jettonWalletAccount.balance,
-                              jettonWalletMaster.jetton_content.decimals,
-                            )}{" "}
-                            {tokenSymbol}
-                          </span>
-                        </div>
-                        <div className={styles.jettonRow}>
-                          <span className={styles.jettonLabel}>Owner</span>
-                          <span
-                            className={`${styles.jettonValue} ${styles.jettonLink}`}
-                            onClick={() => handleSearch(jettonWalletAccount.owner)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                handleSearch(jettonWalletAccount.owner)
-                              }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            <AddressLabel address={jettonWalletAccount.owner} />
-                          </span>
-                        </div>
-                        <div className={styles.jettonRow}>
-                          <span className={styles.jettonLabel}>Minter</span>
-                          <span
-                            className={`${styles.jettonValue} ${styles.jettonLink}`}
-                            onClick={() => handleSearch(jettonWalletAccount.jetton)}
-                            onKeyDown={e => {
-                              if (e.key === "Enter" || e.key === " ") {
-                                handleSearch(jettonWalletAccount.jetton)
-                              }
-                            }}
-                            role="button"
-                            tabIndex={0}
-                          >
-                            <AddressLabel address={jettonWalletAccount.jetton} />
-                          </span>
-                        </div>
-                      </>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-            {accountState && currentNftItem && (
-              <div className={styles.jettonInfo}>
-                <div className={styles.jettonHeader}>
-                  <img src={nftItemImage} alt={nftItemName} className={styles.jettonImage} />
-                  <div className={styles.jettonTitle}>
-                    <div className={styles.jettonName}>{nftItemName}</div>
-                    <div className={styles.jettonSymbol}>NFT item</div>
-                  </div>
-                </div>
-                {nftItemDescription && (
-                  <div className={styles.jettonDescription}>{nftItemDescription}</div>
-                )}
-                <div className={styles.jettonDetails}>
-                  <div className={styles.jettonRow}>
-                    <span className={styles.jettonLabel}>Index</span>
-                    <span className={styles.jettonValue}>#{currentNftItem.index}</span>
-                  </div>
-                  <div className={styles.jettonRow}>
-                    <span className={styles.jettonLabel}>Owner</span>
-                    <span
-                      className={`${styles.jettonValue} ${styles.jettonLink}`}
-                      onClick={() => {
-                        if (currentNftItem.owner_address) handleSearch(currentNftItem.owner_address)
-                      }}
-                      onKeyDown={e => {
-                        if ((e.key === "Enter" || e.key === " ") && currentNftItem.owner_address) {
-                          handleSearch(currentNftItem.owner_address)
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      {currentNftItem.owner_address ? (
-                        <AddressLabel address={currentNftItem.owner_address} />
-                      ) : (
-                        "No owner"
-                      )}
-                    </span>
-                  </div>
-                  <div className={styles.jettonRow}>
-                    <span className={styles.jettonLabel}>Collection</span>
-                    <span
-                      className={`${styles.jettonValue} ${styles.jettonLink}`}
-                      onClick={() => {
-                        if (currentNftItem.collection_address) {
-                          handleSearch(currentNftItem.collection_address)
-                        }
-                      }}
-                      onKeyDown={e => {
-                        if (
-                          (e.key === "Enter" || e.key === " ") &&
-                          currentNftItem.collection_address
-                        ) {
-                          handleSearch(currentNftItem.collection_address)
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      {currentNftItem.collection_address ? (
-                        <AddressLabel address={currentNftItem.collection_address} />
-                      ) : (
-                        "Standalone"
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-            {accountState && nftCollectionName && !currentNftItem && (
-              <div className={styles.jettonInfo}>
-                <div className={styles.jettonHeader}>
-                  <img
-                    src={nftCollectionImage}
-                    alt={nftCollectionName}
-                    className={styles.jettonImage}
-                  />
-                  <div className={styles.jettonTitle}>
-                    <div className={styles.jettonName}>{nftCollectionName}</div>
-                    <div className={styles.jettonSymbol}>NFT collection</div>
-                  </div>
-                </div>
-                {nftCollectionDescription && (
-                  <div className={styles.jettonDescription}>{nftCollectionDescription}</div>
-                )}
-                <div className={styles.jettonDetails}>
-                  <div className={styles.jettonRow}>
-                    <span className={styles.jettonLabel}>Indexed items</span>
-                    <span className={styles.jettonValue}>
-                      {currentNftCollectionItems.length.toLocaleString()}
-                    </span>
-                  </div>
-                  {collectionSample && (
-                    <div className={styles.jettonRow}>
-                      <span className={styles.jettonLabel}>Latest item</span>
-                      <span
-                        className={`${styles.jettonValue} ${styles.jettonLink}`}
-                        onClick={() => handleSearch(collectionSample.address)}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            handleSearch(collectionSample.address)
-                          }
-                        }}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        #{collectionSample.index}
-                      </span>
+                      <div className={styles.jettonRow}>
+                        <span className={styles.jettonLabel}>Collection</span>
+                        <span
+                          className={`${styles.jettonValue} ${styles.jettonLink}`}
+                          onClick={() => {
+                            if (currentNftItem.collection_address) {
+                              handleSearch(currentNftItem.collection_address)
+                            }
+                          }}
+                          onKeyDown={e => {
+                            if (
+                              (e.key === "Enter" || e.key === " ") &&
+                              currentNftItem.collection_address
+                            ) {
+                              handleSearch(currentNftItem.collection_address)
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          {currentNftItem.collection_address ? (
+                            <AddressLabel address={currentNftItem.collection_address} />
+                          ) : (
+                            "Standalone"
+                          )}
+                        </span>
+                      </div>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
+                {accountState && nftCollectionName && !currentNftItem && (
+                  <div className={styles.jettonInfo}>
+                    <div className={styles.jettonHeader}>
+                      <img
+                        src={nftCollectionImage}
+                        alt={nftCollectionName}
+                        className={styles.jettonImage}
+                      />
+                      <div className={styles.jettonTitle}>
+                        <div className={styles.jettonName}>{nftCollectionName}</div>
+                        <div className={styles.jettonSymbol}>NFT collection</div>
+                      </div>
+                    </div>
+                    {nftCollectionDescription && (
+                      <div className={styles.jettonDescription}>{nftCollectionDescription}</div>
+                    )}
+                    <div className={styles.jettonDivider} />
+                    <div className={styles.jettonDetails}>
+                      <div className={styles.jettonRow}>
+                        <span className={styles.jettonLabel}>Indexed items</span>
+                        <span className={styles.jettonValue}>
+                          {currentNftCollectionItems.length.toLocaleString()}
+                        </span>
+                      </div>
+                      {collectionSample && (
+                        <div className={styles.jettonRow}>
+                          <span className={styles.jettonLabel}>Latest item</span>
+                          <span
+                            className={`${styles.jettonValue} ${styles.jettonLink}`}
+                            onClick={() => handleSearch(collectionSample.address)}
+                            onKeyDown={e => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                handleSearch(collectionSample.address)
+                              }
+                            }}
+                            role="button"
+                            tabIndex={0}
+                          >
+                            #{collectionSample.index}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
           <AccountDetails
             transactions={transactions}
             accountState={accountState}
-            accountCodeHash={accountStateV3?.code_hash}
+            compilerAbi={compilerAbi}
+            compilerAbiLoading={compilerAbiLoading}
+            compilerAbiError={compilerAbiError}
             ownerAddress={formattedAddress}
             jettonWallets={jettonWallets}
             nftItems={nftItems}
@@ -754,6 +863,108 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
             activeTabHash={activeTab}
             onTabChange={handleTabChange}
           />
+          {jettonMaster && jettonMetadataOpen && jettonMetadataJson && (
+            <div
+              className={styles.metadataOverlay}
+              role="presentation"
+              onClick={event => {
+                if (event.target === event.currentTarget) {
+                  setJettonMetadataOpen(false)
+                }
+              }}
+            >
+              <section
+                className={styles.metadataDialog}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="jetton-metadata-title"
+              >
+                <button
+                  type="button"
+                  className={styles.metadataCloseButton}
+                  onClick={() => setJettonMetadataOpen(false)}
+                  aria-label="Close metadata"
+                >
+                  <X size={18} strokeWidth={3} />
+                </button>
+                <h2 id="jetton-metadata-title" className={styles.metadataTitle}>
+                  Metadata
+                </h2>
+                <div className={styles.metadataHero}>
+                  <div className={styles.metadataMain}>
+                    <div className={styles.metadataTokenTitle}>
+                      <span>{tokenName}</span>
+                    </div>
+                    <div className={styles.metadataSummary}>
+                      <div className={styles.metadataRow}>
+                        <span className={styles.metadataLabel}>Address</span>
+                        <span className={`${styles.metadataValue} ${styles.metadataLink}`}>
+                          <AddressLabel address={formattedAddress} />
+                        </span>
+                      </div>
+                      <div className={styles.metadataRow}>
+                        <span className={styles.metadataLabel}>Owner</span>
+                        <span
+                          className={`${styles.metadataValue} ${styles.metadataLink}`}
+                          onClick={() => handleSearch(jettonMaster.admin_address)}
+                          onKeyDown={event => {
+                            if (event.key === "Enter" || event.key === " ") {
+                              handleSearch(jettonMaster.admin_address)
+                            }
+                          }}
+                          role="button"
+                          tabIndex={0}
+                        >
+                          <AddressLabel address={jettonMaster.admin_address} />
+                        </span>
+                      </div>
+                      {tokenTotalSupplyLabel && (
+                        <div className={styles.metadataRow}>
+                          <span className={styles.metadataLabel}>Max.supply</span>
+                          <span className={styles.metadataValue}>{tokenTotalSupplyLabel}</span>
+                        </div>
+                      )}
+                      <div className={styles.metadataRow}>
+                        <span className={styles.metadataLabel}>Mintable</span>
+                        <span className={styles.metadataValue}>
+                          {String(jettonMaster.mintable)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  {jettonMaster.jetton_content.image && (
+                    <img
+                      src={jettonMaster.jetton_content.image}
+                      alt={tokenName}
+                      className={styles.metadataTokenImage}
+                    />
+                  )}
+                </div>
+                {jettonMaster.jetton_content.description && (
+                  <p className={styles.metadataDescription}>
+                    {jettonMaster.jetton_content.description}
+                  </p>
+                )}
+                <div className={styles.metadataJsonFrame}>
+                  <button
+                    type="button"
+                    className={styles.metadataJsonCopyButton}
+                    onClick={() => {
+                      void navigator.clipboard.writeText(jettonMetadataJson)
+                      setJettonMetadataCopied(true)
+                    }}
+                    aria-label={jettonMetadataCopied ? "Metadata copied" : "Copy metadata JSON"}
+                    title={jettonMetadataCopied ? "Copied" : "Copy metadata JSON"}
+                  >
+                    <Copy size={18} />
+                  </button>
+                  <pre className={styles.metadataJson}>
+                    <code>{renderJson(jettonMetadataJson)}</code>
+                  </pre>
+                </div>
+              </section>
+            </div>
+          )}
         </>
       )}
 
@@ -769,6 +980,54 @@ function formatJettonAmount(value: string, decimals?: string): string {
   return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
     maximumFractionDigits: decimalsNumber,
   })
+}
+
+const JSON_TOKEN_RE =
+  /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/g
+
+function renderJson(json: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
+  let lastIndex = 0
+  let key = 0
+
+  for (const match of json.matchAll(JSON_TOKEN_RE)) {
+    if (match.index === undefined) continue
+
+    if (match.index > lastIndex) {
+      parts.push(json.slice(lastIndex, match.index))
+    }
+
+    const [token, stringToken, colon, literalToken] = match
+    if (stringToken) {
+      parts.push(
+        <span
+          key={`json-token-${key++}`}
+          className={colon ? styles.metadataJsonKey : styles.metadataJsonValue}
+        >
+          {stringToken}
+        </span>,
+      )
+      if (colon) {
+        parts.push(colon)
+      }
+    } else if (literalToken) {
+      parts.push(
+        <span key={`json-token-${key++}`} className={styles.metadataJsonValue}>
+          {literalToken}
+        </span>,
+      )
+    } else {
+      parts.push(token)
+    }
+
+    lastIndex = match.index + token.length
+  }
+
+  if (lastIndex < json.length) {
+    parts.push(json.slice(lastIndex))
+  }
+
+  return parts
 }
 
 function getAccountTokenInfo(

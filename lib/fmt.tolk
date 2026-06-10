@@ -9,7 +9,8 @@
 /// - `{:X}`: same lowercase hexadecimal as `{:x}`, but with `0x`
 /// - `{:b}`: int formatted as binary without `0b`
 /// - `{:B}`: same binary as `{:b}`, but with `0b`
-/// - `{:ton}`: integer nanotons formatted as `<value> TON`
+/// - `{:gram}` / `{:grams}`: integer nanograms formatted as `<value> GRAM`
+/// - `{:ton}`: legacy alias for `{:gram}` / `{:grams}`
 /// - `{:cell-tree}`: cell/slice/builder/Cell<T> formatted as a tree of cell references
 ///
 /// Placeholder syntax:
@@ -24,14 +25,14 @@
 ///   for example `{:_>8}` uses `_` as fill and `>` as alignment.
 /// - `width` is a decimal constant and means minimum visible width; longer values
 ///   are not truncated. Dynamic width is not supported.
-/// - `type` is one of `x`, `X`, `b`, `B`, `ton`, or `cell-tree`.
+/// - `type` is one of `x`, `X`, `b`, `B`, `gram`, `grams`, `ton`, or `cell-tree`.
 ///   `X` and `B` only add prefixes; they do not uppercase digits.
-/// - After a width, the type may be written directly (`{:08x}`, `{:>12ton}`)
-///   or after an extra colon (`{:0>8:x}`, `{:>12:ton}`).
+/// - After a width, the type may be written directly (`{:08x}`, `{:>12gram}`)
+///   or after an extra colon (`{:0>8:x}`, `{:>12:gram}`).
 ///
 /// Width, alignment, and padding:
 /// - Without explicit alignment, strings are left-aligned; int-like values and numeric
-///   formatters (`x`, `X`, `b`, `B`, `ton`) are right-aligned.
+///   formatters (`x`, `X`, `b`, `B`, `gram`, `grams`, `ton`) are right-aligned.
 /// - The default fill character is a space.
 /// - `{:05}` is shorthand for zero fill and right alignment. For this shorthand,
 ///   zeroes are inserted after a sign and after `0x`/`0b` prefixes:
@@ -50,8 +51,8 @@
 /// - Invalid format strings (unknown modifier, unsupported placeholder, unmatched braces)
 ///   fail at runtime with a parser error that includes a byte offset.
 /// - Named arguments and dynamic width are not supported.
-/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, and `{:ton}` fall back
-///   to default formatting.
+/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, `{:gram}`, `{:grams}`,
+///   and `{:ton}` fall back to default formatting.
 /// - For non-cell/slice/builder/Cell<T> arguments, `{:cell-tree}` falls back to default formatting.
 ///
 /// Examples:
@@ -68,8 +69,8 @@
 /// val centered = format("|{:.^7}|", "hi"); // "|..hi...|"
 /// val prefixedPadded = format("|{:08X}|", 255); // "|0x0000ff|"
 ///
-/// // Formatting TON amounts
-/// val balance = format("Balance: {:ton}", 500_000_000); // "Balance: 0.5 TON"
+/// // Formatting GRAM amounts
+/// val balance = format("Balance: {:grams}", 500_000_000); // "Balance: 0.5 GRAM"
 ///
 /// // Formatting cell references as a tree
 /// val tree = format("{:cell-tree}", bodyCell);
@@ -81,7 +82,7 @@
 /// val partial = format("{} {}", "left"); // "left {}"
 ///
 /// // Multiple arguments
-/// val info = format("User {} has {} items worth {:ton}", "Alice", 5, 1_000_000_000);
+/// val info = format("User {} has {} items worth {:grams}", "Alice", 5, 1_000_000_000);
 ///
 /// // Parse an integer from a string
 /// val num = parseInt("42");
@@ -107,7 +108,7 @@ import "ffi"
 /// format("{:x}", "abc");   // "abc"
 /// format("{:b}", "abc");   // "abc"
 /// format("{:X}", true);    // "true"
-/// format("{:ton}", true);  // "true"
+/// format("{:gram}", true); // "true"
 /// ```
 fun format<T1 = void, T2 = void, T3 = void, T4 = void, T5 = void>(
     fmt: string,

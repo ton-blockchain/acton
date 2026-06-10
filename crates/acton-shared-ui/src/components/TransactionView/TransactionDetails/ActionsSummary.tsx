@@ -122,7 +122,7 @@ const isActionFailed = (action: BackendExecutorAction): boolean => {
   return action.failure_code !== undefined || failureReason !== undefined
 }
 
-const formatNanoTon = (value: string): string => {
+const formatNanograms = (value: string): string => {
   try {
     return fmt.formatCurrency(BigInt(value))
   } catch {
@@ -136,11 +136,11 @@ const formatFailureReason = (
   if (!reason) return
 
   switch (reason.type) {
-    case "not_enough_toncoin_to_send": {
-      return `Not enough Toncoin: balance ${formatNanoTon(reason.remaining_balance)}, required ${formatNanoTon(reason.required)}.`
+    case "not_enough_grams_to_send": {
+      return `Not enough GRAM: balance ${formatNanograms(reason.remaining_balance)}, required ${formatNanograms(reason.required)}.`
     }
-    case "cannot_reserve_toncoin": {
-      return `Cannot reserve ${formatNanoTon(reason.requested)}: only ${formatNanoTon(reason.available)} available.`
+    case "cannot_reserve_grams": {
+      return `Cannot reserve ${formatNanograms(reason.requested)}: only ${formatNanograms(reason.available)} available.`
     }
   }
 }

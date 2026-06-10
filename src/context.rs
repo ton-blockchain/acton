@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use std::collections::VecDeque;
 use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tolk_compiler::types_kernel::TyIdx;
@@ -25,12 +25,32 @@ use ton_executor::ExecutorVerbosity;
 use ton_executor::get::GetMethodResultSuccess;
 use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{ContData, Tuple, TupleItem};
+use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, HashBytes, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{IntAddr, LibDescr, StdAddr, Transaction};
 
 #[derive(Debug)]
 pub struct DebugStopRequested;
+
+// Keep in sync with `impl.treasuryCode()` in `lib/emulation/testing.tolk`.
+pub(crate) const TREASURY_CODE_BOC64: &str = "te6cckEBBAEARQABFP8A9KQT9LzyyAsBAgEgAwIAWvLT/+1E0NP/0RK68qL0BNH4AH+OFiGAEPR4b6UgmALTB9QwAfsAkTLiAbPmWwAE0jD+omUe";
+
+static TREASURY_CODE_HASH: LazyLock<HashBytes> = LazyLock::new(|| {
+    let code =
+        Boc::decode_base64(TREASURY_CODE_BOC64).expect("testing.treasury code BoC must be valid");
+    code_lookup_hash(&code)
+});
+
+#[must_use]
+pub(crate) fn is_treasury_code_hash(code_hash: &HashBytes) -> bool {
+    code_hash == &*TREASURY_CODE_HASH
+}
+
+#[must_use]
+pub(crate) fn is_treasury_code(code: &Cell) -> bool {
+    is_treasury_code_hash(&code_lookup_hash(code))
+}
 
 impl std::fmt::Display for DebugStopRequested {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

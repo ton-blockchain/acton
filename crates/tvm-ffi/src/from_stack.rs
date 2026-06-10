@@ -464,7 +464,9 @@ mod tests {
         let result = Cell::from_item(TupleItem::Int(BigInt::from(42)));
         assert!(matches!(
             result,
-            Err(ArgError::TypeMismatch { expected: "Cell" })
+            Err(ArgError::TypeMismatch {
+                expected: "Cell | Slice"
+            })
         ));
     }
 

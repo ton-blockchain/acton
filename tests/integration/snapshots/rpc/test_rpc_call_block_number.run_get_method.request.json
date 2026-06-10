@@ -1,0 +1,11 @@
+{
+  "id": "1",
+  "jsonrpc": "2.0",
+  "method": "runGetMethod",
+  "params": {
+    "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+    "method": "currentCounter",
+    "seqno": 123456,
+    "stack": []
+  }
+}

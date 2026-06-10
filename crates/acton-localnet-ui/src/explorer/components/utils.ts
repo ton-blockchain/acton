@@ -75,6 +75,12 @@ export function normalizeAddress(address: string, options?: AddressFormatOptions
   return toDisplayAddress(address, options) ?? address
 }
 
+export function toRawAddress(address: string): string {
+  const parsed = parseAddress(address)
+  const rawString = (parsed as {toRawString?: () => string} | undefined)?.toRawString
+  return typeof rawString === "function" ? rawString.call(parsed) : address
+}
+
 export function isSameAddress(a: string, b: string): boolean {
   if (!a || !b) return false
   const parsedA = parseAddress(a)

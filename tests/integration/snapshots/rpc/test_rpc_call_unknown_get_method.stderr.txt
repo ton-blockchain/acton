@@ -1,4 +1,4 @@
 Error: Get method missing not found in ABI for Counter
 Available get methods:
- currentCounter
- double
+ currentCounter(): int
+ double(value: uint32): int

@@ -11,7 +11,7 @@
   ✓ formatter debug logs println [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmDebugPing 0.2 TON -> fm_debug B                                           gas=540
+       └── FmDebugPing 0.2 GRAM -> fm_debug B                                          gas=540
            queryId: 1
            └── Debug logs:
                fmt-debug-marker

@@ -1,4 +1,4 @@
-<svg width="776px" height="668px" xmlns="http://www.w3.org/2000/svg">
+<svg width="793px" height="668px" xmlns="http://www.w3.org/2000/svg">
   <style>
     .fg { fill: #AAAAAA }
     .bg { fill: #000000 }
@@ -50,17 +50,17 @@
 </tspan>
     <tspan x="10px" y="262px">
 </tspan>
-    <tspan x="10px" y="280px"><tspan>──────────────────────────────────────────────────────────────────────────────────────────</tspan>
+    <tspan x="10px" y="280px"><tspan>────────────────────────────────────────────────────────────────────────────────────────────</tspan>
 </tspan>
-    <tspan x="10px" y="298px"><tspan> Test                        Traces   Tx   Gas Used   Gas Fee            Total Fee        </tspan>
+    <tspan x="10px" y="298px"><tspan> Test                        Traces   Tx   Gas Used   Gas Fee             Total Fee         </tspan>
 </tspan>
-    <tspan x="10px" y="316px"><tspan>──────────────────────────────────────────────────────────────────────────────────────────</tspan>
+    <tspan x="10px" y="316px"><tspan>────────────────────────────────────────────────────────────────────────────────────────────</tspan>
 </tspan>
-    <tspan x="10px" y="334px"><tspan> test-profiled-transaction        3    3        815    0.000054337 TON    0.000054337 TON </tspan>
+    <tspan x="10px" y="334px"><tspan> test-profiled-transaction        3    3        815    0.000054337 GRAM    0.000054337 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="352px"><tspan>                                  3    3       1363    0.000090869 TON    0.000090869 TON </tspan>
+    <tspan x="10px" y="352px"><tspan>                                  3    3       1363    0.000090869 GRAM    0.000090869 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="370px"><tspan>                                               +548   +0.000036532 TON   +0.000036532 TON </tspan>
+    <tspan x="10px" y="370px"><tspan>                                               +548   +0.000036532 GRAM   +0.000036532 GRAM </tspan>
 </tspan>
     <tspan x="10px" y="388px">
 </tspan>
@@ -72,25 +72,25 @@
 </tspan>
     <tspan x="10px" y="442px">
 </tspan>
-    <tspan x="10px" y="460px"><tspan>────────────────────────────────────────────────────────────────────────────────────────</tspan>
+    <tspan x="10px" y="460px"><tspan>───────────────────────────────────────────────────────────────────────────────────────────</tspan>
 </tspan>
-    <tspan x="10px" y="478px"><tspan> Trace     Tx Count   Gas Used   Gas Fee            Fwd Fee            Total Fee        </tspan>
+    <tspan x="10px" y="478px"><tspan> Trace     Tx Count   Gas Used   Gas Fee             Fwd Fee             Total Fee         </tspan>
 </tspan>
-    <tspan x="10px" y="496px"><tspan>────────────────────────────────────────────────────────────────────────────────────────</tspan>
+    <tspan x="10px" y="496px"><tspan>───────────────────────────────────────────────────────────────────────────────────────────</tspan>
 </tspan>
-    <tspan x="10px" y="514px"><tspan> Trace 1          1        309    0.000020601 TON    0.000089869 TON    0.000020601 TON </tspan>
+    <tspan x="10px" y="514px"><tspan> Trace 1          1        309    0.000020601 GRAM    0.000089869 GRAM    0.000020601 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="532px"><tspan> Trace 2          1        253    0.000016868 TON    0.000063113 TON    0.000016868 TON </tspan>
+    <tspan x="10px" y="532px"><tspan> Trace 2          1        253    0.000016868 GRAM    0.000063113 GRAM    0.000016868 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="550px"><tspan>                  1        527    0.000035134 TON    0.000065246 TON    0.000035134 TON </tspan>
+    <tspan x="10px" y="550px"><tspan>                  1        527    0.000035134 GRAM    0.000065246 GRAM    0.000035134 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="568px"><tspan>                          +274   +0.000018266 TON   +0.000002133 TON   +0.000018266 TON </tspan>
+    <tspan x="10px" y="568px"><tspan>                          +274   +0.000018266 GRAM   +0.000002133 GRAM   +0.000018266 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="586px"><tspan> Trace 3          1        253    0.000016868 TON    0.000044446 TON    0.000016868 TON </tspan>
+    <tspan x="10px" y="586px"><tspan> Trace 3          1        253    0.000016868 GRAM    0.000044446 GRAM    0.000016868 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="604px"><tspan>                  1        527    0.000035134 TON    0.000044446 TON    0.000035134 TON </tspan>
+    <tspan x="10px" y="604px"><tspan>                  1        527    0.000035134 GRAM    0.000044446 GRAM    0.000035134 GRAM </tspan>
 </tspan>
-    <tspan x="10px" y="622px"><tspan>                          +274   +0.000018266 TON                      +0.000018266 TON </tspan>
+    <tspan x="10px" y="622px"><tspan>                          +274   +0.000018266 GRAM                       +0.000018266 GRAM </tspan>
 </tspan>
     <tspan x="10px" y="640px">
 </tspan>

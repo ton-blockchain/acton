@@ -3,7 +3,15 @@ import path from "node:path"
 import {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
-import {FiArrowUpRight, FiCheck, FiChevronDown, FiCircle, FiMinus, FiX} from "react-icons/fi"
+import {
+  FiArrowUpRight,
+  FiCheck,
+  FiChevronDown,
+  FiChevronUp,
+  FiCircle,
+  FiMinus,
+  FiX,
+} from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
 
@@ -19,6 +27,7 @@ import {
 } from "@acton/shared-ui"
 import {
   applyParsedBodies,
+  buildValueFlowItems,
   fmt,
   getTransactionOpcode,
   processTransactions,
@@ -33,10 +42,12 @@ import {
   TableHeader,
   TableRow,
   resolveAbiOpcodeName,
+  ValueFlowTable,
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
 import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
+import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
 
 import styles from "./TestDetails.module.css"
 
@@ -50,6 +61,8 @@ interface TestDetailsProps {
   readonly projectRoot?: string
   readonly gasProfile?: GasProfileData
   readonly gasProfileLoaded?: boolean
+  readonly isSidebarCollapsed?: boolean
+  readonly onExpandSidebar?: () => void
 }
 
 interface IDEConfig {
@@ -94,6 +107,10 @@ const formatSkippedTraceCount = (count: number): string => {
   return count === 1 ? "1 trace skipped" : `${count} traces skipped`
 }
 
+const formatTreasuryDeployTraceCount = (count: number): string => {
+  return count === 1 ? "1 treasury deploy" : `${count} treasury deploys`
+}
+
 const isExternalMessageNotAcceptedError = (error: string): boolean => {
   const normalized = error.toLowerCase()
   const mentionsExternal = normalized.includes("external")
@@ -108,6 +125,7 @@ const MISSING_VM_LOG_HINT = [
   "No VM logs were collected for this trace.",
   "Re-run with --verbose flag",
 ].join("\n")
+const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
 
 const toIdeSourcePosition = (location: SourceLocation): Pick<TestReport, "row" | "column"> => ({
   row: Math.max(0, location.line - 1),
@@ -139,6 +157,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   projectRoot,
   gasProfile,
   gasProfileLoaded = true,
+  isSidebarCollapsed = false,
+  onExpandSidebar,
 }) => {
   const [activeTab, setActiveTab] = useState<TestDetailsTab>(() => {
     const saved = localStorage.getItem("activeTab")
@@ -151,6 +171,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
     return saved ? Number.parseInt(saved, 10) : 0
   })
+  const [isValueFlowExpanded, setIsValueFlowExpanded] = useState(() => {
+    return localStorage.getItem(VALUE_FLOW_EXPANDED_STORAGE_KEY) === "true"
+  })
+  const [isTreasuryDeployTracesExpanded, setIsTreasuryDeployTracesExpanded] = useState(false)
   const [selectedIdeName, setSelectedIdeName] = useState<string | null>(() => {
     return localStorage.getItem("selectedIde")
   })
@@ -384,6 +408,22 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       : `${transactionCount} transactions`
   const skippedTracesCount = trace?.skipped_traces_count ?? 0
   const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
+  const traceEntries = useMemo(() => {
+    return (trace?.traces ?? []).map((traceItem, index) => ({traceItem, index}))
+  }, [trace])
+  const treasuryDeployTraceEntries = useMemo(
+    () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy === true),
+    [traceEntries],
+  )
+  const regularTraceEntries = useMemo(
+    () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy !== true),
+    [traceEntries],
+  )
+  const treasuryDeployTraceLabel = formatTreasuryDeployTraceCount(treasuryDeployTraceEntries.length)
+  const isSelectedTraceTreasuryDeploy =
+    trace?.traces[selectedTraceIndex]?.is_treasury_deploy === true
+  const shouldShowTreasuryDeployTraces =
+    isTreasuryDeployTracesExpanded || isSelectedTraceTreasuryDeploy
   const hasGasProfile = gasProfile !== undefined && gasProfile.total_gas > 0
   const shouldShowTraceSelector =
     activeTab !== "info" &&
@@ -435,6 +475,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   const parsedTransactions = useMemo(() => {
     return parsedTraceTransactionsWithBodies[selectedTraceIndex] ?? []
   }, [parsedTraceTransactionsWithBodies, selectedTraceIndex])
+  const valueFlowItems = useMemo(
+    () => buildValueFlowItems(parsedTransactions),
+    [parsedTransactions],
+  )
+  const shouldShowValueFlowToggle = activeTab === "transactions" && valueFlowItems.length > 0
 
   const currentTraceParseIssue = traceParseIssues.find(
     issue => issue.traceIndex === selectedTraceIndex,
@@ -525,6 +570,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       }
     })
   }, [allContracts, backendContracts, parsedTraceTransactionsWithBodies, trace])
+  const treasuryDeployTraceFeeSummaries = useMemo(
+    () =>
+      traceFeeSummaries.filter(summary => trace?.traces[summary.traceIndex]?.is_treasury_deploy),
+    [trace, traceFeeSummaries],
+  )
+  const regularTraceFeeSummaries = useMemo(
+    () =>
+      traceFeeSummaries.filter(summary => !trace?.traces[summary.traceIndex]?.is_treasury_deploy),
+    [trace, traceFeeSummaries],
+  )
 
   const failedTransactions = useMemo(() => {
     if (!test.failed_transactions) return []
@@ -594,17 +649,33 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     if (trace) {
       const saved = localStorage.getItem(`selectedTraceIndex:${test.suite_name}::${test.name}`)
       const index = saved ? Number.parseInt(saved, 10) : 0
-      if (index < trace.traces.length) {
+      const firstRegularTraceIndex = regularTraceEntries[0]?.index ?? 0
+      if (saved && Number.isInteger(index) && index >= 0 && index < trace.traces.length) {
         setSelectedTraceIndex(index)
       } else {
-        setSelectedTraceIndex(0)
+        setSelectedTraceIndex(firstRegularTraceIndex)
       }
     }
-  }, [trace, test.suite_name, test.name])
+  }, [regularTraceEntries, trace, test.suite_name, test.name])
 
   const handleSelectTraceIndex = (index: number) => {
     setSelectedTraceIndex(index)
     localStorage.setItem(`selectedTraceIndex:${test.suite_name}::${test.name}`, index.toString())
+  }
+
+  const handleToggleTreasuryDeployTraces = () => {
+    const nextExpanded = !shouldShowTreasuryDeployTraces
+    setIsTreasuryDeployTracesExpanded(nextExpanded)
+
+    if (!nextExpanded && isSelectedTraceTreasuryDeploy && regularTraceEntries.length > 0) {
+      handleSelectTraceIndex(regularTraceEntries[0].index)
+    }
+  }
+
+  const handleToggleValueFlow = () => {
+    const nextExpanded = !isValueFlowExpanded
+    setIsValueFlowExpanded(nextExpanded)
+    localStorage.setItem(VALUE_FLOW_EXPANDED_STORAGE_KEY, nextExpanded ? "true" : "false")
   }
 
   useEffect(() => {
@@ -740,6 +811,46 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     )
   }
 
+  const renderTraceFeeSummaryRow = (summary: TraceFeeSummary) => {
+    const isTreasuryDeploy = trace?.traces[summary.traceIndex]?.is_treasury_deploy === true
+
+    return (
+      <TableRow
+        key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
+        className={isTreasuryDeploy ? styles.treasuryDeployTraceFeeRow : undefined}
+      >
+        <TableCell>
+          <button
+            type="button"
+            className={styles.traceLinkButton}
+            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
+            title={`Open ${summary.traceName} (${summary.firstMessageName}) in Transactions`}
+          >
+            <span>
+              {summary.traceName}
+              <span className={styles.traceMessageSeparator} aria-hidden="true">
+                {" · "}
+              </span>
+              <span className={styles.traceMessageName}>{summary.firstMessageName}</span>
+            </span>
+            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+          </button>
+        </TableCell>
+        <TableCell className={styles.numericCell}>{summary.transactionCount.toString()}</TableCell>
+        <TableCell className={styles.numericCell}>{summary.totalGasUsed.toString()}</TableCell>
+        <TableCell className={styles.numericCell}>
+          {fmt.formatCurrency(summary.totalGasFees)}
+        </TableCell>
+        <TableCell className={styles.numericCell}>
+          {fmt.formatCurrency(summary.totalForwardFees)}
+        </TableCell>
+        <TableCell className={styles.numericCell}>
+          {fmt.formatCurrency(summary.totalFees)}
+        </TableCell>
+      </TableRow>
+    )
+  }
+
   const renderTabContent = () => {
     if (activeTab === "info") {
       return (
@@ -772,7 +883,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             <div className={styles.infoItem}>
               <div className={styles.infoLabel}>Stats</div>
               <div className={styles.infoValue}>
-                {formatDuration(test.duration)} • {transactionStats}
+                <span data-visual-dynamic="duration" data-visual-placeholder="<duration>">
+                  {formatDuration(test.duration)}
+                </span>{" "}
+                • {transactionStats}
               </div>
             </div>
           </div>
@@ -929,46 +1043,32 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {traceFeeSummaries.map(summary => (
-                      <TableRow
-                        key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
-                      >
-                        <TableCell>
+                    {treasuryDeployTraceFeeSummaries.length > 0 && (
+                      <TableRow className={styles.treasuryDeploySummaryRow}>
+                        <TableCell colSpan={6}>
                           <button
                             type="button"
-                            className={styles.traceLinkButton}
-                            onClick={() => handleOpenTraceTransactions(summary.traceIndex)}
-                            title={`Open ${summary.traceName} (${summary.firstMessageName}) in Transactions`}
+                            className={styles.treasuryDeploySummaryToggle}
+                            onClick={handleToggleTreasuryDeployTraces}
+                            aria-expanded={shouldShowTreasuryDeployTraces}
                           >
-                            <span>
-                              {summary.traceName}
-                              <span className={styles.traceMessageSeparator} aria-hidden="true">
-                                {" · "}
-                              </span>
-                              <span className={styles.traceMessageName}>
-                                {summary.firstMessageName}
-                              </span>
-                            </span>
-                            <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
+                            {shouldShowTreasuryDeployTraces ? (
+                              <FiChevronUp aria-hidden="true" />
+                            ) : (
+                              <FiChevronDown aria-hidden="true" />
+                            )}
+                            <span>{treasuryDeployTraceLabel}</span>
                           </button>
                         </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {summary.transactionCount.toString()}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {summary.totalGasUsed.toString()}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalGasFees)}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalForwardFees)}
-                        </TableCell>
-                        <TableCell className={styles.numericCell}>
-                          {fmt.formatCurrency(summary.totalFees)}
-                        </TableCell>
                       </TableRow>
-                    ))}
+                    )}
+                    {shouldShowTreasuryDeployTraces &&
+                      treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
+                        renderTraceFeeSummaryRow(traceFeeSummary),
+                      )}
+                    {regularTraceFeeSummaries.map(traceFeeSummary =>
+                      renderTraceFeeSummaryRow(traceFeeSummary),
+                    )}
                   </TableBody>
                 </Table>
               </div>
@@ -1020,12 +1120,20 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 {hasExecutorLog && (
                   <div className={styles.logSection}>
                     <div className={styles.logSectionTitle}>Executor Log</div>
-                    <DataBlock data={tx.executor_logs} />
+                    <DataBlock
+                      data={tx.executor_logs}
+                      visualDynamic="executor-log"
+                      visualPlaceholder="<executor log>"
+                    />
                   </div>
                 )}
                 <div className={styles.logSection}>
                   <div className={styles.logSectionTitle}>VM Log</div>
-                  <DataBlock data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT} />
+                  <DataBlock
+                    data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    visualDynamic="vm-log"
+                    visualPlaceholder="<vm log>"
+                  />
                 </div>
               </div>
             )
@@ -1041,7 +1149,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           <div className={styles.txLogs}>
             <div className={styles.logSection}>
               <div className={styles.logSectionTitle}>VM Log</div>
-              <DataBlock data={MISSING_VM_LOG_HINT} />
+              <DataBlock
+                data={MISSING_VM_LOG_HINT}
+                visualDynamic="vm-log"
+                visualPlaceholder="<vm log>"
+              />
             </div>
           </div>
         )
@@ -1098,6 +1210,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       }
       return (
         <>
+          {isValueFlowExpanded && valueFlowItems.length > 0 && (
+            <div className={styles.valueFlowSection} data-testid="value-flow-section">
+              <ValueFlowTable items={valueFlowItems} contracts={contracts} />
+            </div>
+          )}
           <div className={styles.treeWrapper}>
             <TransactionTree
               transactions={parsedTransactions}
@@ -1115,7 +1232,18 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   return (
     <div className={styles.details}>
       <div className={styles.header}>
-        <div className={styles.titleInfo}>
+        <div className={styles.titleInfo} data-testid="test-details-title">
+          {isSidebarCollapsed && onExpandSidebar && (
+            <button
+              type="button"
+              onClick={onExpandSidebar}
+              className={styles.expandButton}
+              title="Expand sidebar"
+              aria-label="Expand sidebar"
+            >
+              <DocsSidebarIcon />
+            </button>
+          )}
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>
@@ -1157,9 +1285,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
       </div>
 
       <div className={styles.tabsContainer}>
-        <div className={styles.tabsList}>
+        <div className={styles.tabsList} role="tablist" aria-label="Test details">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "info"}
             className={`${styles.tabTrigger} ${activeTab === "info" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("info")}
           >
@@ -1167,6 +1297,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "transactions"}
             className={`${styles.tabTrigger} ${activeTab === "transactions" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("transactions")}
           >
@@ -1174,6 +1306,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === "logs"}
             className={`${styles.tabTrigger} ${activeTab === "logs" ? styles.activeTabTrigger : ""}`}
             onClick={() => handleTabChange("logs")}
           >
@@ -1182,6 +1316,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           {hasGasProfile && (
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === "profile"}
               className={`${styles.tabTrigger} ${activeTab === "profile" ? styles.activeTabTrigger : ""}`}
               onClick={() => handleTabChange("profile")}
             >
@@ -1191,31 +1327,76 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
         </div>
       </div>
 
-      {shouldShowTraceSelector && (
+      {(shouldShowTraceSelector || shouldShowValueFlowToggle) && (
         <div className={styles.traceSelector}>
-          {trace.traces.map((traceItem, index) => (
+          {shouldShowTraceSelector && (
+            <div className={styles.traceTabs}>
+              {treasuryDeployTraceEntries.length > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.traceTab} ${styles.treasuryDeployTraceToggle}`}
+                  onClick={handleToggleTreasuryDeployTraces}
+                  aria-expanded={shouldShowTreasuryDeployTraces}
+                >
+                  {shouldShowTreasuryDeployTraces ? (
+                    <FiChevronUp aria-hidden="true" />
+                  ) : (
+                    <FiChevronDown aria-hidden="true" />
+                  )}
+                  <span>{treasuryDeployTraceLabel}</span>
+                </button>
+              )}
+              {shouldShowTreasuryDeployTraces &&
+                treasuryDeployTraceEntries.map(({traceItem, index}) => (
+                  <button
+                    key={`${trace.name}-${index}`}
+                    type="button"
+                    className={`${styles.traceTab} ${styles.treasuryDeployTraceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
+                    onClick={() => handleSelectTraceIndex(index)}
+                    aria-current={selectedTraceIndex === index ? "true" : undefined}
+                  >
+                    {formatTraceName(traceItem.name, index)}
+                  </button>
+                ))}
+              {regularTraceEntries.map(({traceItem, index}) => (
+                <button
+                  key={`${trace.name}-${index}`}
+                  type="button"
+                  className={`${styles.traceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
+                  onClick={() => handleSelectTraceIndex(index)}
+                  aria-current={selectedTraceIndex === index ? "true" : undefined}
+                >
+                  {formatTraceName(traceItem.name, index)}
+                </button>
+              ))}
+              {skippedTracesCount > 0 && (
+                <button
+                  type="button"
+                  className={`${styles.traceTab} ${styles.skippedTraceTab}`}
+                  disabled
+                >
+                  {skippedTraceLabel}
+                </button>
+              )}
+            </div>
+          )}
+          {shouldShowValueFlowToggle && (
             <button
-              key={`${trace.name}-${index}`}
               type="button"
-              className={`${styles.traceTab} ${selectedTraceIndex === index ? styles.activeTraceTab : ""}`}
-              onClick={() => handleSelectTraceIndex(index)}
+              className={styles.valueFlowToggle}
+              onClick={handleToggleValueFlow}
+              aria-expanded={isValueFlowExpanded}
             >
-              {formatTraceName(traceItem.name, index)}
-            </button>
-          ))}
-          {skippedTracesCount > 0 && (
-            <button
-              type="button"
-              className={`${styles.traceTab} ${styles.skippedTraceTab}`}
-              disabled
-            >
-              {skippedTraceLabel}
+              <span>{isValueFlowExpanded ? "Hide" : "Show"} Value Flow</span>
+              {isValueFlowExpanded ? <FiChevronUp /> : <FiChevronDown />}
             </button>
           )}
         </div>
       )}
 
-      <div className={styles.tabContent}>{renderTabContent()}</div>
+      <div className={styles.tabContent} data-testid="test-details-content">
+        {renderTabContent()}
+      </div>
     </div>
   )
 }

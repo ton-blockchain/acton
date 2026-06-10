@@ -80,7 +80,7 @@ const quickSearchResults: readonly SearchResult[] = [
   {
     id: "quick-faucet",
     title: "Faucet",
-    description: "Send test TON to a wallet",
+    description: "Send test GRAM to a wallet",
     href: "/faucet",
     icon: Wallet,
   },

@@ -3,6 +3,7 @@ import {Address, beginCell, storeMessage, type Message} from "@ton/core"
 const MINT_NEW_JETTONS_OPCODE = 0x64_2b_7d_07
 const INTERNAL_TRANSFER_STEP_OPCODE = 0x17_8d_45_19
 
+// todo forwardTonAmount etc., update them together with templates
 const DEFAULT_MINT_MESSAGE_VALUE = 100_000_000n
 const DEFAULT_MINT_TON_AMOUNT = 50_000_000n
 const DEFAULT_FORWARD_TON_AMOUNT = 20_000_000n

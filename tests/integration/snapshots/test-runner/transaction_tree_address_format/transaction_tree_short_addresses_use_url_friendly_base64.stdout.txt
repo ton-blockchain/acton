@@ -1,0 +1,13 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/transaction_tree_url_friendly_address.test.tolk (1 test)
+  ✓ transaction tree url friendly address [TIME]
+    └─ Test output:
+       N/A -> url_friendly_sender A
+       └── empty 0.1 GRAM -> kQD___..____Bi B                                          compute phase skipped aborted
+
+ ✓ 1 passed in 1 file

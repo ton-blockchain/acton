@@ -1,6 +1,6 @@
 use crate::commands::common::error_fmt;
 use crate::contract_interface::{
-    compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
+    compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::stdlib;
@@ -391,11 +391,12 @@ fn process_contract(
     if is_boc_path(contract_path) {
         debug!("Loading BoC file: {}", contract_path.display());
         let precompiled = read_precompiled_boc(contract_path, contract_src_display)?;
-        let abi = compile_optional_contract_interface(
+        let abi = compile_optional_contract_interface_with_cache(
             acton_config,
             project_root,
             contract_id,
             contract_config,
+            Some(file_cache),
         )?
         .map(|interface| interface.abi);
         return Ok(ProcessedContract {

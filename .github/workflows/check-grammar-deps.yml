@@ -7,13 +7,17 @@ on:
       - master
     paths:
       - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/**"
+      - "crates/tree-sitter-**/.yarnrc.yml"
+      - "crates/tree-sitter-**/package.json"
+      - "crates/tree-sitter-**/yarn.lock"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/check-grammar-deps.yml"
-      - "crates/tree-sitter-**/**"
+      - "crates/tree-sitter-**/.yarnrc.yml"
+      - "crates/tree-sitter-**/package.json"
+      - "crates/tree-sitter-**/yarn.lock"
   workflow_dispatch:
 
 concurrency:

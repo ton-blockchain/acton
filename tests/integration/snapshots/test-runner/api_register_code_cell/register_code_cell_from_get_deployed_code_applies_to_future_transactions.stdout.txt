@@ -11,6 +11,6 @@
   ✓ register code cell from get deployed code [TIME]
     └─ Test output:
        N/A -> q_deployer A
-       └── empty 0.2 TON -> q_loaded_alias B                                           gas=253
+       └── empty 0.2 GRAM -> q_loaded_alias B                                          gas=253
 
  ✓ 1 passed in 1 file

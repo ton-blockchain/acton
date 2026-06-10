@@ -2386,6 +2386,7 @@ fn test_new_w5_extension_app_template_matches_contract_app_tooling_files() {
     for relative_path in [
         ".github/workflows/contracts.yml",
         ".github/workflows/dapp.yml",
+        ".npmrc",
         ".prettierignore",
         ".prettierrc",
         "components.json",

@@ -67,7 +67,7 @@ generated aliases such as `acton run nft-deploy-item` and
 The deployment scripts prompt for a wallet by default. Set `NFT_DEPLOYER` in
 `.env` or your shell when you need non-interactive execution.
 
-1. Create a local wallet and request testnet TON:
+1. Create a local wallet and request testnet GRAM:
 
 ```bash
 acton wallet new --name deployer --local --airdrop

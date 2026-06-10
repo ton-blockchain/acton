@@ -210,7 +210,7 @@ pub struct TraceInMessage {
     pub sender: Option<IntAddr>,
     /// Contract address that received the message.
     pub contract: IntAddr,
-    /// Amount of nanoton sent with the message.
+    /// Amount of nanograms sent with the message.
     pub amount: Option<u64>,
     /// Opcode extracted from the message body.
     pub opcode: Option<u32>,
@@ -243,20 +243,20 @@ pub struct TraceEmulatedTx {
 
 /// Breakdown of money movements and fees within the transaction.
 ///
-/// All values are in nanoton (10^-9 TON).
+/// All values are in nanograms (10^-9 GRAM).
 ///
 /// # Example
 ///
 /// ```ignore
 /// let money = &result.money;
-/// println!("Fees: {} nanoton", money.total_fees);
-/// println!("Balance after: {} nanoton", money.balance_after);
+/// println!("Fees: {} nanograms", money.total_fees);
+/// println!("Balance after: {} nanograms", money.balance_after);
 /// ```
 #[derive(Debug, Clone)]
 pub struct TraceMoneyResult {
     /// Balance of the account **before** the transaction execution.
     pub balance_before: u64,
-    /// Sum of all nanotons sent via *internal* outgoing messages.
+    /// Sum of all nanograms sent via *internal* outgoing messages.
     /// External messages are excluded as they carry no value.
     pub sent_total: u64,
     /// Total fees of the transaction (including storage, gas and action fees).

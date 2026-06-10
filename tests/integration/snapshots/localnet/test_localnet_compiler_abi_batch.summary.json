@@ -1,6 +1,9 @@
 {
+  "catalog_contract_name": "WalletV4r2",
+  "catalog_has_seqno_get_method": true,
   "compiler_name": "tolk",
   "contract_name": "getter",
   "has_add_ten_get_method": true,
+  "local_registration_overrides_catalog": true,
   "missing_code_hash_is_null": true
 }

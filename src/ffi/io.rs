@@ -1,4 +1,4 @@
-use crate::commands::common::{error_fmt, format_nanotons};
+use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::{BuildCache, Context, to_cell};
 use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
 use crate::formatter::FormatterContext;
@@ -142,7 +142,7 @@ enum PlaceholderKind {
     HexPrefixed,
     Binary,
     BinaryPrefixed,
-    Ton,
+    Gram,
     CellTree,
 }
 
@@ -196,7 +196,7 @@ fn parse_placeholder_spec(
 
     let Some(mut spec) = content.strip_prefix(':') else {
         bail!(
-            "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:X}}, {{:b}}, {{:B}}, {{:ton}}, {{:cell-tree}})"
+            "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:X}}, {{:b}}, {{:B}}, {{:gram}}, {{:grams}}, {{:ton}}, {{:cell-tree}})"
         )
     };
     if spec.is_empty() {
@@ -259,7 +259,7 @@ fn parse_placeholder_spec(
         "X" => PlaceholderKind::HexPrefixed,
         "b" => PlaceholderKind::Binary,
         "B" => PlaceholderKind::BinaryPrefixed,
-        "ton" => PlaceholderKind::Ton,
+        "gram" | "grams" | "ton" => PlaceholderKind::Gram,
         "cell-tree" => PlaceholderKind::CellTree,
         _ => {
             return Err(unknown_format_modifier_error(
@@ -286,7 +286,7 @@ fn unknown_format_modifier_error(
     byte_pos: usize,
 ) -> anyhow::Error {
     anyhow!(
-        "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :X, :b, :B, :ton, :cell-tree)"
+        "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :X, :b, :B, :gram, :grams, :ton, :cell-tree)"
     )
 }
 
@@ -384,8 +384,8 @@ fn format_single_arg(
             Some(value) => format_prefixed_int(format!("{value:b}"), "0b"),
             None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
         },
-        PlaceholderKind::Ton => match int_value {
-            Some(value) => format_nanotons(value),
+        PlaceholderKind::Gram => match int_value {
+            Some(value) => format_nanograms(value),
             None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
         },
         PlaceholderKind::CellTree => {
@@ -442,7 +442,7 @@ fn apply_width(mut formatted: String, spec: &PlaceholderSpec, is_int: bool) -> S
                 | PlaceholderKind::HexPrefixed
                 | PlaceholderKind::Binary
                 | PlaceholderKind::BinaryPrefixed
-                | PlaceholderKind::Ton
+                | PlaceholderKind::Gram
         ) {
         FormatAlign::Right
     } else {

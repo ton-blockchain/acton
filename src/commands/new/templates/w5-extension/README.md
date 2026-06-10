@@ -85,7 +85,7 @@ set `W5_DEPLOYER` to the Wallet V5 name to skip the prompt.
 The deployment scripts expect a Wallet V5 selected at runtime, or named through
 `W5_DEPLOYER` in non-interactive contexts.
 
-1. Create a local Wallet V5 and request testnet TON:
+1. Create a local Wallet V5 and request testnet GRAM:
 
 ```bash
 acton wallet new --name deployer --local --airdrop --version v5r1

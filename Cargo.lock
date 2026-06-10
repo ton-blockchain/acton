@@ -5378,6 +5378,7 @@ dependencies = [
 name = "ton-localnet"
 version = "1.1.0"
 dependencies = [
+ "acton-abi-catalog",
  "acton-config",
  "anyhow",
  "axum",
@@ -6815,6 +6816,7 @@ dependencies = [
  "tar",
  "tempfile",
  "toml_edit 0.24.0+spec-1.1.0",
+ "tycho-types",
  "urlencoding",
 ]
 

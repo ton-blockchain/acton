@@ -147,7 +147,7 @@ REQUIREMENTS AND LIMITATIONS
 
 COST AND BACKEND NOTES
        o  when --dry-run is not used, the final verification transaction sends
-          0.1 TON
+          0.1 GRAM
 
        o  if the verifier backend reports that the contract is already
           verified, Acton exits successfully without sending another

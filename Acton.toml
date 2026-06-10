@@ -11,7 +11,7 @@ fail-on-diff = false
 [test.mutation]
 
 [lint]
-exclude = ["tests/**", "**/templates/**"]
+exclude = ["tests/**", "**/templates/**", "crates/acton-test-ui/e2e/**"]
 
 [fmt]
 ignore = ["crates/tolk-compiler/**"]

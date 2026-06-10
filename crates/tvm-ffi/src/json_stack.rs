@@ -14,13 +14,15 @@ pub enum JsonStackEntry {
     #[serde(rename = "tvm.stackEntryNumber")]
     Number { number: JsonNumber },
     #[serde(rename = "tvm.stackEntryCell")]
-    Cell { cell: String },
+    Cell { cell: JsonBoc },
     #[serde(rename = "tvm.stackEntrySlice")]
-    Slice { slice: String },
+    Slice { slice: JsonBoc },
     #[serde(rename = "tvm.stackEntryBuilder")]
-    Builder { builder: String },
+    Builder { builder: JsonBoc },
     #[serde(rename = "tvm.stackEntryTuple")]
     Tuple { tuple: JsonTuple },
+    #[serde(rename = "tvm.stackEntryList", alias = "list")]
+    List { list: JsonList },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -29,7 +31,28 @@ pub struct JsonNumber {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+pub enum JsonBoc {
+    String(String),
+    Object { bytes: String },
+}
+
+impl JsonBoc {
+    fn as_str(&self) -> &str {
+        match self {
+            JsonBoc::String(value) => value,
+            JsonBoc::Object { bytes } => bytes,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct JsonTuple {
+    pub elements: Vec<JsonStackEntry>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct JsonList {
     pub elements: Vec<JsonStackEntry>,
 }
 
@@ -59,16 +82,16 @@ fn item_to_json(item: &TupleItem) -> anyhow::Result<JsonStackEntry> {
         }),
         TupleItem::Nan => anyhow::bail!("NaN not supported in JSON stack"),
         TupleItem::Cell(c) => Ok(JsonStackEntry::Cell {
-            cell: Boc::encode_base64(c),
+            cell: JsonBoc::String(Boc::encode_base64(c)),
         }),
         TupleItem::Slice(c) => Ok(JsonStackEntry::Slice {
-            slice: Boc::encode_base64(c),
+            slice: JsonBoc::String(Boc::encode_base64(c)),
         }),
         TupleItem::Cont(cont) => Ok(JsonStackEntry::Slice {
-            slice: Boc::encode_base64(&cont.code),
+            slice: JsonBoc::String(Boc::encode_base64(&cont.code)),
         }),
         TupleItem::Builder(c) => Ok(JsonStackEntry::Builder {
-            builder: Boc::encode_base64(c),
+            builder: JsonBoc::String(Boc::encode_base64(c)),
         }),
         TupleItem::Tuple(t) => {
             let mut elements = Vec::new();
@@ -138,15 +161,15 @@ fn json_to_item(entry: JsonStackEntry) -> anyhow::Result<TupleItem> {
             Ok(TupleItem::Int(i))
         }
         JsonStackEntry::Cell { cell } => {
-            let c = Boc::decode_base64(&cell).context("Failed to decode cell BOC")?;
+            let c = Boc::decode_base64(cell.as_str()).context("Failed to decode cell BOC")?;
             Ok(TupleItem::Cell(c))
         }
         JsonStackEntry::Slice { slice } => {
-            let c = Boc::decode_base64(&slice).context("Failed to decode slice BOC")?;
+            let c = Boc::decode_base64(slice.as_str()).context("Failed to decode slice BOC")?;
             Ok(TupleItem::Slice(c))
         }
         JsonStackEntry::Builder { builder } => {
-            let c = Boc::decode_base64(&builder).context("Failed to decode builder BOC")?;
+            let c = Boc::decode_base64(builder.as_str()).context("Failed to decode builder BOC")?;
             Ok(TupleItem::Builder(c))
         }
         JsonStackEntry::Tuple { tuple } => {
@@ -155,6 +178,24 @@ fn json_to_item(entry: JsonStackEntry) -> anyhow::Result<TupleItem> {
                 elements.push(json_to_item(el)?);
             }
             Ok(TupleItem::Tuple(Tuple(elements)))
+        }
+        JsonStackEntry::List { list } => {
+            let mut elements = Vec::new();
+            for el in list.elements {
+                elements.push(json_to_item(el)?);
+            }
+            Ok(TupleItem::Tuple(Tuple(elements)))
+        }
+    }
+}
+
+fn json_to_mixed_item(value: Value) -> anyhow::Result<TupleItem> {
+    match json_to_legacy_item(value.clone()) {
+        Ok(item) => Ok(item),
+        Err(legacy_err) => {
+            let entry: JsonStackEntry = serde_json::from_value(value)
+                .with_context(|| format!("Failed to parse stack entry as legacy or std format. Legacy error: {legacy_err}"))?;
+            json_to_item(entry)
         }
     }
 }
@@ -240,7 +281,7 @@ pub fn json_to_legacy_item(value: Value) -> anyhow::Result<TupleItem> {
                 .context("list must have elements")?;
             let items = elements
                 .iter()
-                .map(|v| json_to_legacy_item(v.clone()))
+                .map(|v| json_to_mixed_item(v.clone()))
                 .collect::<anyhow::Result<Vec<_>>>()?;
             Ok(TupleItem::Tuple(Tuple(items)))
         }
@@ -304,6 +345,87 @@ mod tests {
         assert_eq!(
             json_to_legacy_item(serde_json::json!(["num", "-0x2a"])).unwrap(),
             TupleItem::Int(BigInt::from(-42))
+        );
+    }
+
+    #[test]
+    fn test_std_stack_accepts_list_entries() {
+        assert_eq!(
+            json_to_stack(vec![serde_json::json!({
+                "@type": "tvm.stackEntryList",
+                "list": {
+                    "@type": "tvm.list",
+                    "elements": [
+                        {
+                            "@type": "tvm.stackEntryNumber",
+                            "number": {
+                                "@type": "tvm.numberDecimal",
+                                "number": "7"
+                            }
+                        }
+                    ]
+                }
+            })])
+            .unwrap(),
+            Tuple(vec![TupleItem::Tuple(Tuple(vec![TupleItem::Int(
+                BigInt::from(7)
+            )]))])
+        );
+    }
+
+    #[test]
+    fn test_legacy_stack_accepts_toncenter_mixed_list_entries() {
+        let mut builder = CellBuilder::new();
+        builder.store_small_uint(42, 8).unwrap();
+        let cell = builder.build().unwrap();
+        let boc = Boc::encode_base64(&cell);
+
+        assert_eq!(
+            json_to_legacy_stack(vec![serde_json::json!([
+                "list",
+                {
+                    "@type": "tvm.list",
+                    "elements": [
+                        {
+                            "@type": "tvm.stackEntryTuple",
+                            "tuple": {
+                                "@type": "tvm.tuple",
+                                "elements": [
+                                    {
+                                        "@type": "tvm.stackEntryNumber",
+                                        "number": {
+                                            "@type": "tvm.numberDecimal",
+                                            "number": "11"
+                                        }
+                                    },
+                                    {
+                                        "@type": "tvm.stackEntryNumber",
+                                        "number": {
+                                            "@type": "tvm.numberDecimal",
+                                            "number": "22"
+                                        }
+                                    },
+                                    {
+                                        "@type": "tvm.stackEntryCell",
+                                        "cell": {
+                                            "@type": "tvm.cell",
+                                            "bytes": boc
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    ]
+                }
+            ])])
+            .unwrap(),
+            Tuple(vec![TupleItem::Tuple(Tuple(vec![TupleItem::Tuple(
+                Tuple(vec![
+                    TupleItem::Int(BigInt::from(11)),
+                    TupleItem::Int(BigInt::from(22)),
+                    TupleItem::Cell(cell)
+                ])
+            )]))])
         );
     }
 }

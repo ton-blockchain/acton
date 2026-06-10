@@ -67,8 +67,8 @@ SUBCOMMANDS
 
               Defaults to 52258.
 
-          --amount ton
-              Explicit TON amount to send.
+          --amount gram
+              Explicit GRAM amount to send.
 
               Overrides duration-based estimation.
 
@@ -139,8 +139,8 @@ SUBCOMMANDS
           --duration duration
               Requested additional storage duration such as 100d or 1y.
 
-          --amount ton
-              Explicit TON amount to send.
+          --amount gram
+              Explicit GRAM amount to send.
 
               Overrides duration-based estimation.
 
@@ -213,7 +213,7 @@ RESOLUTION RULES
           for the destination file
 
 AMOUNT ESTIMATION
-       For publish and topup, --duration is used to estimate the required TON
+       For publish and topup, --duration is used to estimate the required GRAM
        amount from the library size and storage duration.
 
        If --amount is passed, it overrides that estimate completely.

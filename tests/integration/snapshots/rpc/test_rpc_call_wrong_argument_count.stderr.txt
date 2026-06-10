@@ -1,1 +1,1 @@
-Error: Wrong number of arguments: expected 10, got 1
+Error: Wrong number of arguments for acceptBasic(i: int, u: uint32, flag: bool, title: string, owner: address, maybeOwner: address?, optionalInt: int?, cellArg: cell, sliceArg: slice, bits: bits32): int: expected 10, got 1

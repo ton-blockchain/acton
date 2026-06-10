@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite",
+    "e2e": "playwright test --config playwright.config.ts",
     "fmt": "prettier --write -l --cache .",
     "fmt:check": "prettier --check --cache .",
     "lint": "eslint --max-warnings 0 . --cache",

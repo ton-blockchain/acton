@@ -60,7 +60,7 @@ pub const GIVER_ADDR: Addr = Addr {
     addr: [0x55; 32],
 };
 
-pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B TON
+pub const GIVER_BALANCE: u128 = 1_000_000_000_000_000_000; // 1B GRAM
 const EXOTIC_LIBRARY_TAG: u8 = 2;
 
 impl Node {
@@ -2016,18 +2016,28 @@ fn account_state_preview_from_optional_account_cell(cell: &Cell) -> Option<Accou
             status: AccountStatus::Nonexist,
             code_hash: None,
             data_hash: None,
+            code_boc: None,
+            data_boc: None,
             frozen_hash: None,
         });
     };
 
     let mut code_hash = None;
     let mut data_hash = None;
+    let mut code_boc = None;
+    let mut data_boc = None;
     let mut frozen_hash = None;
     let status = match account.state {
         AccountState::Uninit => AccountStatus::Uninit,
         AccountState::Active(state) => {
-            code_hash = state.code.map(|cell| Hash256(*cell.repr_hash().as_array()));
-            data_hash = state.data.map(|cell| Hash256(*cell.repr_hash().as_array()));
+            if let Some(cell) = state.code {
+                code_hash = Some(Hash256(*cell.repr_hash().as_array()));
+                code_boc = Some(Boc::encode(cell).into());
+            }
+            if let Some(cell) = state.data {
+                data_hash = Some(Hash256(*cell.repr_hash().as_array()));
+                data_boc = Some(Boc::encode(cell).into());
+            }
             AccountStatus::Active
         }
         AccountState::Frozen(state) => {
@@ -2042,6 +2052,8 @@ fn account_state_preview_from_optional_account_cell(cell: &Cell) -> Option<Accou
         status,
         code_hash,
         data_hash,
+        code_boc,
+        data_boc,
         frozen_hash,
     })
 }
@@ -2584,8 +2596,17 @@ mod tests {
     #[test]
     fn account_state_preview_uses_account_state_hash_and_balance() {
         let account = test_addr(0x21);
-        let boc =
-            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 12_345_678);
+        let code = make_lib_root(0xc0de);
+        let data = make_lib_root(0xda7a);
+        let code_boc = Boc::encode(code.clone()).into();
+        let data_boc = Boc::encode(data.clone()).into();
+        let boc = make_active_shard_account_boc_with_state(
+            account,
+            Some(code.clone()),
+            Some(data.clone()),
+            Dict::new(),
+            12_345_678,
+        );
 
         let preview = account_state_preview_from_boc(&boc).expect("preview must parse");
 
@@ -2595,6 +2616,16 @@ mod tests {
         );
         assert_eq!(preview.balance, 12_345_678);
         assert_eq!(preview.status, AccountStatus::Active);
+        assert_eq!(
+            preview.code_hash,
+            Some(Hash256(*code.repr_hash().as_array()))
+        );
+        assert_eq!(
+            preview.data_hash,
+            Some(Hash256(*data.repr_hash().as_array()))
+        );
+        assert_eq!(preview.code_boc, Some(code_boc));
+        assert_eq!(preview.data_boc, Some(data_boc));
     }
 
     #[test]

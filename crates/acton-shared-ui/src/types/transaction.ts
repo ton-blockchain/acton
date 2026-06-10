@@ -42,6 +42,7 @@ export type ParsedValue =
       readonly kind: "scalar"
       readonly value: string
       readonly rawValue?: string
+      readonly typeName?: string
     }
   | {
       readonly kind: "array"
@@ -54,6 +55,7 @@ export type ParsedValue =
     }
   | {
       readonly kind: "map"
+      readonly typeName?: string
       readonly entries: readonly ParsedValueMapEntry[]
     }
 
@@ -68,8 +70,11 @@ export interface TransactionInfo {
   readonly actions: Cell | undefined
   readonly outActions: readonly OutAction[]
   readonly contractName: string | undefined
+  contractAbi: ContractABI | undefined
   readonly shardAccountBefore: string
   readonly shardAccountAfter: string
+  readonly accountBalanceBefore?: bigint
+  readonly accountBalanceAfter?: bigint
   parsedBody: ParsedTransactionBody | undefined
   parsedStorageBefore: ParsedContractStorage | undefined
   parsedStorageAfter: ParsedContractStorage | undefined
@@ -82,4 +87,10 @@ export interface ContractData {
   readonly address: Address
   readonly letter: string
   readonly abi?: ContractABI
+}
+
+export interface ValueFlowItem {
+  readonly address: string
+  readonly change: bigint
+  readonly fee: bigint
 }

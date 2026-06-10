@@ -793,6 +793,7 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
                     className={styles.flameChart}
                     role="img"
                     aria-label={`Gas flamegraph for ${selectedContract.name}`}
+                    data-testid="gas-profile-flamegraph"
                   />
                 )}
               </div>
@@ -815,7 +816,11 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
                       />
                     </svg>
                   )}
-                  <div className={styles.details} ref={detailsRef}>
+                  <div
+                    className={styles.details}
+                    ref={detailsRef}
+                    data-testid="gas-profile-frame-details"
+                  >
                     <nav className={styles.stackPath} aria-label="Call stack">
                       {selectedStack.map((part, index) => (
                         <span key={`${part}-${index}`} className={styles.stackPart}>
@@ -911,7 +916,10 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
                                 No instructions for this filter.
                               </div>
                             ) : (
-                              <table className={styles.instructionStatsTable}>
+                              <table
+                                className={styles.instructionStatsTable}
+                                data-testid="gas-profile-instruction-stats-table"
+                              >
                                 <thead>
                                   <tr>
                                     <th scope="col">Instruction</th>

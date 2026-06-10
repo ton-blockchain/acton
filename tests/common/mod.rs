@@ -43,6 +43,11 @@ fn add_regex_redactions(subs: &mut snapbox::Redactions) {
     subs.insert("[TIME]", regex!(r"\b(\d+\.)?\d+µs\b")).ok();
     subs.insert("[TIME]", regex!(r"\b(\d+\.)?\d+ms\b")).ok();
     subs.insert("[TIME]", regex!(r"\b(\d+\.)?\d+s\b")).ok();
+    subs.insert(
+        "[TIME]",
+        regex!(r"(\d+\.)?\d+(?:\x1b\[[0-9;]*m)+(?:μs|µs|ms|s)\b"),
+    )
+    .ok();
     subs.insert("[LINE]", regex!(r"(\.tolk):\d+:\d+")).ok();
 }
 

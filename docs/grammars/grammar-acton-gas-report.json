@@ -77,11 +77,11 @@
           "name": "markup.deleted.acton-gas-report"
         },
         {
-          "match": "-\\d+(?:\\.\\d+)?\\s+TON",
+          "match": "-\\d+(?:\\.\\d+)?\\s+GRAM",
           "name": "markup.inserted.acton-gas-report"
         },
         {
-          "match": "\\+\\d+(?:\\.\\d+)?\\s+TON",
+          "match": "\\+\\d+(?:\\.\\d+)?\\s+GRAM",
           "name": "markup.deleted.acton-gas-report"
         },
         {
@@ -97,7 +97,7 @@
     "amounts": {
       "patterns": [
         {
-          "match": "\\b\\d+(?:\\.\\d+)?\\s+TON\\b",
+          "match": "\\b\\d+(?:\\.\\d+)?\\s+GRAM\\b",
           "name": "constant.numeric.acton-gas-report"
         },
         {

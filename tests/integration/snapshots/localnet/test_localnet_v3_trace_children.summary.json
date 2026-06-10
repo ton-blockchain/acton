@@ -1,5 +1,7 @@
 {
   "first_child_lt_matches_legacy_child_transaction": true,
+  "parent_account_state_after_has_code_boc": true,
+  "parent_account_state_after_has_data_boc": true,
   "parent_legacy_child_transactions_count": 1,
   "parent_trace_node_children_count": 1,
   "parent_trace_node_present": true,

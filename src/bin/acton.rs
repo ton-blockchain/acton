@@ -1143,16 +1143,16 @@ pub enum LocalnetCommand {
         )]
         dump_state: Option<String>,
     },
-    #[command(about = "Request TON from faucet")]
+    #[command(about = "Request GRAM from faucet")]
     Airdrop {
-        #[arg(help = "Address to receive TON")]
+        #[arg(help = "Address to receive funds")]
         address: String,
         #[arg(
             long,
             short,
-            help = "Amount of TON to request",
+            help = "Amount of GRAM to request",
             default_value = "100",
-            value_parser = parse_positive_ton_amount
+            value_parser = parse_positive_gram_amount
         )]
         amount: f64,
         #[arg(
@@ -1206,7 +1206,7 @@ pub enum LibraryCommand {
             help_heading = "Broadcasting"
         )]
         tonconnect_port: u16,
-        #[arg(long, help = "Amount of TON to send for publication")]
+        #[arg(long, help = "Amount of GRAM to send for publication")]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
         yes: bool,
@@ -1272,7 +1272,7 @@ pub enum LibraryCommand {
         tonconnect_port: u16,
         #[arg(
             long,
-            help = "Amount of TON to send (overrides duration-based calculation)"
+            help = "Amount of GRAM to send (overrides duration-based calculation)"
         )]
         amount: Option<String>,
         #[arg(short, long, help = "Skip confirmation prompts")]
@@ -2572,17 +2572,17 @@ fn report_error_as_json<T>(result: anyhow::Result<T>) {
     }
 }
 
-fn parse_positive_ton_amount(value: &str) -> Result<f64, String> {
+fn parse_positive_gram_amount(value: &str) -> Result<f64, String> {
     let amount = value
         .parse::<f64>()
-        .map_err(|err| format!("invalid TON amount '{value}': {err}"))?;
+        .map_err(|err| format!("invalid GRAM amount '{value}': {err}"))?;
 
     if !amount.is_finite() {
-        return Err(format!("TON amount must be finite, got '{value}'"));
+        return Err(format!("GRAM amount must be finite, got '{value}'"));
     }
 
     if amount <= 0.0 {
-        return Err(format!("TON amount must be greater than 0, got '{value}'"));
+        return Err(format!("GRAM amount must be greater than 0, got '{value}'"));
     }
 
     Ok(amount)

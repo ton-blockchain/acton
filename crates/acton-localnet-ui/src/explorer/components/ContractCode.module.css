@@ -68,6 +68,16 @@
   overflow-x: hidden;
 }
 
+.storageBlock {
+  max-height: 600px;
+  min-height: 96px;
+  overflow: auto;
+  padding: var(--spacing-md);
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+}
+
 .empty {
   text-align: center;
   padding: var(--spacing-xl);

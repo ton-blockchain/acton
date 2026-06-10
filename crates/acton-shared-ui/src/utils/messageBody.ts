@@ -1,10 +1,10 @@
-import {Address, Builder, Cell, Dictionary, Slice, loadShardAccount} from "@ton/core"
 import type {Message, MessageRelaxed} from "@ton/core"
+import {Address, Builder, Cell, Dictionary, loadShardAccount, Slice} from "@ton/core"
 import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {
   DynamicCtx,
-  SymTable as CompilerSymTable,
   renderTy,
+  SymTable as CompilerSymTable,
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
 
@@ -189,6 +189,9 @@ const getDeclarationCandidates = (
         if (declaration.type_params && declaration.type_params.length > 0) {
           continue
         }
+        if (declaration.prefix && declaration.prefix.prefix_len !== 32) {
+          continue
+        }
 
         const matchesOpcode =
           opcode !== undefined &&
@@ -306,7 +309,151 @@ const toSerializedCellScalar = (
   rawValue: cell.toBoc({idx: false, crc32: false}).toString("hex"),
 })
 
-const toParsedValue = (value: unknown): ParsedValue => {
+interface ParsedValueTypeContext {
+  readonly symbols: SymTable
+  readonly tyIdx: number
+}
+
+function renderTypeName(context: ParsedValueTypeContext | undefined): string | undefined {
+  if (!context) {
+    return undefined
+  }
+
+  try {
+    return renderTy(context.symbols, context.tyIdx)
+  } catch {
+    return undefined
+  }
+}
+
+function tryGetTy(symbols: SymTable, tyIdx: number): Ty | undefined {
+  try {
+    return symbols.tyByIdx(tyIdx)
+  } catch {
+    return undefined
+  }
+}
+
+function toParsedValueWithType(
+  value: unknown,
+  context: ParsedValueTypeContext,
+): ParsedValue | undefined {
+  const ty = tryGetTy(context.symbols, context.tyIdx)
+  if (!ty) {
+    return undefined
+  }
+
+  switch (ty.kind) {
+    case "nullable": {
+      return value === null
+        ? {kind: "null"}
+        : toParsedValue(value, {symbols: context.symbols, tyIdx: ty.inner_ty_idx})
+    }
+    case "cellOf": {
+      if (typeof value !== "object" || value === null || !("ref" in value)) {
+        return undefined
+      }
+
+      return toParsedValue((value as {readonly ref: unknown}).ref, {
+        symbols: context.symbols,
+        tyIdx: ty.inner_ty_idx,
+      })
+    }
+    case "arrayOf":
+    case "lispListOf": {
+      if (!Array.isArray(value)) {
+        return undefined
+      }
+
+      return {
+        kind: "array",
+        items: value.map(item =>
+          toParsedValue(item, {symbols: context.symbols, tyIdx: ty.inner_ty_idx}),
+        ),
+      }
+    }
+    case "tensor":
+    case "shapedTuple": {
+      if (!Array.isArray(value)) {
+        return undefined
+      }
+
+      return {
+        kind: "array",
+        items: value.map((item, index) =>
+          toParsedValue(item, {
+            symbols: context.symbols,
+            tyIdx: ty.items_ty_idx[index] ?? context.tyIdx,
+          }),
+        ),
+      }
+    }
+    case "mapKV": {
+      if (!(value instanceof Dictionary)) {
+        return undefined
+      }
+
+      return {
+        kind: "map",
+        typeName: renderTy(context.symbols, context.tyIdx),
+        entries: [...value].map(([key, itemValue]) => ({
+          key: toParsedValue(key, {symbols: context.symbols, tyIdx: ty.key_ty_idx}),
+          value: toParsedValue(itemValue, {symbols: context.symbols, tyIdx: ty.value_ty_idx}),
+        })),
+      }
+    }
+    case "StructRef": {
+      const structRef = context.symbols.getStruct(ty.struct_name)
+      if (structRef.custom_pack_unpack?.unpack_from_slice) {
+        return undefined
+      }
+
+      if (typeof value !== "object" || value === null) {
+        return undefined
+      }
+
+      const objectValue = value as Record<string, unknown>
+      return {
+        kind: "object",
+        typeName: renderTy(context.symbols, context.tyIdx),
+        entries: context.symbols.structFieldsOf(context.tyIdx, false).map(field => ({
+          key: field.name,
+          value: toParsedValue(objectValue[field.name], {
+            symbols: context.symbols,
+            tyIdx: field.ty_idx,
+          }),
+        })),
+      }
+    }
+    case "AliasRef": {
+      const aliasRef = context.symbols.getAlias(ty.alias_name)
+      if (aliasRef.custom_pack_unpack?.unpack_from_slice) {
+        return undefined
+      }
+
+      const target = context.symbols.aliasTargetOf(context.tyIdx)
+      return toParsedValue(value, {symbols: context.symbols, tyIdx: target.ty_idx})
+    }
+    default: {
+      return undefined
+    }
+  }
+}
+
+const toParsedValue = (value: unknown, typeContext?: ParsedValueTypeContext): ParsedValue => {
+  let typedValue: ParsedValue | undefined
+  if (typeContext) {
+    try {
+      typedValue = toParsedValueWithType(value, typeContext)
+    } catch {
+      typedValue = undefined
+    }
+  }
+
+  if (typedValue) {
+    return typedValue
+  }
+
   if (value === null) {
     return {kind: "null"}
   }
@@ -320,7 +467,7 @@ const toParsedValue = (value: unknown): ParsedValue => {
   }
 
   if (typeof value === "bigint" || typeof value === "number" || typeof value === "string") {
-    return {kind: "scalar", value: value.toString()}
+    return {kind: "scalar", value: value.toString(), typeName: renderTypeName(typeContext)}
   }
 
   if (value instanceof Address) {
@@ -414,6 +561,9 @@ const createBodyParser = (message: ParsableMessage): Slice | undefined => {
   return parser
 }
 
+const isBouncedInternalMessage = (message: ParsableMessage): boolean =>
+  message.info.type === "internal" && message.info.bounced
+
 const getOpcodeAfterBouncePrefix = (message: ParsableMessage): number | undefined => {
   const opcodeSlice = createBodyParser(message)
   if (!opcodeSlice || opcodeSlice.remainingBits < 32) {
@@ -432,6 +582,68 @@ export const getMessageOpcode = (message: ParsableMessage): number | undefined =
   return Number(slice.preloadUint(32))
 }
 
+const tryReadTextCommentString = (slice: Slice): string | undefined => {
+  const parser = slice.clone()
+  try {
+    const text = parser.loadStringTail()
+    return parser.remainingBits === 0 && parser.remainingRefs === 0 ? text : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const textCommentTailValue = (slice: Slice): ParsedValue => {
+  const text = tryReadTextCommentString(slice)
+  if (text !== undefined) {
+    return {kind: "scalar", value: text}
+  }
+
+  return toSerializedCellScalar("Slice", slice.asCell())
+}
+
+const tryDecodeTextCommentBody = (message: ParsableMessage): ParsedTransactionBody | undefined => {
+  const baseSlice = createBodyParser(message)
+  if (!baseSlice || baseSlice.remainingBits < 32) {
+    return undefined
+  }
+
+  const parser = baseSlice.clone()
+  if (parser.loadUint(32) !== 0) {
+    return undefined
+  }
+
+  return {
+    name: "Text Comment",
+    value: {
+      kind: "object",
+      typeName: "Text Comment",
+      entries: [{key: "text", value: textCommentTailValue(parser)}],
+    },
+  }
+}
+
+const resolveCandidateOpcodeName = (
+  abi: ContractABI,
+  symbols: SymTable,
+  candidate: MessageCandidate,
+  opcode: number | undefined,
+): string | undefined => {
+  if (opcode === undefined) {
+    return undefined
+  }
+
+  return resolveOpcodeNameFromBodyType(abi, symbols, candidate.body_ty_idx, opcode)
+}
+
+const createBouncedOpcodeBody = (name: string, body: Slice): ParsedTransactionBody => ({
+  name,
+  value: {
+    kind: "object",
+    typeName: name,
+    entries: [{key: "body", value: toSerializedCellScalar("Slice", body.asCell())}],
+  },
+})
+
 const tryDecodeMessageWithCandidates = (
   message: ParsableMessage,
   abi: ContractABI,
@@ -447,22 +659,43 @@ const tryDecodeMessageWithCandidates = (
   }
 
   const ctx = new DynamicCtx(abi)
+  const bouncedInternal = isBouncedInternalMessage(message)
+  const opcode = bouncedInternal ? getOpcodeAfterBouncePrefix(message) : undefined
+  const skipGenericBouncedDecode = bouncedInternal && opcode !== undefined
+  const bouncedOpcodeName = bouncedInternal
+    ? candidates
+        .map(candidate => resolveCandidateOpcodeName(abi, ctx.symbols, candidate, opcode))
+        .find(name => name !== undefined)
+    : undefined
 
   for (const candidate of candidates) {
     const parser = baseSlice.clone()
+    const candidateOpcodeName = skipGenericBouncedDecode
+      ? resolveCandidateOpcodeName(abi, ctx.symbols, candidate, opcode)
+      : undefined
     try {
       const decoded: unknown = unpackFromSliceDynamic(ctx, candidate.body_ty_idx, parser) as unknown
       if (!hasAcceptableMessageDecodeRemainder(baseSlice, parser)) {
         continue
       }
 
-      return {
+      const parsedBody = {
         name: getBodyTypeName(ctx.symbols, candidate.body_ty_idx),
-        value: toParsedValue(decoded),
+        value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate.body_ty_idx}),
       }
+
+      if (skipGenericBouncedDecode && !candidateOpcodeName) {
+        continue
+      }
+
+      return parsedBody
     } catch {
       continue
     }
+  }
+
+  if (bouncedOpcodeName) {
+    return createBouncedOpcodeBody(bouncedOpcodeName, baseSlice)
   }
 
   return undefined
@@ -500,18 +733,29 @@ const getStorageCandidates = (compilerAbi: ContractABI): readonly number[] => {
   return [...new Map(candidates).values()]
 }
 
-const getStorageDataSlice = (shardAccountBase64: string): Slice | undefined => {
+const parseShardAccount = (shardAccountBase64: string) => {
   try {
-    const shard = loadShardAccount(Cell.fromBase64(shardAccountBase64).beginParse())
-    const state = shard.account?.storage.state
-    if (state?.type !== "active" || !state.state.data) {
-      return undefined
-    }
-
-    return state.state.data.beginParse()
+    return loadShardAccount(Cell.fromBase64(shardAccountBase64).beginParse())
   } catch {
+    return
+  }
+}
+
+const getStorageDataSlice = (shardAccountBase64: string): Slice | undefined => {
+  const shard = parseShardAccount(shardAccountBase64)
+  const state = shard?.account?.storage.state
+  if (state?.type !== "active" || !state.state.data) {
     return undefined
   }
+
+  return state.state.data.beginParse()
+}
+
+export const getShardAccountBalance = (shardAccountBase64: string): bigint | undefined => {
+  const shard = parseShardAccount(shardAccountBase64)
+  if (!shard) return
+
+  return shard.account?.storage.balance.coins ?? 0n
 }
 
 const tryDecodeStorageSliceWithAbi = (
@@ -535,7 +779,7 @@ const tryDecodeStorageSliceWithAbi = (
 
       return {
         name: getBodyTypeName(ctx.symbols, candidate),
-        value: toParsedValue(decoded),
+        value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate}),
       }
     } catch {
       continue
@@ -564,6 +808,21 @@ const tryDecodeStorageCellWithAbi = (
   return tryDecodeStorageSliceWithAbi(dataCell.beginParse(), abi)
 }
 
+export const decodeStorageDataCell = (
+  dataCellBase64: string | null | undefined,
+  abi: ContractABI | undefined,
+): ParsedContractStorage | undefined => {
+  if (!dataCellBase64 || !abi) {
+    return undefined
+  }
+
+  try {
+    return tryDecodeStorageCellWithAbi(Cell.fromBase64(dataCellBase64), abi)
+  } catch {
+    return undefined
+  }
+}
+
 export const resolveMessageOpcodeName = (
   message: ParsableMessage,
   contracts: Map<string, ContractData>,
@@ -572,6 +831,9 @@ export const resolveMessageOpcodeName = (
   const opcode = getMessageOpcode(message)
   if (opcode === undefined) {
     return undefined
+  }
+  if (opcode === 0) {
+    return "Text Comment"
   }
 
   const destinationContract =
@@ -603,6 +865,11 @@ export const decodeMessageBody = (
   contracts: Map<string, ContractData>,
   sourceAddress?: string,
 ): ParsedTransactionBody | undefined => {
+  const textCommentBody = tryDecodeTextCommentBody(message)
+  if (textCommentBody) {
+    return textCommentBody
+  }
+
   const sourceContract = sourceAddress ? contracts.get(sourceAddress) : undefined
   const destinationContract =
     message.info.type === "internal" ? contracts.get(message.info.dest.toString()) : undefined
@@ -702,6 +969,11 @@ const tryDecodeTransactionBodyWithAbi = (
   const inMessage = tx.transaction.inMessage
   if (!inMessage) {
     return undefined
+  }
+
+  const textCommentBody = tryDecodeTextCommentBody(inMessage)
+  if (textCommentBody) {
+    return textCommentBody
   }
 
   if (inMessage.info.type === "internal" && inMessage.info.bounced) {

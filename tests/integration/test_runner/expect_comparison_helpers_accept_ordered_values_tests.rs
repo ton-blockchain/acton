@@ -43,9 +43,25 @@ get fun `test ad stdlib comparison helpers`() {
     expect(42).toBeLessOrEqual(42);
     expect(42).toBeGreaterOrEqual(42);
     expect(7).toBeGreaterOrEqual(1);
+    expect(5).toBeInRange(5, 10);
+    expect(7).toBeInRange(5, 10);
+    expect(10).toBeInRange(5, 10);
 }
 ",
         "integration/snapshots/test-runner/expect_comparison_helpers_accept_ordered_values/expect_comparison_helpers_accept_ordered_values.stdout.txt",
+    );
+}
+
+#[test]
+fn expect_in_range_reports_bounds_on_failure() {
+    run_expect_failure(
+        "ad-stdlib-expect-in-range-failure",
+        r"
+get fun `test ad stdlib in range failure`() {
+    expect(11).toBeInRange(5, 10);
+}
+",
+        "integration/snapshots/test-runner/expect_comparison_helpers_accept_ordered_values/expect_in_range_reports_bounds_on_failure.stdout.txt",
     );
 }
 

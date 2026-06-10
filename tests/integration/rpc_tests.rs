@@ -2,8 +2,9 @@ use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
 use crate::support::project::{ActonCommand, Project, ProjectBuilder};
 use crate::support::toncenter::{
-    ToncenterV2MockResponse, append_custom_network, append_custom_network_with_urls,
-    append_localnet_network, spawn_toncenter_v2_mock_with_capture as spawn_toncenter_v2_mock,
+    CapturedToncenterRequest, ToncenterV2MockResponse, append_custom_network,
+    append_custom_network_with_urls, append_localnet_network,
+    spawn_toncenter_v2_mock_with_capture as spawn_toncenter_v2_mock,
     toncenter_v2_account_info_with_code_ok_response as toncenter_v2_account_info_ok_response,
     toncenter_v2_masterchain_info_ok_response,
 };
@@ -235,6 +236,50 @@ fn test_rpc_info_prints_remote_account_without_local_abi_match() {
         header_value(&captured[0].headers, "X-API-Key"),
         Some("custom-mock-api-key"),
         "rpc info should send TonCenter API keys for custom networks from MOCK_API_KEY",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_rpc_info_forwards_block_number_to_account_info() {
+    let project = ProjectBuilder::new("rpc-info-block-number").build();
+    let log_dir = prepare_log_dir(project.path());
+    let (mock_url, mock_handle, captured) =
+        spawn_toncenter_v2_mock(vec![toncenter_v2_account_info_ok_response(
+            777_000_000,
+            &test_cell_boc64(0xdead_beef),
+            &test_cell_boc64(0x1234_5678),
+            "active",
+            "",
+            "17",
+            "deadbeef",
+        )]);
+    append_custom_network(project.path(), "mock", &format!("{mock_url}/api/v2"));
+
+    project
+        .acton()
+        .current_dir(project.path())
+        .arg("rpc")
+        .arg("info")
+        .arg(RAW_INFO_ADDRESS)
+        .arg("--net")
+        .arg("custom:mock")
+        .arg("--block-number")
+        .arg("123456")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success()
+        .assert_snapshot_matches("integration/snapshots/rpc/test_rpc_info_block_number.stdout.txt");
+
+    mock_handle.join().expect("mock server thread must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured requests mutex should not be poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one TonCenter request");
+    assert_request_snapshot(
+        &captured[0],
+        "integration/snapshots/rpc/test_rpc_info_block_number.request.txt",
     );
 }
 
@@ -840,6 +885,7 @@ fn toncenter_v3_trace_ok_response(
                         "hash": TRACE_ROOT_HASH,
                         "lt": "100",
                         "now": 1_700_000_000_u32,
+                        "mc_block_seqno": 10_000_u32,
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "1200",
@@ -879,6 +925,7 @@ fn toncenter_v3_trace_ok_response(
                         "hash": TRACE_CHILD_HASH,
                         "lt": "101",
                         "now": 1_700_000_001_u32,
+                        "mc_block_seqno": 10_001_u32,
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "100",
@@ -898,6 +945,7 @@ fn toncenter_v3_trace_ok_response(
                         "hash": TRACE_RETURN_HASH,
                         "lt": "102",
                         "now": 1_700_000_002_u32,
+                        "mc_block_seqno": 10_002_u32,
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "100",
@@ -989,6 +1037,7 @@ fn toncenter_v3_trace_without_in_msg_response(account: &str) -> ToncenterV2MockR
                         "hash": TRACE_ROOT_HASH,
                         "lt": "100",
                         "now": 1_700_000_000_u32,
+                        "mc_block_seqno": 10_000_u32,
                         "orig_status": "active",
                         "end_status": "active",
                         "total_fees": "1200",
@@ -1078,6 +1127,24 @@ fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a s
         .iter()
         .find(|(header_name, _)| header_name.eq_ignore_ascii_case(name))
         .map(|(_, value)| value.as_str())
+}
+
+fn assert_request_snapshot(request: &CapturedToncenterRequest, snapshot_path: &str) {
+    let mut normalized = format!("{} {}\n", request.method, request.path);
+    if !request.body.is_empty() {
+        let body = std::str::from_utf8(&request.body).expect("request body must be utf-8");
+        normalized.push_str(body);
+        normalized.push('\n');
+    }
+
+    let expected_path = Path::new("tests").join(snapshot_path);
+    let expected = fs::read_to_string(&expected_path).unwrap_or_else(|err| {
+        panic!(
+            "request snapshot {} must exist: {err}\n\nactual:\n{normalized}",
+            expected_path.display()
+        )
+    });
+    assertion().eq(normalized, expected);
 }
 
 fn prepare_log_dir(project_root: &Path) -> String {

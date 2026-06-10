@@ -2,6 +2,7 @@ import * as React from "react"
 import {useEffect, useMemo, useState} from "react"
 import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {ToastProvider} from "@acton/shared-ui"
+import type {ThemeMode} from "@acton/shared-ui"
 
 import {TonClient} from "./explorer/api/client"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
@@ -14,6 +15,15 @@ import styles from "./App.module.css"
 const HOST = (import.meta.env.VITE_LOCALNET_HOST || "").replace(/\/$/, "")
 const TONCENTER_API_KEY = import.meta.env.VITE_LOCALNET_TONCENTER_API_KEY?.trim() || undefined
 let clientSingleton: TonClient | undefined
+
+const readInitialTheme = (): ThemeMode => {
+  const storedTheme = localStorage.getItem("theme")
+  if (storedTheme === "dark" || storedTheme === "light") {
+    return storedTheme
+  }
+
+  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+}
 
 function getTonClient(): TonClient {
   clientSingleton ??= new TonClient({
@@ -67,12 +77,7 @@ const TransactionPage = React.lazy(async () => {
 })
 
 export const App: React.FC = () => {
-  const [theme, setTheme] = useState(() => {
-    return (
-      localStorage.getItem("theme") ||
-      (globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
-    )
-  })
+  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
 
   const client = useMemo(getTonClient, [])
 
@@ -98,8 +103,8 @@ export const App: React.FC = () => {
 
 interface AppContentProps {
   readonly client: TonClient
-  readonly theme: string
-  readonly setTheme: (theme: string) => void
+  readonly theme: ThemeMode
+  readonly setTheme: (theme: ThemeMode) => void
 }
 
 const AppContent: React.FC<AppContentProps> = ({client, theme, setTheme}) => {

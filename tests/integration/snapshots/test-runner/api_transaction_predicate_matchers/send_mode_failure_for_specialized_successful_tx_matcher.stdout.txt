@@ -11,10 +11,10 @@
   ✗ send mode successful tx mismatch [TIME]
     └─ Error: expect(actual).toHaveSuccessfulTx(expected)
         N/A -> sender A
-        └── Ping 0.5 TON -> harness B                                                   gas=1978
-            └── BounceNotice 0.1 TON -> sender A                                        gas=309
+        └── Ping 0.5 GRAM -> harness B                                                  gas=1978
+            └── BounceNotice 0.1 GRAM -> sender A                                       gas=309
         
-        Cannot find transaction from harness B EQCLlS..c1L6Hl to sender A EQAXTu..1D6wLK
+        Cannot find transaction from harness B kQCLlS..c1Lxpv to sender A kQAXTu..1D67lA
         with:
           opcode=0xae110002 BounceNotice
           success=true

@@ -1,15 +1,17 @@
 use super::{
-    LocalContractMatch, find_local_contract_match, format_int_address, format_std_address,
-    load_rpc_config, resolve_rpc_network,
+    LocalContractMatch, find_local_contract_match, format_get_method_signature,
+    format_get_method_signature_colored, format_int_address, format_std_address, load_rpc_config,
+    pretty_address_format, resolve_rpc_network,
 };
 use crate::commands::abi_args::{parse_abi_parameters, parse_number, parse_raw_stack_args};
 use crate::commands::common::error_fmt;
 use crate::context::code_lookup_hash;
-use acton_config::color::OwoColorize;
+use crate::formatter::FormatterContext;
+use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::ActonConfig;
-use acton_debug::{
-    PrettyAddressFormat, PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type,
-};
+#[cfg(test)]
+use acton_debug::PrettyAddressFormat;
+use acton_debug::{PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type};
 use anyhow::{Context, anyhow};
 use log::warn;
 use num_traits::ToPrimitive;
@@ -29,6 +31,7 @@ pub(super) fn rpc_call_cmd(
     method: &str,
     args: &[String],
     net: Option<String>,
+    block_number: Option<u64>,
     json: bool,
     raw: bool,
 ) -> anyhow::Result<()> {
@@ -41,7 +44,7 @@ pub(super) fn rpc_call_cmd(
     let client = TonApiClient::new(network.clone(), config.custom_networks())?;
 
     let remote = client
-        .get_account_info(None, &address.to_string())
+        .get_account_info(block_number, &address.to_string())
         .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
     let code = TonApiClient::decode_optional_cell(&remote.code)?;
     let contract_match = code
@@ -59,17 +62,49 @@ pub(super) fn rpc_call_cmd(
         .flatten();
 
     let stack = if let (Some(abi), Some(get_method)) = (abi, get_method) {
-        parse_abi_parameters(abi, &get_method.parameters, args)?
+        parse_get_method_parameters(abi, get_method, args)?
     } else {
         parse_raw_stack_args(args)?
     };
     let stack_json = legacy_stack_to_json(&stack).context("Failed to encode get-method stack")?;
 
     let result = client
-        .run_get_method(&address.to_string(), method, &stack_json)
+        .run_get_method_at_block(&address.to_string(), method, &stack_json, block_number)
         .with_context(|| {
             format!("Failed to run get method {method} on {address} from {network}")
         })?;
+    if json && result.exit_code != 0 {
+        let mut output = serde_json::json!({
+            "network": network.to_string(),
+            "address": format_std_address(&address, &network),
+            "rawAddress": address.to_string(),
+            "contract": contract_match.as_ref().map(|matched| matched.contract_name.as_str()),
+            "method": method,
+            "signature": abi.zip(get_method).map(|(abi, method)| format_get_method_signature(abi, method)),
+            "exitCode": result.exit_code,
+            "error": get_method_exit_error_json(method, result.exit_code, abi),
+            "result": serde_json::Value::Null,
+            "rawStack": &result.stack,
+        });
+        if let Some(block_number) = block_number {
+            output["block"] = serde_json::json!(block_number);
+        }
+        println!("{}", serde_json::to_string_pretty(&output)?);
+        let _ = stdout().flush();
+        let _ = stderr().flush();
+        process::exit(1);
+    }
+    if !json && result.exit_code != 0 {
+        println!(
+            "{} {}",
+            "Error:".red(),
+            get_method_exit_error(method, result.exit_code, abi)
+        );
+        let _ = stdout().flush();
+        let _ = stderr().flush();
+        process::exit(1);
+    }
+
     let result_tuple = result
         .parse_stack_tuple()
         .context("Failed to parse runGetMethod result stack")?;
@@ -84,7 +119,7 @@ pub(super) fn rpc_call_cmd(
     };
 
     if json {
-        let output = serde_json::json!({
+        let mut output = serde_json::json!({
             "network": network.to_string(),
             "address": format_std_address(&address, &network),
             "rawAddress": address.to_string(),
@@ -95,6 +130,9 @@ pub(super) fn rpc_call_cmd(
             "result": decoded_result.as_ref().map(|result| result.json.clone()),
             "rawStack": &result.stack,
         });
+        if let Some(block_number) = block_number {
+            output["block"] = serde_json::json!(block_number);
+        }
         println!("{}", serde_json::to_string_pretty(&output)?);
     } else {
         match decoded_result {
@@ -105,21 +143,10 @@ pub(super) fn rpc_call_cmd(
                 print_raw_stack(&result_tuple, &network);
             }
         }
-
-        if result.exit_code != 0 {
-            println!(
-                "\n{} {}",
-                "Error:".red(),
-                get_method_exit_error(method, result.exit_code)
-            );
-            let _ = stdout().flush();
-            let _ = stderr().flush();
-            process::exit(1);
-        }
     }
 
     if result.exit_code != 0 {
-        anyhow::bail!("{}", get_method_exit_error(method, result.exit_code));
+        anyhow::bail!("{}", get_method_exit_error(method, result.exit_code, abi));
     }
 
     Ok(())
@@ -168,7 +195,7 @@ fn resolve_get_method<'a>(
     let available = abi
         .get_methods
         .iter()
-        .map(|method| format!(" {}", method.name.yellow()))
+        .map(|method| format!(" {}", format_get_method_signature_colored(abi, method)))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -186,6 +213,24 @@ fn resolve_get_method<'a>(
 
 fn parse_get_method_id(method: &str) -> Option<i32> {
     parse_number(method)?.to_i32()
+}
+
+fn parse_get_method_parameters(
+    abi: &ContractABI,
+    get_method: &ABIGetMethod,
+    args: &[String],
+) -> anyhow::Result<Tuple> {
+    let expected_count = get_method.parameters.len();
+    if args.len() != expected_count {
+        anyhow::bail!(
+            "Wrong number of arguments for {}: expected {}, got {}",
+            format_get_method_signature_colored(abi, get_method),
+            expected_count,
+            args.len()
+        );
+    }
+
+    parse_abi_parameters(abi, &get_method.parameters, args)
 }
 
 struct DecodedResult {
@@ -220,7 +265,7 @@ fn decode_get_method_result(
     let options = PrettyRenderOptions {
         address_format: pretty_address_format(network),
         address_labels: Default::default(),
-        colorize: false,
+        colorize: colors_enabled(),
     };
     Ok(DecodedResult {
         json: rendered_value_to_json(&rendered, network),
@@ -332,14 +377,6 @@ fn rendered_address_value(
         .unwrap_or_else(|| fallback.to_owned())
 }
 
-const fn pretty_address_format(network: &Network) -> PrettyAddressFormat {
-    if network.uses_testnet_address_format() {
-        PrettyAddressFormat::Testnet
-    } else {
-        PrettyAddressFormat::Mainnet
-    }
-}
-
 fn print_pretty_result(value: &str) {
     for line in value.lines() {
         println!("{line}");
@@ -432,30 +469,90 @@ fn format_raw_stack_tuple(tuple: &Tuple, network: &Network) -> String {
     format!("[{items}]")
 }
 
-fn get_method_exit_error(method: &str, exit_code: i32) -> String {
-    if exit_code == 11 {
-        return format!(
-            "Get method {} not found (exit code {exit_code})",
-            method.yellow()
-        );
-    }
-
-    format!("Get method {method} exited with code {exit_code}")
+#[derive(Debug, Clone)]
+enum GetMethodExitErrorInfo {
+    MethodNotFound,
+    Abi(crate::formatter::AbiExitCodeInfo),
+    Unknown,
 }
 
-fn format_get_method_signature(abi: &ContractABI, method: &ABIGetMethod) -> String {
-    let params = method
-        .parameters
-        .iter()
-        .map(|param| format!("{}: {}", param.name, abi.render_type(param.ty_idx)))
-        .collect::<Vec<_>>()
-        .join(", ");
-    format!(
-        "{}({}): {}",
-        method.name,
-        params,
-        abi.render_type(method.return_ty_idx)
-    )
+fn get_method_exit_error_info(exit_code: i32, abi: Option<&ContractABI>) -> GetMethodExitErrorInfo {
+    if exit_code == 11 {
+        return GetMethodExitErrorInfo::MethodNotFound;
+    }
+
+    FormatterContext::find_custom_exit_code_info(exit_code, abi)
+        .map_or(GetMethodExitErrorInfo::Unknown, GetMethodExitErrorInfo::Abi)
+}
+
+fn get_method_exit_error_plain(
+    method: &str,
+    exit_code: i32,
+    info: &GetMethodExitErrorInfo,
+) -> String {
+    match info {
+        GetMethodExitErrorInfo::MethodNotFound => {
+            format!("Get method {method} not found (exit code {exit_code})")
+        }
+        GetMethodExitErrorInfo::Abi(info) if info.description != info.symbolic_name => format!(
+            "Get method {method} failed: {}: {} (exit code {exit_code})",
+            info.symbolic_name, info.description
+        ),
+        GetMethodExitErrorInfo::Abi(info) => format!(
+            "Get method {method} failed: {} (exit code {exit_code})",
+            info.symbolic_name
+        ),
+        GetMethodExitErrorInfo::Unknown => {
+            format!("Get method {method} failed (exit code {exit_code})")
+        }
+    }
+}
+
+fn get_method_exit_error_json(
+    method: &str,
+    exit_code: i32,
+    abi: Option<&ContractABI>,
+) -> serde_json::Value {
+    let info = get_method_exit_error_info(exit_code, abi);
+    let mut error = serde_json::json!({
+        "message": get_method_exit_error_plain(method, exit_code, &info),
+    });
+
+    if let GetMethodExitErrorInfo::Abi(info) = info {
+        let description = (info.description != info.symbolic_name).then_some(info.description);
+        error["name"] = serde_json::Value::String(info.symbolic_name);
+        if let Some(description) = description {
+            error["description"] = serde_json::Value::String(description);
+        }
+    }
+
+    error
+}
+
+fn get_method_exit_error(method: &str, exit_code: i32, abi: Option<&ContractABI>) -> String {
+    match get_method_exit_error_info(exit_code, abi) {
+        GetMethodExitErrorInfo::MethodNotFound => format!(
+            "Get method {} not found (exit code {exit_code})",
+            method.yellow()
+        ),
+        GetMethodExitErrorInfo::Abi(info) => {
+            let exit_name = info.symbolic_name.yellow();
+            let exit_info = if info.description == info.symbolic_name {
+                exit_name.to_string()
+            } else {
+                format!("{}: {}", exit_name, info.description.dimmed())
+            };
+
+            format!(
+                "Get method {} failed: {exit_info} (exit code {exit_code})",
+                method.yellow()
+            )
+        }
+        GetMethodExitErrorInfo::Unknown => format!(
+            "Get method {} failed (exit code {exit_code})",
+            method.yellow()
+        ),
+    }
 }
 
 #[cfg(test)]

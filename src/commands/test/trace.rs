@@ -1,4 +1,5 @@
 use crate::commands::test::{Pos, TestDescriptor};
+use crate::context::is_treasury_code;
 use crate::context::{
     BuildCache, CompilationResult, Emulations, FailedSendMessageResult, KnownAddresses, to_cell,
 };
@@ -10,9 +11,11 @@ use std::path::Path;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use ton_emulator::SendMessageResultSuccess;
 use ton_retrace::trace::{ExecutedAction, ExecutedActionFailureReason, ExecutedActions};
 use ton_source_map::SourceLocation;
 use tycho_types::boc::Boc;
+use tycho_types::models::AccountStatus;
 use xxhash_rust::xxh3::xxh3_64;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -29,6 +32,8 @@ pub(super) struct TestTrace {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(super) struct TransactionList {
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub is_treasury_deploy: bool,
     pub transactions: Vec<TransactionInfo>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failed_messages: Vec<FailedMessageInfo>,
@@ -82,6 +87,23 @@ const fn is_zero(value: &usize) -> bool {
     *value == 0
 }
 
+#[allow(clippy::trivially_copy_pass_by_ref)]
+const fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn is_treasury_deploy_trace(trace_transactions: &[SendMessageResultSuccess]) -> bool {
+    let Some(root) = trace_transactions.first() else {
+        return false;
+    };
+
+    matches!(
+        root.transaction.orig_status,
+        AccountStatus::NotExists | AccountStatus::Uninit
+    ) && root.transaction.end_status == AccountStatus::Active
+        && root.code.as_ref().is_some_and(is_treasury_code)
+}
+
 fn safe_file_stem(name: &str, fallback: &str) -> String {
     let mut stem = String::with_capacity(name.len());
     for ch in name.chars() {
@@ -113,11 +135,11 @@ pub(super) fn contract_file_name(contract_name: &str) -> String {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ExecutorActionFailureReasonInfo {
-    NotEnoughToncoinToSend {
+    NotEnoughGramsToSend {
         remaining_balance: String,
         required: String,
     },
-    CannotReserveToncoin {
+    CannotReserveGrams {
         requested: String,
         available: String,
     },
@@ -242,17 +264,17 @@ fn executor_action_info(
 #[must_use]
 fn convert_failure_reason(reason: ExecutedActionFailureReason) -> ExecutorActionFailureReasonInfo {
     match reason {
-        ExecutedActionFailureReason::NotEnoughToncoinToSend {
+        ExecutedActionFailureReason::NotEnoughGramsToSend {
             remaining_balance,
             required,
-        } => ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend {
+        } => ExecutorActionFailureReasonInfo::NotEnoughGramsToSend {
             remaining_balance: remaining_balance.to_string(),
             required: required.to_string(),
         },
-        ExecutedActionFailureReason::CannotReserveToncoin {
+        ExecutedActionFailureReason::CannotReserveGrams {
             requested,
             available,
-        } => ExecutorActionFailureReasonInfo::CannotReserveToncoin {
+        } => ExecutorActionFailureReasonInfo::CannotReserveGrams {
             requested: requested.to_string(),
             available: available.to_string(),
         },
@@ -334,9 +356,11 @@ pub(super) fn dump_test_transactions(
                 || format!("Trace {}", visible_trace_index + 1),
                 ToString::to_string,
             );
+            let is_treasury_deploy = is_treasury_deploy_trace(trace_transactions);
 
             TransactionList {
                 name,
+                is_treasury_deploy,
                 transactions,
                 failed_messages,
             }
@@ -441,9 +465,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::SendMessage {
                 failure_code: Some(37),
-                failure_reason: Some(
-                    ExecutorActionFailureReasonInfo::NotEnoughToncoinToSend { .. }
-                ),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::NotEnoughGramsToSend { .. }),
                 location: None,
                 ..
             }
@@ -477,7 +499,7 @@ mod tests {
             &parsed[1],
             ExecutorActionInfo::ReserveCurrency {
                 failure_code: Some(37),
-                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveToncoin { .. }),
+                failure_reason: Some(ExecutorActionFailureReasonInfo::CannotReserveGrams { .. }),
                 location: None,
                 ..
             }

@@ -147,6 +147,8 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const CATALOG_WALLET_V4R2_CODE_HASH: &str =
+    "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 
 const V3_GETTER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -830,6 +832,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
         .and_then(|tx| tx.get("lt"))
         .and_then(Value::as_str);
     let first_legacy_child_lt = legacy_child_lts.first().and_then(Value::as_str);
+    let parent_account_state_after = &parent_v3_tx["account_state_after"];
 
     let trace_legacy_summary = json!({
         "trace_root_children_count": trace_root_children.map_or(0, Vec::len),
@@ -838,6 +841,12 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
         "parent_legacy_child_transactions_count": legacy_child_lts.len(),
         "first_child_lt_matches_legacy_child_transaction": first_tree_child_lt.is_some()
             && first_tree_child_lt == first_legacy_child_lt,
+        "parent_account_state_after_has_code_boc": parent_account_state_after["code_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+        "parent_account_state_after_has_data_boc": parent_account_state_after["data_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
     });
     let trace_legacy_summary_json = format!(
         "{}\n",
@@ -3322,13 +3331,42 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
     let abi_response = wait_for_ok_response(
         &node,
         &format!(
-            "/acton_getCompilerAbi?code_hash={}&code_hash={missing_code_hash}",
+            "/acton_getCompilerAbi?code_hash={}&code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={missing_code_hash}",
             encode_query_component(&code_hash_hex)
         ),
         Duration::from_secs(12),
     );
     let abi_payload = response_payload(&abi_response);
     let abi = &abi_payload[&code_hash_hex];
+    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH];
+
+    let register_override_response = node.post_json(
+        "/acton_registerCompilerAbis",
+        &json!({
+            "entries": [
+                {
+                    "code_hash": CATALOG_WALLET_V4R2_CODE_HASH,
+                    "compiler_abi": {
+                        "compiler_name": "tolk",
+                        "contract_name": "LocalOverride"
+                    }
+                }
+            ]
+        }),
+    );
+    assert_eq!(
+        register_override_response["ok"].as_bool(),
+        Some(true),
+        "registerCompilerAbis failed: {}",
+        serde_json::to_string_pretty(&register_override_response).unwrap_or_default()
+    );
+    let override_response = wait_for_ok_response(
+        &node,
+        &format!("/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}"),
+        Duration::from_secs(12),
+    );
+    let override_payload = response_payload(&override_response);
+
     let abi_summary = json!({
         "compiler_name": abi["compiler_name"],
         "contract_name": abi["contract_name"],
@@ -3337,6 +3375,16 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
                 .iter()
                 .any(|method| method["name"].as_str() == Some("addTen"))
         }),
+        "catalog_contract_name": catalog_abi["contract_name"],
+        "catalog_has_seqno_get_method": catalog_abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("seqno"))
+        }),
+        "local_registration_overrides_catalog": override_payload[CATALOG_WALLET_V4R2_CODE_HASH]
+            ["contract_name"]
+            .as_str()
+            == Some("LocalOverride"),
         "missing_code_hash_is_null": abi_payload[missing_code_hash].is_null(),
     });
     let abi_summary_json = format!(

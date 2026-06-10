@@ -245,12 +245,12 @@ mod tests {
     }
 
     #[test]
-    fn finds_wallet_v4r2_signed_external_by_opcode() {
-        let abis = find_abis_by_opcode(0xd26b2518);
+    fn finds_wallet_v4r2_plugin_destruct_by_opcode() {
+        let abis = find_abis_by_opcode(0x64737472);
 
         assert!(
             abis.iter().any(|abi| abi.contract_name == "WalletV4r2"),
-            "wallet v4r2 signed external opcode must resolve to WalletV4r2"
+            "wallet v4r2 plugin destruct opcode must resolve to WalletV4r2"
         );
     }
 

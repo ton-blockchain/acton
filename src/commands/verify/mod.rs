@@ -543,7 +543,7 @@ pub fn verify_cmd(
         bounced: false,
         src: IntAddr::Std(sender_std_addr),
         dst: IntAddr::Std(ton_address_to_std_addr(&registry_address)),
-        value: CurrencyCollection::new(100_000_000u128), // 0.1 TON
+        value: CurrencyCollection::new(100_000_000u128), // 0.1 GRAM
         ihr_fee: Default::default(),
         fwd_fee: Default::default(),
         created_lt: 0,

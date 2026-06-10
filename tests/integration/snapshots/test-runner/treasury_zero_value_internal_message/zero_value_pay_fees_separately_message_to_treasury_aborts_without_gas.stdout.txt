@@ -11,8 +11,8 @@
   ✓ zero value pay fees separately message to treasury aborts without gas [TIME]
     └─ Test output:
        N/A -> sender A
-       └── SendOwnershipAssigned 1 TON -> ownership_relay B                            gas=1831
-           └── OwnershipAssigned 0 TON -> recipient C                                  compute phase skipped aborted
+       └── SendOwnershipAssigned 1 GRAM -> ownership_relay B                           gas=1831
+           └── OwnershipAssigned 0 GRAM -> recipient C                                 compute phase skipped aborted
        
        txCount=2
 

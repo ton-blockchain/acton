@@ -893,12 +893,22 @@ fn save_test_trace_skips_traces_hidden_from_ui() {
                 .to_string()
         })
         .collect::<Vec<_>>();
+    let treasury_deploy_flags = traces
+        .iter()
+        .map(|item| {
+            item["is_treasury_deploy"]
+                .as_bool()
+                .unwrap_or(false)
+                .to_string()
+        })
+        .collect::<Vec<_>>();
     let summary = format!(
-        "trace_count: {}\nskipped_traces_count: {}\ntrace_names: {}\ntransaction_counts: {}\n",
+        "trace_count: {}\nskipped_traces_count: {}\ntrace_names: {}\ntransaction_counts: {}\ntreasury_deploy_flags: {}\n",
         traces.len(),
         trace["skipped_traces_count"].as_u64().unwrap_or(0),
         trace_names.join(","),
         tx_counts.join(","),
+        treasury_deploy_flags.join(","),
     );
 
     assert_trace_summary_snapshot(

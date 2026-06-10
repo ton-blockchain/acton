@@ -2373,7 +2373,7 @@ fn test_script_to_calculate_storage_fee() {
         .arg(&(60 * 60 * 24 * 365).to_string())
         .run()
         .success()
-        .assert_contains("0.258139024 TON");
+        .assert_contains("0.258139024 GRAM");
 }
 
 // ========================================
