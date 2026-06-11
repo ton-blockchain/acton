@@ -21,7 +21,8 @@ pub mod opcodes {
     pub const JETTON_INTERNAL_TRANSFER: u32 = 0x178d_4519;
     pub const JETTON_NOTIFY: u32 = 0x7362_d09c;
     pub const JETTON_WALLET_TRANSFER_NOTIFICATION: u32 = JETTON_NOTIFY;
-    pub const JETTON_MINT: u32 = 0x0000_0015;
+    pub const JETTON_MINT: u32 = 0x642b_7d07;
+    pub const MINTER_JETTON_MINT: u32 = 0x0000_0015;
 
     pub const DEDUST_VAULT_NATIVE_V2_SWAP: u32 = 0xea06_185d;
     pub const DEDUST_POOL_V2_SWAP_EXTERNAL: u32 = 0x61ee_542d;

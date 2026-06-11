@@ -7,16 +7,16 @@
 //! A successful trace is split across contracts. The user sends funds to a Vault,
 //! the Vault asks a Pool to swap, and the Pool sends a payout leg. Because of that
 //! we first recognize protocol-internal legs, then compose them with the concrete
-//! outgoing transfer that delivers the resulting asset to the recipient.
+//! incoming offer and outgoing payout movements.
 
 use super::super::enrichment::{
     ActionInfo, ActionInfoBox, EnrichmentContext, format_asset_amount, format_ton_amount,
     message_destination,
 };
 use super::super::{
-    Action, ActionKind, ActionProvider, Asset, AssetAmount, BaseActionGraph, BaseActionKind,
-    BaseMatch, BaseMatcher, CompositeMatch, CompositeMatcher, JettonTransferView, TraceNode,
-    opcode_matches, opcodes,
+    Action, ActionKind, ActionProvider, Asset, AssetAmount, BaseAction, BaseActionGraph,
+    BaseActionKind, BaseMatch, BaseMatcher, CompositeMatch, CompositeMatcher, JettonTransferView,
+    TraceNode, opcode_matches, opcodes,
 };
 use std::collections::BTreeSet;
 use tycho_types::models::IntAddr;
@@ -39,7 +39,7 @@ impl ActionProvider for DedustProvider {
     fn describe(&self, action: &Action, ctx: &EnrichmentContext<'_>) -> Option<ActionInfoBox> {
         match action.kind {
             ActionKind::DedustSwap => Some(Box::new(DedustSwapInfo {
-                offer: native_offer(action, ctx),
+                offer: offer_amount(action, ctx),
                 ask: payout_amount(action, ctx),
             })),
             ActionKind::DedustPayout => {
@@ -197,17 +197,44 @@ impl CompositeMatcher for DedustSwapMatcher {
                     )
                 })?;
 
-                let mut nodes = swap_leg.nodes.clone();
+                let offer_action = (swap_leg.kind == BaseActionKind::DedustJettonSwapLeg)
+                    .then(|| direct_jetton_offer(graph, swap_leg))
+                    .flatten();
+
+                let mut nodes = BTreeSet::new();
+                let mut base_actions = Vec::new();
+
+                if let Some(offer_action) = offer_action {
+                    nodes.extend(offer_action.nodes.iter().copied());
+                    base_actions.push(offer_action.id);
+                }
+
+                nodes.extend(swap_leg.nodes.iter().copied());
+                base_actions.push(swap_leg.id);
+
                 nodes.extend(payout_action.nodes.iter().copied());
+                base_actions.push(payout_action.id);
 
                 Some(CompositeMatch {
                     kind: ActionKind::DedustSwap,
-                    base_actions: vec![swap_leg.id, payout_action.id],
+                    base_actions,
                     nodes,
                 })
             })
             .collect()
     }
+}
+
+fn direct_jetton_offer<'a>(
+    graph: &'a BaseActionGraph<'_>,
+    swap_leg: &BaseAction,
+) -> Option<&'a BaseAction> {
+    graph.base_actions().iter().find(|action| {
+        action.kind == BaseActionKind::JettonTransfer
+            && graph
+                .children_of(action.id)
+                .any(|child| child.id == swap_leg.id)
+    })
 }
 
 #[derive(Debug, Clone)]
@@ -260,6 +287,10 @@ impl ActionInfo for DedustPayoutInfo {
     }
 }
 
+fn offer_amount(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmount> {
+    native_offer(action, ctx).or_else(|| jetton_offer(action, ctx))
+}
+
 fn native_offer(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmount> {
     // For TON -> X the official Native Vault `swap#ea06185d` body carries the TON
     // `amount`, so no Pool event parsing is needed to recover the offered side.
@@ -278,44 +309,97 @@ fn native_offer(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmo
     })
 }
 
-fn payout_amount(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmount> {
-    // The asked side is derived from the consumed payout action until we parse the
-    // Pool `swap#9c610de3` event directly. For TON -> jetton this is enough: the
-    // payout action is the jetton transfer that carries the resulting amount.
-    let base_action = ctx.find_action_base(action, |base_action| {
+fn jetton_offer(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmount> {
+    let swap_leg_index = action.base_actions.iter().position(|id| {
         matches!(
-            base_action.kind,
-            BaseActionKind::JettonTransfer
-                | BaseActionKind::PtonTransfer
-                | BaseActionKind::DedustPayout
+            ctx.base_action(*id).map(|base_action| base_action.kind),
+            Some(BaseActionKind::DedustJettonSwapLeg)
         )
     })?;
-    let root = ctx.fact_for_base(base_action)?;
+    let base_action = action.base_actions[..swap_leg_index]
+        .iter()
+        .filter_map(|id| ctx.base_action(*id))
+        .find(|base_action| base_action.kind == BaseActionKind::JettonTransfer)?;
+
+    jetton_transfer_amount(base_action, ctx)
+}
+
+fn payout_amount(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<AssetAmount> {
+    // The asked side is derived from the consumed payout action until we parse the
+    // Pool `swap#9c610de3` event directly. For jetton-funded swaps the offer
+    // transfer is placed before the swap leg, so payout lookup starts after it.
+    let base_action = payout_base_action(action, ctx)?;
 
     match base_action.kind {
-        BaseActionKind::JettonTransfer => {
-            let transfer = JettonTransferView::parse(root)?;
-            Some(AssetAmount {
-                asset: Asset::Jetton {
-                    wallet: root
-                        .message
-                        .as_ref()
-                        .and_then(|msg| msg.destination.clone()),
-                },
-                amount: transfer.amount()?,
-            })
-        }
+        BaseActionKind::JettonTransfer => jetton_transfer_amount(base_action, ctx),
         BaseActionKind::PtonTransfer => {
+            let root = ctx.fact_for_base(base_action)?;
             let transfer = JettonTransferView::parse(root)?;
             Some(AssetAmount {
                 asset: Asset::Ton,
                 amount: transfer.amount()?,
             })
         }
-        BaseActionKind::DedustPayout => Some(AssetAmount {
-            asset: Asset::Ton,
-            amount: root.message.as_ref()?.value,
-        }),
+        BaseActionKind::DedustPayout => {
+            let root = ctx.fact_for_base(base_action)?;
+            Some(AssetAmount {
+                asset: Asset::Ton,
+                amount: root.message.as_ref()?.value,
+            })
+        }
         _ => None,
     }
+}
+
+fn payout_base_action<'a>(action: &Action, ctx: &EnrichmentContext<'a>) -> Option<&'a BaseAction> {
+    let start = swap_leg_index(action, ctx).map_or(0, |index| index + 1);
+
+    action.base_actions[start..]
+        .iter()
+        .filter_map(|id| ctx.base_action(*id))
+        .find(|base_action| {
+            matches!(
+                base_action.kind,
+                BaseActionKind::JettonTransfer
+                    | BaseActionKind::PtonTransfer
+                    | BaseActionKind::DedustPayout
+            )
+        })
+        .or_else(|| {
+            ctx.find_action_base(action, |base_action| {
+                matches!(
+                    base_action.kind,
+                    BaseActionKind::JettonTransfer
+                        | BaseActionKind::PtonTransfer
+                        | BaseActionKind::DedustPayout
+                )
+            })
+        })
+}
+
+fn swap_leg_index(action: &Action, ctx: &EnrichmentContext<'_>) -> Option<usize> {
+    action.base_actions.iter().position(|id| {
+        matches!(
+            ctx.base_action(*id).map(|base_action| base_action.kind),
+            Some(BaseActionKind::DedustNativeSwapLeg) | Some(BaseActionKind::DedustJettonSwapLeg)
+        )
+    })
+}
+
+fn jetton_transfer_amount(
+    base_action: &BaseAction,
+    ctx: &EnrichmentContext<'_>,
+) -> Option<AssetAmount> {
+    let root = ctx.fact_for_base(base_action)?;
+    let transfer = JettonTransferView::parse(root)?;
+
+    Some(AssetAmount {
+        asset: Asset::Jetton {
+            wallet: root
+                .message
+                .as_ref()
+                .and_then(|msg| msg.destination.clone()),
+        },
+        amount: transfer.amount()?,
+    })
 }

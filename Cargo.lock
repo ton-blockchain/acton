@@ -5357,6 +5357,7 @@ dependencies = [
  "num-bigint",
  "serde_json",
  "sha2",
+ "ton-api",
  "ton-executor",
  "tvm-ffi",
  "tycho-types",

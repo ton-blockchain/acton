@@ -4,8 +4,8 @@ use common::{check_extraction, trace};
 use expect_test::expect;
 use std::collections::BTreeMap;
 use ton_indexer::actions::{
-    DecodedBody, DecodedValue, NodeFact, TraceFacts, enrich_actions, extract_actions, opcodes,
-    render_action,
+    DecodedBody, DecodedValue, MessageFact, NodeFact, TraceFacts, enrich_actions, extract_actions,
+    opcodes, render_action,
 };
 
 #[test]
@@ -98,6 +98,65 @@ fn enriched_dedust_native_swap_reads_ton_offer_and_jetton_ask() {
         "DedustSwap: DedustSwapInfo { offer: Some(AssetAmount { asset: Ton, amount: 10000000000 }), ask: Some(AssetAmount { asset: Jetton { wallet: None }, amount: 123000000 }) }\nrender: swapped 10 TON to 123000000 jetton units via DeDust"
     ]
         .assert_eq(&formatted);
+}
+
+#[test]
+fn enriched_dedust_jetton_swap_reads_jetton_offer_and_ton_ask() {
+    let trace = trace!(
+        r"
+        JettonTransfer #1
+        └── JettonInternalTransfer #2
+            └── JettonNotify #3
+                └── DedustPoolV2SwapExternal #4
+                    └── DedustPoolV2PayOutFromPool #5
+                        └── DedustPayout #6
+        "
+    );
+    let extraction = extract_actions(&trace);
+    let mut facts = TraceFacts::new();
+    facts.insert(NodeFact {
+        id: 1,
+        opcode: Some(opcodes::JETTON_TRANSFER),
+        message: None,
+        decoded: Some(DecodedBody {
+            type_name: "JettonTransfer".to_owned(),
+            fields: BTreeMap::from([(
+                "amount".to_owned(),
+                DecodedValue::Coins(50_000_000_000_000),
+            )]),
+        }),
+    });
+    facts.insert(NodeFact {
+        id: 6,
+        opcode: Some(opcodes::DEDUST_PAYOUT),
+        message: Some(MessageFact {
+            source: None,
+            destination: None,
+            value: 12_323_063_628,
+            bounced: false,
+            body: None,
+        }),
+        decoded: None,
+    });
+
+    let enriched = enrich_actions(&extraction, &facts);
+    let formatted = enriched
+        .iter()
+        .map(|item| {
+            format!(
+                "{:?}: {:?}\nrender: {}",
+                item.action.kind,
+                &item.info,
+                render_action(item)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    expect![
+        "DedustSwap: DedustSwapInfo { offer: Some(AssetAmount { asset: Jetton { wallet: None }, amount: 50000000000000 }), ask: Some(AssetAmount { asset: Ton, amount: 12323063628 }) }\nrender: swapped 50000000000000 jetton units to 12.323063628 TON via DeDust"
+    ]
+    .assert_eq(&formatted);
 }
 
 #[test]
@@ -309,8 +368,7 @@ fn dedust_jetton_swap_consumes_native_ton_payout_tail() {
         trace,
         expect![[r"
             actions:
-            DedustSwap nodes={5, 6, 7, 8, 9} base_actions=[1, 2]
-            JettonTransfer nodes={2, 3, 4, 10} base_actions=[0]
+            DedustSwap nodes={2, 3, 4, 5, 6, 7, 8, 9, 10} base_actions=[0, 1, 2]
             ContractCall nodes={1} base_actions=[3]
 
             base_actions:
@@ -350,10 +408,9 @@ fn dedust_jetton_swap_trace_extracts_native_payout_swap() {
         trace,
         expect![[r"
             actions:
-            DedustSwap nodes={12, 13, 14} base_actions=[3, 4]
+            DedustSwap nodes={9, 10, 11, 12, 13, 14, 15} base_actions=[2, 3, 4]
             JettonTransfer nodes={2, 3, 4, 17} base_actions=[0]
             JettonTransfer nodes={6, 7, 8, 16} base_actions=[1]
-            JettonTransfer nodes={9, 10, 11, 15} base_actions=[2]
             ContractCall nodes={1} base_actions=[5]
             ContractCall nodes={5} base_actions=[6]
 
@@ -419,9 +476,8 @@ fn mixed_dedust_stonfi_poolv3_route_trace() {
         expect![[r"
             actions:
             StonfiSwap nodes={10, 14, 15, 16, 17} base_actions=[3, 4]
-            DedustSwap nodes={5, 6, 7} base_actions=[1, 2]
+            DedustSwap nodes={2, 3, 4, 5, 6, 7, 18} base_actions=[0, 1, 2]
             DedustSwap nodes={26, 27, 28, 29, 30, 31, 37} base_actions=[7, 8]
-            JettonTransfer nodes={2, 3, 4, 18} base_actions=[0]
             JettonTransfer nodes={19, 20, 21, 38} base_actions=[5]
             PtonTransfer nodes={24, 25} base_actions=[6]
             JettonTransfer nodes={34, 35, 36} base_actions=[9]

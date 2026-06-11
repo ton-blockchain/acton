@@ -23,6 +23,7 @@ sha2 = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }
+ton-api = { workspace = true }
 
 [lints]
 workspace = true
