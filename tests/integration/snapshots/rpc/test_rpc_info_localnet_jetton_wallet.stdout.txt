@@ -1,0 +1,30 @@
+Basic Information
+  Network:           localnet
+  Raw Address:       0:51df56f242f58abd2cd6ba689723e86fc5159cdc340bbd92788034f219d5cf04
+  Status:            active
+  Contract:          JettonWallet
+  Balance:           [TON_BALANCE] GRAM
+  Last Tx LT:        8
+  Last Tx Hash:      [TX_HASH]
+  Code Hash:         0x7bfa53bce90ce26cd368ec2989eba2bd15d286104742f0e04659f485a03012ba
+  Data Hash:         0x2b38f60246fffa2ba1ee616f4bdb1ab7bf7525d4d445dab6a178f61e5cee7006
+
+Jetton Wallet
+  Token:             Acton Sample Jetton (ACTON)
+  Balance:           123.45 ACTON
+  Owner:             [WALLET_ADDRESS_BASE]
+  Master:            [WALLET_ADDRESS_BASE]
+  Decimals:          9
+  Description:       Sample jetton deployed from acton-contracts scripts
+
+Storage
+  WalletStorage {
+      jettonBalance: 123450000000,
+      ownerAddress: [WALLET_ADDRESS_BASE],
+      minterAddress: [WALLET_ADDRESS_BASE],
+  }
+
+Get Methods
+  get_wallet_data(): JettonWalletDataReply
+
+hint: To run get method: acton rpc call --net localnet [WALLET_ADDRESS_BASE] <METHOD> [ARGS...]

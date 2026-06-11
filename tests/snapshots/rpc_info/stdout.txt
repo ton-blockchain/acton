@@ -10,5 +10,7 @@ Options:
       --color <WHEN>                 Control when to use colored output [default: auto] [possible values: auto, always, never]
       --manifest-path <PATH>         Path to Acton.toml
       --net <NET>                    Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>
+      --json                         Print machine-readable JSON output
       --project-root <PATH>          Path to project root
+      --raw                          Skip domain inspectors such as jetton detection
   -h, --help                         Print help

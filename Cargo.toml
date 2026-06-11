@@ -221,6 +221,7 @@ ton-retrace = { workspace = true }
 ton-source-map = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
+ton-indexer = { workspace = true }
 
 # remote crates
 # base TON libraries

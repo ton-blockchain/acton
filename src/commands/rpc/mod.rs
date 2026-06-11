@@ -1,5 +1,4 @@
-use crate::commands::common::{error_fmt, format_nanograms};
-use crate::context::code_lookup_hash;
+use crate::commands::common::format_nanograms;
 use crate::contract_interface::{
     compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
 };
@@ -19,11 +18,10 @@ use tolk_compiler::dynamic_unpack;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
-};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
 
 mod call;
+mod info;
 mod trace;
 
 #[derive(Subcommand, Clone)]
@@ -39,6 +37,10 @@ pub enum RpcCommand {
             help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
         )]
         net: Option<String>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(long, help = "Skip domain inspectors such as jetton detection")]
+        raw: bool,
     },
     #[command(about = "Call a contract get-method through TonCenter")]
     Call {
@@ -120,7 +122,9 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             address,
             block_number,
             net,
-        } => rpc_info_cmd(&address, net, block_number),
+            json,
+            raw,
+        } => info::rpc_info_cmd(&address, net, block_number, json, raw),
         RpcCommand::Call {
             address,
             method,
@@ -141,121 +145,6 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             show_bodies,
         } => trace::rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
-}
-
-fn rpc_info_cmd(
-    address_input: &str,
-    net: Option<String>,
-    block_number: Option<u64>,
-) -> anyhow::Result<()> {
-    let (address, _) = StdAddr::from_str_ext(address_input, StdAddrFormat::any())
-        .map_err(|_| anyhow!("Invalid address"))
-        .with_context(|| error_fmt::invalid_address(address_input))?;
-
-    let network = resolve_rpc_network(net)?;
-    let config = load_rpc_config()?;
-    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
-
-    let remote = client
-        .get_account_info(block_number, &address.to_string())
-        .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
-
-    let balance = remote.balance.to_bigint()?;
-    let code = TonApiClient::decode_optional_cell(&remote.code)?;
-    let data = TonApiClient::decode_optional_cell(&remote.data)?;
-
-    let matched_contract = code
-        .as_ref()
-        .map(|code| find_local_contract_match(code.repr_hash(), &config))
-        .transpose()?
-        .flatten();
-    let catalog_contract = code.as_ref().and_then(|code| {
-        acton_abi_catalog::find_contract_by_code_hash(&code_lookup_hash(code).to_string())
-    });
-    let local_abi = matched_contract
-        .as_ref()
-        .and_then(|contract| contract.abi.clone());
-    let catalog_abi = catalog_contract.map(acton_abi_catalog::CatalogContract::abi);
-    let contract_name = match (
-        matched_contract.as_ref(),
-        local_abi.is_some(),
-        catalog_contract,
-    ) {
-        (Some(contract), true, _) => contract.contract_name.green().to_string(),
-        (_, _, Some(contract)) => contract.display_name.green().to_string(),
-        _ => "unknown".dimmed().to_string(),
-    };
-    let has_abi = local_abi.is_some() || catalog_abi.is_some();
-
-    let decoded_storage = match (&data, local_abi.as_deref(), catalog_abi.as_deref()) {
-        (Some(data), Some(abi), _) => Some(decode_storage(data, abi, &network)?),
-        (Some(data), None, Some(abi)) => match decode_storage(data, abi, &network) {
-            Ok(decoded_storage) => Some(decoded_storage),
-            Err(err) => {
-                warn!("Skipping bundled ABI storage decode: {err:#}");
-                None
-            }
-        },
-        _ => None,
-    };
-
-    print_section_title("Remote Account");
-    print_kv("Network", network.to_string());
-    if let Some(block_number) = block_number {
-        print_kv("Block", block_number.to_string().yellow().to_string());
-    }
-    print_kv("Raw Address", address.to_string().cyan().to_string());
-    print_kv("Status", format_account_status(&remote.state));
-    print_kv("Contract", contract_name);
-    print_kv("Balance", format_nanograms(&balance).white().to_string());
-    print_kv("Last Tx LT", remote.last_transaction_id.lt.as_str());
-    print_kv(
-        "Last Tx Hash",
-        remote
-            .last_transaction_id
-            .hash
-            .as_str()
-            .yellow()
-            .to_string(),
-    );
-
-    if let Some(code) = &code {
-        print_kv("Code Hash", format_hash(code.repr_hash()));
-    }
-    if let Some(data) = &data {
-        print_kv("Data Hash", format_hash(data.repr_hash()));
-    }
-    if remote.state == "frozen" && !remote.frozen_hash.is_empty() {
-        print_kv(
-            "Frozen Hash",
-            remote.frozen_hash.as_str().yellow().to_string(),
-        );
-    }
-
-    match decoded_storage {
-        Some(decoded_storage) => {
-            print_section("Decoded Storage");
-            print_indented_block(&decoded_storage, 2);
-        }
-        None if data.is_some() && has_abi => {
-            print_section("Decoded Storage");
-            println!("  {}", "<unavailable>".dimmed());
-        }
-        None if data.is_some() => {
-            print_section("Decoded Storage");
-            println!("  {}", "<ABI not found>".dimmed());
-        }
-        None => {}
-    }
-
-    if let Some(abi) = local_abi.as_deref().or(catalog_abi.as_deref()) {
-        print_section("Get Methods");
-        print_get_methods(abi);
-    }
-
-    print_get_method_hint(address_input, &network, block_number);
-
-    Ok(())
 }
 
 fn rpc_block_cmd(net: Option<String>) -> anyhow::Result<()> {
@@ -497,7 +386,7 @@ pub(super) fn format_std_address(address: &StdAddr, network: &Network) -> String
 
 const LABEL_WIDTH: usize = 18;
 
-fn print_section_title(title: &str) {
+pub(super) fn print_section_title(title: &str) {
     println!("{}", title.bold().cyan());
 }
 

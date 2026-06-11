@@ -611,6 +611,113 @@ fn test_rpc_info_decodes_storage_from_localnet() {
     node.stop();
 }
 
+#[test]
+fn test_rpc_info_detects_jetton_master_and_wallet_from_localnet() {
+    let workspace = ProjectBuilder::new("rpc-info-localnet-jetton")
+        .without_acton_toml()
+        .build();
+    let project_dir = workspace.path().join("jetton");
+    let project_dir_str = project_dir.display().to_string();
+
+    workspace
+        .acton()
+        .arg("new")
+        .arg(&project_dir_str)
+        .arg("--name")
+        .arg("jetton-info")
+        .arg("--description")
+        .arg("jetton info inspector")
+        .arg("--template")
+        .arg("jetton")
+        .arg("--license")
+        .arg("MIT")
+        .run()
+        .success();
+
+    write_deployer_wallets(&project_dir);
+    let node = workspace
+        .localnet()
+        .current_dir(&project_dir)
+        .before_start(|cmd| cmd.build().current_dir(&project_dir))
+        .args(["--accounts", "deployer"])
+        .start();
+    append_custom_network_with_urls(
+        &project_dir,
+        "localnet",
+        &format!("{}/api/v2", node.base_url()),
+        &format!("{}/api/v3", node.base_url()),
+    );
+    let log_dir = prepare_log_dir(&project_dir);
+
+    let deploy_output = workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/deploy.tolk")
+        .arg("--net")
+        .arg("localnet")
+        .env("JETTON_DEPLOYER", "deployer")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run();
+    let deploy_stdout = stdout(&deploy_output);
+    deploy_output.success();
+
+    let minter_address = extract_marker_address(&deploy_stdout, "JETTON MINTER_ADDRESS=");
+    node.wait_until_address_state_active(&minter_address, Duration::from_secs(12));
+
+    let mint_output = workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("script")
+        .arg("scripts/mint.tolk")
+        .arg("--net")
+        .arg("localnet")
+        .env("JETTON_ADMIN", "deployer")
+        .env("JETTON_MINTER_ADDRESS", &minter_address)
+        .env("JETTON_MINT_AMOUNT", "123450000000")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run();
+    let mint_stdout = stdout(&mint_output);
+    mint_output.success();
+
+    let wallet_address = extract_marker_address(&mint_stdout, "JETTON_RECIPIENT WALLET_ADDRESS=");
+    node.wait_until_address_state_active(&wallet_address, Duration::from_secs(12));
+
+    let master_info = workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("rpc")
+        .arg("info")
+        .arg(&minter_address)
+        .arg("--net")
+        .arg("localnet")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+    assert_localnet_rpc_snapshot(
+        &master_info,
+        "integration/snapshots/rpc/test_rpc_info_localnet_jetton_master.stdout.txt",
+    );
+
+    let wallet_info = workspace
+        .acton()
+        .current_dir(&project_dir)
+        .arg("rpc")
+        .arg("info")
+        .arg(&wallet_address)
+        .arg("--net")
+        .arg("localnet")
+        .env("ACTON_LOG_DIR", &log_dir)
+        .run()
+        .success();
+    assert_localnet_rpc_snapshot(
+        &wallet_info,
+        "integration/snapshots/rpc/test_rpc_info_localnet_jetton_wallet.stdout.txt",
+    );
+
+    node.stop();
+}
+
 #[allow(clippy::significant_drop_tightening)]
 #[test]
 fn test_rpc_block_prints_full_toncenter_masterchain_info() {
@@ -1122,6 +1229,15 @@ fn extract_marker_value(output: &str, marker: &str) -> String {
         .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"))
 }
 
+fn extract_marker_address(output: &str, marker: &str) -> String {
+    let value = extract_marker_value(output, marker);
+    value
+        .split_whitespace()
+        .next()
+        .unwrap_or_else(|| panic!("Marker `{marker}` produced an empty address"))
+        .to_owned()
+}
+
 fn header_value<'a>(headers: &'a [(String, String)], name: &str) -> Option<&'a str> {
     headers
         .iter()
@@ -1159,6 +1275,10 @@ fn assert_localnet_rpc_snapshot(
 ) {
     let normalized = normalize_localnet_rpc_stdout(&output.get_normalized_stdout());
     let expected_path = Path::new("tests").join(snapshot_path);
+    if std::env::var("SNAPSHOTS").as_deref() == Ok("overwrite") {
+        fs::write(&expected_path, normalized).expect("must write localnet rpc snapshot");
+        return;
+    }
     let expected =
         fs::read_to_string(&expected_path).expect("localnet rpc snapshot file must exist");
     assertion().eq(normalized, expected);
@@ -1169,6 +1289,10 @@ fn normalize_localnet_rpc_stdout(stdout: &str) -> String {
     for line in stdout.lines() {
         if let Some((prefix, _)) = line.split_once("Last Tx Hash:") {
             normalized_lines.push(format!("{prefix}Last Tx Hash:      [TX_HASH]"));
+        } else if let Some((prefix, _)) = line.split_once("Balance:")
+            && line.contains(" GRAM")
+        {
+            normalized_lines.push(format!("{prefix}Balance:           [TON_BALANCE] GRAM"));
         } else {
             normalized_lines.push(line.to_owned());
         }
