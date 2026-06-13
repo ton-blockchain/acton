@@ -593,24 +593,42 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
 
   const contracts = useMemo(() => {
     const map = new Map<string, ContractData>()
+    const priorities = new Map<string, number>()
+    const walletPriority = 2
+    const transactionPriority = 1
+    const failedTransactionPriority = 0
 
-    const addContract = (address: Address, name?: string) => {
+    const addContract = (address: Address, name: string | undefined, priority: number) => {
       const addrStr = address.toString()
-      if (map.has(addrStr)) return
-
+      const existing = map.get(addrStr)
+      const existingPriority = priorities.get(addrStr)
       const backendContract = name ? backendContracts[name] : undefined
+
+      if (existing && existingPriority !== undefined) {
+        if (existingPriority > priority) return
+        const addressFallback = fmt.formatAddress(addrStr)
+        if (
+          existingPriority === priority &&
+          name === undefined &&
+          existing.displayName !== addressFallback
+        ) {
+          return
+        }
+      }
+
+      priorities.set(addrStr, priority)
       map.set(addrStr, {
         displayName: backendContract?.display_name ?? name ?? fmt.formatAddress(addrStr),
         address,
-        letter: String.fromCodePoint(65 + (map.size % 26)),
-        abi: backendContract?.abi,
+        letter: existing?.letter ?? String.fromCodePoint(65 + (map.size % 26)),
+        abi: backendContract?.abi ?? existing?.abi,
       })
     }
 
     if (trace?.wallets) {
       for (const [address, name] of Object.entries(trace.wallets)) {
         try {
-          addContract(Address.parse(address), name)
+          addContract(Address.parse(address), name, walletPriority)
         } catch (error) {
           console.error("Failed to parse wallet address", address, error)
         }
@@ -620,7 +638,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     if (parsedTransactions) {
       for (const tx of parsedTransactions) {
         if (tx.address) {
-          addContract(tx.address, tx.contractName)
+          addContract(tx.address, tx.contractName, transactionPriority)
         }
       }
     }
@@ -628,7 +646,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     if (failedTransactions) {
       for (const tx of failedTransactions) {
         if (tx.address) {
-          addContract(tx.address, tx.contractName)
+          addContract(tx.address, tx.contractName, failedTransactionPriority)
         }
       }
     }
