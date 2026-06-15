@@ -51,8 +51,8 @@
   width: 100%;
 }
 
-.sessionsContent {
-  padding-top: 12px;
+.sessionsContent.sessionsContent {
+  padding-top: 18px;
 }
 
 .walletCardHeader {

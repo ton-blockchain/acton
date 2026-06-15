@@ -1567,9 +1567,12 @@
 
   .sidebarSlot,
   .sidebarSlotCollapsed {
+    position: relative;
+    z-index: 100;
     width: 100%;
     height: auto;
     overflow: visible;
+    will-change: auto;
   }
 
   .sidebarViewport,
@@ -1581,6 +1584,7 @@
     height: auto;
     pointer-events: auto;
     transform: none;
+    will-change: auto;
   }
 
   .sidebarPeekTarget,

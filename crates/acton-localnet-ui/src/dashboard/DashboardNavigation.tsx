@@ -278,7 +278,7 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
                   <KeyRound size={18} />
                   {localnetApiToken ? (
                     <Check size={12} className={styles.utilityStatusIcon} />
-                  ) : null}
+                  ) : undefined}
                 </button>
 
                 <ThemeSwitch
