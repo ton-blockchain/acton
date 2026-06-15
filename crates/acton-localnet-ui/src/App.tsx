@@ -9,6 +9,7 @@ import {TonClient} from "./explorer/api/client"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {DashboardPage} from "./dashboard/DashboardPage"
+import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import styles from "./App.module.css"
@@ -146,19 +147,21 @@ export const App: React.FC = () => {
       <ToastProvider>
         <NetworkInfoProvider client={client}>
           <AddressBookProvider client={client}>
-            <AppContent
-              client={client}
-              isAuthOverlayOpen={isAuthOverlayOpen}
-              isAuthOverlayRequired={isAuthOverlayRequired}
-              localnetApiToken={localnetApiToken}
-              onClearAuthToken={clearAuthToken}
-              onCloseAuthOverlay={closeAuthOverlay}
-              onOpenAuthOverlay={openAuthOverlay}
-              onRequireAuthToken={handleUnauthorized}
-              onSaveAuthToken={saveAuthToken}
-              theme={theme}
-              setTheme={setTheme}
-            />
+            <WalletRuntimeProvider client={client} host={HOST}>
+              <AppContent
+                client={client}
+                isAuthOverlayOpen={isAuthOverlayOpen}
+                isAuthOverlayRequired={isAuthOverlayRequired}
+                localnetApiToken={localnetApiToken}
+                onClearAuthToken={clearAuthToken}
+                onCloseAuthOverlay={closeAuthOverlay}
+                onOpenAuthOverlay={openAuthOverlay}
+                onRequireAuthToken={handleUnauthorized}
+                onSaveAuthToken={saveAuthToken}
+                theme={theme}
+                setTheme={setTheme}
+              />
+            </WalletRuntimeProvider>
           </AddressBookProvider>
         </NetworkInfoProvider>
       </ToastProvider>
@@ -232,7 +235,7 @@ const AppContent: React.FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps}>
                   <RouteSuspense>
-                    <WalletsPage client={client} host={HOST} />
+                    <WalletsPage />
                   </RouteSuspense>
                 </DashboardPage>
               }

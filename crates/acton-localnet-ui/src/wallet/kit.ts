@@ -45,7 +45,7 @@ export function getWalletNetworkLabel(): string {
 
 export function createWalletKit(host: string): TonWalletKit {
   const origin = getWalletOrigin()
-  const walletUrl = `${origin}/wallets`
+  const walletUrl = origin
   const apiEndpoint = getApiEndpoint(host)
 
   return new TonWalletKit({
