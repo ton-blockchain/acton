@@ -1,5 +1,6 @@
 import {Search} from "lucide-react"
 import * as React from "react"
+import {createPortal} from "react-dom"
 
 import type {TonClient} from "../explorer/api/client"
 
@@ -36,18 +37,9 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
       return
     }
 
-    let originLeft = rect.left
-    let originTop = rect.top
-    const sidebar = searchButton?.closest<HTMLElement>(`.${styles.sidebar}`)
-    if (sidebar && globalThis.matchMedia("(max-width: 920px)").matches) {
-      const sidebarRect = sidebar.getBoundingClientRect()
-      originLeft = rect.left - sidebarRect.left
-      originTop = rect.top - sidebarRect.top
-    }
-
     setSearchOriginStyle({
-      "--search-origin-left": `${originLeft}px`,
-      "--search-origin-top": `${originTop}px`,
+      "--search-origin-left": `${rect.left}px`,
+      "--search-origin-top": `${rect.top}px`,
       "--search-origin-width": `${rect.width}px`,
       "--search-origin-height": `${rect.height}px`,
     })
@@ -146,24 +138,27 @@ export const DashboardSearch: React.FC<DashboardSearchProps> = ({client}) => {
         <span className={styles.searchShortcut}>F</span>
       </button>
 
-      {isSearchMounted ? (
-        <React.Suspense
-          fallback={
-            <SearchOverlayFallback
-              isOpen={isSearchOpen}
-              style={searchOriginStyle}
-              onClose={closeSearch}
-            />
-          }
-        >
-          <DashboardSearchOverlay
-            client={client}
-            isOpen={isSearchOpen}
-            onClose={closeSearch}
-            originStyle={searchOriginStyle}
-          />
-        </React.Suspense>
-      ) : undefined}
+      {isSearchMounted
+        ? createPortal(
+            <React.Suspense
+              fallback={
+                <SearchOverlayFallback
+                  isOpen={isSearchOpen}
+                  style={searchOriginStyle}
+                  onClose={closeSearch}
+                />
+              }
+            >
+              <DashboardSearchOverlay
+                client={client}
+                isOpen={isSearchOpen}
+                onClose={closeSearch}
+                originStyle={searchOriginStyle}
+              />
+            </React.Suspense>,
+            document.body,
+          )
+        : undefined}
     </>
   )
 }
