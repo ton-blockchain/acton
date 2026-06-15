@@ -310,6 +310,18 @@ mod tests {
     }
 
     #[test]
+    fn finds_template_jetton_minter_by_code_hash() {
+        let contract = find_contract_by_code_hash(
+            "6bf8f48ca97d3fd9c8e553344efe7af030c322459e2ee2197a052162f1961bfb",
+        )
+        .expect("template jetton minter must be present in bundled catalog");
+
+        assert_eq!(contract.display_name, "JettonMinter");
+        assert_eq!(contract.abi().contract_name, "JettonMinter");
+        assert_eq!(contract.abi().storage.storage_ty_idx, Some(36));
+    }
+
+    #[test]
     fn normalizes_uppercase_prefixed_hashes() {
         let contract = find_contract_by_code_hash(
             "0xA0CFC2C48AEE16A271F2CFC0B7382D81756CECB1017D077FAAAB3BB602F6868C",

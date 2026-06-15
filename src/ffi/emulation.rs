@@ -520,40 +520,49 @@ fn send_message_impl(
         return Ok(());
     }
 
-    if ctx.can_broadcast_to_network()
-        && let Some(tonconnect) = ctx.env.find_tonconnect_by_address(src_std)
-    {
+    if ctx.can_broadcast_to_network() {
         let network = ctx.network();
-        let (wallet_ext_in, norm_hash) = send_tonconnect_message(&msg, tonconnect, &network)
-            .context("Failed to send message with TON Connect")?;
+        let tonconnect = ctx.env.find_tonconnect_by_address(src_std);
+        let wallet = ctx.env.find_wallet_by_address(src_std);
 
-        ctx.chain.world_state.invalidate_remote_cache();
+        if tonconnect.is_some() || wallet.is_some() {
+            let custom_networks = ctx.env.config.custom_networks();
+            if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
+                warn!("Failed to register compiler ABI in localnet: {err:#}");
+            }
 
-        let pseudo_tx =
-            build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
-        stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
-        return Ok(());
-    }
+            if let Some(tonconnect) = tonconnect {
+                let (wallet_ext_in, norm_hash) =
+                    send_tonconnect_message(&msg, tonconnect, &network)
+                        .context("Failed to send message with TON Connect")?;
 
-    if ctx.can_broadcast_to_network()
-        && let Some(wallet) = ctx.env.find_wallet_by_address(src_std)
-    {
-        let network = ctx.network();
-        let custom_networks = ctx.env.config.custom_networks();
-        if let Err(err) = register_localnet_abis(ctx, &custom_networks) {
-            warn!("Failed to register compiler ABI in localnet: {err:#}");
+                ctx.chain.world_state.invalidate_remote_cache();
+
+                let pseudo_tx = build_pseudo_broadcast_tx(
+                    ctx.chain.world_state.get_now(),
+                    wallet_ext_in,
+                    norm_hash,
+                );
+                stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
+                return Ok(());
+            }
+
+            if let Some(wallet) = wallet {
+                let (wallet_ext_in, norm_hash) =
+                    send_wallet_message(&msg, wallet, &network, custom_networks)
+                        .context("Failed to send message to real network")?;
+
+                ctx.chain.world_state.invalidate_remote_cache();
+
+                let pseudo_tx = build_pseudo_broadcast_tx(
+                    ctx.chain.world_state.get_now(),
+                    wallet_ext_in,
+                    norm_hash,
+                );
+                stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
+                return Ok(());
+            }
         }
-
-        let (wallet_ext_in, norm_hash) =
-            send_wallet_message(&msg, wallet, &network, custom_networks)
-                .context("Failed to send message to real network")?;
-
-        ctx.chain.world_state.invalidate_remote_cache();
-
-        let pseudo_tx =
-            build_pseudo_broadcast_tx(ctx.chain.world_state.get_now(), wallet_ext_in, norm_hash);
-        stack.push(TupleItem::big_array_from_items(vec![pseudo_tx]));
-        return Ok(());
     }
 
     let libs = ctx.chain.build_libs(&src);
