@@ -3357,9 +3357,8 @@ fn register_localnet_abis(
         .timeout(Duration::from_secs(5))
         .user_agent(crate::build_info::user_agent())
         .build()?;
-    let response = client
-        .post(&url)
-        .json(&payload)
+    let request = client.post(&url).json(&payload);
+    let response = with_localnet_auth(request)
         .send()
         .with_context(|| format!("Failed to POST compiler ABI registry to {url}"))?;
     let status = response.status();
@@ -3383,6 +3382,15 @@ fn register_localnet_abis(
     );
 
     Ok(())
+}
+
+fn with_localnet_auth(
+    request: reqwest::blocking::RequestBuilder,
+) -> reqwest::blocking::RequestBuilder {
+    match crate::commands::localnet::resolve_localnet_auth_token(None) {
+        Some(token) => request.bearer_auth(token),
+        None => request,
+    }
 }
 
 fn localnet_acton_url(

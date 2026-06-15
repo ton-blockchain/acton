@@ -1149,6 +1149,11 @@ pub enum LocalnetCommand {
             value_name = "PATH"
         )]
         dump_state: Option<String>,
+        #[arg(
+            long,
+            help = "Require a token for all Localnet HTTP API, control, emulate, and streaming endpoints"
+        )]
+        require_auth: bool,
     },
     #[command(about = "Request GRAM from faucet")]
     Airdrop {
@@ -1168,6 +1173,8 @@ pub enum LocalnetCommand {
             help = "Localnet server port (default: [localnet].port or 5411)"
         )]
         port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
     },
     #[command(about = "Inspect localnet status")]
     Status {
@@ -1179,6 +1186,8 @@ pub enum LocalnetCommand {
         port: Option<u16>,
         #[arg(long, help = "Print machine-readable JSON")]
         json: bool,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
     },
 }
 
@@ -2391,6 +2400,7 @@ fn main() {
                 block_interval_ms,
                 load_state,
                 dump_state,
+                require_auth,
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
@@ -2417,6 +2427,7 @@ fn main() {
                         resolved_localnet.block_interval_ms,
                         load_state,
                         dump_state,
+                        require_auth,
                     )
                     .await
                 })
@@ -2425,6 +2436,7 @@ fn main() {
                 address,
                 amount,
                 port,
+                auth_token,
             } => {
                 let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
@@ -2432,16 +2444,23 @@ fn main() {
                     .build()
                     .expect("Failed to build tokio runtime");
                 rt.block_on(async {
-                    commands::localnet::localnet_airdrop_cmd(&address, amount, port).await
+                    commands::localnet::localnet_airdrop_cmd(&address, amount, port, auth_token)
+                        .await
                 })
             }
-            LocalnetCommand::Status { port, json } => {
+            LocalnetCommand::Status {
+                port,
+                json,
+                auth_token,
+            } => {
                 let port = resolve_localnet_port(port);
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()
                     .expect("Failed to build tokio runtime");
-                rt.block_on(async { commands::localnet::localnet_status_cmd(port, json).await })
+                rt.block_on(async {
+                    commands::localnet::localnet_status_cmd(port, json, auth_token).await
+                })
             }
         },
     };

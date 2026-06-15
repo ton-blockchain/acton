@@ -741,6 +741,136 @@ fn localnet_serves_embedded_ui_and_spa_routes() {
 }
 
 #[test]
+fn localnet_require_auth_protects_http_api() {
+    let project = ProjectBuilder::new("localnet-require-auth").build();
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("Failed to create HTTP client");
+
+    let unauthorized_v2 = get_json_with_status(
+        &client,
+        &format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+    );
+    let unauthorized_control =
+        get_json_with_status(&client, &format!("{}/acton_nodeInfo", node.base_url()));
+    let unauthorized_emulate = post_json_with_status(
+        &client,
+        &format!("{}/api/emulate/v1/emulateTrace", node.base_url()),
+        &json!({}),
+    );
+    let unauthorized_sse = post_json_with_status(
+        &client,
+        &format!("{}/api/streaming/v2/sse", node.base_url()),
+        &json!({
+            "addresses": [V3_TRANSACTIONS_TEST_ACCOUNT_A],
+            "types": ["transactions"]
+        }),
+    );
+    let ui_response = client
+        .get(node.base_url())
+        .send()
+        .expect("UI request must be sent");
+    let ui_status = ui_response.status().as_u16();
+    let ui_body = ui_response
+        .text()
+        .expect("UI response body must be readable");
+
+    let authorized_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .bearer_auth(token)
+        .send()
+        .expect("authorized v2 request must be sent");
+    let authorized_v2_status = authorized_v2.status().as_u16();
+    let authorized_v2_json: Value = authorized_v2
+        .json()
+        .expect("authorized v2 response must be JSON");
+
+    let api_key_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .header("X-API-Key", token)
+        .send()
+        .expect("x-api-key v2 request must be sent");
+    let api_key_v2_status = api_key_v2.status().as_u16();
+    let api_key_v2_json: Value = api_key_v2
+        .json()
+        .expect("x-api-key v2 response must be JSON");
+
+    let options_status = client
+        .request(
+            reqwest::Method::OPTIONS,
+            format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+        )
+        .header("Origin", "http://127.0.0.1:3000")
+        .header("Access-Control-Request-Method", "GET")
+        .send()
+        .expect("OPTIONS request must be sent")
+        .status()
+        .as_u16();
+
+    let status_output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let mut status_payload: Value = serde_json::from_str(&status_output.get_stdout())
+        .expect("protected status output must be JSON");
+    normalize_localnet_status_json(&mut status_payload, node.port());
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("airdrop")
+        .arg(V3_TRANSACTIONS_TEST_ACCOUNT_A)
+        .arg("--amount")
+        .arg("0.25")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+
+    let summary = json!({
+        "unauthorized": {
+            "v2": summarize_auth_error(unauthorized_v2),
+            "control": summarize_auth_error(unauthorized_control),
+            "emulate": summarize_auth_error(unauthorized_emulate),
+            "sse": summarize_auth_error(unauthorized_sse),
+        },
+        "authorized": {
+            "bearer_status": authorized_v2_status,
+            "bearer_ok": authorized_v2_json["ok"].as_bool(),
+            "x_api_key_status": api_key_v2_status,
+            "x_api_key_ok": api_key_v2_json["ok"].as_bool(),
+            "options_status": options_status,
+            "status_command_running": status_payload["running"].as_bool(),
+        },
+        "ui": {
+            "status": ui_status,
+            "html_shell": ui_body.contains("<div id=\"root\"></div>"),
+            "leaks_token": ui_body.contains(token),
+            "has_bootstrap_token": ui_body.contains("__ACTON_LOCALNET__"),
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_require_auth.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_batches_address_name_lookup() {
     let project = ProjectBuilder::new("localnet-address-name-batch").build();
     let node = project.localnet().start();
@@ -3979,6 +4109,47 @@ fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> String {
         serde_json::to_string_pretty(value).expect("Failed to serialize JSON snapshot")
     );
     normalize_output_preserve_escapes(&response_json, project_path)
+}
+
+fn get_json_with_status(client: &Client, url: &str) -> (u16, Value) {
+    let response = client
+        .get(url)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
+    parse_json_response(response, "GET", url)
+}
+
+fn post_json_with_status(client: &Client, url: &str, payload: &Value) -> (u16, Value) {
+    let response = client
+        .post(url)
+        .json(payload)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed POST {url}: {error}"));
+    parse_json_response(response, "POST", url)
+}
+
+fn parse_json_response(
+    response: reqwest::blocking::Response,
+    method: &str,
+    url: &str,
+) -> (u16, Value) {
+    let status = response.status().as_u16();
+    let body = response
+        .text()
+        .unwrap_or_else(|error| panic!("Failed to read {method} {url} response body: {error}"));
+    let json = serde_json::from_str(&body)
+        .unwrap_or_else(|error| panic!("{method} {url} returned invalid JSON: {error}\n{body}"));
+    (status, json)
+}
+
+fn summarize_auth_error((status, mut response): (u16, Value)) -> Value {
+    normalize_extra_for_snapshot(&mut response);
+    json!({
+        "status": status,
+        "ok": response["ok"],
+        "code": response["code"],
+        "error": response["error"],
+    })
 }
 
 fn normalize_localnet_status_json(payload: &mut Value, expected_port: u16) {

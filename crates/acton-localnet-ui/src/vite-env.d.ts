@@ -3,6 +3,7 @@
 // eslint-disable-next-line functional/type-declaration-immutability
 interface ImportMetaEnv {
   readonly VITE_LOCALNET_HOST?: string
+  readonly VITE_LOCALNET_API_TOKEN?: string
   readonly VITE_LOCALNET_TONCENTER_API_KEY?: string
 }
 

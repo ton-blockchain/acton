@@ -24,6 +24,8 @@ interface TonClientOptions {
   readonly v2BaseUrl: string
   readonly v3BaseUrl: string
   readonly addressNameBaseUrl: string
+  readonly localnetApiToken?: string
+  readonly onUnauthorized?: () => void
   readonly toncenterApiKey?: string
 }
 
@@ -42,13 +44,24 @@ export class TonClient {
   private readonly v2BaseUrl: string
   private readonly v3BaseUrl: string
   private readonly addressNameBaseUrl: string
+  private readonly localnetApiToken: string | undefined
+  private readonly onUnauthorized: (() => void) | undefined
   private readonly toncenterApiKey: string | undefined
   private readonly pendingGetRequests = new Map<string, Promise<unknown>>()
 
-  constructor({v2BaseUrl, v3BaseUrl, addressNameBaseUrl, toncenterApiKey}: TonClientOptions) {
+  constructor({
+    v2BaseUrl,
+    v3BaseUrl,
+    addressNameBaseUrl,
+    localnetApiToken,
+    onUnauthorized,
+    toncenterApiKey,
+  }: TonClientOptions) {
     this.v2BaseUrl = v2BaseUrl
     this.v3BaseUrl = v3BaseUrl
     this.addressNameBaseUrl = addressNameBaseUrl
+    this.localnetApiToken = localnetApiToken?.trim() || undefined
+    this.onUnauthorized = onUnauthorized
     this.toncenterApiKey = toncenterApiKey?.trim() || undefined
   }
 
@@ -408,7 +421,7 @@ export class TonClient {
       const url = this.buildStreamingSseUrl()
       const response = await fetch(
         url.toString(),
-        this.withToncenterApiKey(url, {
+        this.withApiAuthHeaders(url, {
           method: "POST",
           headers: {
             Accept: "text/event-stream",
@@ -424,6 +437,9 @@ export class TonClient {
       )
 
       if (!response.ok) {
+        if (response.status === 401) {
+          this.onUnauthorized?.()
+        }
         const body = await response.text().catch(() => "")
         throw new Error(body || `Streaming subscription failed with status ${response.status}`)
       }
@@ -515,7 +531,10 @@ export class TonClient {
   }
 
   private async fetchRequest<T>(url: URL, errorMessage: string, options?: RequestInit): Promise<T> {
-    const response = await fetch(url.toString(), this.withToncenterApiKey(url, options))
+    const response = await fetch(url.toString(), this.withApiAuthHeaders(url, options))
+    if (response.status === 401) {
+      this.onUnauthorized?.()
+    }
     const raw = await this.parseResponseJson(response, errorMessage)
 
     if (this.isApiResponse<T>(raw)) {
@@ -593,20 +612,35 @@ export class TonClient {
     }
   }
 
-  private withToncenterApiKey(url: URL, options?: RequestInit): RequestInit | undefined {
-    if (!this.toncenterApiKey || !this.isToncenterApiUrl(url)) {
-      return options
+  private withApiAuthHeaders(url: URL, options?: RequestInit): RequestInit | undefined {
+    const headers = new Headers(options?.headers)
+    let changed = false
+
+    if (this.localnetApiToken && this.isLocalnetApiUrl(url)) {
+      headers.set("Authorization", `Bearer ${this.localnetApiToken}`)
+      changed = true
     }
 
-    const headers = new Headers(options?.headers)
-    headers.set("X-API-Key", this.toncenterApiKey)
-    return {...options, headers}
+    if (this.toncenterApiKey && this.isToncenterApiUrl(url)) {
+      headers.set("X-API-Key", this.toncenterApiKey)
+      changed = true
+    }
+
+    return changed ? {...options, headers} : options
   }
 
   private isToncenterApiUrl(url: URL): boolean {
     return (
       this.isUrlWithinBase(url, this.buildUrl(this.v2BaseUrl, "")) ||
       this.isUrlWithinBase(url, this.buildUrl(this.v3BaseUrl, ""))
+    )
+  }
+
+  private isLocalnetApiUrl(url: URL): boolean {
+    return (
+      this.isToncenterApiUrl(url) ||
+      this.isUrlWithinBase(url, this.buildUrl(this.addressNameBaseUrl, "")) ||
+      this.isUrlWithinBase(url, this.buildStreamingSseUrl())
     )
   }
 

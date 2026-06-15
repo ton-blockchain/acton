@@ -13,6 +13,8 @@ const SIDEBAR_COLLAPSED_STORAGE_KEY = "localnetSidebarCollapsed"
 
 interface DashboardPageProps {
   readonly client: TonClient
+  readonly localnetApiToken?: string
+  readonly onOpenAuthTokenOverlay: () => void
   readonly theme: ThemeMode
   readonly setTheme: (theme: ThemeMode) => void
   readonly children?: React.ReactNode
@@ -23,6 +25,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   children,
   client,
   embedded = false,
+  localnetApiToken,
+  onOpenAuthTokenOverlay,
   theme,
   setTheme,
 }) => {
@@ -164,6 +168,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         <div className={styles.sidebarViewport} onPointerLeave={hideSidebarPreview}>
           <DashboardNavigation
             client={client}
+            localnetApiToken={localnetApiToken}
+            onOpenAuthTokenOverlay={onOpenAuthTokenOverlay}
             theme={theme}
             setTheme={setTheme}
             onToggleSidebar={toggleSidebar}

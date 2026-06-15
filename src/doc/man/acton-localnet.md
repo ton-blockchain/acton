@@ -67,6 +67,11 @@ Load Localnet state from a JSON snapshot before startup.
 Dump Localnet state to a JSON snapshot on shutdown.
 {{/option}}
 
+{{#option "`--require-auth`" }}
+Require a token for all Localnet HTTP API, control, emulate, and streaming
+endpoints. The server prints the token on startup.
+{{/option}}
+
 {{/options}}
 
 `--load-state` and `--db-path` cannot be used together in the same run.
@@ -95,6 +100,11 @@ Amount of GRAM to request.
 Localnet server port.
 {{/option}}
 
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
 {{/options}}
 
 ### acton localnet status
@@ -115,6 +125,11 @@ Localnet server port.
 
 {{#option "`--json`" }}
 Print machine-readable JSON.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
 {{/options}}
@@ -151,6 +166,31 @@ Acton loads `.env` automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one-off overrides or CI.
 
+## Localnet API Auth
+
+`acton localnet start --require-auth` protects every Localnet HTTP route under
+`/api/*`, `/acton_*`, `/api/emulate/*`, and `/api/streaming/*`. Static UI files
+remain public, but the bundled UI does not receive the token from the server.
+When a protected API request returns `401`, the bundled UI shows a token overlay;
+paste the printed token there before using protected API views. The key button
+in the sidebar footer reopens the same overlay.
+
+When auth is enabled, the server prints a localnet API token. Pass it as either:
+
+```text
+Authorization: Bearer <TOKEN>
+X-API-Key: <TOKEN>
+```
+
+`Authorization: Bearer` is the preferred form. `X-API-Key` is accepted for
+TonCenter-compatible clients. Browser WebSocket clients can pass `token=<TOKEN>`
+only on `/api/streaming/v2/ws`.
+
+For CLI subcommands that call localnet control routes, pass `--auth-token` or
+set `ACTON_LOCALNET_AUTH_TOKEN`. If `ACTON_LOCALNET_AUTH_TOKEN` is set when
+starting with `--require-auth`, localnet uses that value; otherwise it generates
+and prints a fresh token.
+
 ## Runtime Model
 
 - fork mode allows local development against remote chain state
@@ -173,6 +213,8 @@ one-off overrides or CI.
 - the UI reads chain data from `/api/v2` and `/api/v3`, and uses `acton_*`
   control endpoints for local address aliases, registered compiler ABIs,
   status, and snapshot tooling
+- `--require-auth` protects read and write API routes, including read-only
+  streaming endpoints
 - when `--port` and `[localnet].port` are both absent, the current runtime
   fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
@@ -207,8 +249,10 @@ TonCenter-compatible message endpoints such as `/api/v2/sendBoc` and
 `/acton_sendInternalMessage` when local tooling needs to inject a raw internal
 message.
 
-Control endpoints are not authenticated and are intended only for local
-development. Do not expose the localnet server publicly.
+Control endpoints are unauthenticated by default for local development. Use
+`--require-auth` when another local process, browser page, or test harness should
+not be able to read or mutate the running localnet without the token. Do not
+expose the localnet server publicly.
 
 ## Persistence
 

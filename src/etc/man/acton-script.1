@@ -301,7 +301,17 @@ TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainne
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Broadcast a deploy flow and print explorer links:
+\h'-04' 5.\h'+01'Run against a protected localnet:
+.sp
+.RS 4
+.nf
+ACTON_LOCALNET_AUTH_TOKEN=localnet\-token acton script scripts/deploy.tolk \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Broadcast a deploy flow and print explorer links:
 .sp
 .RS 4
 .nf
@@ -311,7 +321,7 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Broadcast through TON Connect instead of local wallet keys:
+\h'-04' 7.\h'+01'Broadcast through TON Connect instead of local wallet keys:
 .sp
 .RS 4
 .nf
@@ -322,6 +332,9 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-tonconnect
 .SH "TONCENTER API KEYS"
 Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+Protected \fBlocalnet\fR requests read \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. Use the token
+printed by \fBacton localnet start \-\-require\-auth\fR\&.
 .sp
 For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
 names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so

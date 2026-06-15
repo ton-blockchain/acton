@@ -35,6 +35,7 @@ pub struct ServerState {
     pub shutdown: ShutdownSignal,
     pub network_conditions: NetworkConditions,
     pub api_calls: ApiCallLog,
+    pub auth_token: Option<Arc<str>>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -288,6 +289,7 @@ pub struct ServerArgs {
     pub rate_limit_rps: Option<u32>,
     pub response_delay_ms: Option<u64>,
     pub startup_wallets: Vec<StartupWallet>,
+    pub auth_token: Option<String>,
 }
 
 pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> anyhow::Result<()> {
@@ -299,7 +301,9 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> anyhow::Result
         rate_limit_rps,
         response_delay_ms,
         startup_wallets,
+        auth_token,
     } = args;
+    let auth_token = auth_token.map(Arc::<str>::from);
 
     seed_startup_wallet_names(&node, &startup_wallets).await?;
     let network_conditions = NetworkConditions::new(response_delay_ms);
@@ -323,6 +327,7 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> anyhow::Result
             shutdown: shutdown.clone(),
             network_conditions: network_conditions.clone(),
             api_calls,
+            auth_token: auth_token.clone(),
         },
         rate_limit_rps,
     );
@@ -333,6 +338,13 @@ pub async fn run_server(node: Arc<Localnet>, args: ServerArgs) -> anyhow::Result
         "    {} Localnet server and UI on http://{address}",
         "Starting".green().bold(),
     );
+    if let Some(token) = auth_token.as_deref() {
+        println!(
+            "        {} Localnet API token: {}",
+            "Auth".yellow().bold(),
+            token
+        );
+    }
     if let Some(fork_network) = fork_network {
         let fork_source = fork_block_number
             .map(|seqno| format!("{fork_network} at seqno {seqno}"))

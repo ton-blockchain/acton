@@ -5,6 +5,7 @@ use crate::wallets;
 use acton_config::color::OwoColorize;
 use acton_config::config::ActonConfig;
 use anyhow::Context;
+use rand::RngCore;
 use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -16,6 +17,7 @@ use ton_localnet::remote::RemoteProvider;
 use ton_localnet::storage::AccountStatus;
 use ton_localnet::{Localnet, ServerArgs, StartupWallet, run_server};
 use ton_retrace::Network;
+use toncenter_keys::LOCALNET_API_KEY_ENV;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{CellBuilder, CellSliceParts};
 use tycho_types::models::{
@@ -26,6 +28,7 @@ use tycho_types::models::{
 const STARTUP_ACCOUNT_TOPUP_NANOGRAMS: u128 = 100_000_000_000; // 100 GRAM
 const STARTUP_DEPLOY_TRANSFER_NANOGRAMS: u128 = 50_000_000; // 0.05 GRAM
 const WALLET_MSG_TTL_SECONDS: u64 = 600;
+pub(crate) const LOCALNET_AUTH_TOKEN_ENV: &str = LOCALNET_API_KEY_ENV;
 pub use status::localnet_status_cmd;
 
 #[allow(clippy::too_many_arguments)]
@@ -40,6 +43,7 @@ pub async fn localnet_start_cmd(
     block_interval_ms: u64,
     load_state: Option<String>,
     dump_state: Option<String>,
+    require_auth: bool,
 ) -> anyhow::Result<()> {
     if load_state.is_some() && db_path.is_some() {
         anyhow::bail!("--load-state cannot be used together with --db-path for now");
@@ -79,6 +83,7 @@ pub async fn localnet_start_cmd(
     }
 
     let startup_wallets = setup_startup_accounts(&node, &accounts).await?;
+    let auth_token = require_auth.then(localnet_auth_token);
     let run_result = run_server(
         node.clone(),
         ServerArgs {
@@ -89,6 +94,7 @@ pub async fn localnet_start_cmd(
             rate_limit_rps: rate_limit,
             response_delay_ms,
             startup_wallets,
+            auth_token,
         },
     )
     .await;
@@ -294,17 +300,20 @@ pub async fn localnet_airdrop_cmd(
     address: &str,
     amount_grams: f64,
     port: u16,
+    auth_token: Option<String>,
 ) -> anyhow::Result<()> {
     let client = crate::http::client_builder()
         .user_agent(crate::build_info::user_agent())
         .build()?;
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
-    let res = client
+    let auth_token = resolve_localnet_auth_token(auth_token);
+    let request = client
         .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
         .json(&serde_json::json!({
             "address": address,
             "amount": amount_nanograms
-        }))
+        }));
+    let res = with_localnet_auth(request, auth_token.as_deref())
         .send()
         .await
         .context("Failed to reach localnet faucet")?;
@@ -340,4 +349,42 @@ pub async fn localnet_airdrop_cmd(
     }
 
     Ok(())
+}
+
+fn localnet_auth_token() -> String {
+    localnet_auth_token_from_env().unwrap_or_else(generate_localnet_auth_token)
+}
+
+pub(crate) fn resolve_localnet_auth_token(auth_token: Option<String>) -> Option<String> {
+    auth_token
+        .and_then(|token| {
+            let token = token.trim().to_owned();
+            (!token.is_empty()).then_some(token)
+        })
+        .or_else(localnet_auth_token_from_env)
+}
+
+fn localnet_auth_token_from_env() -> Option<String> {
+    std::env::var(LOCALNET_AUTH_TOKEN_ENV)
+        .ok()
+        .and_then(|token| {
+            let token = token.trim().to_owned();
+            (!token.is_empty()).then_some(token)
+        })
+}
+
+fn generate_localnet_auth_token() -> String {
+    let mut bytes = [0_u8; 32];
+    rand::rngs::OsRng.fill_bytes(&mut bytes);
+    hex::encode(bytes)
+}
+
+pub(crate) fn with_localnet_auth(
+    request: reqwest::RequestBuilder,
+    auth_token: Option<&str>,
+) -> reqwest::RequestBuilder {
+    match auth_token.map(str::trim).filter(|token| !token.is_empty()) {
+        Some(token) => request.bearer_auth(token),
+        None => request,
+    }
 }

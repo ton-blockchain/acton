@@ -220,6 +220,7 @@ tasm-core = { workspace = true }
 ton-api = { workspace = true }
 ton-retrace = { workspace = true }
 ton-source-map = { workspace = true }
+toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
 ton-indexer = { workspace = true }

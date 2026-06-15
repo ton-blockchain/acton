@@ -588,13 +588,16 @@ fn perform_localnet_airdrop(
         .build()
         .context("Failed to build HTTP client")?;
     let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
-    let initial_balance = fetch_localnet_account_balance(&client, port, &address);
-    let response = client
+    let auth_token = crate::commands::localnet::resolve_localnet_auth_token(None);
+    let initial_balance =
+        fetch_localnet_account_balance(&client, port, &address, auth_token.as_deref());
+    let request = client
         .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
         .json(&serde_json::json!({
             "address": address,
             "amount": amount_nanograms,
-        }))
+        }));
+    let response = with_localnet_blocking_auth(request, auth_token.as_deref())
         .send()
         .context(
             "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
@@ -616,7 +619,13 @@ fn perform_localnet_airdrop(
             let expected_balance = initial_balance
                 .context("Failed to read localnet balance before faucet request")?
                 .saturating_add(amount_nanograms);
-            wait_for_localnet_airdrop_balance(&client, port, &address, expected_balance)?;
+            wait_for_localnet_airdrop_balance(
+                &client,
+                port,
+                &address,
+                expected_balance,
+                auth_token.as_deref(),
+            )?;
             let message = format!("Successfully airdropped {amount_grams} GRAM on localnet");
             Ok(AirdropResult {
                 address,
@@ -643,12 +652,14 @@ fn fetch_localnet_account_balance(
     client: &reqwest::blocking::Client,
     port: u16,
     address: &str,
+    auth_token: Option<&str>,
 ) -> anyhow::Result<u128> {
-    let response: serde_json::Value = client
+    let request = client
         .get(format!(
             "http://127.0.0.1:{port}/api/v2/getAddressInformation"
         ))
-        .query(&[("address", address)])
+        .query(&[("address", address)]);
+    let response: serde_json::Value = with_localnet_blocking_auth(request, auth_token)
         .send()
         .context("Failed to query localnet account balance")?
         .json()
@@ -667,10 +678,11 @@ fn wait_for_localnet_airdrop_balance(
     port: u16,
     address: &str,
     expected_balance: u128,
+    auth_token: Option<&str>,
 ) -> anyhow::Result<()> {
     let deadline = Instant::now() + Duration::from_secs(12);
     loop {
-        if fetch_localnet_account_balance(client, port, address).unwrap_or_default()
+        if fetch_localnet_account_balance(client, port, address, auth_token).unwrap_or_default()
             >= expected_balance
         {
             return Ok(());
@@ -680,6 +692,16 @@ fn wait_for_localnet_airdrop_balance(
             anyhow::bail!("Timed out waiting for localnet airdrop balance");
         }
         std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn with_localnet_blocking_auth(
+    request: reqwest::blocking::RequestBuilder,
+    auth_token: Option<&str>,
+) -> reqwest::blocking::RequestBuilder {
+    match auth_token.map(str::trim).filter(|token| !token.is_empty()) {
+        Some(token) => request.bearer_auth(token),
+        None => request,
     }
 }
 

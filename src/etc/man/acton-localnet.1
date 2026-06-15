@@ -67,6 +67,12 @@ Load Localnet state from a JSON snapshot before startup.
 Dump Localnet state to a JSON snapshot on shutdown.
 .RE
 .sp
+\fB\-\-require\-auth\fR
+.RS 4
+Require a token for all Localnet HTTP API, control, emulate, and streaming
+endpoints. The server prints the token on startup.
+.RE
+.sp
 \fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
 .SS "acton localnet airdrop"
 Send GRAM from the local faucet to an address.
@@ -88,6 +94,12 @@ Amount of GRAM to request.
 .RS 4
 Localnet server port.
 .RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
 .SS "acton localnet status"
 Inspect the current localnet status.
 .SS "Synopsis"
@@ -102,6 +114,12 @@ Localnet server port.
 \fB\-\-json\fR
 .RS 4
 Print machine\-readable JSON.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SH "CONFIGURATION"
 You can store defaults in \fBActon.toml\fR:
@@ -133,6 +151,31 @@ becomes \fBMOCK_REMOTE_API_KEY\fR\&.
 Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.
+.SH "LOCALNET API AUTH"
+\fBacton localnet start \-\-require\-auth\fR protects every Localnet HTTP route under
+\fB/api/*\fR, \fB/acton_*\fR, \fB/api/emulate/*\fR, and \fB/api/streaming/*\fR\&. Static UI files
+remain public, but the bundled UI does not receive the token from the server.
+When a protected API request returns \fB401\fR, the bundled UI shows a token overlay;
+paste the printed token there before using protected API views. The key button
+in the sidebar footer reopens the same overlay.
+.sp
+When auth is enabled, the server prints a localnet API token. Pass it as either:
+.sp
+.RS 4
+.nf
+Authorization: Bearer <TOKEN>
+X\-API\-Key: <TOKEN>
+.fi
+.RE
+.sp
+\fBAuthorization: Bearer\fR is the preferred form. \fBX\-API\-Key\fR is accepted for
+TonCenter\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
+only on \fB/api/streaming/v2/ws\fR\&.
+.sp
+For CLI subcommands that call localnet control routes, pass \fB\-\-auth\-token\fR or
+set \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. If \fBACTON_LOCALNET_AUTH_TOKEN\fR is set when
+starting with \fB\-\-require\-auth\fR, localnet uses that value; otherwise it generates
+and prints a fresh token.
 .SH "RUNTIME MODEL"
 .sp
 .RS 4
@@ -183,6 +226,11 @@ the same frontend shell
 \h'-04'\(bu\h'+03'the UI reads chain data from \fB/api/v2\fR and \fB/api/v3\fR, and uses \fBacton_*\fR
 control endpoints for local address aliases, registered compiler ABIs,
 status, and snapshot tooling
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-require\-auth\fR protects read and write API routes, including read\-only
+streaming endpoints
 .RE
 .sp
 .RS 4
@@ -248,8 +296,10 @@ TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
 \fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
 message.
 .sp
-Control endpoints are not authenticated and are intended only for local
-development. Do not expose the localnet server publicly.
+Control endpoints are unauthenticated by default for local development. Use
+\fB\-\-require\-auth\fR when another local process, browser page, or test harness should
+not be able to read or mutate the running localnet without the token. Do not
+expose the localnet server publicly.
 .SH "PERSISTENCE"
 .sp
 .RS 4

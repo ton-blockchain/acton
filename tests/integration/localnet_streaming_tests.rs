@@ -182,6 +182,42 @@ fn localnet_supports_streaming_v2_websocket() {
     node.stop();
 }
 
+#[test]
+fn localnet_require_auth_allows_websocket_query_token() {
+    let project = ProjectBuilder::new("localnet-streaming-v2-websocket-auth").build();
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let mut ws = connect_localnet_websocket_path(
+        node.port(),
+        &format!("/api/streaming/v2/ws?token={token}"),
+    );
+
+    write_ws_text(
+        &mut ws,
+        &json!({
+            "id": "ping-auth",
+            "operation": "ping"
+        })
+        .to_string(),
+    );
+    let pong = read_ws_json(&mut ws);
+
+    let summary = json!({
+        "pong": {
+            "id": pong["id"],
+            "status": pong["status"],
+        },
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_streaming_v2_websocket_auth.summary.json"),
+    );
+
+    node.stop();
+}
+
 fn read_sse_json_events(response: &mut Response, expected: usize, timeout: Duration) -> Vec<Value> {
     let deadline = Instant::now() + timeout;
     let mut buffer = Vec::new();
@@ -233,6 +269,10 @@ fn parse_sse_frame(frame: &[u8]) -> Option<Value> {
 }
 
 fn connect_localnet_websocket(port: u16) -> TcpStream {
+    connect_localnet_websocket_path(port, "/api/streaming/v2/ws")
+}
+
+fn connect_localnet_websocket_path(port: u16, path: &str) -> TcpStream {
     let mut stream =
         TcpStream::connect(("127.0.0.1", port)).expect("Failed to connect websocket TCP stream");
     stream
@@ -245,7 +285,7 @@ fn connect_localnet_websocket(port: u16) -> TcpStream {
     let key = base64::engine::general_purpose::STANDARD.encode([7_u8; 16]);
     write!(
         stream,
-        "GET /api/streaming/v2/ws HTTP/1.1\r\n\
+        "GET {path} HTTP/1.1\r\n\
          Host: 127.0.0.1:{port}\r\n\
          Upgrade: websocket\r\n\
          Connection: Upgrade\r\n\

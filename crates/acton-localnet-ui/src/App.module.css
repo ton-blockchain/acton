@@ -20,3 +20,223 @@
   background: var(--litenode-bg);
   font-size: 0.92rem;
 }
+
+.authOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.authBackdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: var(--litenode-overlay);
+  backdrop-filter: blur(3px);
+  cursor: default;
+}
+
+.authPanel {
+  position: relative;
+  z-index: 1;
+  width: min(440px, calc(100vw - 32px));
+  padding: 18px;
+  border: 1px solid var(--litenode-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--litenode-surface) 92%, transparent);
+  color: var(--litenode-text);
+  box-shadow: var(--litenode-shadow-popover);
+  backdrop-filter: blur(18px);
+}
+
+.authHeader {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.authIcon {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: var(--litenode-surface-raised);
+  color: var(--litenode-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--litenode-inset-highlight);
+}
+
+.authTitleBlock {
+  min-width: 0;
+}
+
+.authTitle {
+  margin: 1px 0 0;
+  color: var(--litenode-text-strong);
+  font-size: 1.02rem;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: 0;
+}
+
+.authDescription {
+  margin: 7px 0 0;
+  color: var(--litenode-text-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.authCloseButton {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--litenode-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.authCloseButton:hover {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-surface-hover);
+  color: var(--litenode-text);
+}
+
+.authForm {
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.authLabel {
+  color: var(--litenode-text-subtle);
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+
+.authInputFrame {
+  height: 42px;
+  min-width: 0;
+  padding: 0 11px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text-faint);
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  box-shadow: var(--litenode-inset-highlight);
+}
+
+.authInputFrame:focus-within {
+  border-color: var(--litenode-border-strong);
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.authInput {
+  min-width: 0;
+  flex: 1 1 auto;
+  border: 0;
+  outline: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--litenode-text);
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.authInput::placeholder {
+  color: var(--litenode-text-soft);
+}
+
+.authActions {
+  margin-top: 5px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.authActionButton {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 10px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text-subtle);
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.authActionButton:hover:not(:disabled) {
+  border-color: var(--litenode-border-strong);
+  background: var(--litenode-surface-hover);
+  color: var(--litenode-text);
+}
+
+.authActionButton:focus-visible,
+.authCloseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.authActionButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.authPrimaryButton {
+  border-color: var(--litenode-primary);
+  background: var(--litenode-primary);
+  color: var(--litenode-primary-foreground);
+}
+
+.authPrimaryButton:hover:not(:disabled) {
+  border-color: var(--litenode-primary-hover);
+  background: var(--litenode-primary-hover);
+  color: var(--litenode-primary-foreground);
+}
+
+@media (max-width: 520px) {
+  .authOverlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .authPanel {
+    width: 100%;
+  }
+
+  .authActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}

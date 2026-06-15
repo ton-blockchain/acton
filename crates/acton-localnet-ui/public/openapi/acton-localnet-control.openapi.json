@@ -3,7 +3,7 @@
   "info": {
     "title": "Acton Localnet Control API",
     "version": "1.0.0",
-    "description": "Local development control endpoints exposed by the Acton localnet server. These routes are intended for local tooling and are not authenticated."
+    "description": "Local development control endpoints exposed by the Acton localnet server. These routes are intended for local tooling. When localnet is started with --require-auth, pass the printed token as Authorization: Bearer <token> or X-API-Key: <token>."
   },
   "servers": [
     {
@@ -14,7 +14,15 @@
   "tags": [
     {
       "name": "Localnet Control",
-      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling, are not authenticated, and should not be exposed publicly. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "APIKeyHeader": []
     }
   ],
   "paths": {
@@ -298,6 +306,19 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Localnet API token printed by `acton localnet start --require-auth`."
+      },
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Alternative localnet API token header for TonCenter-compatible clients."
+      }
+    },
     "parameters": {
       "AddressQuery": {
         "name": "address",

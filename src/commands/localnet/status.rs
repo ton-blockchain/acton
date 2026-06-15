@@ -29,7 +29,11 @@ struct LocalnetStatusResult {
     fork_block_number: Option<u64>,
 }
 
-pub async fn localnet_status_cmd(port: u16, json: bool) -> anyhow::Result<()> {
+pub async fn localnet_status_cmd(
+    port: u16,
+    json: bool,
+    auth_token: Option<String>,
+) -> anyhow::Result<()> {
     let client = crate::http::client_builder()
         .user_agent(crate::build_info::user_agent())
         .build()?;
@@ -42,8 +46,9 @@ pub async fn localnet_status_cmd(port: u16, json: bool) -> anyhow::Result<()> {
         fork_network: None,
         fork_block_number: None,
     };
-    let output = match client
-        .get(format!("http://127.0.0.1:{port}/acton_nodeInfo"))
+    let auth_token = super::resolve_localnet_auth_token(auth_token);
+    let request = client.get(format!("http://127.0.0.1:{port}/acton_nodeInfo"));
+    let output = match super::with_localnet_auth(request, auth_token.as_deref())
         .send()
         .await
     {

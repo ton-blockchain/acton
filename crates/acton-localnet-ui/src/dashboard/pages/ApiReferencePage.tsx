@@ -9,6 +9,8 @@ type ApiReferenceVersion = "control" | "v2" | "v3"
 
 interface ApiReferencePageProps {
   readonly apiBaseUrl: string
+  readonly localnetApiToken?: string
+  readonly onUnauthorized: () => void
   readonly theme: string
   readonly toncenterApiKey?: string
   readonly version: ApiReferenceVersion
@@ -41,6 +43,8 @@ const apiReferences: Record<
 
 export const ApiReferencePage: React.FC<ApiReferencePageProps> = ({
   apiBaseUrl,
+  localnetApiToken,
+  onUnauthorized,
   theme,
   toncenterApiKey,
   version,
@@ -48,9 +52,9 @@ export const ApiReferencePage: React.FC<ApiReferencePageProps> = ({
   const reference = apiReferences[version]
   const localnetOrigin = React.useMemo(() => apiOrigin(apiBaseUrl), [apiBaseUrl])
   const syncReferenceAnchor = useApiReferenceAnchorSync(reference.slug)
-  const toncenterFetch = React.useMemo(
-    () => createToncenterApiFetch(apiBaseUrl, toncenterApiKey),
-    [apiBaseUrl, toncenterApiKey],
+  const apiReferenceFetch = React.useMemo(
+    () => createApiReferenceFetch(apiBaseUrl, localnetApiToken, toncenterApiKey, onUnauthorized),
+    [apiBaseUrl, localnetApiToken, onUnauthorized, toncenterApiKey],
   )
   const configuration = React.useMemo<AnyApiReferenceConfiguration>(
     () => ({
@@ -81,8 +85,8 @@ export const ApiReferencePage: React.FC<ApiReferencePageProps> = ({
         targetKey: "shell",
         clientKey: "curl",
       },
-      fetch: toncenterFetch,
-      customFetch: toncenterFetch,
+      fetch: apiReferenceFetch,
+      customFetch: apiReferenceFetch,
       darkMode: theme === "dark",
       documentDownloadType: "json",
       forceDarkModeState: theme === "dark" ? "dark" : "light",
@@ -228,7 +232,7 @@ export const ApiReferencePage: React.FC<ApiReferencePageProps> = ({
         }
       `,
     }),
-    [localnetOrigin, reference, syncReferenceAnchor, theme, toncenterApiKey, toncenterFetch],
+    [apiReferenceFetch, localnetOrigin, reference, syncReferenceAnchor, theme, toncenterApiKey],
   )
 
   return (
@@ -311,14 +315,14 @@ function decodeHashPath(hashPath: string): string {
   }
 }
 
-function createToncenterApiFetch(
+function createApiReferenceFetch(
   apiBaseUrl: string,
+  localnetApiToken: string | undefined,
   apiKey: string | undefined,
-): typeof fetch | undefined {
+  onUnauthorized: () => void,
+): typeof fetch {
+  const localnetToken = localnetApiToken?.trim()
   const toncenterApiKey = apiKey?.trim()
-  if (!toncenterApiKey) {
-    return undefined
-  }
 
   const baseUrl = new URL(apiBaseUrl, globalThis.location.origin)
   return (input, init) => {
@@ -330,11 +334,21 @@ function createToncenterApiFetch(
     const headers = new Headers(
       init?.headers ?? (input instanceof Request ? input.headers : undefined),
     )
-    headers.set("X-API-Key", toncenterApiKey)
+    if (localnetToken) {
+      headers.set("Authorization", `Bearer ${localnetToken}`)
+    }
+    if (toncenterApiKey) {
+      headers.set("X-API-Key", toncenterApiKey)
+    }
     const requestInit = {...init, headers}
-    return input instanceof Request
-      ? fetch(new Request(input, requestInit))
-      : fetch(input, requestInit)
+    const responsePromise =
+      input instanceof Request ? fetch(new Request(input, requestInit)) : fetch(input, requestInit)
+    return responsePromise.then(response => {
+      if (response.status === 401) {
+        onUnauthorized()
+      }
+      return response
+    })
   }
 }
 

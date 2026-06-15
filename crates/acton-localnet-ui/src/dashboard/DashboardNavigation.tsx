@@ -3,6 +3,7 @@ import {
   BookOpen,
   Boxes,
   Braces,
+  Check,
   FileJson,
   Github,
   Image,
@@ -31,6 +32,8 @@ import styles from "./DashboardPage.module.css"
 
 interface DashboardNavigationProps {
   readonly client: TonClient
+  readonly localnetApiToken?: string
+  readonly onOpenAuthTokenOverlay: () => void
   readonly theme: ThemeMode
   readonly setTheme: (theme: ThemeMode) => void
   readonly onToggleSidebar?: () => void
@@ -77,6 +80,8 @@ const footerItems: SidebarItem[] = [
 
 export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
   client,
+  localnetApiToken,
+  onOpenAuthTokenOverlay,
   theme,
   setTheme,
   onToggleSidebar,
@@ -255,6 +260,26 @@ export const DashboardNavigation: React.FC<DashboardNavigationProps> = ({
                     )}
                   </button>
                 )}
+
+                <button
+                  type="button"
+                  className={`${styles.sidebarUtilityButton} ${
+                    localnetApiToken ? styles.sidebarUtilityButtonActive : ""
+                  }`}
+                  onClick={() => {
+                    onOpenAuthTokenOverlay()
+                    closeMobileMenu()
+                  }}
+                  title={localnetApiToken ? "Localnet API token set" : "Set localnet API token"}
+                  aria-label={
+                    localnetApiToken ? "Edit localnet API token" : "Set localnet API token"
+                  }
+                >
+                  <KeyRound size={18} />
+                  {localnetApiToken ? (
+                    <Check size={12} className={styles.utilityStatusIcon} />
+                  ) : null}
+                </button>
 
                 <ThemeSwitch
                   theme={theme}

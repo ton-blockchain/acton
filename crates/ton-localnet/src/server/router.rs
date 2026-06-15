@@ -21,7 +21,7 @@ use crate::server::{
 use axum::{
     Json, Router,
     extract::Request,
-    http::{HeaderValue, Method, StatusCode, request::Parts},
+    http::{HeaderValue, Method, StatusCode, header, request::Parts},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -29,6 +29,8 @@ use axum::{
 #[cfg(not(debug_assertions))]
 use include_dir::{Dir, include_dir};
 use serde_json::{Value, json};
+#[cfg(debug_assertions)]
+use std::fs;
 #[cfg(debug_assertions)]
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -39,8 +41,6 @@ use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-#[cfg(debug_assertions)]
-use tower_http::services::{ServeDir, ServeFile};
 use tower_http::trace::TraceLayer;
 
 #[cfg(not(debug_assertions))]
@@ -166,26 +166,19 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         record_api_call(request, next, api_calls_for_api.clone())
     }));
 
+    let mut protected_router = Router::new().nest("/api", api_router).merge(acton_router);
+    if let Some(auth_token) = state.auth_token.clone() {
+        protected_router = protected_router.layer(middleware::from_fn(move |request, next| {
+            require_auth(request, next, auth_token.clone())
+        }));
+    }
+
     let app = Router::new()
-        .nest("/api", api_router)
-        .merge(acton_router)
+        .merge(protected_router)
+        .fallback(handle_embedded_ui)
         .layer(loopback_cors())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
-
-    #[cfg(debug_assertions)]
-    let app = {
-        let dist_path = PathBuf::from(concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../acton-localnet-ui/dist"
-        ));
-        app.fallback_service(
-            ServeDir::new(&dist_path).fallback(ServeFile::new(dist_path.join("index.html"))),
-        )
-    };
-
-    #[cfg(not(debug_assertions))]
-    let app = app.fallback(handle_embedded_ui);
 
     app.layer(CompressionLayer::new())
 }
@@ -197,6 +190,62 @@ async fn delay_response(request: Request, next: Next, conditions: NetworkConditi
         sleep(Duration::from_millis(delay_ms)).await;
     }
     response
+}
+
+async fn require_auth(request: Request, next: Next, auth_token: Arc<str>) -> Response {
+    if request.method() == Method::OPTIONS || request_has_valid_auth(&request, &auth_token) {
+        return next.run(request).await;
+    }
+
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(json!({
+            "ok": false,
+            "error": "Unauthorized: missing or invalid localnet API token",
+            "code": 401,
+            "@extra": get_extra()
+        })),
+    )
+        .into_response()
+}
+
+fn request_has_valid_auth(request: &Request, auth_token: &str) -> bool {
+    bearer_token_matches(request, auth_token)
+        || api_key_matches(request, auth_token)
+        || websocket_query_token_matches(request, auth_token)
+}
+
+fn bearer_token_matches(request: &Request, auth_token: &str) -> bool {
+    request
+        .headers()
+        .get(header::AUTHORIZATION)
+        .and_then(|value| value.to_str().ok())
+        .and_then(|value| value.strip_prefix("Bearer "))
+        == Some(auth_token)
+}
+
+fn api_key_matches(request: &Request, auth_token: &str) -> bool {
+    request
+        .headers()
+        .get("x-api-key")
+        .and_then(|value| value.to_str().ok())
+        == Some(auth_token)
+}
+
+fn websocket_query_token_matches(request: &Request, auth_token: &str) -> bool {
+    let path = request
+        .uri()
+        .path()
+        .strip_prefix("/api")
+        .unwrap_or_else(|| request.uri().path());
+    if path != "/streaming/v2/ws" {
+        return false;
+    }
+
+    request.uri().query().is_some_and(|query| {
+        url::form_urlencoded::parse(query.as_bytes())
+            .any(|(key, value)| key == "token" && value == auth_token)
+    })
 }
 
 async fn record_api_call(request: Request, next: Next, api_calls: ApiCallLog) -> Response {
@@ -383,27 +432,50 @@ fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -
     }
 }
 
-#[cfg(not(debug_assertions))]
-async fn handle_embedded_ui(uri: axum::http::Uri) -> impl IntoResponse {
+async fn handle_embedded_ui(uri: axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() { "index.html" } else { path };
 
-    if let Some(file) = UI_DIR.get_file(path) {
-        let content_type = match path.split('.').next_back() {
-            Some("html") => "text/html",
-            Some("js") => "application/javascript",
-            Some("css") => "text/css",
-            Some("svg") => "image/svg+xml",
-            Some("png") => "image/png",
-            Some("json") => "application/json",
-            _ => "application/octet-stream",
-        };
-        return (([("content-type", content_type)]), file.contents()).into_response();
+    if let Some(contents) = load_ui_file(path) {
+        return (([("content-type", ui_content_type(path))]), contents).into_response();
     }
 
-    if let Some(index) = UI_DIR.get_file("index.html") {
-        return (([("content-type", "text/html")]), index.contents()).into_response();
+    if let Some(index) = load_ui_file("index.html") {
+        return (([("content-type", "text/html")]), index).into_response();
     }
 
     StatusCode::NOT_FOUND.into_response()
+}
+
+fn ui_content_type(path: &str) -> &'static str {
+    match path.split('.').next_back() {
+        Some("html") => "text/html",
+        Some("js") => "application/javascript",
+        Some("css") => "text/css",
+        Some("svg") => "image/svg+xml",
+        Some("png") => "image/png",
+        Some("json") => "application/json",
+        _ => "application/octet-stream",
+    }
+}
+
+#[cfg(debug_assertions)]
+fn load_ui_file(path: &str) -> Option<Vec<u8>> {
+    if path.contains("..") {
+        return None;
+    }
+    let dist_path = PathBuf::from(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../acton-localnet-ui/dist"
+    ));
+    let file_path = dist_path.join(path);
+    if !file_path.is_file() {
+        return None;
+    }
+    fs::read(file_path).ok()
+}
+
+#[cfg(not(debug_assertions))]
+fn load_ui_file(path: &str) -> Option<Vec<u8>> {
+    UI_DIR.get_file(path).map(|file| file.contents().to_vec())
 }

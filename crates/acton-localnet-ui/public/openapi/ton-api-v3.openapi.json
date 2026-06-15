@@ -2,7 +2,7 @@
   "schemes": [],
   "swagger": "2.0",
   "info": {
-    "description": "TON Index collects data from a full node to PostgreSQL database and provides convenient API to an indexed blockchain.\n\nThis bundled reference is derived from the official TonCenter v3 OpenAPI document and filtered to endpoints implemented by Acton localnet.",
+    "description": "TON Index collects data from a full node to PostgreSQL database and provides convenient API to an indexed blockchain.\n\nWhen Acton localnet is started with --require-auth, pass the printed localnet API token as `X-API-Key` or `Authorization: Bearer <token>`.\n\nThis bundled reference is derived from the official TonCenter v3 OpenAPI document and filtered to endpoints implemented by Acton localnet.",
     "title": "Acton Localnet TonCenter API v3",
     "contact": {},
     "version": "1.2.6"

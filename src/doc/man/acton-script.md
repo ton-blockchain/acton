@@ -245,13 +245,19 @@ When a script can affect on-chain state, the usual safe sequence is:
    TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
    ```
 
-5. Broadcast a deploy flow and print explorer links:
+5. Run against a protected localnet:
+
+   ```bash
+   ACTON_LOCALNET_AUTH_TOKEN=localnet-token acton script scripts/deploy.tolk --net localnet
+   ```
+
+6. Broadcast a deploy flow and print explorer links:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --explorer tonscan
    ```
 
-6. Broadcast through TON Connect instead of local wallet keys:
+7. Broadcast through TON Connect instead of local wallet keys:
 
    ```bash
    acton script scripts/deploy.tolk --net testnet --tonconnect
@@ -261,6 +267,9 @@ When a script can affect on-chain state, the usual safe sequence is:
 
 Built-in `mainnet`/`testnet` requests read `TONCENTER_MAINNET_API_KEY` or
 `TONCENTER_TESTNET_API_KEY`, depending on the selected network.
+
+Protected `localnet` requests read `ACTON_LOCALNET_AUTH_TOKEN`. Use the token
+printed by `acton localnet start --require-auth`.
 
 For `custom:<name>`, Acton reads `<NORMALIZED_NAME>_API_KEY`. Custom network
 names are uppercased and non-alphanumeric characters are replaced with `_`, so

@@ -4510,6 +4510,41 @@ fn test_script_wait_for_first_transaction_returns_root_on_localnet() {
 }
 
 #[test]
+fn test_script_uses_localnet_auth_token_env() {
+    let project = build_localnet_wait_project(
+        "script-localnet-auth-token-env",
+        "wait_for_first_transaction",
+        WAIT_FOR_FIRST_TRANSACTION_SCRIPT,
+    );
+
+    write_localnet_wallet_config(&project, "deployer");
+
+    let node = project
+        .localnet()
+        .require_auth()
+        .args(["--accounts", "deployer"])
+        .start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    append_localnet_network(project.path(), &node.base_url());
+
+    let output = project
+        .acton()
+        .script("scripts/wait_for_first_transaction.tolk")
+        .verify_network("localnet")
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/script/test_script_uses_localnet_auth_token_env.stdout.txt",
+    );
+
+    node.stop();
+}
+
+#[test]
 fn test_script_unfunded_wallet_wait_for_first_transaction_repro_on_localnet() {
     let project = ProjectBuilder::new("script-unfunded-wallet-wait-localnet")
         .script_file(

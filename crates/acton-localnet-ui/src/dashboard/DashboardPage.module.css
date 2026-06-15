@@ -644,6 +644,52 @@
   box-shadow: 0 0 0 2px var(--litenode-focus);
 }
 
+.sidebarUtilityButton {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--litenode-text-subtle);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.sidebarUtilityButton:hover {
+  background: var(--litenode-surface-hover);
+  color: var(--litenode-text);
+}
+
+.sidebarUtilityButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.sidebarUtilityButtonActive {
+  color: var(--litenode-text);
+}
+
+.utilityStatusIcon {
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 12px;
+  height: 12px;
+  padding: 1px;
+  border-radius: 999px;
+  background: var(--litenode-primary);
+  color: var(--litenode-primary-foreground);
+}
+
 .navItem {
   width: 100%;
   min-height: 36px;
