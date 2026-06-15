@@ -575,7 +575,7 @@ fn localnet_records_api_calls_for_dashboard() {
     });
 
     assertion().eq(
-        pretty_json_for_snapshot(&snapshot, project.path()),
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
         snapbox::file!("snapshots/localnet/test_localnet_api_calls_dashboard.response.json"),
     );
 
@@ -3873,8 +3873,8 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         Duration::from_secs(12),
     );
     let abi_payload = response_payload(&abi_response);
-    let abi = &abi_payload[&code_hash_hex];
-    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH];
+    let abi = &abi_payload[&code_hash_hex]["compiler_abi"];
+    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH]["compiler_abi"];
 
     let register_override_response = node.post_json(
         "/acton_registerCompilerAbis",
@@ -3918,6 +3918,7 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
                 .any(|method| method["name"].as_str() == Some("seqno"))
         }),
         "local_registration_overrides_catalog": override_payload[CATALOG_WALLET_V4R2_CODE_HASH]
+            ["compiler_abi"]
             ["contract_name"]
             .as_str()
             == Some("LocalOverride"),
@@ -4828,6 +4829,9 @@ fn normalize_api_calls_for_snapshot(response: &mut Value) {
             }
             if let Some(duration_ms) = call.get_mut("duration_ms") {
                 *duration_ms = json!("[DURATION_MS]");
+            }
+            if let Some(duration_ns) = call.get_mut("duration_ns") {
+                *duration_ns = json!("[DURATION_NS]");
             }
         }
     }

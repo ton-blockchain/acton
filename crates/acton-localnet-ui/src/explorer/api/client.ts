@@ -18,6 +18,7 @@ import type {
   V3RunGetMethodStackEntry,
   V3TracesResponse,
   V3TransactionsResponse,
+  VerificationSourceResponse,
 } from "./types"
 
 interface TonClientOptions {
@@ -345,6 +346,20 @@ export class TonClient {
       url,
       "Failed to fetch compiler ABI",
     )
+  }
+
+  async getVerifiedSource(options: {
+    readonly address?: string
+    readonly codeHash?: string
+  }): Promise<VerificationSourceResponse> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getVerifiedSource")
+    if (options.address) {
+      url.searchParams.append("address", options.address)
+    }
+    if (options.codeHash) {
+      url.searchParams.append("code_hash", options.codeHash)
+    }
+    return this.request<VerificationSourceResponse>(url, "Failed to fetch verified source")
   }
 
   async getNodeInfo(): Promise<LocalnetNodeInfo> {

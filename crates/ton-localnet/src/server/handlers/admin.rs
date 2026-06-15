@@ -2,8 +2,9 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
 use crate::server::models::{
-    FaucetRequest, GetApiCallsRequest, RegisterCompilerAbisRequest, SendBocRequest,
-    SetAddressNameRequest, SetNetworkConditionsRequest, SetShardAccountRequest, StatePathRequest,
+    FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest, RegisterCompilerAbisRequest,
+    SendBocRequest, SetAddressNameRequest, SetNetworkConditionsRequest, SetShardAccountRequest,
+    StatePathRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
@@ -18,6 +19,10 @@ use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
+use std::time::Duration;
+
+const VERIFIER_SOURCE_URL: &str = "https://verifier.acton.monster/api/v1/verification/source";
+const VERIFIER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 
 pub async fn faucet(
     State(node): State<Arc<Localnet>>,
@@ -195,6 +200,53 @@ pub async fn get_compiler_abi(
             .unwrap_or(Value::Null)
     })
     .await
+}
+
+pub async fn get_verified_source(Query(payload): Query<GetVerifiedSourceRequest>) -> Json<Value> {
+    handle_result(fetch_verified_source(payload), Clone::clone).await
+}
+
+async fn fetch_verified_source(payload: GetVerifiedSourceRequest) -> anyhow::Result<Value> {
+    let address = non_empty_text(payload.address);
+    let code_hash = non_empty_text(payload.code_hash);
+    if address.is_none() && code_hash.is_none() {
+        anyhow::bail!("Provide address or code_hash");
+    }
+
+    let mut url = reqwest::Url::parse(VERIFIER_SOURCE_URL)?;
+    {
+        let mut query = url.query_pairs_mut();
+        if let Some(address) = address {
+            query.append_pair("address", &address);
+        }
+        if let Some(code_hash) = code_hash {
+            query.append_pair("code_hash", &code_hash);
+        }
+    }
+
+    let response = reqwest::Client::builder()
+        .timeout(VERIFIER_REQUEST_TIMEOUT)
+        .build()?
+        .get(url)
+        .send()
+        .await?;
+    let status = response.status();
+    let body = response.text().await?;
+    let value = serde_json::from_str::<Value>(&body).unwrap_or(Value::String(body));
+
+    if !status.is_success() {
+        let message = value.get("error").and_then(Value::as_str).map_or_else(
+            || format!("Verifier request failed with status {status}"),
+            ToOwned::to_owned,
+        );
+        anyhow::bail!("{message}");
+    }
+
+    Ok(value)
+}
+
+fn non_empty_text(value: Option<String>) -> Option<String> {
+    value.filter(|value| !value.trim().is_empty())
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {

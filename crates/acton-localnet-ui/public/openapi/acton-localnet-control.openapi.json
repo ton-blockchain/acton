@@ -116,6 +116,37 @@
         }
       }
     },
+    "/acton_getVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getVerifiedSource",
+        "summary": "Get verified contract source",
+        "description": "Proxies Acton verifier source lookup by address or code hash and returns verified source bundles when the contract is confirmed.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
     "/acton_registerCompilerAbis": {
       "post": {
         "tags": ["Localnet Control"],
@@ -473,6 +504,28 @@
           }
         }
       },
+      "VerifiedSourceResponse": {
+        "description": "Successful wrapped response with source bundles returned by the Acton verifier.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/VerificationSource"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "FundAccountResponse": {
         "description": "Successful faucet response.",
         "content": {
@@ -733,6 +786,126 @@
             "items": {
               "$ref": "#/components/schemas/ContractAbiLink"
             }
+          }
+        }
+      },
+      "VerificationSource": {
+        "type": "object",
+        "required": ["address", "code_hash", "verified", "onchain", "bundles"],
+        "properties": {
+          "address": {
+            "type": "string",
+            "nullable": true
+          },
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "onchain": {
+            "$ref": "#/components/schemas/OnchainVerification"
+          },
+          "bundles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceBundle"
+            }
+          }
+        }
+      },
+      "OnchainVerification": {
+        "type": "object",
+        "required": ["master_address", "verification_record_address"],
+        "properties": {
+          "master_address": {
+            "type": "string"
+          },
+          "verification_record_address": {
+            "type": "string"
+          }
+        }
+      },
+      "SourceBundle": {
+        "type": "object",
+        "required": [
+          "source_bundle_hash",
+          "verified_at",
+          "bundle_path",
+          "language",
+          "compiler_version",
+          "entrypoint",
+          "compile_params",
+          "sources",
+          "files"
+        ],
+        "properties": {
+          "source_bundle_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified_at": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "commit": {
+            "type": "string",
+            "nullable": true
+          },
+          "bundle_path": {
+            "type": "string"
+          },
+          "language": {
+            "type": "string"
+          },
+          "compiler_version": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "compile_params": {},
+          "sources": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceFileSummary"
+            }
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceFile"
+            }
+          }
+        }
+      },
+      "SourceFileSummary": {
+        "type": "object",
+        "required": ["path", "is_entrypoint"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "is_entrypoint": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SourceFile": {
+        "type": "object",
+        "required": ["path", "sha256", "content_base64", "content_text"],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string"
+          },
+          "content_base64": {
+            "type": "string"
+          },
+          "content_text": {
+            "type": "string",
+            "nullable": true
           }
         }
       },

@@ -5388,6 +5388,7 @@ dependencies = [
  "hex",
  "include_dir",
  "indexmap 2.12.0",
+ "reqwest",
  "rusqlite",
  "serde",
  "serde_json",

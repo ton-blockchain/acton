@@ -33,6 +33,7 @@ import type {
   NftItem,
   Message,
   Transaction,
+  VerificationSourceResponse,
 } from "../api/types"
 import {TonClient} from "../api/client"
 import {addressKey, buildMessageNamesByOpcodeHex} from "../api/compilerAbi"
@@ -55,6 +56,8 @@ interface AccountDetailsProps {
   readonly compilerAbi?: ContractABI
   readonly compilerAbiLoading?: boolean
   readonly compilerAbiError?: string
+  readonly verifiedSource?: VerificationSourceResponse
+  readonly verifiedSourceLoading?: boolean
   readonly ownerAddress: string
   readonly jettonWallets: JettonWallet[]
   readonly nftItems: NftItem[]
@@ -82,6 +85,8 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
   compilerAbi,
   compilerAbiLoading = false,
   compilerAbiError,
+  verifiedSource,
+  verifiedSourceLoading = false,
   ownerAddress,
   jettonWallets,
   nftItems,
@@ -630,6 +635,8 @@ export const AccountDetails: React.FC<AccountDetailsProps> = ({
                 compilerAbi={compilerAbi}
                 compilerAbiLoading={compilerAbiLoading}
                 compilerAbiError={compilerAbiError}
+                verifiedSource={verifiedSource}
+                verifiedSourceLoading={verifiedSourceLoading}
                 onContractClick={onAddressClick}
               />
             </Suspense>

@@ -57,6 +57,12 @@ pub struct GetLibrariesRequest {
 }
 
 #[derive(Deserialize)]
+pub struct GetVerifiedSourceRequest {
+    pub address: Option<String>,
+    pub code_hash: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct GetTransactionsRequest {
     pub address: String,
     #[serde(default = "default_limit")]

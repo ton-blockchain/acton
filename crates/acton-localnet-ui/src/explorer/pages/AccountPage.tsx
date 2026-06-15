@@ -14,6 +14,7 @@ import type {
   NftItem,
   Transaction,
   V3AccountState,
+  VerificationSourceResponse,
 } from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
@@ -60,6 +61,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
   const [extendedContractAbi, setExtendedContractAbi] = useState<ExtendedContractABI | undefined>()
   const [compilerAbiLoading, setCompilerAbiLoading] = useState(false)
   const [compilerAbiError, setCompilerAbiError] = useState<string | undefined>()
+  const [verifiedSource, setVerifiedSource] = useState<VerificationSourceResponse | undefined>()
+  const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
   const [jettonMetadataCopied, setJettonMetadataCopied] = useState(false)
 
@@ -222,6 +225,38 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
     }
 
     void loadCompilerAbi()
+    return () => {
+      isActive = false
+    }
+  }, [accountCodeHash, client])
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadVerifiedSource = async () => {
+      if (!accountCodeHash) {
+        setVerifiedSource(undefined)
+        setVerifiedSourceLoading(false)
+        return
+      }
+
+      setVerifiedSource(undefined)
+      setVerifiedSourceLoading(true)
+
+      try {
+        const source = await client.getVerifiedSource({codeHash: accountCodeHash})
+        if (!isActive) return
+        setVerifiedSource(source.verified && source.bundles.length > 0 ? source : undefined)
+      } catch (error) {
+        if (!isActive) return
+        console.debug("Failed to fetch verified source", error)
+        setVerifiedSource(undefined)
+      } finally {
+        if (isActive) setVerifiedSourceLoading(false)
+      }
+    }
+
+    void loadVerifiedSource()
     return () => {
       isActive = false
     }
@@ -853,6 +888,8 @@ export const AccountPage: React.FC<AccountPageProps> = ({client}) => {
             compilerAbi={compilerAbi}
             compilerAbiLoading={compilerAbiLoading}
             compilerAbiError={compilerAbiError}
+            verifiedSource={verifiedSource}
+            verifiedSourceLoading={verifiedSourceLoading}
             ownerAddress={formattedAddress}
             jettonWallets={jettonWallets}
             nftItems={nftItems}
