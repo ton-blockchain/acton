@@ -3,4 +3,4 @@ frozenLockfile = true
 minimumReleaseAge = 604800 # 7 days in seconds
 
 # The version cannot be specified. It will be possible after: https://github.com/oven-sh/bun/issues/28967
-minimumReleaseAgeExcludes = ["@ton/tolk-abi-to-typescript", "qs"]
+minimumReleaseAgeExcludes = ["@ton/tolk-abi-to-typescript"]
