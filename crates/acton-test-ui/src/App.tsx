@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
@@ -571,7 +571,6 @@ export const App: React.FC = () => {
         </button>
       )}
 
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
       <div
         onMouseDown={startResizing}
         onMouseEnter={() => setIsHoveredResizer(true)}

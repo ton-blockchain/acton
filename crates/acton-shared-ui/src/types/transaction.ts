@@ -59,7 +59,6 @@ export type ParsedValue =
       readonly entries: readonly ParsedValueMapEntry[]
     }
 
-// eslint-disable-next-line functional/type-declaration-immutability
 export interface TransactionInfo {
   readonly lt: string
   readonly address: Address | undefined

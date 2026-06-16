@@ -1,4 +1,4 @@
-import {Address, beginCell, storeMessage, type Message} from "@ton/core"
+import {type Address, beginCell, storeMessage, type Message} from "@ton/core"
 
 const MINT_NEW_JETTONS_OPCODE = 0x64_2b_7d_07
 const INTERNAL_TRANSFER_STEP_OPCODE = 0x17_8d_45_19

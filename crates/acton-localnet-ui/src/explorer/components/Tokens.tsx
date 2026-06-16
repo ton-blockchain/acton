@@ -1,7 +1,8 @@
-import React, {useEffect, useState} from "react"
+import type React from "react"
+import {useEffect, useState} from "react"
 
-import {JettonWallet, JettonMaster} from "../api/types"
-import {TonClient} from "../api/client"
+import type {JettonWallet, JettonMaster} from "../api/types"
+import type {TonClient} from "../api/client"
 
 import styles from "./Tokens.module.css"
 
@@ -66,7 +67,7 @@ export const Tokens: React.FC<TokensProps> = ({wallets, client, onAddressClick})
           const decimals = Number(w.master?.jetton_content?.decimals || 9)
           const rawBalance = Number(w.balance)
           const rawSupply = Number(w.master?.total_supply || "0")
-          const balance = rawBalance / Math.pow(10, decimals)
+          const balance = rawBalance / 10 ** decimals
           const supplyShare = rawSupply > 0 ? rawBalance / rawSupply : undefined
           const supplyShareLabel =
             supplyShare === undefined

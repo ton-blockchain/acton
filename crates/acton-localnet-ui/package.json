@@ -11,8 +11,8 @@
     "dev": "vite --port 3006",
     "fmt": "prettier --write -l --cache .",
     "fmt:check": "prettier --check --cache .",
-    "lint": "eslint --max-warnings 0 . --cache",
-    "lint:fix": "eslint --fix . --cache",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "precommit": "bun fmt && bun lint && bun build",
     "preview": "vite preview"
   },

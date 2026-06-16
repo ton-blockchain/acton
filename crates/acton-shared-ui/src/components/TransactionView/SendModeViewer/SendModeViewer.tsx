@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 
 import {Tooltip} from "@/components/Tooltip/Tooltip"
 import {parseSendMode} from "@/components/TransactionView/SendModeViewer/parser"

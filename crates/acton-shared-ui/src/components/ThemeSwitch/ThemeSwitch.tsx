@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import {Moon, Sun} from "lucide-react"
 import {clsx} from "clsx"
 

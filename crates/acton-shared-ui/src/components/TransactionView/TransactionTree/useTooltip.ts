@@ -120,13 +120,10 @@ export function useTooltip(): UseTooltipReturn {
         Math.min(bestPosition.y, viewport.height - tooltipHeight - margin),
       )
 
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-      const placement = bestPosition.placement as "top" | "bottom" | "left" | "right"
-
       return {
         x: finalX,
         y: finalY,
-        placement: placement,
+        placement: bestPosition.placement,
       }
     },
     [],

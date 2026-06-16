@@ -187,7 +187,7 @@ export const EXIT_CODE_DESCRIPTIONS = {
     description: "Default opcode mismatch for `T.fromCell` and `T.fromSlice` in Tolk.",
     phase: "Compute phase",
   },
-  65_535: {
+  65535: {
     name: "Unknown Opcode",
     description: "Common developer-defined code often used similarly to 130 (unknown opcode).",
     phase: "User-defined",

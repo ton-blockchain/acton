@@ -6,7 +6,7 @@ import {createPortal} from "react-dom"
 import {QRCodeSVG} from "qrcode.react"
 
 import type {FullAccountState, JettonMaster, JettonWallet} from "../api/types"
-import {TonClient} from "../api/client"
+import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
 import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
