@@ -1,4 +1,5 @@
 import "@local-acton/crypto"
+import "@local-acton/emulation/testing"
 import "@local-acton/testing/expect"
 
 get fun `test mnemonic new returns 24 words`() {
@@ -25,9 +26,19 @@ get fun `test mnemonic to key pair and sign`() {
 }
 
 get fun `test fast random bytes`() {
-    // Different seeds produce different output
-    val bytes1 = crypto.getFastRandomBytes(32, 42);
-    val bytes2 = crypto.getFastRandomBytes(32, 43);
+    // Same seed produce same output
+    testing.setRandomSeed(42);
+    val bytes1 = crypto.getFastRandomBytes(32);
+    testing.setRandomSeed(42);
+    val bytes2 = crypto.getFastRandomBytes(32);
+    expect(bytes1).toEqual(bytes2);
+}
+
+get fun `test fast random bytes 2`() {
+    // One seed two calls = different output
+    testing.setRandomSeed(42);
+    val bytes1 = crypto.getFastRandomBytes(32);
+    val bytes2 = crypto.getFastRandomBytes(32);
     expect(bytes1).toNotEqual(bytes2);
 }
 
