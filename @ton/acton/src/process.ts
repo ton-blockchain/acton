@@ -16,12 +16,22 @@ export type StartedLocalnetProcess = {
 export async function startLocalnetProcess(
   options: StartLocalnetOptions,
 ): Promise<StartedLocalnetProcess> {
+  if (options.requireAuth && !options.authToken) {
+    throw new ActonError("Localnet.start({requireAuth: true}) requires authToken")
+  }
+
   const port = options.port ?? (await findAvailablePort())
   const args = buildStartArgs(port, options)
   const projectRoot = resolveProjectRoot(options.projectRoot)
   const child = spawn(options.command ?? "acton", args, {
     cwd: projectRoot,
-    env: {...process.env, ...options.env},
+    env: {
+      ...process.env,
+      ...options.env,
+      ...(options.requireAuth && options.authToken
+        ? {ACTON_LOCALNET_AUTH_TOKEN: options.authToken}
+        : {}),
+    },
     stdio: options.stdio ?? "ignore",
   })
 
@@ -49,6 +59,10 @@ export function buildStartArgs(port: number, options: StartLocalnetOptions): str
   }
   pushOption(args, "--db-path", options.dbPath)
   pushOption(args, "--rate-limit", options.rateLimit)
+  pushOption(args, "--response-delay-ms", options.responseDelayMs)
+  pushOption(args, "--block-interval-ms", options.blockIntervalMs)
+  pushFlag(args, "--no-mining", options.noMining)
+  pushFlag(args, "--require-auth", options.requireAuth)
   pushOption(args, "--load-state", options.loadState)
   pushOption(args, "--dump-state", options.dumpState)
 
@@ -75,6 +89,12 @@ async function findAvailablePort(): Promise<number> {
 function pushOption(args: string[], name: string, value: number | string | undefined): void {
   if (value !== undefined) {
     args.push(name, String(value))
+  }
+}
+
+function pushFlag(args: string[], name: string, value: boolean | undefined): void {
+  if (value) {
+    args.push(name)
   }
 }
 

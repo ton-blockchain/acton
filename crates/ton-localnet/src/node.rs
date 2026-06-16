@@ -1661,12 +1661,10 @@ impl Node {
         mc_block_seqno: Option<Seqno>,
     ) -> anyhow::Result<storage::EmulateTraceResult> {
         let msg_hash = boc.hash()?;
-        let msg_meta = parse_msg_meta(&boc, msg_hash)?;
-        let dst = msg_meta
+        parse_msg_meta(&boc, msg_hash)?
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
 
-        let shard_account_boc = self.get_shard_account_for_emulation(&dst, mc_block_seqno)?;
         let (lt, gen_utime, block_seqno) = self.emulation_context(mc_block_seqno)?;
         let mut code_cells = HashMap::new();
         let mut data_cells = HashMap::new();
@@ -1716,7 +1714,7 @@ impl Node {
             anyhow::bail!("Emulated trace is too deep");
         }
 
-        let msg_hash = compute_boc_hash(&boc)?;
+        let msg_hash = boc.hash()?;
         let msg_meta = parse_msg_meta(&boc, msg_hash)?;
         let dst = msg_meta
             .dst
@@ -1736,7 +1734,7 @@ impl Node {
             gen_utime: state.gen_utime,
             rand_seed: None,
             ignore_chksig,
-            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+            prev_blocks_info: self.prev_blocks_info_at(state.block_seqno),
         };
         let exec_result = self.executor.execute(
             &shard_account_boc,
@@ -1794,17 +1792,14 @@ impl Node {
             state.code_cells,
             state.data_cells,
         );
-        let shard_account_after = exec_result
-            .new_account_boc
-            .clone()
-            .unwrap_or_else(|| shard_account_boc.clone());
+        let shard_account_after = exec_result.new_account_boc.clone();
         let code = account_code_boc(&shard_account_after);
         state
             .account_overlay
             .insert(dst, shard_account_after.clone());
         state.trace_records.push(storage::EmulateTraceRecord {
             raw_transaction: exec_result.tx_boc.clone(),
-            shard_account_before: shard_account_boc,
+            shard_account_before: shard_account_boc.clone(),
             shard_account: shard_account_after,
             parent_transaction,
             code,
@@ -1816,23 +1811,30 @@ impl Node {
                 .map(|actions| actions.to_string()),
         });
 
-        Ok(storage::EmulateTraceResult {
-            trace: TraceNode {
-                transaction: TransactionInfo {
-                    meta: tx_meta,
-                    in_msg: Some(MessageInfo {
-                        meta: msg_meta,
-                        boc,
-                    }),
-                    out_msgs,
-                    tx_boc: exec_result.tx_boc,
-                    account_state_before: account_state_preview_from_boc(&shard_account_boc),
-                    account_state_after: account_state_preview_from_boc(
-                        &exec_result.new_account_boc,
-                    ),
-                },
-                children: Vec::new(),
-                external_hash: Some(msg_hash),
+        let mut children = Vec::new();
+        for out_msg in &out_msgs {
+            if out_msg.meta.dst.is_some() {
+                children.push(self.emulate_trace_message(
+                    state,
+                    out_msg.boc.clone(),
+                    Some(lt),
+                    false,
+                    depth + 1,
+                )?);
+            }
+        }
+
+        Ok(TraceNode {
+            transaction: TransactionInfo {
+                meta: tx_meta,
+                in_msg: Some(MessageInfo {
+                    meta: msg_meta,
+                    boc,
+                }),
+                out_msgs,
+                tx_boc: exec_result.tx_boc,
+                account_state_before: account_state_preview_from_boc(&shard_account_boc),
+                account_state_after: account_state_preview_from_boc(&exec_result.new_account_boc),
             },
             children,
             external_hash: parent_transaction.is_none().then_some(msg_hash),

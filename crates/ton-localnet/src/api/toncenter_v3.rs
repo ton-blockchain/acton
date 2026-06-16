@@ -696,7 +696,7 @@ pub fn map_emulate_trace_response(
                     "shardAccountBefore": record.shard_account_before.to_base64(),
                     "shardAccount": record.shard_account.to_base64(),
                     "parentTransaction": record.parent_transaction,
-                    "code": record.code.as_ref().map(crate::types::BocBytes::to_base64),
+                    "code": record.code.as_ref().map(BocBytes::to_base64),
                     "vmLog": record.vm_log,
                     "executorLogs": record.executor_logs,
                     "actions": record.actions,

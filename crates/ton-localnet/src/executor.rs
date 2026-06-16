@@ -1,5 +1,6 @@
 use crate::types::{BocBytes, Lt};
 use anyhow::Context;
+use std::sync::Arc;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::message::{EmulationResult, Executor, PrevBlocksInfo, RunTransactionArgs};
 use tycho_types::boc::Boc;
@@ -73,10 +74,7 @@ impl TvmEmulatorAdapter {
 }
 
 pub(crate) fn localnet_executor_verbosity() -> ExecutorVerbosity {
-    if std::env::var("ACTON_NODE_COVERAGE")
-        .map(|value| value.trim() == "1")
-        .unwrap_or(false)
-    {
+    if std::env::var("ACTON_NODE_COVERAGE").is_ok_and(|value| value.trim() == "1") {
         ExecutorVerbosity::FullLocationStack
     } else {
         ExecutorVerbosity::Short

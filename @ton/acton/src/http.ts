@@ -3,16 +3,19 @@ import type {ApiEnvelope} from "./types.js"
 import {isRecord, parseJson, toEndpointUrl} from "./utils.js"
 
 export class LocalnetHttpClient {
-  constructor(private readonly endpoint: string) {}
+  constructor(
+    private readonly endpoint: string,
+    private readonly authToken?: string,
+  ) {}
 
   async getJson<T>(path: string): Promise<T> {
-    return this.requestJson<T>(path, {method: "GET"})
+    return this.requestJson<T>(path, {headers: this.headers(), method: "GET"})
   }
 
   async postJson<T>(path: string, body: unknown): Promise<T> {
     return this.requestJson<T>(path, {
       body: JSON.stringify(body),
-      headers: {"content-type": "application/json"},
+      headers: this.headers({"content-type": "application/json"}),
       method: "POST",
     })
   }
@@ -20,7 +23,7 @@ export class LocalnetHttpClient {
   async postRawJson<T>(path: string, body: unknown): Promise<T> {
     const response = await fetch(toEndpointUrl(this.endpoint, path), {
       body: JSON.stringify(body),
-      headers: {"content-type": "application/json"},
+      headers: this.headers({"content-type": "application/json"}),
       method: "POST",
     })
     const text = await response.text()
@@ -60,6 +63,16 @@ export class LocalnetHttpClient {
     }
 
     return payload.result as T
+  }
+
+  private headers(headers: Record<string, string> = {}): Record<string, string> {
+    if (!this.authToken) {
+      return headers
+    }
+    return {
+      ...headers,
+      Authorization: `Bearer ${this.authToken}`,
+    }
   }
 }
 

@@ -8,6 +8,7 @@
     "test": "acton test",
     "test:node": "acton test tests-node/counter.node.test.ts",
     "test:node:failing": "acton test tests-node/counter.node.failing.test.ts",
+    "test:node:vitest": "vitest run tests-node/localnet-control.node.test.ts",
     "test:tolk": "acton test tests",
     "test:ts": "bun test tests-ts",
     "wrapper:ts": "acton wrapper Counter --ts"
@@ -16,6 +17,7 @@
     "@ton/acton": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.0"
   }
 }

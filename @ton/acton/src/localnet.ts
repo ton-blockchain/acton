@@ -37,11 +37,21 @@ import type {
   AccountInfoResult,
   CloseLocalnetOptions,
   EmulateTraceResult,
+  LocalnetApiCallLog,
+  LocalnetClockInfo,
+  LocalnetCompilerAbiRegistration,
   LocalnetCoverageRecord,
+  LocalnetExtendedContractAbi,
+  LocalnetMineResult,
   LocalnetNodeInfo,
+  LocalnetNetworkConditions,
+  LocalnetNetworkConditionsOptions,
   LocalnetTraceRecord,
   LocalnetTreasuryRecord,
   LocalnetOptions,
+  LocalnetRecoveryPointResult,
+  LocalnetStartupWallet,
+  LocalnetVerifiedSourceRequest,
   RawTransaction,
   RunGetMethodResult,
   SendBocResult,
@@ -56,6 +66,7 @@ const DEFAULT_STARTUP_TIMEOUT_MS = 10 * 1000
 const DEFAULT_POLL_INTERVAL_MS = 100
 const DEFAULT_CLOSE_TIMEOUT_MS = 5 * 1000
 const DEFAULT_TRACKED_TRANSACTIONS_LIMIT = 32
+const DEFAULT_TRACKED_TRANSACTIONS_TIMEOUT_MS = 10 * 1000
 
 export class Localnet {
   readonly endpoint: string
@@ -71,7 +82,7 @@ export class Localnet {
   constructor(options: LocalnetOptions = {}, child?: ChildProcess, autoClose = false) {
     this.endpoint = normalizeEndpoint(options.endpoint ?? "http://127.0.0.1:5411")
     this.child = child
-    this.http = new LocalnetHttpClient(this.endpoint)
+    this.http = new LocalnetHttpClient(this.endpoint, options.authToken)
     if (child && autoClose) {
       this.unregisterAutoClose = registerAutoClose(child)
     }
@@ -84,7 +95,7 @@ export class Localnet {
   static async start(options: StartLocalnetOptions = {}): Promise<Localnet> {
     const started = await startLocalnetProcess(options)
     const localnet = new Localnet(
-      {endpoint: started.endpoint},
+      {authToken: options.authToken, endpoint: started.endpoint},
       started.child,
       options.autoClose ?? true,
     )
@@ -172,12 +183,7 @@ export class Localnet {
   }
 
   async sendBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
-    const encoded =
-      typeof boc === "string"
-        ? boc
-        : Buffer.isBuffer(boc)
-          ? boc.toString("base64")
-          : boc.toBoc().toString("base64")
+    const encoded = encodeBoc(boc)
 
     if (this.collectCoverage() || this.collectTraces()) {
       await this.captureMessageDiagnostics(encoded)
@@ -188,6 +194,10 @@ export class Localnet {
 
   async sendMessage(message: Message): Promise<SendBocResult> {
     return this.sendBoc(beginCell().store(storeMessage(message)).endCell())
+  }
+
+  async sendInternalMessage(message: Message): Promise<SendBocResult> {
+    return this.sendInternalBoc(beginCell().store(storeMessage(message)).endCell())
   }
 
   async transactions(
@@ -226,10 +236,19 @@ export class Localnet {
 
     await action()
 
-    const transactions = await this.transactions(parsedAddress, {
-      limit: options.limit ?? DEFAULT_TRACKED_TRANSACTIONS_LIMIT,
-    })
-    return transactions.filter(transaction => transaction.lt > previousLt).reverse()
+    const limit = options.limit ?? DEFAULT_TRACKED_TRANSACTIONS_LIMIT
+    const timeoutMs = options.timeoutMs ?? DEFAULT_TRACKED_TRANSACTIONS_TIMEOUT_MS
+    const pollIntervalMs = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS
+    const deadline = Date.now() + timeoutMs
+
+    while (true) {
+      const transactions = await this.transactions(parsedAddress, {limit})
+      const tracked = transactions.filter(transaction => transaction.lt > previousLt).reverse()
+      if (tracked.length > 0 || Date.now() >= deadline) {
+        return tracked
+      }
+      await delay(Math.min(pollIntervalMs, Math.max(deadline - Date.now(), 0)))
+    }
   }
 
   async airdrop(address: Address | string, amount: bigint | string = toNano("100")): Promise<void> {
@@ -246,12 +265,144 @@ export class Localnet {
     })
   }
 
+  async sendInternalBoc(boc: string | Cell | Buffer): Promise<SendBocResult> {
+    return this.http.postJson<SendBocResult>("/acton_sendInternalMessage", {boc: encodeBoc(boc)})
+  }
+
+  async setShardAccount(
+    address: Address | string,
+    shardAccount: string | Cell | Buffer,
+  ): Promise<void> {
+    await this.http.postJson<unknown>("/acton_setShardAccount", {
+      address: formatAddress(parseAddress(address)),
+      shard_account: encodeBoc(shardAccount),
+    })
+  }
+
   async dumpState(path: string): Promise<void> {
     await this.http.postJson<unknown>("/acton_dumpState", {path})
   }
 
   async loadState(path: string): Promise<void> {
     await this.http.postJson<unknown>("/acton_loadState", {path})
+  }
+
+  async snapshot(): Promise<LocalnetRecoveryPointResult> {
+    return this.http.postJson<LocalnetRecoveryPointResult>("/acton_snapshot", {})
+  }
+
+  async revert(id: number | LocalnetRecoveryPointResult): Promise<LocalnetRecoveryPointResult> {
+    return this.http.postJson<LocalnetRecoveryPointResult>("/acton_revert", {
+      id: typeof id === "number" ? id : id.id,
+    })
+  }
+
+  async mine(blocks = 1): Promise<LocalnetMineResult> {
+    return this.http.postJson<LocalnetMineResult>("/acton_mine", {blocks})
+  }
+
+  async increaseTime(seconds: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_increaseTime", {seconds})
+  }
+
+  async setTime(timestamp: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_setTime", {timestamp})
+  }
+
+  async setNextBlockTimestamp(timestamp: number): Promise<LocalnetClockInfo> {
+    return this.http.postJson<LocalnetClockInfo>("/acton_setNextBlockTimestamp", {timestamp})
+  }
+
+  async setNetworkConditions(
+    options: LocalnetNetworkConditionsOptions,
+  ): Promise<LocalnetNetworkConditions> {
+    return this.http.postJson<LocalnetNetworkConditions>("/acton_setNetworkConditions", {
+      response_delay_ms: options.responseDelayMs,
+    })
+  }
+
+  async getApiCalls(limit?: number): Promise<LocalnetApiCallLog> {
+    const query = new URLSearchParams()
+    if (limit !== undefined) {
+      query.set("limit", String(limit))
+    }
+    const queryString = query.toString()
+    const suffix = queryString ? `?${queryString}` : ""
+    return this.http.getJson<LocalnetApiCallLog>(`/acton_getApiCalls${suffix}`)
+  }
+
+  async getStartupWallets(): Promise<readonly LocalnetStartupWallet[]> {
+    return this.http.getJson<readonly LocalnetStartupWallet[]>("/acton_getStartupWallets")
+  }
+
+  async setAddressName(address: Address | string, name: string): Promise<void> {
+    await this.http.postJson<unknown>("/acton_setAddressName", {
+      address: formatAddress(parseAddress(address)),
+      name,
+    })
+  }
+
+  async getAddressName(address: Address | string): Promise<string | undefined> {
+    const formattedAddress = formatAddress(parseAddress(address))
+    const names = await this.getAddressNames([formattedAddress])
+    return names[formattedAddress]
+  }
+
+  async getAddressNames(
+    addresses: readonly (Address | string)[],
+  ): Promise<Record<string, string | undefined>> {
+    if (addresses.length === 0) {
+      return {}
+    }
+
+    const query = new URLSearchParams()
+    for (const address of addresses) {
+      query.append("address", formatAddress(parseAddress(address)))
+    }
+    const rows = await this.http.getJson<Record<string, string | null>>(
+      `/acton_getAddressName?${query}`,
+    )
+    return Object.fromEntries(
+      Object.entries(rows).map(([address, name]) => [address, name ?? undefined]),
+    )
+  }
+
+  async registerCompilerAbis(
+    entries: readonly LocalnetCompilerAbiRegistration[],
+  ): Promise<void> {
+    await this.http.postJson<unknown>("/acton_registerCompilerAbis", {
+      entries: entries.map(entry => ({
+        code_hash: entry.codeHash,
+        compiler_abi: entry.compilerAbi,
+      })),
+    })
+  }
+
+  async getCompilerAbis(
+    codeHashes: readonly string[],
+  ): Promise<Record<string, LocalnetExtendedContractAbi | null>> {
+    if (codeHashes.length === 0) {
+      return {}
+    }
+
+    const query = new URLSearchParams()
+    for (const codeHash of codeHashes) {
+      query.append("code_hash", codeHash)
+    }
+    return this.http.getJson<Record<string, LocalnetExtendedContractAbi | null>>(
+      `/acton_getCompilerAbi?${query}`,
+    )
+  }
+
+  async getVerifiedSource(request: LocalnetVerifiedSourceRequest): Promise<unknown> {
+    const query = new URLSearchParams()
+    if (request.address) {
+      query.set("address", request.address)
+    }
+    if (request.codeHash) {
+      query.set("code_hash", request.codeHash)
+    }
+    return this.http.getJson<unknown>(`/acton_getVerifiedSource?${query}`)
   }
 
   async getAccountState(address: Address): Promise<ContractState> {
@@ -378,6 +529,14 @@ export class Localnet {
 
 function isPreGenesisStateError(error: unknown): boolean {
   return error instanceof LocalnetApiError && error.message === "Block 0 not found"
+}
+
+function encodeBoc(boc: string | Cell | Buffer): string {
+  return typeof boc === "string"
+    ? boc
+    : Buffer.isBuffer(boc)
+      ? boc.toString("base64")
+      : boc.toBoc().toString("base64")
 }
 
 function registerAutoClose(child: ChildProcess): () => void {

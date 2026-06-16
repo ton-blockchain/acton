@@ -11,7 +11,7 @@ import type {Localnet} from "./localnet.js"
 
 export class LocalnetSender implements Sender {
   constructor(
-    private readonly localnet: Pick<Localnet, "sendMessage">,
+    private readonly localnet: Pick<Localnet, "sendInternalMessage">,
     readonly address: Address,
   ) {}
 
@@ -37,6 +37,6 @@ export class LocalnetSender implements Sender {
       },
     }
 
-    await this.localnet.sendMessage(message)
+    await this.localnet.sendInternalMessage(message)
   }
 }

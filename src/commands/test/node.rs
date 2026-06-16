@@ -363,6 +363,7 @@ fn fill_passed_report_output(
 
     report.execution = Some(TestExecutionContext {
         assert_failure: None,
+        debug_output: String::new(),
         expected_exit_code: 0,
         failure: None,
         fuzz: None,
@@ -406,6 +407,7 @@ fn fill_failed_report(
             }
             report.execution = Some(TestExecutionContext {
                 assert_failure: Some(failure),
+                debug_output: String::new(),
                 expected_exit_code: 0,
                 failure: Some(context),
                 fuzz: None,
@@ -427,6 +429,7 @@ fn fill_failed_report(
             report.detailed_message = Some(FormatterContext::strip_ansi_text(&detailed));
             report.execution = Some(TestExecutionContext {
                 assert_failure: Some(failure),
+                debug_output: String::new(),
                 expected_exit_code: 0,
                 failure: Some(context),
                 fuzz: None,
@@ -444,6 +447,7 @@ fn fill_failed_report(
     report.detailed_message = stack;
     report.execution = Some(TestExecutionContext {
         assert_failure: None,
+        debug_output: String::new(),
         expected_exit_code: 0,
         failure: None,
         fuzz: None,
@@ -485,11 +489,12 @@ fn empty_failure_context(runner: &TestRunner<'_>) -> TestFailureExecutionContext
 
 fn ensure_node_contract_metadata(runner: &mut TestRunner<'_>) -> anyhow::Result<()> {
     let project_root = configured_project_root().to_path_buf();
-    super::coverage::compile_project_contracts_for_coverage(
+    super::coverage::compile_project_contracts(
         &mut runner.build_cache,
         runner.file_build_cache,
         &runner.acton_config,
         &project_root,
+        true,
     )
 }
 

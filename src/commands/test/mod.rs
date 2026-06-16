@@ -901,7 +901,7 @@ fn collect_test_files(
     paths: &[String],
     project_root: &Path,
     config: &TestConfig,
-) -> anyhow::Result<Vec<String>> {
+) -> anyhow::Result<Vec<SelectedTestFile>> {
     let project_root_abs =
         dunce::canonicalize(project_root).unwrap_or_else(|_| project_root.to_path_buf());
     let mut test_files = Vec::new();
@@ -930,7 +930,7 @@ fn collect_test_files_from_path(
     path: &str,
     project_root_abs: &Path,
     config: &TestConfig,
-    test_files: &mut Vec<String>,
+    test_files: &mut Vec<SelectedTestFile>,
     seen: &mut HashSet<PathBuf>,
 ) -> anyhow::Result<()> {
     if !fs::exists(path).unwrap_or(false) {
@@ -946,15 +946,20 @@ fn collect_test_files_from_path(
 
     let mut add_test_file = |path: PathBuf| {
         if seen.insert(path.clone()) {
-            test_files.push(path.to_string_lossy().to_string());
+            test_files.push(selected_test_file_from_path(path)?);
         }
+        Ok::<_, anyhow::Error>(())
     };
 
     if metadata.is_file() {
-        if !path.ends_with(".test.tolk") {
-            anyhow::bail!("Test file must end with {}", ".test.tolk".yellow());
+        if !path.ends_with(".test.tolk") && !path.ends_with(".test.ts") {
+            anyhow::bail!(
+                "Test file must end with {} or {}",
+                ".test.tolk".yellow(),
+                ".test.ts".yellow()
+            );
         }
-        add_test_file(dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path)));
+        add_test_file(dunce::canonicalize(path).unwrap_or_else(|_| PathBuf::from(path)))?;
         return Ok(());
     }
 
@@ -966,7 +971,7 @@ fn collect_test_files_from_path(
             &config.exclude_patterns,
             &config.include_patterns,
         )? {
-            add_test_file(file);
+            add_test_file(file)?;
         }
         return Ok(());
     }

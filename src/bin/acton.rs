@@ -2121,7 +2121,7 @@ fn main() {
                 ) {
                     Ok(config) => {
                         if let Some(node_path) = node {
-                            if path.is_some() {
+                            if !paths.is_empty() {
                                 Err(anyhow::anyhow!(
                                     "`acton test --node` does not accept the positional test path; pass the TypeScript path as the --node value"
                                 ))

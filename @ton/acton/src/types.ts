@@ -2,6 +2,7 @@ import type {Buffer} from "node:buffer"
 
 export type LocalnetOptions = {
   readonly endpoint?: string
+  readonly authToken?: string
 }
 
 export type StartLocalnetOptions = {
@@ -13,6 +14,11 @@ export type StartLocalnetOptions = {
   readonly accounts?: readonly string[]
   readonly dbPath?: string
   readonly rateLimit?: number
+  readonly responseDelayMs?: number
+  readonly blockIntervalMs?: number
+  readonly noMining?: boolean
+  readonly requireAuth?: boolean
+  readonly authToken?: string
   readonly loadState?: string
   readonly dumpState?: string
   readonly env?: Readonly<Record<string, string | undefined>>
@@ -36,15 +42,110 @@ export type CloseLocalnetOptions = {
 export type LocalnetNodeInfo = {
   readonly uptime_seconds: number
   readonly last_block_seqno: number
+  readonly current_unix_time: number
+  readonly time_offset_seconds: number
+  readonly next_block_timestamp: number | null
   readonly state_source: string
   readonly fork_network: string | null
   readonly fork_block_number: number | null
+  readonly network_conditions: LocalnetNetworkConditions
+}
+
+export type LocalnetNetworkConditions = {
+  readonly response_delay_ms: number
+}
+
+export type LocalnetNetworkConditionsOptions = {
+  readonly responseDelayMs: number
 }
 
 export type SendBocResult = {
   readonly "@type": "ok"
   readonly hash?: string
   readonly hash_norm?: string
+}
+
+export type LocalnetBlockId = {
+  readonly workchain: number
+  readonly shard: number
+  readonly seqno: number
+  readonly root_hash: string
+  readonly file_hash: string
+}
+
+export type LocalnetMineResult = {
+  readonly blocks_mined: number
+  readonly last_block_seqno: number
+  readonly blocks: readonly LocalnetBlockId[]
+}
+
+export type LocalnetRecoveryPointResult = {
+  readonly id: number
+  readonly block_seqno: number
+}
+
+export type LocalnetClockInfo = {
+  readonly current_unix_time: number
+  readonly time_offset_seconds: number
+  readonly next_block_timestamp: number | null
+}
+
+export type LocalnetApiCallStatus = "success" | "failed"
+export type LocalnetApiCallType = "read" | "write"
+export type LocalnetApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
+
+export type LocalnetApiCallRecord = {
+  readonly sequence: number
+  readonly status: LocalnetApiCallStatus
+  readonly status_code: number
+  readonly call_type: LocalnetApiCallType
+  readonly api_family: LocalnetApiCallFamily
+  readonly http_method: string
+  readonly path: string
+  readonly method: string
+  readonly request_id: unknown
+  readonly timestamp_ms: number
+  readonly duration_ns: number
+}
+
+export type LocalnetApiCallLog = {
+  readonly calls: readonly LocalnetApiCallRecord[]
+  readonly total_retained: number
+  readonly max_retained: number
+}
+
+export type LocalnetStartupWallet = {
+  readonly name: string
+  readonly mnemonic: readonly string[]
+  readonly version: string
+  readonly network: string
+  readonly address: string
+  readonly public_key: string
+  readonly wallet_id: number
+}
+
+export type LocalnetContractAbiLink = {
+  readonly kind: string
+  readonly title: string
+  readonly url: string
+  readonly scope: string
+}
+
+export type LocalnetExtendedContractAbi<T = unknown> = {
+  readonly compiler_abi: T
+  readonly display_name?: string
+  readonly code_hashes: readonly string[]
+  readonly links: readonly LocalnetContractAbiLink[]
+}
+
+export type LocalnetCompilerAbiRegistration<T = unknown> = {
+  readonly codeHash: string
+  readonly compilerAbi: T
+}
+
+export type LocalnetVerifiedSourceRequest = {
+  readonly address?: string
+  readonly codeHash?: string
 }
 
 export type TransactionsOptions = {
@@ -56,6 +157,8 @@ export type TransactionsOptions = {
 
 export type TrackTransactionsOptions = {
   readonly limit?: number
+  readonly timeoutMs?: number
+  readonly pollIntervalMs?: number
 }
 
 export type ApiEnvelope<T> = {
