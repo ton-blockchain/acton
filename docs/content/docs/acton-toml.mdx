@@ -254,6 +254,8 @@ Configures defaults for `acton localnet`.
 | `accounts`          | `string[]` | -       | Wallet names from `[wallets]` to auto-fund and auto-deploy on `localnet start`.                                 |
 | `rate-limit`        | `integer`  | -       | Maximum `/api` requests per second to simulate provider limits (`429` on overflow).                             |
 | `response-delay-ms` | `integer`  | -       | Response delay for `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints; streaming/control/UI are not delayed. |
+| `block-interval-ms` | `integer`  | `500`   | Block production interval in milliseconds when automatic mining is enabled.                                     |
+| `no-mining`         | `boolean`  | `false` | Disable automatic block production; mine blocks manually with `acton localnet mine` or `/acton_mine`.           |
 
 Example:
 
@@ -265,9 +267,11 @@ fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
 response-delay-ms = 300
+block-interval-ms = 500
+no-mining = false
 ```
 
-`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, and `--response-delay-ms <MS>` override these values for a single run.
+`acton localnet start --port <PORT>`, `--fork-net <NETWORK>`, `--fork-block-number <SEQNO>`, `--accounts <NAME[,NAME...]>`, `--rate-limit <RPS>`, `--response-delay-ms <MS>`, `--block-interval-ms <MS>`, and `--no-mining` override these values for a single run. If `[localnet].no-mining = true`, there is no CLI flag that turns automatic mining back on for that run.
 
 ## `[test]`
 

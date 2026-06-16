@@ -41,6 +41,7 @@ pub async fn localnet_start_cmd(
     rate_limit: Option<u32>,
     response_delay_ms: Option<u64>,
     block_interval_ms: u64,
+    no_mining: bool,
     load_state: Option<String>,
     dump_state: Option<String>,
     require_auth: bool,
@@ -70,6 +71,7 @@ pub async fn localnet_start_cmd(
         state_source,
         db_path.clone(),
         Duration::from_millis(block_interval_ms),
+        !no_mining,
     ));
     if let Some(path) = load_state.as_deref() {
         node.load_state(path.to_owned())
@@ -82,7 +84,7 @@ pub async fn localnet_start_cmd(
         );
     }
 
-    let startup_wallets = setup_startup_accounts(&node, &accounts).await?;
+    let startup_wallets = setup_startup_accounts(&node, &accounts, no_mining).await?;
     let auth_token = require_auth.then(localnet_auth_token);
     let run_result = run_server(
         node.clone(),
@@ -119,6 +121,7 @@ pub async fn localnet_start_cmd(
 async fn setup_startup_accounts(
     node: &Arc<Localnet>,
     accounts: &[String],
+    manual_mining: bool,
 ) -> anyhow::Result<Vec<StartupWallet>> {
     if accounts.is_empty() {
         return Ok(Vec::new());
@@ -168,6 +171,11 @@ async fn setup_startup_accounts(
             node.faucet(address.clone(), STARTUP_ACCOUNT_TOPUP_NANOGRAMS)
                 .await
                 .with_context(|| format!("Failed to top up wallet '{wallet_name}'"))?;
+            if manual_mining {
+                node.mine_blocks(1)
+                    .await
+                    .with_context(|| format!("Failed to mine top up for wallet '{wallet_name}'"))?;
+            }
 
             let wallet_state = wait_for_startup_wallet_funds(node, &address, &wallet_name).await?;
 
@@ -183,6 +191,11 @@ async fn setup_startup_accounts(
                 node.send_boc(deploy_boc)
                     .await
                     .with_context(|| format!("Failed to deploy wallet '{wallet_name}'"))?;
+                if manual_mining {
+                    node.mine_blocks(1).await.with_context(|| {
+                        format!("Failed to mine deployment for wallet '{wallet_name}'")
+                    })?;
+                }
                 wait_for_startup_wallet_deploy(node, &address, &wallet_name).await?;
                 println!(
                     "       {} wallet {} {}",
@@ -371,6 +384,62 @@ pub async fn localnet_airdrop_cmd(
         let status = res.status();
         let body = res.text().await.unwrap_or_default();
         anyhow::bail!("Airdrop failed with status {status}: {body}");
+    }
+
+    Ok(())
+}
+
+pub async fn localnet_mine_cmd(
+    blocks: u32,
+    port: u16,
+    auth_token: Option<String>,
+) -> anyhow::Result<()> {
+    let client = crate::http::client_builder()
+        .user_agent(crate::build_info::user_agent())
+        .build()?;
+    let auth_token = resolve_localnet_auth_token(auth_token);
+    let request = client
+        .post(format!("http://127.0.0.1:{port}/acton_mine"))
+        .json(&serde_json::json!({ "blocks": blocks }));
+    let res = with_localnet_auth(request, auth_token.as_deref())
+        .send()
+        .await
+        .context("Failed to reach localnet mining endpoint")?;
+
+    if res.status().is_success() {
+        let json: serde_json::Value = res.json().await?;
+        if json
+            .get("ok")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+        {
+            let result = json.get("result").unwrap_or(&serde_json::Value::Null);
+            let blocks_mined = result
+                .get("blocks_mined")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or_else(|| u64::from(blocks));
+            let last_block_seqno = result
+                .get("last_block_seqno")
+                .and_then(serde_json::Value::as_u64)
+                .unwrap_or_default();
+            println!(
+                "{} mined {} localnet block{}; latest seqno {}",
+                "Successfully".green().bold(),
+                blocks_mined,
+                if blocks_mined == 1 { "" } else { "s" },
+                last_block_seqno
+            );
+        } else {
+            let error = json
+                .get("error")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Unknown error");
+            anyhow::bail!("Mining failed: {error}");
+        }
+    } else {
+        let status = res.status();
+        let body = res.text().await.unwrap_or_default();
+        anyhow::bail!("Mining failed with status {status}: {body}");
     }
 
     Ok(())

@@ -536,6 +536,161 @@ fn localnet_mines_empty_blocks_on_interval_without_transactions() {
 }
 
 #[test]
+fn localnet_no_mining_mines_only_on_request() {
+    let project = ProjectBuilder::new("localnet-no-mining-manual-blocks").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
+
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let initial_seqno = latest_masterchain_seqno(&node);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&node);
+
+    let mine_default = node.post_json("/acton_mine", &json!({}));
+    let default_payload = response_payload(&mine_default);
+    let after_default_seqno = latest_masterchain_seqno(&node);
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("mine")
+        .arg("2")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let after_cli_seqno = latest_masterchain_seqno(&node);
+
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let before_faucet = node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000_u64
+        }),
+    );
+    let after_faucet_before_mine =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let mine_faucet = node.post_json("/acton_mine", &json!({}));
+    let after_faucet_mine =
+        wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
+
+    let mut invalid_zero = node.post_json("/acton_mine", &json!({ "blocks": 0 }));
+    normalize_extra_for_snapshot(&mut invalid_zero);
+
+    let snapshot = json!({
+        "config_no_mining_kept_seqno": after_sleep_seqno == initial_seqno,
+        "default_mine": {
+            "ok": mine_default["ok"].as_bool(),
+            "blocks_mined": default_payload["blocks_mined"].as_u64(),
+            "block_count": default_payload["blocks"].as_array().map(Vec::len),
+            "seqno_delta": after_default_seqno - initial_seqno,
+        },
+        "cli_mine": {
+            "seqno_delta": after_cli_seqno - after_default_seqno,
+        },
+        "queued_faucet": {
+            "fund_ok": fund["ok"].as_bool(),
+            "balance_before": parse_address_balance(&before_faucet).to_string(),
+            "balance_after_queue": parse_address_balance(&after_faucet_before_mine).to_string(),
+            "mine_ok": mine_faucet["ok"].as_bool(),
+            "balance_after_mine": parse_address_balance(&after_faucet_mine).to_string(),
+        },
+        "invalid_zero": {
+            "ok": invalid_zero["ok"].as_bool(),
+            "code": invalid_zero["code"].as_i64(),
+            "error": invalid_zero["error"].as_str(),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_no_mining_manual_blocks.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
+    let project = ProjectBuilder::new("localnet-no-mining-startup-accounts-fork").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project.localnet().start();
+    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
+
+    let forked_node = project
+        .localnet()
+        .args([
+            "--fork-net",
+            "custom:fork-source",
+            "--accounts",
+            "deployer",
+            "--no-mining",
+        ])
+        .start();
+
+    let startup_wallets = forked_node.get_json("/acton_getStartupWallets");
+    let startup_wallets_payload = response_payload(&startup_wallets);
+    let wallets = startup_wallets_payload
+        .as_array()
+        .expect("startup wallets response must contain an array");
+    let wallet = wallets
+        .first()
+        .expect("forked no-mining localnet must bootstrap deployer wallet");
+    let address = wallet["address"]
+        .as_str()
+        .expect("startup wallet must expose address");
+
+    wait_until_address_state_active(&forked_node, address, Duration::from_secs(5));
+    let node_info = forked_node.get_json("/acton_nodeInfo");
+    let initial_seqno = latest_masterchain_seqno(&forked_node);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&forked_node);
+    let mine_response = forked_node.post_json("/acton_mine", &json!({}));
+    let after_mine_seqno = latest_masterchain_seqno(&forked_node);
+
+    let snapshot = json!({
+        "startup_wallet": {
+            "count": wallets.len(),
+            "name": wallet["name"].as_str(),
+            "version": wallet["version"].as_str(),
+            "network": wallet["network"].as_str(),
+            "address_present": !address.is_empty(),
+        },
+        "state_source": {
+            "state_source": node_info["result"]["state_source"].as_str(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+            "fork_block_number": node_info["result"]["fork_block_number"].as_u64(),
+        },
+        "manual_mining": {
+            "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
+            "mine_ok": mine_response["ok"].as_bool(),
+            "seqno_delta": after_mine_seqno - after_sleep_seqno,
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_no_mining_startup_accounts_fork.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
 fn localnet_records_api_calls_for_dashboard() {
     let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
     let node = project.localnet().start();
@@ -4014,6 +4169,10 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    append_custom_localnet_network(project_path, "localnet", base_url);
+}
+
+fn append_custom_localnet_network(project_path: &Path, network_name: &str, base_url: &str) {
     use std::fmt::Write as _;
 
     let acton_toml_path = project_path.join("Acton.toml");
@@ -4023,7 +4182,7 @@ fn append_localnet_network(project_path: &Path, base_url: &str) {
         acton_toml,
         r#"
 
-[networks.localnet]
+[networks.{network_name}]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
     );

@@ -43,6 +43,10 @@ SUBCOMMANDS
           --block-interval-ms ms
               Localnet block production interval.
 
+          --no-mining
+              Disable automatic block production. Mine blocks manually with
+              acton localnet mine or POST /acton_mine.
+
           --load-state path
               Load Localnet state from a JSON snapshot before startup.
 
@@ -67,6 +71,23 @@ SUBCOMMANDS
 
           -a, --amount gram
               Amount of GRAM to request.
+
+          -p, --port port
+              Localnet server port.
+
+          --auth-token token
+              Localnet API token for a server started with --require-auth. If
+              omitted, Acton reads ACTON_LOCALNET_AUTH_TOKEN.
+
+   acton localnet mine
+       Mine localnet blocks manually.
+
+      Synopsis
+          acton localnet mine [options] [n]
+
+      Options
+          n
+              Number of blocks to mine. Defaults to 1.
 
           -p, --port port
               Localnet server port.
@@ -103,6 +124,7 @@ CONFIGURATION
            rate-limit = 1
            response-delay-ms = 300
            block-interval-ms = 500
+           no-mining = false
 
        CLI flags override config values for the current invocation.
 
@@ -163,8 +185,13 @@ RUNTIME MODEL
           defaults to 500 ms, and still creates empty blocks when no
           transactions are queued
 
+       o  --no-mining or [localnet].no-mining = true disables automatic block
+          production; use acton localnet mine [N] or POST /acton_mine to create
+          blocks manually
+
        o  messages accepted through send_boc, acton_sendInternalMessage, or the
-          faucet are queued and included on a later block tick
+          faucet are queued and included on a later automatic or manually mined
+          block
 
        o  a block can include multiple transactions; locally generated internal
           messages are processed in the same block when possible
@@ -214,6 +241,9 @@ CONTROL ENDPOINTS
 
        o  POST /acton_sendInternalMessage with {"boc":"<BASE64_BOC>"} sends a
           base64-encoded internal message BOC through the local internal queue
+
+       o  POST /acton_mine with optional {"blocks":N} mines queued and/or empty
+          blocks manually; N defaults to 1
 
        o  POST /acton_setNetworkConditions with {"response_delay_ms":300}
           updates simulated network latency; use 0 to disable response delay

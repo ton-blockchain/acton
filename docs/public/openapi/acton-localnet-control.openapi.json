@@ -23,7 +23,7 @@
         "tags": ["Localnet Control"],
         "operationId": "fundAccount",
         "summary": "Fund an account",
-        "description": "Credits an address with local funds and mines the resulting transfer transaction.",
+        "description": "Queues a local faucet transfer to credit an address. The transfer is included on the next automatic or manually mined block.",
         "requestBody": {
           "required": true,
           "content": {
@@ -256,6 +256,32 @@
         "responses": {
           "200": {
             "$ref": "#/components/responses/StartupWalletsResponse"
+          }
+        }
+      }
+    },
+    "/acton_mine": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "mineBlocks",
+        "summary": "Mine localnet blocks",
+        "description": "Manually mines queued and/or empty localnet blocks. When the request body is omitted or blocks is not provided, one block is mined.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MineBlocksRequest"
+              },
+              "example": {
+                "blocks": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MineBlocksResponse"
           }
         }
       }
@@ -521,6 +547,28 @@
           }
         }
       },
+      "MineBlocksResponse": {
+        "description": "Successful manual mining response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/MineBlocksResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "NetworkConditionsResponse": {
         "description": "Successful simulated network conditions response.",
         "content": {
@@ -578,6 +626,28 @@
       "Base64Boc": {
         "type": "string",
         "description": "Base64-encoded TON BOC."
+      },
+      "LocalnetBlockId": {
+        "type": "object",
+        "required": ["workchain", "shard", "seqno", "root_hash", "file_hash"],
+        "properties": {
+          "workchain": {
+            "type": "integer"
+          },
+          "shard": {
+            "type": "integer"
+          },
+          "seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "root_hash": {
+            "type": "string"
+          },
+          "file_hash": {
+            "type": "string"
+          }
+        }
       },
       "SuccessEnvelope": {
         "type": "object",
@@ -754,6 +824,37 @@
         "properties": {
           "boc": {
             "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "MineBlocksRequest": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Number of blocks to mine."
+          }
+        }
+      },
+      "MineBlocksResult": {
+        "type": "object",
+        "required": ["blocks_mined", "last_block_seqno", "blocks"],
+        "properties": {
+          "blocks_mined": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalnetBlockId"
+            }
           }
         }
       },

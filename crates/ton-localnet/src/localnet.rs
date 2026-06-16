@@ -175,6 +175,13 @@ pub struct LocalnetConsensusBlock {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetMineResult {
+    pub blocks_mined: u32,
+    pub last_block_seqno: Seqno,
+    pub blocks: Vec<LocalnetBlockId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
     pub gen_utime: u32,
@@ -401,6 +408,10 @@ pub(crate) enum Request {
         path: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
+    MineBlocks {
+        count: u32,
+        resp: oneshot::Sender<anyhow::Result<LocalnetMineResult>>,
+    },
 }
 
 pub struct Localnet {
@@ -417,6 +428,7 @@ impl Localnet {
         state_source: StateSource,
         db_path: Option<String>,
         block_interval: Duration,
+        auto_mining: bool,
     ) -> Self {
         let (tx, rx) = mpsc::channel(100);
         let (events_tx, _) = broadcast::channel(1024);
@@ -424,8 +436,14 @@ impl Localnet {
         let node_events_tx = events_tx.clone();
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, node_events_tx, state_source, db_path, block_interval)
-            {
+            if let Err(e) = run_node_loop(
+                rx,
+                node_events_tx,
+                state_source,
+                db_path,
+                block_interval,
+                auto_mining,
+            ) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
@@ -1010,6 +1028,12 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn mine_blocks(&self, count: u32) -> anyhow::Result<LocalnetMineResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::MineBlocks { count, resp }).await?;
+        rx.await?
+    }
+
     pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
         let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
             anyhow::anyhow!("Invalid address, only standard internal address is allowed")
@@ -1022,23 +1046,44 @@ impl Localnet {
 }
 
 fn run_node_loop(
-    rx: mpsc::Receiver<Request>,
+    mut rx: mpsc::Receiver<Request>,
     events_tx: broadcast::Sender<StreamingCommitEvent>,
     state_source: StateSource,
     db_path: Option<String>,
     block_interval: Duration,
+    auto_mining: bool,
 ) -> anyhow::Result<()> {
+    let mut node = create_node(events_tx, state_source, db_path)?;
+    tracing::info!(
+        "TON localnet started, block interval: {}ms, auto mining: {}",
+        block_interval.as_millis(),
+        auto_mining
+    );
+
+    if !auto_mining {
+        while let Some(req) = rx.blocking_recv() {
+            process_loop_request(&mut node, req);
+        }
+        return Ok(());
+    }
+
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_time()
         .build()
         .context("Failed to create localnet node runtime")?;
-    runtime.block_on(run_node_loop_async(
-        rx,
-        events_tx,
-        state_source,
-        db_path,
-        block_interval,
-    ))
+    runtime.block_on(run_node_loop_async(rx, node, block_interval))
+}
+
+fn create_node(
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
+    state_source: StateSource,
+    db_path: Option<String>,
+) -> anyhow::Result<Node> {
+    let executor = Box::new(TvmEmulatorAdapter::new()?);
+    let config_boc = BocBytes::from_base64(DEFAULT_CONFIG)?;
+    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path)?;
+    node.streaming_events = Some(events_tx);
+    Ok(node)
 }
 
 // The node loop runs on a dedicated current-thread Tokio runtime, so the
@@ -1046,20 +1091,9 @@ fn run_node_loop(
 #[allow(clippy::future_not_send)]
 async fn run_node_loop_async(
     mut rx: mpsc::Receiver<Request>,
-    events_tx: broadcast::Sender<StreamingCommitEvent>,
-    state_source: StateSource,
-    db_path: Option<String>,
+    mut node: Node,
     block_interval: Duration,
 ) -> anyhow::Result<()> {
-    let executor = Box::new(TvmEmulatorAdapter::new()?);
-    let config_boc = BocBytes::from_base64(DEFAULT_CONFIG)?;
-    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path)?;
-    node.streaming_events = Some(events_tx);
-
-    tracing::info!(
-        "TON localnet started, block interval: {}ms",
-        block_interval.as_millis()
-    );
     let mut next_block_at = Instant::now() + block_interval;
 
     loop {
@@ -1089,6 +1123,26 @@ fn mine_scheduled_block(node: &mut Node, block_interval: Duration) -> Instant {
         tracing::error!("Block mining failed: {:?}", e);
     }
     Instant::now() + block_interval
+}
+
+fn handle_mine_blocks(node: &mut Node, count: u32) -> anyhow::Result<LocalnetMineResult> {
+    anyhow::ensure!(count > 0, "blocks must be greater than 0");
+
+    let mut blocks = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        tracing::info!("Manually mining localnet block");
+        let block = node.mine_block()?;
+        blocks.push(block.block_id());
+    }
+
+    let last_block_seqno = blocks
+        .last()
+        .map_or(node.globals.head_seqno, |block| block.seqno);
+    Ok(LocalnetMineResult {
+        blocks_mined: count,
+        last_block_seqno,
+        blocks,
+    })
 }
 
 fn process_loop_request(node: &mut Node, req: Request) {
@@ -1359,6 +1413,10 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::LoadState { path, resp } => {
             let res = node.load_state_from_path(path);
+            let _ = resp.send(res);
+        }
+        Request::MineBlocks { count, resp } => {
+            let res = handle_mine_blocks(node, count);
             let _ = resp.send(res);
         }
     }

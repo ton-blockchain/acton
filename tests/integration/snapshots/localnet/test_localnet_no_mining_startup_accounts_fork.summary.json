@@ -1,0 +1,19 @@
+{
+  "manual_mining": {
+    "mine_ok": true,
+    "seqno_delta": 1,
+    "seqno_stable_after_start": true
+  },
+  "startup_wallet": {
+    "address_present": true,
+    "count": 1,
+    "name": "deployer",
+    "network": "localnet",
+    "version": "v4r2"
+  },
+  "state_source": {
+    "fork_block_number": null,
+    "fork_network": "fork-source",
+    "state_source": "remote"
+  }
+}

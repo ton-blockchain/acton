@@ -2,9 +2,9 @@ use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::Localnet;
 use crate::server::models::{
-    FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest, RegisterCompilerAbisRequest,
-    SendBocRequest, SetAddressNameRequest, SetNetworkConditionsRequest, SetShardAccountRequest,
-    StatePathRequest,
+    FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest, MineBlocksRequest,
+    RegisterCompilerAbisRequest, SendBocRequest, SetAddressNameRequest,
+    SetNetworkConditionsRequest, SetShardAccountRequest, StatePathRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
@@ -12,6 +12,7 @@ use crate::server::{
 use crate::types::Hash256;
 use axum::{
     Json,
+    body::Bytes,
     extract::Query,
     extract::{RawQuery, State},
 };
@@ -82,6 +83,22 @@ pub async fn set_network_conditions(
     network_conditions.set_response_delay_ms(payload.response_delay_ms);
     handle_result(
         async move { Ok::<_, anyhow::Error>(network_conditions.info()) },
+        |res| serde_json::to_value(res).unwrap_or(Value::Null),
+    )
+    .await
+}
+
+pub async fn mine_blocks(State(node): State<Arc<Localnet>>, body: Bytes) -> Json<Value> {
+    handle_result(
+        async move {
+            let payload = if body.is_empty() {
+                MineBlocksRequest::default()
+            } else {
+                serde_json::from_slice::<MineBlocksRequest>(&body)
+                    .map_err(|e| anyhow::anyhow!("Invalid mine request JSON: {e}"))?
+            };
+            node.mine_blocks(payload.blocks.unwrap_or(1)).await
+        },
         |res| serde_json::to_value(res).unwrap_or(Value::Null),
     )
     .await

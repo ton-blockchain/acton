@@ -506,6 +506,8 @@ pub struct LocalnetSettings {
     /// Block production interval in milliseconds for `acton localnet start`
     #[schemars(range(min = 1))]
     pub block_interval_ms: Option<u64>,
+    /// Disable automatic block production for `acton localnet start`
+    pub no_mining: Option<bool>,
 }
 
 const fn default_localnet_port() -> Option<u16> {
@@ -2211,6 +2213,7 @@ accounts = ["deployer", "user"]
 rate-limit = 3
 response-delay-ms = 300
 block-interval-ms = 250
+no-mining = true
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -2225,5 +2228,6 @@ block-interval-ms = 250
         assert_eq!(localnet.rate_limit, Some(3));
         assert_eq!(localnet.response_delay_ms, Some(300));
         assert_eq!(localnet.block_interval_ms, Some(250));
+        assert_eq!(localnet.no_mining, Some(true));
     }
 }

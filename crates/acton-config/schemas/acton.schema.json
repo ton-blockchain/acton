@@ -488,6 +488,10 @@
             }
           ]
         },
+        "no-mining": {
+          "description": "Disable automatic block production for `acton localnet start`",
+          "type": "boolean"
+        },
         "port": {
           "description": "Localnet port used by `acton localnet` commands",
           "default": 3000,

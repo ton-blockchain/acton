@@ -197,6 +197,11 @@ pub struct SetNetworkConditionsRequest {
     pub response_delay_ms: u64,
 }
 
+#[derive(Default, Deserialize)]
+pub struct MineBlocksRequest {
+    pub blocks: Option<u32>,
+}
+
 #[derive(Deserialize)]
 pub struct GetApiCallsRequest {
     pub limit: Option<usize>,

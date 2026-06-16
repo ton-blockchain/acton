@@ -1138,6 +1138,11 @@ pub enum LocalnetCommand {
         block_interval_ms: Option<u64>,
         #[arg(
             long,
+            help = "Disable automatic block production; mine blocks manually with `acton localnet mine` (default: [localnet].no-mining)"
+        )]
+        no_mining: bool,
+        #[arg(
+            long,
             help = "Load Localnet state from JSON snapshot before startup",
             conflicts_with = "db_path", // for now
             value_name = "PATH"
@@ -1167,6 +1172,24 @@ pub enum LocalnetCommand {
             value_parser = parse_positive_gram_amount
         )]
         amount: f64,
+        #[arg(
+            long,
+            short,
+            help = "Localnet server port (default: [localnet].port or 5411)"
+        )]
+        port: Option<u16>,
+        #[arg(long, help = "Localnet API token (default: ACTON_LOCALNET_AUTH_TOKEN)")]
+        auth_token: Option<String>,
+    },
+    #[command(about = "Mine localnet blocks manually")]
+    Mine {
+        #[arg(
+            help = "Number of blocks to mine",
+            default_value_t = 1,
+            value_name = "N",
+            value_parser = clap::value_parser!(u32).range(1..)
+        )]
+        blocks: u32,
         #[arg(
             long,
             short,
@@ -2398,6 +2421,7 @@ fn main() {
                 rate_limit,
                 response_delay_ms,
                 block_interval_ms,
+                no_mining,
                 load_state,
                 dump_state,
                 require_auth,
@@ -2410,6 +2434,7 @@ fn main() {
                     rate_limit,
                     response_delay_ms,
                     block_interval_ms,
+                    no_mining,
                 );
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
@@ -2425,6 +2450,7 @@ fn main() {
                         resolved_localnet.rate_limit,
                         resolved_localnet.response_delay_ms,
                         resolved_localnet.block_interval_ms,
+                        resolved_localnet.no_mining,
                         load_state,
                         dump_state,
                         require_auth,
@@ -2446,6 +2472,20 @@ fn main() {
                 rt.block_on(async {
                     commands::localnet::localnet_airdrop_cmd(&address, amount, port, auth_token)
                         .await
+                })
+            }
+            LocalnetCommand::Mine {
+                blocks,
+                port,
+                auth_token,
+            } => {
+                let port = resolve_localnet_port(port);
+                let rt = tokio::runtime::Builder::new_multi_thread()
+                    .enable_all()
+                    .build()
+                    .expect("Failed to build tokio runtime");
+                rt.block_on(async {
+                    commands::localnet::localnet_mine_cmd(blocks, port, auth_token).await
                 })
             }
             LocalnetCommand::Status {
@@ -2567,12 +2607,14 @@ struct ResolvedLocalnetSettings {
     rate_limit: Option<u32>,
     response_delay_ms: Option<u64>,
     block_interval_ms: u64,
+    no_mining: bool,
 }
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
-    resolve_localnet_settings(cli_port, None, None, None, None, None, None).port
+    resolve_localnet_settings(cli_port, None, None, None, None, None, None, false).port
 }
 
+#[allow(clippy::too_many_arguments)]
 fn resolve_localnet_settings(
     cli_port: Option<u16>,
     cli_fork_net: Option<String>,
@@ -2581,6 +2623,7 @@ fn resolve_localnet_settings(
     cli_rate_limit: Option<u32>,
     cli_response_delay_ms: Option<u64>,
     cli_block_interval_ms: Option<u64>,
+    cli_no_mining: bool,
 ) -> ResolvedLocalnetSettings {
     let config = load_localnet_settings_from_config();
     ResolvedLocalnetSettings {
@@ -2593,6 +2636,7 @@ fn resolve_localnet_settings(
         block_interval_ms: cli_block_interval_ms
             .or(config.block_interval_ms)
             .unwrap_or(ton_localnet::DEFAULT_BLOCK_INTERVAL_MS),
+        no_mining: cli_no_mining || config.no_mining.unwrap_or(false),
     }
 }
 

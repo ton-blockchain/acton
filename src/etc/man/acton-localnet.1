@@ -57,6 +57,12 @@ Delay TonCenter v2/v3 and Emulate API responses.
 Localnet block production interval.
 .RE
 .sp
+\fB\-\-no\-mining\fR
+.RS 4
+Disable automatic block production. Mine blocks manually with
+\fBacton localnet mine\fR or \fBPOST /acton_mine\fR\&.
+.RE
+.sp
 \fB\-\-load\-state\fR \fIpath\fR
 .RS 4
 Load Localnet state from a JSON snapshot before startup.
@@ -88,6 +94,27 @@ Recipient address.
 \fB\-a\fR, \fB\-\-amount\fR \fIgram\fR
 .RS 4
 Amount of GRAM to request.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton localnet mine"
+Mine localnet blocks manually.
+.SS "Synopsis"
+\fBacton localnet mine\fR [\fIoptions\fR] [\fIn\fR]
+.SS "Options"
+.sp
+\fIn\fR
+.RS 4
+Number of blocks to mine. Defaults to \fB1\fR\&.
 .RE
 .sp
 \fB\-p\fR, \fB\-\-port\fR \fIport\fR
@@ -134,6 +161,7 @@ accounts = ["deployer", "user"]
 rate\-limit = 1
 response\-delay\-ms = 300
 block\-interval\-ms = 500
+no\-mining = false
 .fi
 .RE
 .sp
@@ -207,8 +235,14 @@ to 500 ms, and still creates empty blocks when no transactions are queued
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-no\-mining\fR or \fB[localnet].no\-mining = true\fR disables automatic block
+production; use \fBacton localnet mine [N]\fR or \fBPOST /acton_mine\fR to create
+blocks manually
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'messages accepted through \fBsend_boc\fR, \fBacton_sendInternalMessage\fR, or the
-faucet are queued and included on a later block tick
+faucet are queued and included on a later automatic or manually mined block
 .RE
 .sp
 .RS 4
@@ -284,6 +318,11 @@ account state with a base64\-encoded \fBShardAccount\fR BOC
 .RS 4
 \h'-04'\(bu\h'+03'\fBPOST /acton_sendInternalMessage\fR with \fB{"boc":"<BASE64_BOC>"}\fR sends a
 base64\-encoded internal message BOC through the local internal queue
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_mine\fR with optional \fB{"blocks":N}\fR mines queued and/or empty
+blocks manually; \fBN\fR defaults to \fB1\fR
 .RE
 .sp
 .RS 4

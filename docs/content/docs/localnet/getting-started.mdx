@@ -45,6 +45,28 @@ Then target the same port for CLI helpers:
 acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
+## Mine Blocks Manually
+
+Use `--no-mining` when you want full control over block production:
+
+```bash
+acton localnet start --no-mining
+```
+
+Accepted messages stay queued until you mine blocks:
+
+```bash
+acton localnet mine
+acton localnet mine 5
+```
+
+You can also store the mode in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+no-mining = true
+```
+
 ## Simulate API Latency
 
 Use `--response-delay-ms` when you need local API requests to behave more like

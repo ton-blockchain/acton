@@ -1,0 +1,24 @@
+{
+  "cli_mine": {
+    "seqno_delta": 2
+  },
+  "config_no_mining_kept_seqno": true,
+  "default_mine": {
+    "block_count": 1,
+    "blocks_mined": 1,
+    "ok": true,
+    "seqno_delta": 1
+  },
+  "invalid_zero": {
+    "code": 500,
+    "error": "blocks must be greater than 0",
+    "ok": false
+  },
+  "queued_faucet": {
+    "balance_after_mine": "1000000000",
+    "balance_after_queue": "0",
+    "balance_before": "0",
+    "fund_ok": true,
+    "mine_ok": true
+  }
+}

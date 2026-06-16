@@ -59,6 +59,11 @@ Delay TonCenter v2/v3 and Emulate API responses.
 Localnet block production interval.
 {{/option}}
 
+{{#option "`--no-mining`" }}
+Disable automatic block production. Mine blocks manually with
+`acton localnet mine` or `POST /acton_mine`.
+{{/option}}
+
 {{#option "`--load-state` _path_" }}
 Load Localnet state from a JSON snapshot before startup.
 {{/option}}
@@ -94,6 +99,33 @@ Recipient address.
 
 {{#option "`-a`, `--amount` _gram_" }}
 Amount of GRAM to request.
+{{/option}}
+
+{{#option "`-p`, `--port` _port_" }}
+Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
+{{/options}}
+
+### acton localnet mine
+
+Mine localnet blocks manually.
+
+#### Synopsis
+
+`acton localnet mine` [_options_] [_n_]
+
+#### Options
+
+{{#options command="acton localnet mine"}}
+
+{{#option "_n_" }}
+Number of blocks to mine. Defaults to `1`.
 {{/option}}
 
 {{#option "`-p`, `--port` _port_" }}
@@ -147,6 +179,7 @@ accounts = ["deployer", "user"]
 rate-limit = 1
 response-delay-ms = 300
 block-interval-ms = 500
+no-mining = false
 ```
 
 CLI flags override config values for the current invocation.
@@ -203,8 +236,11 @@ and prints a fresh token.
   `http://127.0.0.1:<port>/`
 - the node produces a block every `--block-interval-ms` milliseconds, defaults
   to 500 ms, and still creates empty blocks when no transactions are queued
+- `--no-mining` or `[localnet].no-mining = true` disables automatic block
+  production; use `acton localnet mine [N]` or `POST /acton_mine` to create
+  blocks manually
 - messages accepted through `send_boc`, `acton_sendInternalMessage`, or the
-  faucet are queued and included on a later block tick
+  faucet are queued and included on a later automatic or manually mined block
 - a block can include multiple transactions; locally generated internal
   messages are processed in the same block when possible
 - the bundled UI is a single-page explorer app, so routes like `/explorer`,
@@ -241,6 +277,8 @@ tooling:
   account state with a base64-encoded `ShardAccount` BOC
 - `POST /acton_sendInternalMessage` with `{"boc":"<BASE64_BOC>"}` sends a
   base64-encoded internal message BOC through the local internal queue
+- `POST /acton_mine` with optional `{"blocks":N}` mines queued and/or empty
+  blocks manually; `N` defaults to `1`
 - `POST /acton_setNetworkConditions` with `{"response_delay_ms":300}` updates
   simulated network latency; use `0` to disable response delay
 
