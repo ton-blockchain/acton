@@ -10,8 +10,8 @@
     "./styles/*": "./src/styles/*"
   },
   "scripts": {
-    "fmt": "prettier --write -l --cache .",
-    "fmt:check": "prettier --check --cache .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write ."
   },

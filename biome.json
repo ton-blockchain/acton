@@ -8,16 +8,36 @@
   "files": {
     "ignoreUnknown": true,
     "includes": [
+      "crates/acton-localnet-ui/**/*.css",
+      "crates/acton-localnet-ui/**/*.html",
+      "crates/acton-localnet-ui/**/*.json",
       "crates/acton-localnet-ui/**/*.ts",
       "crates/acton-localnet-ui/**/*.tsx",
+      "crates/acton-shared-ui/**/*.css",
+      "crates/acton-shared-ui/**/*.json",
       "crates/acton-shared-ui/**/*.ts",
       "crates/acton-shared-ui/**/*.tsx",
+      "crates/acton-test-ui/**/*.css",
+      "crates/acton-test-ui/**/*.html",
+      "crates/acton-test-ui/**/*.json",
       "crates/acton-test-ui/**/*.ts",
       "crates/acton-test-ui/**/*.tsx"
     ]
   },
   "formatter": {
-    "enabled": false
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "bracketSpacing": false
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "asNeeded",
+      "quoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all"
+    }
   },
   "linter": {
     "enabled": true,

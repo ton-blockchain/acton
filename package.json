@@ -26,30 +26,8 @@
     "uuid": ">=14.0.0",
     "ws": ">=8.21.0"
   },
-  "prettier": {
-    "arrowParens": "avoid",
-    "bracketSpacing": false,
-    "printWidth": 100,
-    "semi": false,
-    "singleQuote": false,
-    "tabWidth": 2,
-    "trailingComma": "all",
-    "useTabs": false,
-    "overrides": [
-      {
-        "files": [
-          "*.yaml",
-          "*.yml"
-        ],
-        "options": {
-          "tabWidth": 2
-        }
-      }
-    ]
-  },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",
-    "@playwright/test": "1.59.0",
-    "prettier": "3.4.2"
+    "@playwright/test": "1.59.0"
   }
 }

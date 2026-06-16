@@ -9,8 +9,8 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "dev": "vite --port 3006",
-    "fmt": "prettier --write -l --cache .",
-    "fmt:check": "prettier --check --cache .",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
     "lint": "biome lint .",
     "lint:fix": "biome lint --write .",
     "precommit": "bun fmt && bun lint && bun build",
