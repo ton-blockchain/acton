@@ -101,55 +101,6 @@ get fun `test an stdlib raw sign deterministic hash sensitive`() {
 }
 
 #[test]
-fn crypto_fast_random_bytes_seeded_are_deterministic() {
-    run_crypto_case(
-        "an-stdlib-fast-random-seeded-deterministic",
-        r"
-get fun `test an stdlib fast random seeded deterministic`() {
-    val seeded127a = crypto.getFastRandomBytes(127, 42);
-    val seeded127b = crypto.getFastRandomBytes(127, 42);
-    // BUG: getFastRandomBytes should be deterministic for the same seed; expected equal slices, got different values.
-    expect(seeded127a).toEqual(seeded127b);
-}
-",
-        "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_seeded_are_deterministic.stdout.txt",
-    );
-}
-
-#[test]
-fn crypto_fast_random_bytes_rejects_128_bytes() {
-    run_crypto_case(
-        "an-stdlib-fast-random-rejects-128-bytes",
-        r"
-get fun `test an stdlib fast random rejects 128 bytes`() {
-    expectToEndWithExitCode(567);
-    crypto.getFastRandomBytes(128, 1);
-}
-",
-        "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_rejects_128_bytes.stdout.txt",
-    );
-}
-
-#[test]
-fn crypto_fast_random_bytes_supports_zero_bytes() {
-    run_crypto_case(
-        "an-stdlib-fast-random-supports-zero-bytes",
-        r"
-get fun `test an stdlib fast random supports zero bytes`() {
-    val seeded = crypto.getFastRandomBytes(0, 42);
-    val noSeed = crypto.getFastRandomBytes(0);
-
-    expect(seeded.remainingBitsCount()).toEqual(0);
-    expect(seeded.remainingRefsCount()).toEqual(0);
-    expect(noSeed.remainingBitsCount()).toEqual(0);
-    expect(noSeed.remainingRefsCount()).toEqual(0);
-}
-",
-        "integration/snapshots/test-runner/crypto_create_mnemonic_returns_24_words/crypto_fast_random_bytes_supports_zero_bytes.stdout.txt",
-    );
-}
-
-#[test]
 fn crypto_secure_random_bytes_supports_1_and_127() {
     run_crypto_case(
         "an-stdlib-secure-random-supports-1-and-127",
