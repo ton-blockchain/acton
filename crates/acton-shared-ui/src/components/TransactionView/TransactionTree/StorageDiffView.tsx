@@ -3,6 +3,7 @@ import type React from "react"
 import type {ContractData} from "@/types/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
+import {CopyValueButton} from "../CopyValueButton"
 
 import styles from "./StorageDiffView.module.css"
 import type {StorageDiffNode, StorageDiffStatus, StorageLeafValue} from "./storageDiff"
@@ -65,7 +66,7 @@ function renderLeafValue(
       )
     }
     case "scalar": {
-      return (
+      const valueElement = (
         <span
           className={
             DECIMAL_SCALAR_PATTERN.test(value.value)
@@ -76,6 +77,17 @@ function renderLeafValue(
           {value.value}
         </span>
       )
+
+      if (value.rawValue) {
+        return (
+          <span className={styles.storageLeafWithActions}>
+            {valueElement}
+            <CopyValueButton className={styles.copyButton} value={value.rawValue} />
+          </span>
+        )
+      }
+
+      return valueElement
     }
   }
 }
@@ -185,11 +197,18 @@ export function StorageDiffView({
     )
   }
 
+  const showContainerLabel =
+    diff.typeName && (diff.objectKind === "object" || diff.entries.length > 0)
+
   return (
     <div className={styles.storageObject}>
-      {diff.typeName && <span className={styles.storageTypeLabel}>{diff.typeName}</span>}
+      {showContainerLabel && <span className={styles.storageTypeLabel}>{diff.typeName}</span>}
       {diff.entries.length === 0 ? (
-        <span className={styles.storageDiffPlaceholder}>—</span>
+        <span
+          className={`${styles.storageDiffPill} ${styles.storageDiffPillNeutral} ${styles.storageEmptyPill}`}
+        >
+          <span className={styles.storageDiffPlaceholder}>—</span>
+        </span>
       ) : diff.objectKind === "map" ? (
         <div className={styles.storageNestedMap}>
           {diff.entries.map(entry => (

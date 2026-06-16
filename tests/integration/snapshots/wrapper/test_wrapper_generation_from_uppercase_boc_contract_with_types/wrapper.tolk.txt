@@ -14,12 +14,15 @@ struct Precompiled {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun Precompiled.fromStorage(toShard: AddressShardingOptions? = null): Precompiled {
+fun Precompiled.fromStorage(
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): Precompiled {
     val stateInit = ContractState {
         code: build("precompiled"),
         data: createEmptyCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return Precompiled { address, stateInit };
 }
 

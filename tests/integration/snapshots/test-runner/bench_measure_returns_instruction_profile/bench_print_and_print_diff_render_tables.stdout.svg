@@ -1,0 +1,127 @@
+<svg width="751px" height="902px" xmlns="http://www.w3.org/2000/svg">
+  <style>
+    .fg { fill: #AAAAAA }
+    .bg { fill: #000000 }
+    .bg-blue { stroke: #0000AA; fill: #0000AA; user-select: none;  }
+    .fg-green { fill: #00AA00 }
+    .fg-red { fill: #AA0000 }
+    .fg-yellow { fill: #AA5500 }
+    .container {
+      padding: 0 10px;
+      line-height: 18px;
+    }
+    .bold { font-weight: bold; }
+    .dimmed { opacity: 0.7; }
+    tspan {
+      font: 14px SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace;
+      white-space: pre;
+      line-height: 18px;
+    }
+  </style>
+
+  <rect width="100%" height="100%" y="0" rx="4.5" class="bg" />
+
+  <text xml:space="preserve" class="container fg">
+    <tspan x="10px" y="28px"><tspan>  </tspan><tspan class="fg-green bold">Installing</tspan><tspan> standard library [ACTON_VERSION]</tspan>
+</tspan>
+    <tspan x="10px" y="46px"><tspan>   </tspan><tspan class="fg-green bold">Compiling</tspan><tspan> contracts</tspan>
+</tspan>
+    <tspan x="10px" y="64px"><tspan>     </tspan><tspan class="fg-green bold">Running</tspan><tspan> tests</tspan>
+</tspan>
+    <tspan x="10px" y="82px">
+</tspan>
+    <tspan x="10px" y="100px"><tspan class="bg-blue">██████</tspan><tspan> </tspan><tspan>      </tspan>
+</tspan>
+    <tspan x="10px" y="100px"><tspan class="bold"> TEST </tspan><tspan> </tspan><tspan class="dimmed">[ROOT]</tspan>
+</tspan>
+    <tspan x="10px" y="118px">
+</tspan>
+    <tspan x="10px" y="136px"><tspan> </tspan><tspan class="dimmed">&gt;</tspan><tspan> tests/bench_format.test.tolk </tspan><tspan class="dimmed">(1 test)</tspan>
+</tspan>
+    <tspan x="10px" y="154px"><tspan>  </tspan><tspan class="fg-green">✓</tspan><tspan> bench format and format diff return tables </tspan><tspan class="fg-green">[TIME]</tspan>
+</tspan>
+    <tspan x="10px" y="172px"><tspan>    </tspan><tspan class="dimmed">└─</tspan><tspan> Test output:</tspan>
+</tspan>
+    <tspan x="10px" y="190px"><tspan>       Bench profile: </tspan><tspan class="fg-green">"current loop"</tspan>
+</tspan>
+    <tspan x="10px" y="208px"><tspan>       Total gas: </tspan><tspan class="fg-yellow">643</tspan>
+</tspan>
+    <tspan x="10px" y="226px"><tspan>       </tspan>
+</tspan>
+    <tspan x="10px" y="244px"><tspan>       ────────────────────────────────────────────────</tspan>
+</tspan>
+    <tspan x="10px" y="262px"><tspan>        Instruction    Count   Total   Avg   Min   Max</tspan>
+</tspan>
+    <tspan x="10px" y="280px"><tspan>       ────────────────────────────────────────────────</tspan>
+</tspan>
+    <tspan x="10px" y="298px"><tspan>        DUP                8     144    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="316px"><tspan>        INC                6     108    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="334px"><tspan>        LESSINT            4     104    26    26    26</tspan>
+</tspan>
+    <tspan x="10px" y="352px"><tspan>        ADD                3      54    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="370px"><tspan>        SWAP               3      54    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="388px"><tspan>        XCHG               3      54    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="406px"><tspan>        PUSHCONT           2      36    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="424px"><tspan>        implicit RET       7      35     5     5     5</tspan>
+</tspan>
+    <tspan x="10px" y="442px"><tspan>        DROP               1      18    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="460px"><tspan>        PUSHINT            1      18    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="478px"><tspan>        WHILE              1      18    18    18    18</tspan>
+</tspan>
+    <tspan x="10px" y="496px"><tspan>       </tspan>
+</tspan>
+    <tspan x="10px" y="514px"><tspan>       Bench diff: </tspan><tspan class="fg-green">"baseline add"</tspan><tspan> -&gt; </tspan><tspan class="fg-green">"current loop"</tspan>
+</tspan>
+    <tspan x="10px" y="532px"><tspan>       Baseline gas for </tspan><tspan class="fg-green">"baseline add"</tspan><tspan>: </tspan><tspan class="fg-yellow">18</tspan>
+</tspan>
+    <tspan x="10px" y="550px"><tspan>       Current gas for </tspan><tspan class="fg-green">"current loop"</tspan><tspan>: </tspan><tspan class="fg-yellow">643</tspan>
+</tspan>
+    <tspan x="10px" y="568px"><tspan>       Gas diff: </tspan><tspan class="fg-red">+625</tspan><tspan> (</tspan><tspan class="fg-red">+3472.22%</tspan><tspan>)</tspan>
+</tspan>
+    <tspan x="10px" y="586px"><tspan>       </tspan>
+</tspan>
+    <tspan x="10px" y="604px"><tspan>       ────────────────────────────────────────────────────────────────────────────────</tspan>
+</tspan>
+    <tspan x="10px" y="622px"><tspan>        Instruction    Baseline   Current   Diff   %        Base Count   Current Count</tspan>
+</tspan>
+    <tspan x="10px" y="640px"><tspan>       ────────────────────────────────────────────────────────────────────────────────</tspan>
+</tspan>
+    <tspan x="10px" y="658px"><tspan>        DUP                   0       144   +144      n/a            0               8</tspan>
+</tspan>
+    <tspan x="10px" y="676px"><tspan>        INC                   0       108   +108      n/a            0               6</tspan>
+</tspan>
+    <tspan x="10px" y="694px"><tspan>        LESSINT               0       104   +104      n/a            0               4</tspan>
+</tspan>
+    <tspan x="10px" y="712px"><tspan>        ADD                   0        54    +54      n/a            0               3</tspan>
+</tspan>
+    <tspan x="10px" y="730px"><tspan>        SWAP                  0        54    +54      n/a            0               3</tspan>
+</tspan>
+    <tspan x="10px" y="748px"><tspan>        XCHG                  0        54    +54      n/a            0               3</tspan>
+</tspan>
+    <tspan x="10px" y="766px"><tspan>        PUSHCONT              0        36    +36      n/a            0               2</tspan>
+</tspan>
+    <tspan x="10px" y="784px"><tspan>        implicit RET          0        35    +35      n/a            0               7</tspan>
+</tspan>
+    <tspan x="10px" y="802px"><tspan>        DROP                  0        18    +18      n/a            0               1</tspan>
+</tspan>
+    <tspan x="10px" y="820px"><tspan>        WHILE                 0        18    +18      n/a            0               1</tspan>
+</tspan>
+    <tspan x="10px" y="838px"><tspan>        PUSHINT              18        18      0   +0.00%            1               1</tspan>
+</tspan>
+    <tspan x="10px" y="856px">
+</tspan>
+    <tspan x="10px" y="874px"><tspan> </tspan><tspan class="fg-green bold">✓</tspan><tspan> </tspan><tspan class="fg-green bold">1</tspan><tspan> </tspan><tspan class="fg-green bold">passed</tspan><tspan> </tspan><tspan class="dimmed">in</tspan><tspan> </tspan><tspan class="fg-green">1</tspan><tspan> </tspan><tspan class="fg-green dimmed">file</tspan>
+</tspan>
+    <tspan x="10px" y="892px">
+</tspan>
+  </text>
+
+</svg>

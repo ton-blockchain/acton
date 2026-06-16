@@ -2,7 +2,7 @@
   "abi_schema_version": "1.0",
   "alias_instantiations": [],
   "compiler_name": "tolk",
-  "compiler_version": "1.4.0",
+  "compiler_version": "1.4.1",
   "contract_name": "Precompiled",
   "declarations": [
     {

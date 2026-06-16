@@ -12,12 +12,13 @@ license = { workspace = true }
 
 [dependencies]
 ton-executor = { workspace = true }
-tvm-ffi = { workspace = true }
+tvm-ffi = { workspace = true, features = ["derive"] }
 tycho-types = { workspace = true }
 base64 = { workspace = true }
 anyhow = { workspace = true }
 crc = { workspace = true }
 num-bigint = { workspace = true }
+reqwest = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 

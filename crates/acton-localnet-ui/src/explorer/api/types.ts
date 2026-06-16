@@ -128,9 +128,109 @@ export interface V3TracesResponse {
   readonly traces: readonly V3Trace[]
 }
 
+export interface V3TransactionsResponse {
+  readonly address_book: Record<string, unknown>
+  readonly transactions: readonly V3TransactionListItem[]
+}
+
+export type StreamingFinality = "pending" | "confirmed" | "finalized"
+
+export interface StreamingTransactionsEvent {
+  readonly type: "transactions"
+  readonly finality: StreamingFinality
+  readonly trace_external_hash_norm?: string
+  readonly transactions: readonly V3Transaction[]
+}
+
+export interface V3TransactionListItem {
+  readonly account: string
+  readonly hash: string
+  readonly lt: string
+  readonly now: number
+  readonly total_fees: string
+  readonly description: {
+    readonly type: string
+    readonly aborted: boolean
+    readonly compute_ph: {
+      readonly skipped: boolean
+      readonly success: boolean
+      readonly exit_code: number
+    }
+    readonly action: {
+      readonly success: boolean
+      readonly result_code: number
+    }
+  }
+  readonly in_msg?: V3Message | null
+  readonly out_msgs: readonly V3Message[]
+  readonly block_ref: {
+    readonly workchain: number
+    readonly shard: string
+    readonly seqno: number
+  }
+  readonly mc_block_seqno: number
+}
+
+export interface LocalnetNodeInfo {
+  readonly uptime_seconds: number
+  readonly last_block_seqno: number
+  readonly state_source: string
+  readonly fork_network?: string | null
+  readonly fork_block_number?: number | null
+  readonly network_conditions?: {
+    readonly response_delay_ms: number
+  }
+}
+
+export type ApiCallStatus = "success" | "failed"
+export type ApiCallType = "read" | "write"
+export type ApiCallFamily = "control" | "emulate" | "json_rpc" | "streaming" | "v2" | "v3"
+
+export interface ApiCallRecord {
+  readonly sequence: number
+  readonly status: ApiCallStatus
+  readonly status_code: number
+  readonly call_type: ApiCallType
+  readonly api_family: ApiCallFamily
+  readonly http_method: string
+  readonly path: string
+  readonly method: string
+  readonly request_id: unknown
+  readonly timestamp_ms: number
+  readonly duration_ns: number
+}
+
+export interface ApiCallLogResponse {
+  readonly calls: readonly ApiCallRecord[]
+  readonly total_retained: number
+  readonly max_retained: number
+}
+
+export interface StartupWallet {
+  readonly name: string
+  readonly mnemonic: readonly string[]
+  readonly version: string
+  readonly network: string
+  readonly address: string
+  readonly public_key: string
+  readonly wallet_id: number
+}
+
+export interface V3RunGetMethodStackEntry {
+  readonly type: string
+  readonly value: unknown
+}
+
+export interface V3RunGetMethodResponse {
+  readonly gas_used: number
+  readonly exit_code: number
+  readonly stack: readonly V3RunGetMethodStackEntry[]
+  readonly vm_log: string
+}
+
 export interface V3Trace {
   readonly trace_id: string
-  readonly external_hash: string
+  readonly external_hash?: string | null
   readonly mc_seqno_start: string
   readonly mc_seqno_end: string
   readonly start_lt: string
@@ -153,10 +253,10 @@ export interface V3Trace {
 
 export interface V3TraceNode {
   readonly tx_hash: string
-  readonly in_msg_hash: string
-  readonly in_msg?: V3Message
-  readonly transaction: V3Transaction
-  readonly children: readonly V3TraceNode[]
+  readonly in_msg_hash?: string
+  readonly in_msg?: V3Message | null
+  readonly transaction?: V3Transaction
+  readonly children?: readonly V3TraceNode[]
 }
 
 export interface V3Transaction {
@@ -175,14 +275,41 @@ export interface V3Transaction {
     readonly compute_ph: {
       readonly skipped: boolean
       readonly success: boolean
+      readonly msg_state_used?: boolean
+      readonly account_activated?: boolean
+      readonly gas_fees?: string
+      readonly gas_used?: string
+      readonly gas_limit?: string
+      readonly gas_credit?: string
+      readonly mode?: number
       readonly exit_code: number
+      readonly exit_arg?: number
+      readonly vm_steps?: number
+      readonly vm_init_state_hash?: string
+      readonly vm_final_state_hash?: string
     }
     readonly action: {
       readonly success: boolean
+      readonly valid?: boolean
+      readonly no_funds?: boolean
       readonly result_code: number
+      readonly result_arg?: number
+      readonly tot_actions?: number
+      readonly spec_actions?: number
+      readonly skipped_actions?: number
+      readonly msgs_created?: number
+      readonly total_fwd_fees?: string
+      readonly total_action_fees?: string
+      readonly action_list_hash?: string
+      readonly tot_msg_size?: {
+        readonly cells?: string
+        readonly bits?: string
+      }
     }
+    readonly credit_first?: boolean
+    readonly destroyed?: boolean
   }
-  readonly in_msg?: V3Message
+  readonly in_msg?: V3Message | null
   readonly out_msgs: readonly V3Message[]
   readonly block_ref: {
     readonly workchain: number
@@ -190,8 +317,21 @@ export interface V3Transaction {
     readonly seqno: number
   }
   readonly mc_block_seqno: number
-  readonly raw_transaction: string
-  readonly child_transactions: readonly string[]
+  readonly child_transactions?: readonly string[] | null
+  readonly account_state_before?: V3TransactionAccountState | null
+  readonly account_state_after?: V3TransactionAccountState | null
+}
+
+export interface V3TransactionAccountState {
+  readonly hash: string
+  readonly balance: string
+  readonly code_boc?: string | null
+  readonly extra_currencies: Record<string, string>
+  readonly account_status: string
+  readonly data_boc?: string | null
+  readonly frozen_hash?: string | null
+  readonly data_hash?: string | null
+  readonly code_hash?: string | null
 }
 
 export interface V3Message {
@@ -204,9 +344,14 @@ export interface V3Message {
   readonly import_fee: string
   readonly created_lt: string
   readonly created_at: string
+  readonly ihr_disabled?: boolean
   readonly bounce: boolean
   readonly bounced: boolean
   readonly message_content: {
+    readonly hash: string
+    readonly body: string
+  }
+  readonly init_state?: {
     readonly hash: string
     readonly body: string
   }
@@ -240,6 +385,50 @@ export interface JettonWallet {
   readonly jetton: string
   readonly last_transaction_lt: string
   readonly owner: string
+}
+
+export interface JettonWalletData {
+  readonly balance: string
+  readonly jetton: string
+  readonly owner: string
+}
+
+export interface VerificationSourceResponse {
+  readonly address: string | null
+  readonly code_hash: string
+  readonly verified: boolean
+  readonly onchain: OnchainVerification
+  readonly bundles: readonly SourceBundle[]
+}
+
+export interface OnchainVerification {
+  readonly master_address: string
+  readonly verification_record_address: string
+}
+
+export interface SourceBundle {
+  readonly source_bundle_hash: string
+  readonly verified_at: number
+  readonly commit: string | null
+  readonly bundle_path: string
+  readonly language: string
+  readonly compiler_version: string
+  readonly entrypoint: string
+  readonly compile_params: unknown
+  readonly sources: readonly SourceFileSummary[]
+  readonly files: readonly SourceFile[]
+}
+
+export interface SourceFileSummary {
+  readonly path: string
+  readonly is_entrypoint: boolean
+}
+
+export interface SourceFile {
+  readonly path: string
+  readonly sha256: string
+  readonly content_base64: string
+  readonly content_text: string | null
 }
 
 export interface NftCollection {

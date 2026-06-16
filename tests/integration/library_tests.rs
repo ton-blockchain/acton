@@ -17,6 +17,10 @@ use toml::Value as TomlValue;
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 
 const LIB_HASH: &str = "b993c68c596425f05d1bc492d7c03e2979ab669901ed5a57e35e6dd4d6089d27";
+const PUBLISH_TEST_CODE_ARG: &str = "te6cckEBAQEAAgAAAEysuc0=";
+const PUBLISH_TEST_CODE_BOC64: &str = "te6ccgEBAQEAAgAAAA==";
+const PUBLISH_TEST_CODE_HASH: &str =
+    "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7";
 const LOCALNET_LIBRARY_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
@@ -820,6 +824,7 @@ fn test_library_publish_interactive_cancel_confirmation() {
     use expectrl::Eof;
 
     let project = ProjectBuilder::new("library-publish-interactive-cancel").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
 
     let wallets_toml = r#"[wallets.wallet]
 kind = "v5r1"
@@ -833,6 +838,10 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
 
     let mut session = project
         .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
         .library()
         .publish()
         .with_code("te6cckEBAQEAAgAAAEysuc0=")
@@ -845,7 +854,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("No", "failed to send cancellation response");
     session.expect(Eof);
 
@@ -853,6 +862,505 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         !project.path().join("libraries.toml").exists(),
         "libraries.toml should not be created when publish is cancelled"
     );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_library_publish_prompts_to_topup_tracked_exact_match() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-topup-tracked-exact-match").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    write_publish_library_metadata_file(
+        &project.path().join("libraries.toml"),
+        "tracked-lib",
+        "testnet",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .with_net("testnet")
+        .arg("--amount")
+        .arg("1")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Library with this hash is already tracked on testnet:");
+    session.expect("Top up an existing tracked library instead of publishing a new one?");
+    session.send_line("Yes", "failed to choose tracked library top-up");
+    session.expect("Send 1 GRAM to top-up library?");
+    session.send_line("No", "failed to cancel tracked library top-up");
+    session.expect(Eof);
+    session.assert_file_snapshot_matches(
+        "libraries.toml",
+        "integration/snapshots/library/test_library_publish_prompts_to_topup_tracked_exact_match.libraries.toml",
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_library_publish_prompts_to_topup_tracked_exact_match_from_global_libraries() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-topup-global-exact-match").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let global_path = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries")
+        .join("global.libraries.toml");
+    write_publish_library_metadata_file(
+        &global_path,
+        "global-tracked-lib",
+        "testnet",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .with_net("testnet")
+        .arg("--amount")
+        .arg("1")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Library with this hash is already tracked on testnet:");
+    session.expect("global-tracked-lib in global.libraries.toml");
+    session.expect("Top up an existing tracked library instead of publishing a new one?");
+    session.send_line("Yes", "failed to choose tracked library top-up");
+    session.expect("Send 1 GRAM to top-up library?");
+    session.send_line("No", "failed to cancel tracked library top-up");
+    session.expect(Eof);
+
+    fs::copy(&global_path, project.path().join("global.libraries.toml"))
+        .expect("failed to copy global libraries file for snapshot assertion");
+    session.assert_file_snapshot_matches(
+        "global.libraries.toml",
+        "integration/snapshots/library/test_library_publish_prompts_to_topup_tracked_exact_match_from_global_libraries.global.libraries.toml",
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[cfg(unix)]
+#[test]
+fn test_library_publish_selects_specific_tracked_match_and_updates_global_topup_timestamp() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-topup-selects-global-match").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let local_path = project.path().join("libraries.toml");
+    write_publish_library_metadata_file(
+        &local_path,
+        "local-tracked-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+    let global_path = home_temp
+        .path()
+        .join(".config")
+        .join("acton")
+        .join("libraries")
+        .join("global.libraries.toml");
+    write_publish_library_metadata_file(
+        &global_path,
+        "global-tracked-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let before_local = read_library_entry(&local_path, "local-tracked-lib");
+    let before_global = read_library_entry(&global_path, "global-tracked-lib");
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Library with this hash is already tracked on mock-v2:");
+    session.expect("local-tracked-lib in local libraries.toml");
+    session.expect("global-tracked-lib in global.libraries.toml");
+    session.expect("Top up an existing tracked library instead of publishing a new one?");
+    session.send_line("Yes", "failed to choose tracked library top-up");
+    session.expect("Select tracked library to top up:");
+    session.send_line(
+        "global-tracked-lib",
+        "failed to select global tracked library",
+    );
+    session.expect("Send 1 GRAM to top-up library?");
+    session.send_line("Yes", "failed to confirm selected tracked library top-up");
+    session.expect("Top-up transaction sent successfully");
+    session.expect(Eof);
+
+    let after_local = read_library_entry(&local_path, "local-tracked-lib");
+    let after_global = read_library_entry(&global_path, "global-tracked-lib");
+    assert_eq!(
+        before_local.last_topup_timestamp, after_local.last_topup_timestamp,
+        "local tracked library timestamp should stay unchanged when global match is selected"
+    );
+    assert_ne!(
+        before_global.last_topup_timestamp, after_global.last_topup_timestamp,
+        "selected global tracked library timestamp should be updated after top-up"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(captured.len(), 2, "expected seqno + sendBoc requests");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[cfg(unix)]
+#[test]
+fn test_library_publish_declines_tracked_topup_and_continues_publish() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-decline-tracked-topup").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+    let libraries_path = project.path().join("libraries.toml");
+    write_publish_library_metadata_file(
+        &libraries_path,
+        "tracked-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--local")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Top up an existing tracked library instead of publishing a new one?");
+    session.send_line("No", "failed to decline tracked library top-up");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
+    session.send_line("Yes", "failed to confirm publish after declining top-up");
+    session.expect("Transaction sent successfully");
+    session.expect("Library info saved");
+    session.expect(Eof);
+
+    let content = fs::read_to_string(&libraries_path).expect("failed to read libraries.toml");
+    assert!(
+        content.contains("[libraries.tracked-lib]") && content.contains("[libraries.unknown]"),
+        "declining top-up should continue publish and append new metadata, got:\n{content}"
+    );
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected getLibraries check + seqno + sendBoc requests"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_yes_with_tracked_match_warns_and_continues_publish() {
+    let project = ProjectBuilder::new("library-publish-yes-tracked-match-warns").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+    write_publish_library_metadata_file(
+        &project.path().join("libraries.toml"),
+        "tracked-lib",
+        "custom:mock-v2",
+        "2026-01-05T12:00:00Z",
+    );
+
+    project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .run()
+        .success()
+        .assert_contains("Library with this hash is already tracked on mock-v2:")
+        .assert_contains("Library info saved")
+        .assert_not_contains("Top up an existing tracked library instead of publishing a new one?");
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "--yes should skip tracked prompts but still run warning-only on-chain getLibraries check"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[cfg(unix)]
+#[test]
+fn test_library_publish_warns_on_onchain_match_and_continues_publish() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-onchain-match-warning").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_ok_response(PUBLISH_TEST_CODE_ARG),
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--local")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
+    session.send_line("Yes", "failed to confirm publish");
+    session.expect("Library code with this hash is already available on-chain on mock-v2.");
+    session.expect("Transaction sent successfully");
+    session.expect("Library info saved");
+    session.expect(Eof);
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected getLibraries warning check + seqno + sendBoc requests"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_library_publish_yes_warns_on_onchain_match_and_continues_publish() {
+    let project = ProjectBuilder::new("library-publish-yes-onchain-match-warning").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_ok_response(PUBLISH_TEST_CODE_ARG),
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--yes")
+        .arg("--local")
+        .run()
+        .success()
+        .assert_contains("Library code with this hash is already available on-chain on mock-v2.")
+        .assert_contains("Library info saved");
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected getLibraries warning check + seqno + sendBoc requests"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[cfg(unix)]
+#[test]
+fn test_library_publish_ignores_onchain_check_error_and_continues_publish() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-onchain-check-error-ignored").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_error_response("mock getLibraries failure"),
+        toncenter_v2_get_libraries_error_response("mock getLibraries failure"),
+        toncenter_v2_get_libraries_error_response("mock getLibraries failure"),
+        toncenter_v2_seqno_ok_response(),
+        toncenter_v2_send_boc_ok_response(),
+    ]);
+    append_custom_network(project.path(), "mock-v2", &mock_url);
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .arg("--net")
+        .arg("custom:mock-v2")
+        .arg("--amount")
+        .arg("1")
+        .arg("--local")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(30)));
+
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
+    session.send_line("Yes", "failed to confirm publish");
+    session.expect("Transaction sent successfully");
+    session.expect("Library info saved");
+    session.expect(Eof);
+
+    mock_handle.join().expect("mock toncenter v2 must finish");
+    let captured = captured
+        .lock()
+        .expect("captured toncenter v2 requests mutex poisoned");
+    assert_eq!(
+        captured.len(),
+        5,
+        "expected retried getLibraries check + seqno + sendBoc requests"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn test_library_publish_same_hash_different_network_does_not_prompt_to_topup() {
+    use expectrl::Eof;
+
+    let project = ProjectBuilder::new("library-publish-same-hash-different-network").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
+    write_deployer_wallets(project.path());
+    write_publish_library_metadata_file(
+        &project.path().join("libraries.toml"),
+        "tracked-on-mainnet",
+        "mainnet",
+        "2026-01-05T12:00:00Z",
+    );
+
+    let mut session = project
+        .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
+        .library()
+        .publish()
+        .with_code(PUBLISH_TEST_CODE_ARG)
+        .with_duration("1d")
+        .wallet("deployer")
+        .with_net("testnet")
+        .arg("--amount")
+        .arg("1")
+        .spawn_pty()
+        .set_expect_timeout(Some(Duration::from_secs(20)));
+
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
+    session.send_line(
+        "No",
+        "failed to cancel publish after skipping top-up prompt",
+    );
+    session.expect(Eof);
 }
 
 #[cfg(unix)]
@@ -899,7 +1407,7 @@ address-testnet = "kQBBSo2ccLuHuGiTn1z9Lei17LfBVOPewQmFR8pA2dAv2ixT"
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(20)));
 
-    session.expect("Send 1 TON to top-up library?");
+    session.expect("Send 1 GRAM to top-up library?");
     session.send_line("No", "failed to send cancellation response");
     session.expect(Eof);
     session.assert_file_snapshot_matches(
@@ -1815,7 +2323,7 @@ fn test_library_topup_happy_path_with_duration_and_prompted_amount() {
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to provide amount for duration-based topup");
     session.expect("Top-up transaction sent successfully");
     session.expect(Eof);
@@ -1892,6 +2400,7 @@ fn test_library_publish_uses_testnet_env_api_key() {
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
@@ -1939,6 +2448,7 @@ fn test_library_publish_uses_mainnet_env_api_key_for_mainnet() {
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
@@ -2186,7 +2696,7 @@ fn test_library_publish_interactive_empty_amount_exits_without_metadata_changes(
         .spawn_pty()
         .set_expect_timeout(Some(Duration::from_secs(30)));
 
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line(
         "   ",
         "failed to submit whitespace amount input that should trim to empty",
@@ -2216,6 +2726,7 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_error_response("mock publish failure"),
         toncenter_v2_send_boc_error_response("mock publish failure"),
@@ -2253,8 +2764,8 @@ fn test_library_publish_reports_send_boc_failure_and_skips_metadata_save() {
         .expect("captured toncenter v2 requests mutex poisoned");
     assert_eq!(
         captured.len(),
-        4,
-        "expected seqno + 3 failing sendBoc retries"
+        5,
+        "expected getLibraries check + seqno + 3 failing sendBoc retries"
     );
 }
 
@@ -2265,6 +2776,7 @@ fn test_library_publish_retries_send_boc_and_succeeds_on_third_attempt() {
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_error_response("transient publish failure"),
         toncenter_v2_send_boc_error_response("transient publish failure"),
@@ -2300,11 +2812,12 @@ fn test_library_publish_retries_send_boc_and_succeeds_on_third_attempt() {
         .expect("captured toncenter v2 requests mutex poisoned");
     assert_eq!(
         captured.len(),
-        4,
-        "expected seqno + 2 failing sendBoc retries + final success"
+        5,
+        "expected getLibraries check + seqno + 2 failing sendBoc retries + final success"
     );
-    assert_eq!(captured[0].path, "/jsonRPC");
-    for request in &captured[1..] {
+    assert!(captured[0].path.starts_with("/getLibraries?libraries="));
+    assert_eq!(captured[1].path, "/jsonRPC");
+    for request in &captured[2..] {
         assert_eq!(request.path, "/sendBoc");
     }
 }
@@ -2591,9 +3104,11 @@ fn test_library_publish_fully_interactive_happy_path_without_flags() {
     use expectrl::Eof;
 
     let project = ProjectBuilder::new("library-publish-fully-interactive-happy").build();
+    let home_temp = tempfile::TempDir::new().expect("failed to create home temp dir");
     write_deployer_wallets(project.path());
 
     let (mock_url, mock_handle, captured) = spawn_toncenter_v2_mock(vec![
+        toncenter_v2_get_libraries_not_found_response(),
         toncenter_v2_seqno_ok_response(),
         toncenter_v2_send_boc_ok_response(),
     ]);
@@ -2601,6 +3116,10 @@ fn test_library_publish_fully_interactive_happy_path_without_flags() {
 
     let mut session = project
         .acton()
+        .env(
+            "HOME",
+            home_temp.path().to_str().expect("home path should be utf8"),
+        )
         .library()
         .publish()
         .with_code("te6cckEBAQEAAgAAAEysuc0=")
@@ -2612,9 +3131,9 @@ fn test_library_publish_fully_interactive_happy_path_without_flags() {
 
     session.expect("Enter duration");
     session.send_line("1d", "failed to send duration for interactive publish");
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to send amount for interactive publish");
-    session.expect("Send 1 TON to publish library? Note that any extra TON will be refunded.");
+    session.expect("Send 1 GRAM to publish library? Note that any extra GRAM will be refunded.");
     session.send_line("Yes", "failed to confirm interactive publish");
     session.expect("Save library info to:");
     session.send_line("", "failed to select default local storage");
@@ -2630,7 +3149,11 @@ fn test_library_publish_fully_interactive_happy_path_without_flags() {
     let captured = captured
         .lock()
         .expect("captured toncenter v2 requests mutex poisoned");
-    assert_eq!(captured.len(), 2, "expected seqno + sendBoc requests");
+    assert_eq!(
+        captured.len(),
+        3,
+        "expected getLibraries check + seqno + sendBoc requests"
+    );
 }
 
 #[allow(clippy::significant_drop_tightening)]
@@ -2670,7 +3193,7 @@ fn test_library_topup_fully_interactive_happy_path_without_duration_or_amount_fl
     session.send_line("", "failed to select default wallet");
     session.expect("Enter duration to top up for");
     session.send_line("1d", "failed to send duration for interactive topup");
-    session.expect("Enter amount in TON");
+    session.expect("Enter amount in GRAM");
     session.send_line("1", "failed to send amount for interactive topup");
     session.expect("Top-up transaction sent successfully");
     session.expect(Eof);
@@ -2889,6 +3412,21 @@ fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
     }
 }
 
+fn toncenter_v2_get_libraries_not_found_response() -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "result": [{
+                    "found": false
+                }]
+            }
+        })
+        .to_string(),
+    }
+}
+
 fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
@@ -2981,6 +3519,36 @@ cells = 4
     .expect("failed to write library metadata");
 }
 
+fn write_publish_library_metadata_file(
+    path: &Path,
+    library_id: &str,
+    network: &str,
+    last_topup: &str,
+) {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).expect("failed to create publish library metadata directory");
+    }
+
+    fs::write(
+        path,
+        format!(
+            r#"[libraries.{library_id}]
+name = "MyLib"
+hash = "{PUBLISH_TEST_CODE_HASH}"
+code = "{PUBLISH_TEST_CODE_BOC64}"
+account = "{TEST_LIBRARY_ACCOUNT}"
+duration = 31536000
+network = "{network}"
+timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "{last_topup}"
+bits = 1024
+cells = 4
+"#,
+        ),
+    )
+    .expect("failed to write publish library metadata");
+}
+
 fn append_custom_network(project_path: &Path, network_name: &str, v2_url: &str) {
     use std::fmt::Write as _;
 
@@ -3024,6 +3592,42 @@ api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
     );
     fs::write(&acton_toml_path, acton_toml).expect("failed to write Acton.toml with localnet");
+}
+
+fn read_library_entry(path: &Path, library_id: &str) -> StoredLibraryEntry {
+    let content = fs::read_to_string(path).expect("failed to read libraries file");
+    let doc: TomlValue = toml::from_str(&content).expect("libraries file should be valid TOML");
+    let libraries = doc
+        .get("libraries")
+        .and_then(TomlValue::as_table)
+        .expect("libraries table should be present");
+    let entry = libraries
+        .get(library_id)
+        .and_then(TomlValue::as_table)
+        .unwrap_or_else(|| panic!("library entry '{library_id}' should be present"));
+
+    StoredLibraryEntry {
+        hash: entry
+            .get("hash")
+            .and_then(TomlValue::as_str)
+            .expect("library hash should be present")
+            .to_string(),
+        account: entry
+            .get("account")
+            .and_then(TomlValue::as_str)
+            .expect("library account should be present")
+            .to_string(),
+        network: entry
+            .get("network")
+            .and_then(TomlValue::as_str)
+            .expect("library network should be present")
+            .to_string(),
+        last_topup_timestamp: entry
+            .get("last_topup_timestamp")
+            .and_then(TomlValue::as_str)
+            .expect("last_topup_timestamp should be present")
+            .to_string(),
+    }
 }
 
 fn read_first_library_entry(path: &Path) -> (String, StoredLibraryEntry) {

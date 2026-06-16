@@ -70,6 +70,19 @@ network.
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
 .RS 4
 Historical block sequence number to fork from.
+.sp
+When a fork block number is set, Acton caches resolved remote accounts under
+\fBbuild/cache/<network>/<seqno>/<workchain>_<address\-hash>.json\fR\&. Later script
+runs with the same fork network, block number, and address read that file before
+calling the remote API.
+.RE
+.sp
+\fB\-\-no\-fork\-cache\fR
+.RS 4
+Disable persistent account cache for pinned fork block numbers. Use this when
+you want every script run to fetch forked accounts from the remote API. The
+regular \fB\-\-clear\-cache\fR flag removes this cache together with the rest of
+\fBbuild/cache\fR\&.
 .RE
 .SS "Broadcasting Options"
 .sp
@@ -201,11 +214,15 @@ Forwarded arguments are parsed against the ABI for \fBmain()\fR\&.
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fBany_address\fR accepts an internal address or the \fBaddr_none\fR literal
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'arrays accept \fB[item1, item2]\fR
 .RE
 .sp
 Unsupported parameter types currently include \fBstructs\fR, \fBtuple\fR, \fBmap\fR,
-\fBdict\fR, \fBbuilder\fR, \fBany_address\fR and other complex types.
+\fBdict\fR, \fBbuilder\fR and other complex types.
 .SH "SIDE EFFECTS"
 \fBacton script\fR always compiles and executes the selected script. With
 \fB\-\-net\fR, it can send real blockchain transactions; without \fB\-\-net\fR, execution
@@ -284,7 +301,17 @@ TONCENTER_MAINNET_API_KEY=your\-key acton script query.tolk \-\-fork\-net mainne
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Broadcast a deploy flow and print explorer links:
+\h'-04' 5.\h'+01'Run against a protected localnet:
+.sp
+.RS 4
+.nf
+ACTON_LOCALNET_AUTH_TOKEN=localnet\-token acton script scripts/deploy.tolk \-\-net localnet
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 6.\h'+01'Broadcast a deploy flow and print explorer links:
 .sp
 .RS 4
 .nf
@@ -294,7 +321,7 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-explorer tonscan
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Broadcast through TON Connect instead of local wallet keys:
+\h'-04' 7.\h'+01'Broadcast through TON Connect instead of local wallet keys:
 .sp
 .RS 4
 .nf
@@ -305,6 +332,9 @@ acton script scripts/deploy.tolk \-\-net testnet \-\-tonconnect
 .SH "TONCENTER API KEYS"
 Built\-in \fBmainnet\fR/\fBtestnet\fR requests read \fBTONCENTER_MAINNET_API_KEY\fR or
 \fBTONCENTER_TESTNET_API_KEY\fR, depending on the selected network.
+.sp
+Protected \fBlocalnet\fR requests read \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. Use the token
+printed by \fBacton localnet start \-\-require\-auth\fR\&.
 .sp
 For \fBcustom:<name>\fR, Acton reads \fB<NORMALIZED_NAME>_API_KEY\fR\&. Custom network
 names are uppercased and non\-alphanumeric characters are replaced with \fB_\fR, so

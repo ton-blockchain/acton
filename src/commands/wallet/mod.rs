@@ -18,7 +18,7 @@ use std::io::{IsTerminal, Read, Write, stdin, stdout};
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::sync::mpsc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use toml_edit::{DocumentMut, Item, Table, value};
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
@@ -87,7 +87,7 @@ struct ResolvedAirdropWallet {
 
 enum AirdropTarget {
     Testnet { faucet_url: String },
-    Localnet { port: u16, amount_ton: f64 },
+    Localnet { port: u16, amount_grams: f64 },
 }
 
 impl AirdropTarget {
@@ -106,7 +106,7 @@ const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const CHALLENGE_VERSION: [u32; 1] = [1];
 const DEFAULT_FAUCET_URL: &str = "https://faucet.ton.org/";
 const DEFAULT_LOCALNET_PORT: u16 = 5411;
-const LOCALNET_WALLET_AIRDROP_AMOUNT_TON: f64 = 100.0;
+const LOCALNET_WALLET_AIRDROP_AMOUNT_GRAMS: f64 = 100.0;
 const AIRDROP_BALANCE_WAIT_ATTEMPTS: usize = 10;
 const AIRDROP_BALANCE_WAIT_INTERVAL: Duration = Duration::from_secs(2);
 const TEST_WALLET_KEYRING_SUPPORTED_ENV: &str = "ACTON_TEST_WALLET_KEYRING_SUPPORTED"; // integration tests only
@@ -165,7 +165,7 @@ pub enum WalletCommand {
         secure: Option<bool>,
         #[arg(
             long,
-            help = "Request testnet TON from faucet after wallet creation",
+            help = "Request testnet GRAM from faucet after wallet creation",
             default_value_t = false
         )]
         airdrop: bool,
@@ -236,7 +236,7 @@ pub enum WalletCommand {
         #[arg(long, help = "Output result as JSON")]
         json: bool,
     },
-    #[command(about = "Request TON coins from testnet or localnet faucet")]
+    #[command(about = "Request GRAM from testnet or localnet faucet")]
     Airdrop {
         #[arg(help = "Name of the wallet (prompts if not provided)")]
         name: Option<String>,
@@ -417,8 +417,8 @@ fn perform_airdrop_for_wallet(
         AirdropTarget::Testnet { faucet_url } => {
             perform_testnet_airdrop(wallet.address, faucet_url, json)
         }
-        AirdropTarget::Localnet { port, amount_ton } => {
-            perform_localnet_airdrop(wallet.address, amount_ton, port)
+        AirdropTarget::Localnet { port, amount_grams } => {
+            perform_localnet_airdrop(wallet.address, amount_grams, port)
         }
     }
 }
@@ -443,7 +443,7 @@ fn resolve_airdrop_target(
 
             Ok(AirdropTarget::Localnet {
                 port,
-                amount_ton: LOCALNET_WALLET_AIRDROP_AMOUNT_TON,
+                amount_grams: LOCALNET_WALLET_AIRDROP_AMOUNT_GRAMS,
             })
         }
     }
@@ -470,7 +470,7 @@ fn perform_testnet_airdrop(
         .build()
         .context("Failed to build HTTP client")?;
 
-    // Faucet for testnet TON uses Proof-of-Work so we need to solve it to get coins
+    // Faucet for testnet GRAM uses Proof-of-Work so we need to solve it to get coins.
 
     // 1. Get challenge
     if !json {
@@ -525,7 +525,7 @@ fn perform_testnet_airdrop(
             challenge_data.difficulty
         );
     }
-    let start = std::time::Instant::now();
+    let start = Instant::now();
     let nonce = solve_challenge(&challenge_data.challenge, challenge_data.difficulty)?;
     let duration = start.elapsed();
     if !json {
@@ -578,7 +578,7 @@ fn perform_testnet_airdrop(
 
 fn perform_localnet_airdrop(
     address: String,
-    amount_ton: f64,
+    amount_grams: f64,
     port: u16,
 ) -> anyhow::Result<AirdropResult> {
     let client = crate::http::blocking_client_builder()
@@ -587,13 +587,17 @@ fn perform_localnet_airdrop(
         .user_agent(crate::build_info::user_agent())
         .build()
         .context("Failed to build HTTP client")?;
-    let amount_nanotons = (amount_ton * 1_000_000_000.0) as u128;
-    let response = client
+    let amount_nanograms = (amount_grams * 1_000_000_000.0) as u128;
+    let auth_token = crate::commands::localnet::resolve_localnet_auth_token(None);
+    let initial_balance =
+        fetch_localnet_account_balance(&client, port, &address, auth_token.as_deref());
+    let request = client
         .post(format!("http://127.0.0.1:{port}/acton_fundAccount"))
         .json(&serde_json::json!({
             "address": address,
-            "amount": amount_nanotons,
-        }))
+            "amount": amount_nanograms,
+        }));
+    let response = with_localnet_blocking_auth(request, auth_token.as_deref())
         .send()
         .context(
             "Failed to send request to localnet faucet. Make sure `acton localnet start` is running",
@@ -612,7 +616,17 @@ fn perform_localnet_airdrop(
                 .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false)
         {
-            let message = format!("Successfully airdropped {amount_ton} TON on localnet");
+            let expected_balance = initial_balance
+                .context("Failed to read localnet balance before faucet request")?
+                .saturating_add(amount_nanograms);
+            wait_for_localnet_airdrop_balance(
+                &client,
+                port,
+                &address,
+                expected_balance,
+                auth_token.as_deref(),
+            )?;
+            let message = format!("Successfully airdropped {amount_grams} GRAM on localnet");
             Ok(AirdropResult {
                 address,
                 difficulty: None,
@@ -631,6 +645,63 @@ fn perform_localnet_airdrop(
         let status = response.status();
         let body = response.text().unwrap_or_default();
         anyhow::bail!("Localnet faucet returned error {status}: {body}");
+    }
+}
+
+fn fetch_localnet_account_balance(
+    client: &reqwest::blocking::Client,
+    port: u16,
+    address: &str,
+    auth_token: Option<&str>,
+) -> anyhow::Result<u128> {
+    let request = client
+        .get(format!(
+            "http://127.0.0.1:{port}/api/v2/getAddressInformation"
+        ))
+        .query(&[("address", address)]);
+    let response: serde_json::Value = with_localnet_blocking_auth(request, auth_token)
+        .send()
+        .context("Failed to query localnet account balance")?
+        .json()
+        .context("Failed to parse localnet account balance response")?;
+
+    response
+        .pointer("/result/balance")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("0")
+        .parse::<u128>()
+        .context("Failed to parse localnet account balance")
+}
+
+fn wait_for_localnet_airdrop_balance(
+    client: &reqwest::blocking::Client,
+    port: u16,
+    address: &str,
+    expected_balance: u128,
+    auth_token: Option<&str>,
+) -> anyhow::Result<()> {
+    let deadline = Instant::now() + Duration::from_secs(12);
+    loop {
+        if fetch_localnet_account_balance(client, port, address, auth_token).unwrap_or_default()
+            >= expected_balance
+        {
+            return Ok(());
+        }
+
+        if Instant::now() >= deadline {
+            anyhow::bail!("Timed out waiting for localnet airdrop balance");
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn with_localnet_blocking_auth(
+    request: reqwest::blocking::RequestBuilder,
+    auth_token: Option<&str>,
+) -> reqwest::blocking::RequestBuilder {
+    match auth_token.map(str::trim).filter(|token| !token.is_empty()) {
+        Some(token) => request.bearer_auth(token),
+        None => request,
     }
 }
 
@@ -758,7 +829,7 @@ fn solve_challenge_with_limits(
         anyhow::bail!("PoW difficulty must be at most 256 bits");
     }
 
-    let started_at = std::time::Instant::now();
+    let started_at = Instant::now();
     let mut nonce: u64 = 0;
     loop {
         if started_at.elapsed() >= max_duration {
@@ -1118,12 +1189,12 @@ fn list_wallets(balance: bool, json: bool) -> anyhow::Result<()> {
 
         if balance {
             if let Some(b) = balances.get(&address) {
-                let balance_ton = *b as f64 / 1_000_000_000.0;
+                let balance_grams = *b as f64 / 1_000_000_000.0;
                 balance_val = Some(*b);
-                balance_info = format!("— {}", format!("{balance_ton:.4} TON").green());
+                balance_info = format!("— {}", format!("{balance_grams:.4} GRAM").green());
             } else {
                 balance_val = Some(0.into());
-                balance_info = format!("— {}", "0 TON".dimmed());
+                balance_info = format!("— {}", "0 GRAM".dimmed());
             }
         }
 
@@ -1311,7 +1382,7 @@ fn resolve_auto_airdrop(airdrop_flag: bool, json: bool) -> anyhow::Result<bool> 
         return Ok(false);
     }
 
-    Confirm::new("Request testnet TON from faucet now?")
+    Confirm::new("Request testnet GRAM from faucet now?")
         .with_default(false)
         .prompt()
         .context("Failed to read auto-airdrop confirmation")
@@ -1443,22 +1514,23 @@ fn maybe_wait_for_testnet_airdrop_balance(
             Ok(Some(balance))
                 if testnet_airdrop_balance_has_arrived(balance_before_airdrop, balance) =>
             {
-                let balance_ton = balance as f64 / 1_000_000_000.0;
+                let balance_grams = balance as f64 / 1_000_000_000.0;
                 if let Some(balance_before_airdrop) = balance_before_airdrop
                     && balance_before_airdrop > 0
                 {
-                    let increase_ton = (balance - balance_before_airdrop) as f64 / 1_000_000_000.0;
+                    let increase_grams =
+                        (balance - balance_before_airdrop) as f64 / 1_000_000_000.0;
                     println!(
                         "{} Testnet balance increased: {} ({})",
                         "✓".green(),
-                        format!("{balance_ton:.4} TON").green(),
-                        format!("+{increase_ton:.4} TON").green()
+                        format!("{balance_grams:.4} GRAM").green(),
+                        format!("+{increase_grams:.4} GRAM").green()
                     );
                 } else {
                     println!(
                         "{} Testnet funds are available: {}",
                         "✓".green(),
-                        format!("{balance_ton:.4} TON").green()
+                        format!("{balance_grams:.4} GRAM").green()
                     );
                 }
                 return;
@@ -1788,16 +1860,16 @@ fn new_wallet(
             }
             println!(
                 "\n{}",
-                "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
+                "NOTE: This is a testnet wallet. Testnet GRAM has NO VALUE.".yellow()
             );
         } else {
             println!(
                 "\n{}",
-                "NOTE: This is a testnet wallet. Coins in testnet have NO VALUE.".yellow()
+                "NOTE: This is a testnet wallet. Testnet GRAM has NO VALUE.".yellow()
             );
 
             println!(
-                "\nTo get testnet coins run {} or check official documentation: {}",
+                "\nTo get testnet GRAM run {} or check official documentation: {}",
                 "acton wallet airdrop".yellow(),
                 "https://docs.ton.org/ecosystem/wallet-apps/get-coins#how-to-get-coins-on-testnet"
                     .underline(),

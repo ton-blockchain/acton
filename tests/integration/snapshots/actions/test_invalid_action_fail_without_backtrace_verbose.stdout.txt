@@ -11,7 +11,7 @@
   ✓ action fail [TIME]
     └─ Test output:
        N/A -> deployer A
-       └── empty 0.2 TON -> simple B                                                   gas=823 aborted action_result_code=34
+       └── empty 0.2 GRAM -> simple B                                                  gas=823 aborted action_result_code=34
            ├── account created
            ├── Action phase failed
            ├── Description: Action is invalid or not supported

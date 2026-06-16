@@ -3,12 +3,6 @@ title: "Precompiled BoC contracts"
 description: "Use a precompiled .boc file as a contract source while keeping wrappers and ABI available"
 ---
 
-<Callout type="warn" title="Coming in Acton 1.1">
-  The `types = ...` companion file described below is not available in the
-  current Acton release yet and will be released in Acton 1.1. You can try it
-  earlier in a [trunk release](/docs/installation#trunk-releases).
-</Callout>
-
 Most contracts in an Acton project start from `.tolk` files. Sometimes you only
 have the compiled contract code: a `.boc` artifact from another repository, a
 release bundle, or a contract whose source is generated elsewhere.
@@ -53,6 +47,8 @@ so Acton cannot rebuild it with generated dependency helpers. Put `depends` on
 the `.tolk` contract that needs the BoC code, like `Parent` above.
 
 ## Add typed tooling
+
+<AvailabilityBadge since="Acton 1.1" />
 
 The BoC alone has no ABI. Acton can read and embed the code, but it cannot know
 which storage type, messages, or get methods belong to it.

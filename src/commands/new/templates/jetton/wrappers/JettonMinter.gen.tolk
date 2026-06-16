@@ -19,12 +19,13 @@ struct JettonMinter {
 fun JettonMinter.fromStorage(
     storage: MinterStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): JettonMinter {
     val stateInit = ContractState {
         code: build("JettonMinter"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return JettonMinter { address, stateInit };
 }
 

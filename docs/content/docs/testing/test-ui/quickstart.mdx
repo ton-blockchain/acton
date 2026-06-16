@@ -1,9 +1,9 @@
 ---
 title: "Quickstart"
-description: "Step-by-step guide to run Test UI and inspect failed tests, traces, transactions, and logs"
+description: "Step-by-step guide to run Test UI and inspect failed tests, traces, transactions, logs, and gas profiles"
 ---
 
-The `acton test --ui` runs the suite, opens the browser UI, and surfaces failed tests, traces, and logs.
+The `acton test --ui` runs the suite, opens the browser UI, and surfaces failed tests, traces, logs, coverage, and gas profiles.
 
 ## 1. Run tests with UI
 
@@ -22,9 +22,13 @@ acton test tests/counter.test.tolk --ui --filter "test deploy"
 
 # Open Test UI with coverage viewer enabled
 acton test --coverage --ui
+
+# Open Test UI with gas profile flamegraphs enabled
+acton test --gas-profile build/gas.cpuprofile --ui
 ```
 
 With both `--coverage` and `--ui`, an extra `Coverage` tab appears next to the regular test results view.
+With both `--gas-profile` and `--ui`, an extra `Profile` tab appears. Add `--gas-profile-include-tests` when you need gas profiles for `.test.tolk` unit-test get-method execution.
 
 ## 2. Open failed test first
 
@@ -59,7 +63,16 @@ Open `Logs` tab:
 - `Executor Log` for high-level execution flow
 - `VM Log` for low-level VM details
 
+## 5. Inspect gas hot paths
+
+Open `Profile` tab when the run includes `--gas-profile --ui`:
+
+- use the top-level `Profile` tab to compare contract flamegraphs
+- use the per-test `Profile` tab to inspect unit-test hot paths collected with `--gas-profile-include-tests`
+- click a flamegraph block to see source location, total gas, self gas, and contract share
+
 ## Common issues
 
 - UI server did not start: selected port may be busy; try `--ui-port 23456`.
 - Coverage tab is missing: rerun tests with both `--coverage` and `--ui`.
+- Profile tab is missing: rerun tests with both `--gas-profile <FILE>` and `--ui`.

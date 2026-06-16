@@ -520,6 +520,24 @@ fn fuzz_supported_address_and_nullable_types_report_inputs() {
 }
 
 #[test]
+fn fuzz_address_parameters_are_passed_as_slices() {
+    run_seeded_success_snapshot(
+        "fuzz-address-slices",
+        &with_imports(
+            EXPECT_IMPORT,
+            r"
+            @test.fuzz(1)
+            get fun `test fuzz address slices`(owner: address, target: any_address) {
+                expect(owner as any_address).toBeInternalAddress();
+                expect(target).toBeInternalAddress();
+            }
+        ",
+        ),
+        "address_parameters_are_passed_as_slices",
+    );
+}
+
+#[test]
 fn fuzz_cli_seed_overrides_acton_toml_seed() {
     let snapshot_path = snapshot_path("cli_seed_overrides_acton_toml_seed");
     fuzz_project(

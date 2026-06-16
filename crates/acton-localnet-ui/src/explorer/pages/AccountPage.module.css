@@ -1,8 +1,12 @@
 .container {
-  padding: var(--spacing-lg) var(--spacing-md);
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: 15px;
+  box-sizing: border-box;
 }
 
 .loading {
@@ -12,7 +16,7 @@
 }
 
 .error {
-  background-color: rgba(239, 68, 68, 0.1);
+  background-color: var(--litenode-danger-bg-soft);
   border: 1px solid var(--tonscan-error);
   color: var(--tonscan-error);
   padding: var(--spacing-md);
@@ -24,96 +28,577 @@
   padding: var(--spacing-xl);
   color: var(--tonscan-text-secondary);
   background-color: var(--tonscan-card-bg);
-  border-radius: var(--border-radius-md);
+  border-radius: 16px;
   border: 1px solid var(--tonscan-border);
 }
 
 .topSection {
-  display: flex;
-  gap: var(--spacing-lg);
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+  gap: 16px;
   align-items: stretch;
 }
 
+.topSectionSingle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .topSection > :first-child {
+  min-width: 0;
+  height: 100%;
+}
+
+.contextColumn {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 16px;
+  min-width: 0;
+}
+
+.contextColumn > .jettonInfo {
   flex: 1;
 }
 
 .jettonInfo {
-  flex: 1;
-  background-color: var(--tonscan-card-bg);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--tonscan-border);
-  padding: var(--spacing-lg);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: 16px;
+  min-width: 0;
+  min-height: 133px;
+  padding: 20px 24px;
+  background: var(--tonscan-card-bg);
+  border: 0;
+  border-radius: 12px;
+  box-shadow: none;
+  box-sizing: border-box;
 }
 
 .jettonHeader {
   display: flex;
-  gap: var(--spacing-md);
+  justify-content: flex-start;
+  gap: 12px;
   align-items: center;
+  min-height: 40px;
+}
+
+.jettonMasterInfo {
+  justify-content: flex-start;
+}
+
+.jettonHeaderContent {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 2px;
+  min-width: 0;
 }
 
 .jettonTitle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .jettonImage {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  border: 0;
+  background: transparent;
   object-fit: cover;
+  flex: 0 0 auto;
 }
 
 .jettonName {
-  font-size: 1.25rem;
-  font-weight: 600;
+  display: block;
+  min-width: 0;
   color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .jettonSymbol {
-  font-size: 0.875rem;
+  margin-top: 0;
   color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: 20px;
+}
+
+.jettonSupply {
+  min-width: 0;
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  line-height: 18px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jettonMetadataButton {
+  align-self: flex-start;
+  min-height: 18px;
+  padding: 0;
+  color: var(--tonscan-link);
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-normal);
+  line-height: 18px;
+}
+
+.jettonMetadataButton:hover {
+  text-decoration: underline;
+}
+
+.jettonMetadataButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.addressCopyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 7px;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.addressCopyButton:hover {
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-bg-secondary);
+}
+
+.addressCopyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.addressCopyButtonCopied {
+  color: var(--tonscan-text-primary);
 }
 
 .jettonDescription {
-  font-size: 0.875rem;
   color: var(--tonscan-text-secondary);
-  line-height: 1.4;
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--tonscan-border);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  max-width: 68ch;
+  overflow-wrap: anywhere;
+}
+
+.jettonDivider {
+  height: 1px;
+  background: var(--tonscan-border);
 }
 
 .jettonDetails {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
-  margin-top: var(--spacing-sm);
+  gap: 12px;
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
 }
 
 .jettonRow {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--spacing-xs) 0;
-  border-bottom: 1px solid var(--tonscan-border);
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 0;
+  min-height: 20px;
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.jettonRow:last-child {
+  border-bottom: none;
 }
 
 .jettonLabel {
-  color: var(--tonscan-text-secondary);
-  font-size: 0.875rem;
+  flex: 0 0 144px;
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  line-height: 20px;
 }
 
 .jettonValue {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
   color: var(--tonscan-text-primary);
-  font-weight: 500;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: 20px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.jettonValue[onClick] {
+.jettonAddressValue {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.jettonAddressValue .jettonValue {
+  flex: 0 1 auto;
+  max-width: calc(100% - 28px);
+}
+
+.jettonLink {
   cursor: pointer;
+  border-radius: 6px;
+}
+
+.jettonLink:hover {
   color: var(--tonscan-link);
 }
 
-.jettonValue[onClick]:hover {
+.jettonLink:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.metadataOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.64);
+  backdrop-filter: blur(6px);
+}
+
+.metadataDialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  width: min(600px, 100%);
+  max-height: min(680px, calc(100dvh - 48px));
+  box-sizing: border-box;
+  padding: 24px;
+  overflow: auto;
+  background: var(--tonscan-card-bg);
+  border-radius: 12px;
+  box-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.12),
+    0 4px 4px rgba(0, 0, 0, 0.04);
+}
+
+.metadataTitle {
+  margin: 0;
+  color: var(--tonscan-text-primary);
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
+}
+
+.metadataHero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 32px;
+  align-items: start;
+}
+
+.metadataMain {
+  min-width: 0;
+}
+
+.metadataTokenTitle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 14px;
+  color: var(--tonscan-text-primary);
+  font-size: 1.25rem;
+  font-weight: var(--font-weight-bold);
+  line-height: 24px;
+}
+
+.metadataTokenTitle span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadataTokenImage {
+  width: 100px;
+  height: 100px;
+  margin-top: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 auto;
+}
+
+.metadataCloseButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--tonscan-card-bg);
+  background: var(--tonscan-text-secondary);
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.metadataCloseButton:hover {
+  color: var(--tonscan-card-bg);
+  background: var(--tonscan-text-primary);
+}
+
+.metadataCloseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.metadataSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.metadataRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  min-width: 0;
+  min-height: 20px;
+}
+
+.metadataLabel {
+  flex: 0 0 144px;
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-bold);
+  line-height: 20px;
+}
+
+.metadataValue {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-normal);
+  line-height: 20px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadataLink {
+  color: var(--tonscan-link);
+  cursor: pointer;
+}
+
+.metadataLink:hover {
   text-decoration: underline;
+}
+
+.metadataLink:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.metadataDescription {
+  margin: 0;
+  color: var(--tonscan-text-primary);
+  font-size: var(--font-size-sm);
+  line-height: 20px;
+}
+
+.metadataJsonFrame {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--litenode-control-hover);
+  border-radius: 12px;
+}
+
+.metadataJsonCopyButton {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.metadataJsonCopyButton:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.metadataJsonCopyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.metadataJson {
+  margin: 0;
+  padding: 16px 44px 16px 16px;
+  overflow: auto;
+  color: var(--tonscan-text-primary);
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  line-height: 18px;
+}
+
+.metadataJsonKey {
+  color: var(--tonscan-text-primary);
+}
+
+.metadataJsonValue {
+  color: var(--tonscan-link);
+}
+
+@media (max-width: 1100px) {
+  .topSection {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 620px) {
+  .jettonInfo {
+    min-height: 0;
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .jettonHeader {
+    align-items: flex-start;
+  }
+
+  .jettonRow {
+    flex-direction: column;
+    gap: 3px;
+    min-height: 0;
+    padding: 9px 0;
+  }
+
+  .jettonLabel {
+    flex-basis: auto;
+  }
+
+  .metadataOverlay {
+    padding: 12px;
+  }
+
+  .metadataDialog {
+    gap: 20px;
+    max-height: calc(100dvh - 24px);
+    padding: 24px 16px 16px;
+    border-radius: 14px;
+  }
+
+  .metadataTitle,
+  .metadataTokenTitle {
+    font-size: 1.25rem;
+    line-height: 24px;
+  }
+
+  .metadataHero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .metadataTokenTitle {
+    margin-bottom: 14px;
+  }
+
+  .metadataTokenImage {
+    width: 88px;
+    height: 88px;
+    margin-top: 0;
+  }
+
+  .metadataCloseButton {
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+  }
+
+  .metadataRow {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .metadataLabel {
+    flex-basis: auto;
+    font-size: var(--font-size-sm);
+  }
+
+  .metadataValue,
+  .metadataDescription {
+    font-size: var(--font-size-sm);
+  }
+
+  .metadataJsonFrame {
+    border-radius: 12px;
+  }
+
+  .metadataJson {
+    padding: 16px 40px 16px 16px;
+    font-size: var(--font-size-xs);
+  }
+
+  .metadataJsonCopyButton {
+    top: 10px;
+    right: 10px;
+    width: 24px;
+    height: 24px;
+  }
 }

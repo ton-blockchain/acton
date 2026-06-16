@@ -1,0 +1,13 @@
+{
+  "accepted": {
+    "hash_matches": true,
+    "hash_norm_matches": true
+  },
+  "after_next_tick": {
+    "has_transaction": true,
+    "matched_normalized_hash": true
+  },
+  "before_next_tick": {
+    "transaction_count": 0
+  }
+}

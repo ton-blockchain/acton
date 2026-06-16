@@ -419,7 +419,8 @@ fn setup_counter_project(method_name: &str) -> DebugSession {
 
     let builder = DebugBuilder::new("debug-callback")
         .project_ref(project)
-        .executable_file("main.tolk");
+        .executable_file("main.tolk")
+        .without_outer_frame_local_snapshots();
 
     builder.method_name(method_name).build()
 }

@@ -147,6 +147,8 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const CATALOG_WALLET_V4R2_CODE_HASH: &str =
+    "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 
 const V3_GETTER_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
@@ -156,6 +158,43 @@ get fun addTen(value: int): int {
     return value + 10;
 }
 ";
+
+const PREVBLOCKS_GETTER_CONTRACT: &str = r#"
+fun onInternalMessage(_: InMessage) {}
+fun onBouncedMessage(_: InMessageBounced) {}
+
+@pure
+fun prevMcBlocks(): tuple
+    asm "PREVMCBLOCKS"
+
+@pure
+fun prevKeyBlock(): tuple
+    asm "PREVKEYBLOCK"
+
+@pure
+fun prevMcBlocks100(): tuple
+    asm "PREVMCBLOCKS_100"
+
+fun blockSeqno(block: tuple): int {
+    return block.get(2) as int;
+}
+
+get fun prevMcBlocksCount(): int {
+    return prevMcBlocks().size();
+}
+
+get fun latestPrevMcSeqno(): int {
+    return blockSeqno(prevMcBlocks().first() as tuple);
+}
+
+get fun prevKeySeqno(): int {
+    return blockSeqno(prevKeyBlock());
+}
+
+get fun prevMcBlocks100FirstSeqno(): int {
+    return blockSeqno(prevMcBlocks100().first() as tuple);
+}
+"#;
 
 const V3_DEPLOY_GETTER_SCRIPT: &str = r#"
 import "../../lib/build"
@@ -260,7 +299,7 @@ fun main() {
         dest: {
             stateInit: counterInit,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("DEPLOY_NULL");
         return;
     }
@@ -275,7 +314,7 @@ fun main() {
         body: IncreaseCounter {
             increaseBy: 5,
         },
-    })).waitForFirstTransaction(true, 30, 100) == null) {
+    })).waitForFirstTransaction(true, 40, 25) == null) {
         println("INCREASE_NULL");
         return;
     }
@@ -458,6 +497,514 @@ fn localnet_starts_and_serves_masterchain_info() {
 }
 
 #[test]
+fn localnet_mines_empty_blocks_on_interval_without_transactions() {
+    let project = ProjectBuilder::new("localnet-empty-interval-blocks").build();
+    let node = project.localnet().start();
+
+    let initial_seqno = latest_masterchain_seqno(&node);
+    let empty_block_seqno = initial_seqno + 1;
+    let target_seqno = initial_seqno + 2;
+    let reached_seqno =
+        wait_for_masterchain_seqno_at_least(&node, target_seqno, Duration::from_secs(5));
+
+    let block = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getBlockTransactionsExt?seqno={empty_block_seqno}"),
+        Duration::from_secs(5),
+    );
+    let block_payload = response_payload(&block);
+    let transactions = block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactionsExt must return transactions array");
+
+    let snapshot = json!({
+        "target_seqno_reached": reached_seqno >= target_seqno,
+        "empty_block": {
+            "type": block_payload["@type"].as_str(),
+            "req_count": block_payload["req_count"].as_u64(),
+            "transaction_count": transactions.len(),
+            "incomplete": block_payload["incomplete"].as_bool(),
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_empty_interval_blocks.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_no_mining_mines_only_on_request() {
+    let project = ProjectBuilder::new("localnet-no-mining-manual-blocks").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
+
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let initial_seqno = latest_masterchain_seqno(&node);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&node);
+
+    let mine_default = node.post_json("/acton_mine", &json!({}));
+    let default_payload = response_payload(&mine_default);
+    let after_default_seqno = latest_masterchain_seqno(&node);
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("mine")
+        .arg("2")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let after_cli_seqno = latest_masterchain_seqno(&node);
+
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let before_faucet = node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000_u64
+        }),
+    );
+    let after_faucet_before_mine =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let mine_faucet = node.post_json("/acton_mine", &json!({}));
+    let after_faucet_mine =
+        wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
+
+    let mut invalid_zero = node.post_json("/acton_mine", &json!({ "blocks": 0 }));
+    normalize_extra_for_snapshot(&mut invalid_zero);
+
+    let snapshot = json!({
+        "config_no_mining_kept_seqno": after_sleep_seqno == initial_seqno,
+        "default_mine": {
+            "ok": mine_default["ok"].as_bool(),
+            "blocks_mined": default_payload["blocks_mined"].as_u64(),
+            "block_count": default_payload["blocks"].as_array().map(Vec::len),
+            "seqno_delta": after_default_seqno - initial_seqno,
+        },
+        "cli_mine": {
+            "seqno_delta": after_cli_seqno - after_default_seqno,
+        },
+        "queued_faucet": {
+            "fund_ok": fund["ok"].as_bool(),
+            "balance_before": parse_address_balance(&before_faucet).to_string(),
+            "balance_after_queue": parse_address_balance(&after_faucet_before_mine).to_string(),
+            "mine_ok": mine_faucet["ok"].as_bool(),
+            "balance_after_mine": parse_address_balance(&after_faucet_mine).to_string(),
+        },
+        "invalid_zero": {
+            "ok": invalid_zero["ok"].as_bool(),
+            "code": invalid_zero["code"].as_i64(),
+            "error": invalid_zero["error"].as_str(),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_no_mining_manual_blocks.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
+    let project = ProjectBuilder::new("localnet-time-controls").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
+
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+
+    let first_mine = node.post_json("/acton_mine", &json!({}));
+    let first_seqno = response_payload(&first_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let first_gen_utime = block_header_gen_utime(&node, first_seqno);
+
+    let increase = node.post_json("/acton_increaseTime", &json!({ "seconds": 3600 }));
+    let increase_payload = response_payload(&increase);
+    let second_mine = node.post_json("/acton_mine", &json!({}));
+    let second_seqno = response_payload(&second_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let second_gen_utime = block_header_gen_utime(&node, second_seqno);
+
+    let target = "0:3333333333333333333333333333333333333333333333333333333333333333";
+    let next_block_timestamp = second_gen_utime + 7200;
+    let next_block_timestamp_arg = next_block_timestamp.to_string();
+    project
+        .acton()
+        .arg("localnet")
+        .arg("set-next-block-timestamp")
+        .arg(&next_block_timestamp_arg)
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let pending_status = node.get_json("/acton_nodeInfo");
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000_u64
+        }),
+    );
+    let next_timestamp_mine = node.post_json("/acton_mine", &json!({}));
+    let tx_block_seqno = response_payload(&next_timestamp_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let tx_block_gen_utime = block_header_gen_utime(&node, tx_block_seqno);
+    let tx_response = wait_for_v3_transactions_response(
+        &node,
+        &format!("/api/v3/transactions?account={target}&limit=10"),
+        Duration::from_secs(3),
+    );
+    let txs = v3_transactions_from_response(&tx_response);
+    let faucet_tx_now = txs
+        .first()
+        .and_then(|tx| tx["now"].as_u64())
+        .expect("faucet transaction must expose now") as u32;
+    let cleared_status = node.get_json("/acton_nodeInfo");
+
+    let set_time_target = tx_block_gen_utime + 1800;
+    let set_time = node.post_json("/acton_setTime", &json!({ "timestamp": set_time_target }));
+    let set_time_mine = node.post_json("/acton_mine", &json!({}));
+    let set_time_seqno = response_payload(&set_time_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let set_time_block_gen_utime = block_header_gen_utime(&node, set_time_seqno);
+
+    let mut invalid_backwards = node.post_json(
+        "/acton_setNextBlockTimestamp",
+        &json!({ "timestamp": set_time_block_gen_utime - 1 }),
+    );
+    normalize_extra_for_snapshot(&mut invalid_backwards);
+    let mut invalid_zero_increase = node.post_json("/acton_increaseTime", &json!({ "seconds": 0 }));
+    normalize_extra_for_snapshot(&mut invalid_zero_increase);
+
+    let snapshot = json!({
+        "increase_time": {
+            "ok": increase["ok"].as_bool(),
+            "offset_at_least_requested": increase_payload["time_offset_seconds"]
+                .as_i64()
+                .is_some_and(|offset| offset >= 3600),
+            "block_advanced_by_requested_delta": second_gen_utime >= first_gen_utime + 3600,
+        },
+        "next_block_timestamp": {
+            "pending_matches_requested_timestamp": pending_status["result"]["next_block_timestamp"]
+                .as_u64()
+                == Some(u64::from(next_block_timestamp)),
+            "fund_ok": fund["ok"].as_bool(),
+            "block_matches_requested_timestamp": tx_block_gen_utime == next_block_timestamp,
+            "tx_now_matches_block": faucet_tx_now == tx_block_gen_utime,
+            "pending_cleared_after_mine": cleared_status["result"]["next_block_timestamp"].is_null(),
+        },
+        "set_time": {
+            "ok": set_time["ok"].as_bool(),
+            "block_at_or_after_requested_time": set_time_block_gen_utime >= set_time_target,
+        },
+        "invalid_backwards": {
+            "ok": invalid_backwards["ok"].as_bool(),
+            "code": invalid_backwards["code"].as_i64(),
+            "error_contains_latest_block": invalid_backwards["error"]
+                .as_str()
+                .is_some_and(|error| error.contains("before latest block timestamp")),
+        },
+        "invalid_zero_increase": {
+            "ok": invalid_zero_increase["ok"].as_bool(),
+            "code": invalid_zero_increase["code"].as_i64(),
+            "error": invalid_zero_increase["error"].as_str(),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_time_controls.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
+    let project = ProjectBuilder::new("localnet-recovery-points").build();
+    let db_path = project.path().join("localnet.sqlite");
+    let db_path_arg = db_path.display().to_string();
+
+    let node = project
+        .localnet()
+        .args(["--no-mining", "--db-path", db_path_arg.as_str()])
+        .start();
+
+    let first_mine = node.post_json("/acton_mine", &json!({}));
+    let first_seqno = response_payload(&first_mine)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let first_gen_utime = block_header_gen_utime(&node, first_seqno);
+
+    let older_snapshot = node.post_json("/acton_snapshot", &json!({}));
+    let older_snapshot_id = response_payload(&older_snapshot)["id"]
+        .as_u64()
+        .expect("snapshot response must expose id");
+
+    let next_block_timestamp = first_gen_utime + 300;
+    let set_next = node.post_json(
+        "/acton_setNextBlockTimestamp",
+        &json!({ "timestamp": next_block_timestamp }),
+    );
+    let snapshot = node.post_json("/acton_snapshot", &json!({}));
+    let snapshot_id = response_payload(&snapshot)["id"]
+        .as_u64()
+        .expect("snapshot response must expose id");
+
+    let target = "0:4444444444444444444444444444444444444444444444444444444444444444";
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": target,
+            "amount": 1_000_000_000u128,
+        }),
+    );
+    let mine_faucet = node.post_json("/acton_mine", &json!({}));
+    let faucet_block_seqno = response_payload(&mine_faucet)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let faucet_block_gen_utime = block_header_gen_utime(&node, faucet_block_seqno);
+    let target_after_mine =
+        wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
+
+    let newer_snapshot = node.post_json("/acton_snapshot", &json!({}));
+    let newer_snapshot_id = response_payload(&newer_snapshot)["id"]
+        .as_u64()
+        .expect("snapshot response must expose id");
+    let increase_later = node.post_json("/acton_increaseTime", &json!({ "seconds": 60 }));
+    let status_after_later_change = node.get_json("/acton_nodeInfo");
+
+    let reverted = node.post_json("/acton_revert", &json!({ "id": snapshot_id }));
+    let seqno_after_revert = latest_masterchain_seqno(&node);
+    let target_after_revert =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let status_after_revert = node.get_json("/acton_nodeInfo");
+
+    let mine_after_revert = node.post_json("/acton_mine", &json!({}));
+    let replayed_seqno = response_payload(&mine_after_revert)["last_block_seqno"]
+        .as_u64()
+        .expect("mine response must expose last_block_seqno") as u32;
+    let replayed_gen_utime = block_header_gen_utime(&node, replayed_seqno);
+    let target_after_empty_mine =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+
+    let mut invalid_revert_same = node.post_json("/acton_revert", &json!({ "id": snapshot_id }));
+    normalize_extra_for_snapshot(&mut invalid_revert_same);
+    let mut invalid_revert_newer =
+        node.post_json("/acton_revert", &json!({ "id": newer_snapshot_id }));
+    normalize_extra_for_snapshot(&mut invalid_revert_newer);
+
+    let reverted_older = node.post_json("/acton_revert", &json!({ "id": older_snapshot_id }));
+    let seqno_after_revert_older = latest_masterchain_seqno(&node);
+    let status_after_revert_older = node.get_json("/acton_nodeInfo");
+    let target_after_revert_older =
+        node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+
+    node.stop();
+
+    let restarted = project
+        .localnet()
+        .args(["--no-mining", "--db-path", db_path_arg.as_str()])
+        .start();
+    let restarted_seqno = latest_masterchain_seqno(&restarted);
+    let restarted_target =
+        restarted.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
+    let restarted_block_2 = restarted.get_json("/api/v2/getBlockHeader?seqno=2");
+
+    let snapshot = json!({
+        "create": {
+            "older": summarize_admin_response(&older_snapshot),
+            "current": summarize_admin_response(&snapshot),
+            "newer": summarize_admin_response(&newer_snapshot),
+        },
+        "mutate_after_snapshot": {
+            "set_next_ok": set_next["ok"].as_bool(),
+            "fund_ok": fund["ok"].as_bool(),
+            "mine_ok": mine_faucet["ok"].as_bool(),
+            "faucet_block_used_pending_timestamp": faucet_block_gen_utime == next_block_timestamp,
+            "balance_after_mine": parse_address_balance(&target_after_mine).to_string(),
+            "increase_later_ok": increase_later["ok"].as_bool(),
+        },
+        "revert_current": {
+            "response": summarize_admin_response(&reverted),
+            "seqno_after_revert": seqno_after_revert,
+            "balance_after_revert": parse_address_balance(&target_after_revert).to_string(),
+            "pending_timestamp_restored": status_after_revert["result"]["next_block_timestamp"]
+                .as_u64()
+                == Some(u64::from(next_block_timestamp)),
+            "time_offset_rolled_back": status_after_later_change["result"]["time_offset_seconds"]
+                .as_i64()
+                > status_after_revert["result"]["time_offset_seconds"].as_i64(),
+            "empty_mine_used_restored_timestamp": replayed_gen_utime == next_block_timestamp,
+            "balance_after_empty_mine": parse_address_balance(&target_after_empty_mine).to_string(),
+        },
+        "recovery_point_invalidation": {
+            "same": summarize_admin_response(&invalid_revert_same),
+            "newer": summarize_admin_response(&invalid_revert_newer),
+            "older_still_reverts": summarize_admin_response(&reverted_older),
+            "seqno_after_revert_older": seqno_after_revert_older,
+            "pending_timestamp_after_revert_older": status_after_revert_older["result"]["next_block_timestamp"].clone(),
+            "balance_after_revert_older": parse_address_balance(&target_after_revert_older).to_string(),
+        },
+        "persistent_db_after_restart": {
+            "seqno": restarted_seqno,
+            "balance": parse_address_balance(&restarted_target).to_string(),
+            "block_2_removed": restarted_block_2["ok"].as_bool() == Some(false),
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_recovery_points.summary.json"),
+    );
+
+    restarted.stop();
+}
+
+#[test]
+fn localnet_no_mining_bootstraps_startup_accounts_in_fork_mode() {
+    let project = ProjectBuilder::new("localnet-no-mining-startup-accounts-fork").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let source_node = project.localnet().start();
+    append_custom_localnet_network(project.path(), "fork-source", &source_node.base_url());
+
+    let forked_node = project
+        .localnet()
+        .args([
+            "--fork-net",
+            "custom:fork-source",
+            "--accounts",
+            "deployer",
+            "--no-mining",
+        ])
+        .start();
+
+    let startup_wallets = forked_node.get_json("/acton_getStartupWallets");
+    let startup_wallets_payload = response_payload(&startup_wallets);
+    let wallets = startup_wallets_payload
+        .as_array()
+        .expect("startup wallets response must contain an array");
+    let wallet = wallets
+        .first()
+        .expect("forked no-mining localnet must bootstrap deployer wallet");
+    let address = wallet["address"]
+        .as_str()
+        .expect("startup wallet must expose address");
+
+    wait_until_address_state_active(&forked_node, address, Duration::from_secs(5));
+    let node_info = forked_node.get_json("/acton_nodeInfo");
+    let initial_seqno = latest_masterchain_seqno(&forked_node);
+    thread::sleep(Duration::from_millis(250));
+    let after_sleep_seqno = latest_masterchain_seqno(&forked_node);
+    let mine_response = forked_node.post_json("/acton_mine", &json!({}));
+    let after_mine_seqno = latest_masterchain_seqno(&forked_node);
+
+    let snapshot = json!({
+        "startup_wallet": {
+            "count": wallets.len(),
+            "name": wallet["name"].as_str(),
+            "version": wallet["version"].as_str(),
+            "network": wallet["network"].as_str(),
+            "address_present": !address.is_empty(),
+        },
+        "state_source": {
+            "state_source": node_info["result"]["state_source"].as_str(),
+            "fork_network": node_info["result"]["fork_network"].as_str(),
+            "fork_block_number": node_info["result"]["fork_block_number"].as_u64(),
+        },
+        "manual_mining": {
+            "seqno_stable_after_start": after_sleep_seqno == initial_seqno,
+            "mine_ok": mine_response["ok"].as_bool(),
+            "seqno_delta": after_mine_seqno - after_sleep_seqno,
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_no_mining_startup_accounts_fork.summary.json"
+        ),
+    );
+
+    forked_node.stop();
+    source_node.stop();
+}
+
+#[test]
+fn localnet_records_api_calls_for_dashboard() {
+    let project = ProjectBuilder::new("localnet-api-calls-dashboard").build();
+    let node = project.localnet().start();
+
+    let mut initial_log = node.get_json("/acton_getApiCalls");
+    normalize_api_calls_for_snapshot(&mut initial_log);
+
+    let _admin_wallets = node.get_json("/acton_getStartupWallets");
+    let _admin_status = node.get_json("/acton_nodeInfo");
+    let _v2_status = node.get_json("/api/v2/getMasterchainInfo");
+    let _successful_rpc = node.post_json(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "getMasterchainInfo",
+            "params": {}
+        }),
+    );
+    let (failed_status, _failed_rpc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "missing",
+            "method": "missingMethod",
+            "params": {}
+        }),
+    );
+
+    let mut logged_calls = node.get_json("/acton_getApiCalls?limit=10");
+    normalize_api_calls_for_snapshot(&mut logged_calls);
+
+    let snapshot = json!({
+        "initial_log": initial_log,
+        "failed_status": failed_status,
+        "logged_calls": logged_calls,
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_api_calls_dashboard.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_serves_get_shard_account_cell_for_empty_account() {
     let project = ProjectBuilder::new("localnet-shard-account-cell-empty").build();
     let node = project.localnet().start();
@@ -616,6 +1163,171 @@ fn localnet_serves_embedded_ui_and_spa_routes() {
 }
 
 #[test]
+fn localnet_require_auth_protects_http_api() {
+    let project = ProjectBuilder::new("localnet-require-auth").build();
+    let node = project.localnet().require_auth().start();
+    let token = node
+        .auth_token()
+        .expect("protected localnet test must expose auth token");
+    let client = Client::builder()
+        .timeout(Duration::from_secs(5))
+        .build()
+        .expect("Failed to create HTTP client");
+
+    let unauthorized_v2 = get_json_with_status(
+        &client,
+        &format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+    );
+    let unauthorized_control =
+        get_json_with_status(&client, &format!("{}/acton_nodeInfo", node.base_url()));
+    let unauthorized_emulate = post_json_with_status(
+        &client,
+        &format!("{}/api/emulate/v1/emulateTrace", node.base_url()),
+        &json!({}),
+    );
+    let unauthorized_sse = post_json_with_status(
+        &client,
+        &format!("{}/api/streaming/v2/sse", node.base_url()),
+        &json!({
+            "addresses": [V3_TRANSACTIONS_TEST_ACCOUNT_A],
+            "types": ["transactions"]
+        }),
+    );
+    let ui_response = client
+        .get(node.base_url())
+        .send()
+        .expect("UI request must be sent");
+    let ui_status = ui_response.status().as_u16();
+    let ui_body = ui_response
+        .text()
+        .expect("UI response body must be readable");
+
+    let authorized_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .bearer_auth(token)
+        .send()
+        .expect("authorized v2 request must be sent");
+    let authorized_v2_status = authorized_v2.status().as_u16();
+    let authorized_v2_json: Value = authorized_v2
+        .json()
+        .expect("authorized v2 response must be JSON");
+
+    let api_key_v2 = client
+        .get(format!("{}/api/v2/getMasterchainInfo", node.base_url()))
+        .header("X-API-Key", token)
+        .send()
+        .expect("x-api-key v2 request must be sent");
+    let api_key_v2_status = api_key_v2.status().as_u16();
+    let api_key_v2_json: Value = api_key_v2
+        .json()
+        .expect("x-api-key v2 response must be JSON");
+
+    let options_status = client
+        .request(
+            reqwest::Method::OPTIONS,
+            format!("{}/api/v2/getMasterchainInfo", node.base_url()),
+        )
+        .header("Origin", "http://127.0.0.1:3000")
+        .header("Access-Control-Request-Method", "GET")
+        .send()
+        .expect("OPTIONS request must be sent")
+        .status()
+        .as_u16();
+
+    let status_output = project
+        .acton()
+        .arg("localnet")
+        .arg("status")
+        .arg("--json")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+    let mut status_payload: Value = serde_json::from_str(&status_output.get_stdout())
+        .expect("protected status output must be JSON");
+    normalize_localnet_status_json(&mut status_payload, node.port());
+
+    project
+        .acton()
+        .arg("localnet")
+        .arg("airdrop")
+        .arg(V3_TRANSACTIONS_TEST_ACCOUNT_A)
+        .arg("--amount")
+        .arg("0.25")
+        .arg("--port")
+        .arg(&node.port().to_string())
+        .env("ACTON_LOCALNET_AUTH_TOKEN", token)
+        .run()
+        .success();
+
+    let summary = json!({
+        "unauthorized": {
+            "v2": summarize_auth_error(unauthorized_v2),
+            "control": summarize_auth_error(unauthorized_control),
+            "emulate": summarize_auth_error(unauthorized_emulate),
+            "sse": summarize_auth_error(unauthorized_sse),
+        },
+        "authorized": {
+            "bearer_status": authorized_v2_status,
+            "bearer_ok": authorized_v2_json["ok"].as_bool(),
+            "x_api_key_status": api_key_v2_status,
+            "x_api_key_ok": api_key_v2_json["ok"].as_bool(),
+            "options_status": options_status,
+            "status_command_running": status_payload["running"].as_bool(),
+        },
+        "ui": {
+            "status": ui_status,
+            "html_shell": ui_body.contains("<div id=\"root\"></div>"),
+            "leaks_token": ui_body.contains(token),
+            "has_bootstrap_token": ui_body.contains("__ACTON_LOCALNET__"),
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_require_auth.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_batches_address_name_lookup() {
+    let project = ProjectBuilder::new("localnet-address-name-batch").build();
+    let node = project.localnet().start();
+    let named_address = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let unnamed_address = "0:3333333333333333333333333333333333333333333333333333333333333333";
+
+    node.post_json(
+        "/acton_setAddressName",
+        &json!({
+            "address": named_address,
+            "name": "treasury"
+        }),
+    );
+
+    let mut response = node.get_json(&format!(
+        "/acton_getAddressName?address={}&address={}",
+        encode_query_component(named_address),
+        encode_query_component(unnamed_address)
+    ));
+    normalize_extra_for_snapshot(&mut response);
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&response)
+            .expect("Failed to serialize address name batch response")
+    );
+
+    assertion().eq(
+        response_json,
+        snapbox::file!("snapshots/localnet/test_localnet_address_name_batch.response.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let project = ProjectBuilder::new("localnet-pre-start-commands")
         .contract("child", CHILD_CONTRACT)
@@ -701,6 +1413,79 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
         serde_json::to_string_pretty(&tx_std_response).unwrap_or_default()
     );
 
+    let parent_transaction = transactions
+        .iter()
+        .find(|tx| {
+            tx.get("out_msgs")
+                .and_then(Value::as_array)
+                .is_some_and(|out| !out.is_empty())
+        })
+        .expect("deployer trace must include a parent transaction with out messages");
+    let parent_tx_hash = parent_transaction
+        .pointer("/transaction_id/hash")
+        .and_then(Value::as_str)
+        .expect("parent transaction hash must be present");
+    let traces = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/traces?hash={}",
+            encode_query_component(parent_tx_hash)
+        ),
+        Duration::from_secs(12),
+    );
+    let trace_payload = response_payload(&traces);
+    let trace = trace_payload["traces"]
+        .as_array()
+        .and_then(|items| items.first())
+        .expect("v3 traces must contain a first trace");
+    let transactions_map = trace["transactions"]
+        .as_object()
+        .expect("v3 trace must include transactions map");
+    let parent_v3_tx = transactions_map
+        .get(parent_tx_hash)
+        .unwrap_or_else(|| panic!("v3 trace must include parent transaction {parent_tx_hash}"));
+    let legacy_child_lts = parent_v3_tx["child_transactions"]
+        .as_array()
+        .expect("v3 transaction entry must include legacy child_transactions");
+    let trace_root_children = trace["trace"]["children"].as_array();
+    let parent_trace_node = find_trace_node(&trace["trace"], parent_tx_hash);
+    let parent_trace_children = parent_trace_node
+        .and_then(|node| node.get("children"))
+        .and_then(Value::as_array);
+    let first_tree_child_lt = parent_trace_children
+        .and_then(|children| children.first())
+        .and_then(|child| child.get("tx_hash"))
+        .and_then(Value::as_str)
+        .and_then(|child_hash| transactions_map.get(child_hash))
+        .and_then(|tx| tx.get("lt"))
+        .and_then(Value::as_str);
+    let first_legacy_child_lt = legacy_child_lts.first().and_then(Value::as_str);
+    let parent_account_state_after = &parent_v3_tx["account_state_after"];
+
+    let trace_legacy_summary = json!({
+        "trace_root_children_count": trace_root_children.map_or(0, Vec::len),
+        "parent_trace_node_present": parent_trace_node.is_some(),
+        "parent_trace_node_children_count": parent_trace_children.map_or(0, Vec::len),
+        "parent_legacy_child_transactions_count": legacy_child_lts.len(),
+        "first_child_lt_matches_legacy_child_transaction": first_tree_child_lt.is_some()
+            && first_tree_child_lt == first_legacy_child_lt,
+        "parent_account_state_after_has_code_boc": parent_account_state_after["code_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+        "parent_account_state_after_has_data_boc": parent_account_state_after["data_boc"]
+            .as_str()
+            .is_some_and(|boc| !boc.is_empty()),
+    });
+    let trace_legacy_summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&trace_legacy_summary)
+            .expect("Failed to serialize v3 trace compatibility summary")
+    );
+    assertion().eq(
+        trace_legacy_summary_json,
+        snapbox::file!("snapshots/localnet/test_localnet_v3_trace_children.summary.json"),
+    );
+
     let mut tx_std_response = tx_std_response;
     normalize_transactions_std_for_snapshot(&mut tx_std_response);
 
@@ -745,7 +1530,7 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         serde_json::to_string_pretty(&rate_limited).unwrap_or_default()
     );
 
-    let (admin_status, admin_response) = node.get_json_with_status("/acton_getStateSource");
+    let (admin_status, admin_response) = node.get_json_with_status("/acton_nodeInfo");
     assert_eq!(
         admin_status, 200,
         "Admin endpoints must stay available when API rate-limit is enabled"
@@ -761,6 +1546,61 @@ fn localnet_can_rate_limit_api_endpoints_to_simulate_provider_limits() {
         "Expected API requests to recover after rate-limit window"
     );
     assert_eq!(api_after_window["ok"].as_bool(), Some(true));
+
+    node.stop();
+}
+
+#[test]
+fn localnet_can_update_response_delay_while_running() {
+    let project = ProjectBuilder::new("localnet-response-delay-runtime").build();
+    let node = project.localnet().start();
+
+    let initial_info_response = node.get_json("/acton_nodeInfo");
+    let initial_info = response_payload(&initial_info_response);
+    let initial_response_delay_ms = initial_info["network_conditions"]["response_delay_ms"].clone();
+
+    let set_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 250 }),
+    );
+    let set_conditions = response_payload(&set_conditions_response);
+    let set_response_delay_ms = set_conditions["response_delay_ms"].clone();
+
+    let info_after_set_response = node.get_json("/acton_nodeInfo");
+    let info_after_set = response_payload(&info_after_set_response);
+    let node_info_response_delay_ms =
+        info_after_set["network_conditions"]["response_delay_ms"].clone();
+
+    let started_at = Instant::now();
+    let delayed_api_response = node.get_json("/api/v2/getMasterchainInfo");
+    let delayed_api_elapsed = started_at.elapsed();
+
+    let reset_conditions_response = node.post_json(
+        "/acton_setNetworkConditions",
+        &json!({ "response_delay_ms": 0 }),
+    );
+    let reset_conditions = response_payload(&reset_conditions_response);
+    let reset_response_delay_ms = reset_conditions["response_delay_ms"].clone();
+
+    let info_after_reset_response = node.get_json("/acton_nodeInfo");
+    let info_after_reset = response_payload(&info_after_reset_response);
+    let node_info_after_reset_response_delay_ms =
+        info_after_reset["network_conditions"]["response_delay_ms"].clone();
+
+    let summary = json!({
+        "initial_response_delay_ms": initial_response_delay_ms,
+        "set_response_delay_ms": set_response_delay_ms,
+        "node_info_response_delay_ms": node_info_response_delay_ms,
+        "api_delay_observed": delayed_api_elapsed >= Duration::from_millis(220),
+        "api_request_ok": delayed_api_response["ok"].as_bool(),
+        "reset_response_delay_ms": reset_response_delay_ms,
+        "node_info_after_reset_response_delay_ms": node_info_after_reset_response_delay_ms,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_response_delay_runtime.summary.json"),
+    );
 
     node.stop();
 }
@@ -914,9 +1754,10 @@ fn localnet_admin_dump_and_load_state_roundtrip() {
         }),
     );
 
-    let before_info = wait_for_ok_response(
+    let before_info = wait_for_address_balance_at_least(
         &node,
-        &format!("/api/v2/getAddressInformation?address={address_before}"),
+        address_before,
+        1_000_000_000,
         Duration::from_secs(5),
     );
     let before_balance = parse_address_balance(&before_info);
@@ -936,9 +1777,10 @@ fn localnet_admin_dump_and_load_state_roundtrip() {
         }),
     );
 
-    let after_info = wait_for_ok_response(
+    let after_info = wait_for_address_balance_at_least(
         &node,
-        &format!("/api/v2/getAddressInformation?address={address_after}"),
+        address_after,
+        2_000_000_000,
         Duration::from_secs(5),
     );
     let after_balance_before_load = parse_address_balance(&after_info);
@@ -982,6 +1824,158 @@ fn localnet_admin_dump_and_load_state_roundtrip() {
         pretty_json_for_snapshot(&snapshot, project.path()),
         snapbox::file!(
             "snapshots/localnet/test_localnet_admin_dump_and_load_state_roundtrip.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_set_shard_account_updates_selected_account() {
+    let project = ProjectBuilder::new("localnet-admin-set-shard-account").build();
+    let node = project.localnet().start();
+    let source = "0:1111111111111111111111111111111111111111111111111111111111111111";
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let fund = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": source,
+            "amount": 1_000_000_000u128,
+        }),
+    );
+    let source_info =
+        wait_for_address_balance_at_least(&node, source, 1_000_000_000, Duration::from_secs(5));
+    let source_balance = parse_address_balance(&source_info);
+    let source_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={source}"),
+        Duration::from_secs(5),
+    );
+    let source_shard_boc = shard_account_cell_boc64(&source_shard_response).to_owned();
+
+    let set = node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": source_shard_boc,
+        }),
+    );
+    let target_info_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getAddressInformation?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_balance_after_set = parse_address_balance(&target_info_after_set);
+    let target_shard_response = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={target}"),
+        Duration::from_secs(5),
+    );
+    let target_shard_boc = shard_account_cell_boc64(&target_shard_response).to_owned();
+
+    let invalid = node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": target,
+            "shard_account": "not-a-boc",
+        }),
+    );
+
+    let snapshot = json!({
+        "fund": summarize_admin_response(&fund),
+        "set": summarize_admin_response(&set),
+        "source_balance": source_balance.to_string(),
+        "target_balance_after_set": target_balance_after_set.to_string(),
+        "target_cell_matches_source": target_shard_boc == source_shard_boc,
+        "target_after_set": summarize_shard_account_cell_response(&target_shard_response, None),
+        "invalid": summarize_admin_response(&invalid),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_set_shard_account_updates_selected_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_raw_internal_messages_use_acton_endpoint() {
+    let project = ProjectBuilder::new("localnet-raw-internal-message").build();
+    let node = project.localnet().start();
+    let internal_boc = build_localnet_internal_boc();
+    let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
+
+    let send_boc = node.post_json(
+        "/api/v2/sendBoc",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let send_boc_return_hash = node.post_json(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let (json_rpc_send_boc_status, json_rpc_send_boc) = node.post_json_with_status(
+        "/api/v2/jsonRPC",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "send",
+            "method": "sendBoc",
+            "params": {
+                "boc": internal_boc,
+            },
+        }),
+    );
+    let (json_rpc_send_boc_return_hash_status, json_rpc_send_boc_return_hash) = node
+        .post_json_with_status(
+            "/api/v2/jsonRPC",
+            &json!({
+                "jsonrpc": "2.0",
+                "id": "send-return-hash",
+                "method": "sendBocReturnHash",
+                "params": {
+                    "boc": internal_boc,
+                },
+            }),
+        );
+    let (message_status, message) = node.post_json_with_status(
+        "/api/v3/message",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let acton_send = node.post_json(
+        "/acton_sendInternalMessage",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let target_info =
+        wait_for_address_balance_at_least(&node, target, 50_000_000, Duration::from_secs(5));
+
+    let snapshot = json!({
+        "send_boc": summarize_admin_response(&send_boc),
+        "send_boc_return_hash": summarize_admin_response(&send_boc_return_hash),
+        "json_rpc_send_boc_status": json_rpc_send_boc_status,
+        "json_rpc_send_boc": summarize_admin_response(&json_rpc_send_boc),
+        "json_rpc_send_boc_return_hash_status": json_rpc_send_boc_return_hash_status,
+        "json_rpc_send_boc_return_hash": summarize_admin_response(&json_rpc_send_boc_return_hash),
+        "message_status": message_status,
+        "message": message,
+        "acton_send": summarize_admin_response(&acton_send),
+        "target_balance": parse_address_balance(&target_info).to_string(),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_raw_internal_messages_use_acton_endpoint.summary.json"
         ),
     );
 
@@ -1773,7 +2767,7 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
 
     let normalized_hash_query = encode_query_component(message_hash_norm);
 
-    let traces = wait_for_ok_response(
+    let traces = wait_for_non_empty_v3_traces_response(
         &node,
         &format!("/api/v3/traces?msg_hash={normalized_hash_query}"),
         Duration::from_secs(12),
@@ -1791,7 +2785,7 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
         Some(message_hash)
     );
 
-    let by_msg_hash = wait_for_ok_response(
+    let by_msg_hash = wait_for_v3_transactions_response(
         &node,
         &format!(
             "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
@@ -1815,6 +2809,105 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
 }
 
 #[test]
+fn localnet_v3_traces_unknown_hashes_return_empty_traces() {
+    let project = ProjectBuilder::new("localnet-v3-traces-unknown-hashes").build();
+    let node = project.localnet().start();
+
+    let unknown_msg_hash = encode_query_component(&Hash256([0x42; 32]).to_base64());
+    let unknown_tx_hash = encode_query_component(&Hash256([0x43; 32]).to_base64());
+
+    let (msg_status, msg_response) =
+        node.get_json_with_status(&format!("/api/v3/traces?msg_hash={unknown_msg_hash}"));
+    let (tx_status, tx_response) =
+        node.get_json_with_status(&format!("/api/v3/traces?tx_hash={unknown_tx_hash}"));
+
+    let summary = json!({
+        "msg_hash": {
+            "status": msg_status,
+            "response": msg_response,
+        },
+        "tx_hash": {
+            "status": tx_status,
+            "response": tx_response,
+        },
+    });
+    snapbox::assert_data_eq!(
+        format!("{}\n", pretty_json_for_snapshot(&summary, project.path())),
+        snapbox::file!("snapshots/localnet/test_localnet_v3_traces_unknown_hashes.response.json")
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_send_boc_return_hash_waits_for_scheduled_block_before_transaction_appears() {
+    let project = ProjectBuilder::new("localnet-send-boc-scheduled-mining").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .args(["--accounts", "deployer", "--block-interval-ms", "3000"])
+        .start();
+    let initial_seqno = latest_masterchain_seqno(&node);
+    wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
+
+    let message_boc = build_localnet_ext_in_boc();
+    let (expected_hash, expected_hash_norm) = compute_message_hashes_base64(&message_boc);
+
+    let response = node.post_json(
+        "/api/v2/sendBocReturnHash",
+        &json!({
+            "boc": message_boc
+        }),
+    );
+    let payload = response_payload(&response);
+    let message_hash = payload["hash"]
+        .as_str()
+        .expect("sendBocReturnHash hash must be a string");
+    let message_hash_norm = payload["hash_norm"]
+        .as_str()
+        .expect("sendBocReturnHash hash_norm must be a string");
+    let normalized_hash_query = encode_query_component(message_hash_norm);
+    let by_message_query = format!(
+        "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
+    );
+
+    let before_tick = wait_for_ok_response(&node, &by_message_query, Duration::from_secs(2));
+    let before_tick_transactions = v3_transactions_from_response(&before_tick);
+
+    let after_tick =
+        wait_for_v3_transactions_response(&node, &by_message_query, Duration::from_secs(8));
+    let after_tick_transactions = v3_transactions_from_response(&after_tick);
+    let matched_normalized_hash = after_tick_transactions
+        .iter()
+        .any(|tx| tx["in_msg"]["hash_norm"].as_str() == Some(message_hash_norm));
+
+    let snapshot = json!({
+        "accepted": {
+            "hash_matches": message_hash == expected_hash,
+            "hash_norm_matches": message_hash_norm == expected_hash_norm,
+        },
+        "before_next_tick": {
+            "transaction_count": before_tick_transactions.len(),
+        },
+        "after_next_tick": {
+            "has_transaction": !after_tick_transactions.is_empty(),
+            "matched_normalized_hash": matched_normalized_hash,
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_send_boc_waits_for_scheduled_block.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_supports_emulate_v1_emulate_trace() {
     let project = ProjectBuilder::new("localnet-emulate-v1-emulate-trace").build();
     let node = project.localnet().start();
@@ -1823,6 +2916,12 @@ fn localnet_supports_emulate_v1_emulate_trace() {
     let seqno_before = before["result"]["last"]["seqno"]
         .as_i64()
         .expect("masterchain seqno must be integer before emulate");
+    let transactions_before = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100",
+        Duration::from_secs(5),
+    );
+    let tx_count_before = v3_transactions_from_response(&transactions_before).len();
 
     let response = node.post_json(
         "/api/emulate/v1/emulateTrace",
@@ -1870,19 +2969,23 @@ fn localnet_supports_emulate_v1_emulate_trace() {
         "address_book/metadata must be absent by default:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
-    assert_eq!(
-        response["mc_block_seqno"].as_i64(),
-        Some(seqno_before),
-        "Unexpected mc_block_seqno in emulateTrace response:\n{}",
+    let response_seqno = response["mc_block_seqno"]
+        .as_i64()
+        .expect("emulateTrace response must include mc_block_seqno");
+    assert!(
+        response_seqno >= seqno_before,
+        "Unexpected mc_block_seqno in emulateTrace response; expected at least {seqno_before}:\n{}",
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
 
+    let explicit_seqno =
+        wait_for_masterchain_seqno_at_least(&node, response_seqno.max(1), Duration::from_secs(5));
     let response_with_seqno = node.post_json(
         "/api/emulate/v1/emulateTrace",
         &json!({
             "boc": V3_MESSAGE_TEST_BOC,
             "ignore_chksig": false,
-            "mc_block_seqno": seqno_before
+            "mc_block_seqno": explicit_seqno
         }),
     );
     assert!(
@@ -1898,18 +3001,22 @@ fn localnet_supports_emulate_v1_emulate_trace() {
     );
     assert_eq!(
         response_with_seqno["mc_block_seqno"].as_i64(),
-        Some(seqno_before),
+        Some(explicit_seqno),
         "Unexpected mc_block_seqno for explicit emulate request:\n{}",
         serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
     );
 
-    let after = wait_for_ok_response(&node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
-    let seqno_after = after["result"]["last"]["seqno"]
-        .as_i64()
-        .expect("masterchain seqno must be integer after emulate");
+    let transactions_after = wait_for_ok_response(
+        &node,
+        "/api/v3/transactions?limit=100",
+        Duration::from_secs(5),
+    );
     assert_eq!(
-        seqno_after, seqno_before,
-        "emulateTrace must not commit state. before={seqno_before}, after={seqno_after}"
+        v3_transactions_from_response(&transactions_after).len(),
+        tx_count_before,
+        "emulateTrace must not commit transactions. before:\n{}\nafter:\n{}",
+        serde_json::to_string_pretty(&transactions_before).unwrap_or_default(),
+        serde_json::to_string_pretty(&transactions_after).unwrap_or_default()
     );
 
     let (invalid_status, invalid) = node.post_json_with_status(
@@ -2119,7 +3226,7 @@ fn localnet_supports_v3_transactions_endpoints() {
         );
     }
 
-    let all_txs_response = wait_for_ok_response(
+    let all_txs_response = wait_for_v3_transactions_response(
         &node,
         "/api/v3/transactions?limit=100&sort=desc",
         Duration::from_secs(12),
@@ -2518,6 +3625,87 @@ fn localnet_supports_v3_transactions_endpoints() {
 }
 
 #[test]
+fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
+    let project = ProjectBuilder::new("localnet-batch-faucet-scheduled-block").build();
+    let node = project
+        .localnet()
+        .args(["--block-interval-ms", "3000"])
+        .start();
+    let initial_seqno = latest_masterchain_seqno(&node);
+    wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
+
+    let first_faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_A,
+            "amount": 250_000_000u128
+        }),
+    );
+    let second_faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_B,
+            "amount": 250_000_000u128
+        }),
+    );
+
+    let first_account_response = wait_for_v3_transactions_response(
+        &node,
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=10"),
+        Duration::from_secs(8),
+    );
+    let second_account_response = wait_for_v3_transactions_response(
+        &node,
+        &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_B}&limit=10"),
+        Duration::from_secs(8),
+    );
+
+    let first_tx = &v3_transactions_from_response(&first_account_response)[0];
+    let second_tx = &v3_transactions_from_response(&second_account_response)[0];
+    let first_seqno = first_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("first transaction mc_block_seqno must be integer");
+    let second_seqno = second_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("second transaction mc_block_seqno must be integer");
+    let block = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getBlockTransactionsExt?seqno={first_seqno}"),
+        Duration::from_secs(5),
+    );
+    let block_payload = response_payload(&block);
+    let block_transactions = block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactionsExt must return transactions array");
+
+    let snapshot = json!({
+        "faucet": {
+            "first_ok": is_success_response(&first_faucet),
+            "second_ok": is_success_response(&second_faucet),
+        },
+        "transactions": {
+            "first_account": first_tx["account"].as_str(),
+            "second_account": second_tx["account"].as_str(),
+            "same_mc_block_seqno": first_seqno == second_seqno,
+        },
+        "block": {
+            "req_count": block_payload["req_count"].as_u64(),
+            "transaction_count": block_transactions.len(),
+            "has_at_least_two_transactions": block_transactions.len() >= 2,
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_batches_faucet_messages_into_one_block.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_supports_v3_account_states_endpoint() {
     let project = ProjectBuilder::new("localnet-v3-account-states")
         .without_acton_toml()
@@ -2908,6 +4096,146 @@ fn localnet_supports_v3_run_get_method() {
 }
 
 #[test]
+fn localnet_run_get_method_on_missing_account_returns_vm_exit_code() {
+    let project = ProjectBuilder::new("localnet-run-get-method-missing-account").build();
+    let node = project.localnet().start();
+
+    let (v3_status, v3_response) = node.post_json_with_status(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": "EQDzA78rXj_YgEpIn43GrHcPgffSdYWiBFVZfAAD9SKdc7Vn",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+    let (v2_status, v2_response) = node.post_json_with_status(
+        "/api/v2/runGetMethod",
+        &json!({
+            "address": "EQDzA78rXj_YgEpIn43GrHcPgffSdYWiBFVZfAAD9SKdc7Vn",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+    let v2_payload = response_payload(&v2_response);
+    let (no_code_status, no_code_response) = node.post_json_with_status(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": "0:5555555555555555555555555555555555555555555555555555555555555555",
+            "method": "get_verification_record",
+            "stack": []
+        }),
+    );
+
+    let snapshot = json!({
+        "v3": {
+            "status": v3_status,
+            "has_error": v3_response.get("error").is_some(),
+            "gas_used": v3_response["gas_used"],
+            "exit_code": v3_response["exit_code"],
+            "stack": v3_response["stack"],
+        },
+        "v2": {
+            "status": v2_status,
+            "ok": v2_response["ok"],
+            "gas_used": v2_payload["gas_used"],
+            "exit_code": v2_payload["exit_code"],
+            "stack": v2_payload["stack"],
+            "last_transaction_id": v2_payload["last_transaction_id"],
+        },
+        "existing_no_code": {
+            "status": no_code_status,
+            "has_error": no_code_response.get("error").is_some(),
+            "gas_used": no_code_response["gas_used"],
+            "exit_code": no_code_response["exit_code"],
+            "stack": no_code_response["stack"],
+        },
+    });
+
+    let snapshot_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("snapshot JSON must serialize")
+    );
+    assertion().eq(
+        snapshot_json,
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_run_get_method_missing_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_contracts_can_read_prevblocks_instructions() {
+    let project = ProjectBuilder::new("localnet-prevblocks-get-method")
+        .contract("getter", PREVBLOCKS_GETTER_CONTRACT)
+        .script_file("deploy_getter", V3_DEPLOY_GETTER_SCRIPT)
+        .build();
+
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_result = project
+        .acton()
+        .script("scripts/deploy_getter.tolk")
+        .verify_network("localnet")
+        .run();
+    let script_stdout = String::from_utf8(script_result.output.get_output().stdout.clone())
+        .expect("Failed to decode deploy script stdout");
+    let script_stderr = String::from_utf8(script_result.output.get_output().stderr.clone())
+        .expect("Failed to decode deploy script stderr");
+    let script_status = script_result.output.get_output().status.code().unwrap_or(1);
+
+    assert_eq!(
+        script_status, 0,
+        "Deploy script failed with status {script_status}\nstdout:\n{script_stdout}\nstderr:\n{script_stderr}"
+    );
+
+    let getter_address = extract_marker_value(&script_stdout, "GETTER_CONTRACT=");
+    wait_until_address_state_active(&node, &getter_address, Duration::from_secs(12));
+    let query_seqno = latest_masterchain_seqno(&node) as u32;
+
+    let prev_count =
+        run_v3_get_num_at_seqno(&node, &getter_address, "prevMcBlocksCount", query_seqno);
+    let latest_prev_seqno =
+        run_v3_get_num_at_seqno(&node, &getter_address, "latestPrevMcSeqno", query_seqno);
+    let prev_key_seqno =
+        run_v3_get_num_at_seqno(&node, &getter_address, "prevKeySeqno", query_seqno);
+    let sparse_first_seqno = run_v3_get_num_at_seqno(
+        &node,
+        &getter_address,
+        "prevMcBlocks100FirstSeqno",
+        query_seqno,
+    );
+    let expected_sparse_first_seqno = i64::from(query_seqno - (query_seqno % 100));
+
+    let snapshot = json!({
+        "prev_mc_blocks_count_positive": prev_count > 0,
+        "latest_prev_mc_seqno_matches_query_seqno": latest_prev_seqno == i64::from(query_seqno),
+        "prev_key_seqno_matches_latest_prev_mc_seqno": prev_key_seqno == latest_prev_seqno,
+        "prev_mc_blocks_100_first_seqno_matches_expected": sparse_first_seqno == expected_sparse_first_seqno,
+    });
+
+    let snapshot_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&snapshot).expect("snapshot JSON must serialize")
+    );
+    assertion().eq(
+        snapshot_json,
+        snapbox::file!("snapshots/localnet/test_localnet_prevblocks_get_methods.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
     let project = ProjectBuilder::new("localnet-compiler-abi-registry")
         .contract("getter", V3_GETTER_CONTRACT)
@@ -2957,33 +4285,76 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .expect("accountStates code_hash must be valid base64")
         .to_hex();
 
+    let missing_code_hash = "1111111111111111111111111111111111111111111111111111111111111111";
     let abi_response = wait_for_ok_response(
         &node,
-        &format!("/acton_getCompilerAbi?code_hash={code_hash_hex}"),
+        &format!(
+            "/acton_getCompilerAbi?code_hash={}&code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={missing_code_hash}",
+            encode_query_component(&code_hash_hex)
+        ),
         Duration::from_secs(12),
     );
-    let abi = response_payload(&abi_response);
+    let abi_payload = response_payload(&abi_response);
+    let abi = &abi_payload[&code_hash_hex]["compiler_abi"];
+    let catalog_abi = &abi_payload[CATALOG_WALLET_V4R2_CODE_HASH]["compiler_abi"];
 
-    assert_eq!(abi["compiler_name"].as_str(), Some("tolk"));
-    assert_eq!(abi["contract_name"].as_str(), Some("getter"));
-    assert!(
-        abi["get_methods"].as_array().is_some_and(|methods| {
+    let register_override_response = node.post_json(
+        "/acton_registerCompilerAbis",
+        &json!({
+            "entries": [
+                {
+                    "code_hash": CATALOG_WALLET_V4R2_CODE_HASH,
+                    "compiler_abi": {
+                        "compiler_name": "tolk",
+                        "contract_name": "LocalOverride"
+                    }
+                }
+            ]
+        }),
+    );
+    assert_eq!(
+        register_override_response["ok"].as_bool(),
+        Some(true),
+        "registerCompilerAbis failed: {}",
+        serde_json::to_string_pretty(&register_override_response).unwrap_or_default()
+    );
+    let override_response = wait_for_ok_response(
+        &node,
+        &format!("/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}"),
+        Duration::from_secs(12),
+    );
+    let override_payload = response_payload(&override_response);
+
+    let abi_summary = json!({
+        "compiler_name": abi["compiler_name"],
+        "contract_name": abi["contract_name"],
+        "has_add_ten_get_method": abi["get_methods"].as_array().is_some_and(|methods| {
             methods
                 .iter()
                 .any(|method| method["name"].as_str() == Some("addTen"))
         }),
-        "compiler ABI must include addTen get method:\n{}",
-        serde_json::to_string_pretty(abi).unwrap_or_default()
+        "catalog_contract_name": catalog_abi["contract_name"],
+        "catalog_has_seqno_get_method": catalog_abi["get_methods"].as_array().is_some_and(|methods| {
+            methods
+                .iter()
+                .any(|method| method["name"].as_str() == Some("seqno"))
+        }),
+        "local_registration_overrides_catalog": override_payload[CATALOG_WALLET_V4R2_CODE_HASH]
+            ["compiler_abi"]
+            ["contract_name"]
+            .as_str()
+            == Some("LocalOverride"),
+        "missing_code_hash_is_null": abi_payload[missing_code_hash].is_null(),
+    });
+    let abi_summary_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(&abi_summary)
+            .expect("Failed to serialize compiler ABI batch summary")
     );
 
-    let missing_response = node.get_json(
-        "/acton_getCompilerAbi?code_hash=1111111111111111111111111111111111111111111111111111111111111111",
-    );
-    assert_eq!(missing_response["ok"].as_bool(), Some(true));
-    assert!(
-        response_payload(&missing_response).is_null(),
-        "Unknown code hash must return null result:\n{}",
-        serde_json::to_string_pretty(&missing_response).unwrap_or_default()
+    assertion().eq(
+        abi_summary_json,
+        snapbox::file!("snapshots/localnet/test_localnet_compiler_abi_batch.summary.json"),
     );
 
     node.stop();
@@ -3065,6 +4436,10 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
 }
 
 fn append_localnet_network(project_path: &Path, base_url: &str) {
+    append_custom_localnet_network(project_path, "localnet", base_url);
+}
+
+fn append_custom_localnet_network(project_path: &Path, network_name: &str, base_url: &str) {
     use std::fmt::Write as _;
 
     let acton_toml_path = project_path.join("Acton.toml");
@@ -3074,7 +4449,7 @@ fn append_localnet_network(project_path: &Path, base_url: &str) {
         acton_toml,
         r#"
 
-[networks.localnet]
+[networks.{network_name}]
 api = {{ v2 = "{base_url}/api/v2", v3 = "{base_url}/api/v3" }}
 "#
     );
@@ -3124,12 +4499,85 @@ fn response_payload(response: &Value) -> &Value {
     }
 }
 
+fn run_v3_get_num_at_seqno(
+    node: &crate::support::localnet::LocalnetHandle,
+    address: &str,
+    method: &str,
+    seqno: u32,
+) -> i64 {
+    let response = node.post_json(
+        "/api/v3/runGetMethod",
+        &json!({
+            "address": address,
+            "method": method,
+            "seqno": seqno,
+            "stack": [],
+        }),
+    );
+
+    assert!(
+        is_success_response(&response),
+        "v3 runGetMethod {method} failed: {}",
+        serde_json::to_string_pretty(&response).unwrap_or_default()
+    );
+
+    let payload = response_payload(&response);
+    assert_eq!(payload["exit_code"].as_i64(), Some(0));
+    assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
+    payload["stack"][0]["value"]
+        .as_str()
+        .expect("numeric get-method result must be a string")
+        .parse::<i64>()
+        .expect("numeric get-method result must parse")
+}
+
 fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> String {
     let response_json = format!(
         "{}\n",
         serde_json::to_string_pretty(value).expect("Failed to serialize JSON snapshot")
     );
     normalize_output_preserve_escapes(&response_json, project_path)
+}
+
+fn get_json_with_status(client: &Client, url: &str) -> (u16, Value) {
+    let response = client
+        .get(url)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed GET {url}: {error}"));
+    parse_json_response(response, "GET", url)
+}
+
+fn post_json_with_status(client: &Client, url: &str, payload: &Value) -> (u16, Value) {
+    let response = client
+        .post(url)
+        .json(payload)
+        .send()
+        .unwrap_or_else(|error| panic!("Failed POST {url}: {error}"));
+    parse_json_response(response, "POST", url)
+}
+
+fn parse_json_response(
+    response: reqwest::blocking::Response,
+    method: &str,
+    url: &str,
+) -> (u16, Value) {
+    let status = response.status().as_u16();
+    let body = response
+        .text()
+        .unwrap_or_else(|error| panic!("Failed to read {method} {url} response body: {error}"));
+    let json = serde_json::from_str(&body)
+        .unwrap_or_else(|error| panic!("{method} {url} returned invalid JSON: {error}\n{body}"));
+    (status, json)
+}
+
+fn summarize_auth_error((status, mut response): (u16, Value)) -> Value {
+    normalize_extra_for_snapshot(&mut response);
+    json!({
+        "status": status,
+        "ok": response["ok"],
+        "code": response["code"],
+        "error": response["error"],
+    })
 }
 
 fn normalize_localnet_status_json(payload: &mut Value, expected_port: u16) {
@@ -3153,6 +4601,50 @@ fn normalize_localnet_status_json(payload: &mut Value, expected_port: u16) {
             serde_json::to_string_pretty(payload).unwrap_or_default()
         ),
     }
+
+    match payload.get_mut("last_block_seqno") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[LAST_BLOCK_SEQNO]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status last_block_seqno to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("current_unix_time") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[CURRENT_UNIX_TIME]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status current_unix_time to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("time_offset_seconds") {
+        Some(value) if value.as_i64().is_some() => {
+            *value = json!("[TIME_OFFSET_SECONDS]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status time_offset_seconds to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
+
+    match payload.get_mut("next_block_timestamp") {
+        Some(value) if value.as_u64().is_some() => {
+            *value = json!("[NEXT_BLOCK_TIMESTAMP]");
+        }
+        Some(value) if value.is_null() => {}
+        _ => panic!(
+            "Expected localnet status next_block_timestamp to be a number or null, got:\n{}",
+            serde_json::to_string_pretty(payload).unwrap_or_default()
+        ),
+    }
 }
 
 fn normalize_localnet_status_stdout(stdout: &str, port: u16) -> String {
@@ -3165,6 +4657,18 @@ fn normalize_localnet_status_stdout(stdout: &str, port: u16) -> String {
             if trimmed.starts_with("Uptime: ") {
                 let indent = &line[..line.len() - trimmed.len()];
                 format!("{indent}Uptime: [UPTIME_SECONDS]s")
+            } else if trimmed.starts_with("Last block seqno: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Last block seqno: [LAST_BLOCK_SEQNO]")
+            } else if trimmed.starts_with("Virtual time: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Virtual time: [CURRENT_UNIX_TIME]")
+            } else if trimmed.starts_with("Time offset: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Time offset: [TIME_OFFSET_SECONDS]s")
+            } else if trimmed.starts_with("Next block timestamp: ") {
+                let indent = &line[..line.len() - trimmed.len()];
+                format!("{indent}Next block timestamp: [NEXT_BLOCK_TIMESTAMP]")
             } else {
                 line.to_owned()
             }
@@ -3182,6 +4686,9 @@ fn summarize_admin_response(response: &Value) -> Value {
     normalize_extra_for_snapshot(&mut response);
     if let Some(tx_hash) = response.pointer_mut("/result/result/tx_hash") {
         *tx_hash = json!("[HASH]");
+    }
+    if let Some(hash) = response.pointer_mut("/result/hash") {
+        *hash = json!("[HASH]");
     }
     response
 }
@@ -3206,6 +4713,94 @@ fn wait_for_ok_response(
     }
 }
 
+fn wait_for_non_empty_v3_traces_response(
+    node: &crate::support::localnet::LocalnetHandle,
+    query: &str,
+    timeout: Duration,
+) -> Value {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let (status, response) = node.get_json_with_status(query);
+        if (200..300).contains(&status)
+            && is_success_response(&response)
+            && response_payload(&response)["traces"]
+                .as_array()
+                .is_some_and(|traces| !traces.is_empty())
+        {
+            return response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for non-empty traces response from `{query}`; last status={status}:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn wait_for_v3_transactions_response(
+    node: &crate::support::localnet::LocalnetHandle,
+    query: &str,
+    timeout: Duration,
+) -> Value {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let (status, response) = node.get_json_with_status(query);
+        if (200..300).contains(&status)
+            && is_success_response(&response)
+            && !v3_transactions_from_response(&response).is_empty()
+        {
+            return response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for non-empty v3 transactions from `{query}`; last status={status}:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn latest_masterchain_seqno(node: &crate::support::localnet::LocalnetHandle) -> i64 {
+    let response = wait_for_ok_response(node, "/api/v2/getMasterchainInfo", Duration::from_secs(5));
+    response["result"]["last"]["seqno"]
+        .as_i64()
+        .expect("masterchain seqno must be integer")
+}
+
+fn block_header_gen_utime(node: &crate::support::localnet::LocalnetHandle, seqno: u32) -> u32 {
+    let response = wait_for_ok_response(
+        node,
+        &format!("/api/v2/getBlockHeader?seqno={seqno}"),
+        Duration::from_secs(5),
+    );
+    response_payload(&response)["gen_utime"]
+        .as_u64()
+        .expect("block header must expose gen_utime") as u32
+}
+
+fn wait_for_masterchain_seqno_at_least(
+    node: &crate::support::localnet::LocalnetHandle,
+    min_seqno: i64,
+    timeout: Duration,
+) -> i64 {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json("/api/v2/getMasterchainInfo");
+        if let Some(seqno) = response["result"]["last"]["seqno"].as_i64()
+            && seqno >= min_seqno
+        {
+            return seqno;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for masterchain seqno >= {min_seqno}; last response:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(50));
+    }
+}
+
 fn wait_until_address_state_active(
     node: &crate::support::localnet::LocalnetHandle,
     address: &str,
@@ -3221,6 +4816,28 @@ fn wait_until_address_state_active(
         assert!(
             Instant::now() < deadline,
             "Timed out waiting for address `{address}` to become active:\n{}",
+            serde_json::to_string_pretty(&response).unwrap_or_default()
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn wait_for_address_balance_at_least(
+    node: &crate::support::localnet::LocalnetHandle,
+    address: &str,
+    expected_balance: u128,
+    timeout: Duration,
+) -> Value {
+    let query = format!("/api/v2/getAddressInformation?address={address}");
+    let deadline = Instant::now() + timeout;
+    loop {
+        let response = node.get_json(&query);
+        if is_success_response(&response) && parse_address_balance(&response) >= expected_balance {
+            return response;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "Timed out waiting for address `{address}` balance to reach {expected_balance}:\n{}",
             serde_json::to_string_pretty(&response).unwrap_or_default()
         );
         thread::sleep(Duration::from_millis(200));
@@ -3366,25 +4983,7 @@ fn build_localnet_ext_in_boc() -> String {
         TonWallet::new_with_params(version, key_pair, 0, wallet_id).expect("wallet must build");
 
     let wallet_addr = ton_address_to_std_addr(&wallet.address);
-    let message = OwnedMessage {
-        info: MsgInfo::Int(IntMsgInfo {
-            ihr_disabled: true,
-            bounce: false,
-            bounced: false,
-            src: IntAddr::Std(wallet_addr.clone()),
-            dst: IntAddr::Std(wallet_addr),
-            value: CurrencyCollection::new(50_000_000),
-            ihr_fee: Default::default(),
-            fwd_fee: Default::default(),
-            created_at: 0,
-            created_lt: 0,
-        }),
-        init: None,
-        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
-        layout: None,
-    };
-
-    let internal_boc = BocRepr::encode(message).expect("must encode internal message boc");
+    let internal_boc = build_internal_message_boc(wallet_addr.clone(), wallet_addr, 50_000_000);
     let internal_cell = TonCell::from_boc(internal_boc).expect("must decode internal TonCell");
     let expire_at = (SystemTime::now() + Duration::from_secs(600))
         .duration_since(UNIX_EPOCH)
@@ -3395,6 +4994,43 @@ fn build_localnet_ext_in_boc() -> String {
         .expect("must build external-in message")
         .to_boc_base64()
         .expect("must encode external-in message boc")
+}
+
+fn build_localnet_internal_boc() -> String {
+    let source = test_std_addr(0x11);
+    let target = test_std_addr(0x22);
+    base64::engine::general_purpose::STANDARD
+        .encode(build_internal_message_boc(source, target, 50_000_000))
+}
+
+fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {
+    let message = OwnedMessage {
+        info: MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: IntAddr::Std(source),
+            dst: IntAddr::Std(target),
+            value: CurrencyCollection::new(value),
+            ihr_fee: Default::default(),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        }),
+        init: None,
+        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
+        layout: None,
+    };
+
+    BocRepr::encode(message).expect("must encode internal message boc")
+}
+
+fn test_std_addr(byte: u8) -> StdAddr {
+    StdAddr {
+        anycast: None,
+        address: HashBytes([byte; 32]),
+        workchain: 0,
+    }
 }
 
 fn compute_message_hashes_base64(boc_b64: &str) -> (String, String) {
@@ -3508,6 +5144,17 @@ fn contains_tx_hash(transactions: &[Value], hash: &str) -> bool {
     transactions
         .iter()
         .any(|tx| tx["hash"].as_str() == Some(hash))
+}
+
+fn find_trace_node<'a>(node: &'a Value, tx_hash: &str) -> Option<&'a Value> {
+    if node.get("tx_hash").and_then(Value::as_str) == Some(tx_hash) {
+        return Some(node);
+    }
+
+    node.get("children")
+        .and_then(Value::as_array)?
+        .iter()
+        .find_map(|child| find_trace_node(child, tx_hash))
 }
 
 fn assert_transactions_sorted_by_lt_asc(transactions: &[Value]) {
@@ -3643,6 +5290,27 @@ fn normalize_out_msg_queue_size_for_snapshot(response: &mut Value) {
                 if let Some(seqno) = id.get_mut("seqno") {
                     *seqno = json!("[SEQNO]");
                 }
+            }
+        }
+    }
+}
+
+fn normalize_api_calls_for_snapshot(response: &mut Value) {
+    normalize_extra_for_snapshot(response);
+
+    if let Some(calls) = response
+        .pointer_mut("/result/calls")
+        .and_then(Value::as_array_mut)
+    {
+        for call in calls {
+            if let Some(timestamp_ms) = call.get_mut("timestamp_ms") {
+                *timestamp_ms = json!("[TIMESTAMP_MS]");
+            }
+            if let Some(duration_ms) = call.get_mut("duration_ms") {
+                *duration_ms = json!("[DURATION_MS]");
+            }
+            if let Some(duration_ns) = call.get_mut("duration_ns") {
+                *duration_ns = json!("[DURATION_NS]");
             }
         }
     }

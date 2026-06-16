@@ -1,0 +1,3 @@
+Error: New verifier request failed: HTTP 400 Bad Request (HTTP/1.1) at [LOCALHOST_URL]/api/v1/verify
+Response body:
+{"error":"new verifier rejected sources"}

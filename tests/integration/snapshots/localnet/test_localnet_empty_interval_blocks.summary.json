@@ -1,0 +1,9 @@
+{
+  "empty_block": {
+    "incomplete": false,
+    "req_count": 0,
+    "transaction_count": 0,
+    "type": "blocks.transactionsExt"
+  },
+  "target_seqno_reached": true
+}

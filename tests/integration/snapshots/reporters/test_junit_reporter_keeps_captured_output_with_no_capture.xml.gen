@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="test-results" tests="1" failures="0" errors="0">
+    <testsuite name="output.test.tolk" tests="1" disabled="0" errors="0" failures="0" timestamp="[DATE]" [TIME]>
+        <properties>
+            <property name="file.path" value="[ROOT]/tests/output.test.tolk"/>
+        </properties>
+        <testcase name="test junit no capture output" classname="output.test.tolk" [TIME]>
+            <system-out>junit no capture stdout
+stack(0 values) : 
+</system-out>
+            <system-err>junit no capture stderr
+</system-err>
+        </testcase>
+    </testsuite>
+</testsuites>

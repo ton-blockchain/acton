@@ -51,15 +51,29 @@ import "ffi"
 /// Format supports the following placeholders when the first argument is a string:
 /// - `{}` - default formatter output
 /// - `{:x}` - formats an int as lowercase hexadecimal without `0x` prefix
-/// - `{:ton}` - formats an int amount in nanotons as `<value> TON`
+/// - `{:X}` - same lowercase hexadecimal as `{:x}`, but with `0x` prefix
+/// - `{:b}` - formats an int as binary without `0b` prefix
+/// - `{:B}` - same binary as `{:b}`, but with `0b` prefix
+/// - `{:gram}` / `{:grams}` - formats an int amount in nanograms as `<value> GRAM`
+/// - `{:ton}` - legacy alias for `{:gram}` / `{:grams}`
 /// - `{:cell-tree}` - formats a cell/slice/builder/Cell<T> as a tree of cell references
+///
+/// Placeholder syntax is the same as `format` from `fmt.tolk`:
+/// - The full format spec is made of optional fill, align, width, and type parts.
+/// - `{:>8}`, `{:_<8}`, and `{:^8}` set constant width and alignment.
+/// - `{:0>8x}` and `{:0>8:x}` both combine fill, width, and a type modifier.
+/// - `{:05}` is sign-aware zero padding; `{:08X}` pads after the `0x` prefix.
+/// - Width is minimum visible width; longer values are not truncated.
+/// - `X` and `B` only add prefixes; they do not uppercase digits.
+/// - Dynamic width and named arguments are not supported.
 ///
 /// Notes:
 /// - Escape literal braces with `{{` and `}}`.
 /// - If the first string is an invalid format string, it is printed literally.
-/// - If placeholders outnumber arguments, unmatched placeholders stay in output as text.
+/// - If placeholders outnumber arguments, the full unmatched placeholders stay in output as text.
 /// - If arguments outnumber placeholders, extra arguments are appended after the formatted text.
-/// - For non-int arguments, `{:x}` and `{:ton}` fall back to the same behavior as `{}`.
+/// - For non-int arguments, `{:x}`, `{:X}`, `{:b}`, `{:B}`, `{:gram}`, `{:grams}`,
+///   and `{:ton}` fall back to the same behavior as `{}`.
 /// - For non-cell/slice/builder/Cell<T> arguments, `{:cell-tree}` falls back to the same behavior as `{}`.
 fun println<
     T1,

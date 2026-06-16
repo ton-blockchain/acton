@@ -54,6 +54,7 @@ fn shard_account(
 fn public_world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()> {
     let mut state = new_world_state()?;
     state.set_now(1_700_000_123);
+    state.set_random_seed(Some([0x42; 32]));
     state.get_lt();
     state.get_lt();
     state.register_lib(body_with_u32(0xcafe_babe)?);
@@ -74,6 +75,7 @@ fn public_world_state_snapshot_round_trip_preserves_state() -> anyhow::Result<()
     state.update_account(&second_addr, &second_account);
 
     let snapshot = state.snapshot()?;
+    assert_eq!(snapshot.random_seed, Some(hex::encode([0x42; 32])));
     let json = serde_json::to_string_pretty(&snapshot)?;
     let decoded: WorldStateSnapshot = serde_json::from_str(&json)?;
 
@@ -222,6 +224,8 @@ fn public_world_state_from_snapshot_rejects_invalid_account_address() -> anyhow:
         version: 1,
         current_lt: 0,
         current_now: 0,
+        random_seed: None,
+        ignore_chksig: false,
         config_boc64: ton_executor::DEFAULT_CONFIG.to_owned(),
         libraries_boc64: vec![],
         accounts: vec![WorldStateAccountSnapshot {
@@ -249,6 +253,8 @@ fn public_world_state_from_snapshot_rejects_invalid_config_boc() {
         version: 1,
         current_lt: 0,
         current_now: 0,
+        random_seed: None,
+        ignore_chksig: false,
         config_boc64: "not-base64".to_owned(),
         libraries_boc64: vec![],
         accounts: vec![],
@@ -270,6 +276,8 @@ fn public_world_state_from_snapshot_rejects_invalid_library_boc() {
         version: 1,
         current_lt: 0,
         current_now: 0,
+        random_seed: None,
+        ignore_chksig: false,
         config_boc64: ton_executor::DEFAULT_CONFIG.to_owned(),
         libraries_boc64: vec!["not-base64".to_owned()],
         accounts: vec![],
@@ -278,6 +286,52 @@ fn public_world_state_from_snapshot_rejects_invalid_library_boc() {
     assert!(
         WorldState::from_snapshot(snapshot).is_err(),
         "snapshot with invalid library should be rejected"
+    );
+}
+
+#[test]
+fn public_world_state_from_snapshot_rejects_invalid_random_seed_hex() {
+    let snapshot = WorldStateSnapshot {
+        version: 1,
+        current_lt: 0,
+        current_now: 0,
+        random_seed: Some("not-hex".to_owned()),
+        ignore_chksig: false,
+        config_boc64: ton_executor::DEFAULT_CONFIG.to_owned(),
+        libraries_boc64: vec![],
+        accounts: vec![],
+    };
+
+    let error = WorldState::from_snapshot(snapshot)
+        .err()
+        .expect("snapshot with invalid random seed should be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("Invalid random seed in snapshot"),
+        "unexpected error: {message}"
+    );
+}
+
+#[test]
+fn public_world_state_from_snapshot_rejects_invalid_random_seed_length() {
+    let snapshot = WorldStateSnapshot {
+        version: 1,
+        current_lt: 0,
+        current_now: 0,
+        random_seed: Some("42".to_owned()),
+        ignore_chksig: false,
+        config_boc64: ton_executor::DEFAULT_CONFIG.to_owned(),
+        libraries_boc64: vec![],
+        accounts: vec![],
+    };
+
+    let error = WorldState::from_snapshot(snapshot)
+        .err()
+        .expect("snapshot with short random seed should be rejected");
+    let message = error.to_string();
+    assert!(
+        message.contains("expected 32 bytes, got 1"),
+        "unexpected error: {message}"
     );
 }
 
@@ -301,6 +355,8 @@ fn public_world_state_load_snapshot_failure_keeps_existing_state() -> anyhow::Re
         version: 1,
         current_lt: 9,
         current_now: 9,
+        random_seed: None,
+        ignore_chksig: false,
         config_boc64: ton_executor::DEFAULT_CONFIG.to_owned(),
         libraries_boc64: vec![],
         accounts: vec![WorldStateAccountSnapshot {

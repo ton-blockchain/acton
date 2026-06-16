@@ -23,6 +23,19 @@ test-workspace:
     cargo nextest run --workspace {{ NEXTEST_PROFILE_ARGS }} {{ TEST_FEATURE_ARGS }}
     cargo test --workspace --doc
 
+install-test-ui-e2e-browsers:
+    bun run playwright install chromium
+
+test-ui-e2e-run: install-test-ui-e2e-browsers
+    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    bun run test:e2e:test-ui
+
+test-ui-e2e: build-ui build-dev test-ui-e2e-run
+
+test-ui-e2e-update: build-ui build-dev install-test-ui-e2e-browsers
+    bunx tsc -p crates/acton-test-ui/tsconfig.e2e.json --noEmit
+    CHECK_UI_SNAPSHOTS=1 bun run test:e2e:test-ui -- --update-snapshots
+
 _tree-sitter-test grammar:
     cd crates/tree-sitter-{{ grammar }} && yarn install --immutable && yarn tree-sitter generate && yarn tree-sitter test
 
@@ -83,12 +96,23 @@ check-deny:
 check-audit:
     cargo audit
 
-check-security: check-deny check-audit
-    bun audit --audit-level=moderate
+check-templates-security:
+  cd src/commands/new/templates/counter-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/empty-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/jetton-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/nft-app && npm audit --audit-level=moderate
+  cd src/commands/new/templates/w5-extension-app && npm audit --audit-level=moderate
+
+check-grammar-security:
     cd crates/tree-sitter-fift && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tasm && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tlb && yarn npm audit --all --recursive --severity=moderate
     cd crates/tree-sitter-tolk && yarn npm audit --all --recursive --severity=moderate
+
+check-ui-security:
+  bun audit --audit-level=moderate
+
+check-security: check-deny check-audit check-templates-security check-grammar-security check-ui-security
     cd crates/ton-ls/editors/code && yarn npm audit --all --recursive --severity=moderate
 
 check-tolk:

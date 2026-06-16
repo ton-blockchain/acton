@@ -1,24 +1,38 @@
 use crate::localnet::{
-    LocalnetAccountState, LocalnetBlockTransactions, LocalnetMessage, LocalnetRunGetMethodResult,
-    LocalnetTransaction, convert_to_message_struct,
+    LocalnetAcceptedExternalMessage, LocalnetAccountState, LocalnetMessage,
+    LocalnetRunGetMethodResult, LocalnetTransaction, convert_to_message_struct,
 };
 use crate::storage::{
-    AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta, MessageInfo, MsgMeta,
-    NftItemMeta, TraceNode, TransactionInfo,
+    AccountStatePreview, AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta,
+    MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
 };
-use crate::types::Addr;
-use base64::Engine;
+use crate::types::{Addr, BocBytes, Hash256};
 use serde_json::value::Value;
 use std::collections::HashMap;
 use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
+use tycho_types::cell::HashBytes;
+use tycho_types::models::{
+    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
+};
 
 #[allow(clippy::ptr_arg)]
 pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
+    let mut metadata = serde_json::Map::new();
+    for master in masters {
+        metadata.insert(
+            master.address.to_string(),
+            serde_json::json!({
+                "is_indexed": true,
+                "token_info": [map_jetton_master_token_info(master)],
+            }),
+        );
+    }
+
     serde_json::json!({
         "address_book": {},
-        "metadata": {},
+        "metadata": metadata,
         "jetton_masters": masters.iter().map(map_jetton_master).collect::<Vec<_>>()
     })
 }
@@ -26,7 +40,7 @@ pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
 fn map_jetton_master(m: &JettonMasterMeta) -> Value {
     serde_json::json!({
         "address": m.address.to_string(),
-        "admin_address": m.admin_address.to_string(),
+        "admin_address": m.admin_address.map(|address| address.to_string()),
         "code_hash": m.code_hash.to_base64(),
         "data_hash": m.data_hash.to_base64(),
         "jetton_content": m.jetton_content,
@@ -189,7 +203,7 @@ pub fn map_address_information(state: &LocalnetAccountState) -> Value {
         "balance": state.balance.to_string(),
         "code": encode_optional_boc(state.code.as_ref()),
         "data": encode_optional_boc(state.data.as_ref()),
-        "frozen_hash": state.frozen_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
+        "frozen_hash": state.frozen_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
         "last_transaction_hash": state.last_transaction_id.hash.to_base64(),
         "last_transaction_lt": state.last_transaction_id.lt.to_string(),
         "status": map_address_information_status(&state.state),
@@ -197,19 +211,11 @@ pub fn map_address_information(state: &LocalnetAccountState) -> Value {
 }
 
 #[must_use]
-pub fn map_send_message(bt: &LocalnetBlockTransactions) -> Value {
-    let message_hash = bt
-        .msg_hash
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
-        .unwrap_or_default();
-    let message_hash_norm = bt.msg_hash_norm.as_ref().map_or_else(
-        || message_hash.clone(),
-        super::super::types::Hash256::to_base64,
-    );
+pub fn map_send_message(message: &LocalnetAcceptedExternalMessage) -> Value {
+    let message_hash = message.msg_hash.to_base64();
     serde_json::json!({
         "message_hash": message_hash,
-        "message_hash_norm": message_hash_norm,
+        "message_hash_norm": message.msg_hash_norm.to_base64(),
     })
 }
 
@@ -221,6 +227,13 @@ pub fn map_transactions_response(transactions: &[LocalnetTransaction]) -> Value 
 }
 
 fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
+    let tx_details = transaction_details(&tx.data);
+    let trace_external_hash = tx
+        .in_msg
+        .hash_norm
+        .as_ref()
+        .unwrap_or(&tx.in_msg.hash)
+        .to_base64();
     let in_msg = if tx.in_msg.hash.0 == [0; 32] {
         Value::Null
     } else {
@@ -232,33 +245,48 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         .filter(|msg| msg.hash.0 != [0; 32])
         .map(|msg| map_v3_message(msg, &tx.hash, tx.utime, false))
         .collect::<Vec<_>>();
+    let fallback_action_result_code = if tx.success { 0 } else { tx.exit_code };
 
     serde_json::json!({
         "account": tx.address.to_string(),
         "hash": tx.hash.to_base64(),
         "lt": tx.transaction_id.lt.to_string(),
         "now": tx.utime,
-        "orig_status": "active",
-        "end_status": "active",
+        "orig_status": tx_details.orig_status,
+        "end_status": tx_details.end_status,
         "total_fees": tx.total_fees.to_string(),
         "total_fees_extra_currencies": {},
-        "prev_trans_hash": zero_hash_base64(),
-        "prev_trans_lt": "0",
+        "prev_trans_hash": tx_details.prev_trans_hash,
+        "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
-            "aborted": !tx.success,
-            "compute_ph": {
-                "skipped": false,
-                "success": tx.success,
-                "exit_code": tx.exit_code,
-            },
-            "action": {
-                "success": tx.success,
-                "result_code": if tx.success { 0 } else { tx.exit_code },
-            }
+            "aborted": tx_details.aborted.unwrap_or(!tx.success),
+            "destroyed": tx_details.destroyed.unwrap_or(false),
+            "credit_first": tx_details.credit_first.unwrap_or(false),
+            "is_tock": false,
+            "installed": false,
+            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
+                default_storage_phase(tx.storage_fees)
+            }),
+            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
+                default_compute_phase(false, tx.success, tx.exit_code)
+            }),
+            "action": tx_details.action_phase.unwrap_or_else(|| {
+                default_action_phase(tx.success, fallback_action_result_code, tx.out_msgs.len())
+            })
         },
         "in_msg": in_msg,
         "out_msgs": out_msgs,
+        "account_state_before": map_transaction_account_state(
+            None,
+            &tx_details.account_state_before_hash,
+            tx_details.orig_status,
+        ),
+        "account_state_after": map_transaction_account_state(
+            None,
+            &tx_details.account_state_after_hash,
+            tx_details.end_status,
+        ),
         "block_ref": {
             "workchain": 0,
             "shard": "-9223372036854775808",
@@ -267,13 +295,13 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         "mc_block_seqno": tx.mc_block_seqno,
         "emulated": false,
         "trace_id": tx.hash.to_base64(),
-        "trace_external_hash": tx.hash.to_base64(),
+        "trace_external_hash": trace_external_hash,
     })
 }
 
 fn map_v3_message(
     msg: &LocalnetMessage,
-    tx_hash: &crate::types::Hash256,
+    tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
 ) -> Value {
@@ -293,7 +321,7 @@ fn map_v3_message(
         "ihr_disabled": true,
         "message_content": {
             "hash": msg.body_hash.to_base64(),
-            "body": base64::engine::general_purpose::STANDARD.encode(&msg.body),
+            "body": msg.body.to_base64(),
         },
     });
 
@@ -303,10 +331,7 @@ fn map_v3_message(
         root.insert("opcode".to_string(), Value::from(i64::from(opcode)));
     }
 
-    if let Some(hash_norm) = msg
-        .hash_norm
-        .as_ref()
-        .map(super::super::types::Hash256::to_base64)
+    if let Some(hash_norm) = msg.hash_norm.as_ref().map(Hash256::to_base64)
         && let Some(root) = mapped.as_object_mut()
     {
         root.insert("hash_norm".to_string(), Value::String(hash_norm));
@@ -319,7 +344,7 @@ fn map_v3_message(
             "init_state".to_string(),
             serde_json::json!({
                 "hash": hash_boc_base64(&msg.init_state).unwrap_or_default(),
-                "body": base64::engine::general_purpose::STANDARD.encode(&msg.init_state),
+                "body": msg.init_state.to_base64(),
             }),
         );
     }
@@ -341,9 +366,9 @@ fn map_v3_message(
     mapped
 }
 
-fn hash_boc_base64(boc: &crate::types::BocBytes) -> Option<String> {
+fn hash_boc_base64(boc: &BocBytes) -> Option<String> {
     let cell = Boc::decode(boc).ok()?;
-    Some(crate::types::Hash256(*cell.repr_hash().as_array()).to_base64())
+    Some(Hash256(*cell.repr_hash().as_array()).to_base64())
 }
 
 fn map_jetton_wallet(w: &JettonWalletMeta) -> Value {
@@ -531,16 +556,10 @@ fn map_account_state_full(
 
     if include_boc {
         if let Some(code) = state.code.as_ref() {
-            mapped.insert(
-                "code_boc".to_string(),
-                Value::String(base64::engine::general_purpose::STANDARD.encode(code)),
-            );
+            mapped.insert("code_boc".to_string(), Value::String(code.to_base64()));
         }
         if let Some(data) = state.data.as_ref() {
-            mapped.insert(
-                "data_boc".to_string(),
-                Value::String(base64::engine::general_purpose::STANDARD.encode(data)),
-            );
+            mapped.insert("data_boc".to_string(), Value::String(data.to_base64()));
         }
     }
 
@@ -576,15 +595,19 @@ fn content_string(content: &Value, key: &str) -> Option<String> {
 
 #[must_use]
 pub fn map_traces(tn: &TraceNode) -> Value {
+    map_traces_with_emulated(tn, false)
+}
+
+fn map_traces_with_emulated(tn: &TraceNode, emulated: bool) -> Value {
     let mut transactions = HashMap::new();
     let mut transactions_order = Vec::new();
-    collect_transactions(tn, &mut transactions, &mut transactions_order);
+    collect_transactions(tn, &mut transactions, &mut transactions_order, emulated);
 
     serde_json::json!({
         "address_book": {},
         "metadata": {},
         "traces": [
-            map_trace(tn, &transactions, &transactions_order)
+            map_trace(tn, &transactions, &transactions_order, emulated)
         ]
     })
 }
@@ -597,7 +620,7 @@ pub fn map_emulate_trace_response(
     metadata: Option<Value>,
 ) -> Value {
     let tn = &emulation.trace;
-    let mapped = map_traces(tn);
+    let mapped = map_traces_with_emulated(tn, true);
     let trace_entry = mapped
         .get("traces")
         .and_then(Value::as_array)
@@ -654,7 +677,10 @@ pub fn map_emulate_trace_response(
         response.insert("metadata".to_string(), metadata);
     }
 
-    response.insert("rand_seed".to_string(), serde_json::json!(""));
+    response.insert(
+        "rand_seed".to_string(),
+        serde_json::json!(zero_hash_base64()),
+    );
     response.insert(
         "vm_log".to_string(),
         serde_json::json!(emulation.vm_log.as_str()),
@@ -689,9 +715,7 @@ pub fn map_emulate_trace_response(
     Value::Object(response)
 }
 
-fn map_cells_by_hash_base64(
-    cells: &HashMap<crate::types::Hash256, crate::types::BocBytes>,
-) -> Value {
+fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> Value {
     let mut entries = cells
         .iter()
         .map(|(hash, boc)| (hash.to_base64(), boc.to_base64()))
@@ -727,10 +751,11 @@ fn collect_transactions(
     tn: &TraceNode,
     transactions: &mut HashMap<String, Value>,
     order: &mut Vec<String>,
+    emulated: bool,
 ) {
     let tx_hash = tn.transaction.meta.tx_hash.to_base64();
     if !transactions.contains_key(&tx_hash) {
-        let mut tx_val = map_transaction(&tn.transaction);
+        let mut tx_val = map_transaction(&tn.transaction, emulated);
 
         let child_lts: Vec<String> = tn
             .children
@@ -749,7 +774,7 @@ fn collect_transactions(
         order.push(tx_hash);
     }
     for child in &tn.children {
-        collect_transactions(child, transactions, order);
+        collect_transactions(child, transactions, order, emulated);
     }
 }
 
@@ -757,10 +782,11 @@ fn map_trace(
     tn: &TraceNode,
     transactions: &HashMap<String, Value>,
     transactions_order: &[String],
+    emulated: bool,
 ) -> Value {
     serde_json::json!({
         "trace_id": tn.transaction.meta.tx_hash.to_base64(),
-        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), super::super::types::Hash256::to_base64),
+        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), Hash256::to_base64),
         "mc_seqno_start": "0",
         "mc_seqno_end": "0",
         "start_lt": tn.transaction.meta.lt.to_string(),
@@ -768,7 +794,7 @@ fn map_trace(
         "end_lt": tn.max_lt().to_string(),
         "end_utime": tn.max_utime(),
         "is_incomplete": false,
-        "trace": map_trace_node(tn),
+        "trace": map_trace_node(tn, emulated),
         "transactions": transactions,
         "transactions_order": transactions_order,
         "actions": [],
@@ -782,41 +808,60 @@ fn map_trace(
     })
 }
 
-fn map_trace_node(tn: &TraceNode) -> Value {
+fn map_trace_node(tn: &TraceNode, emulated: bool) -> Value {
     serde_json::json!({
         "tx_hash": tn.transaction.meta.tx_hash.to_base64(),
-        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(super::super::types::Hash256::to_base64).unwrap_or_default(),
+        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
         "in_msg": tn.transaction.in_msg.as_ref().map(|m| {
             map_trace_message_info(m, &tn.transaction.meta.tx_hash, tn.transaction.meta.now, true)
         }),
-        "transaction": map_transaction(&tn.transaction),
-        "children": tn.children.iter().map(map_trace_node).collect::<Vec<_>>(),
+        "transaction": map_transaction(&tn.transaction, emulated),
+        "children": tn.children.iter().map(|child| map_trace_node(child, emulated)).collect::<Vec<_>>(),
     })
 }
 
-fn map_transaction(tx: &TransactionInfo) -> Value {
+fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
+    let tx_details = transaction_details(&tx.tx_boc);
+    let trace_external_hash = tx.meta.in_msg_hash.unwrap_or(tx.meta.tx_hash).to_base64();
+    let compute_phase_skipped = tx.meta.compute_exit_code.is_none();
+    let compute_phase_success = tx.meta.compute_exit_code == Some(0);
+    let action_phase_success = tx.meta.action_result_code == Some(0);
+
     serde_json::json!({
         "account": tx.meta.account.to_string(),
         "hash": tx.meta.tx_hash.to_base64(),
         "lt": tx.meta.lt.to_string(),
         "now": tx.meta.now,
-        "orig_status": "active",
-        "end_status": "active",
+        "orig_status": tx_details.orig_status,
+        "end_status": tx_details.end_status,
         "total_fees": tx.meta.total_fees.unwrap_or(0).to_string(),
-        "prev_trans_hash": zero_hash_base64(),
-        "prev_trans_lt": "0",
+        "total_fees_extra_currencies": {},
+        "prev_trans_hash": tx_details.prev_trans_hash,
+        "prev_trans_lt": tx_details.prev_trans_lt,
         "description": {
             "type": "ord",
-            "aborted": !tx.meta.success,
-            "compute_ph": {
-                "skipped": tx.meta.compute_exit_code.is_none(),
-                "success": tx.meta.compute_exit_code == Some(0),
-                "exit_code": tx.meta.compute_exit_code.unwrap_or(0),
-            },
-            "action": {
-                "success": tx.meta.action_result_code == Some(0),
-                "result_code": tx.meta.action_result_code.unwrap_or(0),
-            }
+            "aborted": tx_details.aborted.unwrap_or(!tx.meta.success),
+            "destroyed": tx_details.destroyed.unwrap_or(false),
+            "credit_first": tx_details.credit_first.unwrap_or(false),
+            "is_tock": false,
+            "installed": false,
+            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
+                default_storage_phase(tx.meta.storage_fees.unwrap_or(0))
+            }),
+            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
+                default_compute_phase(
+                    compute_phase_skipped,
+                    compute_phase_success,
+                    tx.meta.compute_exit_code.unwrap_or(0),
+                )
+            }),
+            "action": tx_details.action_phase.unwrap_or_else(|| {
+                default_action_phase(
+                    action_phase_success,
+                    tx.meta.action_result_code.unwrap_or(0),
+                    tx.out_msgs.len(),
+                )
+            })
         },
         "in_msg": tx.in_msg.as_ref().map(|m| {
             map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, true)
@@ -824,6 +869,16 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
         "out_msgs": tx.out_msgs.iter().map(|m| {
             map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false)
         }).collect::<Vec<_>>(),
+        "account_state_before": map_transaction_account_state(
+            tx.account_state_before.as_ref(),
+            &tx_details.account_state_before_hash,
+            tx_details.orig_status,
+        ),
+        "account_state_after": map_transaction_account_state(
+            tx.account_state_after.as_ref(),
+            &tx_details.account_state_after_hash,
+            tx_details.end_status,
+        ),
         "block_ref": {
             "workchain": 0,
             "shard": "-9223372036854775808",
@@ -831,12 +886,322 @@ fn map_transaction(tx: &TransactionInfo) -> Value {
         },
         "mc_block_seqno": tx.meta.block_seqno,
         "child_transactions": [],
+        "emulated": emulated,
+        "trace_id": tx.meta.tx_hash.to_base64(),
+        "trace_external_hash": trace_external_hash,
     })
+}
+
+struct TransactionDetails {
+    prev_trans_hash: String,
+    prev_trans_lt: String,
+    orig_status: &'static str,
+    end_status: &'static str,
+    account_state_before_hash: String,
+    account_state_after_hash: String,
+    aborted: Option<bool>,
+    destroyed: Option<bool>,
+    credit_first: Option<bool>,
+    storage_phase: Option<Value>,
+    compute_phase: Option<Value>,
+    action_phase: Option<Value>,
+}
+
+impl Default for TransactionDetails {
+    fn default() -> Self {
+        Self {
+            prev_trans_hash: zero_hash_base64(),
+            prev_trans_lt: "0".to_string(),
+            orig_status: "active",
+            end_status: "active",
+            account_state_before_hash: zero_hash_base64(),
+            account_state_after_hash: zero_hash_base64(),
+            aborted: None,
+            destroyed: None,
+            credit_first: None,
+            storage_phase: None,
+            compute_phase: None,
+            action_phase: None,
+        }
+    }
+}
+
+fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
+    let Some(transaction) = Boc::decode(tx_boc)
+        .ok()
+        .and_then(|cell| cell.parse::<tycho_types::models::Transaction>().ok())
+    else {
+        return TransactionDetails::default();
+    };
+
+    let state_update = transaction.state_update.load().ok();
+    let tx_info = transaction.info.load().ok();
+    let ordinary_info = match tx_info {
+        Some(TxInfo::Ordinary(info)) => Some(info),
+        _ => None,
+    };
+
+    TransactionDetails {
+        prev_trans_hash: hash_bytes_base64(&transaction.prev_trans_hash),
+        prev_trans_lt: transaction.prev_trans_lt.to_string(),
+        orig_status: map_tycho_account_status(transaction.orig_status),
+        end_status: map_tycho_account_status(transaction.end_status),
+        account_state_before_hash: state_update
+            .as_ref()
+            .map_or_else(zero_hash_base64, |update| hash_bytes_base64(&update.old)),
+        account_state_after_hash: state_update
+            .as_ref()
+            .map_or_else(zero_hash_base64, |update| hash_bytes_base64(&update.new)),
+        aborted: ordinary_info.as_ref().map(|info| info.aborted),
+        destroyed: ordinary_info.as_ref().map(|info| info.destroyed),
+        credit_first: ordinary_info.as_ref().map(|info| info.credit_first),
+        storage_phase: ordinary_info
+            .as_ref()
+            .map(|info| map_storage_phase(info.storage_phase.as_ref())),
+        compute_phase: ordinary_info
+            .as_ref()
+            .map(|info| map_compute_phase(&info.compute_phase)),
+        action_phase: ordinary_info
+            .as_ref()
+            .and_then(|info| info.action_phase.as_ref())
+            .map(map_action_phase),
+    }
+}
+
+fn default_storage_phase(storage_fees_collected: u128) -> Value {
+    serde_json::json!({
+        "storage_fees_collected": storage_fees_collected.to_string(),
+        "status_change": "unchanged",
+    })
+}
+
+fn map_storage_phase(phase: Option<&tycho_types::models::StoragePhase>) -> Value {
+    let Some(phase) = phase else {
+        return default_storage_phase(0);
+    };
+
+    let mut value = serde_json::json!({
+        "storage_fees_collected": u128::from(phase.storage_fees_collected).to_string(),
+        "status_change": map_account_status_change(phase.status_change),
+    });
+
+    if let Some(storage_fees_due) = phase.storage_fees_due
+        && let Some(root) = value.as_object_mut()
+    {
+        root.insert(
+            "storage_fees_due".to_string(),
+            Value::String(u128::from(storage_fees_due).to_string()),
+        );
+    }
+
+    value
+}
+
+fn default_compute_phase(skipped: bool, success: bool, exit_code: i32) -> Value {
+    serde_json::json!({
+        "skipped": skipped,
+        "success": success,
+        "msg_state_used": false,
+        "account_activated": false,
+        "gas_fees": "0",
+        "gas_used": "0",
+        "gas_limit": "0",
+        "mode": 0,
+        "exit_code": exit_code,
+        "vm_steps": 0,
+        "vm_init_state_hash": zero_hash_base64(),
+        "vm_final_state_hash": zero_hash_base64(),
+    })
+}
+
+fn map_compute_phase(phase: &ComputePhase) -> Value {
+    match phase {
+        ComputePhase::Skipped(phase) => serde_json::json!({
+            "skipped": true,
+            "success": false,
+            "reason": map_compute_skip_reason(phase.reason),
+            "exit_code": 0,
+        }),
+        ComputePhase::Executed(phase) => {
+            let mut value = serde_json::json!({
+                "skipped": false,
+                "success": phase.success,
+                "msg_state_used": phase.msg_state_used,
+                "account_activated": phase.account_activated,
+                "gas_fees": u128::from(phase.gas_fees).to_string(),
+                "gas_used": u64::from(phase.gas_used).to_string(),
+                "gas_limit": u64::from(phase.gas_limit).to_string(),
+                "mode": phase.mode,
+                "exit_code": phase.exit_code,
+                "vm_steps": phase.vm_steps,
+                "vm_init_state_hash": hash_bytes_base64(&phase.vm_init_state_hash),
+                "vm_final_state_hash": hash_bytes_base64(&phase.vm_final_state_hash),
+            });
+
+            if let Some(root) = value.as_object_mut() {
+                if let Some(gas_credit) = phase.gas_credit {
+                    root.insert(
+                        "gas_credit".to_string(),
+                        Value::String(u32::from(gas_credit).to_string()),
+                    );
+                }
+
+                if let Some(exit_arg) = phase.exit_arg {
+                    root.insert("exit_arg".to_string(), Value::from(exit_arg));
+                }
+            }
+
+            value
+        }
+    }
+}
+
+fn default_action_phase(success: bool, result_code: i32, out_msgs_len: usize) -> Value {
+    serde_json::json!({
+        "success": success,
+        "valid": true,
+        "no_funds": false,
+        "status_change": "unchanged",
+        "result_code": result_code,
+        "tot_actions": out_msgs_len,
+        "spec_actions": 0,
+        "skipped_actions": 0,
+        "msgs_created": out_msgs_len,
+        "action_list_hash": zero_hash_base64(),
+        "tot_msg_size": {
+            "cells": "0",
+            "bits": "0",
+        },
+    })
+}
+
+fn map_action_phase(phase: &ActionPhase) -> Value {
+    let mut value = serde_json::json!({
+        "success": phase.success,
+        "valid": phase.valid,
+        "no_funds": phase.no_funds,
+        "status_change": map_account_status_change(phase.status_change),
+        "result_code": phase.result_code,
+        "tot_actions": phase.total_actions,
+        "spec_actions": phase.special_actions,
+        "skipped_actions": phase.skipped_actions,
+        "msgs_created": phase.messages_created,
+        "action_list_hash": hash_bytes_base64(&phase.action_list_hash),
+        "tot_msg_size": {
+            "cells": u64::from(phase.total_message_size.cells).to_string(),
+            "bits": u64::from(phase.total_message_size.bits).to_string(),
+        },
+    });
+
+    if let Some(root) = value.as_object_mut() {
+        if let Some(total_fwd_fees) = phase.total_fwd_fees {
+            root.insert(
+                "total_fwd_fees".to_string(),
+                Value::String(u128::from(total_fwd_fees).to_string()),
+            );
+        }
+
+        if let Some(total_action_fees) = phase.total_action_fees {
+            root.insert(
+                "total_action_fees".to_string(),
+                Value::String(u128::from(total_action_fees).to_string()),
+            );
+        }
+
+        if let Some(result_arg) = phase.result_arg {
+            root.insert("result_arg".to_string(), Value::from(result_arg));
+        }
+    }
+
+    value
+}
+
+const fn map_account_status_change(change: AccountStatusChange) -> &'static str {
+    match change {
+        AccountStatusChange::Unchanged => "unchanged",
+        AccountStatusChange::Frozen => "frozen",
+        AccountStatusChange::Deleted => "deleted",
+    }
+}
+
+const fn map_compute_skip_reason(reason: ComputePhaseSkipReason) -> &'static str {
+    match reason {
+        ComputePhaseSkipReason::NoState => "no_state",
+        ComputePhaseSkipReason::BadState => "bad_state",
+        ComputePhaseSkipReason::NoGas => "no_gas",
+        ComputePhaseSkipReason::Suspended => "suspended",
+    }
+}
+
+fn map_transaction_account_state(
+    preview: Option<&AccountStatePreview>,
+    fallback_hash: &str,
+    fallback_status: &str,
+) -> Value {
+    if let Some(preview) = preview {
+        let mut value = map_emulation_account_state(
+            fallback_hash,
+            &preview.balance.to_string(),
+            map_account_state_status(&preview.status),
+            preview.frozen_hash.as_ref(),
+            preview.data_hash.as_ref(),
+            preview.code_hash.as_ref(),
+        );
+        insert_account_state_bocs(&mut value, preview);
+        return value;
+    }
+
+    map_emulation_account_state(fallback_hash, "0", fallback_status, None, None, None)
+}
+
+fn insert_account_state_bocs(value: &mut Value, preview: &AccountStatePreview) {
+    let Some(mapped) = value.as_object_mut() else {
+        return;
+    };
+
+    if let Some(code_boc) = &preview.code_boc {
+        mapped.insert("code_boc".to_string(), Value::String(code_boc.to_base64()));
+    }
+    if let Some(data_boc) = &preview.data_boc {
+        mapped.insert("data_boc".to_string(), Value::String(data_boc.to_base64()));
+    }
+}
+
+fn map_emulation_account_state(
+    hash: &str,
+    balance: &str,
+    account_status: &str,
+    frozen_hash: Option<&Hash256>,
+    data_hash: Option<&Hash256>,
+    code_hash: Option<&Hash256>,
+) -> Value {
+    serde_json::json!({
+        "hash": hash,
+        "balance": balance,
+        "extra_currencies": {},
+        "account_status": account_status,
+        "frozen_hash": frozen_hash.map(Hash256::to_base64),
+        "data_hash": data_hash.map(Hash256::to_base64),
+        "code_hash": code_hash.map(Hash256::to_base64),
+    })
+}
+
+fn hash_bytes_base64(hash: &HashBytes) -> String {
+    Hash256(*hash.as_array()).to_base64()
+}
+
+const fn map_tycho_account_status(status: tycho_types::models::AccountStatus) -> &'static str {
+    match status {
+        tycho_types::models::AccountStatus::Uninit => "uninit",
+        tycho_types::models::AccountStatus::Frozen => "frozen",
+        tycho_types::models::AccountStatus::Active => "active",
+        tycho_types::models::AccountStatus::NotExists => "nonexist",
+    }
 }
 
 fn map_trace_message_info(
     msg: &MessageInfo,
-    tx_hash: &crate::types::Hash256,
+    tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
 ) -> Value {
@@ -916,13 +1281,12 @@ fn map_stack_entry(entry: Value) -> Value {
     }
 }
 
-fn encode_optional_boc(data: Option<&crate::types::BocBytes>) -> String {
-    data.map(|c| base64::engine::general_purpose::STANDARD.encode(c))
-        .unwrap_or_default()
+fn encode_optional_boc(data: Option<&BocBytes>) -> String {
+    data.map(BocBytes::to_base64).unwrap_or_default()
 }
 
 fn zero_hash_base64() -> String {
-    crate::types::Hash256([0; 32]).to_base64()
+    Hash256([0; 32]).to_base64()
 }
 
 const fn map_address_information_status(status: &AccountStatus) -> &'static str {
@@ -944,10 +1308,36 @@ const fn map_account_state_status(status: &AccountStatus) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{map_nft_collection_token_info, map_nft_item_token_info};
-    use crate::storage::NftItemMeta;
+    use super::{map_jetton_masters, map_nft_collection_token_info, map_nft_item_token_info};
+    use crate::storage::{JettonMasterMeta, NftItemMeta};
     use crate::types::Hash256;
     use serde_json::json;
+
+    fn sample_jetton_master() -> JettonMasterMeta {
+        JettonMasterMeta {
+            address: "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                .parse()
+                .expect("valid master address"),
+            admin_address: Some(
+                "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                    .parse()
+                    .expect("valid admin address"),
+            ),
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            jetton_content: json!({
+                "name": "UTYA",
+                "symbol": "UTYA",
+                "description": "Duck token",
+                "image": "https://example.com/utya.png",
+                "decimals": "9",
+            }),
+            jetton_wallet_code_hash: Hash256([3; 32]),
+            last_transaction_lt: 42,
+            mintable: true,
+            total_supply: 1_000_000,
+        }
+    }
 
     fn sample_nft_item() -> NftItemMeta {
         NftItemMeta {
@@ -979,6 +1369,24 @@ mod tests {
             init: true,
             last_transaction_lt: 42,
         }
+    }
+
+    #[test]
+    fn jetton_masters_response_includes_token_metadata() {
+        let master = sample_jetton_master();
+        let address = master.address.to_string();
+        let response = map_jetton_masters(&vec![master]);
+        let token_info = &response["metadata"][&address]["token_info"][0];
+
+        assert_eq!(
+            response["metadata"][&address]["is_indexed"].as_bool(),
+            Some(true)
+        );
+        assert_eq!(token_info["type"].as_str(), Some("jetton_masters"));
+        assert_eq!(token_info["name"].as_str(), Some("UTYA"));
+        assert_eq!(token_info["symbol"].as_str(), Some("UTYA"));
+        assert_eq!(token_info["description"].as_str(), Some("Duck token"));
+        assert_eq!(token_info["extra"]["decimals"].as_str(), Some("9"));
     }
 
     #[test]

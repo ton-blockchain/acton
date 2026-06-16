@@ -17,6 +17,7 @@ pub(crate) struct LocalnetBuilder<'a> {
     current_dir: PathBuf,
     port: u16,
     args: Vec<String>,
+    auth_token: Option<String>,
     ready_timeout: Duration,
 }
 
@@ -35,6 +36,7 @@ impl<'a> LocalnetBuilder<'a> {
             current_dir: project.path().to_path_buf(),
             port: find_available_port(),
             args: Vec::new(),
+            auth_token: None,
             ready_timeout: DEFAULT_READY_TIMEOUT,
         }
     }
@@ -68,6 +70,12 @@ impl<'a> LocalnetBuilder<'a> {
         self
     }
 
+    pub(crate) fn require_auth(mut self) -> Self {
+        self.args.push("--require-auth".to_owned());
+        self.auth_token = Some("test-localnet-auth-token".to_owned());
+        self
+    }
+
     pub(crate) fn before_start<F>(self, configure: F) -> Self
     where
         F: FnOnce(ActonCommand) -> ActonCommand,
@@ -82,6 +90,9 @@ impl<'a> LocalnetBuilder<'a> {
             .arg("start")
             .arg("--port")
             .arg(self.port.to_string());
+        if !self.args.iter().any(|arg| arg == "--block-interval-ms") {
+            cmd.arg("--block-interval-ms").arg("50");
+        }
         cmd.args(&self.args)
             .current_dir(&self.current_dir)
             .env("NO_COLOR", "1")
@@ -89,6 +100,9 @@ impl<'a> LocalnetBuilder<'a> {
             .env("USERPROFILE", self.project.isolated_home())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
+        if let Some(auth_token) = self.auth_token.as_deref() {
+            cmd.env("ACTON_LOCALNET_AUTH_TOKEN", auth_token);
+        }
 
         let child = cmd.spawn().unwrap_or_else(|e| {
             panic!(
@@ -101,6 +115,7 @@ impl<'a> LocalnetBuilder<'a> {
             child: Some(child),
             port: self.port,
             base_url: format!("http://127.0.0.1:{}", self.port),
+            auth_token: self.auth_token,
             client: Client::builder()
                 .timeout(Duration::from_secs(5))
                 .build()
@@ -128,6 +143,7 @@ pub(crate) struct LocalnetHandle {
     child: Option<Child>,
     port: u16,
     base_url: String,
+    auth_token: Option<String>,
     client: Client,
 }
 
@@ -141,11 +157,14 @@ impl LocalnetHandle {
         self.base_url.clone()
     }
 
+    pub(crate) fn auth_token(&self) -> Option<&str> {
+        self.auth_token.as_deref()
+    }
+
     pub(crate) fn get_json(&self, path: &str) -> Value {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
-            .client
-            .get(&url)
+            .with_auth(self.client.get(&url))
             .send()
             .unwrap_or_else(|e| panic!("Failed GET {url}: {e}"));
         let status = response.status();
@@ -163,8 +182,7 @@ impl LocalnetHandle {
     pub(crate) fn get_json_with_status(&self, path: &str) -> (u16, Value) {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
-            .client
-            .get(&url)
+            .with_auth(self.client.get(&url))
             .send()
             .unwrap_or_else(|e| panic!("Failed GET {url}: {e}"));
         let status = response.status().as_u16();
@@ -179,9 +197,7 @@ impl LocalnetHandle {
     pub(crate) fn post_json(&self, path: &str, payload: &Value) -> Value {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
-            .client
-            .post(&url)
-            .json(payload)
+            .with_auth(self.client.post(&url).json(payload))
             .send()
             .unwrap_or_else(|e| panic!("Failed POST {url}: {e}"));
         let status = response.status();
@@ -199,9 +215,7 @@ impl LocalnetHandle {
     pub(crate) fn post_json_with_status(&self, path: &str, payload: &Value) -> (u16, Value) {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
-            .client
-            .post(&url)
-            .json(payload)
+            .with_auth(self.client.post(&url).json(payload))
             .send()
             .unwrap_or_else(|e| panic!("Failed POST {url}: {e}"));
         let status = response.status().as_u16();
@@ -217,6 +231,25 @@ impl LocalnetHandle {
         self.terminate();
     }
 
+    pub(crate) fn wait_until_address_state_active(&self, address: &str, timeout: Duration) {
+        let query = format!("/api/v2/getAddressState?address={address}");
+        let deadline = Instant::now() + timeout;
+        loop {
+            let response = self.get_json(&query);
+            if response["ok"].as_bool() == Some(true)
+                && response["result"].as_str() == Some("active")
+            {
+                return;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "Timed out waiting for address `{address}` to become active:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            );
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
+
     fn wait_until_ready(&mut self, timeout: Duration) -> Result<String, String> {
         let deadline = Instant::now() + timeout;
         let probe_url = format!("http://127.0.0.1:{}/api/v2/getMasterchainInfo", self.port);
@@ -230,7 +263,7 @@ impl LocalnetHandle {
                 return Err(format!("Localnet exited before ready with status {status}"));
             }
 
-            if let Ok(response) = self.client.get(&probe_url).send()
+            if let Ok(response) = self.with_auth(self.client.get(&probe_url)).send()
                 && response.status().is_success()
                 && let Ok(json) = response.json::<Value>()
                 && json.get("ok").and_then(Value::as_bool) == Some(true)
@@ -244,6 +277,16 @@ impl LocalnetHandle {
             }
 
             thread::sleep(Duration::from_millis(100));
+        }
+    }
+
+    fn with_auth(
+        &self,
+        request: reqwest::blocking::RequestBuilder,
+    ) -> reqwest::blocking::RequestBuilder {
+        match self.auth_token.as_deref() {
+            Some(token) => request.bearer_auth(token),
+            None => request,
         }
     }
 

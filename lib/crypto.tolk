@@ -114,38 +114,32 @@ fun crypto.getSecureRandomBytes(bytesNum: uint16): slice {
     return ffi.getSecureRandomBytes(bytesNum);
 }
 
-/// Generates fast (non-cryptographic) deterministic random bytes using a seed.
+/// Generates fast (non-cryptographic) random bytes from the current VM random
+/// state.
 ///
-/// If `seed` is not provided, the current `blockchain.now()` value is used at
-/// the moment of the call.
-/// The maximum `bytesNum` is 127; values >= 128 will throw an error
+/// Each call consumes from the VM's random number generator (via
+/// [random.uint256]), so successive calls return different bytes.
+/// The maximum `bytesNum` is 127; values >= 128 will throw an error.
 ///
-/// Same seed always produces the same output, which is useful for reproducible
-/// tests.
-///
-/// Practical determinism note:
-/// - Passing an explicit `seed` gives fully time-independent reproducibility.
-/// - Omitting `seed` makes the result deterministic only for a fixed blockchain
-///   time. In tests, `testing.setNow(...)` can be used to freeze that time.
-/// - If the blockchain time changes between calls, the output changes too.
+/// Reproducibility:
+/// The output is deterministic for a fixed VM random seed. In tests, call
+/// [testing.setRandomSeed] (or [random.setSeed]) with an explicit seed before
+/// calling this function to make the result reproducible.
 ///
 /// Example:
 /// ```tolk
-/// val bytes = crypto.getFastRandomBytes(16, 42);
+/// val bytes = crypto.getFastRandomBytes(16);
 /// ```
 ///
-/// Example with fixed emulation time:
+/// Example with a fixed random seed:
 /// ```tolk
-/// testing.setNow(1700004321);
+/// testing.setRandomSeed(42);
 /// val a = crypto.getFastRandomBytes(16);
+/// testing.setRandomSeed(42);
 /// val b = crypto.getFastRandomBytes(16);
-/// // `a == b` because both calls used the same `blockchain.now()`
+/// // `a == b` because both calls started from the same VM random seed
 /// ```
-fun crypto.getFastRandomBytes(bytesNum: uint16, seed: int? = null): slice {
-    if (seed == null) {
-        seed = blockchain.now();
-    }
-    random.setSeed(seed as uint256);
+fun crypto.getFastRandomBytes(bytesNum: uint16): slice {
     // In this case bytes won't fit in one slice
     if (bytesNum >= 128) {
         Assert.fail("getFastRandomBytes expects bytesNum less than 128");

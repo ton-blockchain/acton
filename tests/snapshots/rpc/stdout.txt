@@ -4,6 +4,7 @@ Usage: acton[EXE] rpc [OPTIONS] <COMMAND>
 
 Commands:
   info          Show remote account information and decode storage when ABI is known
+  call          Call a contract get-method through TonCenter
   block         Print the latest masterchain block info returned by TonCenter
   block-number  Print the latest masterchain block number for a network
   trace         Render a TonCenter v3 trace as a decoded transaction tree

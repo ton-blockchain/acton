@@ -47,6 +47,10 @@ on:
     tags:
       - '**[0-9]+.[0-9]+.[0-9]+*'
 
+env:
+  CARGO_DIST_VERSION: "0.31.0"
+  CARGO_DIST_SOURCE_DIGEST: "f9e8829f2e537b7c6648c11bf05cc0f69c1eee08"
+
 jobs:
   # Run 'dist plan' (or host) to determine what tasks we need to do
   plan:
@@ -64,10 +68,18 @@ jobs:
           persist-credentials: false
           submodules: recursive
       - name: Install dist
-        # we specify bash to get pipefail; it guards against the `curl` command
-        # failing. otherwise `sh` won't catch that `curl` returned non-0
         shell: bash
-        run: "curl --proto '=https' --tlsv1.2 -LsSf https://github.com/axodotdev/cargo-dist/releases/download/v0.31.0/cargo-dist-installer.sh | sh"
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf "https://github.com/axodotdev/cargo-dist/releases/download/v${CARGO_DIST_VERSION}/cargo-dist-x86_64-unknown-linux-gnu.tar.xz" -o /tmp/cargo-dist.tar.xz
+
+          gh attestation verify /tmp/cargo-dist.tar.xz \
+            --repo axodotdev/cargo-dist \
+            --signer-workflow github.com/axodotdev/cargo-dist/.github/workflows/release.yml \
+            --source-ref "refs/tags/v${CARGO_DIST_VERSION}" \
+            --source-digest "${CARGO_DIST_SOURCE_DIGEST}"
+
+          tar -xf /tmp/cargo-dist.tar.xz -C /tmp
+          install /tmp/cargo-dist-x86_64-unknown-linux-gnu/dist ~/.cargo/bin/
       - name: Cache dist
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -267,6 +279,10 @@ jobs:
     # "host" however must run to completion, no skipping allowed!
     if: ${{ always() && needs.host.result == 'success' && needs.custom-check-release-binary.result == 'success' && needs.custom-check-installer-file.result == 'success' }}
     runs-on: "ubicloud-standard-2-ubuntu-2204"
+    permissions:
+      "attestations": "write"
+      "contents": "write"
+      "id-token": "write"
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
@@ -285,6 +301,13 @@ jobs:
         run: |
           # Remove the granular manifests
           rm -f artifacts/*-dist-manifest.json
+      - name: Attest
+        uses: actions/attest-build-provenance@a2bbfa25375fe432b6a289bc6b6cd05ecd0c4c32 # v4.1.0
+        with:
+          subject-path: |
+            artifacts/*.json
+            artifacts/*.sh
+            artifacts/*.tar.gz
       - name: Create GitHub Release
         env:
           PRERELEASE_FLAG: "${{ fromJson(needs.host.outputs.val).announcement_is_prerelease && '--prerelease' || '' }}"

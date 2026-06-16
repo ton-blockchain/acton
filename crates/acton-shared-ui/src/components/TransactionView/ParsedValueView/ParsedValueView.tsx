@@ -1,80 +1,20 @@
-import * as React from "react"
-import {useEffect, useState} from "react"
+import type React from "react"
 
 import type {ContractData, ParsedValue, ParsedValueMapEntry} from "@/types/transaction"
+import {formatCurrency} from "@/utils/format"
 
+import {CopyValueButton} from "../CopyValueButton"
 import {ContractChip} from "../ContractChip/ContractChip"
 
 import styles from "./ParsedValueView.module.css"
 
 const DECIMAL_SCALAR_PATTERN = /^-?\d+(?:\.\d+)?$/
+const INTEGER_SCALAR_PATTERN = /^-?\d+$/
+
+type ParsedScalarValue = Extract<ParsedValue, {readonly kind: "scalar"}>
 
 function ParsedTypeLabel({typeName}: {readonly typeName: string}): React.JSX.Element {
   return <span className={styles.parsedTypeLabel}>{typeName}</span>
-}
-
-function CopyValueButton({rawValue}: {readonly rawValue: string}): React.JSX.Element {
-  const [isCopied, setIsCopied] = useState(false)
-
-  const handleCopy = (): void => {
-    navigator.clipboard
-      .writeText(rawValue)
-      .then(() => {
-        setIsCopied(true)
-      })
-      .catch((error: unknown) => {
-        console.error("Failed to copy:", error)
-      })
-  }
-
-  useEffect(() => {
-    if (!isCopied) {
-      return
-    }
-
-    const timer = setTimeout(() => setIsCopied(false), 2000)
-    return () => clearTimeout(timer)
-  }, [isCopied])
-
-  return (
-    <button
-      type="button"
-      className={styles.copyButton}
-      onClick={event => {
-        event.stopPropagation()
-        handleCopy()
-      }}
-      title={isCopied ? "Copied full BOC hex" : "Copy full BOC hex"}
-      aria-label={isCopied ? "Copied full BOC hex" : "Copy full BOC hex"}
-    >
-      {isCopied ? (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <title>Copied</title>
-          <polyline points="20,6 9,17 4,12" />
-        </svg>
-      ) : (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-        >
-          <title>Copy full BOC hex</title>
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-          <path d="m5,15 L5,5 a2,2 0 0,1 2,-2 l10,0" />
-        </svg>
-      )}
-    </button>
-  )
 }
 
 function ParsedValueRow({
@@ -92,7 +32,12 @@ function ParsedValueRow({
     <>
       <div className={styles.parsedEntryKey}>{label}:</div>
       <div className={styles.parsedEntryValue}>
-        <ParsedValueView value={value} contracts={contracts} onContractClick={onContractClick} />
+        <ParsedValueView
+          value={value}
+          contracts={contracts}
+          onContractClick={onContractClick}
+          fieldName={label}
+        />
       </div>
     </>
   )
@@ -138,6 +83,7 @@ interface ParsedValueViewProps {
   readonly contracts: Map<string, ContractData>
   readonly onContractClick?: (address: string) => void
   readonly fallbackTypeName?: string
+  readonly fieldName?: string
 }
 
 export function ParsedValueView({
@@ -145,6 +91,7 @@ export function ParsedValueView({
   contracts,
   onContractClick,
   fallbackTypeName,
+  fieldName,
 }: ParsedValueViewProps): React.JSX.Element {
   switch (value.kind) {
     case "null": {
@@ -170,6 +117,8 @@ export function ParsedValueView({
       )
     }
     case "scalar": {
+      const displayValue = formatScalarByFieldName(value, fieldName)
+
       return (
         <span className={styles.scalarWithActions}>
           <span
@@ -179,9 +128,11 @@ export function ParsedValueView({
                 : styles.parsedScalar
             }
           >
-            {value.value}
+            {displayValue}
           </span>
-          {value.rawValue && <CopyValueButton rawValue={value.rawValue} />}
+          {value.rawValue && (
+            <CopyValueButton className={styles.copyButton} value={value.rawValue} />
+          )}
         </span>
       )
     }
@@ -234,7 +185,7 @@ export function ParsedValueView({
     case "map": {
       return (
         <div className={styles.parsedContainer}>
-          <span className={styles.parsedBadge}>map</span>
+          <span className={styles.parsedBadge}>{value.typeName ?? "map"}</span>
           {value.entries.length === 0 ? (
             <span className={styles.parsedEmpty}>{"{}"}</span>
           ) : (
@@ -252,5 +203,87 @@ export function ParsedValueView({
         </div>
       )
     }
+  }
+}
+
+function isAsciiAlphanumeric(value: string): boolean {
+  return /^[A-Za-z0-9]$/.test(value)
+}
+
+function isAsciiDigit(value: string): boolean {
+  return value >= "0" && value <= "9"
+}
+
+function isAsciiLowercase(value: string): boolean {
+  return value >= "a" && value <= "z"
+}
+
+function isAsciiUppercase(value: string): boolean {
+  return value >= "A" && value <= "Z"
+}
+
+function identifierWordBoundary(prev: string, current: string, next: string | undefined): boolean {
+  if (isAsciiDigit(prev) !== isAsciiDigit(current)) {
+    return true
+  }
+
+  if (isAsciiLowercase(prev) && isAsciiUppercase(current)) {
+    return true
+  }
+
+  return (
+    isAsciiUppercase(prev) &&
+    isAsciiUppercase(current) &&
+    next !== undefined &&
+    isAsciiLowercase(next)
+  )
+}
+
+function identifierHasWord(name: string, needle: string): boolean {
+  let start: number | undefined
+  let prev: string | undefined
+
+  for (let index = 0; index < name.length; index += 1) {
+    const current = name[index]
+    if (!isAsciiAlphanumeric(current)) {
+      if (start !== undefined && name.slice(start, index).toLowerCase() === needle.toLowerCase()) {
+        return true
+      }
+
+      start = undefined
+      prev = undefined
+      continue
+    }
+
+    const next = index + 1 < name.length ? name[index + 1] : undefined
+    if (prev !== undefined && start !== undefined && identifierWordBoundary(prev, current, next)) {
+      if (name.slice(start, index).toLowerCase() === needle.toLowerCase()) {
+        return true
+      }
+      start = index
+    } else if (start === undefined) {
+      start = index
+    }
+
+    prev = current
+  }
+
+  return start !== undefined && name.slice(start).toLowerCase() === needle.toLowerCase()
+}
+
+function formatScalarByFieldName(value: ParsedScalarValue, fieldName: string | undefined): string {
+  if (
+    value.typeName !== "coins" ||
+    fieldName === undefined ||
+    !identifierHasWord(fieldName, "ton") ||
+    !INTEGER_SCALAR_PATTERN.test(value.value)
+  ) {
+    return value.value
+  }
+
+  try {
+    return formatCurrency(BigInt(value.value))
+  } catch {
+    return value.value
   }
 }

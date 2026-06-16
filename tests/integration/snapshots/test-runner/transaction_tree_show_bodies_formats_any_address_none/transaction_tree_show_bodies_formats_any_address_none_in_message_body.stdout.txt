@@ -1,0 +1,24 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling receiver
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/show_bodies_any_address_none.test.tolk (1 test)
+  ✗ ex show bodies any address none [TIME]
+    └─ Error: expect(actual).toHaveTx(expected)
+        N/A -> deployer A
+        └── RouteWithMaybeDest 0.1 GRAM -> receiver B                                   gas=333
+            queryId: 1, maybeDest: addr_none
+            └── account created
+        
+        Cannot find transaction from <any> to kQAAAA..AAqmB2
+        with:
+      └─ at tests/show_bodies_any_address_none.test[LINE]
+
+ ✗ 1 failed in 1 file
+
+Some tests failed.

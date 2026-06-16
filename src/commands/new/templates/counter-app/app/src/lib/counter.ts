@@ -53,7 +53,7 @@ function parseUint32(
   return parsed;
 }
 
-function parseTonAmount(value: string, label: string): bigint {
+function parseGramAmount(value: string, label: string): bigint {
   const trimmed = value.trim();
 
   if (!trimmed) {
@@ -157,7 +157,7 @@ export function buildDeployTransaction(
   preview: CounterPreview;
 } {
   const preview = getCounterPreview(counterIdValue, ownerAddressValue);
-  const amount = parseTonAmount(deployAmountValue, 'Deploy value');
+  const amount = parseGramAmount(deployAmountValue, 'Deploy value');
 
   return {
     address: preview.address,
@@ -184,7 +184,7 @@ export function buildCounterActionTransaction(options: {
 }): { address: string; request: SendTransactionRequest } {
   const address = Address.parse(options.addressValue);
   const normalizedAddress = formatAddress(address);
-  const amount = parseTonAmount(options.messageValue, 'Message value');
+  const amount = parseGramAmount(options.messageValue, 'Message value');
   const step = parseUint32(options.stepValue, 'Step', { allowZero: false });
 
   return {

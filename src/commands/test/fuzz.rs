@@ -253,7 +253,7 @@ fn generate_fuzz_value(
         FuzzParameterKind::Address | FuzzParameterKind::AnyAddress => {
             let address = generate_std_address(run_idx, rng);
             Ok((
-                TupleItem::Cell(to_cell(&address)),
+                TupleItem::Slice(to_cell(&address)),
                 format_std_address(&address),
             ))
         }

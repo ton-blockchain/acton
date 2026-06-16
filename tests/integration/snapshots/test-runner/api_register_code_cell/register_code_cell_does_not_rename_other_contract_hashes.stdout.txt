@@ -13,11 +13,11 @@
   ✓ register code cell is hash specific [TIME]
     └─ Test output:
        N/A -> q_deployer A
-       └── empty 1 TON -> q_simple_alias B                                             gas=253
+       └── empty 1 GRAM -> q_simple_alias B                                            gas=253
            └── account created
        
        N/A -> q_deployer A
-       └── empty 1 TON -> child B                                                      gas=353
+       └── empty 1 GRAM -> child B                                                     gas=353
            └── account created
 
  ✓ 1 passed in 1 file

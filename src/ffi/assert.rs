@@ -71,8 +71,8 @@ fn assert_bin_impl(
         .ok_or_else(|| anyhow!("ty_idx=`{right_ty_idx}` does not fit into usize"))?;
 
     if operator == "==" || operator == "!=" {
-        let left_rendered = render_tuple_as_tolk_type(&source_map, &left, left_ty_idx);
-        let right_rendered = render_tuple_as_tolk_type(&source_map, &right, right_ty_idx);
+        let left_rendered = render_tuple_as_tolk_type(source_map.as_ref(), &left, left_ty_idx);
+        let right_rendered = render_tuple_as_tolk_type(source_map.as_ref(), &right, right_ty_idx);
         let values_equal = rendered_values_equal(&left_rendered, &right_rendered);
 
         if operator == "==" && values_equal {

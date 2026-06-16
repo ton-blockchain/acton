@@ -253,6 +253,157 @@ get fun `test-profiled-unknown-opcode`() {
 }
 "#;
 
+const GAS_PROFILED_UNIT_TEST: &str = r"
+struct X {
+    seed: int
+}
+
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    if (result == 0) {
+        throw 901;
+    }
+}
+";
+
+const GAS_PROFILED_MESSAGE_CONTRACT: &str = r"
+fun touchOne(): int {
+    return 1;
+}
+
+fun onInternalMessage(_: InMessage) {
+    touchOne();
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const GAS_PROFILED_DEEP_STACK_CONTRACT: &str = r"
+@noinline
+fun profileLeaf(seed: int): int {
+    var acc = seed;
+    repeat (5) {
+        acc += seed;
+        acc *= 2;
+    }
+    return acc;
+}
+
+@noinline
+fun profileLevelFour(seed: int): int {
+    return profileLeaf(seed + 4);
+}
+
+@noinline
+fun profileLevelThree(seed: int): int {
+    return profileLevelFour(seed + 3);
+}
+
+@noinline
+fun profileLevelTwo(seed: int): int {
+    return profileLevelThree(seed + 2);
+}
+
+@noinline
+fun profileLevelOne(seed: int): int {
+    return profileLevelTwo(seed + 1);
+}
+
+fun onInternalMessage(_: InMessage) {
+    val result = profileLevelOne(1);
+    if (result == 0) {
+        throw 701;
+    }
+}
+
+fun onBouncedMessage(_: InMessageBounced) {}
+";
+
+const GAS_PROFILED_MESSAGES_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test gas profile contract entrypoints`() {
+    val init = ContractState {
+        code: build("simple"),
+        data: createEmptyCell(),
+    };
+
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployer = testing.treasury("deployer");
+
+    val deploy = createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    });
+    expect(net.send(deployer.address, deploy).size()).toEqual(1);
+
+    val ping = createMessage({
+        bounce: false,
+        value: ton("0.01"),
+        dest: address,
+    });
+    expect(net.send(deployer.address, ping).size()).toEqual(1);
+}
+"#;
+
+const GAS_PROFILED_DEEP_STACK_TEST: &str = r#"
+import "../../lib/testing/expect"
+import "../../lib/build"
+import "../../lib/emulation/network"
+import "../../lib/emulation/testing"
+import "../../lib/types/big_array"
+
+get fun `test gas profile deep stack`() {
+    val init = ContractState {
+        code: build("deep"),
+        data: createEmptyCell(),
+    };
+
+    val address = AutoDeployAddress { stateInit: init }.calculateAddress();
+    val deployer = testing.treasury("deployer");
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("1.0"),
+        dest: {
+            stateInit: init,
+        },
+    })).size()).toEqual(1);
+
+    expect(net.send(deployer.address, createMessage({
+        bounce: false,
+        value: ton("0.2"),
+        dest: address,
+    })).size()).toEqual(1);
+}
+"#;
+
 const BUILD_WITH_PROJECT_ROOT_RELATIVE_PATH_TEST: &str = r#"
 import "../../lib/build"
 import "../../lib/testing/expect"
@@ -503,6 +654,93 @@ fn test_run_specific_test_file() {
         .assert_passed(1)
         .assert_contains("in file 1")
         .assert_not_contains("in file 2");
+}
+
+#[test]
+fn test_run_multiple_explicit_test_files() {
+    let project = ProjectBuilder::new("multiple-explicit-test-files")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file(
+            "test1",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in selected file 1`() {
+                expect(1).toEqual(1);
+                println("selected file 1");
+            }
+        "#,
+        )
+        .test_file(
+            "test2",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in selected file 2`() {
+                expect(2).toEqual(2);
+                println("selected file 2");
+            }
+        "#,
+        )
+        .test_file(
+            "test3",
+            r#"
+            import "../../lib/testing/expect"
+            import "../../lib/io"
+
+            get fun `test in unselected file 3`() {
+                expect(3).toEqual(3);
+                println("unselected file 3");
+            }
+        "#,
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .paths(&["tests/test1.test.tolk", "tests/test2.test.tolk"])
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_contains("selected file 1")
+        .assert_contains("selected file 2")
+        .assert_not_contains("unselected file 3")
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_run_multiple_explicit_test_files.stdout.txt",
+        );
+}
+
+#[test]
+fn test_run_multiple_paths_deduplicates_overlapping_test_files() {
+    let project = ProjectBuilder::new("multiple-overlapping-test-paths")
+        .contract("simple", SIMPLE_CONTRACT)
+        .raw_file(
+            "tests/selected/test1.test.tolk",
+            &passing_test_file(NESTED_TEST_IMPORT, "test overlapping file 1", 1),
+        )
+        .raw_file(
+            "tests/selected/test2.test.tolk",
+            &passing_test_file(NESTED_TEST_IMPORT, "test overlapping file 2", 2),
+        )
+        .build();
+
+    project
+        .acton()
+        .test()
+        .paths(&[
+            "tests/selected",
+            "tests/selected/test1.test.tolk",
+            "tests/selected/test2.test.tolk",
+        ])
+        .run()
+        .success()
+        .assert_passed(2)
+        .assert_snapshot_matches(
+            "integration/snapshots/flags/test_run_multiple_paths_deduplicates_overlapping_test_files.stdout.txt",
+        );
 }
 
 #[test]
@@ -1538,6 +1776,143 @@ fn test_snapshot_nested_output_creates_parent_directories() {
         project.path().join(snapshot_path).exists(),
         "snapshot file should be created with missing parent dirs"
     );
+}
+
+#[test]
+fn test_gas_profile_flag_exports_devtools_profile_for_unit_test() {
+    let project = ProjectBuilder::new("gas-profile-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .with_gas_profile_include_tests()
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_flag_exports_devtools_profile_for_unit_test.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_format_collapsed_exports_collapsed_stacks_for_unit_test() {
+    let project = ProjectBuilder::new("gas-profile-collapsed-flag")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .with_gas_profile_include_tests()
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_format_collapsed_exports_collapsed_stacks_for_unit_test.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_defaults_to_messages_only() {
+    let project = ProjectBuilder::new("gas-profile-default-messages-only")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_defaults_to_messages_only.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_messages_prefix_entrypoints_with_contract_name() {
+    let project = ProjectBuilder::new("gas-profile-message-entrypoints")
+        .contract("simple", GAS_PROFILED_MESSAGE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_MESSAGES_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_messages_prefix_entrypoints_with_contract_name.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_collapsed_records_deep_contract_stack_samples() {
+    let project = ProjectBuilder::new("gas-profile-deep-stack-collapsed")
+        .contract("deep", GAS_PROFILED_DEEP_STACK_CONTRACT)
+        .test_file("profile", GAS_PROFILED_DEEP_STACK_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.collapsed")
+        .with_gas_profile_format("collapsed")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/flags/test_gas_profile_collapsed_records_deep_contract_stack_samples.collapsed",
+        );
+}
+
+#[test]
+fn test_gas_profile_devtools_records_deep_contract_stack_samples() {
+    let project = ProjectBuilder::new("gas-profile-deep-stack-cpuprofile")
+        .contract("deep", GAS_PROFILED_DEEP_STACK_CONTRACT)
+        .test_file("profile", GAS_PROFILED_DEEP_STACK_TEST)
+        .build();
+
+    let output = project
+        .acton()
+        .test()
+        .with_gas_profile("gas.cpuprofile")
+        .run()
+        .success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/flags/test_gas_profile_devtools_records_deep_contract_stack_samples.cpuprofile",
+        );
 }
 
 #[test]

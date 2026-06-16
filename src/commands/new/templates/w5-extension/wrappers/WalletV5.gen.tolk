@@ -16,12 +16,16 @@ struct WalletV5 {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun WalletV5.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): WalletV5 {
+fun WalletV5.fromStorage(
+    storage: Storage,
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): WalletV5 {
     val stateInit = ContractState {
         code: build("WalletV5"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return WalletV5 { address, stateInit };
 }
 

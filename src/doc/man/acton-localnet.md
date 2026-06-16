@@ -51,6 +51,19 @@ Path to a SQLite database for persistent node state.
 Maximum `/api` requests per second to simulate provider rate limits.
 {{/option}}
 
+{{#option "`--response-delay-ms` _ms_" }}
+Delay TonCenter v2/v3 and Emulate API responses.
+{{/option}}
+
+{{#option "`--block-interval-ms` _ms_" }}
+Localnet block production interval.
+{{/option}}
+
+{{#option "`--no-mining`" }}
+Disable automatic block production. Mine blocks manually with
+`acton localnet mine` or `POST /acton_mine`.
+{{/option}}
+
 {{#option "`--load-state` _path_" }}
 Load Localnet state from a JSON snapshot before startup.
 {{/option}}
@@ -59,13 +72,18 @@ Load Localnet state from a JSON snapshot before startup.
 Dump Localnet state to a JSON snapshot on shutdown.
 {{/option}}
 
+{{#option "`--require-auth`" }}
+Require a token for all Localnet HTTP API, control, emulate, and streaming
+endpoints. The server prints the token on startup.
+{{/option}}
+
 {{/options}}
 
 `--load-state` and `--db-path` cannot be used together in the same run.
 
 ### acton localnet airdrop
 
-Send TON from the local faucet to an address.
+Send GRAM from the local faucet to an address.
 
 #### Synopsis
 
@@ -79,12 +97,128 @@ Send TON from the local faucet to an address.
 Recipient address.
 {{/option}}
 
-{{#option "`-a`, `--amount` _ton_" }}
-Amount of TON to request.
+{{#option "`-a`, `--amount` _gram_" }}
+Amount of GRAM to request.
 {{/option}}
 
 {{#option "`-p`, `--port` _port_" }}
 Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
+{{/options}}
+
+### acton localnet mine
+
+Mine localnet blocks manually.
+
+#### Synopsis
+
+`acton localnet mine` [_options_] [_n_]
+
+#### Options
+
+{{#options command="acton localnet mine"}}
+
+{{#option "_n_" }}
+Number of blocks to mine. Defaults to `1`.
+{{/option}}
+
+{{#option "`-p`, `--port` _port_" }}
+Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
+{{/options}}
+
+### acton localnet increase-time
+
+Increase the localnet virtual clock.
+
+#### Synopsis
+
+`acton localnet increase-time` [_options_] _seconds_
+
+#### Options
+
+{{#options command="acton localnet increase-time"}}
+
+{{#option "_seconds_" }}
+Seconds to add to the virtual localnet clock.
+{{/option}}
+
+{{#option "`-p`, `--port` _port_" }}
+Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
+{{/options}}
+
+### acton localnet set-time
+
+Set the localnet virtual clock.
+
+#### Synopsis
+
+`acton localnet set-time` [_options_] _timestamp_
+
+#### Options
+
+{{#options command="acton localnet set-time"}}
+
+{{#option "_timestamp_" }}
+Unix timestamp in seconds. The timestamp cannot be lower than the latest mined
+block time.
+{{/option}}
+
+{{#option "`-p`, `--port` _port_" }}
+Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
+{{/options}}
+
+### acton localnet set-next-block-timestamp
+
+Set a one-shot timestamp for the next localnet block.
+
+#### Synopsis
+
+`acton localnet set-next-block-timestamp` [_options_] _timestamp_
+
+#### Options
+
+{{#options command="acton localnet set-next-block-timestamp"}}
+
+{{#option "_timestamp_" }}
+Unix timestamp in seconds for the next mined block. The timestamp is consumed
+by the next automatic or manually mined block and cannot be lower than the
+latest mined block time.
+{{/option}}
+
+{{#option "`-p`, `--port` _port_" }}
+Localnet server port.
+{{/option}}
+
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
 {{/option}}
 
 {{/options}}
@@ -109,6 +243,11 @@ Localnet server port.
 Print machine-readable JSON.
 {{/option}}
 
+{{#option "`--auth-token` _token_" }}
+Localnet API token for a server started with `--require-auth`. If omitted,
+Acton reads `ACTON_LOCALNET_AUTH_TOKEN`.
+{{/option}}
+
 {{/options}}
 
 ## Configuration
@@ -122,6 +261,9 @@ fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
 rate-limit = 1
+response-delay-ms = 300
+block-interval-ms = 500
+no-mining = false
 ```
 
 CLI flags override config values for the current invocation.
@@ -141,6 +283,31 @@ Acton loads `.env` automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one-off overrides or CI.
 
+## Localnet API Auth
+
+`acton localnet start --require-auth` protects every Localnet HTTP route under
+`/api/*`, `/acton_*`, `/api/emulate/*`, and `/api/streaming/*`. Static UI files
+remain public, but the bundled UI does not receive the token from the server.
+When a protected API request returns `401`, the bundled UI shows a token overlay;
+paste the printed token there before using protected API views. The key button
+in the sidebar footer reopens the same overlay.
+
+When auth is enabled, the server prints a localnet API token. Pass it as either:
+
+```text
+Authorization: Bearer <TOKEN>
+X-API-Key: <TOKEN>
+```
+
+`Authorization: Bearer` is the preferred form. `X-API-Key` is accepted for
+TonCenter-compatible clients. Browser WebSocket clients can pass `token=<TOKEN>`
+only on `/api/streaming/v2/ws`.
+
+For CLI subcommands that call localnet control routes, pass `--auth-token` or
+set `ACTON_LOCALNET_AUTH_TOKEN`. If `ACTON_LOCALNET_AUTH_TOKEN` is set when
+starting with `--require-auth`, localnet uses that value; otherwise it generates
+and prints a fresh token.
+
 ## Runtime Model
 
 - fork mode allows local development against remote chain state
@@ -151,15 +318,35 @@ one-off overrides or CI.
   `Ctrl+C`
 - the Localnet UI is available on the root path, for example
   `http://127.0.0.1:<port>/`
+- the node produces a block every `--block-interval-ms` milliseconds, defaults
+  to 500 ms, and still creates empty blocks when no transactions are queued
+- `--no-mining` or `[localnet].no-mining = true` disables automatic block
+  production; use `acton localnet mine [N]` or `POST /acton_mine` to create
+  blocks manually
+- localnet has a virtual clock for block and transaction time; use
+  `acton localnet increase-time`, `acton localnet set-time`, or
+  `acton localnet set-next-block-timestamp` to move it without waiting for real
+  time
+- messages accepted through `send_boc`, `acton_sendInternalMessage`, or the
+  faucet are queued and included on a later automatic or manually mined block
+- a block can include multiple transactions; locally generated internal
+  messages are processed in the same block when possible
 - the bundled UI is a single-page explorer app, so routes like `/explorer`,
   `/tokens`, `/nfts`, and per-address or per-transaction pages are served from
   the same frontend shell
 - the UI reads chain data from `/api/v2` and `/api/v3`, and uses `acton_*`
   control endpoints for local address aliases, registered compiler ABIs,
   status, and snapshot tooling
+- `--require-auth` protects read and write API routes, including read-only
+  streaming endpoints
 - when `--port` and `[localnet].port` are both absent, the current runtime
   fallback is `5411`
 - `--rate-limit` applies to `/api/*` endpoints, not admin endpoints
+- `--response-delay-ms` applies only to `/api/v2`, `/api/v3`, and
+  `/api/emulate/v1` endpoints; streaming, control, and UI routes are not
+  delayed
+- `POST /acton_setNetworkConditions` can change the response delay while the
+  server is running, and `GET /acton_nodeInfo` reports the current value
 - `--dump-state` writes a snapshot during graceful shutdown
 
 ## Control Endpoints
@@ -173,9 +360,35 @@ tooling:
   JSON state snapshot without stopping the server
 - `POST /acton_loadState` with `{"path":"snapshots/localnet.json"}` replaces
   the current node state with a JSON state snapshot
+- `POST /acton_snapshot` creates a runtime in-memory recovery point and returns
+  its id
+- `POST /acton_revert` with `{"id":1}` restores a runtime recovery point and
+  invalidates that point plus every newer point
+- `POST /acton_setShardAccount` with
+  `{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}` replaces the selected
+  account state with a base64-encoded `ShardAccount` BOC
+- `POST /acton_sendInternalMessage` with `{"boc":"<BASE64_BOC>"}` sends a
+  base64-encoded internal message BOC through the local internal queue
+- `POST /acton_mine` with optional `{"blocks":N}` mines queued and/or empty
+  blocks manually; `N` defaults to `1`
+- `POST /acton_increaseTime` with `{"seconds":3600}` adds seconds to the
+  virtual localnet clock
+- `POST /acton_setTime` with `{"timestamp":1710000000}` sets the current
+  virtual Unix time
+- `POST /acton_setNextBlockTimestamp` with `{"timestamp":1710000600}` sets a
+  one-shot timestamp for the next mined block
+- `POST /acton_setNetworkConditions` with `{"response_delay_ms":300}` updates
+  simulated network latency; use `0` to disable response delay
 
-Control endpoints are not authenticated and are intended only for local
-development. Do not expose the localnet server publicly.
+TonCenter-compatible message endpoints such as `/api/v2/sendBoc` and
+`/api/v3/message` accept external-in messages only. Use
+`/acton_sendInternalMessage` when local tooling needs to inject a raw internal
+message.
+
+Control endpoints are unauthenticated by default for local development. Use
+`--require-auth` when another local process, browser page, or test harness should
+not be able to read or mutate the running localnet without the token. Do not
+expose the localnet server publicly.
 
 ## Persistence
 

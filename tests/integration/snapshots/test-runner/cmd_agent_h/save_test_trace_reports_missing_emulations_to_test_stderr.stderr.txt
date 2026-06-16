@@ -1,1 +1,0 @@
-Warning: trace export is enabled for test 'test-empty-trace-warning', but no emulated transactions were recorded; test-empty-trace-warning_trace.json will not be written to [ROOT]/build/traces

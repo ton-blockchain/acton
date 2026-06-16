@@ -166,7 +166,7 @@ Example:
 ```tolk
 val state = scripts.fetchAccountState(contract.address);
 if (state != null) {
-    println("Balance: {:ton}", state.storage.balance.grams);
+    println("Balance: {:gram}", state.storage.balance.grams);
 } else {
     println("Account not found");
 }
@@ -188,7 +188,7 @@ Example:
 ```tolk
 val storageFee = scripts.fetchAccountStorageFee(contract.address, 86400); // 1 day
 if (storageFee != null) {
-    println("Daily storage fee: {:ton}", storageFee);
+    println("Daily storage fee: {:gram}", storageFee);
 }
 ```
 
@@ -207,7 +207,7 @@ Returns 0 if the address is not deployed.
 Example:
 ```tolk
 val balance = scripts.fetchAccountBalance(address);
-println("{:ton}", balance);
+println("{:gram}", balance);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/emulation/scripts.tolk#L169" />

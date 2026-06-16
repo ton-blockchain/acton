@@ -30,7 +30,7 @@ use ton_api::Network;
 use ton_source_map::SourceLocation;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
-use tycho_types::cell::{Cell, CellSlice, HashBytes};
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
 use tycho_types::models::{
     AccountState, AccountStatus, Base64StdAddrFlags, ComputePhase, ComputePhaseSkipReason,
     DisplayBase64StdAddr, ExecutedComputePhase, IntAddr, Message, MsgInfo, RelaxedMessage,
@@ -68,7 +68,9 @@ struct DecodedMessageBody {
 #[derive(Clone, Copy, Debug)]
 enum MessageBodyDirection {
     Incoming,
+    ExternalIncoming,
     Outgoing,
+    ExternalOutgoing,
 }
 
 enum FormattedExtraInfo {
@@ -203,18 +205,16 @@ impl<'a> FormatterContext<'a> {
         code: i32,
     ) -> Option<AbiExitCodeInfo> {
         let code_cell = Self::account_code(&self.accounts, &StdAddr::new(0, tx.account));
-        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
-        Self::find_custom_exit_code_info(code, build.abi.as_deref())
+        self.find_code_cell_custom_exit_code_info(code_cell, code)
     }
 
     fn find_address_custom_exit_code_info(
         &self,
         addr: &StdAddr,
-        code: i32,
+        exit_code: i32,
     ) -> Option<AbiExitCodeInfo> {
         let code_cell = Self::account_code(&self.accounts, addr);
-        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
-        Self::find_custom_exit_code_info(code, build.abi.as_deref())
+        self.find_code_cell_custom_exit_code_info(code_cell, exit_code)
     }
 
     fn find_code_custom_exit_code_info(
@@ -223,8 +223,23 @@ impl<'a> FormatterContext<'a> {
         exit_code: i32,
     ) -> Option<AbiExitCodeInfo> {
         let code_cell = Boc::decode_base64(code_boc64).ok();
-        let (_, build) = self.build_cache.result_for_code(&code_cell)?;
-        Self::find_custom_exit_code_info(exit_code, build.abi.as_deref())
+        self.find_code_cell_custom_exit_code_info(code_cell, exit_code)
+    }
+
+    fn find_code_cell_custom_exit_code_info(
+        &self,
+        code_cell: Option<Cell>,
+        exit_code: i32,
+    ) -> Option<AbiExitCodeInfo> {
+        self.build_cache
+            .result_for_code(&code_cell)
+            .and_then(|(_, build)| {
+                Self::find_custom_exit_code_info(exit_code, build.abi.as_deref())
+            })
+            .or_else(|| {
+                let abi = Self::catalog_abi_for_code(code_cell.as_ref())?;
+                Self::find_custom_exit_code_info(exit_code, Some(abi.as_ref()))
+            })
     }
 
     pub(crate) fn format_external_not_accepted_vm_result(
@@ -341,13 +356,36 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
     }
 
-    fn format_annotation_address(&self, address: &IntAddr) -> String {
+    fn format_annotation_address(
+        &self,
+        address: &IntAddr,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let rendered = self.address_to_string(address);
-        let Some(contract_type) = self.get_contract_type(address) else {
-            return rendered;
-        };
+        match (
+            self.get_contract_type(address),
+            contract_letters.get(address),
+        ) {
+            (Some(contract_type), Some(letter)) => {
+                format!(
+                    "{rendered} ({contract_type} {})",
+                    Self::bold_without_reset(letter)
+                )
+            }
+            (Some(contract_type), None) => format!("{rendered} ({contract_type})"),
+            (None, Some(letter)) => format!("{rendered} {}", Self::bold_without_reset(letter)),
+            (None, None) => rendered,
+        }
+    }
 
-        format!("{rendered} ({contract_type})")
+    fn bold_without_reset(value: &str) -> String {
+        if colors_enabled() {
+            // Annotation rows are styled outside this string. A local reset here would drop
+            // that outer style before the closing punctuation.
+            format!("\x1b[1m{value}")
+        } else {
+            value.to_owned()
+        }
     }
 
     /// Format transaction list as a tree
@@ -812,13 +850,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if let Some(in_msg) = &tx.in_msg
             && let Ok(in_msg) = in_msg.parse::<RelaxedMessage>()
         {
-            let resolved_body = self.resolve_incoming_message_body(&in_msg);
-            let message_part = self.format_single_message(
-                &in_msg,
-                contract_letters,
-                show_full_names,
-                resolved_body.as_ref(),
-            );
+            let message_part =
+                self.format_single_message(&in_msg, contract_letters, show_full_names);
             if !message_part.is_empty() {
                 return message_part;
             }
@@ -827,13 +860,9 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if let Ok(Some(in_msg)) = tx.load_in_msg()
             && let MsgInfo::ExtIn(info) = &in_msg.info
         {
-            let resolved_body = self.resolve_external_incoming_message_body(tx, &in_msg);
-            let message_name = resolved_body.as_ref().map_or_else(
-                || {
-                    let mut body = in_msg.body;
-                    self.format_external_incoming_message_name(tx, body.load_u32().unwrap_or(0))
-                },
-                |body| Self::color_message_name(&body.name),
+            let message_name = self.format_external_incoming_message_name(
+                tx,
+                Self::opcode_from_body(in_msg.body, false),
             );
             let destination = self.format_address_with_letter(&info.dst, contract_letters, true);
 
@@ -860,7 +889,6 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         in_msg: &RelaxedMessage,
         contract_letters: &HashMap<IntAddr, String>,
         show_full_names: bool,
-        resolved_body: Option<&DecodedMessageBody>,
     ) -> String {
         let RelaxedMsgInfo::Int(info) = &in_msg.info else {
             if let RelaxedMsgInfo::ExtOut(_) = &in_msg.info {
@@ -886,14 +914,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             result += " -> ".dimmed().to_string().as_str();
         }
 
-        let message_name = resolved_body.map_or_else(
-            || self.format_incoming_message_name(in_msg),
-            |body| Self::color_message_name(&body.name),
-        );
+        let message_name = self.format_incoming_message_name(in_msg);
         result += &message_name;
         result += " ";
 
-        result += self.format_ton_tokens(info.value.tokens).as_str();
+        result += self.format_gram_tokens(info.value.tokens).as_str();
         result += " -> ".dimmed().to_string().as_str();
 
         result += &self.format_address_with_letter(&info.dst, contract_letters, true);
@@ -901,34 +926,46 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         result
     }
 
-    fn format_ton_tokens(&self, tokens: Tokens) -> String {
+    fn format_gram_tokens(&self, tokens: Tokens) -> String {
         let amount = tokens.into_inner() as f64 / 1e9;
-        format!("{amount} TON").green().to_string()
+        format!("{amount} GRAM").green().to_string()
     }
 
-    fn format_ton(&self, amount: &BigInt) -> String {
+    fn format_grams(&self, amount: &BigInt) -> String {
         let amount = amount.to_f64().unwrap_or(0.0) / 1e9;
-        format!("{amount} TON").green().to_string()
+        format!("{amount} GRAM").green().to_string()
     }
 
-    fn format_inbound_message_body(&self, tx: &Transaction) -> Option<String> {
+    fn format_inbound_message_body(
+        &self,
+        tx: &Transaction,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> Option<String> {
         if !self.show_bodies {
             return None;
         }
 
         let body = self.resolve_transaction_inbound_message_body(tx)?;
-        Some(self.format_decoded_message_body(&body))
+        Some(self.format_decoded_message_body(&body, contract_letters))
     }
 
     pub(crate) fn transaction_inbound_message_name(&self, tx: &Transaction) -> Option<String> {
-        self.resolve_transaction_inbound_message_body(tx)
-            .map(|body| body.name)
-            .or_else(|| {
-                tx.in_msg
-                    .as_ref()
-                    .and_then(|in_msg| in_msg.parse::<RelaxedMessage>().ok())
-                    .and_then(|in_msg| self.incoming_message_name(&in_msg))
-            })
+        if let Some(name) = tx
+            .in_msg
+            .as_ref()
+            .and_then(|in_msg| in_msg.parse::<RelaxedMessage>().ok())
+            .and_then(|in_msg| self.incoming_message_name(&in_msg))
+        {
+            return Some(name);
+        }
+
+        let in_msg = tx.load_in_msg().ok()??;
+        let MsgInfo::ExtIn(_) = &in_msg.info else {
+            return None;
+        };
+        let opcode = Self::opcode_from_body(in_msg.body, false)?;
+        self.external_incoming_message_name(tx, opcode)
+            .or_else(|| Self::generic_message_name(Some(opcode)))
     }
 
     fn resolve_transaction_inbound_message_body(
@@ -966,16 +1003,25 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                     )
                 };
 
-                self.try_decode_message_with_builds(
-                    in_msg.body,
+                let destination_abis = self.prioritized_abis(
                     self.build_cache.prioritized_results(destination_build),
+                    self.catalog_abi_for_address(Some(&info.dst)),
+                );
+                let source_abis = self.prioritized_abis(
+                    self.build_cache.prioritized_results(source_build),
+                    self.catalog_abi_for_address(info.src.as_ref()),
+                );
+
+                self.try_decode_message_with_abis(
+                    in_msg.body,
+                    destination_abis,
                     destination_direction,
                     info.bounced,
                 )
                 .or_else(|| {
-                    self.try_decode_message_with_builds(
+                    self.try_decode_message_with_abis(
                         in_msg.body,
-                        self.build_cache.prioritized_results(source_build),
+                        source_abis,
                         source_direction,
                         info.bounced,
                     )
@@ -989,6 +1035,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         &self,
         tx: &Transaction,
         msg: &RelaxedMessage,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> Option<Vec<FormattedExtraInfo>> {
         let RelaxedMsgInfo::ExtOut(info) = &msg.info else {
             return None;
@@ -996,7 +1043,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
         let resolved_body = self.resolve_outgoing_external_message_body(tx, msg);
         let message_name = resolved_body.as_ref().map_or_else(
-            || self.format_outgoing_external_message_name(tx, Self::extract_opcode(msg)),
+            || self.format_outgoing_external_message_name(tx, Self::message_opcode(msg)),
             |body| Self::color_message_name(&body.name),
         );
 
@@ -1025,7 +1072,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             && let Some(body) = resolved_body
         {
             infos.push(FormattedExtraInfo::Annotation(
-                self.format_decoded_message_body(&body),
+                self.format_decoded_message_body(&body, contract_letters),
             ));
         }
 
@@ -1041,15 +1088,17 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             return None;
         };
 
-        let build = self.build_result_for_tx_account(tx)?;
-        let abi = build.abi.as_ref()?;
-        self.try_decode_message_body_types(
+        let account_code = self.code_for_tx_account(tx);
+        let build = self.build_result_for_tx_account(tx);
+        let abis = self.prioritized_abis(
+            self.build_cache.prioritized_results(build),
+            Self::catalog_abi_for_code(account_code.as_ref()),
+        );
+        self.try_decode_message_with_abis(
             in_msg.body,
-            abi,
-            abi.incoming_external
-                .iter()
-                .map(|message| message.body_ty_idx),
-            0,
+            abis,
+            MessageBodyDirection::ExternalIncoming,
+            false,
         )
     }
 
@@ -1058,24 +1107,31 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         tx: &Transaction,
         msg: &RelaxedMessage,
     ) -> Option<DecodedMessageBody> {
-        let build = self.build_result_for_tx_account(tx)?;
-        let abi = build.abi.as_ref()?;
-        self.try_decode_message_body_types(
+        let account_code = self.code_for_tx_account(tx);
+        let build = self.build_result_for_tx_account(tx);
+        let abis = self.prioritized_abis(
+            self.build_cache.prioritized_results(build),
+            Self::catalog_abi_for_code(account_code.as_ref()),
+        );
+        self.try_decode_message_with_abis(
             msg.body,
-            abi,
-            abi.emitted_events.iter().map(|message| message.body_ty_idx),
-            0,
+            abis,
+            MessageBodyDirection::ExternalOutgoing,
+            false,
         )
     }
 
-    fn build_result_for_tx_account(&self, tx: &Transaction) -> Option<context::CompilationResult> {
-        let code = self
-            .accounts
+    fn code_for_tx_account(&self, tx: &Transaction) -> Option<Cell> {
+        self.accounts
             .iter()
             .find_map(|(addr, _)| {
                 (addr.address == tx.account).then(|| Self::account_code(&self.accounts, addr))
             })
-            .flatten();
+            .flatten()
+    }
+
+    fn build_result_for_tx_account(&self, tx: &Transaction) -> Option<context::CompilationResult> {
+        let code = self.code_for_tx_account(tx);
         self.build_cache
             .result_for_code(&code)
             .map(|(_, result)| result)
@@ -1094,23 +1150,88 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             .map(|(_, result)| result)
     }
 
-    fn try_decode_message_with_builds(
+    fn catalog_abi_for_address(&self, dst: Option<&IntAddr>) -> Option<Arc<ContractABI>> {
+        let code = match dst? {
+            IntAddr::Std(addr) => Self::account_code(&self.accounts, addr),
+            IntAddr::Var(_) => None,
+        };
+        Self::catalog_abi_for_code(code.as_ref())
+    }
+
+    fn catalog_abi_for_code(code: Option<&Cell>) -> Option<Arc<ContractABI>> {
+        let code_hash = context::code_lookup_hash(code?);
+        acton_abi_catalog::find_abi_by_code_hash(&code_hash.to_string())
+    }
+
+    fn prioritized_abis(
+        &self,
+        builds: Vec<context::CompilationResult>,
+        fallback_abi: Option<Arc<ContractABI>>,
+    ) -> Vec<Arc<ContractABI>> {
+        let mut abis = Vec::new();
+        for build in builds {
+            if let Some(abi) = build.abi {
+                abis.push(abi);
+            }
+        }
+        if let Some(abi) = fallback_abi {
+            abis.push(abi);
+        }
+        abis
+    }
+
+    fn with_opcode_fallback_abis(
+        &self,
+        mut abis: Vec<Arc<ContractABI>>,
+        opcode: Option<u32>,
+    ) -> Vec<Arc<ContractABI>> {
+        let Some(opcode) = opcode else {
+            return abis;
+        };
+        if opcode == 0 {
+            return abis;
+        }
+
+        for abi in acton_abi_catalog::find_abis_by_opcode(opcode) {
+            if abis
+                .iter()
+                .any(|existing| existing.contract_name == abi.contract_name)
+            {
+                continue;
+            }
+            abis.push(abi);
+        }
+
+        abis
+    }
+
+    fn try_decode_message_with_abis(
         &self,
         body: CellSlice<'_>,
-        builds: Vec<context::CompilationResult>,
+        abis: Vec<Arc<ContractABI>>,
         direction: MessageBodyDirection,
         bounced: bool,
     ) -> Option<DecodedMessageBody> {
-        let opcode = Self::opcode_after_bounce_prefix(body, bounced);
-        for build in builds {
-            let Some(abi) = build.abi.as_ref() else {
-                continue;
-            };
-            let candidates = Self::compiler_message_candidates(abi, direction, opcode);
+        let (opcode, body_tail) = Self::opcode_and_body_tail_after_bounce_prefix(body, bounced)
+            .map_or((None, None), |(opcode, body_tail)| {
+                (Some(opcode), Some(body_tail))
+            });
+
+        if let Some(decoded) = Self::try_decode_text_comment_body(opcode, body_tail) {
+            return Some(decoded);
+        }
+
+        let abis = if Self::should_use_opcode_fallback(opcode, body_tail.as_ref()) {
+            self.with_opcode_fallback_abis(abis, opcode)
+        } else {
+            abis
+        };
+        for abi in abis {
+            let body_candidates = Self::compiler_message_candidates(&abi, direction, opcode);
             if let Some(decoded) = self.try_decode_message_body_types(
                 body,
-                abi,
-                candidates,
+                &abi,
+                body_candidates,
                 if bounced { 32 } else { 0 },
             ) {
                 return Some(decoded);
@@ -1118,6 +1239,18 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
 
         None
+    }
+
+    fn should_use_opcode_fallback(opcode: Option<u32>, body_tail: Option<&CellSlice<'_>>) -> bool {
+        // `0x00000001` with no payload is too common to decode through the
+        // global catalog. A code-hash matched ABI can still decode it earlier.
+        if opcode == Some(1)
+            && body_tail.is_some_and(|tail| tail.size_bits() == 0 && tail.size_refs() == 0)
+        {
+            return false;
+        }
+
+        true
     }
 
     fn compiler_message_candidates(
@@ -1131,7 +1264,20 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         match direction {
             MessageBodyDirection::Incoming => {
                 for message in &abi.incoming_messages {
-                    Self::push_compiler_message_candidate(
+                    Self::push_opcode_message_candidate(
+                        abi,
+                        opcode,
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty_idx,
+                    );
+                }
+            }
+            MessageBodyDirection::ExternalIncoming => {
+                for message in &abi.incoming_external {
+                    Self::push_opcode_message_candidate(
+                        abi,
+                        opcode,
                         &mut candidates,
                         &mut seen,
                         message.body_ty_idx,
@@ -1140,7 +1286,29 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             }
             MessageBodyDirection::Outgoing => {
                 for message in &abi.outgoing_messages {
-                    Self::push_compiler_message_candidate(
+                    Self::push_opcode_message_candidate(
+                        abi,
+                        opcode,
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty_idx,
+                    );
+                }
+            }
+            MessageBodyDirection::ExternalOutgoing => {
+                for message in &abi.emitted_events {
+                    Self::push_opcode_message_candidate(
+                        abi,
+                        opcode,
+                        &mut candidates,
+                        &mut seen,
+                        message.body_ty_idx,
+                    );
+                }
+                for message in &abi.outgoing_messages {
+                    Self::push_opcode_message_candidate(
+                        abi,
+                        opcode,
                         &mut candidates,
                         &mut seen,
                         message.body_ty_idx,
@@ -1154,6 +1322,18 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
 
         candidates
+    }
+
+    fn push_opcode_message_candidate(
+        abi: &ContractABI,
+        opcode: Option<u32>,
+        candidates: &mut Vec<TyIdx>,
+        seen: &mut HashSet<TyIdx>,
+        candidate: TyIdx,
+    ) {
+        if Self::compiler_type_matches_opcode(abi, candidate, opcode) {
+            Self::push_compiler_message_candidate(candidates, seen, candidate);
+        }
     }
 
     fn push_compiler_message_candidate(
@@ -1189,17 +1369,13 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                             prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
                         })
                     });
-                    let priority = if matches_opcode {
-                        0
-                    } else if prefix.is_some() {
-                        1
-                    } else {
-                        2
-                    };
-                    candidates.push((priority, *ty_idx));
+                    if matches_opcode {
+                        candidates.push((0, *ty_idx));
+                    }
                 }
                 ABIDeclaration::Alias {
                     ty_idx,
+                    target_ty_idx,
                     type_params,
                     ..
                 } => {
@@ -1210,23 +1386,137 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                         continue;
                     }
 
-                    candidates.push((3, *ty_idx));
+                    if Self::compiler_type_matches_opcode(abi, *target_ty_idx, opcode) {
+                        candidates.push((1, *ty_idx));
+                    }
                 }
-                ABIDeclaration::Enum { ty_idx, .. } => {
-                    candidates.push((4, *ty_idx));
-                }
+                ABIDeclaration::Enum { .. } => {}
             }
         }
         candidates.sort_by_key(|(priority, _)| *priority);
         candidates
     }
 
+    fn compiler_type_matches_opcode(abi: &ContractABI, ty_idx: TyIdx, opcode: Option<u32>) -> bool {
+        let Some(opcode) = opcode else {
+            return false;
+        };
+        Self::compiler_type_matches_opcode_inner(abi, ty_idx, opcode, &mut HashSet::new())
+    }
+
+    fn compiler_type_matches_opcode_inner(
+        abi: &ContractABI,
+        ty_idx: TyIdx,
+        opcode: u32,
+        seen: &mut HashSet<TyIdx>,
+    ) -> bool {
+        if !seen.insert(ty_idx) {
+            return false;
+        }
+
+        match abi.ty_by_idx(ty_idx) {
+            Some(Ty::StructRef { struct_name, .. }) => {
+                Self::struct_declaration_matches_opcode(abi, struct_name, opcode)
+            }
+            Some(Ty::AliasRef { alias_name, .. }) => Self::alias_target_ty_idx(abi, alias_name)
+                .is_some_and(|target_ty_idx| {
+                    Self::compiler_type_matches_opcode_inner(abi, target_ty_idx, opcode, seen)
+                }),
+            _ => false,
+        }
+    }
+
+    fn struct_declaration_matches_opcode(
+        abi: &ContractABI,
+        struct_name: &str,
+        opcode: u32,
+    ) -> bool {
+        abi.declarations.iter().any(|declaration| {
+            let ABIDeclaration::Struct {
+                name,
+                type_params,
+                prefix,
+                ..
+            } = declaration
+            else {
+                return false;
+            };
+
+            name == struct_name
+                && type_params.as_ref().is_none_or(Vec::is_empty)
+                && prefix.as_ref().is_some_and(|prefix| {
+                    prefix.prefix_len == 32 && prefix.prefix_num == u64::from(opcode)
+                })
+        })
+    }
+
+    fn alias_target_ty_idx(abi: &ContractABI, alias_name: &str) -> Option<TyIdx> {
+        abi.declarations.iter().find_map(|declaration| {
+            let ABIDeclaration::Alias {
+                name,
+                target_ty_idx,
+                type_params,
+                ..
+            } = declaration
+            else {
+                return None;
+            };
+
+            (name == alias_name && type_params.as_ref().is_none_or(Vec::is_empty))
+                .then_some(*target_ty_idx)
+        })
+    }
+
     fn opcode_after_bounce_prefix(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
+        Self::opcode_and_body_tail_after_bounce_prefix(body, bounced).map(|(opcode, _)| opcode)
+    }
+
+    fn opcode_and_body_tail_after_bounce_prefix(
+        body: CellSlice<'_>,
+        bounced: bool,
+    ) -> Option<(u32, CellSlice<'_>)> {
         let mut parser = body;
         if bounced {
             parser.load_u32().ok()?;
         }
-        parser.load_u32().ok()
+        let opcode = parser.load_u32().ok()?;
+        Some((opcode, parser))
+    }
+
+    fn try_decode_text_comment_body(
+        opcode: Option<u32>,
+        body_tail: Option<CellSlice<'_>>,
+    ) -> Option<DecodedMessageBody> {
+        if opcode != Some(0) {
+            return None;
+        }
+        let body_tail = body_tail?;
+
+        Some(DecodedMessageBody {
+            name: "text comment".to_owned(),
+            data: UnpackedValue::Object {
+                name: "TextComment".to_owned(),
+                fields: vec![("text".to_owned(), Self::text_comment_tail_value(body_tail))],
+            },
+        })
+    }
+
+    fn text_comment_tail_value(parser: CellSlice<'_>) -> UnpackedValue {
+        let mut text_parser = parser;
+        if let Some(bytes) = Tuple::parse_snake_bytes_slice(&mut text_parser)
+            && let Ok(text) = String::from_utf8(bytes)
+        {
+            return UnpackedValue::String(text);
+        }
+
+        Self::remaining_slice_as_cell(parser)
+            .map_or(UnpackedValue::Null, UnpackedValue::RemainingBitsAndRefs)
+    }
+
+    fn remaining_slice_as_cell(mut parser: CellSlice<'_>) -> Option<Cell> {
+        let mut builder = CellBuilder::new();
+        builder.store_slice(parser.load_remaining()).ok()?;
+        builder.build().ok()
     }
 
     fn try_decode_message_body_types<I>(
@@ -1245,8 +1535,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 continue;
             }
 
-            let Ok(data) = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, body_ty_idx)
-            else {
+            let Ok(data) = dynamic_unpack::unpack_from_slice(&mut parser, abi, body_ty_idx) else {
                 continue;
             };
             if parser.size_bits() != 0 || parser.size_refs() != 0 {
@@ -1274,15 +1563,25 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
     }
 
-    fn format_decoded_message_body(&self, body: &DecodedMessageBody) -> String {
-        self.format_annotation_body(&body.data)
+    fn format_decoded_message_body(
+        &self,
+        body: &DecodedMessageBody,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
+        self.format_annotation_body(&body.data, contract_letters)
     }
 
-    fn format_annotation_body(&self, data: &UnpackedValue) -> String {
+    fn format_annotation_body(
+        &self,
+        data: &UnpackedValue,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
-            UnpackedValue::Object { fields, .. } => self.format_annotation_object(fields, 0, true),
-            _ => self.format_annotation_value(data, 0),
+            UnpackedValue::Object { fields, .. } => {
+                self.format_annotation_object(fields, 0, true, contract_letters)
+            }
+            _ => self.format_annotation_value(data, 0, contract_letters),
         }
     }
 
@@ -1291,6 +1590,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         fields: &[(String, UnpackedValue)],
         indent: usize,
         is_root: bool,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
         if fields.is_empty() {
             return "{}".to_owned();
@@ -1303,7 +1603,13 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         {
             let inner = fields
                 .iter()
-                .map(|(name, value)| format!("{}: {}", name, self.format_annotation_scalar(value)))
+                .map(|(name, value)| {
+                    format!(
+                        "{}: {}",
+                        name,
+                        self.format_annotation_scalar(value, contract_letters)
+                    )
+                })
                 .collect::<Vec<_>>()
                 .join(", ");
             return if is_root {
@@ -1325,7 +1631,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             vec!["{".to_owned()]
         };
         for (name, field_value) in fields {
-            let value = self.format_annotation_value(field_value, indent + 1);
+            let value = self.format_annotation_value(field_value, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{field_indent}{name}: {first}"));
@@ -1338,19 +1644,33 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         lines.join("\n")
     }
 
-    fn format_annotation_value(&self, data: &UnpackedValue, indent: usize) -> String {
+    fn format_annotation_value(
+        &self,
+        data: &UnpackedValue,
+        indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Object { fields, .. } => {
-                self.format_annotation_object(fields, indent, false)
+                self.format_annotation_object(fields, indent, false, contract_letters)
             }
-            UnpackedValue::Array(items) => self.format_annotation_array(items, indent),
-            UnpackedValue::Map(entries) => self.format_annotation_map(entries, indent),
-            _ => self.format_annotation_scalar(data),
+            UnpackedValue::Array(items) => {
+                self.format_annotation_array(items, indent, contract_letters)
+            }
+            UnpackedValue::Map(entries) => {
+                self.format_annotation_map(entries, indent, contract_letters)
+            }
+            _ => self.format_annotation_scalar(data, contract_letters),
         }
     }
 
-    fn format_annotation_array(&self, items: &[UnpackedValue], indent: usize) -> String {
+    fn format_annotation_array(
+        &self,
+        items: &[UnpackedValue],
+        indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         if items.is_empty() {
             return "[]".to_owned();
         }
@@ -1358,7 +1678,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         if items.len() <= 3 && items.iter().all(Self::is_annotation_scalar) {
             let inner = items
                 .iter()
-                .map(|item| self.format_annotation_scalar(item))
+                .map(|item| self.format_annotation_scalar(item, contract_letters))
                 .collect::<Vec<_>>()
                 .join(", ");
             return format!("[{inner}]");
@@ -1368,7 +1688,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let item_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["[".to_owned()];
         for item in items {
-            let value = self.format_annotation_value(item, indent + 1);
+            let value = self.format_annotation_value(item, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{item_indent}{first}"));
@@ -1383,6 +1703,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         &self,
         entries: &[(UnpackedValue, UnpackedValue)],
         indent: usize,
+        contract_letters: &HashMap<IntAddr, String>,
     ) -> String {
         if entries.is_empty() {
             return "{}".to_owned();
@@ -1392,8 +1713,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let entry_indent = "    ".repeat(Self::annotation_container_inner_indent(indent));
         let mut lines = vec!["{".to_owned()];
         for (key, value) in entries {
-            let key = self.format_annotation_value(key, indent + 1);
-            let value = self.format_annotation_value(value, indent + 1);
+            let key = self.format_annotation_value(key, indent + 1, contract_letters);
+            let value = self.format_annotation_value(value, indent + 1, contract_letters);
             let mut value_lines = value.lines();
             if let Some(first) = value_lines.next() {
                 lines.push(format!("{entry_indent}{key} => {first}"));
@@ -1404,7 +1725,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         lines.join("\n")
     }
 
-    fn format_annotation_scalar(&self, data: &UnpackedValue) -> String {
+    fn format_annotation_scalar(
+        &self,
+        data: &UnpackedValue,
+        contract_letters: &HashMap<IntAddr, String>,
+    ) -> String {
         let data = Self::unwrap_annotation_data(data);
         match data {
             UnpackedValue::Null => "null".to_owned(),
@@ -1412,7 +1737,10 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             UnpackedValue::Number(value) => value.to_string(),
             UnpackedValue::Bool(value) => value.to_string(),
             UnpackedValue::String(value) => format!("{value:?}"),
-            UnpackedValue::Address(value) => self.format_annotation_address(value),
+            UnpackedValue::AddressNone => "addr_none".to_owned(),
+            UnpackedValue::Address(value) => {
+                self.format_annotation_address(value, contract_letters)
+            }
             UnpackedValue::ExtAddress(value) => value.to_string(),
             UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
                 Boc::encode_hex(value)
@@ -1426,7 +1754,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 }
             }
             UnpackedValue::Object { .. } | UnpackedValue::Array(_) | UnpackedValue::Map(_) => {
-                self.format_annotation_value(data, 0)
+                self.format_annotation_value(data, 0, contract_letters)
             }
         }
     }
@@ -1486,7 +1814,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let mut result = String::new();
         let mut extra_infos = vec![];
 
-        if let Some(body) = self.format_inbound_message_body(tx) {
+        if let Some(body) = self.format_inbound_message_body(tx, contract_letters) {
             extra_infos.push(FormattedExtraInfo::Annotation(body));
         }
 
@@ -1547,55 +1875,53 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         }
 
         match info.action_phase {
-            None => {}
-            Some(action) => {
-                if action.result_code != 0 {
-                    result += &format!(" action_result_code={}", action.result_code)
-                        .red()
-                        .to_string();
+            Some(action) if action.result_code != 0 => {
+                result += &format!(" action_result_code={}", action.result_code)
+                    .red()
+                    .to_string();
 
-                    extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
+                extra_infos.push(FormattedExtraInfo::Tree("Action phase failed".to_string()));
 
-                    if let Some(info) = exit_codes::find_for_phase(
-                        action.result_code,
-                        exit_codes::ExitCodePhase::Action,
-                    ) {
+                if let Some(info) = exit_codes::find_for_phase(
+                    action.result_code,
+                    exit_codes::ExitCodePhase::Action,
+                ) {
+                    extra_infos.push(FormattedExtraInfo::Tree(format!(
+                        "Description: {}",
+                        info.description.to_string().yellow()
+                    )));
+                }
+
+                // Trying to collect installed and executed out actions
+                let vm_logs = self.emulations.find_tx_logs(tx.lt);
+                let installed_actions = if let Some(vm_logs) = vm_logs {
+                    retrace::find_installed_actions(vm_logs)
+                } else {
+                    InstalledActions::empty()
+                };
+
+                let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
+                if let Some(logs) = executor_logs {
+                    if self.backtrace.is_none() {
                         extra_infos.push(FormattedExtraInfo::Tree(format!(
-                            "Description: {}",
-                            info.description.to_string().yellow()
+                            "Re-run with {} to get actions location",
+                            "--backtrace full".yellow()
                         )));
                     }
 
-                    // Trying to collect installed and executed out actions
-                    let vm_logs = self.emulations.find_tx_logs(tx.lt);
-                    let installed_actions = if let Some(vm_logs) = vm_logs {
-                        retrace::find_installed_actions(vm_logs)
-                    } else {
-                        InstalledActions::empty()
-                    };
-
-                    let executor_logs = self.emulations.find_tx_executor_logs(tx.lt);
-                    if let Some(logs) = executor_logs {
-                        if self.backtrace.is_none() {
-                            extra_infos.push(FormattedExtraInfo::Tree(format!(
-                                "Re-run with {} to get actions location",
-                                "--backtrace full".yellow()
-                            )));
-                        }
-
-                        let actions = self.format_actions_retrace(
-                            child_prefix,
-                            tx,
-                            installed_actions,
-                            logs,
-                            contract_letters,
-                        );
-                        if !actions.is_empty() {
-                            extra_infos.push(FormattedExtraInfo::Tree(actions));
-                        }
+                    let actions = self.format_actions_retrace(
+                        child_prefix,
+                        tx,
+                        installed_actions,
+                        logs,
+                        contract_letters,
+                    );
+                    if !actions.is_empty() {
+                        extra_infos.push(FormattedExtraInfo::Tree(actions));
                     }
                 }
             }
+            _ => {}
         }
 
         for ext_msg in &send_result.externals {
@@ -1603,7 +1929,8 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 continue;
             };
 
-            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg) else {
+            let Some(msg_infos) = self.format_outgoing_external_message(tx, &msg, contract_letters)
+            else {
                 continue;
             };
 
@@ -1711,33 +2038,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             )));
         }
 
-        if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt)
-            && !missing_libraries.is_empty()
-        {
-            let mut missing_libraries = missing_libraries.iter().cloned().collect::<Vec<_>>();
-            missing_libraries.sort_unstable();
-
-            if missing_libraries.len() == 1 {
-                extra_infos.push(FormattedExtraInfo::Tree(format!(
-                    "Library {} is missing, which is what causes this error",
-                    missing_libraries.join(", ").yellow()
-                )));
-            } else {
-                extra_infos.push(FormattedExtraInfo::Tree(format!(
-                    "Missing libraries: {}",
-                    missing_libraries.join(", ").yellow()
-                )));
+        if let Some(missing_libraries) = self.emulations.find_tx_missing_libraries(tx.lt) {
+            for line in Self::format_missing_libraries_help_lines(missing_libraries.iter().cloned())
+            {
+                extra_infos.push(FormattedExtraInfo::Tree(line));
             }
-            extra_infos.push(FormattedExtraInfo::Tree(
-                "This most likely happened because the library is not registered in tests"
-                    .to_owned(),
-            ));
-            extra_infos.push(FormattedExtraInfo::Tree(format!(
-                "To manually register library use {} somewhere in {}-like function",
-                "testing.registerLibrary(code)".yellow(),
-                "setupTests()".yellow(),
-            )));
-            extra_infos.push(FormattedExtraInfo::Tree("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/libraries".to_owned()));
         }
 
         self.format_transaction_backtrace(tx, child_prefix, extra_infos);
@@ -1838,7 +2143,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             return None;
         };
 
-        let message_name = self.format_unknown_message_name(Self::extract_opcode(msg));
+        let message_name = self.format_unknown_message_name(Self::message_opcode(msg));
 
         let msg_info = if let Some(ext_addr) = &info.dst {
             let hex_data = hex::encode(&ext_addr.data);
@@ -1904,11 +2209,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                     let message_part = match installed {
                         Some(InstalledAction::Message(message)) => message.message().map_or_else(
                             || message.msg_hash.clone(),
-                            |msg| self.format_single_message(&msg, contract_letters, false, None),
+                            |msg| self.format_single_message(&msg, contract_letters, false),
                         ),
                         _ => "msg: ".to_owned() + hash,
                     };
-                    let balance_part = format!("balance: {}", self.format_ton(remaining_balance));
+                    let balance_part = format!("balance: {}", self.format_grams(remaining_balance));
 
                     action_parts.push((message_part, balance_part, location_part));
                 }
@@ -1923,11 +2228,11 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                     let message_part = format!(
                         "{} {} {}",
                         "reserve".blue(),
-                        self.format_ton(reserve),
+                        self.format_grams(reserve),
                         Self::format_reserve_currency_flags(mode_flags).dimmed()
                     );
                     let balance_part =
-                        format!("balance: {}", self.format_ton(changed_remaining_balance));
+                        format!("balance: {}", self.format_grams(changed_remaining_balance));
 
                     action_parts.push((message_part, balance_part, location_part));
                 }
@@ -2128,7 +2433,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
                 let mut result = if let Some(contract_type) = contract_type {
                     format!("{}", contract_type.cyan())
                 } else {
-                    Self::format_addr_hash(addr).dimmed().to_string()
+                    self.format_addr_hash(addr).dimmed().to_string()
                 };
                 let _ = write!(result, " {} ", letter.bold());
                 result
@@ -2141,24 +2446,21 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             if let Some(contract_type) = contract_type {
                 format!("{}", contract_type.cyan())
             } else {
-                Self::format_addr_hash(addr).dimmed().to_string()
+                self.format_addr_hash(addr).dimmed().to_string()
             }
         }
     }
 
-    #[allow(clippy::useless_let_if_seq)]
-    fn extract_opcode(in_msg: &RelaxedMessage) -> u32 {
-        let mut body = in_msg.body;
+    fn message_opcode(in_msg: &RelaxedMessage) -> Option<u32> {
         let bounced = match &in_msg.info {
             RelaxedMsgInfo::Int(info) => info.bounced,
             RelaxedMsgInfo::ExtOut(_) => false,
         };
-        let mut opcode = body.load_u32().unwrap_or(0);
-        if bounced {
-            // if bounced read another 32 bit to get the actual opcode
-            opcode = body.load_u32().unwrap_or(0);
-        }
-        opcode
+        Self::opcode_after_bounce_prefix(in_msg.body, bounced)
+    }
+
+    fn opcode_from_body(body: CellSlice<'_>, bounced: bool) -> Option<u32> {
+        Self::opcode_after_bounce_prefix(body, bounced)
     }
 
     fn color_message_name(name: &str) -> String {
@@ -2170,13 +2472,13 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             return Self::color_message_name(&name);
         }
 
-        self.format_unknown_message_name(Self::extract_opcode(in_msg))
+        self.format_unknown_message_name(Self::message_opcode(in_msg))
     }
 
     fn incoming_message_name(&self, in_msg: &RelaxedMessage) -> Option<String> {
-        let opcode = Self::extract_opcode(in_msg);
+        let opcode = Self::message_opcode(in_msg);
         let RelaxedMsgInfo::Int(info) = &in_msg.info else {
-            return (opcode == 0).then(|| "empty".to_owned());
+            return Self::generic_message_name(opcode);
         };
 
         let destination_build = self.build_result_for_address(Some(&info.dst));
@@ -2184,28 +2486,29 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             .src
             .as_ref()
             .and_then(|src| self.build_result_for_address(Some(src)));
+        let destination_abi = self.catalog_abi_for_address(Some(&info.dst));
+        let source_abi = self.catalog_abi_for_address(info.src.as_ref());
 
-        self.message_name_from_endpoint_builds(opcode, destination_build, source_build)
-            .or_else(|| (opcode == 0).then(|| "empty".to_owned()))
+        opcode
+            .and_then(|opcode| {
+                self.message_name_from_endpoints(
+                    opcode,
+                    destination_build,
+                    source_build,
+                    destination_abi,
+                    source_abi,
+                )
+            })
+            .or_else(|| Self::generic_message_name(opcode))
     }
 
-    fn format_external_incoming_message_name(&self, tx: &Transaction, opcode: u32) -> String {
-        let build = self.build_result_for_tx_account(tx);
-        self.format_message_name_from_build(opcode, build.as_ref())
-    }
-
-    fn format_outgoing_external_message_name(&self, tx: &Transaction, opcode: u32) -> String {
-        let build = self.build_result_for_tx_account(tx);
-        self.format_message_name_from_build(opcode, build.as_ref())
-    }
-
-    fn format_message_name_from_build(
+    fn format_external_incoming_message_name(
         &self,
-        opcode: u32,
-        build: Option<&context::CompilationResult>,
+        tx: &Transaction,
+        opcode: Option<u32>,
     ) -> String {
-        if let Some(build) = build
-            && let Some(name) = build.message_name_by_opcode(opcode)
+        if let Some(opcode) = opcode
+            && let Some(name) = self.external_incoming_message_name(tx, opcode)
         {
             return Self::color_message_name(&name);
         }
@@ -2213,12 +2516,64 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         self.format_unknown_message_name(opcode)
     }
 
-    fn format_unknown_message_name(&self, opcode: u32) -> String {
-        if opcode == 0 {
-            Self::color_message_name("empty")
-        } else {
-            Self::color_message_name(&format!("0x{opcode:08x}"))
+    fn external_incoming_message_name(&self, tx: &Transaction, opcode: u32) -> Option<String> {
+        let account_code = self.code_for_tx_account(tx);
+        let build = self.build_result_for_tx_account(tx);
+        let abis = self.prioritized_abis(
+            self.build_cache.prioritized_results(build),
+            Self::catalog_abi_for_code(account_code.as_ref()),
+        );
+        let abis = self.with_opcode_fallback_abis(abis, Some(opcode));
+        Self::message_name_from_abis(opcode, abis)
+    }
+
+    fn format_outgoing_external_message_name(
+        &self,
+        tx: &Transaction,
+        opcode: Option<u32>,
+    ) -> String {
+        let Some(opcode) = opcode else {
+            return self.format_unknown_message_name(None);
+        };
+
+        let build = self.build_result_for_tx_account(tx);
+        self.format_message_name_from_builds(opcode, self.build_cache.prioritized_results(build))
+    }
+
+    fn format_message_name_from_builds(
+        &self,
+        opcode: u32,
+        builds: impl IntoIterator<Item = context::CompilationResult>,
+    ) -> String {
+        if let Some(name) = self.build_cache.message_name_by_opcode(opcode, builds) {
+            return Self::color_message_name(&name);
         }
+
+        self.format_unknown_message_name(Some(opcode))
+    }
+
+    fn format_unknown_message_name(&self, opcode: Option<u32>) -> String {
+        match opcode {
+            None => Self::color_message_name("empty"),
+            Some(0) => Self::color_message_name("text comment"),
+            Some(opcode) => Self::color_message_name(&format!("0x{opcode:08x}")),
+        }
+    }
+
+    fn generic_message_name(opcode: Option<u32>) -> Option<String> {
+        match opcode {
+            None => Some("empty".to_owned()),
+            Some(0) => Some("text comment".to_owned()),
+            Some(_) => None,
+        }
+    }
+
+    fn message_name_from_abis(
+        opcode: u32,
+        abis: impl IntoIterator<Item = Arc<ContractABI>>,
+    ) -> Option<String> {
+        abis.into_iter()
+            .find_map(|abi| abi.find_message_name_by_opcode(opcode).map(str::to_owned))
     }
 
     fn message_name_from_endpoint_builds(
@@ -2231,6 +2586,46 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             opcode,
             [destination_build, source_build].into_iter().flatten(),
         )
+    }
+
+    fn message_name_from_endpoints(
+        &self,
+        opcode: u32,
+        destination_build: Option<context::CompilationResult>,
+        source_build: Option<context::CompilationResult>,
+        destination_abi: Option<Arc<ContractABI>>,
+        source_abi: Option<Arc<ContractABI>>,
+    ) -> Option<String> {
+        if let Some(name) = self.message_name_from_endpoint_builds(
+            opcode,
+            destination_build.clone(),
+            source_build.clone(),
+        ) {
+            return Some(name);
+        }
+
+        let mut abis = self.prioritized_abis(
+            self.build_cache
+                .prioritized_results([destination_build, source_build].into_iter().flatten()),
+            None,
+        );
+        Self::push_unique_abi(&mut abis, destination_abi);
+        Self::push_unique_abi(&mut abis, source_abi);
+        let abis = self.with_opcode_fallback_abis(abis, Some(opcode));
+        Self::message_name_from_abis(opcode, abis)
+    }
+
+    fn push_unique_abi(abis: &mut Vec<Arc<ContractABI>>, abi: Option<Arc<ContractABI>>) {
+        let Some(abi) = abi else {
+            return;
+        };
+        if abis
+            .iter()
+            .any(|existing| existing.contract_name == abi.contract_name)
+        {
+            return;
+        }
+        abis.push(abi);
     }
 
     fn message_name_from_search_params(
@@ -2274,6 +2669,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
 
         let code = info.code?;
         let code_hash = code.repr_hash();
+        let code_lookup_hash = context::code_lookup_hash(&code);
 
         // contract can be registered as a cell with a name
         if let Some(cell_name) = self.known_code_cells.get(code_hash) {
@@ -2285,6 +2681,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
         let compilation_result = self.build_cache.result_for_code(&Some(code));
         if let Some((_, result)) = compilation_result {
             return Some(result.display_name);
+        }
+
+        if let Some(contract) =
+            acton_abi_catalog::find_contract_by_code_hash(&code_lookup_hash.to_string())
+        {
+            return Some(contract.display_name.clone());
         }
 
         None
@@ -2392,11 +2794,12 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
     }
 
     /// Show address in short format
-    fn format_addr_hash(addr: &IntAddr) -> String {
-        let Some(std_addr) = addr.as_std() else {
+    fn format_addr_hash(&self, addr: &IntAddr) -> String {
+        if !matches!(addr, IntAddr::Std(_)) {
             return addr.to_string();
-        };
-        let raw = std_addr.display_base64(true).to_string();
+        }
+
+        let raw = self.address_to_string(addr);
         raw[..6].to_string() + ".." + &raw[raw.len() - 6..]
     }
 
@@ -2422,7 +2825,7 @@ See https://ton-blockchain.github.io/acton/docs/wallets for more information
             builder += format!("{} ", letter.bold()).as_str();
         }
 
-        builder += Self::format_addr_hash(addr).dimmed().to_string().as_str();
+        builder += self.format_addr_hash(addr).dimmed().to_string().as_str();
 
         builder
     }
@@ -3022,6 +3425,40 @@ impl FormatterContext<'_> {
         code.to_string()
     }
 
+    fn format_missing_libraries_help_lines(
+        missing_libraries: impl IntoIterator<Item = String>,
+    ) -> Vec<String> {
+        let mut missing_libraries = missing_libraries.into_iter().collect::<Vec<_>>();
+        missing_libraries.sort_unstable();
+
+        if missing_libraries.is_empty() {
+            return Vec::new();
+        }
+
+        let mut lines = Vec::new();
+        if missing_libraries.len() == 1 {
+            lines.push(format!(
+                "Library {} is missing, which is what causes this error",
+                missing_libraries.join(", ").yellow()
+            ));
+        } else {
+            lines.push(format!(
+                "Missing libraries: {}",
+                missing_libraries.join(", ").yellow()
+            ));
+        }
+        lines.push(
+            "This most likely happened because the library is not registered in tests".to_owned(),
+        );
+        lines.push(format!(
+            "To manually register library use {} somewhere in {}-like function",
+            "testing.registerLibrary(code)".yellow(),
+            "setupTests()".yellow(),
+        ));
+        lines.push("Learn more about libraries in documentation: https://ton-blockchain.github.io/acton/docs/libraries".to_owned());
+        lines
+    }
+
     #[must_use]
     pub fn format_get_method_assert_failure_title(failure: &GetMethodAssertFailure) -> String {
         if failure.vm_exit_code == 11 {
@@ -3054,7 +3491,9 @@ impl FormatterContext<'_> {
     pub fn format_get_method_assert_failure(&self, failure: &GetMethodAssertFailure) -> String {
         let mut output = Self::format_get_method_assert_failure_title(failure);
 
-        if failure.vm_exit_code == 11 || failure.vm_exit_code == 2 {
+        if (failure.vm_exit_code == 11 || failure.vm_exit_code == 2)
+            && failure.missing_libraries.is_empty()
+        {
             return output;
         }
 
@@ -3065,6 +3504,12 @@ impl FormatterContext<'_> {
             failure.vm_exit_code.to_string().yellow()
         )
         .ok();
+
+        for line in
+            Self::format_missing_libraries_help_lines(failure.missing_libraries.iter().cloned())
+        {
+            writeln!(details, "{line}").ok();
+        }
 
         let replayed_exception = retrace::find_exception_info(&failure.vm_log, &failure.source_map);
 

@@ -1,14 +1,26 @@
 import type {ABIStruct, ContractABI, Ty} from "@ton/tolk-abi-to-typescript"
 import {SymTable} from "@ton/tolk-abi-to-typescript"
 
-import {parseAddress} from "../components/utils"
+import {toRawAddress} from "../components/utils"
 
 type CompilerAbiMessageKind = "incoming_messages" | "outgoing_messages"
 
+export interface ContractAbiLink {
+  readonly kind: string
+  readonly title: string
+  readonly url: string
+  readonly scope: string
+}
+
+export interface ExtendedContractABI {
+  readonly compiler_abi: ContractABI
+  readonly display_name?: string
+  readonly code_hashes: readonly string[]
+  readonly links: readonly ContractAbiLink[]
+}
+
 export function addressKey(address: string): string {
-  const parsed = parseAddress(address)
-  const rawString = (parsed as {toRawString?: () => string} | undefined)?.toRawString
-  return typeof rawString === "function" ? rawString.call(parsed) : address
+  return toRawAddress(address)
 }
 
 export function buildMessageNamesByOpcodeHex(

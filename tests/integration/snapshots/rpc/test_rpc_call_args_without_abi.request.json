@@ -1,0 +1,57 @@
+{
+  "id": "1",
+  "jsonrpc": "2.0",
+  "method": "runGetMethod",
+  "params": {
+    "address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+    "method": "seqno",
+    "stack": [
+      [
+        "num",
+        "0x1"
+      ],
+      [
+        "num",
+        "0x2a"
+      ],
+      [
+        "num",
+        "-0x1"
+      ],
+      [
+        "null",
+        null
+      ],
+      [
+        "slice",
+        {
+          "bytes": "te6ccgEBAQEAJAAAQ4AGZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZmZnA="
+        }
+      ],
+      [
+        "slice",
+        {
+          "bytes": "te6ccgEBAQEAAwAAASA="
+        }
+      ],
+      [
+        "cell",
+        {
+          "bytes": "te6ccgEBAQEABgAACAECAwQ="
+        }
+      ],
+      [
+        "slice",
+        {
+          "bytes": "te6ccgEBAQEABgAACBEiM0Q="
+        }
+      ],
+      [
+        "slice",
+        {
+          "bytes": "te6ccgEBAQEABwAACmhlbGxv"
+        }
+      ]
+    ]
+  }
+}

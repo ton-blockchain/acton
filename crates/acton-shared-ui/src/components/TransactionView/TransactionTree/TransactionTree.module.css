@@ -3,7 +3,13 @@
   border-radius: var(--border-radius-md);
   overflow: hidden;
   line-height: 1.6;
-  --transaction-tree-failed-node-fill: color-mix(in srgb, var(--color-failed) 58%, var(--bg-color));
+  --transaction-tree-failed-node-fill: #edb04d;
+  --transaction-tree-failed-node-stroke: var(--text-primary);
+  --transaction-tree-failed-node-text: #ffffff;
+  --transaction-tree-failed-badge-fill: var(--text-primary);
+  --transaction-tree-failed-badge-text: var(--bg-color);
+  --transaction-tree-failed-badge-stroke: var(--bg-color);
+  --transaction-tree-failed-badge-mark-stroke: var(--bg-color);
 }
 
 .treeContainer {
@@ -88,7 +94,7 @@
 .tooltip {
   background-color: var(--bg-color);
   border-radius: var(--border-radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-tooltip);
   padding: var(--spacing-md);
   font-size: var(--font-size-sm);
   min-width: 200px;
@@ -108,7 +114,7 @@
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
   border-top: 8px solid var(--bg-color);
-  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.1));
+  filter: drop-shadow(0 2px 1px var(--shadow-color-soft));
 }
 
 .tooltipContent {
@@ -173,7 +179,7 @@
 .transactionDetails {
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
   background-color: var(--bg-color);
-  margin: 0 var(--spacing-md);
+  margin: 0 var(--spacing-md) var(--spacing-2xl);
 }
 
 .storageMeta {
@@ -230,6 +236,10 @@
 .nodeCircle,
 .nodeCircleSelected {
   cursor: pointer;
+}
+
+.failedBadge {
+  pointer-events: none;
 }
 
 .nodeCircleSelected:focus {

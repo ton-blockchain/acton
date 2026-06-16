@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "fumadocs-ui/css/neutral.css";
 @import "fumadocs-ui/css/preset.css";
+@import "../../node_modules/fumadocs-openapi/css/preset.css";
 @import "fumadocs-twoslash/twoslash.css";
 
 .twoslash .twoslash-error.twoslash-error-level-warning {
@@ -61,6 +62,19 @@ body {
 code,
 pre {
   font-family: var(--font-geist-mono), "Courier New", monospace;
+}
+
+.prose h2:has(+ .availability-badge) {
+  margin-bottom: 0.5rem;
+}
+
+.prose .availability-badge {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.prose .availability-badge + figure {
+  margin-top: 1rem;
 }
 
 figure.shiki > div[role="region"] {

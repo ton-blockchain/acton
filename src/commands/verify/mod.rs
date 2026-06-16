@@ -8,9 +8,10 @@ use acton_config::config::{ActonConfig, project_root as configured_project_root}
 use anyhow::{Context, anyhow};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::fmt::Write as _;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::str::FromStr;
 use std::sync::Arc;
 use ton::ton_core::cell::TonCell;
@@ -33,6 +34,8 @@ const MAINNET_VERIFIER_BACKEND: &str = "https://verifier-mainnet.tonstudio.io";
 const TESTNET_VERIFIER_BACKEND: &str = "https://verifier-testnet.tonstudio.io";
 const VERIFY_BACKEND_ENV: &str = "ACTON_VERIFY_BACKEND";
 const VERIFY_BACKENDS_ENV: &str = "ACTON_VERIFY_BACKENDS";
+const NEW_VERIFIER_BACKEND: &str = "https://verifier.acton.monster";
+const NEW_VERIFY_BACKEND_ENV: &str = "ACTON_NEW_VERIFY_BACKEND";
 
 #[allow(clippy::too_many_arguments)]
 pub fn verify_cmd(
@@ -42,6 +45,7 @@ pub fn verify_cmd(
     wallet_name: Option<String>,
     compiler_version: Option<String>,
     dry_run: bool,
+    new_verifier: bool,
     tonconnect: bool,
     tonconnect_port: u16,
 ) -> anyhow::Result<()> {
@@ -68,6 +72,22 @@ pub fn verify_cmd(
         anyhow::bail!(
             "Unsupported verification network {network}. Verification backends are available only for mainnet and testnet"
         );
+    }
+    if new_verifier {
+        if wallet_name.is_some() {
+            anyhow::bail!(
+                "{} cannot be used with {}; the new verifier registers source bundles server-side",
+                "--wallet".yellow(),
+                "--new".yellow()
+            );
+        }
+        if tonconnect {
+            anyhow::bail!(
+                "{} cannot be used with {}; the new verifier does not require wallet approval",
+                "--tonconnect".yellow(),
+                "--new".yellow()
+            );
+        }
     }
 
     println!("  {} Contract: {}", "→".blue().bold(), contract_key.cyan());
@@ -106,28 +126,94 @@ pub fn verify_cmd(
 
     let code = Boc::decode_base64(&code_boc64)?;
     let code_hash = code.repr_hash();
+    let code_hash_hex = hex::encode(code_hash);
 
     println!(
         "  {} Code hash: {}",
         "→".blue().bold(),
-        format!("0x{}", hex::encode(code_hash)).dimmed()
+        format!("0x{code_hash_hex}").dimmed()
     );
 
-    let contract_address = if let Some(addr) = address {
-        TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr))?
-    } else {
-        let addr_input = inquire::Text::new("Enter deployed contract address:")
-            .prompt()
-            .context("Failed to read address")?;
-        TonAddress::from_str(&addr_input)
-            .with_context(|| error_fmt::invalid_address(&addr_input))?
+    let contract_address = match address {
+        Some(addr) => {
+            Some(TonAddress::from_str(&addr).with_context(|| error_fmt::invalid_address(&addr))?)
+        }
+        None if new_verifier => None,
+        None => {
+            let addr_input = inquire::Text::new("Enter deployed contract address:")
+                .prompt()
+                .context("Failed to read address")?;
+            Some(
+                TonAddress::from_str(&addr_input)
+                    .with_context(|| error_fmt::invalid_address(&addr_input))?,
+            )
+        }
     };
 
+    if let Some(contract_address) = &contract_address {
+        println!(
+            "  {} Contract address: {}",
+            "→".blue().bold(),
+            format_ton_address(contract_address, network == Network::Testnet).dimmed()
+        );
+        if new_verifier {
+            validate_new_verifier_address_code_hash(
+                &config,
+                &network,
+                contract_address,
+                code_hash,
+            )?;
+        }
+    }
+
+    println!("  {} Collecting source files", "→".blue().bold());
+    let source_files = source_files_from_source_map(&source_map);
     println!(
-        "  {} Contract address: {}",
-        "→".blue().bold(),
-        format_ton_address(&contract_address, network == Network::Testnet).dimmed()
+        "  {} Collected {} source file{}",
+        "✓".green().bold(),
+        source_files.len(),
+        if source_files.len() == 1 { "" } else { "s" }
     );
+
+    if source_files.is_empty() {
+        anyhow::bail!("No source files found");
+    }
+
+    let project_root = acton_config::config::project_root();
+    let mut upload_parts: Vec<UploadPart> = Vec::new();
+    let mut normalized_source_paths: Vec<(String, bool)> = Vec::new();
+
+    for (path, is_entrypoint) in &source_files {
+        let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
+        let file_content = fs::read(&path).context("Failed to read source file")?;
+        let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
+            anyhow::bail!("Failed to get filename from path: {}", path.display());
+        };
+        let source_path = normalize_source_path_for_verifier(&path, project_root);
+        normalized_source_paths.push((source_path.clone(), *is_entrypoint));
+
+        upload_parts.push(UploadPart {
+            field_name: source_path,
+            file_name: filename.to_string(),
+            bytes: file_content,
+        });
+    }
+
+    let version = compiler_version.unwrap_or_else(|| "1.4.1".to_owned());
+
+    if new_verifier {
+        return verify_with_new_verifier(
+            &config,
+            &code_hash_hex,
+            &upload_parts,
+            &normalized_source_paths,
+            &version,
+            dry_run,
+        );
+    }
+
+    let contract_address =
+        contract_address.expect("contract address must be present for built-in verifier flow");
 
     let local_wallet: Option<Wallet>;
     let tonconnect_session: Option<Arc<TonConnectSession>>;
@@ -201,39 +287,6 @@ pub fn verify_cmd(
         anyhow::bail!("No backends found for network: {network}");
     }
 
-    println!("  {} Collecting source files", "→".blue().bold());
-    let source_files = source_files_from_source_map(&source_map);
-    println!(
-        "  {} Collected {} source file{}",
-        "✓".green().bold(),
-        source_files.len(),
-        if source_files.len() == 1 { "" } else { "s" }
-    );
-
-    if source_files.is_empty() {
-        anyhow::bail!("No source files found");
-    }
-
-    let project_root = acton_config::config::project_root();
-    let mut upload_parts: Vec<UploadPart> = Vec::new();
-    let mut normalized_source_paths: Vec<(String, bool)> = Vec::new();
-
-    for (path, is_entrypoint) in &source_files {
-        let path = dunce::canonicalize(path).unwrap_or_else(|_| path.clone());
-        let file_content = fs::read(&path).context("Failed to read source file")?;
-        let Some(filename) = path.file_name().and_then(|it| it.to_str()) else {
-            anyhow::bail!("Failed to get filename from path: {}", path.display());
-        };
-        let source_path = normalize_source_path_for_verifier(&path, project_root);
-        normalized_source_paths.push((source_path.clone(), *is_entrypoint));
-
-        upload_parts.push(UploadPart {
-            field_name: source_path,
-            file_name: filename.to_string(),
-            bytes: file_content,
-        });
-    }
-
     let sources_meta: Vec<SourceObject> = normalized_source_paths
         .iter()
         .map(|(path, is_entrypoint)| SourceObject {
@@ -244,8 +297,6 @@ pub fn verify_cmd(
             folder: source_folder_for_verifier(path),
         })
         .collect();
-
-    let version = compiler_version.unwrap_or_else(|| "1.4.0".to_owned());
 
     let contract_hash = base64::engine::general_purpose::STANDARD.encode(code_hash);
     let sources_object = SourcesObject {
@@ -543,7 +594,7 @@ pub fn verify_cmd(
         bounced: false,
         src: IntAddr::Std(sender_std_addr),
         dst: IntAddr::Std(ton_address_to_std_addr(&registry_address)),
-        value: CurrencyCollection::new(100_000_000u128), // 0.1 TON
+        value: CurrencyCollection::new(100_000_000u128), // 0.1 GRAM
         ihr_fee: Default::default(),
         fwd_fee: Default::default(),
         created_lt: 0,
@@ -626,6 +677,15 @@ struct SourceObject {
 }
 
 #[derive(Debug, Serialize)]
+struct NewSourceObject {
+    path: String,
+    is_entrypoint: bool,
+    include_in_command: Option<bool>,
+    is_stdlib: Option<bool>,
+    has_include_directives: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SourcesObject {
     known_contract_hash: String,
@@ -704,6 +764,49 @@ struct SignResponse {
     msg_cell: MsgCell,
 }
 
+#[derive(Debug, Deserialize)]
+struct NewVerifyResponse {
+    #[allow(dead_code)]
+    #[serde(default)]
+    address: Option<String>,
+    code_hash: String,
+    compiled_code_hash: String,
+    verification_result: NewVerificationResult,
+    #[serde(default)]
+    source_bundle_hash: Option<String>,
+    #[allow(dead_code)]
+    #[serde(default)]
+    source_storage: Option<NewSourceStorageResponse>,
+    #[serde(default)]
+    onchain_registration: Option<NewOnchainRegistration>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum NewVerificationResult {
+    Match,
+    Mismatch,
+}
+
+#[derive(Debug, Deserialize)]
+struct NewSourceStorageResponse {
+    #[allow(dead_code)]
+    provider: String,
+    #[allow(dead_code)]
+    commit: String,
+    #[allow(dead_code)]
+    bundle_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct NewOnchainRegistration {
+    #[allow(dead_code)]
+    status: String,
+    #[allow(dead_code)]
+    master_address: String,
+    verification_record_address: String,
+}
+
 #[derive(Debug)]
 struct BackendInfo {
     source_registry: String,
@@ -717,6 +820,167 @@ struct UploadPart {
     field_name: String,
     file_name: String,
     bytes: Vec<u8>,
+}
+
+fn verify_with_new_verifier(
+    config: &ActonConfig,
+    code_hash: &str,
+    upload_parts: &[UploadPart],
+    normalized_source_paths: &[(String, bool)],
+    version: &str,
+    dry_run: bool,
+) -> anyhow::Result<()> {
+    println!("  {} Using new Acton verifier", "→".blue().bold());
+
+    let backend = parse_backend_env(NEW_VERIFY_BACKEND_ENV)
+        .unwrap_or_else(|| NEW_VERIFIER_BACKEND.to_string());
+    let verify_url = format!("{backend}/api/v1/verify");
+
+    println!(
+        "  {} Using backend: {}",
+        "→".blue().bold(),
+        verify_url.dimmed()
+    );
+
+    let sources = new_verifier_sources(normalized_source_paths)?;
+    let compile_params = new_verifier_compile_params(config, version)?;
+    let sources_json = serde_json::to_string(&sources)?;
+    let compile_params_json = serde_json::to_string(&compile_params)?;
+
+    if dry_run {
+        println!(
+            "  {} Dry run mode: skipping source upload",
+            "ℹ".blue().bold()
+        );
+        println!();
+        println!(
+            "{}",
+            "✓ New verifier request prepared successfully!"
+                .green()
+                .bold()
+        );
+        println!("  Backend: {}", verify_url.dimmed());
+        println!(
+            "  Source files: {}",
+            upload_parts.len().to_string().dimmed()
+        );
+        return Ok(());
+    }
+
+    println!("  {} Sending sources to new verifier", "→".blue().bold());
+
+    let source_max_attempts = 8;
+    let mut response = None;
+    let mut last_send_error = None;
+
+    for attempt in 1..=source_max_attempts {
+        let form =
+            build_new_verify_form(upload_parts, code_hash, &sources_json, &compile_params_json)?;
+        let source_client = build_verify_http_client()
+            .context("Failed to create HTTP client for new verifier backend")?;
+        match source_client
+            .post(&verify_url)
+            .header(reqwest::header::CONNECTION, "close")
+            .multipart(form)
+            .send()
+        {
+            Ok(res) => {
+                let status = res.status();
+                let http_version = format!("{:?}", res.version());
+                let cf_ray = res
+                    .headers()
+                    .get("cf-ray")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("-");
+                let should_retry = status.is_server_error() && attempt < source_max_attempts;
+                if should_retry {
+                    println!(
+                        "  {} New verifier returned {} ({}, cf-ray={}) on attempt {attempt}/{source_max_attempts}, retrying...",
+                        "↻".yellow().bold(),
+                        status,
+                        http_version,
+                        cf_ray
+                    );
+                    std::thread::sleep(source_retry_delay(attempt));
+                    continue;
+                }
+                response = Some(res);
+                break;
+            }
+            Err(err) => {
+                let should_retry = attempt < source_max_attempts;
+                if should_retry {
+                    println!(
+                        "  {} Network error on attempt {attempt}/{source_max_attempts}, retrying...\n    {}",
+                        "↻".yellow().bold(),
+                        err.to_string().dimmed()
+                    );
+                    last_send_error = Some(err);
+                    std::thread::sleep(source_retry_delay(attempt));
+                    continue;
+                }
+                return Err(err).context("Failed to send request to new verifier backend");
+            }
+        }
+    }
+
+    let response = response.ok_or_else(|| {
+        if let Some(err) = last_send_error {
+            anyhow!("Failed to send request to new verifier backend: {err}")
+        } else {
+            anyhow!("Failed to get response from new verifier backend")
+        }
+    })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let http_version = format!("{:?}", response.version());
+        let error_text = response
+            .text()
+            .unwrap_or_else(|_| "Unknown error".to_string());
+        let body = truncate_for_display(&error_text, 4_000);
+
+        anyhow::bail!(
+            "New verifier request failed: HTTP {status} ({http_version}) at {verify_url}\nResponse body:\n{body}"
+        );
+    }
+
+    let verify_result: NewVerifyResponse = response
+        .json()
+        .context("Failed to parse new verifier response")?;
+
+    if verify_result.verification_result != NewVerificationResult::Match {
+        anyhow::bail!(
+            "Verification failed: compiled code hash {} does not match target code hash {}",
+            verify_result.compiled_code_hash,
+            verify_result.code_hash
+        );
+    }
+
+    println!(
+        "  {} New verifier accepted source bundle",
+        "✓".green().bold()
+    );
+    if let Some(source_bundle_hash) = &verify_result.source_bundle_hash {
+        println!(
+            "  {} Source bundle: {}",
+            "→".blue().bold(),
+            source_bundle_hash.dimmed()
+        );
+    }
+    if let Some(registration) = &verify_result.onchain_registration {
+        println!(
+            "  {} Verification record: {}",
+            "→".blue().bold(),
+            registration.verification_record_address.dimmed()
+        );
+    }
+
+    println!();
+    println!("{}", "✓ Contract verification completed!".green().bold());
+    show_new_verifier_link(&backend, code_hash);
+
+    Ok(())
 }
 
 fn get_backends() -> anyhow::Result<BackendsConfig> {
@@ -823,6 +1087,130 @@ fn normalize_backend_url(raw: &str) -> Option<String> {
 
 fn parse_backend_list(raw: &str) -> Vec<String> {
     raw.split(',').filter_map(normalize_backend_url).collect()
+}
+
+fn new_verifier_sources(paths: &[(String, bool)]) -> anyhow::Result<Vec<NewSourceObject>> {
+    paths
+        .iter()
+        .map(|(path, is_entrypoint)| {
+            validate_new_verifier_relative_path(path, "source path")?;
+            Ok(NewSourceObject {
+                path: path.clone(),
+                is_entrypoint: *is_entrypoint,
+                include_in_command: Some(true),
+                is_stdlib: Some(false),
+                has_include_directives: Some(true),
+            })
+        })
+        .collect()
+}
+
+fn new_verifier_compile_params(
+    config: &ActonConfig,
+    version: &str,
+) -> anyhow::Result<serde_json::Value> {
+    let mut params = serde_json::Map::new();
+    params.insert(
+        "compiler_version".to_string(),
+        serde_json::Value::String(version.to_string()),
+    );
+
+    let import_mappings = new_verifier_import_mappings(config)?;
+    if !import_mappings.is_empty() {
+        params.insert(
+            "import_mappings".to_string(),
+            serde_json::to_value(import_mappings)?,
+        );
+    }
+
+    Ok(serde_json::Value::Object(params))
+}
+
+fn new_verifier_import_mappings(config: &ActonConfig) -> anyhow::Result<BTreeMap<String, String>> {
+    let project_root = acton_config::config::project_root();
+    config
+        .mappings
+        .clone()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(key, value)| {
+            let normalized_key = if key.starts_with('@') {
+                key
+            } else {
+                format!("@{key}")
+            };
+            let normalized_value =
+                normalize_new_verifier_relative_path(&value, project_root, "import mapping")?;
+            Ok((normalized_key, normalized_value))
+        })
+        .collect()
+}
+
+fn normalize_new_verifier_relative_path(
+    raw: &str,
+    project_root: &Path,
+    label: &str,
+) -> anyhow::Result<String> {
+    let raw = raw.trim();
+    if raw.is_empty() {
+        anyhow::bail!("{label} path is empty");
+    }
+
+    let path = Path::new(raw);
+    let relative = if path.is_absolute() {
+        path.strip_prefix(project_root).with_context(|| {
+            format!("{label} path must be relative or inside project root: {raw}")
+        })?
+    } else {
+        path
+    };
+
+    let mut parts = Vec::new();
+    for component in relative.components() {
+        match component {
+            Component::Normal(part) => parts.push(part.to_string_lossy().to_string()),
+            Component::CurDir => {}
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                anyhow::bail!("{label} path contains an invalid component: {raw}");
+            }
+        }
+    }
+
+    if parts.is_empty() {
+        anyhow::bail!("{label} path is empty after normalization: {raw}");
+    }
+
+    Ok(parts.join("/"))
+}
+
+fn validate_new_verifier_relative_path(raw: &str, label: &str) -> anyhow::Result<()> {
+    let _ = normalize_new_verifier_relative_path(raw, acton_config::config::project_root(), label)?;
+    Ok(())
+}
+
+fn build_new_verify_form(
+    parts: &[UploadPart],
+    code_hash: &str,
+    sources_json: &str,
+    compile_params_json: &str,
+) -> anyhow::Result<reqwest::blocking::multipart::Form> {
+    let mut form = reqwest::blocking::multipart::Form::new()
+        .percent_encode_noop()
+        .text("code_hash", code_hash.to_string())
+        .text("language", "tolk")
+        .text("compile_params", compile_params_json.to_string())
+        .text("sources", sources_json.to_string());
+
+    for part in parts {
+        form = form.part(
+            "files",
+            reqwest::blocking::multipart::Part::bytes(part.bytes.clone())
+                .file_name(part.field_name.clone())
+                .mime_str("application/octet-stream")?,
+        );
+    }
+
+    Ok(form)
 }
 
 fn build_verify_form(
@@ -952,6 +1340,61 @@ fn show_verifier_link(network: &Network, contract_address: TonAddress) {
         )
         .blue()
     );
+}
+
+fn show_new_verifier_link(backend: &str, code_hash: &str) {
+    println!(
+        "View at: {}",
+        format!("{}/{}", backend.trim_end_matches('/'), code_hash).blue()
+    );
+}
+
+fn validate_new_verifier_address_code_hash(
+    config: &ActonConfig,
+    network: &Network,
+    contract_address: &TonAddress,
+    compiled_code_hash: &HashBytes,
+) -> anyhow::Result<()> {
+    let address = format_ton_address(contract_address, network == &Network::Testnet);
+    println!(
+        "  {} Checking deployed code hash for address",
+        "→".blue().bold()
+    );
+
+    let api_client = TonApiClient::new(network.clone(), config.custom_networks())?;
+    let account = api_client
+        .get_account_state(&address)
+        .with_context(|| format!("Failed to fetch account state for {address}"))?;
+
+    if account.status != "active" {
+        anyhow::bail!(
+            "Address {} is not active (status: {}); cannot compare deployed code hash",
+            address.cyan(),
+            account.status.yellow()
+        );
+    }
+
+    let code_boc = account
+        .code_boc
+        .ok_or_else(|| anyhow!("Address {address} is active but has no code"))?;
+    let deployed_code = Boc::decode_base64(&code_boc)
+        .with_context(|| format!("Failed to decode deployed code BoC for {address}"))?;
+    let deployed_code_hash = deployed_code.repr_hash();
+
+    if deployed_code_hash != compiled_code_hash {
+        anyhow::bail!(
+            "Address code hash mismatch: compiled {}, deployed {} at {}",
+            compiled_code_hash.to_string().yellow(),
+            deployed_code_hash.to_string().yellow(),
+            address.cyan()
+        );
+    }
+
+    println!(
+        "  {} Address code hash matches compiled code",
+        "✓".green().bold()
+    );
+    Ok(())
 }
 
 fn get_verifier_address(

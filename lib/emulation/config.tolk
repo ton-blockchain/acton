@@ -155,13 +155,13 @@ const STORAGE_PRICES_INDEX = 18
 struct (0xcc) StoragePrices {
     /// Unix timestamp indicating when these prices became effective.
     initialUnixTime: uint32
-    /// Price per bit of storage in basechain workchains for 65536 seconds, in nanotons.
+    /// Price per bit of storage in basechain workchains for 65536 seconds, in nanograms.
     bitPrice: uint64
-    /// Price per cell of storage in basechain workchains for 65536 seconds, in nanotons.
+    /// Price per cell of storage in basechain workchains for 65536 seconds, in nanograms.
     cellPrice: uint64
-    /// Price per bit of storage in the masterchain for 65536 seconds, in nanotons.
+    /// Price per bit of storage in the masterchain for 65536 seconds, in nanograms.
     masterchainBitPrice: uint64
-    /// Price per cell of storage in the masterchain for 65536 seconds, in nanotons.
+    /// Price per cell of storage in the masterchain for 65536 seconds, in nanograms.
     masterchainCellPrice: uint64
 }
 
@@ -283,7 +283,7 @@ fun BlockchainConfigMap.getStoragePrices(self): StoragePricesDict {
 ///
 /// This variant includes a special gas limit for system contracts.
 struct (0xde) GasPricesExtended {
-    /// Price of 65536 gas units in nanotons.
+    /// Price of 65536 gas units in nanograms.
     gasPrice: uint64
     /// Maximum amount of gas that can be consumed per regular transaction.
     gasLimit: uint64
@@ -293,9 +293,9 @@ struct (0xde) GasPricesExtended {
     gasCredit: uint64
     /// Maximum amount of gas that can be consumed within a single block.
     blockGasLimit: uint64
-    /// Accumulated storage fee limit (in nanotons) above which contracts are frozen.
+    /// Accumulated storage fee limit (in nanograms) above which contracts are frozen.
     freezeDueLimit: uint64
-    /// Accumulated storage fee limit (in nanotons) above which contracts are deleted.
+    /// Accumulated storage fee limit (in nanograms) above which contracts are deleted.
     deleteDueLimit: uint64
 }
 
@@ -322,7 +322,7 @@ const BASECHAIN_GAS_PRICES_INDEX = 21
 ///
 /// Gas prices define the computational cost of executing transactions and smart contracts
 /// on the TON Blockchain. The complexity of any computation is measured in gas units,
-/// and each gas unit has a price in nanotons.
+/// and each gas unit has a price in nanograms.
 ///
 /// Parameters:
 /// - `prices`: Gas price configuration struct
@@ -362,11 +362,11 @@ fun BlockchainConfigMap.getGasPrices(self, chainType: int): GasPrices {
 /// This struct defines the costs associated with forwarding messages between accounts and shards
 /// in the TON Blockchain. Message routing uses these prices to calculate fees for message delivery.
 struct (0xea) MsgForwardPrices {
-    /// Base price for forwarding a message, independent of its size, in nanotons.
+    /// Base price for forwarding a message, independent of its size, in nanograms.
     lumpPrice: uint64
-    /// Price per bit of the message being forwarded, in nanotons per bit.
+    /// Price per bit of the message being forwarded, in nanograms per bit.
     bitPrice: uint64
-    /// Price per cell of the message being forwarded, in nanotons per cell.
+    /// Price per cell of the message being forwarded, in nanograms per cell.
     cellPrice: uint64
     /// Factor for calculating the cost of immediate hypercube routing (IHR).
     ihrPriceFactor: uint32

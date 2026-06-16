@@ -1,18 +1,41 @@
 ACTON-DOC(1)
 
 NAME
-       acton-doc — Look up built-in reference documentation from the CLI
+       acton-doc — Look up reference documentation and contract ABIs from the
+       CLI
 
 SYNOPSIS
        acton doc [options] command
 
 DESCRIPTION
-       Look up built-in reference documentation from the terminal.
+       Look up reference documentation from the terminal.
 
-       At the moment, acton doc provides TVM instruction lookup through the tvm
-       subcommand.
+       acton doc provides contract ABI lookup through the abi subcommand and
+       TVM instruction lookup through the tvm subcommand.
 
 SUBCOMMANDS
+   acton doc abi
+       Print compiler ABI JSON for a local or bundled contract.
+
+      Synopsis
+          acton doc abi contract
+
+      Options
+          contract
+              Contract name, local contract id, or bundled catalog name.
+
+      Behavior
+          acton doc abi first looks at local contracts from Acton.toml, then
+          falls back to the bundled ABI catalog.
+
+          o  local lookup accepts the contract id, display name, or ABI
+             contract name
+
+          o  bundled catalog lookup accepts the catalog display name or ABI
+             contract name
+
+          o  output is always formatted compiler ABI JSON
+
    acton doc tvm
        Lookup TVM instructions by exact name or fuzzy search query.
 
@@ -63,10 +86,11 @@ SUBCOMMANDS
 TOPICS
        Currently available documentation namespaces:
 
+       o  abi
+
        o  tvm
 
-       Additional namespaces may be added in future releases; acton doc tvm is
-       the current built-in reference surface.
+       Additional namespaces may be added in future releases.
 
 EXIT STATUS
        o  0: The requested documentation was printed successfully.
@@ -113,6 +137,11 @@ EXAMPLES
 
               acton doc tvm SENDRAWMSG
               acton doc tvm SENRAWMSG --find
+
+       5. Print contract ABI:
+
+              acton doc abi WalletV4r2
+              acton doc abi counter
 
 SEE ALSO
        o  CLI docs lookup guide

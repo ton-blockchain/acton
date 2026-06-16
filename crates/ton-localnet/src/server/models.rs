@@ -57,6 +57,12 @@ pub struct GetLibrariesRequest {
 }
 
 #[derive(Deserialize)]
+pub struct GetVerifiedSourceRequest {
+    pub address: Option<String>,
+    pub code_hash: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct GetTransactionsRequest {
     pub address: String,
     #[serde(default = "default_limit")]
@@ -122,6 +128,12 @@ pub struct StatePathRequest {
 }
 
 #[derive(Deserialize)]
+pub struct SetShardAccountRequest {
+    pub address: String,
+    pub shard_account: String,
+}
+
+#[derive(Deserialize)]
 pub struct GetTracesQuery {
     #[serde(alias = "hash")]
     pub tx_hash: Option<String>,
@@ -181,8 +193,38 @@ pub struct SetAddressNameRequest {
 }
 
 #[derive(Deserialize)]
-pub struct GetAddressNameQuery {
-    pub address: String,
+pub struct SetNetworkConditionsRequest {
+    pub response_delay_ms: u64,
+}
+
+#[derive(Default, Deserialize)]
+pub struct MineBlocksRequest {
+    pub blocks: Option<u32>,
+}
+
+#[derive(Deserialize)]
+pub struct RevertRecoveryPointRequest {
+    pub id: u64,
+}
+
+#[derive(Deserialize)]
+pub struct IncreaseTimeRequest {
+    pub seconds: u64,
+}
+
+#[derive(Deserialize)]
+pub struct SetTimeRequest {
+    pub timestamp: u32,
+}
+
+#[derive(Deserialize)]
+pub struct SetNextBlockTimestampRequest {
+    pub timestamp: u32,
+}
+
+#[derive(Deserialize)]
+pub struct GetApiCallsRequest {
+    pub limit: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -194,11 +236,6 @@ pub struct CompilerAbiRegistration {
 #[derive(Deserialize)]
 pub struct RegisterCompilerAbisRequest {
     pub entries: Vec<CompilerAbiRegistration>,
-}
-
-#[derive(Deserialize)]
-pub struct GetCompilerAbiQuery {
-    pub code_hash: String,
 }
 
 #[derive(Deserialize)]

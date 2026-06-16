@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/out_actions.test.tolk (1 test)
+  ✓ cj parse out actions reserve one nanogram kind bug [TIME]
+
+ ✓ 1 passed in 1 file

@@ -1,0 +1,605 @@
+.walletLayout {
+  width: fit-content;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: start;
+}
+
+.walletTopGrid,
+.sideColumn,
+.walletList,
+.sessionList,
+.connectForm,
+.modalContent,
+.permissionsList,
+.requestMessages {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.sideColumn {
+  gap: 18px;
+}
+
+.walletTopGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 640px) minmax(300px, 420px);
+  gap: 18px;
+  align-items: start;
+}
+
+.walletList,
+.sessionList,
+.permissionsList,
+.requestMessages {
+  gap: 10px;
+}
+
+.walletListCard {
+  width: min(640px, 100%);
+  max-width: 100%;
+}
+
+.connectCard {
+  width: min(640px, 100%);
+}
+
+.sessionsCard {
+  width: 100%;
+}
+
+.sessionsContent.sessionsContent {
+  padding-top: 18px;
+}
+
+.walletCardHeader {
+  padding: 22px 24px 14px;
+}
+
+.walletCardContent {
+  padding: 0 24px 24px;
+}
+
+.walletHeader {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: start;
+}
+
+.walletHeaderTitle {
+  min-width: 0;
+}
+
+.walletRow {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+  color: inherit;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 24px;
+  padding: 14px 16px;
+  text-align: left;
+}
+
+.walletSummary {
+  min-width: 0;
+  color: inherit;
+  display: block;
+  text-align: left;
+}
+
+.radio,
+.walletInlineAction,
+.addressCopyButton,
+.messageIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.walletBody {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sideHeader,
+.sessionHeader,
+.formFooter,
+.modalActions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.walletTopLine,
+.walletTitleGroup {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.walletTopLine {
+  justify-content: flex-start;
+}
+
+.walletTitleGroup {
+  max-width: 100%;
+  gap: 8px;
+}
+
+.walletName,
+.sessionTitle,
+.pickerTitle,
+.permissionTitle,
+.messageAddress {
+  color: var(--litenode-text);
+  font-weight: 600;
+}
+
+.walletName {
+  min-width: 0;
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.94rem;
+}
+
+.walletBadge,
+.unsupportedItem {
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 999px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.walletBadge {
+  position: relative;
+  top: -4px;
+}
+
+.walletAddress,
+.sessionDomain,
+.pickerSubtitle,
+.permissionDescription,
+.helperText,
+.unsupportedTitle,
+.metaLabel,
+.metaValue,
+.messageValue {
+  color: var(--litenode-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.walletDetailsLine {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.walletAddress,
+.sessionDomain,
+.metaValue {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.walletAddressCluster {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.walletAddressCluster .walletAddress {
+  margin-right: 4px;
+}
+
+.walletBalance {
+  flex: 0 0 auto;
+  align-self: center;
+  color: var(--litenode-text);
+  font-size: 0.94rem;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.unsupportedBlock {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--litenode-border-subtle);
+}
+
+.unsupportedTitle {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.unsupportedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.connectForm {
+  gap: 10px;
+}
+
+.label {
+  color: var(--litenode-text-subtle);
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.textarea {
+  width: 100%;
+  min-height: 108px;
+  resize: vertical;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text);
+  font: inherit;
+  line-height: 1.45;
+  padding: 12px 13px;
+  box-sizing: border-box;
+  box-shadow: var(--litenode-shadow-sm);
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    background-color 120ms ease;
+}
+
+.textarea::placeholder {
+  color: var(--litenode-text-soft);
+}
+
+.textarea:hover:not(:disabled) {
+  border-color: var(--litenode-border-strong);
+}
+
+.textarea:focus-visible {
+  outline: none;
+  border-color: var(--litenode-border-strong);
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.textarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.copyableAddress {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copyableAddressText {
+  min-width: 0;
+  flex: 1 1 auto;
+  color: var(--litenode-text);
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.addressCopyButton {
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 9px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text-muted);
+  cursor: pointer;
+}
+
+.addressCopyButton {
+  width: 30px;
+  height: 30px;
+}
+
+.walletInlineAction {
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--litenode-text-muted);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.addressCopyButton:hover {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-surface-hover);
+  color: var(--litenode-text);
+}
+
+.walletInlineAction:hover,
+.walletInlineActionActive {
+  color: var(--litenode-text);
+}
+
+.addressCopyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.walletInlineAction:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.addressCopyButtonCopied {
+  color: var(--litenode-text);
+}
+
+.sessionCard,
+.permissionItem,
+.messageItem,
+.requestSummary {
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+  padding: 12px;
+}
+
+.sessionCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessionHeader {
+  align-items: flex-start;
+}
+
+.metaRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.metaLabel {
+  font-weight: 600;
+}
+
+.metaValue {
+  color: var(--litenode-text);
+  text-align: right;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 18px;
+  background: var(--litenode-overlay);
+  backdrop-filter: blur(2px);
+}
+
+.modalCard {
+  width: min(520px, 100%);
+  max-height: min(720px, calc(100vh - 36px));
+  overflow: auto;
+  border: 1px solid var(--litenode-border);
+  border-radius: 16px;
+  background: var(--litenode-surface);
+  box-shadow: var(--litenode-shadow-popover);
+}
+
+.modalHeader {
+  padding: 20px 20px 0;
+}
+
+.modalTitleRow {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.modalTitle {
+  margin: 0;
+  color: var(--litenode-text);
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.modalCloseButton {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--litenode-text-muted);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.modalCloseButton:hover {
+  color: var(--litenode-text);
+  background: var(--litenode-surface-hover);
+}
+
+.modalCloseButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.modalSubtitle {
+  margin: 8px 0 0;
+  color: var(--litenode-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.modalContent {
+  gap: 16px;
+  padding: 20px;
+}
+
+.permissionItem,
+.messageItem {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.permissionItem svg,
+.messageItem svg {
+  margin-top: 2px;
+  color: var(--litenode-text-subtle);
+  flex: 0 0 auto;
+}
+
+.walletPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.pickerOption {
+  width: 100%;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  text-align: left;
+}
+
+.pickerOption:hover {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-surface-hover);
+}
+
+.pickerOption:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.pickerOptionActive {
+  border-color: var(--litenode-border-strong);
+  background: var(--litenode-surface-active);
+}
+
+.pickerTitle,
+.pickerSubtitle {
+  display: block;
+}
+
+.radio {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 999px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text);
+}
+
+.requestSummary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.messageIndex {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 9px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text-muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.messageValue {
+  margin-top: 6px;
+}
+
+.spinning {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .walletLayout {
+    width: 100%;
+  }
+
+  .walletTopGrid {
+    width: 100%;
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .sideHeader,
+  .sessionHeader,
+  .formFooter,
+  .modalActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .sideColumn {
+    display: flex;
+  }
+
+  .metaRow {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .metaValue {
+    text-align: left;
+  }
+}

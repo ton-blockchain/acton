@@ -45,6 +45,85 @@ Then target the same port for CLI helpers:
 acton localnet airdrop UQA_ftKIJsHEAE_UgtFOUK15hPzycZooFuUr8duyY9T3kwwM --port 3010
 ```
 
+## Mine Blocks Manually
+
+Use `--no-mining` when you want full control over block production:
+
+```bash
+acton localnet start --no-mining
+```
+
+Accepted messages stay queued until you mine blocks:
+
+```bash
+acton localnet mine
+acton localnet mine 5
+```
+
+You can also store the mode in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+no-mining = true
+```
+
+## Control Time
+
+Localnet uses a virtual clock for block and transaction timestamps. Move it
+forward without waiting for wall-clock time:
+
+```bash
+acton localnet increase-time 3600
+acton localnet mine
+```
+
+Set the current virtual Unix time:
+
+```bash
+acton localnet set-time 1710000000
+```
+
+Set a one-shot timestamp for only the next mined block:
+
+```bash
+acton localnet set-next-block-timestamp 1710000600
+acton localnet mine
+```
+
+The requested timestamp cannot be lower than the latest mined block time.
+`acton localnet status` reports the current virtual time, offset, and any
+pending next-block timestamp.
+
+## Simulate API Latency
+
+Use `--response-delay-ms` when you need local API requests to behave more like
+a slower remote provider:
+
+```bash
+acton localnet start --response-delay-ms 300
+```
+
+This delays `/api/v2`, `/api/v3`, and `/api/emulate/v1` responses. Streaming
+subscriptions, control endpoints, and the explorer UI are not delayed.
+
+You can change the delay while the node is running:
+
+```bash
+curl -s -X POST "http://127.0.0.1:5411/acton_setNetworkConditions" \
+  -H "content-type: application/json" \
+  -d '{"response_delay_ms":300}'
+```
+
+Use `{"response_delay_ms":0}` to disable the delay. The current value is
+included in `/acton_nodeInfo`.
+
+You can also store the same default in `Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+response-delay-ms = 300
+```
+
 ## Stop the Node
 
 Press `Ctrl+C` in the terminal where the node is running.

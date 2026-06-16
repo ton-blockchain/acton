@@ -1,21 +1,24 @@
 use crate::executor::{TvmEmulatorAdapter, localnet_executor_verbosity};
-use crate::node::{Node, StateSource};
+use crate::node::{Node, NodeClockInfo, StateSource};
+use crate::node_snapshot::NodeStateSnapshot;
 use crate::storage;
-use crate::storage::{AccountStatus, BlockMeta, EMPTY_CELL_BASE64, MsgMeta, TransactionInfo};
+use crate::storage::{AccountStatus, BlockMeta, MsgMeta, TransactionInfo};
+use crate::streaming::StreamingCommitEvent;
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
-use base64::Engine;
 use crc::{CRC_16_XMODEM, Crc};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
-use tokio::sync::{mpsc, oneshot};
+use std::time::{Duration, SystemTime};
+use tokio::sync::{broadcast, mpsc, oneshot};
+use tokio::time::Instant;
 use ton_executor::DEFAULT_CONFIG;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
+use ton_executor::message::PrevBlockId;
 use tvm_ffi::json_stack::json_to_legacy_item;
-use tvm_ffi::stack::Tuple;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
@@ -45,6 +48,18 @@ impl LocalnetBlockId {
     }
 }
 
+impl From<LocalnetBlockId> for PrevBlockId {
+    fn from(block_id: LocalnetBlockId) -> Self {
+        Self {
+            workchain: block_id.workchain,
+            shard: block_id.shard,
+            seqno: block_id.seqno,
+            root_hash: block_id.root_hash.0,
+            file_hash: block_id.file_hash.0,
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetAccountState {
     pub address: Addr,
@@ -59,6 +74,22 @@ pub struct LocalnetAccountState {
     pub state: AccountStatus,
     pub sync_utime: u64,
     pub frozen_hash: Option<Hash256>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetAddressInfo {
+    pub address: Addr,
+    pub code_hash: Option<Hash256>,
+    pub jetton_wallet: Option<storage::JettonWalletMeta>,
+    pub jetton_master: Option<storage::JettonMasterMeta>,
+    pub nft_item: Option<storage::NftItemMeta>,
+    pub nft_collection_item: Option<storage::NftItemMeta>,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetAccountStateWithInfo {
+    pub state: LocalnetAccountState,
+    pub info: LocalnetAddressInfo,
 }
 
 impl LocalnetAccountState {
@@ -144,6 +175,19 @@ pub struct LocalnetConsensusBlock {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetMineResult {
+    pub blocks_mined: u32,
+    pub last_block_seqno: Seqno,
+    pub blocks: Vec<LocalnetBlockId>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetRecoveryPointResult {
+    pub id: u64,
+    pub block_seqno: Seqno,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
     pub gen_utime: u32,
@@ -162,6 +206,20 @@ pub struct LocalnetBlockTransactions {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetAcceptedExternalMessage {
+    /// Hash of the exact external-in message BOC accepted into the localnet queue.
+    pub msg_hash: Hash256,
+    /// TEP-467 normalized hash used by TonCenter-compatible lookups for external-in messages.
+    pub msg_hash_norm: Hash256,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetAcceptedInternalMessage {
+    /// Hash of the exact internal message BOC accepted into the localnet queue.
+    pub msg_hash: Hash256,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetLibrary {
     pub hash: Hash256,
     pub found: bool,
@@ -174,17 +232,35 @@ pub struct LocalnetLibrary {
 pub(crate) enum Request {
     SendBoc {
         boc: BocBytes,
-        resp: oneshot::Sender<anyhow::Result<LocalnetBlockTransactions>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedExternalMessage>>,
+    },
+    SendInternalBoc {
+        boc: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
     GetAddressInformation {
         address: Addr,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<LocalnetAccountState>>,
     },
+    GetAccountStates {
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAccountStateWithInfo>>>,
+    },
+    GetAddressInfos {
+        addresses: Vec<Addr>,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAddressInfo>>>,
+    },
     GetShardAccountCell {
         address: Addr,
         seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    SetShardAccount {
+        address: Addr,
+        shard_account: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<()>>,
     },
     GetTransactions {
         address: Addr,
@@ -269,7 +345,7 @@ pub(crate) enum Request {
     Faucet {
         address: Addr,
         amount: u128,
-        resp: oneshot::Sender<anyhow::Result<Value>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetAcceptedInternalMessage>>,
     },
     GetTraces {
         tx_hash: Hash256,
@@ -316,24 +392,19 @@ pub(crate) enum Request {
         name: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    GetAddressName {
-        address: Addr,
-        resp: oneshot::Sender<anyhow::Result<Option<String>>>,
-    },
-    SetStateSource {
-        source: StateSource,
-        resp: oneshot::Sender<anyhow::Result<()>>,
-    },
-    GetStateSource {
-        resp: oneshot::Sender<anyhow::Result<StateSource>>,
+    GetAddressNames {
+        addresses: Vec<Addr>,
+        resp: oneshot::Sender<anyhow::Result<Vec<Option<String>>>>,
     },
     RegisterCompilerAbis {
         entries: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
-    GetCompilerAbi {
-        code_hash: Hash256,
-        resp: oneshot::Sender<anyhow::Result<Option<Value>>>,
+    GetCompilerAbis {
+        code_hashes: Vec<Hash256>,
+        resp: oneshot::Sender<
+            anyhow::Result<Vec<Option<acton_abi_catalog::ExtendedContractAbi<Value>>>>,
+        >,
     },
     DumpState {
         path: String,
@@ -343,32 +414,115 @@ pub(crate) enum Request {
         path: String,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
+    CreateRecoveryPoint {
+        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+    },
+    RevertRecoveryPoint {
+        id: u64,
+        resp: oneshot::Sender<anyhow::Result<LocalnetRecoveryPointResult>>,
+    },
+    MineBlocks {
+        count: u32,
+        resp: oneshot::Sender<anyhow::Result<LocalnetMineResult>>,
+    },
+    GetClockInfo {
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    IncreaseTime {
+        seconds: u64,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    SetTime {
+        timestamp: u32,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
+    SetNextBlockTimestamp {
+        timestamp: u32,
+        resp: oneshot::Sender<anyhow::Result<NodeClockInfo>>,
+    },
 }
 
 pub struct Localnet {
     tx: mpsc::Sender<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
     started_at: SystemTime,
 }
 
-impl Default for Localnet {
-    fn default() -> Self {
-        Self::new(StateSource::Local, None)
+#[derive(Default)]
+struct RecoveryPoints {
+    next_id: u64,
+    points: Vec<RecoveryPoint>,
+}
+
+struct RecoveryPoint {
+    id: u64,
+    snapshot: NodeStateSnapshot,
+}
+
+impl RecoveryPoints {
+    fn create(&mut self, node: &Node) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        let snapshot = node.build_snapshot()?;
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .context("Recovery point id overflow")?;
+        let id = self.next_id;
+        let block_seqno = snapshot.globals.head_seqno;
+        self.points.push(RecoveryPoint { id, snapshot });
+        Ok(LocalnetRecoveryPointResult { id, block_seqno })
+    }
+
+    fn revert(&mut self, node: &mut Node, id: u64) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        let index = self
+            .points
+            .iter()
+            .position(|point| point.id == id)
+            .with_context(|| format!("Recovery point {id} not found"))?;
+        let snapshot = self.points[index].snapshot.clone();
+        let block_seqno = snapshot.globals.head_seqno;
+        node.apply_snapshot(snapshot)?;
+        self.points.truncate(index);
+        Ok(LocalnetRecoveryPointResult { id, block_seqno })
+    }
+
+    fn clear(&mut self) {
+        self.points.clear();
     }
 }
 
+pub const DEFAULT_BLOCK_INTERVAL_MS: u64 = 500;
+
 impl Localnet {
     #[must_use]
-    pub fn new(state_source: StateSource, db_path: Option<String>) -> Self {
+    pub fn new(
+        state_source: StateSource,
+        db_path: Option<String>,
+        block_interval: Duration,
+        auto_mining: bool,
+    ) -> Self {
         let (tx, rx) = mpsc::channel(100);
+        let (events_tx, _) = broadcast::channel(1024);
         let started_at = SystemTime::now();
+        let node_events_tx = events_tx.clone();
 
         std::thread::spawn(move || {
-            if let Err(e) = run_node_loop(rx, state_source, db_path) {
+            if let Err(e) = run_node_loop(
+                rx,
+                node_events_tx,
+                state_source,
+                db_path,
+                block_interval,
+                auto_mining,
+            ) {
                 tracing::error!("Node loop failed: {:?}", e);
             }
         });
 
-        Self { tx, started_at }
+        Self {
+            tx,
+            events_tx,
+            started_at,
+        }
     }
 
     #[must_use]
@@ -378,13 +532,28 @@ impl Localnet {
             .map_or(0, |duration| duration.as_secs())
     }
 
-    pub async fn send_boc(&self, boc_str: String) -> anyhow::Result<LocalnetBlockTransactions> {
-        let boc = base64::engine::general_purpose::STANDARD
-            .decode(&boc_str)
-            .context("Invalid BOC base64")?
-            .into();
+    #[must_use]
+    pub fn subscribe_streaming_events(&self) -> broadcast::Receiver<StreamingCommitEvent> {
+        self.events_tx.subscribe()
+    }
+
+    pub async fn send_boc(
+        &self,
+        boc_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedExternalMessage> {
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
         let (resp, rx) = oneshot::channel();
         self.tx.send(Request::SendBoc { boc, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn send_internal_boc(
+        &self,
+        boc_str: String,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SendInternalBoc { boc, resp }).await?;
         rx.await?
     }
 
@@ -405,6 +574,33 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn get_account_states(
+        &self,
+        addresses: Vec<Addr>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<Vec<LocalnetAccountStateWithInfo>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAccountStates {
+                addresses,
+                seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_address_infos(
+        &self,
+        addresses: Vec<Addr>,
+    ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetAddressInfos { addresses, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_shard_account_cell(
         &self,
         address_str: String,
@@ -416,6 +612,25 @@ impl Localnet {
             .send(Request::GetShardAccountCell {
                 address,
                 seqno,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn set_shard_account(
+        &self,
+        address_str: String,
+        shard_account: String,
+    ) -> anyhow::Result<()> {
+        let address = Self::parse_addr(&address_str)?;
+        let shard_account =
+            BocBytes::from_base64(&shard_account).context("Invalid shard_account base64")?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetShardAccount {
+                address,
+                shard_account,
                 resp,
             })
             .await?;
@@ -665,7 +880,11 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn faucet(&self, address_str: String, amount: u128) -> anyhow::Result<Value> {
+    pub async fn faucet(
+        &self,
+        address_str: String,
+        amount: u128,
+    ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
         let address = Self::parse_addr(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -701,10 +920,7 @@ impl Localnet {
         ignore_chksig: Option<bool>,
         mc_block_seqno: Option<u32>,
     ) -> anyhow::Result<storage::EmulateTraceResult> {
-        let boc = base64::engine::general_purpose::STANDARD
-            .decode(&boc_str)
-            .context("Invalid BOC base64")?
-            .into();
+        let boc = BocBytes::from_base64(&boc_str).context("Invalid BOC base64")?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::EmulateTrace {
@@ -814,27 +1030,21 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn get_address_name(&self, address_str: String) -> anyhow::Result<Option<String>> {
-        let address = Self::parse_addr(&address_str)?;
+    pub async fn get_address_names(
+        &self,
+        address_strs: Vec<String>,
+    ) -> anyhow::Result<Vec<(String, Option<String>)>> {
+        let addresses = address_strs
+            .iter()
+            .map(|address| Self::parse_addr(address))
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetAddressName { address, resp })
+            .send(Request::GetAddressNames { addresses, resp })
             .await?;
-        rx.await?
-    }
+        let names = rx.await??;
 
-    pub async fn set_state_source(&self, source: StateSource) -> anyhow::Result<()> {
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::SetStateSource { source, resp })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn get_state_source(&self) -> anyhow::Result<StateSource> {
-        let (resp, rx) = oneshot::channel();
-        self.tx.send(Request::GetStateSource { resp }).await?;
-        rx.await?
+        Ok(address_strs.into_iter().zip(names).collect())
     }
 
     pub async fn register_compiler_abis(
@@ -852,12 +1062,28 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn get_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<Option<Value>> {
+    pub async fn get_compiler_abis(
+        &self,
+        code_hash_strs: Vec<String>,
+    ) -> anyhow::Result<
+        Vec<(
+            String,
+            Option<acton_abi_catalog::ExtendedContractAbi<Value>>,
+        )>,
+    > {
+        let code_hashes = code_hash_strs
+            .iter()
+            .map(|code_hash| {
+                Hash256::from_hex(code_hash).or_else(|_| Hash256::from_base64(code_hash))
+            })
+            .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetCompilerAbi { code_hash, resp })
+            .send(Request::GetCompilerAbis { code_hashes, resp })
             .await?;
-        rx.await?
+        let abis = rx.await??;
+
+        Ok(code_hash_strs.into_iter().zip(abis).collect())
     }
 
     pub async fn dump_state(&self, path: String) -> anyhow::Result<()> {
@@ -872,7 +1098,58 @@ impl Localnet {
         rx.await?
     }
 
-    fn parse_addr(s: &str) -> anyhow::Result<Addr> {
+    pub async fn create_recovery_point(&self) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::CreateRecoveryPoint { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn revert_recovery_point(
+        &self,
+        id: u64,
+    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::RevertRecoveryPoint { id, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn mine_blocks(&self, count: u32) -> anyhow::Result<LocalnetMineResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::MineBlocks { count, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn clock_info(&self) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetClockInfo { resp }).await?;
+        rx.await?
+    }
+
+    pub async fn increase_time(&self, seconds: u64) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::IncreaseTime { seconds, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn set_time(&self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::SetTime { timestamp, resp }).await?;
+        rx.await?
+    }
+
+    pub async fn set_next_block_timestamp(&self, timestamp: u32) -> anyhow::Result<NodeClockInfo> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::SetNextBlockTimestamp { timestamp, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
         let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
             anyhow::anyhow!("Invalid address, only standard internal address is allowed")
         })?;
@@ -885,46 +1162,115 @@ impl Localnet {
 
 fn run_node_loop(
     mut rx: mpsc::Receiver<Request>,
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
     state_source: StateSource,
     db_path: Option<String>,
+    block_interval: Duration,
+    auto_mining: bool,
 ) -> anyhow::Result<()> {
-    let executor = Box::new(TvmEmulatorAdapter::new()?);
-    let config_bytes = base64::engine::general_purpose::STANDARD.decode(DEFAULT_CONFIG)?;
-    let mut node = Node::with_db_path(executor, config_bytes.into(), state_source, db_path)?;
+    let mut node = create_node(events_tx, state_source, db_path)?;
+    let mut recovery_points = RecoveryPoints::default();
+    tracing::info!(
+        "TON localnet started, block interval: {}ms, auto mining: {}",
+        block_interval.as_millis(),
+        auto_mining
+    );
 
-    tracing::info!("TON localnet started");
+    if !auto_mining {
+        while let Some(req) = rx.blocking_recv() {
+            process_loop_request(&mut node, &mut recovery_points, req);
+        }
+        return Ok(());
+    }
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+        .context("Failed to create localnet node runtime")?;
+    runtime.block_on(run_node_loop_async(rx, node, block_interval))
+}
+
+fn create_node(
+    events_tx: broadcast::Sender<StreamingCommitEvent>,
+    state_source: StateSource,
+    db_path: Option<String>,
+) -> anyhow::Result<Node> {
+    let executor = Box::new(TvmEmulatorAdapter::new()?);
+    let config_boc = BocBytes::from_base64(DEFAULT_CONFIG)?;
+    let mut node = Node::with_db_path(executor, config_boc, state_source, db_path)?;
+    node.streaming_events = Some(events_tx);
+    Ok(node)
+}
+
+// The node loop runs on a dedicated current-thread Tokio runtime, so the
+// non-Send executor stored in Node never crosses thread boundaries.
+#[allow(clippy::future_not_send)]
+async fn run_node_loop_async(
+    mut rx: mpsc::Receiver<Request>,
+    mut node: Node,
+    block_interval: Duration,
+) -> anyhow::Result<()> {
+    let mut next_block_at = Instant::now() + block_interval;
+    let mut recovery_points = RecoveryPoints::default();
 
     loop {
-        // 1. Process all currently pending requests
-        while let Ok(req) = rx.try_recv() {
-            process_loop_request(&mut node, req);
-        }
-
-        // 2. If there are pending messages in the pool, mine one
-        if node.has_pending_messages() {
-            tracing::info!("Auto-mining message from pool");
-            if let Err(e) = node.mine_one() {
-                tracing::error!("Auto-mining failed: {:?}", e);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
+        if Instant::now() >= next_block_at {
+            next_block_at = mine_scheduled_block(&mut node, block_interval);
             continue;
         }
 
-        // 3. If pool is empty, block until next request
-        if let Some(req) = rx.blocking_recv() {
-            process_loop_request(&mut node, req);
-        } else {
-            break; // Channel closed
+        tokio::select! {
+            biased;
+            () = tokio::time::sleep_until(next_block_at) => {
+                next_block_at = mine_scheduled_block(&mut node, block_interval);
+            }
+            req = rx.recv() => {
+                let Some(req) = req else {
+                    return Ok(());
+                };
+                process_loop_request(&mut node, &mut recovery_points, req);
+            }
         }
     }
-    Ok(())
 }
 
-fn process_loop_request(node: &mut Node, req: Request) {
+fn mine_scheduled_block(node: &mut Node, block_interval: Duration) -> Instant {
+    tracing::info!("Mining localnet block");
+    if let Err(e) = node.mine_block() {
+        tracing::error!("Block mining failed: {:?}", e);
+    }
+    Instant::now() + block_interval
+}
+
+fn handle_mine_blocks(node: &mut Node, count: u32) -> anyhow::Result<LocalnetMineResult> {
+    anyhow::ensure!(count > 0, "blocks must be greater than 0");
+
+    let mut blocks = Vec::with_capacity(count as usize);
+    for _ in 0..count {
+        tracing::info!("Manually mining localnet block");
+        let block = node.mine_block()?;
+        blocks.push(block.block_id());
+    }
+
+    let last_block_seqno = blocks
+        .last()
+        .map_or(node.globals.head_seqno, |block| block.seqno);
+    Ok(LocalnetMineResult {
+        blocks_mined: count,
+        last_block_seqno,
+        blocks,
+    })
+}
+
+fn process_loop_request(node: &mut Node, recovery_points: &mut RecoveryPoints, req: Request) {
     tracing::debug!("Node loop processing request: {:?}", req);
     match req {
         Request::SendBoc { boc, resp } => {
             let res = handle_send_boc(node, boc);
+            let _ = resp.send(res);
+        }
+        Request::SendInternalBoc { boc, resp } => {
+            let res = handle_send_internal_boc(node, boc);
             let _ = resp.send(res);
         }
         Request::GetAddressInformation {
@@ -935,12 +1281,32 @@ fn process_loop_request(node: &mut Node, req: Request) {
             let res = handle_get_address_info(node, address, seqno);
             let _ = resp.send(res);
         }
+        Request::GetAccountStates {
+            addresses,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_account_states(node, addresses, seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetAddressInfos { addresses, resp } => {
+            let res = handle_get_address_infos(node, addresses);
+            let _ = resp.send(res);
+        }
         Request::GetShardAccountCell {
             address,
             seqno,
             resp,
         } => {
             let res = node.get_shard_account_at_block(&address, seqno);
+            let _ = resp.send(res);
+        }
+        Request::SetShardAccount {
+            address,
+            shard_account,
+            resp,
+        } => {
+            let res = node.set_shard_account(&address, shard_account);
             let _ = resp.send(res);
         }
         Request::GetTransactions {
@@ -1047,7 +1413,9 @@ fn process_loop_request(node: &mut Node, req: Request) {
             amount,
             resp,
         } => {
-            let res = node.faucet(&address, amount);
+            let res = node
+                .faucet(&address, amount)
+                .map(|msg_hash| LocalnetAcceptedInternalMessage { msg_hash });
             let _ = resp.send(res);
         }
         Request::GetTraces { tx_hash, resp } => {
@@ -1074,7 +1442,7 @@ fn process_loop_request(node: &mut Node, req: Request) {
             offset,
             resp,
         } => {
-            let res = node.get_jetton_masters(address, admin_address, limit, offset);
+            let res = handle_get_jetton_masters(node, address, admin_address, limit, offset);
             let _ = resp.send(res);
         }
         Request::GetJettonWallets {
@@ -1086,7 +1454,8 @@ fn process_loop_request(node: &mut Node, req: Request) {
             offset,
             resp,
         } => {
-            let res = node.get_jetton_wallets(
+            let res = handle_get_jetton_wallets(
+                node,
                 address,
                 owner_address,
                 jetton_address,
@@ -1106,7 +1475,8 @@ fn process_loop_request(node: &mut Node, req: Request) {
             offset,
             resp,
         } => {
-            let res = node.get_nft_items(
+            let res = handle_get_nft_items(
+                node,
                 address,
                 owner_address,
                 collection_address,
@@ -1125,16 +1495,12 @@ fn process_loop_request(node: &mut Node, req: Request) {
             node.history.address_names.insert(address, name);
             let _ = resp.send(Ok(()));
         }
-        Request::GetAddressName { address, resp } => {
-            let res = node.history.address_names.get(&address).cloned();
+        Request::GetAddressNames { addresses, resp } => {
+            let res = addresses
+                .iter()
+                .map(|address| node.history.address_names.get(address).cloned())
+                .collect();
             let _ = resp.send(Ok(res));
-        }
-        Request::SetStateSource { source, resp } => {
-            node.state_source = source;
-            let _ = resp.send(Ok(()));
-        }
-        Request::GetStateSource { resp } => {
-            let _ = resp.send(Ok(node.state_source.clone()));
         }
         Request::RegisterCompilerAbis { entries, resp } => {
             let res = entries
@@ -1144,8 +1510,19 @@ fn process_loop_request(node: &mut Node, req: Request) {
                 });
             let _ = resp.send(res);
         }
-        Request::GetCompilerAbi { code_hash, resp } => {
-            let _ = resp.send(Ok(node.history.get_compiler_abi(&code_hash)));
+        Request::GetCompilerAbis { code_hashes, resp } => {
+            let res = code_hashes
+                .iter()
+                .map(|code_hash| {
+                    node.history
+                        .get_compiler_abi(code_hash)
+                        .map(|compiler_abi| {
+                            registered_compiler_abi_payload(code_hash, compiler_abi)
+                        })
+                        .or_else(|| catalog_compiler_abi_payload(code_hash))
+                })
+                .collect();
+            let _ = resp.send(Ok(res));
         }
         Request::DumpState { path, resp } => {
             let res = node.dump_state_to_path(path);
@@ -1153,32 +1530,95 @@ fn process_loop_request(node: &mut Node, req: Request) {
         }
         Request::LoadState { path, resp } => {
             let res = node.load_state_from_path(path);
+            if res.is_ok() {
+                recovery_points.clear();
+            }
+            let _ = resp.send(res);
+        }
+        Request::CreateRecoveryPoint { resp } => {
+            let res = recovery_points.create(node);
+            let _ = resp.send(res);
+        }
+        Request::RevertRecoveryPoint { id, resp } => {
+            let res = recovery_points.revert(node, id);
+            let _ = resp.send(res);
+        }
+        Request::MineBlocks { count, resp } => {
+            let res = handle_mine_blocks(node, count);
+            let _ = resp.send(res);
+        }
+        Request::GetClockInfo { resp } => {
+            let res = node.clock_info();
+            let _ = resp.send(res);
+        }
+        Request::IncreaseTime { seconds, resp } => {
+            let res = node.increase_time(seconds);
+            let _ = resp.send(res);
+        }
+        Request::SetTime { timestamp, resp } => {
+            let res = node.set_time(timestamp);
+            let _ = resp.send(res);
+        }
+        Request::SetNextBlockTimestamp { timestamp, resp } => {
+            let res = node.set_next_block_timestamp(timestamp);
             let _ = resp.send(res);
         }
     }
 }
 
-fn handle_send_boc(node: &mut Node, boc: BocBytes) -> anyhow::Result<LocalnetBlockTransactions> {
-    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?;
-    let (msg_hash, tx_hash, seqno, _) = node.send_boc(boc)?;
+fn registered_compiler_abi_payload(
+    code_hash: &Hash256,
+    compiler_abi: Value,
+) -> acton_abi_catalog::ExtendedContractAbi<Value> {
+    let display_name = compiler_abi
+        .get("contract_name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+        .map(ToOwned::to_owned);
 
-    let Some(ext_tx) = node.get_transaction_by_hash(&tx_hash) else {
-        anyhow::bail!("Transaction not found after mining")
-    };
+    acton_abi_catalog::ExtendedContractAbi {
+        compiler_abi,
+        display_name,
+        code_hashes: vec![code_hash.to_hex()],
+        links: Vec::new(),
+    }
+}
 
-    let tx_boc = node.get_cell(&tx_hash).unwrap_or_default();
-    let tx_struct = convert_to_tx_struct(&ext_tx, tx_boc)?;
+fn catalog_compiler_abi_payload(
+    code_hash: &Hash256,
+) -> Option<acton_abi_catalog::ExtendedContractAbi<Value>> {
+    let contract = acton_abi_catalog::find_contract_by_code_hash(&code_hash.to_hex())?;
+    let extended_abi = contract.extended_abi();
+    let compiler_abi = serde_json::to_value(&extended_abi.compiler_abi).ok()?;
 
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} with transaction not found after mining")
-    };
+    Some(acton_abi_catalog::ExtendedContractAbi {
+        compiler_abi,
+        display_name: extended_abi.display_name,
+        code_hashes: extended_abi.code_hashes,
+        links: extended_abi.links,
+    })
+}
 
-    Ok(LocalnetBlockTransactions {
-        id: block_header.block_id(),
-        transactions: vec![tx_struct],
-        msg_hash: Some(msg_hash),
+fn handle_send_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetAcceptedExternalMessage> {
+    let msg_hash_norm = normalized_ext_in_hash_from_boc(&boc)?
+        .context("sendBoc accepts only external-in messages")?;
+    let msg_hash = node.send_boc(boc)?;
+    Ok(LocalnetAcceptedExternalMessage {
+        msg_hash,
         msg_hash_norm,
     })
+}
+
+fn handle_send_internal_boc(
+    node: &mut Node,
+    boc: BocBytes,
+) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
+    let msg_hash = node.send_internal_boc(boc)?;
+    Ok(LocalnetAcceptedInternalMessage { msg_hash })
 }
 
 fn handle_get_address_info(
@@ -1186,15 +1626,10 @@ fn handle_get_address_info(
     address: Addr,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetAccountState> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
-    };
-
-    let block_id = block_header.block_id();
-    let sync_utime = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
+    let block_id = block_id_for_query_seqno(node, seqno)?;
+    let sync_utime = u64::from(node.now_unix()?);
 
     let Some(meta) = meta else {
         return Ok(LocalnetAccountState::empty(address, block_id, sync_utime));
@@ -1207,7 +1642,7 @@ fn handle_get_address_info(
     Ok(LocalnetAccountState {
         address,
         account_state_hash: meta.account_hash,
-        balance: meta.cached_balance.unwrap_or(0),
+        balance: meta.balance,
         code,
         code_hash: meta.code_hash,
         data,
@@ -1218,6 +1653,214 @@ fn handle_get_address_info(
         sync_utime,
         frozen_hash: meta.frozen_hash,
     })
+}
+
+fn handle_get_account_states(
+    node: &mut Node,
+    addresses: Vec<Addr>,
+    seqno: Option<u32>,
+) -> anyhow::Result<Vec<LocalnetAccountStateWithInfo>> {
+    addresses
+        .into_iter()
+        .map(|address| {
+            let state = handle_get_address_info(node, address, seqno)?;
+            let info = handle_get_address_context(node, address)?;
+            Ok(LocalnetAccountStateWithInfo { state, info })
+        })
+        .collect()
+}
+
+fn handle_get_address_infos(
+    node: &mut Node,
+    addresses: Vec<Addr>,
+) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
+    addresses
+        .into_iter()
+        .map(|address| handle_get_address_context(node, address))
+        .collect()
+}
+
+fn handle_get_address_context(
+    node: &mut Node,
+    address: Addr,
+) -> anyhow::Result<LocalnetAddressInfo> {
+    node.ensure_detected_assets_for_address(&address)?;
+
+    let code_hash = node
+        .get_address_information(&address)
+        .and_then(|meta| meta.code_hash);
+    let jetton_wallet = node
+        .iter_jetton_wallets()
+        .find(|wallet| wallet.address == address)
+        .cloned();
+    let jetton_master = node
+        .iter_jetton_masters()
+        .find(|master| master.address == address)
+        .cloned();
+    let nft_item = node
+        .iter_nft_items()
+        .find(|item| item.address == address)
+        .cloned();
+    let nft_collection_item = node
+        .iter_nft_items()
+        .find(|item| item.collection_address == Some(address))
+        .cloned();
+
+    Ok(LocalnetAddressInfo {
+        address,
+        code_hash,
+        jetton_wallet,
+        jetton_master,
+        nft_item,
+        nft_collection_item,
+    })
+}
+
+const fn account_query_seqno(node: &Node, seqno: Option<Seqno>) -> Seqno {
+    match seqno {
+        Some(0) | None => node.globals.head_seqno,
+        Some(seqno) => seqno,
+    }
+}
+
+fn block_id_for_query_seqno(node: &Node, seqno: Seqno) -> anyhow::Result<LocalnetBlockId> {
+    if seqno == 0 {
+        return Ok(LocalnetBlockId::first());
+    }
+
+    node.get_block_header(seqno)
+        .map(|block| block.block_id())
+        .ok_or_else(|| anyhow::anyhow!("Block {seqno} not found"))
+}
+
+fn handle_get_jetton_masters(
+    node: &mut Node,
+    address: Option<Addr>,
+    admin_address: Option<Addr>,
+    limit: usize,
+    offset: usize,
+) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
+    if let Some(addr) = address {
+        node.ensure_detected_assets_for_address(&addr)?;
+    }
+
+    Ok(node
+        .iter_jetton_masters()
+        .filter(|master| {
+            if let Some(addr) = address
+                && master.address != addr
+            {
+                return false;
+            }
+            if let Some(addr) = admin_address
+                && master.admin_address != Some(addr)
+            {
+                return false;
+            }
+            true
+        })
+        .skip(offset)
+        .take(limit)
+        .cloned()
+        .collect())
+}
+
+fn handle_get_jetton_wallets(
+    node: &mut Node,
+    address: Option<Addr>,
+    owner_address: Option<Addr>,
+    jetton_address: Option<Addr>,
+    exclude_zero_balance: bool,
+    limit: usize,
+    offset: usize,
+) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
+    if let Some(addr) = address {
+        node.ensure_detected_assets_for_address(&addr)?;
+    }
+
+    Ok(node
+        .iter_jetton_wallets()
+        .filter(|wallet| {
+            if let Some(addr) = address
+                && wallet.address != addr
+            {
+                return false;
+            }
+            if let Some(addr) = owner_address
+                && wallet.owner_address != addr
+            {
+                return false;
+            }
+            if let Some(addr) = jetton_address
+                && wallet.jetton_address != addr
+            {
+                return false;
+            }
+            if exclude_zero_balance && wallet.balance == 0 {
+                return false;
+            }
+            true
+        })
+        .skip(offset)
+        .take(limit)
+        .cloned()
+        .collect())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn handle_get_nft_items(
+    node: &mut Node,
+    address: Option<Addr>,
+    owner_address: Option<Addr>,
+    collection_address: Option<Addr>,
+    index: Option<String>,
+    sort_by_last_transaction_lt: bool,
+    limit: usize,
+    offset: usize,
+) -> anyhow::Result<Vec<storage::NftItemMeta>> {
+    if let Some(addr) = address {
+        node.ensure_detected_assets_for_address(&addr)?;
+    }
+
+    let items = node.iter_nft_items().filter(|item| {
+        if let Some(addr) = address
+            && item.address != addr
+        {
+            return false;
+        }
+        if let Some(addr) = owner_address
+            && item.owner_address != Some(addr)
+        {
+            return false;
+        }
+        if let Some(addr) = collection_address
+            && item.collection_address != Some(addr)
+        {
+            return false;
+        }
+        if let Some(expected_index) = &index
+            && &item.index != expected_index
+        {
+            return false;
+        }
+        true
+    });
+
+    if sort_by_last_transaction_lt {
+        let mut items = items.cloned().collect::<Vec<_>>();
+        items.sort_by(|a, b| {
+            b.last_transaction_lt
+                .cmp(&a.last_transaction_lt)
+                .then_with(|| a.address.cmp(&b.address))
+        });
+        let start = offset.min(items.len());
+        let end = start.saturating_add(limit).min(items.len());
+        items.truncate(end);
+        items.drain(..start);
+        return Ok(items);
+    }
+
+    Ok(items.skip(offset).take(limit).cloned().collect())
 }
 
 fn handle_get_transactions(
@@ -1367,43 +2010,46 @@ fn handle_run_get_method(
     stack: Tuple,
     seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-    let seqno = seqno.unwrap_or(node.globals.head_seqno);
+    let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-    let meta = meta.ok_or_else(|| anyhow::anyhow!("Account {address} not found"))?;
+    let block_id = block_id_for_query_seqno(node, seqno)?;
 
-    let Some(block_header) = node.get_block_header(seqno) else {
-        anyhow::bail!("Block {seqno} not found")
+    let Some(meta) = meta else {
+        return no_code_run_get_method_result(
+            method_id,
+            block_id,
+            LocalnetTransactionId::default(),
+        );
     };
 
-    let block_id = block_header.block_id();
     let last_transaction_id = meta.last_tx_id();
+    let Some(code_hash) = meta.code_hash else {
+        return no_code_run_get_method_result(method_id, block_id, last_transaction_id);
+    };
 
-    let code_boc = meta.code_hash.and_then(|h| node.get_cell(&h)).map_or_else(
-        || EMPTY_CELL_BASE64.to_owned(),
-        |b| base64::engine::general_purpose::STANDARD.encode(b),
-    );
-
-    let data_boc = meta.data_hash.and_then(|h| node.get_cell(&h)).map_or_else(
-        || EMPTY_CELL_BASE64.to_owned(),
-        |b| base64::engine::general_purpose::STANDARD.encode(b),
-    );
-
-    let balance_tokens = meta.cached_balance.unwrap_or(0);
+    let code_boc = node.get_cell_or_empty(Some(code_hash)).to_base64();
+    let data_boc = node.get_cell_or_empty(meta.data_hash).to_base64();
+    let libs = node
+        .build_vm_global_libs_boc()?
+        .map_or_else(String::new, |boc| boc.to_base64());
 
     let args = RunGetMethodArgs {
         code: code_boc,
         data: data_boc,
         method_id,
         address: address.to_string(),
-        unixtime: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
-        balance: balance_tokens.to_string(),
+        unixtime: i64::from(node.now_unix()?),
+        balance: meta.balance.to_string(),
         rand_seed: "0000000000000000000000000000000000000000000000000000000000000000".to_owned(),
         gas_limit: "10000000".to_owned(),
         debug_enabled: false,
         verbosity: localnet_executor_verbosity(),
-        libs: String::new(),
+        libs,
         extra_currencies: Default::default(),
-        prev_blocks_info: None,
+        prev_blocks_info: Some(
+            node.prev_blocks_info_at(seqno)
+                .to_stack_entry_boc_base64()?,
+        ),
     };
 
     let stack_cell = stack
@@ -1418,21 +2064,34 @@ fn handle_run_get_method(
         .context("Execution failed")?;
 
     match res {
-        GetMethodResult::Success(s) => {
-            let stack_bytes = base64::engine::general_purpose::STANDARD
-                .decode(s.stack.as_ref())
-                .unwrap_or_default();
-            Ok(LocalnetRunGetMethodResult {
-                gas_used: s.gas_used.parse().unwrap_or(0),
-                stack: stack_bytes.into(),
-                exit_code: s.vm_exit_code,
-                vm_log: s.vm_log,
-                block_id,
-                last_transaction_id,
-            })
-        }
+        GetMethodResult::Success(s) => Ok(LocalnetRunGetMethodResult {
+            gas_used: s.gas_used.parse().unwrap_or(0),
+            stack: BocBytes::from_base64(s.stack.as_ref()).unwrap_or_default(),
+            exit_code: s.vm_exit_code,
+            vm_log: s.vm_log,
+            block_id,
+            last_transaction_id,
+        }),
         GetMethodResult::Error(e) => anyhow::bail!("Get method error: {e:?}"),
     }
+}
+
+fn no_code_run_get_method_result(
+    method_id: i32,
+    block_id: LocalnetBlockId,
+    last_transaction_id: LocalnetTransactionId,
+) -> anyhow::Result<LocalnetRunGetMethodResult> {
+    let stack = Tuple(vec![TupleItem::Int(method_id.into())])
+        .serialize()
+        .context("Failed to serialize no-code get-method stack to BoC")?;
+    Ok(LocalnetRunGetMethodResult {
+        gas_used: 0,
+        stack: BocBytes::from(Boc::encode(stack)),
+        exit_code: -13,
+        vm_log: Arc::from(""),
+        block_id,
+        last_transaction_id,
+    })
 }
 
 pub(crate) fn convert_to_tx_struct(
@@ -1648,10 +2307,10 @@ fn handle_get_consensus_block(node: &Node) -> anyhow::Result<LocalnetConsensusBl
 fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<LocalnetLibrary>> {
     let entries = node.get_libraries(hashes);
     let mut result = Vec::with_capacity(entries.len());
-    for lookup in entries {
-        if let Some(entry) = lookup.entry {
+    for (hash, entry) in hashes.iter().copied().zip(entries) {
+        if let Some(entry) = entry {
             result.push(LocalnetLibrary {
-                hash: lookup.hash,
+                hash: entry.hash,
                 found: true,
                 data: Some(entry.lib_boc),
                 publishers_count: entry.publishers.len(),
@@ -1659,7 +2318,7 @@ fn handle_get_libraries(node: &Node, hashes: &[Hash256]) -> anyhow::Result<Vec<L
             });
         } else {
             result.push(LocalnetLibrary {
-                hash: lookup.hash,
+                hash,
                 found: false,
                 data: None,
                 publishers_count: 0,

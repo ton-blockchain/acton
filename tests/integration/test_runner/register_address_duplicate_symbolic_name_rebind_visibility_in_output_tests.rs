@@ -19,8 +19,8 @@ fn run_network_case(project_name: &str, test_body: &str, snapshot_path: &str) {
 
     output
         .assert_passed(1)
-        .assert_contains("0.2 TON -> cq_duplicate_name")
-        .assert_contains("0.3 TON -> cq_duplicate_name")
+        .assert_contains("0.2 GRAM -> cq_duplicate_name")
+        .assert_contains("0.3 GRAM -> cq_duplicate_name")
         .assert_snapshot_matches(snapshot_path);
 }
 

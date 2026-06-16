@@ -1,0 +1,82 @@
+{
+  "create": {
+    "current": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "id": 2
+      }
+    },
+    "newer": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 2,
+        "id": 3
+      }
+    },
+    "older": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "id": 1
+      }
+    }
+  },
+  "mutate_after_snapshot": {
+    "balance_after_mine": "1000000000",
+    "faucet_block_used_pending_timestamp": true,
+    "fund_ok": true,
+    "increase_later_ok": true,
+    "mine_ok": true,
+    "set_next_ok": true
+  },
+  "persistent_db_after_restart": {
+    "balance": "0",
+    "block_2_removed": true,
+    "seqno": 1
+  },
+  "recovery_point_invalidation": {
+    "balance_after_revert_older": "0",
+    "newer": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Recovery point 3 not found",
+      "ok": false
+    },
+    "older_still_reverts": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "id": 1
+      }
+    },
+    "pending_timestamp_after_revert_older": null,
+    "same": {
+      "@extra": "[EXTRA]",
+      "code": 500,
+      "error": "Recovery point 2 not found",
+      "ok": false
+    },
+    "seqno_after_revert_older": 1
+  },
+  "revert_current": {
+    "balance_after_empty_mine": "0",
+    "balance_after_revert": "0",
+    "empty_mine_used_restored_timestamp": true,
+    "pending_timestamp_restored": true,
+    "response": {
+      "@extra": "[EXTRA]",
+      "ok": true,
+      "result": {
+        "block_seqno": 1,
+        "id": 2
+      }
+    },
+    "seqno_after_revert": 1,
+    "time_offset_rolled_back": true
+  }
+}

@@ -12,6 +12,7 @@ It is designed for fast local iteration with a familiar TonCenter API and reprod
 - Optional fork mode for querying real blockchain state from testnet or mainnet.
 - Built-in faucet and startup wallet bootstrap for zero-friction local testing.
 - Reproducible environments with SQLite persistence or JSON snapshots.
+- Runtime network-condition controls for simulating slower API responses.
 
 ## Built-in Explorer UI
 
@@ -19,6 +20,7 @@ The local node serves a bundled explorer UI from the same HTTP server as the API
 
 - The root path serves the explorer UI, and client-side routes such as `/explorer`, `/tokens`, `/nfts`, `/explorer/address/<ADDR>`, and `/explorer/tx/<HASH>` all resolve through the same single-page app shell.
 - The UI reads blockchain data from `/api/v2` and `/api/v3`, and uses `/acton_getAddressName` plus `/acton_getCompilerAbi` for local alias and ABI lookups.
+- Account pages subscribe to `/api/streaming/v2/sse` so new transactions and account state changes appear without waiting for a polling interval.
 
 ## Learn more
 
@@ -36,6 +38,6 @@ The local node serves a bundled explorer UI from the same HTTP server as the API
     Persist state to SQLite or export/import JSON snapshots for repeatable runs.
   </Card>
   <Card href="/docs/localnet/api-compatibility" title="API Compatibility">
-    Use TonCenter-compatible v2/v3 routes and admin endpoints.
+    Use TonCenter-compatible v2/v3, Streaming API, and control endpoints.
   </Card>
 </Cards>

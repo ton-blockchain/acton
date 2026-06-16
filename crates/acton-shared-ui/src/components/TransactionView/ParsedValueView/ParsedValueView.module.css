@@ -9,16 +9,17 @@
   align-self: flex-start;
   padding: 1px 6px;
   border-radius: var(--border-radius-full);
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-secondary-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--tonscan-border, var(--border-color));
+  background-color: var(--tonscan-row-hover, var(--bg-secondary-color));
+  color: var(--tonscan-text-secondary, var(--text-secondary));
   font-size: 0.6875rem;
   line-height: 1.4;
+  font-weight: var(--font-weight-medium);
 }
 
 .parsedTypeLabel {
   align-self: flex-start;
-  color: var(--text-primary);
+  color: var(--tonscan-text-primary, var(--text-primary));
   font-size: 0.75rem;
   line-height: 1.4;
   font-weight: var(--font-weight-medium);
@@ -33,7 +34,7 @@
   min-width: 0;
   padding-left: var(--spacing-mds);
   padding-bottom: var(--spacing-mds);
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--tonscan-border, var(--border-color));
 }
 
 .parsedNestedMap {
@@ -42,7 +43,10 @@
 }
 
 .parsedEntryKey {
-  color: var(--text-muted);
+  color: var(--tonscan-text-secondary, var(--text-muted));
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.35;
   white-space: nowrap;
   text-align: left;
   align-self: center;
@@ -51,10 +55,15 @@
 .parsedEntryValue {
   min-width: 0;
   align-self: center;
+  color: var(--tonscan-text-primary, var(--text-primary));
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
 }
 
 .parsedScalar {
   font-family: var(--font-mono), monospace;
+  font-size: var(--font-size-xs);
+  line-height: 1.45;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -78,7 +87,7 @@
 .parsedNull,
 .parsedVoid,
 .parsedEmpty {
-  color: var(--text-muted);
+  color: var(--tonscan-text-secondary, var(--text-muted));
 }
 
 .parsedMapEntry {
@@ -86,9 +95,9 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   padding: var(--spacing-sm) var(--spacing-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--tonscan-border, var(--border-color));
   border-radius: var(--border-radius-sm);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--tonscan-row-hover, var(--bg-secondary-color));
 }
 
 .parsedMapSection {
@@ -99,8 +108,9 @@
 }
 
 .parsedMapSectionLabel {
-  color: var(--text-muted);
+  color: var(--tonscan-text-secondary, var(--text-muted));
   font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
   line-height: 1.2;
   letter-spacing: 0.04em;
 }
@@ -133,8 +143,8 @@
   padding: 0;
   border: none;
   border-radius: var(--border-radius-sm);
-  background-color: var(--bg-color);
-  color: var(--text-secondary);
+  background-color: var(--tonscan-card-bg, var(--bg-color));
+  color: var(--tonscan-text-secondary, var(--text-secondary));
   cursor: pointer;
   opacity: 0;
   pointer-events: none;
@@ -152,12 +162,12 @@
 }
 
 .copyButton:hover {
-  background-color: var(--hover-bg);
-  color: var(--text-primary);
+  background-color: var(--litenode-control-hover, var(--hover-bg));
+  color: var(--tonscan-text-primary, var(--text-primary));
 }
 
 .copyButton:active {
-  background-color: var(--bg-tertiary-color);
+  background-color: var(--tonscan-row-hover, var(--bg-tertiary-color));
 }
 
 .copyButton svg {

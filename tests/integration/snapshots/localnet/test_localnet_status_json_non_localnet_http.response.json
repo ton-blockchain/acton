@@ -1,9 +1,12 @@
 {
+  "current_unix_time": null,
   "fork_block_number": null,
   "fork_network": null,
   "last_block_seqno": null,
+  "next_block_timestamp": null,
   "port": "[PORT]",
   "running": false,
   "state_source": null,
+  "time_offset_seconds": null,
   "uptime_seconds": null
 }

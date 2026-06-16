@@ -13,6 +13,37 @@ Errors are returned with HTTP status and request-error payload:
 }
 ```
 
+## `/acton_setShardAccount`
+
+`/acton_setShardAccount` is a local control endpoint for replacing one account
+state with a serialized `ShardAccount`.
+
+Request body:
+
+```json
+{
+  "address": "<ADDR>",
+  "shard_account": "<BASE64_BOC>"
+}
+```
+
+`shard_account` must be a base64-encoded `ShardAccount` BOC string.
+
+## `/acton_sendInternalMessage`
+
+`/acton_sendInternalMessage` is a local control endpoint for injecting a raw
+internal message into the local node. It accepts the same BOC payload shape as
+TonCenter message endpoints:
+
+```json
+{
+  "boc": "<BASE64_BOC>"
+}
+```
+
+The BOC must decode to `MsgInfo::Int`. TonCenter-compatible endpoints such as
+`/api/v2/sendBoc` and `/api/v3/message` accept external-in messages only.
+
 ## `/api/v3/addressInformation`
 
 `/api/v3/addressInformation` is implemented as a v3-compatible view over
@@ -74,6 +105,20 @@ The response includes:
 - `metadata` with `token_info` for:
   - NFT item addresses (`type: "nft_items"`, includes `nft_index`, optional `name/description/image/symbol`, `extra`)
   - collection addresses (`type: "nft_collections"`)
+
+## `/api/streaming/v2/sse` and `/api/streaming/v2/ws`
+
+The local node exposes a TonCenter Streaming API v2-compatible subset for
+real-time local tooling. Use the official TON Center Streaming API
+documentation for protocol details:
+https://docs.ton.org/applications/api/toncenter/streaming/overview
+
+- `POST /api/streaming/v2/sse` opens an SSE subscription and returns
+  `text/event-stream`.
+- `GET /api/streaming/v2/ws` opens a WebSocket connection.
+
+Localnet emits transaction, account-state, jetton-state, and trace updates.
+Action extraction is not implemented yet.
 
 ## `/api/emulate/v1/emulateTrace`
 

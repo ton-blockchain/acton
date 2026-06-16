@@ -1,0 +1,15 @@
+  → Contract: simple
+  → Compiling contract
+  ✓ Compiled successfully
+  → Code hash: 0xe67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
+  → Collecting source files
+  ✓ Collected 1 source file
+  → Using new Acton verifier
+  → Using backend: [LOCALHOST_URL]/api/v1/verify
+  → Sending sources to new verifier
+  ✓ New verifier accepted source bundle
+  → Source bundle: a7f1d1a6aabbccddeeff00112233445566778899aabbccddeeff001122334455
+  → Verification record: [WALLET_ADDRESS_BASE]
+
+✓ Contract verification completed!
+View at: [LOCALHOST_URL]/e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973

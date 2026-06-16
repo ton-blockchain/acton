@@ -198,7 +198,7 @@ fun impl.treasuryCode(): cell asm """
 /// ```tolk
 /// val state = testing.getAccountState(contract.address);
 /// if (state != null) {
-///     println("Balance: {:ton}", state.storage.balance.grams);
+///     println("Balance: {:gram}", state.storage.balance.grams);
 /// } else {
 ///     println("Account not found");
 /// }
@@ -215,7 +215,7 @@ fun testing.getAccountState(addr: address): TlbAccountInfo? {
 /// ```tolk
 /// val storageFee = testing.getAccountStorageFee(contract.address, 86400); // 1 day
 /// if (storageFee != null) {
-///     println("Daily storage fee: {:ton}", storageFee);
+///     println("Daily storage fee: {:gram}", storageFee);
 /// }
 /// ```
 fun testing.getAccountStorageFee(addr: address, seconds: int): coins? {
@@ -263,7 +263,68 @@ fun testing.getNow(): uint32 {
     return ffi.getNow();
 }
 
-/// Topup an address with a specified amount of TON.
+/// Set the VM random seed used by the current test/script and future emulated execution.
+///
+/// Pass a `uint256` seed for fully reproducible randomness. If [seed] is omitted,
+/// Acton generates a host-random 256-bit seed and returns it so you can print it
+/// and reuse it later.
+///
+/// `testing.setRandomSeed()` synchronizes randomness in two places:
+/// - the current VM context, so [random.getSeed], [random.uint256], and
+///   [random.range] immediately use the new seed
+/// - the emulated world state, so future `net.send`, `testing.runTickTock`,
+///   and `net.runGetMethod` calls use the same deterministic seed source
+///
+/// This function does not affect [crypto.getSecureRandomBytes], which uses
+/// host-side secure randomness.
+///
+/// Example:
+/// ```tolk
+/// // Reproducible seed
+/// testing.setRandomSeed(42);
+/// val a = random.uint256();
+/// testing.setRandomSeed(42);
+/// val b = random.uint256(); // same as `a`
+///
+/// // Host-random seed, returned for logging/reproduction
+/// val seed = testing.setRandomSeed();
+/// println("random seed: {:X}", seed);
+/// ```
+fun testing.setRandomSeed(seed: uint256? = null): uint256 {
+    if (seed == null) {
+        seed = ffi.generateRandomSeed();
+    }
+
+    val resolvedSeed = seed as uint256;
+    random.setSeed(resolvedSeed);
+    ffi.setRandomSeed(resolvedSeed);
+    return resolvedSeed;
+}
+
+/// Controls whether future emulated transactions bypass VM signature checks.
+///
+/// When enabled, the emulator treats TVM signature-checking instructions such as
+/// `CHKSIGNU` and `CHKSIGNS` as successful. This is useful for tests that need to
+/// exercise wallet or external-message flows without constructing a valid
+/// signature.
+///
+/// The setting is scoped to the current emulated world state and affects
+/// subsequent transaction execution paths such as [net.send],
+/// [net.sendExternal], [testing.processSingleTraceStep],
+/// [testing.createTraceIterationCursor], and [testing.runTickTock]. It does not
+/// affect get-method calls or broadcast sends to a real network.
+///
+/// Example:
+/// ```tolk
+/// testing.setChecksigIgnore(true);
+/// val result = net.sendExternal(message);
+/// testing.setChecksigIgnore(false);
+/// ```
+fun testing.setChecksigIgnore(ignore: bool): void {
+    ffi.setChecksigIgnore(ignore);
+}
+
+/// Topup an address with a specified amount of GRAM.
 ///
 /// Example:
 /// ```tolk
@@ -271,7 +332,7 @@ fun testing.getNow(): uint32 {
 /// ```
 ///
 /// Note: This function for tests only!
-/// For testnet TON airdrop onto your wallet, use `acton wallet airdrop` command.
+/// For testnet GRAM airdrop onto your wallet, use `acton wallet airdrop` command.
 fun testing.topUp(to: address, amount: coins): void {
     val treasury = testing.treasury("treasury");
     val topupMsg = createMessage({
@@ -289,7 +350,7 @@ fun testing.topUp(to: address, amount: coins): void {
 /// Example:
 /// ```tolk
 /// val balance = testing.getAccountBalance(address);
-/// println("{:ton}", balance);
+/// println("{:gram}", balance);
 /// ```
 fun testing.getAccountBalance(of: address): coins {
     return impl.getAccountBalance(of);
@@ -542,6 +603,15 @@ fun ffi.setNow(now: int): void
 
 fun ffi.getNow(): int
     asm "29 EXTCALL"
+
+fun ffi.setRandomSeed(seed: uint256): void
+    asm "59 EXTCALL"
+
+fun ffi.generateRandomSeed(): uint256
+    asm "60 EXTCALL"
+
+fun ffi.setChecksigIgnore(ignore: bool): void
+    asm "61 EXTCALL"
 
 fun ffi.setConfig(config: dict): bool
     asm "32 EXTCALL"

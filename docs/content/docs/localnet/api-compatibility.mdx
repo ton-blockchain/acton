@@ -1,9 +1,9 @@
 ---
 title: "API Compatibility"
-description: "Coverage matrix for TonCenter v2/v3 endpoints in Acton local development node"
+description: "Coverage matrix for TonCenter v2/v3 and Streaming API endpoints in Acton local development node"
 ---
 
-This page tracks TonCenter v2 and v3 API coverage in Acton local development node.
+This page tracks TonCenter v2, v3, Streaming API v2, and Emulate API coverage in Acton local development node.
 
 ## TonCenter v2 Coverage Matrix
 
@@ -48,6 +48,10 @@ a TonCenter `tvm.cell` object with base64-encoded BOC bytes. The same method is
 also available through the v2 JSON-RPC entrypoints: `POST /api/v2` and
 `POST /api/v2/jsonRPC`.
 
+`/api/v2/sendBoc`, `/api/v2/sendBocReturnHash`, and the v2 JSON-RPC `sendBoc`
+methods accept external-in messages only. Use `/acton_sendInternalMessage` for
+local development flows that need to inject a raw internal message.
+
 ## TonCenter v3 Coverage Matrix
 
 Acton local development node currently supports 11 TonCenter v3 endpoints:
@@ -68,36 +72,29 @@ Acton local development node currently supports 11 TonCenter v3 endpoints:
 
 `/api/v3/transactions` currently supports only single-value query filters for `account` and `exclude_account`; `/api/v3/pendingTransactions` supports only single-value query filters for `account` and `trace_id`. `/api/v3/transactionsByMessage` filters such as `msg_hash`, `body_hash`, `opcode`, and `direction` are also single-value in local development node (no repeated multi-value form yet).
 
+`/api/v3/message` accepts external-in messages only. Use
+`/acton_sendInternalMessage` to inject a raw internal message in local tooling.
+
 No other v3 endpoints are exposed by the local development node at the moment.
+
+## Streaming API v2
+
+Acton local development node supports a TonCenter Streaming API v2-compatible
+subset for local tools and the bundled explorer UI. For protocol details,
+request fields, finality behavior, and notification schemas, use the
+[official TON Center Streaming API documentation](https://docs.ton.org/applications/api/toncenter/streaming/overview).
+
+| Transport   | Endpoint                 | Available in local node | Purpose                                      |
+|-------------|--------------------------|-------------------------|----------------------------------------------|
+| `SSE`       | `/api/streaming/v2/sse`  | ✅                       | Opens a `text/event-stream` subscription.    |
+| `WebSocket` | `/api/streaming/v2/ws`   | ✅                       | Opens a WebSocket subscription over JSON.    |
+
+Localnet emits transaction, account-state, jetton-state, and trace updates.
+Action extraction is not implemented yet, so action notifications should not be
+used for local indexing.
 
 ## Emulate API Coverage Matrix
 
 | Method | Endpoint                       | Available in local node | Purpose                                                                      |
 |--------|--------------------------------|-------------------------|------------------------------------------------------------------------------|
 | `POST` | `/api/emulate/v1/emulateTrace` | ✅                       | Emulates external message execution trace against current state (no commit). |
-
-## Control API
-
-| Method | Endpoint                      | Request                                                                                  | What it does                                                                              |
-|--------|-------------------------------|------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| `POST` | `/acton_fundAccount`          | JSON body: `{"address":"<ADDR>","amount":<NANOTONS>}`                                    | Credits address with local funds and mines the transfer transaction.                      |
-| `GET`  | `/acton_getAddressName`       | Query: `?address=<ADDR>`                                                                 | Returns current alias for an address (or `null` if not set).                              |
-| `POST` | `/acton_setAddressName`       | JSON body: `{"address":"<ADDR>","name":"<ALIAS>"}`                                       | Sets or updates local alias for an address.                                               |
-| `GET`  | `/acton_getCompilerAbi`       | Query: `?code_hash=<HEX_OR_BASE64_HASH>`                                                 | Returns the registered compiler ABI for a code hash, or `null` when no ABI is registered. |
-| `POST` | `/acton_registerCompilerAbis` | JSON body: `{"entries":[{"code_hash":"<HEX_OR_BASE64_HASH>","compiler_abi":{...}},...]}` | Registers one or more compiler ABIs for later explorer/API lookups.                       |
-| `GET`  | `/acton_nodeInfo`             | No params                                                                                | Returns uptime, latest block seqno, and the active local or remote state source.          |
-| `POST` | `/acton_dumpState`            | JSON body: `{"path":"<SNAPSHOT_PATH>"}`                                                  | Writes a JSON state snapshot without stopping the server.                                 |
-| `POST` | `/acton_loadState`            | JSON body: `{"path":"<SNAPSHOT_PATH>"}`                                                  | Replaces the current node state with a JSON state snapshot.                               |
-| `GET`  | `/acton_getStateSource`       | No params                                                                                | Returns current state source used for account resolution (`Local` or `Remote`).           |
-| `POST` | `/acton_setStateSource`       | JSON enum payload (`"Local"` or `{"Remote": {...}}`)                                     | Switches account state source at runtime.                                                 |
-
-<Callout type="warn">
-  Control routes are intended for local development tooling and should not be exposed publicly.
-  The local node does not implement authentication for these routes. Loopback-only CORS helps
-  browser usage, but it is not an access-control mechanism.
-</Callout>
-
-<Callout type="info">
-  Rate limiting applies only to `/api` routes. Control routes remain available even when
-  `--rate-limit` or `[localnet].rate-limit` is enabled.
-</Callout>

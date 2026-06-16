@@ -67,12 +67,12 @@ export interface FailedMessage {
 
 export type BackendExecutorActionFailureReason =
   | {
-      readonly type: "not_enough_toncoin_to_send"
+      readonly type: "not_enough_grams_to_send"
       readonly remaining_balance: string
       readonly required: string
     }
   | {
-      readonly type: "cannot_reserve_toncoin"
+      readonly type: "cannot_reserve_grams"
       readonly requested: string
       readonly available: string
     }
@@ -111,6 +111,7 @@ export type BackendExecutorAction =
 
 export interface TransactionList {
   readonly name?: string
+  readonly is_treasury_deploy?: boolean
   readonly transactions: BackendTransaction[]
   readonly failed_messages?: FailedMessage[]
 }
@@ -118,6 +119,7 @@ export interface TransactionList {
 export interface Trace {
   readonly name: string
   readonly traces: TransactionList[]
+  readonly skipped_traces_count?: number
   readonly contracts: string[]
   readonly wallets: Record<string, string>
 }

@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling self_call_counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/self_call_state.test.tolk (1 test)
+  ✓ self call after set data persists storage [TIME]
+    └─ Test output:
+       totalDeposits=1
+       txCount=2
+
+ ✓ 1 passed in 1 file

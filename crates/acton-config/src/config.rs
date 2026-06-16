@@ -1,5 +1,6 @@
 use crate::test::{
-    BacktraceMode, CoverageFormat, MutationDiffMode, MutationLevel, ReportFormat, TestConfig,
+    BacktraceMode, CoverageFormat, GasProfileFormat, MutationDiffMode, MutationLevel, ReportFormat,
+    TestConfig,
 };
 use anyhow::{Result, anyhow};
 use path_absolutize::Absolutize;
@@ -294,6 +295,13 @@ pub struct TestSettings {
     pub coverage: Option<TestCoverageSettings>,
     /// Default fuzz settings for parameterized tests
     pub fuzz: Option<TestFuzzSettings>,
+    /// Output path for gas-weighted execution profiling
+    pub gas_profile: Option<String>,
+    /// Export format for gas-weighted execution profiling
+    #[schemars(with = "Option<GasProfileFormat>")]
+    pub gas_profile_format: Option<String>,
+    /// Include `.test.tolk` unit-test execution in the generated gas profile
+    pub gas_profile_include_tests: Option<bool>,
     /// Glob patterns to exclude from testing
     pub exclude: Option<Vec<String>>,
     /// Glob patterns to include in testing
@@ -493,6 +501,13 @@ pub struct LocalnetSettings {
     pub accounts: Option<Vec<String>>,
     /// Maximum number of API requests per second served by `Localnet` `/api` endpoints
     pub rate_limit: Option<u32>,
+    /// Response delay in milliseconds for `Localnet` `/api/v2`, `/api/v3`, and `/api/emulate/v1` endpoints
+    pub response_delay_ms: Option<u64>,
+    /// Block production interval in milliseconds for `acton localnet start`
+    #[schemars(range(min = 1))]
+    pub block_interval_ms: Option<u64>,
+    /// Disable automatic block production for `acton localnet start`
+    pub no_mining: Option<bool>,
 }
 
 const fn default_localnet_port() -> Option<u16> {
@@ -1259,8 +1274,12 @@ impl TestSettings {
         junit_merge_override: bool,
         snapshot_override: Option<String>,
         baseline_gas_override: Option<String>,
+        gas_profile_override: Option<String>,
+        gas_profile_format_override: Option<GasProfileFormat>,
+        gas_profile_include_tests_override: Option<bool>,
         fork_net_override: Option<Network>,
         fork_block_number_override: Option<u64>,
+        fork_cache_enabled: bool,
         save_test_trace_override: Option<String>,
         mutate_override: bool,
         mutate_overrides_override: Option<String>,
@@ -1310,6 +1329,7 @@ impl TestSettings {
                         _ => None,
                     })
             }),
+            no_capture: false,
             coverage: coverage_override.unwrap_or_else(|| self.coverage_enabled().unwrap_or(false)),
             coverage_format: coverage_format_override.or_else(|| {
                 self.coverage_format_value()
@@ -1335,12 +1355,26 @@ impl TestSettings {
             junit_merge: junit_merge_override || self.junit_merge.unwrap_or(false),
             snapshot: snapshot_override,
             baseline_snapshot: baseline_gas_override,
+            gas_profile: gas_profile_override.or_else(|| self.gas_profile.clone()),
+            gas_profile_format: gas_profile_format_override.unwrap_or_else(|| {
+                self.gas_profile_format
+                    .as_deref()
+                    .and_then(|format| match format.to_lowercase().as_str() {
+                        "cpuprofile" => Some(GasProfileFormat::Cpuprofile),
+                        "collapsed" => Some(GasProfileFormat::Collapsed),
+                        _ => None,
+                    })
+                    .unwrap_or_default()
+            }),
+            gas_profile_include_tests: gas_profile_include_tests_override
+                .unwrap_or_else(|| self.gas_profile_include_tests.unwrap_or(false)),
             fork_net: fork_net_override.or_else(|| {
                 self.fork_net
                     .as_deref()
                     .and_then(|n| Network::from_str(n).ok())
             }),
             fork_block_number: fork_block_number_override.or(self.fork_block_number),
+            fork_cache_enabled,
             save_test_trace: save_test_trace_override,
             mutate: mutate_override,
             mutate_overrides: mutate_overrides_override,
@@ -1422,8 +1456,12 @@ mod tests {
             false,
             None,
             None,
+            None,
+            None,
+            None,
             fork_net_override,
             fork_block_number_override,
+            true,
             None,
             false,
             None,
@@ -2173,6 +2211,9 @@ fork-net = "testnet"
 fork-block-number = 1234567
 accounts = ["deployer", "user"]
 rate-limit = 3
+response-delay-ms = 300
+block-interval-ms = 250
+no-mining = true
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -2185,5 +2226,8 @@ rate-limit = 3
             Some(vec!["deployer".to_string(), "user".to_string()])
         );
         assert_eq!(localnet.rate_limit, Some(3));
+        assert_eq!(localnet.response_delay_ms, Some(300));
+        assert_eq!(localnet.block_interval_ms, Some(250));
+        assert_eq!(localnet.no_mining, Some(true));
     }
 }

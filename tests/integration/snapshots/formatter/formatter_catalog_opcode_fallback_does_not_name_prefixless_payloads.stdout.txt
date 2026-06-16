@@ -1,0 +1,14 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/formatter_catalog_opcode_fallback_prefixless_payload.test.tolk (1 test)
+  ✓ formatter catalog opcode fallback does not name prefixless payloads [TIME]
+    └─ Test output:
+       N/A -> sender A
+       └── BidaskInternalProvide 0.2 GRAM -> catalog_sink B                            gas=253
+
+ ✓ 1 passed in 1 file

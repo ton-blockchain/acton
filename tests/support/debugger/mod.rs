@@ -43,7 +43,8 @@ const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 // The shared Fift/Tolk compile path crashes under higher test concurrency,
 // so serialize setup while keeping the debug session itself parallel.
 static DEBUG_COMPILER_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
-const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(5);
+pub(crate) const DEBUG_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+const DEBUG_EVENT_TIMEOUT: Duration = Duration::from_secs(15);
 
 #[derive(Debug, Clone)]
 pub(crate) struct DebugMethod {
@@ -216,6 +217,7 @@ pub(crate) fn run_script_file(
     debug_listener: Option<TcpListener>,
     method: DebugMethod,
     stack: Tuple,
+    capture_outer_frame_locals: bool,
 ) -> anyhow::Result<String> {
     let script_path = Path::new(file_path);
 
@@ -258,6 +260,7 @@ pub(crate) fn run_script_file(
         ExecutorVerbosity::FullLocationStackVerbose,
         stack,
         project_root,
+        capture_outer_frame_locals,
     );
     let script_result = match execution {
         Ok(result) => result,
@@ -279,6 +282,7 @@ fn execute_script(
     verbosity: ExecutorVerbosity,
     stack: Tuple,
     project_root: &Path,
+    capture_outer_frame_locals: bool,
 ) -> anyhow::Result<GetMethodResult> {
     let dest_address = contract_address(code_cell)?;
     let method_name = method.display_name(abi.as_deref());
@@ -346,6 +350,7 @@ fn execute_script(
             stdout_buffer: String::new(),
             stderr_buffer: String::new(),
             capture_output: true,
+            live_output: false,
         },
         asserts: AssertsContext {
             assert_failure: &mut assert_failure,
@@ -383,7 +388,8 @@ fn execute_script(
     executor.prepare(method.id, &stack)?;
     let mut replayer = TolkReplayer::new_live_vm(source_map.as_ref(), executor.clone().into())?;
     replayer.set_abi(abi);
-    let mut dbg_session = ReplayerDebugSession::new(transport, replayer, method_name.into());
+    let mut dbg_session = ReplayerDebugSession::new(transport, replayer, method_name.into())
+        .with_outer_frame_local_snapshots(capture_outer_frame_locals);
     ctx.debug = DebugCtx::new(&mut dbg_session);
 
     if ctx.debug.process_incoming_requests(true)? {

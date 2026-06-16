@@ -1,0 +1,5997 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "Acton Localnet TonCenter API v2",
+    "description": "This API enables HTTP access to TON blockchain - getting accounts and wallets information, looking up blocks and transactions, sending messages to the blockchain, calling get methods of smart contracts, and more.\n\nIn addition to REST API, all methods are available through [JSON-RPC endpoint](#json%20rpc)  with `method` equal to method name and `params` passed as a dictionary.\n\nThe response contains a JSON object, which always has a boolean field `ok` and either `error` or `result`. If `ok` equals true, the request was successful and the result of the query can be found in the `result` field. In case of an unsuccessful request, `ok` equals false and the error is explained in the `error`.\n\nAPI Key should be sent either as `api_key` query parameter or `X-API-Key` header. When Acton localnet is started with --require-auth, pass the printed localnet API token as `X-API-Key` or `Authorization: Bearer <token>`.\n\n\nThis bundled reference is derived from the official TonCenter v2 OpenAPI document and filtered to endpoints implemented by Acton localnet.",
+    "version": "v2.1.13"
+  },
+  "paths": {
+    "/api/v2/jsonRPC": {
+      "post": {
+        "tags": ["rpc"],
+        "summary": "JSON-RPC endpoint",
+        "description": "Endpoint for JSON-RPC requests",
+        "operationId": "jsonRPC_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JsonRpcRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/detectAddress": {
+      "get": {
+        "tags": ["utils"],
+        "summary": "Detect address",
+        "description": "Get all possible address forms",
+        "operationId": "detectAddress_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Detect address",
+        "description": "Get all possible address forms",
+        "operationId": "detectAddress_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/detectHash": {
+      "get": {
+        "tags": ["utils"],
+        "summary": "Detect hash",
+        "description": "Get all possible hash forms",
+        "operationId": "detectHash_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/hash"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Detect hash",
+        "description": "Get all possible hash forms",
+        "operationId": "detectHash_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DetectHashRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/packAddress": {
+      "get": {
+        "tags": ["utils"],
+        "summary": "Pack address",
+        "description": "Pack address to base64 form",
+        "operationId": "packAddress_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Pack address",
+        "description": "Pack address to base64 form",
+        "operationId": "packAddress_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PackAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/unpackAddress": {
+      "get": {
+        "tags": ["utils"],
+        "summary": "Unpack address",
+        "description": "Unpack address from base64 form",
+        "operationId": "unpackAddress_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Unpack address",
+        "description": "Unpack address from base64 form",
+        "operationId": "unpackAddress_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UnpackAddressRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getAddressInformation": {
+      "get": {
+        "tags": ["accounts"],
+        "summary": "Get Address Information",
+        "description": "Get basic information about address",
+        "operationId": "getAddressInformation_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Address Information",
+        "description": "Get basic information about address",
+        "operationId": "getAddressInformation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressInformationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getExtendedAddressInformation": {
+      "get": {
+        "tags": ["accounts"],
+        "summary": "Get Extended Address Information",
+        "description": "Get extended information about address",
+        "operationId": "getExtendedAddressInformation_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Extended Address Information",
+        "description": "Get extended information about address",
+        "operationId": "getExtendedAddressInformation_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExtendedAddressInformationRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getShardAccountCell": {
+      "get": {
+        "tags": ["accounts"],
+        "summary": "Get Shard Address Cell",
+        "description": "Get raw TVM cell with shard account",
+        "operationId": "getShardAccountCell_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Shard Address Cell",
+        "description": "Get raw TVM cell with shard account",
+        "operationId": "getShardAccountCell_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShardAccountCellRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getAddressBalance": {
+      "get": {
+        "tags": ["accounts"],
+        "summary": "Get Address Balance",
+        "description": "Get address balance in nanotons",
+        "operationId": "getAddressBalance_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Address Balance",
+        "description": "Get address balance in nanotons",
+        "operationId": "getAddressBalance_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressBalanceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getAddressState": {
+      "get": {
+        "tags": ["accounts"],
+        "summary": "Get Address State",
+        "description": "Get address state (active, uninitialized or frozen)",
+        "operationId": "getAddressState_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Address State",
+        "description": "Get address state (active, uninitialized or frozen)",
+        "operationId": "getAddressState_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddressStateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getMasterchainInfo": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Masterchain Info",
+        "description": "Get up-to-date masterchain state",
+        "operationId": "getMasterchainInfo_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Masterchain Info",
+        "description": "Get up-to-date masterchain state",
+        "operationId": "getMasterchainInfo_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MasterchainInfoRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getConsensusBlock": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Consensus Block",
+        "description": "Get block that was confirmed by consensus",
+        "operationId": "getConsensusBlock_get",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Consensus Block",
+        "description": "Get block that was confirmed by consensus",
+        "operationId": "getConsensusBlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsensusBlockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/lookupBlock": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Lookup Block",
+        "description": "Look up block by seqno, shard and workchain",
+        "operationId": "lookupBlock_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workchain"
+          },
+          {
+            "$ref": "#/components/parameters/shard"
+          },
+          {
+            "$ref": "#/components/parameters/seqnoOptional"
+          },
+          {
+            "name": "lt",
+            "in": "query",
+            "description": "Logical time of a block",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "x-usrv-cpp-format": "std::int64_t"
+            }
+          },
+          {
+            "name": "unixtime",
+            "in": "query",
+            "description": "UNIX timestamp of a block",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Lookup Block",
+        "description": "Look up block by seqno, shard and workchain",
+        "operationId": "lookupBlock_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LookupBlockRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getShards": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Shards",
+        "description": "Get shards information by given masterchain block seqno",
+        "operationId": "getShards_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/seqno",
+            "description": "Seqno of masterchain block"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Shards",
+        "description": "Get shards information",
+        "operationId": "getShards_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ShardsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getBlockHeader": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Block Header",
+        "description": "Get block header information",
+        "operationId": "getBlockHeader_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workchain"
+          },
+          {
+            "$ref": "#/components/parameters/shard"
+          },
+          {
+            "$ref": "#/components/parameters/seqno"
+          },
+          {
+            "$ref": "#/components/parameters/rootHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/fileHashOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Block Header",
+        "description": "Get block header information",
+        "operationId": "getBlockHeader_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockHeaderRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getOutMsgQueueSize": {
+      "get": {
+        "tags": ["blocks"],
+        "summary": "Get Out Msg Queue Size",
+        "description": "Get size of outbound message queue",
+        "operationId": "getOutMsgQueueSize_get",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Out Msg Queue Size",
+        "description": "Get size of outbound message queue",
+        "operationId": "getOutMsgQueueSize_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutMsgQueueSizeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getBlockTransactions": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Get Block Transactions",
+        "description": "Get transactions in specified block",
+        "operationId": "getBlockTransactions_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workchain"
+          },
+          {
+            "$ref": "#/components/parameters/shard"
+          },
+          {
+            "$ref": "#/components/parameters/seqno"
+          },
+          {
+            "$ref": "#/components/parameters/rootHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/fileHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/afterLtOptional"
+          },
+          {
+            "$ref": "#/components/parameters/afterAccountHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/countOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Block Transactions",
+        "description": "Get transactions in specified block",
+        "operationId": "getBlockTransactions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockTransactionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getBlockTransactionsExt": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Get Block Transactions Extended",
+        "description": "Get transactions in specified block with extended information",
+        "operationId": "getBlockTransactionsExt_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/workchain"
+          },
+          {
+            "$ref": "#/components/parameters/shard"
+          },
+          {
+            "$ref": "#/components/parameters/seqno"
+          },
+          {
+            "$ref": "#/components/parameters/rootHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/fileHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/afterLtOptional"
+          },
+          {
+            "$ref": "#/components/parameters/afterAccountHashOptional"
+          },
+          {
+            "$ref": "#/components/parameters/countOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Block Transactions Extended",
+        "description": "Get transactions in specified block with extended information",
+        "operationId": "getBlockTransactionsExt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BlockTransactionsExtRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getTransactions": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Get Transactions",
+        "description": "Get transactions for specified address",
+        "operationId": "getTransactions_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/limitOptional"
+          },
+          {
+            "$ref": "#/components/parameters/ltOptional"
+          },
+          {
+            "$ref": "#/components/parameters/hashOptional",
+            "description": "Transaction hash to start from"
+          },
+          {
+            "$ref": "#/components/parameters/toLtOptional"
+          },
+          {
+            "$ref": "#/components/parameters/archivalOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Transactions",
+        "description": "Get transactions for specified address",
+        "operationId": "getTransactions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionsRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getTransactionsStd": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Get Transactions Std",
+        "description": "Standardized version of getTransactions",
+        "operationId": "getTransactionsStd_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/address"
+          },
+          {
+            "$ref": "#/components/parameters/limitOptional"
+          },
+          {
+            "$ref": "#/components/parameters/ltOptional"
+          },
+          {
+            "$ref": "#/components/parameters/hashOptional",
+            "description": "Transaction hash to start from"
+          },
+          {
+            "$ref": "#/components/parameters/toLtOptional"
+          },
+          {
+            "$ref": "#/components/parameters/archivalOptional"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Transactions Std",
+        "description": "Standardized version of getTransactions",
+        "operationId": "getTransactionsStd_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TransactionsStdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/tryLocateTx": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Try Locate Transaction",
+        "description": "Try to locate outcoming transaction of __destination__ address by incoming message",
+        "operationId": "tryLocateTx_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/sourceAddress"
+          },
+          {
+            "$ref": "#/components/parameters/destinationAddress"
+          },
+          {
+            "$ref": "#/components/parameters/createdLt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Try Locate Transaction",
+        "description": "Try to locate transaction by incoming message parameters",
+        "operationId": "tryLocateTx_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryLocateTxRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/tryLocateResultTx": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Try Locate Result Transaction",
+        "description": "Same as previous. Try to locate outcoming transaction of destination address by incoming message",
+        "operationId": "tryLocateResultTx_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/sourceAddress"
+          },
+          {
+            "$ref": "#/components/parameters/destinationAddress"
+          },
+          {
+            "$ref": "#/components/parameters/createdLt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Try Locate Result Transaction",
+        "description": "Try to locate incoming transaction of source address by outcoming message",
+        "operationId": "tryLocateResultTx_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryLocateResultTxRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/tryLocateSourceTx": {
+      "get": {
+        "tags": ["transactions"],
+        "summary": "Try Locate Source Transaction",
+        "description": "Try to locate source transaction by destination transaction parameters",
+        "operationId": "tryLocateSourceTx_get",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/sourceAddress"
+          },
+          {
+            "$ref": "#/components/parameters/destinationAddress"
+          },
+          {
+            "$ref": "#/components/parameters/createdLt"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Try Locate Source Transaction",
+        "description": "Try to locate source transaction by destination transaction parameters",
+        "operationId": "tryLocateSourceTx_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TryLocateSourceTxRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getConfigParam": {
+      "get": {
+        "tags": ["configuration"],
+        "summary": "Get Config Parameter",
+        "description": "Get blockchain configuration parameter",
+        "operationId": "getConfigParam_get",
+        "parameters": [
+          {
+            "name": "param",
+            "in": "query",
+            "description": "Parameter number",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          },
+          {
+            "name": "seqno",
+            "in": "query",
+            "description": "Block seqno",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Config Parameter",
+        "description": "Get blockchain configuration parameter",
+        "operationId": "getConfigParam_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigParamRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getConfigAll": {
+      "get": {
+        "tags": ["configuration"],
+        "summary": "Get All Config",
+        "description": "Get all blockchain configuration parameters",
+        "operationId": "getConfigAll_get",
+        "parameters": [
+          {
+            "name": "seqno",
+            "in": "query",
+            "description": "Block seqno",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get All Config",
+        "description": "Get all blockchain configuration parameters",
+        "operationId": "getConfigAll_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigAllRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/getLibraries": {
+      "get": {
+        "tags": ["configuration"],
+        "summary": "Get Libraries",
+        "description": "Get library code by their hashes",
+        "operationId": "getLibraries_get",
+        "parameters": [
+          {
+            "name": "libraries",
+            "in": "query",
+            "description": "Hashes of libraries",
+            "required": false,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "#/components/schemas/TonHash"
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      },
+      "post": {
+        "tags": ["rpc"],
+        "summary": "Get Libraries",
+        "description": "Get library entries by their hashes",
+        "operationId": "getLibraries_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LibrariesRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/sendBoc": {
+      "post": {
+        "tags": ["send", "rpc"],
+        "summary": "Send BOC",
+        "description": "Send bag of cells to blockchain",
+        "operationId": "sendBoc_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBocRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/sendBocReturnHash": {
+      "post": {
+        "tags": ["send", "rpc"],
+        "summary": "Send BOC Return Hash",
+        "description": "Send bag of cells to blockchain and return hash",
+        "operationId": "sendBocReturnHash_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBocRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/runGetMethod": {
+      "post": {
+        "tags": ["run method", "rpc"],
+        "summary": "Run Get Method",
+        "description": "Run get method of smart contract",
+        "operationId": "runGetMethod_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunGetMethodRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    },
+    "/api/v2/runGetMethodStd": {
+      "post": {
+        "tags": ["run method", "rpc"],
+        "summary": "Run Get Method Std",
+        "description": "Run get method of smart contract",
+        "operationId": "runGetMethodStd_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunGetMethodStdRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TonlibResponse"
+                }
+              }
+            }
+          },
+          "default": {
+            "$ref": "#/components/responses/default"
+          }
+        },
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ]
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "utils",
+      "description": "Some useful methods"
+    },
+    {
+      "name": "accounts",
+      "description": "Information about accounts"
+    },
+    {
+      "name": "blocks",
+      "description": "Information about blocks"
+    },
+    {
+      "name": "transactions",
+      "description": "Fetching and locating transactions"
+    },
+    {
+      "name": "configuration",
+      "description": "Information about blockchain config"
+    },
+    {
+      "name": "run method",
+      "description": "Run get-method of smart contracts"
+    },
+    {
+      "name": "send",
+      "description": "Send data to blockchain"
+    },
+    {
+      "name": "rpc",
+      "description": "JSON-RPC and POST endpoints"
+    }
+  ],
+  "components": {
+    "parameters": {
+      "address": {
+        "name": "address",
+        "in": "query",
+        "description": "Identifier of target TON account in any form",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TonAddr"
+        }
+      },
+      "hash": {
+        "name": "hash",
+        "in": "query",
+        "description": "The 256-bit hash in any form",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TonHash"
+        }
+      },
+      "hashOptional": {
+        "name": "hash",
+        "in": "query",
+        "description": "The 256-bit hash in any form",
+        "required": false,
+        "schema": {
+          "$ref": "#/components/schemas/TonHash"
+        }
+      },
+      "workchain": {
+        "name": "workchain",
+        "in": "query",
+        "description": "Workchain ID",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "shard": {
+        "name": "shard",
+        "in": "query",
+        "description": "Shard ID",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "std::int64_t"
+        }
+      },
+      "seqno": {
+        "name": "seqno",
+        "in": "query",
+        "description": "Seqno of a block",
+        "required": true,
+        "schema": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "seqnoOptional": {
+        "name": "seqno",
+        "in": "query",
+        "description": "Seqno of a block",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int32"
+        }
+      },
+      "rootHashOptional": {
+        "name": "root_hash",
+        "in": "query",
+        "description": "Root hash of a block",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "#/components/schemas/TonHash"
+        }
+      },
+      "fileHashOptional": {
+        "name": "file_hash",
+        "in": "query",
+        "description": "File hash of a block",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "#/components/schemas/TonHash"
+        }
+      },
+      "afterLtOptional": {
+        "name": "after_lt",
+        "in": "query",
+        "description": "Logical time of transaction to read after",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-format": "std::int64_t"
+        }
+      },
+      "afterAccountHashOptional": {
+        "name": "after_hash",
+        "in": "query",
+        "description": "Hash of account in this block in hex or base64 representation, which indicates transaction to read after",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "#/components/schemas/TonAddrWithoutWorkchain"
+        }
+      },
+      "countOptional": {
+        "name": "count",
+        "in": "query",
+        "description": "Maximum number of items in response",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "default": 40
+        }
+      },
+      "limitOptional": {
+        "name": "limit",
+        "in": "query",
+        "description": "Maximum number of items in response",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "default": 10
+        }
+      },
+      "ltOptional": {
+        "name": "lt",
+        "in": "query",
+        "description": "Logical time of the transaction to start from",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "std::int64_t"
+        }
+      },
+      "toLtOptional": {
+        "name": "to_lt",
+        "in": "query",
+        "description": "Logical time to stop at",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "std::int64_t",
+          "default": 0
+        }
+      },
+      "archivalOptional": {
+        "name": "archival",
+        "in": "query",
+        "description": "Whether to use archival node",
+        "required": false,
+        "schema": {
+          "type": "boolean",
+          "default": false
+        }
+      },
+      "sourceAddress": {
+        "name": "source",
+        "in": "query",
+        "description": "Source address",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TonAddr"
+        }
+      },
+      "destinationAddress": {
+        "name": "destination",
+        "in": "query",
+        "description": "Destination address",
+        "required": true,
+        "schema": {
+          "$ref": "#/components/schemas/TonAddr"
+        }
+      },
+      "createdLt": {
+        "name": "created_lt",
+        "in": "query",
+        "description": "Creation logical time of a message",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "x-usrv-cpp-type": "std::int64_t"
+        }
+      }
+    },
+    "responses": {
+      "default": {
+        "description": "Tonlib error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/TonlibErrorResponse"
+            },
+            "examples": {
+              "409": {
+                "summary": "Not a token",
+                "value": {
+                  "ok": false,
+                  "code": 409,
+                  "error": "Smart contract is not a Jetton or NFT",
+                  "@extra": "..."
+                }
+              },
+              "422": {
+                "summary": "Request validation error",
+                "value": {
+                  "ok": false,
+                  "code": 422,
+                  "error": "...",
+                  "@extra": "..."
+                }
+              },
+              "429": {
+                "summary": "Ratelimit exceeded",
+                "value": {
+                  "ok": false,
+                  "code": 429,
+                  "error": "...",
+                  "@extra": "..."
+                }
+              },
+              "504": {
+                "summary": "Tonlib timeout",
+                "value": {
+                  "ok": false,
+                  "code": 504,
+                  "error": "...",
+                  "@extra": "..."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key"
+      },
+      "APIKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "api_key"
+      }
+    },
+    "schemas": {
+      "EmptyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [],
+        "properties": {}
+      },
+      "AddressRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          }
+        }
+      },
+      "AddressWithSeqnoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "SeqnoRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["seqno"],
+        "properties": {
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "DetectAddressRequest": {
+        "$ref": "#/components/schemas/AddressRequest"
+      },
+      "DetectHashRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["hash"],
+        "properties": {
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        }
+      },
+      "PackAddressRequest": {
+        "$ref": "#/components/schemas/AddressRequest"
+      },
+      "UnpackAddressRequest": {
+        "$ref": "#/components/schemas/AddressRequest"
+      },
+      "AddressInformationRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "ShardAccountCellRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "ExtendedAddressInformationRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "WalletInformationRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "AddressBalanceRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "AddressStateRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "TokenDataRequest": {
+        "$ref": "#/components/schemas/AddressWithSeqnoRequest"
+      },
+      "MasterchainInfoRequest": {
+        "$ref": "#/components/schemas/EmptyRequest"
+      },
+      "MasterchainBlockSignaturesRequest": {
+        "$ref": "#/components/schemas/SeqnoRequest"
+      },
+      "ShardBlockProofRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workchain", "shard", "seqno"],
+        "properties": {
+          "workchain": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "shard": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "from_seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "ConsensusBlockRequest": {
+        "$ref": "#/components/schemas/EmptyRequest"
+      },
+      "LookupBlockRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workchain", "shard"],
+        "properties": {
+          "workchain": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "shard": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "lt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "unixtime": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "ShardsRequest": {
+        "$ref": "#/components/schemas/SeqnoRequest"
+      },
+      "BlockHeaderRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workchain", "shard", "seqno"],
+        "properties": {
+          "workchain": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "shard": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "root_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "file_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        }
+      },
+      "OutMsgQueueSizeRequest": {
+        "$ref": "#/components/schemas/EmptyRequest"
+      },
+      "BlockTransactionsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["workchain", "shard", "seqno"],
+        "properties": {
+          "workchain": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "shard": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "root_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "file_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "after_lt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "after_hash": {
+            "$ref": "#/components/schemas/TonAddrWithoutWorkchain"
+          },
+          "count": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          }
+        }
+      },
+      "BlockTransactionsExtRequest": {
+        "$ref": "#/components/schemas/BlockTransactionsRequest"
+      },
+      "TransactionsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "lt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "to_lt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "archival": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              },
+              {
+                "type": "boolean"
+              }
+            ],
+            "x-usrv-cpp-type": "bool"
+          },
+          "limit": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          }
+        }
+      },
+      "TransactionsV2Request": {
+        "$ref": "#/components/schemas/TransactionsRequest"
+      },
+      "TryLocateTxRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "destination", "created_lt"],
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "created_lt": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int64",
+                "x-usrv-cpp-type": "std::int64_t"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int64_t"
+          }
+        }
+      },
+      "TryLocateResultTxRequest": {
+        "$ref": "#/components/schemas/TryLocateTxRequest"
+      },
+      "TryLocateSourceTxRequest": {
+        "$ref": "#/components/schemas/TryLocateTxRequest"
+      },
+      "ConfigParamRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "config_id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "param": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          },
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "ConfigAllRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "seqno": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ],
+            "x-usrv-cpp-type": "std::int32_t"
+          }
+        }
+      },
+      "LibrariesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "libraries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TonHash"
+            }
+          }
+        }
+      },
+      "SendBocRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["boc"],
+        "properties": {
+          "boc": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "EstimateFeeRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address", "body"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "body": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "init_code": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "init_data": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "ignore_chksig": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "JsonRpcRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["jsonrpc", "id", "method", "params"],
+        "properties": {
+          "jsonrpc": {
+            "type": "string",
+            "default": "2.0"
+          },
+          "id": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "TonAddr": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::ton_addr"
+      },
+      "TonAddrWithoutWorkchain": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::ton_addr_without_workchain"
+      },
+      "TonHash": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::ton_hash"
+      },
+      "TonHashHex": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::ton_hash_hex"
+      },
+      "Int256": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::int256"
+      },
+      "Bytes": {
+        "type": "string",
+        "x-usrv-cpp-type": "ton_http::types::bytes"
+      },
+      "AccountAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["accountAddress"],
+            "default": "accountAddress"
+          },
+          "account_address": {
+            "type": "string",
+            "x-usrv-cpp-type": "ton_http::types::ton_addr"
+          }
+        }
+      },
+      "TonBlockIdExt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ton.blockIdExt"],
+            "default": "ton.blockIdExt"
+          },
+          "workchain": {
+            "type": "integer"
+          },
+          "shard": {
+            "type": "string",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "seqno": {
+            "type": "integer"
+          },
+          "root_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "file_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        },
+        "required": ["@type", "workchain", "shard", "seqno", "root_hash", "file_hash"],
+        "description": "Extended block identifier."
+      },
+      "DetectAddressBase64Variant": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Base64 form of address variant",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.utils.detectedAddressVariant"],
+            "default": "ext.utils.detectedAddressVariant"
+          },
+          "b64": {
+            "type": "string"
+          },
+          "b64url": {
+            "type": "string"
+          }
+        },
+        "required": ["@type", "b64", "b64url"]
+      },
+      "ExtraCurrencyBalance": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["extraCurrency"],
+            "default": "extraCurrency"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "amount": {
+            "$ref": "#/components/schemas/Int256"
+          }
+        },
+        "required": ["@type", "id", "amount"]
+      },
+      "InternalTransactionId": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Internal transaction identifier.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["internal.transactionId"],
+            "default": "internal.transactionId"
+          },
+          "lt": {
+            "type": "string",
+            "description": "Logical time",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        },
+        "required": ["@type", "lt", "hash"]
+      },
+      "AccountStateRaw": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.accountState"],
+            "default": "raw.accountState"
+          },
+          "code": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "frozen_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        },
+        "required": ["@type", "code", "data", "frozen_hash"]
+      },
+      "AccountStateWalletV3": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["wallet.v3.accountState"],
+            "default": "wallet.v3.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": ["@type", "wallet_id", "seqno"]
+      },
+      "AccountStateWalletV4": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["wallet.v4.accountState"],
+            "default": "wallet.v4.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": ["@type", "wallet_id", "seqno"]
+      },
+      "AccountStateWalletHighloadV1": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["wallet.highload.v1.accountState"],
+            "default": "wallet.highload.v1.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": ["@type", "wallet_id", "seqno"]
+      },
+      "AccountStateWalletHighloadV2": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["wallet.highload.v2.accountState"],
+            "default": "wallet.highload.v2.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "wallet_id"]
+      },
+      "AccountStateDns": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["dns.accountState"],
+            "default": "dns.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "wallet_id"]
+      },
+      "RWalletLimit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["rwallet.limit"],
+            "default": "rwallet.limit"
+          },
+          "seconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "value": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "seconds", "value"]
+      },
+      "RWalletConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["rwallet.config"],
+            "default": "rwallet.config"
+          },
+          "start_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "limits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RWalletLimit"
+            }
+          }
+        },
+        "required": ["@type", "start_at", "limits"]
+      },
+      "AccountStateRWallet": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["rwallet.accountState"],
+            "default": "rwallet.accountState"
+          },
+          "wallet_id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "unlocked_balance": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "config": {
+            "$ref": "#/components/schemas/RWalletConfig"
+          }
+        },
+        "required": ["@type", "wallet_id", "seqno", "unlocked_balance", "config"]
+      },
+      "PChanConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["pchan.config"],
+            "default": "pchan.config"
+          },
+          "alice_public_key": {
+            "type": "string"
+          },
+          "alice_address": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "bob_public_key": {
+            "type": "string"
+          },
+          "bob_address": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "init_timeout": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "close_timeout": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "channel_id": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": [
+          "@type",
+          "alice_public_key",
+          "alice_address",
+          "bob_public_key",
+          "bob_address",
+          "init_timeout",
+          "close_timeout",
+          "channel_id"
+        ]
+      },
+      "PChanStateInit": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["pchan.stateInit"],
+            "default": "pchan.stateInit"
+          },
+          "signed_A": {
+            "type": "boolean"
+          },
+          "signed_B": {
+            "type": "boolean"
+          },
+          "min_A": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "min_B": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expire_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "A": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "B": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "signed_A", "signed_B", "min_A", "min_B", "expire_at", "A", "B"]
+      },
+      "PChanStateClose": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["pchan.stateClose"],
+            "default": "pchan.stateClose"
+          },
+          "signed_A": {
+            "type": "boolean"
+          },
+          "signed_B": {
+            "type": "boolean"
+          },
+          "min_A": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "min_B": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "expire_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "A": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "B": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "signed_A", "signed_B", "min_A", "min_B", "expire_at", "A", "B"]
+      },
+      "PChanStatePayout": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["pchan.statePayout"],
+            "default": "pchan.statePayout"
+          },
+          "A": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "B": {
+            "type": "integer",
+            "format": "int64"
+          }
+        },
+        "required": ["@type", "A", "B"]
+      },
+      "PChanState": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PChanStateInit"
+          },
+          {
+            "$ref": "#/components/schemas/PChanStateClose"
+          },
+          {
+            "$ref": "#/components/schemas/PChanStatePayout"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "pchan.stateInit": "#/components/schemas/PChanStateInit",
+            "pchan.stateClose": "#/components/schemas/PChanStateClose",
+            "pchan.statePayout": "#/components/schemas/PChanStatePayout"
+          }
+        }
+      },
+      "AccountStatePChan": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["pchan.accountState"],
+            "default": "pchan.accountState"
+          },
+          "config": {
+            "$ref": "#/components/schemas/PChanConfig"
+          },
+          "state": {
+            "$ref": "#/components/schemas/PChanState"
+          },
+          "description": {
+            "type": "string"
+          }
+        },
+        "required": ["@type", "config", "state", "description"]
+      },
+      "AccountStateUninited": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["uninited.accountState"],
+            "default": "uninited.accountState"
+          },
+          "frozen_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        },
+        "required": ["@type", "frozen_hash"]
+      },
+      "AccountState": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/AccountStateRaw"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateWalletV3"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateWalletV4"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateWalletHighloadV1"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateWalletHighloadV2"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateDns"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateRWallet"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStatePChan"
+          },
+          {
+            "$ref": "#/components/schemas/AccountStateUninited"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "raw.accountState": "#/components/schemas/AccountStateRaw",
+            "wallet.v3.accountState": "#/components/schemas/AccountStateWalletV3",
+            "wallet.v4.accountState": "#/components/schemas/AccountStateWalletV4",
+            "wallet.highload.v1.accountState": "#/components/schemas/AccountStateWalletHighloadV1",
+            "wallet.highload.v2.accountState": "#/components/schemas/AccountStateWalletHighloadV2",
+            "dns.accountState": "#/components/schemas/AccountStateDns",
+            "rwallet.accountState": "#/components/schemas/AccountStateRWallet",
+            "pchan.accountState": "#/components/schemas/AccountStatePChan",
+            "uninited.accountState": "#/components/schemas/AccountStateUninited"
+          }
+        }
+      },
+      "TokenContentDict": {
+        "type": "object",
+        "additionalProperties": true
+      },
+      "DnsRecordStorageAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "bag_id"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["dns_storage_address"],
+            "default": "dns_storage_address"
+          },
+          "bag_id": {
+            "$ref": "#/components/schemas/TonHashHex"
+          }
+        }
+      },
+      "DnsRecordAdnlAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "adnl_addr"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["dns_adnl_address"],
+            "default": "dns_adnl_address"
+          },
+          "adnl_addr": {
+            "$ref": "#/components/schemas/TonHashHex"
+          }
+        }
+      },
+      "SmcAddr": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "workchain_id", "address"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["addr_std"],
+            "default": "addr_std"
+          },
+          "workchain_id": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "address": {
+            "$ref": "#/components/schemas/TonHashHex"
+          }
+        }
+      },
+      "DnsRecordSmcAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "smc_addr"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["dns_smc_address"],
+            "default": "dns_smc_address"
+          },
+          "smc_addr": {
+            "$ref": "#/components/schemas/SmcAddr"
+          }
+        }
+      },
+      "DnsRecordNextResolver": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "resolver"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["dns_next_resolver"],
+            "default": "dns_next_resolver"
+          },
+          "resolver": {
+            "$ref": "#/components/schemas/SmcAddr"
+          }
+        }
+      },
+      "DnsRecord": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DnsRecordStorageAddress"
+          },
+          {
+            "$ref": "#/components/schemas/DnsRecordSmcAddress"
+          },
+          {
+            "$ref": "#/components/schemas/DnsRecordAdnlAddress"
+          },
+          {
+            "$ref": "#/components/schemas/DnsRecordNextResolver"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "dns_storage_address": "#/components/schemas/DnsRecordStorageAddress",
+            "dns_smc_address": "#/components/schemas/DnsRecordSmcAddress",
+            "dns_adnl_address": "#/components/schemas/DnsRecordAdnlAddress",
+            "dns_next_resolver": "#/components/schemas/DnsRecordNextResolver"
+          }
+        }
+      },
+      "DnsRecordSet": {
+        "type": "object",
+        "additionalProperties": true,
+        "properties": {
+          "dns_next_resolver": {
+            "$ref": "#/components/schemas/DnsRecord"
+          },
+          "wallet": {
+            "$ref": "#/components/schemas/DnsRecord"
+          },
+          "site": {
+            "$ref": "#/components/schemas/DnsRecord"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/DnsRecord"
+          }
+        }
+      },
+      "DnsContent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["domain", "data"],
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/DnsRecordSet"
+          }
+        }
+      },
+      "TokenContent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "data"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["onchain", "offchain"]
+          },
+          "data": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/TokenContentDict"
+              }
+            ]
+          }
+        }
+      },
+      "JettonMasterData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "@type",
+          "address",
+          "contract_type",
+          "total_supply",
+          "mintable",
+          "jetton_content",
+          "jetton_wallet_code"
+        ],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.tokens.jettonMasterData"],
+            "default": "ext.tokens.jettonMasterData"
+          },
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "contract_type": {
+            "type": "string",
+            "enum": ["jetton_master"],
+            "default": "jetton_master"
+          },
+          "total_supply": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "mintable": {
+            "type": "boolean"
+          },
+          "admin_address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "jetton_content": {
+            "$ref": "#/components/schemas/TokenContent"
+          },
+          "jetton_wallet_code": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "JettonWalletData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "@type",
+          "address",
+          "contract_type",
+          "balance",
+          "owner",
+          "jetton",
+          "jetton_wallet_code"
+        ],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.tokens.jettonWalletData"],
+            "default": "ext.tokens.jettonWalletData"
+          },
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "contract_type": {
+            "type": "string",
+            "enum": ["jetton_wallet"],
+            "default": "jetton_wallet"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "owner": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "jetton": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "mintless_is_claimed": {
+            "type": "boolean"
+          },
+          "jetton_wallet_code": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "NftCollectionData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "address", "contract_type", "next_item_index", "collection_content"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.tokens.nftCollectionData"],
+            "default": "ext.tokens.nftCollectionData"
+          },
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "contract_type": {
+            "type": "string",
+            "enum": ["nft_collection"],
+            "default": "nft_collection"
+          },
+          "next_item_index": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "owner_address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "collection_content": {
+            "$ref": "#/components/schemas/TokenContent"
+          }
+        }
+      },
+      "NftItemData": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "address", "contract_type", "init", "index", "content"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.tokens.nftItemData"],
+            "default": "ext.tokens.nftItemData"
+          },
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "contract_type": {
+            "type": "string",
+            "enum": ["nft_item"],
+            "default": "nft_item"
+          },
+          "init": {
+            "type": "boolean"
+          },
+          "index": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "collection_address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "owner_address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "content": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TokenContent"
+              },
+              {
+                "$ref": "#/components/schemas/DnsContent"
+              }
+            ]
+          }
+        }
+      },
+      "TokenData": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/JettonMasterData"
+          },
+          {
+            "$ref": "#/components/schemas/JettonWalletData"
+          },
+          {
+            "$ref": "#/components/schemas/NftCollectionData"
+          },
+          {
+            "$ref": "#/components/schemas/NftItemData"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "ext.tokens.jettonMasterData": "#/components/schemas/JettonMasterData",
+            "ext.tokens.jettonWalletData": "#/components/schemas/JettonWalletData",
+            "ext.tokens.nftCollectionData": "#/components/schemas/NftCollectionData",
+            "ext.tokens.nftItemData": "#/components/schemas/NftItemData"
+          }
+        }
+      },
+      "AccountStateEnum": {
+        "type": "string",
+        "enum": ["uninitialized", "active", "frozen"],
+        "description": "Computed from code/frozen_hash by the API server."
+      },
+      "BlockSignature": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.signature"],
+            "default": "blocks.signature"
+          },
+          "node_id_short": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "signature": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        },
+        "required": ["@type", "node_id_short", "signature"]
+      },
+      "ShardBlockLink": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.shardBlockLink"],
+            "default": "blocks.shardBlockLink"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "proof": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        },
+        "required": ["@type", "id", "proof"]
+      },
+      "BlockLinkBack": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.blockLinkBack"],
+            "default": "blocks.blockLinkBack"
+          },
+          "to_key_block": {
+            "type": "boolean"
+          },
+          "from": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "to": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "dest_proof": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "proof": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "state_proof": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        },
+        "required": ["@type", "to_key_block", "from", "to", "dest_proof", "proof", "state_proof"]
+      },
+      "OutMsgQueueSize": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.outMsgQueueSize"],
+            "default": "blocks.outMsgQueueSize"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt",
+            "description": "Block identifier for the shard."
+          },
+          "size": {
+            "type": "integer",
+            "description": "Queue size for the shard."
+          }
+        },
+        "required": ["@type", "id", "size"]
+      },
+      "LibraryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["smc.libraryEntry"],
+            "default": "smc.libraryEntry"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        },
+        "required": ["@type", "hash", "data"]
+      },
+      "ShortTxId": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Short transaction identifier",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.shortTxId"],
+            "default": "blocks.shortTxId"
+          },
+          "mode": {
+            "type": "integer",
+            "description": "Transaction mode flags"
+          },
+          "account": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "lt": {
+            "type": "string",
+            "description": "Logical time of the transaction",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash",
+            "description": "Base64 hash of the transaction"
+          }
+        },
+        "required": ["@type", "mode", "account", "lt", "hash"]
+      },
+      "MsgDataRaw": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["msg.dataRaw"],
+            "default": "msg.dataRaw"
+          },
+          "body": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "init_state": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "MsgDataText": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["msg.dataText"],
+            "default": "msg.dataText"
+          },
+          "text": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "MsgDataDecryptedText": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["msg.dataDecryptedText"],
+            "default": "msg.dataDecryptedText"
+          },
+          "text": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "MsgDataEncryptedText": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["msg.dataEncryptedText"],
+            "default": "msg.dataEncryptedText"
+          },
+          "text": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "MsgData": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/MsgDataRaw"
+          },
+          {
+            "$ref": "#/components/schemas/MsgDataText"
+          },
+          {
+            "$ref": "#/components/schemas/MsgDataDecryptedText"
+          },
+          {
+            "$ref": "#/components/schemas/MsgDataEncryptedText"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "msg.dataRaw": "#/components/schemas/MsgDataRaw",
+            "msg.dataText": "#/components/schemas/MsgDataText",
+            "msg.dataDecryptedText": "#/components/schemas/MsgDataDecryptedText",
+            "msg.dataEncryptedText": "#/components/schemas/MsgDataEncryptedText"
+          }
+        }
+      },
+      "MessageStd": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.message"],
+            "default": "raw.message"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "extra_currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraCurrencyBalance"
+            }
+          },
+          "fwd_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "ihr_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "created_lt": {
+            "type": "string",
+            "description": "Logical time of the transaction",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "body_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "msg_data": {
+            "$ref": "#/components/schemas/MsgData"
+          }
+        },
+        "required": [
+          "@type",
+          "hash",
+          "source",
+          "destination",
+          "value",
+          "extra_currencies",
+          "fwd_fee",
+          "ihr_fee",
+          "created_lt",
+          "body_hash",
+          "msg_data"
+        ]
+      },
+      "TransactionStd": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.transaction"],
+            "default": "raw.transaction"
+          },
+          "address": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "utime": {
+            "type": "integer",
+            "description": "UNIX timestamp of transaction"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          },
+          "fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "storage_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "other_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "in_msg": {
+            "$ref": "#/components/schemas/MessageStd"
+          },
+          "out_msgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MessageStd"
+            }
+          }
+        },
+        "required": [
+          "@type",
+          "address",
+          "utime",
+          "data",
+          "transaction_id",
+          "fee",
+          "storage_fee",
+          "other_fee",
+          "out_msgs"
+        ]
+      },
+      "TransactionExt": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/TransactionStd"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "@type": {
+                "type": "string",
+                "enum": ["raw.transactionExt"],
+                "default": "raw.transactionExt"
+              },
+              "account": {
+                "$ref": "#/components/schemas/TonAddr"
+              }
+            }
+          }
+        ]
+      },
+      "Message": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.message"],
+            "default": "ext.message"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "destination": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "extra_currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraCurrencyBalance"
+            }
+          },
+          "fwd_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "ihr_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "created_lt": {
+            "type": "string",
+            "description": "Logical time of the transaction",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "body_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "msg_data": {
+            "$ref": "#/components/schemas/MsgData"
+          },
+          "message": {
+            "type": "string"
+          },
+          "message_decode_error": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "@type",
+          "hash",
+          "source",
+          "destination",
+          "value",
+          "extra_currencies",
+          "fwd_fee",
+          "ihr_fee",
+          "created_lt",
+          "body_hash",
+          "msg_data"
+        ]
+      },
+      "Transaction": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.transaction"],
+            "default": "ext.transaction"
+          },
+          "address": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "account": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "utime": {
+            "type": "integer",
+            "description": "UNIX timestamp of transaction"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          },
+          "fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "storage_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "other_fee": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "in_msg": {
+            "$ref": "#/components/schemas/Message"
+          },
+          "out_msgs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          }
+        },
+        "required": [
+          "@type",
+          "address",
+          "account",
+          "utime",
+          "data",
+          "transaction_id",
+          "fee",
+          "storage_fee",
+          "other_fee",
+          "out_msgs"
+        ]
+      },
+      "TonlibObject": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/DetectAddress"
+          },
+          {
+            "$ref": "#/components/schemas/DetectHash"
+          },
+          {
+            "$ref": "#/components/schemas/AddressInformation"
+          },
+          {
+            "$ref": "#/components/schemas/ExtendedAddressInformation"
+          },
+          {
+            "$ref": "#/components/schemas/WalletInformation"
+          },
+          {
+            "$ref": "#/components/schemas/JettonMasterData"
+          },
+          {
+            "$ref": "#/components/schemas/JettonWalletData"
+          },
+          {
+            "$ref": "#/components/schemas/NftCollectionData"
+          },
+          {
+            "$ref": "#/components/schemas/NftItemData"
+          },
+          {
+            "$ref": "#/components/schemas/MasterchainInfo"
+          },
+          {
+            "$ref": "#/components/schemas/BlockSignatures"
+          },
+          {
+            "$ref": "#/components/schemas/BlockSignaturesSimplex"
+          },
+          {
+            "$ref": "#/components/schemas/ShardBlockProof"
+          },
+          {
+            "$ref": "#/components/schemas/ConsensusBlock"
+          },
+          {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          {
+            "$ref": "#/components/schemas/Shards"
+          },
+          {
+            "$ref": "#/components/schemas/BlockHeader"
+          },
+          {
+            "$ref": "#/components/schemas/OutMsgQueueSizes"
+          },
+          {
+            "$ref": "#/components/schemas/BlockTransactions"
+          },
+          {
+            "$ref": "#/components/schemas/BlockTransactionsExt"
+          },
+          {
+            "$ref": "#/components/schemas/Transaction"
+          },
+          {
+            "$ref": "#/components/schemas/TransactionsStd"
+          },
+          {
+            "$ref": "#/components/schemas/ConfigInfo"
+          },
+          {
+            "$ref": "#/components/schemas/LibraryResult"
+          },
+          {
+            "$ref": "#/components/schemas/QueryFees"
+          },
+          {
+            "$ref": "#/components/schemas/ExtMessageInfo"
+          },
+          {
+            "$ref": "#/components/schemas/ResultOk"
+          },
+          {
+            "$ref": "#/components/schemas/RunGetMethodStdResult"
+          },
+          {
+            "$ref": "#/components/schemas/RunGetMethodResult"
+          },
+          {
+            "$ref": "#/components/schemas/TvmCell"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "ext.utils.detectAddress": "#/components/schemas/DetectAddress",
+            "ext.utils.detectedHash": "#/components/schemas/DetectHash",
+            "raw.fullAccountState": "#/components/schemas/AddressInformation",
+            "fullAccountState": "#/components/schemas/ExtendedAddressInformation",
+            "ext.accounts.walletInformation": "#/components/schemas/WalletInformation",
+            "ext.tokens.jettonMasterData": "#/components/schemas/JettonMasterData",
+            "ext.tokens.jettonWalletData": "#/components/schemas/JettonWalletData",
+            "ext.tokens.nftCollectionData": "#/components/schemas/NftCollectionData",
+            "ext.tokens.nftItemData": "#/components/schemas/NftItemData",
+            "blocks.masterchainInfo": "#/components/schemas/MasterchainInfo",
+            "blocks.blockSignatures": "#/components/schemas/BlockSignatures",
+            "blocks.blockSignatures.simplex": "#/components/schemas/BlockSignaturesSimplex",
+            "blocks.shardBlockProof": "#/components/schemas/ShardBlockProof",
+            "ext.blocks.consensusBlock": "#/components/schemas/ConsensusBlock",
+            "ton.blockIdExt": "#/components/schemas/TonBlockIdExt",
+            "blocks.shards": "#/components/schemas/Shards",
+            "blocks.header": "#/components/schemas/BlockHeader",
+            "blocks.outMsgQueueSizes": "#/components/schemas/OutMsgQueueSizes",
+            "blocks.transactions": "#/components/schemas/BlockTransactions",
+            "blocks.transactionsExt": "#/components/schemas/BlockTransactionsExt",
+            "ext.transaction": "#/components/schemas/Transaction",
+            "raw.transactions": "#/components/schemas/TransactionsStd",
+            "configInfo": "#/components/schemas/ConfigInfo",
+            "query.fees": "#/components/schemas/QueryFees",
+            "smc.libraryResult": "#/components/schemas/LibraryResult",
+            "raw.extMessageInfo": "#/components/schemas/ExtMessageInfo",
+            "ok": "#/components/schemas/ResultOk",
+            "smc.runResult": "#/components/schemas/RunGetMethodStdResult",
+            "ext.runResult": "#/components/schemas/RunGetMethodResult",
+            "tvm.cell": "#/components/schemas/TvmCell"
+          }
+        }
+      },
+      "TonlibResponse": {
+        "type": "object",
+        "title": "TonlibResponse",
+        "additionalProperties": false,
+        "required": ["ok", "result", "@extra"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": true
+          },
+          "result": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "$ref": "#/components/schemas/AccountStateEnum"
+              },
+              {
+                "$ref": "#/components/schemas/TonlibObject"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TonlibObject"
+                }
+              }
+            ]
+          },
+          "@extra": {
+            "type": "string",
+            "title": "Extra information"
+          },
+          "jsonrpc": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "TonlibErrorResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "title": "TonlibErrorResponse",
+        "required": ["ok", "error", "code"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok",
+            "default": false
+          },
+          "error": {
+            "type": "string",
+            "title": "Error description"
+          },
+          "code": {
+            "type": "integer",
+            "title": "Error code",
+            "minimum": 100,
+            "maximum": 600
+          },
+          "@extra": {
+            "type": "string",
+            "title": "Extra information"
+          },
+          "jsonrpc": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          }
+        }
+      },
+      "JsonRpcResponse": {
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["jsonrpc", "id"],
+            "properties": {
+              "jsonrpc": {
+                "type": "string",
+                "default": "2.0"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TonlibResponse"
+          }
+        ]
+      },
+      "JsonRpcErrorResponse": {
+        "allOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["jsonrpc", "id"],
+            "properties": {
+              "jsonrpc": {
+                "type": "string",
+                "default": "2.0"
+              },
+              "id": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "$ref": "#/components/schemas/TonlibErrorResponse"
+          }
+        ]
+      },
+      "DetectAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Information about the address.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.utils.detectedAddress"],
+            "default": "ext.utils.detectedAddress"
+          },
+          "raw_form": {
+            "type": "string"
+          },
+          "bounceable": {
+            "$ref": "#/components/schemas/DetectAddressBase64Variant"
+          },
+          "non_bounceable": {
+            "$ref": "#/components/schemas/DetectAddressBase64Variant"
+          },
+          "given_type": {
+            "type": "string",
+            "enum": ["raw_form", "friendly_bounceable", "friendly_non_bounceable"]
+          },
+          "test_only": {
+            "type": "boolean"
+          }
+        },
+        "required": ["@type", "raw_form", "bounceable", "non_bounceable", "given_type", "test_only"]
+      },
+      "DetectHash": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.utils.detectedHash"],
+            "default": "ext.utils.detectedHash"
+          },
+          "b64": {
+            "type": "string",
+            "title": "base64 form"
+          },
+          "b64url": {
+            "type": "string",
+            "title": "base64 url-safe form"
+          },
+          "hex": {
+            "type": "string",
+            "title": "hex form"
+          }
+        },
+        "required": ["@type", "b64", "b64url", "hex"]
+      },
+      "PackAddress": {
+        "type": "string",
+        "title": "Address packed in base64",
+        "x-usrv-cpp-type": "ton_http::types::bytes"
+      },
+      "UnpackAddress": {
+        "type": "string",
+        "title": "Address unpacked to raw form"
+      },
+      "AddressInformation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.fullAccountState"],
+            "default": "raw.fullAccountState"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "extra_currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraCurrencyBalance"
+            }
+          },
+          "last_transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          },
+          "block_id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "code": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "data": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "frozen_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "sync_utime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "state": {
+            "$ref": "#/components/schemas/AccountStateEnum"
+          },
+          "suspended": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "@type",
+          "balance",
+          "extra_currencies",
+          "code",
+          "data",
+          "last_transaction_id",
+          "block_id",
+          "frozen_hash",
+          "sync_utime",
+          "state"
+        ]
+      },
+      "ExtendedAddressInformation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["fullAccountState"],
+            "default": "fullAccountState"
+          },
+          "address": {
+            "$ref": "#/components/schemas/AccountAddress"
+          },
+          "balance": {
+            "$ref": "#/components/schemas/Int256"
+          },
+          "extra_currencies": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ExtraCurrencyBalance"
+            }
+          },
+          "last_transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          },
+          "block_id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "sync_utime": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "account_state": {
+            "$ref": "#/components/schemas/AccountState"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "@type",
+          "address",
+          "balance",
+          "extra_currencies",
+          "last_transaction_id",
+          "block_id",
+          "sync_utime",
+          "account_state",
+          "revision"
+        ]
+      },
+      "WalletInformation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.accounts.walletInformation"],
+            "default": "ext.accounts.walletInformation"
+          },
+          "wallet": {
+            "type": "boolean"
+          },
+          "balance": {
+            "type": "string",
+            "x-usrv-cpp-type": "ton_http::types::int256"
+          },
+          "account_state": {
+            "$ref": "#/components/schemas/AccountStateEnum"
+          },
+          "last_transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          },
+          "wallet_type": {
+            "type": "string",
+            "enum": [
+              "wallet v1 r1",
+              "wallet v1 r2",
+              "wallet v1 r3",
+              "wallet v2 r1",
+              "wallet v2 r2",
+              "wallet v3 r1",
+              "wallet v3 r2",
+              "wallet v4 r1",
+              "wallet v4 r2",
+              "wallet v5 beta",
+              "wallet v5 r1"
+            ]
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "wallet_id": {
+            "type": "integer"
+          },
+          "is_signature_allowed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["@type", "wallet", "balance", "account_state", "last_transaction_id"]
+      },
+      "AddressBalance": {
+        "$ref": "#/components/schemas/Int256"
+      },
+      "AddressState": {
+        "$ref": "#/components/schemas/AccountStateEnum"
+      },
+      "MasterchainInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Information about the latest masterchain block.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.masterchainInfo"],
+            "default": "blocks.masterchainInfo"
+          },
+          "last": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "state_root_hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "init": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          }
+        },
+        "required": ["@type", "last", "state_root_hash", "init"]
+      },
+      "BlockSignatures": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.blockSignatures"],
+            "default": "blocks.blockSignatures"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockSignature"
+            }
+          }
+        },
+        "required": ["@type", "id", "signatures"]
+      },
+      "BlockSignaturesSimplex": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.blockSignatures.simplex"],
+            "default": "blocks.blockSignatures.simplex"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "signatures": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockSignature"
+            }
+          },
+          "session_id": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "slot": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "candidate": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        },
+        "required": ["@type", "id", "signatures", "session_id", "slot", "candidate"]
+      },
+      "MasterchainBlockSignatures": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/BlockSignatures"
+          },
+          {
+            "$ref": "#/components/schemas/BlockSignaturesSimplex"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "blocks.blockSignatures": "#/components/schemas/BlockSignatures",
+            "blocks.blockSignatures.simplex": "#/components/schemas/BlockSignaturesSimplex"
+          }
+        }
+      },
+      "ShardBlockProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.shardBlockProof"],
+            "default": "blocks.shardBlockProof"
+          },
+          "from": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "mc_id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ShardBlockLink"
+            }
+          },
+          "mc_proof": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockLinkBack"
+            }
+          }
+        },
+        "required": ["@type", "from", "mc_id", "links", "mc_proof"]
+      },
+      "ConsensusBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ext.blocks.consensusBlock"],
+            "default": "ext.blocks.consensusBlock"
+          },
+          "consensus_block": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "timestamp": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": ["@type", "consensus_block", "timestamp"]
+      },
+      "LookupBlock": {
+        "$ref": "#/components/schemas/TonBlockIdExt"
+      },
+      "Shards": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.shards"],
+            "default": "blocks.shards"
+          },
+          "shards": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TonBlockIdExt"
+            }
+          }
+        },
+        "required": ["@type", "shards"]
+      },
+      "BlockHeader": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "Block header information.",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.header"],
+            "default": "blocks.header"
+          },
+          "id": {
+            "$ref": "#/components/schemas/TonBlockIdExt",
+            "description": "Extended identifier of the block."
+          },
+          "global_id": {
+            "type": "integer",
+            "description": "Global network identifier."
+          },
+          "version": {
+            "type": "integer",
+            "description": "Block format version."
+          },
+          "after_merge": {
+            "type": "boolean",
+            "description": "True if block was created after a merge."
+          },
+          "after_split": {
+            "type": "boolean",
+            "description": "True if block was created after a split."
+          },
+          "before_split": {
+            "type": "boolean",
+            "description": "True if block was created before a split."
+          },
+          "want_merge": {
+            "type": "boolean",
+            "description": "Indicates if validators wanted a merge."
+          },
+          "want_split": {
+            "type": "boolean",
+            "description": "Indicates if validators wanted a split."
+          },
+          "validator_list_hash_short": {
+            "type": "integer",
+            "description": "Short hash of validator list."
+          },
+          "catchain_seqno": {
+            "type": "integer",
+            "description": "Catchain sequence number."
+          },
+          "min_ref_mc_seqno": {
+            "type": "integer",
+            "description": "Minimum referenced masterchain seqno."
+          },
+          "is_key_block": {
+            "type": "boolean",
+            "description": "True if this block is a key block."
+          },
+          "prev_key_block_seqno": {
+            "type": "integer",
+            "description": "Previous key block sequence number."
+          },
+          "start_lt": {
+            "type": "string",
+            "description": "Starting logical time.",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "end_lt": {
+            "type": "string",
+            "description": "Ending logical time.",
+            "x-usrv-cpp-type": "std::int64_t"
+          },
+          "gen_utime": {
+            "type": "integer",
+            "description": "Block generation UNIX timestamp."
+          },
+          "prev_blocks": {
+            "type": "array",
+            "description": "List of previous block identifiers.",
+            "items": {
+              "$ref": "#/components/schemas/TonBlockIdExt"
+            }
+          }
+        },
+        "required": [
+          "@type",
+          "id",
+          "global_id",
+          "version",
+          "after_merge",
+          "after_split",
+          "before_split",
+          "want_merge",
+          "want_split",
+          "validator_list_hash_short",
+          "catchain_seqno",
+          "min_ref_mc_seqno",
+          "is_key_block",
+          "prev_key_block_seqno",
+          "start_lt",
+          "end_lt",
+          "gen_utime",
+          "prev_blocks"
+        ]
+      },
+      "OutMsgQueueSizes": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.outMsgQueueSizes"],
+            "default": "blocks.outMsgQueueSizes"
+          },
+          "shards": {
+            "type": "array",
+            "description": "List of outgoing message queue sizes per shard.",
+            "items": {
+              "$ref": "#/components/schemas/OutMsgQueueSize"
+            }
+          },
+          "ext_msg_queue_size_limit": {
+            "type": "integer",
+            "description": "Limit for the external message queue size."
+          }
+        },
+        "required": ["@type", "shards", "ext_msg_queue_size_limit"]
+      },
+      "ConfigInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["configInfo"],
+            "default": "configInfo"
+          },
+          "config": {
+            "$ref": "#/components/schemas/TvmCell"
+          }
+        },
+        "required": ["@type", "config"]
+      },
+      "LibraryResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["smc.libraryResult"],
+            "default": "smc.libraryResult"
+          },
+          "result": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LibraryEntry"
+            }
+          }
+        },
+        "required": ["@type", "result"]
+      },
+      "BlockTransactions": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Block transactions information",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.transactions"],
+            "default": "blocks.transactions"
+          },
+          "id": {
+            "description": "Identifier of the block containing the transactions",
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "req_count": {
+            "type": "integer",
+            "description": "Number of requested transactions"
+          },
+          "incomplete": {
+            "type": "boolean",
+            "description": "Indicates if the transaction list is incomplete"
+          },
+          "transactions": {
+            "type": "array",
+            "description": "List of short transaction identifiers",
+            "items": {
+              "$ref": "#/components/schemas/ShortTxId"
+            }
+          }
+        },
+        "required": ["@type", "id", "req_count", "incomplete", "transactions"]
+      },
+      "BlockTransactionsExt": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Block transactions information",
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["blocks.transactionsExt"],
+            "default": "blocks.transactionsExt"
+          },
+          "id": {
+            "description": "Identifier of the block containing the transactions",
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "req_count": {
+            "type": "integer",
+            "description": "Number of requested transactions"
+          },
+          "incomplete": {
+            "type": "boolean",
+            "description": "Indicates if the transaction list is incomplete"
+          },
+          "transactions": {
+            "type": "array",
+            "description": "List of short transaction identifiers",
+            "items": {
+              "$ref": "#/components/schemas/TransactionExt"
+            }
+          }
+        },
+        "required": ["@type", "id", "req_count", "incomplete", "transactions"]
+      },
+      "Transactions": {
+        "type": "array",
+        "items": {
+          "$ref": "#/components/schemas/Transaction"
+        }
+      },
+      "TransactionsStd": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "transactions", "previous_transaction_id"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.transactions"],
+            "default": "raw.transactions"
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TransactionStd"
+            }
+          },
+          "previous_transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          }
+        }
+      },
+      "ExtMessageInfo": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "hash", "hash_norm"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["raw.extMessageInfo"],
+            "default": "raw.extMessageInfo"
+          },
+          "hash": {
+            "$ref": "#/components/schemas/TonHash"
+          },
+          "hash_norm": {
+            "$ref": "#/components/schemas/TonHash"
+          }
+        }
+      },
+      "ResultOk": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ok"],
+            "default": "ok"
+          }
+        }
+      },
+      "SendBocResult": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ResultOk"
+          },
+          {
+            "$ref": "#/components/schemas/ExtMessageInfo"
+          }
+        ],
+        "discriminator": {
+          "propertyName": "@type",
+          "mapping": {
+            "ok": "#/components/schemas/ResultOk",
+            "ext.messageInfo": "#/components/schemas/ExtMessageInfo"
+          }
+        }
+      },
+      "Fees": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "in_fwd_fee", "storage_fee", "gas_fee", "fwd_fee"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["fees"],
+            "default": "fees"
+          },
+          "in_fwd_fee": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "storage_fee": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "gas_fee": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "fwd_fee": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "QueryFees": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "source_fees", "destination_fees"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["query.fees"],
+            "default": "query.fees"
+          },
+          "source_fees": {
+            "$ref": "#/components/schemas/Fees"
+          },
+          "destination_fees": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Fees"
+            }
+          }
+        }
+      },
+      "TvmStackEntrySlice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "slice"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntrySlice"],
+            "default": "tvm.stackEntrySlice"
+          },
+          "slice": {
+            "$ref": "#/components/schemas/TvmSlice"
+          }
+        }
+      },
+      "TvmStackEntryCell": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "cell"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntryCell"],
+            "default": "tvm.stackEntryCell"
+          },
+          "cell": {
+            "$ref": "#/components/schemas/TvmCell"
+          }
+        }
+      },
+      "TvmStackEntryNumber": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "number"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntryNumber"],
+            "default": "tvm.stackEntryNumber"
+          },
+          "number": {
+            "$ref": "#/components/schemas/TvmNumberDecimal"
+          }
+        }
+      },
+      "TvmStackEntryTuple": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "tuple"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntryTuple"],
+            "default": "tvm.stackEntryTuple"
+          },
+          "tuple": {
+            "$ref": "#/components/schemas/TvmTuple"
+          }
+        }
+      },
+      "TvmStackEntryList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "list"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntryList"],
+            "default": "tvm.stackEntryList"
+          },
+          "list": {
+            "$ref": "#/components/schemas/TvmList"
+          }
+        }
+      },
+      "TvmStackEntryUnsupported": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.stackEntryUnsupported"],
+            "default": "tvm.stackEntryUnsupported"
+          }
+        }
+      },
+      "TvmSlice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "bytes"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.slice"],
+            "default": "tvm.slice"
+          },
+          "bytes": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "TvmCell": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "bytes"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.cell"],
+            "default": "tvm.cell"
+          },
+          "bytes": {
+            "$ref": "#/components/schemas/Bytes"
+          }
+        }
+      },
+      "TvmNumberDecimal": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "number"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.numberDecimal"],
+            "default": "tvm.numberDecimal"
+          },
+          "number": {
+            "$ref": "#/components/schemas/Int256"
+          }
+        }
+      },
+      "TvmTuple": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "elements"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.tuple"],
+            "default": "tvm.tuple"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TvmStackEntrySlice",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryCell",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryNumber",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryTuple",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryList",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryUnsupported",
+                  "x-usrv-cpp-indirect": true
+                }
+              ],
+              "discriminator": {
+                "propertyName": "@type",
+                "mapping": {
+                  "tvm.stackEntrySlice": "#/components/schemas/TvmStackEntrySlice",
+                  "tvm.stackEntryCell": "#/components/schemas/TvmStackEntryCell",
+                  "tvm.stackEntryNumber": "#/components/schemas/TvmStackEntryNumber",
+                  "tvm.stackEntryTuple": "#/components/schemas/TvmStackEntryTuple",
+                  "tvm.stackEntryList": "#/components/schemas/TvmStackEntryList",
+                  "tvm.stackEntryUnsupported": "#/components/schemas/TvmStackEntryUnsupported"
+                }
+              }
+            }
+          }
+        }
+      },
+      "TvmList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "elements"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["tvm.list"],
+            "default": "tvm.list"
+          },
+          "elements": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TvmStackEntrySlice",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryCell",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryNumber",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryTuple",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryList",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryUnsupported",
+                  "x-usrv-cpp-indirect": true
+                }
+              ],
+              "discriminator": {
+                "propertyName": "@type",
+                "mapping": {
+                  "tvm.stackEntrySlice": "#/components/schemas/TvmStackEntrySlice",
+                  "tvm.stackEntryCell": "#/components/schemas/TvmStackEntryCell",
+                  "tvm.stackEntryNumber": "#/components/schemas/TvmStackEntryNumber",
+                  "tvm.stackEntryTuple": "#/components/schemas/TvmStackEntryTuple",
+                  "tvm.stackEntryList": "#/components/schemas/TvmStackEntryList",
+                  "tvm.stackEntryUnsupported": "#/components/schemas/TvmStackEntryUnsupported"
+                }
+              }
+            }
+          }
+        }
+      },
+      "RunGetMethodStdRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address", "method", "stack"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "method": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ]
+          },
+          "stack": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TvmStackEntrySlice",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryCell",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryNumber",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryTuple",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryList",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryUnsupported",
+                  "x-usrv-cpp-indirect": true
+                }
+              ],
+              "discriminator": {
+                "propertyName": "@type",
+                "mapping": {
+                  "tvm.stackEntrySlice": "#/components/schemas/TvmStackEntrySlice",
+                  "tvm.stackEntryCell": "#/components/schemas/TvmStackEntryCell",
+                  "tvm.stackEntryNumber": "#/components/schemas/TvmStackEntryNumber",
+                  "tvm.stackEntryTuple": "#/components/schemas/TvmStackEntryTuple",
+                  "tvm.stackEntryList": "#/components/schemas/TvmStackEntryList",
+                  "tvm.stackEntryUnsupported": "#/components/schemas/TvmStackEntryUnsupported"
+                }
+              }
+            }
+          },
+          "seqno": {
+            "type": "integer"
+          }
+        }
+      },
+      "RunGetMethodStdResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "gas_used", "stack", "exit_code"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["smc.runResult"],
+            "default": "smc.runResult"
+          },
+          "gas_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stack": {
+            "type": "array",
+            "items": {
+              "oneOf": [
+                {
+                  "$ref": "#/components/schemas/TvmStackEntrySlice",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryCell",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryNumber",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryTuple",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryList",
+                  "x-usrv-cpp-indirect": true
+                },
+                {
+                  "$ref": "#/components/schemas/TvmStackEntryUnsupported",
+                  "x-usrv-cpp-indirect": true
+                }
+              ],
+              "discriminator": {
+                "propertyName": "@type",
+                "mapping": {
+                  "tvm.stackEntrySlice": "#/components/schemas/TvmStackEntrySlice",
+                  "tvm.stackEntryCell": "#/components/schemas/TvmStackEntryCell",
+                  "tvm.stackEntryNumber": "#/components/schemas/TvmStackEntryNumber",
+                  "tvm.stackEntryTuple": "#/components/schemas/TvmStackEntryTuple",
+                  "tvm.stackEntryList": "#/components/schemas/TvmStackEntryList",
+                  "tvm.stackEntryUnsupported": "#/components/schemas/TvmStackEntryUnsupported"
+                }
+              }
+            }
+          },
+          "exit_code": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "LegacyTvmCell": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["data", "refs", "special"],
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["b64", "len"],
+            "properties": {
+              "b64": {
+                "$ref": "#/components/schemas/Bytes"
+              },
+              "len": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          },
+          "refs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegacyTvmCell"
+            }
+          },
+          "special": {
+            "type": "boolean"
+          }
+        }
+      },
+      "LegacyStackEntryCell": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bytes"],
+        "properties": {
+          "bytes": {
+            "$ref": "#/components/schemas/Bytes"
+          },
+          "object": {
+            "$ref": "#/components/schemas/LegacyTvmCell"
+          }
+        }
+      },
+      "LegacyStackEntry": {
+        "type": "array",
+        "items": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer",
+              "format": "int64"
+            },
+            {
+              "$ref": "#/components/schemas/LegacyStackEntryCell"
+            },
+            {
+              "$ref": "#/components/schemas/TvmTuple",
+              "x-usrv-cpp-indirect": true
+            },
+            {
+              "$ref": "#/components/schemas/TvmList",
+              "x-usrv-cpp-indirect": true
+            }
+          ]
+        },
+        "minItems": 2,
+        "maxItems": 2
+      },
+      "RunGetMethodRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["address", "method", "stack"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/TonAddr"
+          },
+          "method": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer",
+                "format": "int32"
+              }
+            ]
+          },
+          "stack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegacyStackEntry"
+            }
+          },
+          "seqno": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "RunGetMethodResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["@type", "gas_used", "stack", "exit_code", "block_id", "last_transaction_id"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["smc.runResult"],
+            "default": "smc.runResult"
+          },
+          "gas_used": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "stack": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LegacyStackEntry"
+            }
+          },
+          "exit_code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "block_id": {
+            "$ref": "#/components/schemas/TonBlockIdExt"
+          },
+          "last_transaction_id": {
+            "$ref": "#/components/schemas/InternalTransactionId"
+          }
+        }
+      }
+    }
+  },
+  "x-acton-source-openapi-url": "https://toncenter.com/api/v2/openapi.json",
+  "x-acton-filtered-paths": true
+}

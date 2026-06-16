@@ -1,10 +1,11 @@
-use crate::commands::common::{error_fmt, format_nanotons};
+use crate::commands::common::format_nanograms;
 use crate::contract_interface::{
-    compile_optional_contract_interface, is_boc_path, read_precompiled_boc,
+    compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
 };
 use crate::file_build_cache::FileBuildCache;
-use acton_config::color::OwoColorize;
+use acton_config::color::{OwoColorize, colors_enabled};
 use acton_config::config::{ActonConfig, ContractConfig, project_root as configured_project_root};
+use acton_debug::{PrettyAddressFormat, PrettyRenderOptions, render_unpacked_value_as_tolk_type};
 use anyhow::{Context, anyhow};
 use clap::Subcommand;
 use log::warn;
@@ -12,15 +13,15 @@ use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
-use tolk_compiler::abi::ContractABI;
-use tolk_compiler::dynamic_unpack::{self, UnpackedValue};
+use tolk_compiler::abi::{ABIGetMethod, ContractABI};
+use tolk_compiler::dynamic_unpack;
 use ton_api::{Network, TonApiClient};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
-use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
-};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
 
+mod call;
+mod info;
 mod trace;
 
 #[derive(Subcommand, Clone)]
@@ -29,11 +30,43 @@ pub enum RpcCommand {
     Info {
         #[arg(help = "Contract address in friendly or raw format")]
         address: String,
+        #[arg(long, help = "Masterchain block seqno to query account state at")]
+        block_number: Option<u64>,
         #[arg(
             long,
             help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
         )]
         net: Option<String>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(long, help = "Skip domain inspectors such as jetton detection")]
+        raw: bool,
+    },
+    #[command(about = "Call a contract get-method through TonCenter")]
+    Call {
+        #[arg(help = "Contract address in friendly or raw format")]
+        address: String,
+        #[arg(help = "Get-method name")]
+        method: String,
+        #[arg(
+            help = "Arguments to pass to the get-method",
+            allow_hyphen_values = true
+        )]
+        args: Vec<String>,
+        #[arg(
+            long,
+            help = "Network to query (defaults to testnet). Supported values: mainnet, testnet, localnet, custom:<name>"
+        )]
+        net: Option<String>,
+        #[arg(
+            long,
+            help = "Masterchain block seqno to query account state and run get-method at"
+        )]
+        block_number: Option<u64>,
+        #[arg(long, help = "Print machine-readable JSON output")]
+        json: bool,
+        #[arg(long, help = "Print the raw TonCenter stack without ABI decoding")]
+        raw: bool,
     },
     #[command(about = "Print the latest masterchain block info returned by TonCenter")]
     Block {
@@ -85,7 +118,22 @@ pub enum RpcCommand {
 
 pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
     match command {
-        RpcCommand::Info { address, net } => rpc_info_cmd(&address, net),
+        RpcCommand::Info {
+            address,
+            block_number,
+            net,
+            json,
+            raw,
+        } => info::rpc_info_cmd(&address, net, block_number, json, raw),
+        RpcCommand::Call {
+            address,
+            method,
+            args,
+            net,
+            block_number,
+            json,
+            raw,
+        } => call::rpc_call_cmd(&address, &method, &args, net, block_number, json, raw),
         RpcCommand::Block { net } => rpc_block_cmd(net),
         RpcCommand::BlockNumber { net } => rpc_block_number_cmd(net),
         RpcCommand::Trace {
@@ -97,104 +145,6 @@ pub fn rpc_cmd(command: RpcCommand) -> anyhow::Result<()> {
             show_bodies,
         } => trace::rpc_trace_cmd(&hash, net, summary, verbose, show_bodies),
     }
-}
-
-fn rpc_info_cmd(address: &str, net: Option<String>) -> anyhow::Result<()> {
-    let (address, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
-        .map_err(|_| anyhow!("Invalid address"))
-        .with_context(|| error_fmt::invalid_address(address))?;
-
-    let network = resolve_rpc_network(net)?;
-    let config = load_rpc_config()?;
-    let client = TonApiClient::new(network.clone(), config.custom_networks())?;
-
-    let remote = client
-        .get_account_info(None, &address.to_string())
-        .with_context(|| format!("Failed to fetch account info for {address} from {network}"))?;
-
-    let balance = remote.balance.to_bigint()?;
-    let code = TonApiClient::decode_optional_cell(&remote.code)?;
-    let data = TonApiClient::decode_optional_cell(&remote.data)?;
-
-    let matched_contract = code
-        .as_ref()
-        .map(|code| find_local_contract_match(code.repr_hash(), &config))
-        .transpose()?
-        .flatten();
-
-    let decoded_storage = match (&data, matched_contract.as_ref()) {
-        (Some(data), Some(contract)) => contract
-            .abi
-            .as_ref()
-            .map(|abi| decode_storage_json(data, abi, &network))
-            .transpose()?,
-        _ => None,
-    };
-
-    print_section("Remote Account");
-    print_kv("Network", network.to_string());
-    print_kv(
-        "Address",
-        format_std_address(&address, &network).cyan().to_string(),
-    );
-    print_kv("Raw Address", address.to_string().cyan().to_string());
-    print_kv("Status", format_account_status(&remote.state));
-    print_kv("Balance", format_nanotons(&balance).white().to_string());
-    print_kv("Last Tx LT", remote.last_transaction_id.lt.as_str());
-    print_kv(
-        "Last Tx Hash",
-        remote
-            .last_transaction_id
-            .hash
-            .as_str()
-            .yellow()
-            .to_string(),
-    );
-
-    if let Some(code) = &code {
-        print_kv("Code Hash", format_hash(code.repr_hash()));
-    }
-    if let Some(data) = &data {
-        print_kv("Data Hash", format_hash(data.repr_hash()));
-    }
-    if remote.state == "frozen" && !remote.frozen_hash.is_empty() {
-        print_kv(
-            "Frozen Hash",
-            remote.frozen_hash.as_str().yellow().to_string(),
-        );
-    }
-
-    if code.is_some() {
-        print_section("Local Match");
-        if let Some(contract) = &matched_contract {
-            print_kv(
-                "Contract",
-                format!("{} ({})", contract.contract_id, contract.contract_name)
-                    .green()
-                    .to_string(),
-            );
-        } else {
-            print_kv("Contract", "<none>".dimmed().to_string());
-        }
-    }
-
-    match decoded_storage {
-        Some(decoded_storage) => {
-            print_section("Decoded Storage");
-            print_yaml_value(None, &decoded_storage, 2);
-        }
-        None if data.is_some() && matched_contract.is_some() => {
-            print_section("Decoded Storage");
-            println!("  {}", "<unavailable>".dimmed());
-        }
-        None if data.is_some() => {
-            print_section("Decoded Storage");
-            println!("  {}", "<local ABI not found>".dimmed());
-        }
-        None => {}
-    }
-
-    Ok(())
 }
 
 fn rpc_block_cmd(net: Option<String>) -> anyhow::Result<()> {
@@ -223,14 +173,14 @@ fn rpc_block_number_cmd(net: Option<String>) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
+pub(super) fn resolve_rpc_network(net: Option<String>) -> anyhow::Result<Network> {
     net.as_deref()
         .map(Network::from_str)
         .transpose()
         .map(|network| network.unwrap_or(Network::Testnet))
 }
 
-fn load_rpc_config() -> anyhow::Result<ActonConfig> {
+pub(crate) fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     let manifest_path = acton_config::config::manifest_path();
     match ActonConfig::load() {
         Ok(config) => Ok(config),
@@ -244,21 +194,72 @@ fn load_rpc_config() -> anyhow::Result<ActonConfig> {
     }
 }
 
-#[derive(Clone)]
-struct LocalContractMatch {
-    contract_id: String,
-    contract_name: String,
-    abi: Option<Arc<ContractABI>>,
+pub(crate) struct LocalContractMatch {
+    pub(crate) contract_name: String,
+    pub(crate) abi: Option<Arc<ContractABI>>,
 }
 
-fn find_local_contract_match(
+pub(super) fn find_local_contract_match(
     code_hash: &HashBytes,
     config: &ActonConfig,
 ) -> anyhow::Result<Option<LocalContractMatch>> {
     for candidate in load_local_contract_candidates(config)? {
         if &candidate.code_hash == code_hash {
             return Ok(Some(LocalContractMatch {
-                contract_id: candidate.contract_id,
+                contract_name: candidate.contract_name,
+                abi: candidate.abi,
+            }));
+        }
+    }
+
+    Ok(None)
+}
+
+pub(crate) fn find_local_contract_by_config_name(
+    contract_name: &str,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<LocalContractMatch>> {
+    let Some(contracts) = config.contracts() else {
+        return Ok(None);
+    };
+    let normalized = normalize_contract_lookup_name(contract_name);
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
+    let mut file_cache = FileBuildCache::new(None).ok();
+    for (contract_id, contract) in contracts {
+        if !contract_config_matches_name(contract_id, contract, &normalized) {
+            continue;
+        }
+
+        let candidate =
+            load_local_contract_candidate(contract_id, contract, config, file_cache.as_mut())?;
+        return Ok(Some(LocalContractMatch {
+            contract_name: candidate.contract_name,
+            abi: candidate.abi,
+        }));
+    }
+
+    Ok(None)
+}
+
+pub(crate) fn find_local_contract_by_abi_name(
+    contract_name: &str,
+    config: &ActonConfig,
+) -> anyhow::Result<Option<LocalContractMatch>> {
+    let normalized = normalize_contract_lookup_name(contract_name);
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
+    for candidate in load_local_contract_candidates(config)? {
+        if candidate
+            .abi
+            .as_ref()
+            .is_some_and(|abi| normalize_contract_lookup_name(&abi.contract_name) == normalized)
+        {
+            return Ok(Some(LocalContractMatch {
                 contract_name: candidate.contract_name,
                 abi: candidate.abi,
             }));
@@ -298,6 +299,19 @@ fn load_local_contract_candidates(
     Ok(candidates)
 }
 
+fn contract_config_matches_name(
+    contract_id: &str,
+    contract: &ContractConfig,
+    normalized_name: &str,
+) -> bool {
+    normalize_contract_lookup_name(contract_id) == normalized_name
+        || normalize_contract_lookup_name(contract.display_name(contract_id)) == normalized_name
+}
+
+fn normalize_contract_lookup_name(name: &str) -> String {
+    name.trim().to_ascii_lowercase()
+}
+
 struct LocalContractCandidate {
     contract_path: PathBuf,
     contract_id: String,
@@ -317,11 +331,12 @@ fn load_local_contract_candidate(
     let contract_path = contract.absolute_source_path(configured_project_root());
     if is_boc_path(&contract_path) {
         let precompiled = read_precompiled_boc(&contract_path, &contract.src)?;
-        let interface = compile_optional_contract_interface(
+        let interface = compile_optional_contract_interface_with_cache(
             config,
             configured_project_root(),
             contract_id,
             contract,
+            file_cache,
         )?;
         let (abi, source_map) = interface.map_or((None, None), |interface| {
             (
@@ -384,92 +399,85 @@ fn load_local_contract_candidate(
     })
 }
 
-fn decode_storage_json(
-    data: &Cell,
-    abi: &ContractABI,
-    network: &Network,
-) -> anyhow::Result<serde_json::Value> {
-    let storage_ty_idx = abi
-        .storage
-        .storage_at_deployment_ty_idx
-        .or(abi.storage.storage_ty_idx)
-        .ok_or_else(|| anyhow!("Contract ABI does not declare storage"))?;
-    let mut parser = data.as_slice_allow_exotic();
-    let decoded = dynamic_unpack::unpack_from_abi_slice(&mut parser, abi, storage_ty_idx)
-        .context("Failed to decode storage with compiler ABI")?;
-    if parser.size_bits() != 0 || parser.size_refs() != 0 {
-        anyhow::bail!(
-            "Storage cell has {} extra bits and {} extra refs after type decode",
-            parser.size_bits(),
-            parser.size_refs()
-        );
+fn decode_storage(data: &Cell, abi: &ContractABI, network: &Network) -> anyhow::Result<String> {
+    let mut storage_candidates = Vec::new();
+    if let Some(storage_ty_idx) = abi.storage.storage_ty_idx {
+        storage_candidates.push(storage_ty_idx);
     }
-    Ok(compiler_data_to_json(&decoded, network))
-}
+    if let Some(storage_ty_idx) = abi.storage.storage_at_deployment_ty_idx
+        && !storage_candidates.contains(&storage_ty_idx)
+    {
+        storage_candidates.push(storage_ty_idx);
+    }
+    if storage_candidates.is_empty() {
+        anyhow::bail!("Contract ABI does not declare storage");
+    }
 
-fn compiler_data_to_json(data: &UnpackedValue, network: &Network) -> serde_json::Value {
-    match data {
-        UnpackedValue::Null | UnpackedValue::Void => serde_json::Value::Null,
-        UnpackedValue::Number(value) => serde_json::Value::String(value.to_string()),
-        UnpackedValue::Bool(value) => serde_json::Value::Bool(*value),
-        UnpackedValue::String(value) => serde_json::Value::String(value.clone()),
-        UnpackedValue::Address(value) => {
-            serde_json::Value::String(format_int_address(value, network))
-        }
-        UnpackedValue::ExtAddress(value) => serde_json::json!({
-            "bits": value.data_bit_len,
-            "hex": hex::encode(&value.data),
-        }),
-        UnpackedValue::Cell(value) | UnpackedValue::RemainingBitsAndRefs(value) => {
-            serde_json::json!({
-                "boc64": Boc::encode_base64(value.clone()),
-            })
-        }
-        UnpackedValue::Bits((bytes, bit_len)) => serde_json::json!({
-            "bits": bit_len,
-            "hex": hex::encode(bytes),
-        }),
-        UnpackedValue::Array(values) => serde_json::Value::Array(
-            values
-                .iter()
-                .map(|value| compiler_data_to_json(value, network))
-                .collect(),
-        ),
-        UnpackedValue::Map(values) => serde_json::Value::Array(
-            values
-                .iter()
-                .map(|(key, value)| {
-                    serde_json::json!({
-                        "key": compiler_data_to_json(key, network),
-                        "value": compiler_data_to_json(value, network),
-                    })
-                })
-                .collect(),
-        ),
-        UnpackedValue::Object { fields, .. } => {
-            let mut result = serde_json::Map::new();
-            for (name, value) in fields {
-                result.insert(name.clone(), compiler_data_to_json(value, network));
+    let mut errors = Vec::new();
+    let (storage_ty_idx, decoded) = storage_candidates
+        .into_iter()
+        .find_map(|storage_ty_idx| {
+            let mut parser = data.as_slice_allow_exotic();
+            let decoded = match dynamic_unpack::unpack_from_slice(&mut parser, abi, storage_ty_idx)
+            {
+                Ok(decoded) => decoded,
+                Err(err) => {
+                    errors.push(format!(
+                        "{}: failed to decode storage with compiler ABI: {err:#}",
+                        abi.render_param_type(storage_ty_idx)
+                    ));
+                    return None;
+                }
+            };
+            if parser.size_bits() != 0 || parser.size_refs() != 0 {
+                errors.push(format!(
+                    "{}: storage cell has {} extra bits and {} extra refs after type decode",
+                    abi.render_param_type(storage_ty_idx),
+                    parser.size_bits(),
+                    parser.size_refs()
+                ));
+                return None;
             }
-            serde_json::Value::Object(result)
-        }
+            Some((storage_ty_idx, decoded))
+        })
+        .ok_or_else(|| {
+            anyhow!(
+                "Failed to decode storage with compiler ABI candidates: {}",
+                errors.join("; ")
+            )
+        })?;
+
+    let rendered = render_unpacked_value_as_tolk_type(abi, decoded, storage_ty_idx);
+    let options = PrettyRenderOptions {
+        address_format: pretty_address_format(network),
+        address_labels: Default::default(),
+        colorize: colors_enabled(),
+    };
+    Ok(rendered.to_pretty_string(options))
+}
+
+const fn pretty_address_format(network: &Network) -> PrettyAddressFormat {
+    if network.uses_testnet_address_format() {
+        PrettyAddressFormat::Testnet
+    } else {
+        PrettyAddressFormat::Mainnet
     }
 }
 
-fn format_int_address(address: &IntAddr, network: &Network) -> String {
+pub(super) fn format_int_address(address: &IntAddr, network: &Network) -> String {
     match address {
         IntAddr::Std(address) => format_std_address(address, network),
         IntAddr::Var(address) => IntAddr::Var(address.clone()).to_string(),
     }
 }
 
-fn format_std_address(address: &StdAddr, network: &Network) -> String {
+pub(super) fn format_std_address(address: &StdAddr, network: &Network) -> String {
     DisplayBase64StdAddr {
         addr: address,
         flags: Base64StdAddrFlags {
             testnet: network.uses_testnet_address_format(),
             bounceable: true,
-            base64_url: false,
+            base64_url: true,
         },
     }
     .to_string()
@@ -477,17 +485,59 @@ fn format_std_address(address: &StdAddr, network: &Network) -> String {
 
 const LABEL_WIDTH: usize = 18;
 
-fn print_section(title: &str) {
+pub(super) fn print_section_title(title: &str) {
+    println!("{}", title.bold().cyan());
+}
+
+pub(super) fn print_section(title: &str) {
     println!("\n{}", title.bold().cyan());
 }
 
-fn print_kv(label: &str, value: impl AsRef<str>) {
+pub(super) fn print_kv(label: &str, value: impl AsRef<str>) {
     let key = format!("{label}:");
     println!(
         "  {} {}",
         format!("{key:<LABEL_WIDTH$}").dimmed(),
         value.as_ref()
     );
+}
+
+fn print_indented_block(value: &str, indent: usize) {
+    let prefix = " ".repeat(indent);
+    for line in value.lines() {
+        println!("{prefix}{line}");
+    }
+}
+
+fn print_get_methods(abi: &ContractABI) {
+    if abi.get_methods.is_empty() {
+        println!("  {}", "none".dimmed());
+        return;
+    }
+
+    for method in &abi.get_methods {
+        println!("  {}", format_get_method_signature_colored(abi, method));
+    }
+}
+
+fn print_get_method_hint(address: &str, network: &Network, block_number: Option<u64>) {
+    let net_arg = format_rpc_network_arg(network);
+    let block_arg = block_number
+        .map(|block_number| format!(" --block-number {block_number}"))
+        .unwrap_or_default();
+    let command = format!("acton rpc call --net {net_arg}{block_arg} {address} <METHOD> [ARGS...]");
+
+    println!(
+        "\n{}",
+        format!("hint: To run get method: {command}").dimmed()
+    );
+}
+
+fn format_rpc_network_arg(network: &Network) -> String {
+    match network {
+        Network::Custom(name) => format!("custom:{name}"),
+        Network::Mainnet | Network::Testnet | Network::Localnet => network.to_string(),
+    }
 }
 
 fn format_account_status(status: &str) -> String {
@@ -503,116 +553,41 @@ fn format_hash(hash: &HashBytes) -> String {
     format!("0x{hash}").yellow().to_string()
 }
 
-fn print_yaml_value(key: Option<&str>, value: &serde_json::Value, indent: usize) {
-    let prefix = " ".repeat(indent);
-    match value {
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {
-            let scalar = format_yaml_scalar(value);
-            match key {
-                Some(key) => println!("{prefix}{} {scalar}", format!("{key}:").dimmed()),
-                None => println!("{prefix}{scalar}"),
-            }
-        }
-        serde_json::Value::Array(values) => {
-            if let Some(key) = key {
-                if values.is_empty() {
-                    println!("{prefix}{} []", format!("{key}:").dimmed());
-                } else {
-                    println!("{prefix}{}", format!("{key}:").dimmed());
-                }
-            } else if values.is_empty() {
-                println!("{prefix}[]");
-            }
-
-            let next_indent = indent + usize::from(key.is_some()) * 2;
-            for item in values {
-                print_yaml_array_item(item, next_indent);
-            }
-        }
-        serde_json::Value::Object(map) => {
-            if let Some(key) = key {
-                if map.is_empty() {
-                    println!("{prefix}{} {{}}", format!("{key}:").dimmed());
-                } else {
-                    println!("{prefix}{}", format!("{key}:").dimmed());
-                }
-            } else if map.is_empty() {
-                println!("{prefix}{{}}");
-            }
-
-            let next_indent = indent + usize::from(key.is_some()) * 2;
-            for (child_key, child_value) in map {
-                print_yaml_value(Some(child_key), child_value, next_indent);
-            }
-        }
-    }
+pub(super) fn format_get_method_signature(abi: &ContractABI, method: &ABIGetMethod) -> String {
+    format_get_method_signature_with_name(
+        method.name.to_owned(),
+        format_get_method_signature_suffix(abi, method),
+    )
 }
 
-fn print_yaml_array_item(value: &serde_json::Value, indent: usize) {
-    let prefix = " ".repeat(indent);
-    match value {
-        serde_json::Value::Null
-        | serde_json::Value::Bool(_)
-        | serde_json::Value::Number(_)
-        | serde_json::Value::String(_) => {
-            println!("{prefix}- {}", format_yaml_scalar(value));
-        }
-        serde_json::Value::Array(values) => {
-            if values.is_empty() {
-                println!("{prefix}- []");
-            } else {
-                println!("{prefix}-");
-                for child in values {
-                    print_yaml_array_item(child, indent + 2);
-                }
-            }
-        }
-        serde_json::Value::Object(map) => {
-            if map.is_empty() {
-                println!("{prefix}- {{}}");
-            } else {
-                println!("{prefix}-");
-                for (child_key, child_value) in map {
-                    print_yaml_value(Some(child_key), child_value, indent + 2);
-                }
-            }
-        }
-    }
+pub(super) fn format_get_method_signature_colored(
+    abi: &ContractABI,
+    method: &ABIGetMethod,
+) -> String {
+    format_get_method_signature_with_name(
+        method.name.yellow().to_string(),
+        format_get_method_signature_suffix(abi, method)
+            .dimmed()
+            .to_string(),
+    )
 }
 
-fn format_yaml_scalar(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::Null => "null".dimmed().to_string(),
-        serde_json::Value::Bool(true) => "true".green().to_string(),
-        serde_json::Value::Bool(false) => "false".bright_red().to_string(),
-        serde_json::Value::Number(value) => value.to_string().white().to_string(),
-        serde_json::Value::String(value) => colorize_scalar_string(value),
-        serde_json::Value::Array(_) | serde_json::Value::Object(_) => unreachable!(),
-    }
+pub(super) fn format_get_method_signature_with_name(
+    method_name: String,
+    signature_suffix: String,
+) -> String {
+    format!("{method_name}{signature_suffix}")
 }
 
-fn colorize_scalar_string(value: &str) -> String {
-    if looks_like_address(value) {
-        value.cyan().to_string()
-    } else if looks_like_hash(value) {
-        value.yellow().to_string()
-    } else {
-        value.to_string()
-    }
-}
-
-fn looks_like_address(value: &str) -> bool {
-    value.starts_with("EQ")
-        || value.starts_with("UQ")
-        || value.starts_with("kQ")
-        || value.starts_with("0:")
-        || value.starts_with("-1:")
-}
-
-fn looks_like_hash(value: &str) -> bool {
-    let stripped = value.strip_prefix("0x").unwrap_or(value);
-    stripped.len() == 64 && stripped.bytes().all(|byte| byte.is_ascii_hexdigit())
+pub(super) fn format_get_method_signature_suffix(
+    abi: &ContractABI,
+    method: &ABIGetMethod,
+) -> String {
+    let params = method
+        .parameters
+        .iter()
+        .map(|param| format!("{}: {}", param.name, abi.render_type(param.ty_idx)))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("({}): {}", params, abi.render_type(method.return_ty_idx))
 }

@@ -14,6 +14,7 @@ pub enum UnpackedValue {
     Number(BigInt),
     Bool(bool),
     String(String),
+    AddressNone,
     Address(IntAddr),
     ExtAddress(ExtAddr),
     Cell(Cell),
@@ -28,39 +29,47 @@ pub enum UnpackedValue {
 }
 
 #[derive(Clone, Copy)]
-struct SchemaPrefix {
-    prefix_num: u64,
-    prefix_len: i32,
+pub struct SchemaPrefix {
+    pub prefix_num: u64,
+    pub prefix_len: i32,
 }
 
-struct SchemaStructDecl<'a> {
-    prefix: Option<SchemaPrefix>,
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+pub struct SchemaStructDecl<'a> {
+    pub prefix: Option<SchemaPrefix>,
+    pub custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
 }
 
-struct SchemaAliasDecl<'a> {
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+pub struct SchemaAliasDecl<'a> {
+    pub custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
 }
 
-struct SchemaEnumDecl<'a> {
-    encoded_as_ty_idx: TyIdx,
-    custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
+pub struct SchemaEnumDecl<'a> {
+    pub name: String,
+    pub encoded_as_ty_idx: TyIdx,
+    pub members: Vec<SchemaEnumMember>,
+    pub custom_pack_unpack: Option<&'a ABICustomPackUnpack>,
 }
 
 #[derive(Clone)]
-struct SchemaField {
-    name: String,
-    ty_idx: TyIdx,
-    u_label_ty_idx: Option<TyIdx>,
+pub struct SchemaEnumMember {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Clone)]
+pub struct SchemaField {
+    pub name: String,
+    pub ty_idx: TyIdx,
+    pub u_label_ty_idx: Option<TyIdx>,
 }
 
 #[derive(Clone, Copy)]
-struct SchemaAliasTarget {
-    ty_idx: TyIdx,
-    u_label_ty_idx: Option<TyIdx>,
+pub struct SchemaAliasTarget {
+    pub ty_idx: TyIdx,
+    pub u_label_ty_idx: Option<TyIdx>,
 }
 
-trait UnpackSchema: TyResolver {
+pub trait UnpackSchema: TyResolver {
     fn struct_decl_info(&self, target_name: &str) -> Option<SchemaStructDecl<'_>>;
     fn alias_decl_info(&self, target_name: &str) -> Option<SchemaAliasDecl<'_>>;
     fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>>;
@@ -98,7 +107,16 @@ impl UnpackSchema for SourceMap {
     fn enum_decl_info(&self, target_name: &str) -> Option<SchemaEnumDecl<'_>> {
         self.declarations().iter().find_map(|decl| match decl {
             Declaration::Enum(enum_decl) if enum_decl.name == target_name => Some(SchemaEnumDecl {
+                name: enum_decl.name.clone(),
                 encoded_as_ty_idx: enum_decl.encoded_as_ty_idx,
+                members: enum_decl
+                    .members
+                    .iter()
+                    .map(|member| SchemaEnumMember {
+                        name: member.name.clone(),
+                        value: member.value.clone(),
+                    })
+                    .collect(),
                 custom_pack_unpack: enum_decl.custom_pack_unpack.as_ref(),
             }),
             _ => None,
@@ -164,10 +182,19 @@ impl UnpackSchema for ContractABI {
             ABIDeclaration::Enum {
                 name,
                 encoded_as_ty_idx,
+                members,
                 custom_pack_unpack,
                 ..
             } if name == target_name => Some(SchemaEnumDecl {
+                name: name.clone(),
                 encoded_as_ty_idx: *encoded_as_ty_idx,
+                members: members
+                    .iter()
+                    .map(|member| SchemaEnumMember {
+                        name: member.name.clone(),
+                        value: member.value.clone(),
+                    })
+                    .collect(),
                 custom_pack_unpack: custom_pack_unpack.as_ref(),
             }),
             _ => None,
@@ -256,20 +283,12 @@ impl UnpackSchema for ContractABI {
     }
 }
 
-pub fn unpack_from_slice(
+pub fn unpack_from_slice<S: UnpackSchema + ?Sized>(
     data: &mut CellSlice<'_>,
-    symbols: &SourceMap,
+    symbols: &S,
     ty_idx: TyIdx,
 ) -> anyhow::Result<UnpackedValue> {
     unpack_type(data, symbols, ty_idx, None)
-}
-
-pub fn unpack_from_abi_slice(
-    data: &mut CellSlice<'_>,
-    abi: &ContractABI,
-    ty_idx: TyIdx,
-) -> anyhow::Result<UnpackedValue> {
-    unpack_type(data, abi, ty_idx, None)
 }
 
 fn unpack_type<S: UnpackSchema + ?Sized>(
@@ -302,7 +321,7 @@ fn unpack_type<S: UnpackSchema + ?Sized>(
             _ => anyhow::bail!("expected external address for addressExt"),
         }),
         Ty::AddressAny => Ok(match AnyAddr::load_from(data)? {
-            AnyAddr::None => UnpackedValue::String("none".to_owned()),
+            AnyAddr::None => UnpackedValue::AddressNone,
             AnyAddr::Ext(ext_addr) => UnpackedValue::ExtAddress(ext_addr),
             AnyAddr::Std(addr) => UnpackedValue::Address(IntAddr::Std(addr)),
             AnyAddr::Var(addr) => UnpackedValue::Address(IntAddr::Var(addr)),
@@ -683,7 +702,9 @@ fn map_key_bit_len<S: UnpackSchema + ?Sized>(symbols: &S, ty_idx: TyIdx) -> anyh
         .ok_or_else(|| anyhow!("ABI ty_idx {ty_idx} was not found"))?;
     match ty {
         Ty::Bool => Ok(1),
-        Ty::IntN { n } | Ty::UintN { n } => u16::try_from(*n).context("map key width exceeds u16"),
+        Ty::BitsN { n } | Ty::IntN { n } | Ty::UintN { n } => {
+            u16::try_from(*n).context("map key width exceeds u16")
+        }
         Ty::Address => Ok(StdAddr::BITS_WITHOUT_ANYCAST),
         Ty::AliasRef { alias_name, .. } => {
             let decl = symbols
@@ -865,7 +886,10 @@ mod tests {
         AliasInstantiation, ContractABI, StructInstantiation, UnionVariant,
     };
     use expect_test::{Expect, expect};
+    use tycho_types::cell::CellDataBuilder;
     use tycho_types::cell::{CellBuilder, CellFamily, Store};
+    use tycho_types::dict::{DictKey, StoreDictKey};
+    use tycho_types::error::Error;
     use tycho_types::models::{AnyAddr, ExtAddr, StdAddr};
 
     fn empty_abi() -> ContractABI {
@@ -1055,7 +1079,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, body_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, body_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1121,9 +1145,98 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, payload_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, payload_ty_idx).unwrap();
 
         assert!(matches!(data, UnpackedValue::Object { .. }));
+    }
+
+    #[test]
+    fn decodes_map_with_bits264_key_and_void_value() {
+        #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
+        struct Bits264([u8; 33]);
+
+        impl DictKey for Bits264 {
+            const BITS: u16 = 264;
+        }
+
+        impl StoreDictKey for Bits264 {
+            fn store_into_data(&self, data: &mut CellDataBuilder) -> Result<(), Error> {
+                data.store_raw(&self.0, Self::BITS)
+            }
+        }
+
+        let mut abi = empty_abi();
+        let key_ty_idx = add_ty(&mut abi, Ty::BitsN { n: 264 });
+        let value_ty_idx = add_ty(&mut abi, Ty::Void);
+        let map_ty_idx = add_ty(
+            &mut abi,
+            Ty::MapKV {
+                key_ty_idx,
+                value_ty_idx,
+            },
+        );
+        let mut map = dict::Dict::<Bits264, ()>::new();
+        map.set(Bits264([0x11; 33]), ()).unwrap();
+
+        let mut builder = CellBuilder::new();
+        map.store_into(&mut builder, Cell::empty_context()).unwrap();
+        let cell = builder.build().unwrap();
+        let mut slice = cell.as_slice_allow_exotic();
+
+        let data = unpack_from_slice(&mut slice, &abi, map_ty_idx).unwrap();
+
+        assert_unpacked_snapshot(
+            &data,
+            expect![[r"
+                Map(
+                    [
+                        (
+                            Bits(
+                                (
+                                    [
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                        17,
+                                    ],
+                                    264,
+                                ),
+                            ),
+                            Void,
+                        ),
+                    ],
+                )
+            "]],
+        );
     }
 
     #[test]
@@ -1161,7 +1274,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, union_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, union_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1222,7 +1335,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, boxed_uint_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, boxed_uint_ty_idx).unwrap();
 
         let UnpackedValue::Object { name, fields } = data else {
             panic!("expected object");
@@ -1263,7 +1376,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, enum_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, enum_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1305,7 +1418,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, enum_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, enum_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1336,7 +1449,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, varuint_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, varuint_ty_idx).unwrap();
 
         expect![[r"
             Number(
@@ -1369,7 +1482,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, varuint_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, varuint_ty_idx).unwrap();
 
         expect![[r"
             Number(
@@ -1449,7 +1562,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, cell_of_gas_record_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, cell_of_gas_record_ty_idx).unwrap();
 
         expect![[r#"
             Object {
@@ -1494,7 +1607,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::Null));
     }
 
@@ -1509,12 +1622,12 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::Address(_)));
     }
 
     #[test]
-    fn decodes_address_any_none_as_string_like_ts_dynamic_unpack() {
+    fn decodes_address_any_none() {
         let mut abi = empty_abi();
         let ty_idx = add_ty(&mut abi, Ty::AddressAny);
         let mut builder = CellBuilder::new();
@@ -1522,15 +1635,13 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
-            expect![[r#"
-                String(
-                    "none",
-                )
-            "#]],
+            expect![[r"
+                AddressNone
+            "]],
         );
     }
 
@@ -1547,7 +1658,7 @@ mod tests {
         let cell = build_ts_array_u8_cell(&[1, 2, 3], 3);
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, array_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, array_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1582,7 +1693,7 @@ mod tests {
         let cell = build_ts_array_u8_cell(&[1, 2], 3);
         let mut slice = cell.as_slice_allow_exotic();
 
-        let error = unpack_from_abi_slice(&mut slice, &abi, array_ty_idx).unwrap_err();
+        let error = unpack_from_slice(&mut slice, &abi, array_ty_idx).unwrap_err();
 
         expect!["mismatch array binary data: expected 3 elements, got 2"]
             .assert_eq(&error.to_string());
@@ -1601,7 +1712,7 @@ mod tests {
         let cell = build_ts_lisp_list_u8_cell(&[1, 2, 3]);
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, list_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, list_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1632,7 +1743,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, ty_idx).unwrap();
 
         expect![[r"
             Void
@@ -1664,7 +1775,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, cell_of_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, cell_of_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1710,7 +1821,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, payload_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, payload_ty_idx).unwrap();
 
         expect![[r#"
             Object {
@@ -1837,7 +1948,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, concrete_box_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, concrete_box_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1963,7 +2074,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, concrete_alias_ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, concrete_alias_ty_idx).unwrap();
 
         assert_unpacked_snapshot(
             &data,
@@ -1994,7 +2105,7 @@ mod tests {
         let cell = builder.build().unwrap();
         let mut slice = cell.as_slice_allow_exotic();
 
-        let data = unpack_from_abi_slice(&mut slice, &abi, ty_idx).unwrap();
+        let data = unpack_from_slice(&mut slice, &abi, ty_idx).unwrap();
         assert!(matches!(data, UnpackedValue::String(value) if value == "hello"));
     }
 }

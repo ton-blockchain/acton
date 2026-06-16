@@ -1,4 +1,4 @@
-use crate::commands::common::{error_fmt, format_nanotons};
+use crate::commands::common::{error_fmt, format_nanograms};
 use crate::context::{BuildCache, Context, to_cell};
 use crate::ffi::emulation::{compilation_result_for_code, normalize_address_input};
 use crate::formatter::FormatterContext;
@@ -11,7 +11,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::borrow::Cow;
 use std::collections::HashSet;
-use std::io::{IsTerminal, stdin};
+use std::io::{self, IsTerminal, Write, stdin};
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::Ty;
 use tolk_compiler::types_kernel::{TyIdx, render_ty};
@@ -73,8 +73,11 @@ fn println_impl(
     if ctx.io.capture_output {
         ctx.io.stdout_buffer.push_str(&formatted);
         ctx.io.stdout_buffer.push('\n');
-    } else {
-        println!("{formatted}");
+    }
+    if ctx.io.live_output || !ctx.io.capture_output {
+        let mut stdout = io::stdout().lock();
+        writeln!(stdout, "{formatted}")?;
+        stdout.flush()?;
     }
     Ok(())
 }
@@ -84,8 +87,11 @@ fn eprintln_impl(ctx: &mut Context, _stack: &mut Tuple, s: String) -> anyhow::Re
     if ctx.io.capture_output {
         ctx.io.stderr_buffer.push_str(&s);
         ctx.io.stderr_buffer.push('\n');
-    } else {
-        eprintln!("{s}");
+    }
+    if ctx.io.live_output || !ctx.io.capture_output {
+        let mut stderr = io::stderr().lock();
+        writeln!(stderr, "{s}")?;
+        stderr.flush()?;
     }
     Ok(())
 }
@@ -133,45 +139,154 @@ struct ReflectedArg {
 enum PlaceholderKind {
     Plain,
     Hex,
-    Ton,
+    HexPrefixed,
+    Binary,
+    BinaryPrefixed,
+    Gram,
     CellTree,
+}
+
+#[derive(Copy, Clone)]
+enum FormatAlign {
+    Left,
+    Right,
+    Center,
+}
+
+#[derive(Clone)]
+struct PlaceholderSpec {
+    kind: PlaceholderKind,
+    repr: String,
+    fill: char,
+    align: Option<FormatAlign>,
+    width: Option<usize>,
+    sign_aware_zero_pad: bool,
 }
 
 #[derive(Clone)]
 enum FormatToken {
     Literal(String),
-    Placeholder(PlaceholderKind),
+    Placeholder(PlaceholderSpec),
 }
 
-const fn placeholder_repr(kind: PlaceholderKind) -> &'static str {
-    match kind {
-        PlaceholderKind::Plain => "{}",
-        PlaceholderKind::Hex => "{:x}",
-        PlaceholderKind::Ton => "{:ton}",
-        PlaceholderKind::CellTree => "{:cell-tree}",
+const fn parse_align(ch: char) -> Option<FormatAlign> {
+    match ch {
+        '<' => Some(FormatAlign::Left),
+        '>' => Some(FormatAlign::Right),
+        '^' => Some(FormatAlign::Center),
+        _ => None,
     }
 }
 
-fn parse_placeholder_kind(
+fn parse_placeholder_spec(
     content: &str,
     placeholder: &str,
     byte_pos: usize,
-) -> anyhow::Result<PlaceholderKind> {
+) -> anyhow::Result<PlaceholderSpec> {
     if content.is_empty() {
-        return Ok(PlaceholderKind::Plain);
+        return Ok(PlaceholderSpec {
+            kind: PlaceholderKind::Plain,
+            repr: placeholder.to_owned(),
+            fill: ' ',
+            align: None,
+            width: None,
+            sign_aware_zero_pad: false,
+        });
     }
-    if let Some(modifier) = content.strip_prefix(':') {
-        return match modifier {
-            "x" => Ok(PlaceholderKind::Hex),
-            "ton" => Ok(PlaceholderKind::Ton),
-            "cell-tree" => Ok(PlaceholderKind::CellTree),
-            _ => bail!(
-                "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :ton, :cell-tree)"
-            ),
-        };
+
+    let Some(mut spec) = content.strip_prefix(':') else {
+        bail!(
+            "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:X}}, {{:b}}, {{:B}}, {{:gram}}, {{:grams}}, {{:ton}}, {{:cell-tree}})"
+        )
+    };
+    if spec.is_empty() {
+        return Err(unknown_format_modifier_error("", placeholder, byte_pos));
     }
-    bail!(
-        "Invalid format string at byte {byte_pos}: unsupported placeholder {placeholder} (supported: {{}}, {{:x}}, {{:ton}}, {{:cell-tree}})"
+
+    let mut fill = ' ';
+    let mut align = None;
+    let mut sign_aware_zero_pad = false;
+
+    let mut chars = spec.chars();
+    if let Some(first) = chars.next() {
+        let after_first = chars.as_str();
+        if let Some(second) = chars.next()
+            && let Some(parsed_align) = parse_align(second)
+        {
+            fill = first;
+            align = Some(parsed_align);
+            spec = chars.as_str();
+        } else if let Some(parsed_align) = parse_align(first) {
+            align = Some(parsed_align);
+            spec = after_first;
+        }
+    }
+
+    if align.is_none()
+        && spec.len() > 1
+        && spec.starts_with('0')
+        && spec.as_bytes().get(1).is_some_and(u8::is_ascii_digit)
+    {
+        fill = '0';
+        align = Some(FormatAlign::Right);
+        sign_aware_zero_pad = true;
+        spec = &spec[1..];
+    }
+
+    let width_digits_len = spec
+        .as_bytes()
+        .iter()
+        .take_while(|byte| byte.is_ascii_digit())
+        .count();
+    let width = if width_digits_len == 0 {
+        None
+    } else {
+        let digits = &spec[..width_digits_len];
+        spec = &spec[width_digits_len..];
+        Some(digits.parse::<usize>().with_context(|| {
+            format!("Invalid format string at byte {byte_pos}: width '{digits}' is too large")
+        })?)
+    };
+
+    if align.is_some() && width.is_none() && spec.is_empty() {
+        bail!("Invalid format string at byte {byte_pos}: missing width in {placeholder}");
+    }
+
+    let modifier = spec.strip_prefix(':').unwrap_or(spec);
+    let kind = match modifier {
+        "" => PlaceholderKind::Plain,
+        "x" => PlaceholderKind::Hex,
+        "X" => PlaceholderKind::HexPrefixed,
+        "b" => PlaceholderKind::Binary,
+        "B" => PlaceholderKind::BinaryPrefixed,
+        "gram" | "grams" | "ton" => PlaceholderKind::Gram,
+        "cell-tree" => PlaceholderKind::CellTree,
+        _ => {
+            return Err(unknown_format_modifier_error(
+                modifier,
+                placeholder,
+                byte_pos,
+            ));
+        }
+    };
+
+    Ok(PlaceholderSpec {
+        kind,
+        repr: placeholder.to_owned(),
+        fill,
+        align,
+        width,
+        sign_aware_zero_pad,
+    })
+}
+
+fn unknown_format_modifier_error(
+    modifier: &str,
+    placeholder: &str,
+    byte_pos: usize,
+) -> anyhow::Error {
+    anyhow!(
+        "Invalid format string at byte {byte_pos}: unknown format modifier '{modifier}' in {placeholder} (supported: :x, :X, :b, :B, :gram, :grams, :ton, :cell-tree)"
     )
 }
 
@@ -202,12 +317,12 @@ fn parse_format(fmt: &str) -> anyhow::Result<Vec<FormatToken>> {
             let close_pos = i + 1 + close_rel;
             let content = &fmt[i + 1..close_pos];
             let placeholder = &fmt[i..=close_pos];
-            let kind = parse_placeholder_kind(content, placeholder, i)?;
+            let spec = parse_placeholder_spec(content, placeholder, i)?;
 
             if !literal.is_empty() {
                 tokens.push(FormatToken::Literal(std::mem::take(&mut literal)));
             }
-            tokens.push(FormatToken::Placeholder(kind));
+            tokens.push(FormatToken::Placeholder(spec));
 
             i = close_pos + 1;
             continue;
@@ -245,43 +360,146 @@ fn format_default(
 fn format_single_arg(
     ctx: &Context<'_>,
     formatter: &FormatterContext<'_>,
-    kind: PlaceholderKind,
+    spec: &PlaceholderSpec,
     ty_idx: TyIdx,
     arg: TupleItem,
     colorize: bool,
 ) -> anyhow::Result<String> {
-    match kind {
-        PlaceholderKind::Hex => {
-            if let TupleItem::Tuple(items) = &arg
-                && items.len() == 1
-                && let TupleItem::Int(value) = &items[0]
-            {
-                return Ok(format!("{value:x}"));
-            }
-            format_default(ctx, formatter, ty_idx, arg, colorize)
-        }
-        PlaceholderKind::Ton => {
-            if let TupleItem::Tuple(items) = &arg
-                && items.len() == 1
-                && let TupleItem::Int(value) = &items[0]
-            {
-                return Ok(format_nanotons(value));
-            }
-            format_default(ctx, formatter, ty_idx, arg, colorize)
-        }
+    let int_value = single_int_value(&arg);
+    let is_int = int_value.is_some();
+    let formatted = match spec.kind {
+        PlaceholderKind::Hex => match int_value {
+            Some(value) => format!("{value:x}"),
+            None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+        },
+        PlaceholderKind::HexPrefixed => match int_value {
+            Some(value) => format_prefixed_int(format!("{value:x}"), "0x"),
+            None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+        },
+        PlaceholderKind::Binary => match int_value {
+            Some(value) => format!("{value:b}"),
+            None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+        },
+        PlaceholderKind::BinaryPrefixed => match int_value {
+            Some(value) => format_prefixed_int(format!("{value:b}"), "0b"),
+            None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+        },
+        PlaceholderKind::Gram => match int_value {
+            Some(value) => format_nanograms(value),
+            None => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+        },
         PlaceholderKind::CellTree => {
             if let TupleItem::Tuple(items) = &arg
                 && items.len() == 1
                 && let TupleItem::Cell(cell) | TupleItem::Slice(cell) | TupleItem::Builder(cell) =
                     &items[0]
             {
-                return Ok(format_cell_tree(cell.as_ref(), colorize));
+                format_cell_tree(cell.as_ref(), colorize)
+            } else {
+                format_default(ctx, formatter, ty_idx, arg, colorize)?
             }
-
-            format_default(ctx, formatter, ty_idx, arg, colorize)
         }
-        PlaceholderKind::Plain => format_default(ctx, formatter, ty_idx, arg, colorize),
+        PlaceholderKind::Plain => format_default(ctx, formatter, ty_idx, arg, colorize)?,
+    };
+
+    Ok(apply_width(formatted, spec, is_int))
+}
+
+fn single_int_value(arg: &TupleItem) -> Option<&BigInt> {
+    if let TupleItem::Tuple(items) = arg
+        && items.len() == 1
+        && let TupleItem::Int(value) = &items[0]
+    {
+        Some(value)
+    } else {
+        None
     }
+}
+
+fn format_prefixed_int(formatted: String, prefix: &str) -> String {
+    if let Some(stripped) = formatted.strip_prefix('-') {
+        format!("-{prefix}{stripped}")
+    } else {
+        format!("{prefix}{formatted}")
+    }
+}
+
+fn apply_width(mut formatted: String, spec: &PlaceholderSpec, is_int: bool) -> String {
+    let Some(width) = spec.width else {
+        return formatted;
+    };
+    let len = FormatterContext::strip_ansi_text(&formatted)
+        .chars()
+        .count();
+    if len >= width {
+        return formatted;
+    }
+
+    let default_align = if is_int
+        || matches!(
+            spec.kind,
+            PlaceholderKind::Hex
+                | PlaceholderKind::HexPrefixed
+                | PlaceholderKind::Binary
+                | PlaceholderKind::BinaryPrefixed
+                | PlaceholderKind::Gram
+        ) {
+        FormatAlign::Right
+    } else {
+        FormatAlign::Left
+    };
+    let align = spec.align.unwrap_or(default_align);
+    let padding_len = width - len;
+
+    match align {
+        FormatAlign::Left => {
+            formatted.extend(std::iter::repeat_n(spec.fill, padding_len));
+            formatted
+        }
+        FormatAlign::Right => {
+            let padding = std::iter::repeat_n(spec.fill, padding_len).collect::<String>();
+            if spec.sign_aware_zero_pad && spec.fill == '0' {
+                let ansi_prefix_len = leading_ansi_escape_prefix_len(&formatted);
+                let (ansi_prefix, rest) = formatted.split_at(ansi_prefix_len);
+                let (sign, unsigned) = if let Some(unsigned) = rest.strip_prefix('-') {
+                    ("-", unsigned)
+                } else if let Some(unsigned) = rest.strip_prefix('+') {
+                    ("+", unsigned)
+                } else {
+                    ("", rest)
+                };
+                let (prefix, digits) = match spec.kind {
+                    PlaceholderKind::HexPrefixed => unsigned
+                        .strip_prefix("0x")
+                        .map_or(("", unsigned), |digits| ("0x", digits)),
+                    PlaceholderKind::BinaryPrefixed => unsigned
+                        .strip_prefix("0b")
+                        .map_or(("", unsigned), |digits| ("0b", digits)),
+                    _ => ("", unsigned),
+                };
+                return format!("{ansi_prefix}{sign}{prefix}{padding}{digits}");
+            }
+            format!("{padding}{formatted}")
+        }
+        FormatAlign::Center => {
+            let left_len = padding_len / 2;
+            let right_len = padding_len - left_len;
+            let left = std::iter::repeat_n(spec.fill, left_len).collect::<String>();
+            let right = std::iter::repeat_n(spec.fill, right_len).collect::<String>();
+            format!("{left}{formatted}{right}")
+        }
+    }
+}
+
+fn leading_ansi_escape_prefix_len(value: &str) -> usize {
+    let mut prefix_len = 0;
+    while let Some(rest) = value[prefix_len..].strip_prefix('\x1b') {
+        let Some(end) = rest.find('m') else {
+            break;
+        };
+        prefix_len += 1 + end + 1;
+    }
+    prefix_len
 }
 
 fn format_cell_tree(root: &DynCell, colorize: bool) -> String {
@@ -451,12 +669,12 @@ fn format_args(
     for token in tokens {
         match token {
             FormatToken::Literal(text) => out.push_str(&text),
-            FormatToken::Placeholder(kind) => {
+            FormatToken::Placeholder(spec) => {
                 if let Some(arg) = args_iter.next() {
                     let formatted = format_single_arg(
                         ctx,
                         formatter,
-                        kind,
+                        &spec,
                         arg.ty_idx,
                         arg.arg.clone(),
                         colorize,
@@ -464,7 +682,7 @@ fn format_args(
                     out.push_str(&formatted);
                     consumed += 1;
                 } else {
-                    out.push_str(placeholder_repr(kind));
+                    out.push_str(&spec.repr);
                 }
             }
         }

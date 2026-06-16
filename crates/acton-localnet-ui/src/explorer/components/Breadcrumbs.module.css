@@ -4,7 +4,7 @@
   gap: 8px;
   font-size: 14px;
   color: var(--tonscan-text-secondary);
-  margin-bottom: 16px;
+  margin-bottom: 4px;
 }
 
 .item {
@@ -32,4 +32,11 @@
 
 .current:hover {
   text-decoration: none;
+}
+
+@media (max-width: 520px) {
+  .breadcrumbs {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
 }

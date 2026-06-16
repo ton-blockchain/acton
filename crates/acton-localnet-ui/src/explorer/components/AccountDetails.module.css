@@ -1,5 +1,13 @@
 .historyHeaderRow {
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--tonscan-border) !important;
+}
+
+.historyHeaderRow:hover {
+  background-color: transparent !important;
+}
+
+.historyHeaderGroup {
+  border-bottom: none !important;
 }
 
 .historyContent {
@@ -28,38 +36,278 @@
 }
 
 .tableCard {
+  --border-color: var(--tonscan-border);
+
   background-color: var(--tonscan-card-bg) !important;
   border: 1px solid var(--tonscan-border) !important;
+  border-radius: 16px !important;
 }
 
 .tabs {
   display: flex;
-  gap: var(--spacing-lg);
-  padding: 0 var(--spacing-lg);
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
   border-bottom: 1px solid var(--tonscan-border);
 }
 
 .tab {
-  padding: var(--spacing-md) 0 calc(var(--spacing-md) - 2px);
+  min-height: 34px;
+  padding: 0 10px;
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
   cursor: pointer;
-  border-bottom: 2px solid transparent;
+  border: none;
+  border-radius: 8px;
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  background: none;
-  border-top: none;
-  border-left: none;
-  border-right: none;
+  gap: 7px;
+  text-transform: none;
+  letter-spacing: 0;
+  background: transparent;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.tabIcon {
+  width: 19px;
+  height: 19px;
+  color: currentColor;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  transition: color var(--transition-duration-fast);
+}
+
+.tabIcon svg {
+  stroke-width: 2.1;
+}
+
+.tab:hover {
+  background: var(--litenode-control-hover);
+  color: var(--tonscan-text-primary);
+}
+
+.tab:hover .tabIcon {
+  color: var(--tonscan-text-primary);
 }
 
 .tabActive {
-  color: var(--tonscan-accent);
-  border-bottom-color: var(--tonscan-accent);
+  color: var(--tonscan-text-primary);
+  background: var(--litenode-surface-active);
+}
+
+.filterPopoverRoot {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+}
+
+.filtersPopover {
+  position: fixed;
+  z-index: 30;
+  box-sizing: border-box;
+  width: min(430px, calc(100vw - 32px));
+  padding: 18px 14px 14px;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 95%, transparent);
+  box-shadow:
+    0 18px 50px rgb(0 0 0 / 22%),
+    inset 0 1px 0 rgb(255 255 255 / 4%);
+  backdrop-filter: blur(18px);
+}
+
+.filterSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--tonscan-border);
+}
+
+.filterSection:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.filterSection + .filterSection {
+  margin-top: 14px;
+}
+
+.filterSectionTitle {
+  color: var(--tonscan-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.2;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+.actionFiltersList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 3px;
+}
+
+.actionFilterChip {
+  max-width: 100%;
+  min-height: 34px;
+  padding: 0 13px;
+  border: 2px solid var(--tonscan-border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--tonscan-bg) 48%, transparent);
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 750;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.actionFilterChipSelected {
+  border-color: var(--tonscan-accent);
+  background: var(--litenode-surface-active);
+  color: color-mix(in srgb, var(--tonscan-text-primary) 82%, var(--tonscan-text-secondary));
+}
+
+.filterEmptyState {
+  min-height: 34px;
+  padding: 8px;
+  color: var(--tonscan-text-tertiary);
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+}
+
+.segmentedControl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  padding: 3px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
+  border: 1px solid var(--tonscan-border);
+}
+
+.segmentedOption {
+  min-height: 34px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.segmentedOption:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.segmentedOptionActive {
+  background: var(--litenode-surface-active);
+  color: var(--tonscan-text-primary);
+}
+
+.timeFormatGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
+}
+
+.timeFormatOption {
+  position: relative;
+  min-width: 0;
+  min-height: 72px;
+  padding: 9px 8px;
+  border: 0;
+  border-left: 1px solid var(--tonscan-border);
+  background: transparent;
+  color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font: inherit;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    box-shadow var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.timeFormatOption:first-child {
+  border-left: 0;
+}
+
+.timeFormatOption:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.timeFormatOptionActive {
+  background: var(--litenode-surface-active);
+  color: var(--tonscan-text-primary);
+  z-index: 1;
+  box-shadow: none;
+}
+
+.timeFormatOptionActive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--tonscan-accent);
+  border-radius: 13px;
+  pointer-events: none;
+}
+
+.timeFormatOptionActive + .timeFormatOption {
+  border-left-color: transparent;
+}
+
+.timeFormatLabel {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--font-size-sm);
+  font-weight: 750;
+  line-height: 1.2;
+}
+
+.timeFormatPreview {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--tonscan-text-tertiary);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .tableHeader {
@@ -79,6 +327,130 @@
 
 .row:hover {
   background-color: var(--tonscan-row-hover) !important;
+}
+
+.skeletonRow:hover {
+  background-color: transparent !important;
+}
+
+.skeletonRow > td {
+  padding-top: calc(var(--spacing-md) + 0.25px) !important;
+  padding-bottom: calc(var(--spacing-md) + 0.25px) !important;
+}
+
+.emptyRow:hover {
+  background: transparent !important;
+}
+
+.emptyCell {
+  padding: 18px 16px 20px !important;
+  text-align: center;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.tableState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 64px;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.tableStateError {
+  color: var(--tonscan-error);
+}
+
+.skeleton {
+  display: block;
+  background: linear-gradient(
+    90deg,
+    var(--tonscan-row-hover) 0%,
+    var(--litenode-control-hover) 45%,
+    var(--tonscan-row-hover) 90%
+  );
+  background-size: 220% 100%;
+  animation: skeleton-shimmer 1.15s ease-in-out infinite;
+}
+
+.historySkeletonTime {
+  width: 54px;
+  height: 18px;
+  border-radius: 6px;
+}
+
+.historySkeletonIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
+.historySkeletonAction {
+  width: 96px;
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.historySkeletonAddress {
+  width: min(100%, 126px);
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.historySkeletonValue {
+  width: 96px;
+  height: 20px;
+  border-radius: 6px;
+  transform: scaleY(0.9);
+}
+
+.contractSkeleton {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+}
+
+.contractSkeletonTabs {
+  width: 260px;
+  max-width: 100%;
+  height: 34px;
+  border-radius: var(--border-radius-md);
+}
+
+.contractSkeletonBlock {
+  width: 100%;
+  height: 260px;
+  border-radius: var(--border-radius-md);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 120% 0;
+  }
+
+  100% {
+    background-position: -120% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
 }
 
 .clickableRow {
@@ -123,6 +495,7 @@
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--tonscan-text-primary);
+  font-weight: 500;
   min-width: 0;
   max-width: 100%;
 }
@@ -141,26 +514,31 @@
 }
 
 .address {
-  color: var(--tonscan-accent);
-  font-family: var(--font-mono);
+  color: var(--tonscan-text-primary);
+  font-family: inherit;
   font-size: var(--font-size-sm);
+  font-weight: 500;
   cursor: pointer;
   text-decoration: none;
   padding: 2px 6px;
-  border-radius: 4px;
-  transition: all var(--transition-duration-fast);
+  border-radius: 7px;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
   display: inline-block;
   background: none;
   border: none;
 }
 
 .address:hover {
-  text-decoration: underline;
-  background-color: rgba(0, 136, 204, 0.1);
+  color: var(--tonscan-link);
+  text-decoration: none;
+  background-color: var(--litenode-link-chip-bg);
 }
 
 .addressHighlighted {
-  background-color: rgba(0, 136, 204, 0.2);
+  color: var(--tonscan-link);
+  background-color: var(--litenode-link-chip-bg-active);
 }
 
 .opcode {
@@ -193,6 +571,11 @@ th.valueContainer {
   font-weight: var(--font-weight-medium);
 }
 
+.historyValue {
+  font-size: var(--font-size-sm);
+  line-height: 1.35;
+}
+
 .tokenValue {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
@@ -215,34 +598,178 @@ th.valueContainer {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  gap: 12px;
+  padding: 6px 12px;
   border-top: 1px solid var(--tonscan-border);
 }
 
+.paginationControls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .paginationButton {
-  background: transparent;
-  border: 1px solid var(--tonscan-border);
+  min-height: 32px;
+  background: var(--tonscan-card-bg);
+  border: 1px solid var(--litenode-border-control);
   color: var(--tonscan-text-primary);
-  padding: var(--spacing-xs);
-  border-radius: var(--border-radius-sm);
+  padding: 0 10px;
+  border-radius: 8px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background-color var(--transition-duration-fast);
+  gap: 6px;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
 }
 
 .paginationButton:hover:not(:disabled) {
-  background-color: var(--tonscan-row-hover);
+  background-color: var(--litenode-control-hover);
+  border-color: var(--litenode-border-strong);
 }
 
 .paginationButton:disabled {
-  opacity: 0.3;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
-.paginationInfo {
-  font-size: var(--font-size-sm);
+.paginationPage {
+  width: 32px;
+  height: 32px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
   color: var(--tonscan-text-secondary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.paginationPage:hover {
+  background: var(--litenode-control-hover);
+  color: var(--tonscan-text-primary);
+}
+
+.paginationPageActive {
+  border-color: var(--litenode-border-control);
+  background: var(--litenode-surface-active);
+  color: var(--tonscan-text-primary);
+}
+
+.paginationEllipsis {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--tonscan-text-tertiary);
+}
+
+.paginationSkeletonButton {
+  width: 101px;
+  height: 32px;
+  min-height: 32px;
+  box-sizing: border-box;
+  border-color: transparent;
+  cursor: default;
+}
+
+.paginationSkeletonPage {
+  box-sizing: border-box;
+  border-color: transparent;
+  cursor: default;
+}
+
+@media (max-width: 720px) {
+  .tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tab {
+    flex: 0 0 auto;
+  }
+
+  .historyContent,
+  .tokensContent {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .historyContent table,
+  .tokensContent table {
+    min-width: 620px;
+  }
+
+  .pagination {
+    justify-content: flex-start;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .filtersPopover {
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 520px) {
+  .tableCard {
+    border-radius: 14px !important;
+  }
+
+  .tabs {
+    padding: 6px;
+  }
+
+  .tab {
+    min-height: 32px;
+    padding: 0 9px;
+    gap: 6px;
+  }
+
+  .tabIcon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .historyContent table,
+  .tokensContent table {
+    min-width: 580px;
+  }
+
+  .timeFormatGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .timeFormatOption {
+    min-height: 56px;
+    border-left: 0;
+    border-top: 1px solid var(--tonscan-border);
+  }
+
+  .timeFormatOption:first-child {
+    border-top: 0;
+  }
 }

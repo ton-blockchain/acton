@@ -23,10 +23,10 @@ exclude = [
 ]
 
 [workspace.package]
-version = "1.0.0"
+version = "1.1.0"
 authors = ["TON Core"]
 edition = "2024"
-rust-version = "1.94.1"
+rust-version = "1.95.0"
 homepage = "https://ton-blockchain.github.io/acton"
 documentation = "https://ton-blockchain.github.io/acton/docs/welcome"
 repository = "https://github.com/ton-blockchain/acton"
@@ -35,6 +35,7 @@ license = "MIT OR Apache-2.0"
 [workspace.dependencies]
 # local crates
 acton-config = { path = "crates/acton-config" }
+acton-abi-catalog = { path = "crates/acton-abi-catalog" }
 acton-debug = { path = "crates/acton-debug" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
@@ -55,6 +56,7 @@ tolk-linter = { path = "crates/tolk-linter" }
 tolk-macros = { path = "crates/tolk-macros" }
 tolk-dataflow = { path = "crates/tolk-dataflow" }
 tvm-ffi = { path = "crates/tvm-ffi" }
+tvm-ffi-derive = { path = "crates/tvm-ffi-derive" }
 tvm-logs = { path = "crates/tvm-logs" }
 tasm-core = { path = "crates/tasm-core" }
 dap-client = { path = "crates/dap-client" }
@@ -100,6 +102,7 @@ globset = "0.4"
 # formats
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
+indexmap = { version = "2.12.0", features = ["serde"] }
 serde-sarif = "0.8.0"
 schemars = { version = "0.8.22", features = ["derive"] }
 toml = "0.9.8"
@@ -141,13 +144,15 @@ ctrlc = "3.4.5" # graceful Ctrl+C handling
 semver = "1.0.27"
 indicatif = "0.18.3"
 flate2 = "1.1.5"
-tar = "0.4.44"
+tar = "0.4.46"
+zstd = "0.13.3"
 
 # axum for test ui
-axum = "0.8.1"
+axum = { version = "0.8.1", features = ["ws"] }
 tower-http = { version = "0.6.2", features = ["fs", "cors"] }
 tower_governor = "0.8.0"
 opener = "0.8.4"
+tokio-stream = "0.1.18"
 
 # acton wallet
 hmac = "0.12.1"
@@ -196,6 +201,7 @@ cc = "1.2"
 [dependencies]
 # local crates
 acton-config = { workspace = true }
+acton-abi-catalog = { workspace = true }
 acton-debug = { workspace = true }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
@@ -214,8 +220,10 @@ tasm-core = { workspace = true }
 ton-api = { workspace = true }
 ton-retrace = { workspace = true }
 ton-source-map = { workspace = true }
+toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }
+ton-indexer = { workspace = true }
 
 # remote crates
 # base TON libraries

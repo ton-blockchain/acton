@@ -1,0 +1,11 @@
+[libraries.global-tracked-lib]
+name = "MyLib"
+hash = "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+code = "te6ccgEBAQEAAgAAAA=="
+account = "[WALLET_ADDRESS_BASE]"
+duration = 31536000
+network = "testnet"
+timestamp = "2026-01-05T12:00:00Z"
+last_topup_timestamp = "2026-01-05T12:00:00Z"
+bits = 1024
+cells = 4

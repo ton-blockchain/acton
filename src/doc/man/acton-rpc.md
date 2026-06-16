@@ -16,17 +16,20 @@ Query blockchain account state through a configured network endpoint.
 
 - fetch the latest masterchain block number for a network
 - inspect the latest masterchain block object returned by TonCenter
+- call contract get-methods with ABI-parsed or raw TVM stack arguments
 - check whether an account is active, frozen, or uninitialized
 - inspect balance, last transaction metadata, and state hashes
 - render a TonCenter v3 trace as a decoded transaction tree
 - match deployed code against a local Acton project by `code_hash`
-- decode account storage through local ABI metadata when a match is found
+- decode account storage and get-method results through local or bundled ABI
+  metadata when a match is found
 
 The command works without a project manifest for raw remote inspection.
 
 When Acton can resolve a local project and finds a contract with the same
 compiled `code_hash`, it also prints the matched contract name and decodes the
-account storage using the local compiler ABI.
+account storage using the local compiler ABI. If no local match exists, Acton
+falls back to its bundled ABI catalog.
 
 ## Subcommands
 
@@ -64,12 +67,91 @@ Supported values include `mainnet`, `testnet`, `localnet`, and
 - remote account metadata such as status, balance, last transaction LT and
   hashes
 - code and data hashes when the account has deployed state
-- local contract match information when a project contract has the same
-  `code_hash`
+- ABI match information when a project contract or bundled catalog entry has
+  the same `code_hash`
 - decoded storage in a YAML-like view when compiler ABI metadata is available
 
-If no local ABI match is found, Acton still prints the raw remote account
-information and reports that decoded storage is unavailable.
+If no ABI match is found, Acton still prints the raw remote account information
+and reports that decoded storage is unavailable.
+
+### acton rpc call
+
+Call a contract get-method through TonCenter.
+
+#### Synopsis
+
+`acton rpc call` [_options_] _address_ _method_ [_args_...]
+
+#### Options
+
+{{#options command="acton rpc call"}}
+
+{{#option "_address_" }}
+Contract address in friendly or raw format.
+{{/option}}
+
+{{#option "_method_" }}
+Get-method name or numeric TVM method id.
+{{/option}}
+
+{{#option "_args_" }}
+Arguments to pass to the get-method.
+{{/option}}
+
+{{#option "`--net` _network_" }}
+Network to query.
+
+Defaults to `testnet`.
+
+Supported values include `mainnet`, `testnet`, `localnet`, and
+`custom:<name>`.
+{{/option}}
+
+{{#option "`--json`" }}
+Print machine-readable JSON output.
+{{/option}}
+
+{{#option "`--raw`" }}
+Print the raw TonCenter stack without ABI decoding.
+{{/option}}
+
+{{/options}}
+
+#### ABI Arguments
+
+When Acton finds local or bundled ABI metadata for the remote contract,
+get-method arguments are parsed against that ABI.
+
+The _method_ argument can be either an ABI get-method name or a numeric TVM
+method id. When the numeric id is present in the ABI, Acton still uses ABI
+metadata for arguments and result decoding. When the numeric id is not present
+in the ABI, Acton sends the call as a raw get-method request.
+
+- integers use Tolk integer literal syntax such as `42`, `-1`, `0xff`, and
+  `0b1010`
+- `bool` accepts `true` and `false`
+- nullable supported types accept `null`
+- `cell`, `slice`, and `bitsN` accept plain BoC hex without `C{}` or `CS{}`
+  prefixes
+- `any_address` accepts an internal address or the `addr_none` literal
+- arrays accept `[item1, item2]`
+
+Unsupported ABI argument types currently include `structs`, shaped tuples,
+maps, dictionaries, builders, continuations, and other complex values.
+
+Without ABI metadata, `acton rpc call` builds a raw stack from CLI arguments.
+Raw arguments support Tolk integer literals, `true`, `false`, `null`, internal
+addresses, `addr_none`, plain BoC hex as `cell`, and explicit `cell:`, `slice:`,
+`builder:`, and `string:` prefixes.
+
+#### Output
+
+When ABI metadata is available and the result stack width matches the
+get-method return type, Acton prints the decoded Tolk value. Otherwise it prints
+the raw TonCenter stack in a compact field-per-line format.
+
+Raw output uses decimal integers, URL-friendly addresses, `addr_none` for
+two-bit none addresses, and one `fieldN: type = value` line per stack item.
 
 ### acton rpc block
 
@@ -182,9 +264,9 @@ Print decoded message bodies in the transaction tree.
 - total transaction and message counts
 
 Tree and verbose modes then reuse the same transaction tree formatter as Acton
-tests. When current account code matches a local contract in the project,
-Acton prints local contract names through the local ABI. Add `--show-bodies`
-to print decoded inbound message bodies.
+tests. When current account code matches a local contract or bundled catalog
+entry, Acton prints the matched contract name. Add `--show-bodies` to print
+decoded inbound message bodies.
 
 ## Display Options
 
@@ -218,23 +300,30 @@ one-off overrides or CI.
 
 ## ABI Matching
 
-Storage decoding is best-effort and depends on local project context.
+Storage decoding, get-method argument parsing, and get-method result decoding
+are best-effort and depend on local project context or the bundled ABI catalog.
 
 Acton attempts to:
 
 1. fetch the remote account code cell
 2. compute its `code_hash`
 3. compare that hash with locally configured contracts
-4. decode storage with the matched contract's compiler ABI
+4. fall back to the bundled ABI catalog when there is no local ABI
+5. decode storage and get-method results with the matched compiler ABI
 
 This means decoding is robust for contracts you control in the current Acton
-project, but not guaranteed for arbitrary third-party deployments.
+project, and available for known third-party deployments in the bundled
+catalog.
+
+For `acton rpc call`, missing ABI metadata does not prevent a get-method call.
+Acton sends raw stack arguments instead and prints the raw result stack.
 
 ## Exit Status
 
 - `0`: The selected RPC query completed successfully.
 - `1`: The address was invalid, the network could not be resolved, the remote
-  request failed, or local ABI decoding encountered an unrecoverable error.
+  request failed, raw or ABI argument parsing failed, a named get-method was not
+  found in ABI metadata, or the get-method returned a non-zero exit code.
 
 ## Examples
 
@@ -256,25 +345,49 @@ project, but not guaranteed for arbitrary third-party deployments.
    acton rpc info EQC... --net localnet
    ```
 
-4. Use a custom network defined in another manifest:
+4. Call a get-method with ABI-parsed arguments:
+
+   ```bash
+   acton rpc call EQC... get_wallet_data --net mainnet
+   ```
+
+5. Call a get-method by numeric TVM method id:
+
+   ```bash
+   acton rpc call EQC... 85143 --net mainnet
+   ```
+
+6. Call a get-method without ABI metadata by passing raw stack arguments:
+
+   ```bash
+   acton rpc call EQC... 85143 0xff true cell:B5EE9C... --net mainnet
+   ```
+
+7. Pass `addr_none` to an `any_address` get-method argument:
+
+   ```bash
+   acton rpc call EQC... accepts_any_address addr_none --net localnet
+   ```
+
+8. Use a custom network defined in another manifest:
 
    ```bash
    acton --manifest-path ../incident/Acton.toml rpc info EQC... --net custom:staging
    ```
 
-5. Print the latest mainnet masterchain block JSON:
+9. Print the latest mainnet masterchain block JSON:
 
    ```bash
    acton rpc block --net mainnet
    ```
 
-6. Print the latest mainnet masterchain block number:
+10. Print the latest mainnet masterchain block number:
 
    ```bash
    acton rpc block-number --net mainnet
    ```
 
-7. Print a transaction trace from localnet:
+11. Print a transaction trace from localnet:
 
    ```bash
    acton rpc trace <tx-hash> --net localnet

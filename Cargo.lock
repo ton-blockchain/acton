@@ -14,8 +14,9 @@ dependencies = [
 
 [[package]]
 name = "acton"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
+ "acton-abi-catalog",
  "acton-config",
  "acton-debug",
  "acton-mdman",
@@ -93,6 +94,7 @@ dependencies = [
  "ton-api",
  "ton-emulator",
  "ton-executor",
+ "ton-indexer",
  "ton-localnet",
  "ton-ls",
  "ton-retrace",
@@ -109,8 +111,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "acton-abi-catalog"
+version = "1.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tolk-compiler",
+ "zstd",
+]
+
+[[package]]
 name = "acton-config"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "clap",
@@ -125,7 +137,7 @@ dependencies = [
 
 [[package]]
 name = "acton-debug"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -144,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "acton-mdman"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "handlebars",
@@ -221,6 +233,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddd31a130427c27518df266943a5308ed92d4b226cc639f5a8f1002816174301"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "alloc-no-stdlib"
+version = "2.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cc7bb162ec39d46ab1ca8c77bf72e890535becd1751bb45f64c597edb4c8c6b3"
+
+[[package]]
+name = "alloc-stdlib"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94fb8275041c72129eb51b7d0322c29b8387a0386127718b096429201a5d6ece"
+dependencies = [
+ "alloc-no-stdlib",
 ]
 
 [[package]]
@@ -332,6 +359,18 @@ dependencies = [
  "event-listener-strategy",
  "futures-core",
  "pin-project-lite",
+]
+
+[[package]]
+name = "async-compression"
+version = "0.4.41"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d0f9ee0f6e02ffd7ad5816e9464499fba7b3effd01123b515c41d1697c43dad1"
+dependencies = [
+ "compression-codecs",
+ "compression-core",
+ "pin-project-lite",
+ "tokio",
 ]
 
 [[package]]
@@ -504,6 +543,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b52af3cb4058c895d37317bb27508dccc8e5f2d39454016b297bf4a400597b8"
 dependencies = [
  "axum-core",
+ "base64",
  "bytes",
  "form_urlencoded",
  "futures-util",
@@ -522,8 +562,10 @@ dependencies = [
  "serde_json",
  "serde_path_to_error",
  "serde_urlencoded",
+ "sha1",
  "sync_wrapper",
  "tokio",
+ "tokio-tungstenite",
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
@@ -687,6 +729,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "brotli"
+version = "8.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bd8b9603c7aa97359dbd97ecf258968c95f3adddd6db2f7e7a5bef101c84560"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+ "brotli-decompressor",
+]
+
+[[package]]
+name = "brotli-decompressor"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "874bb8112abecc98cbd6d81ea4fa7e94fb9449648c93cc89aa40c81c24d7de03"
+dependencies = [
+ "alloc-no-stdlib",
+ "alloc-stdlib",
+]
+
+[[package]]
 name = "bstr"
 version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -728,6 +791,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6354c81bbfd62d9cfa9cb3c773c2b7b2a3a482d569de977fd0e961f6e7c00583"
 dependencies = [
  "find-msvc-tools",
+ "jobserver",
+ "libc",
  "shlex",
 ]
 
@@ -872,6 +937,24 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width 0.2.0",
 ]
+
+[[package]]
+name = "compression-codecs"
+version = "0.4.37"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb7b51a7d9c967fc26773061ba86150f19c50c0d65c887cb1fbe295fd16619b7"
+dependencies = [
+ "brotli",
+ "compression-core",
+ "flate2",
+ "memchr",
+]
+
+[[package]]
+name = "compression-core"
+version = "0.4.31"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "75984efb6ed102a0d42db99afb6c1948f0380d1d91808d5529916e6c08b49d8d"
 
 [[package]]
 name = "concurrent-queue"
@@ -1191,7 +1274,7 @@ dependencies = [
 
 [[package]]
 name = "dap-client"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "crossbeam-channel",
@@ -1738,7 +1821,7 @@ checksum = "28dea519a9695b9977216879a3ebfddf92f1c08c05d984f8996aecd6ecdc811d"
 
 [[package]]
 name = "fift-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -2645,6 +2728,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
+name = "jobserver"
+version = "0.1.34"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9afb3de4395d6b3e67a780b6de64b51c978ecf11cb9a462c66be7d4ca9039d33"
+dependencies = [
+ "getrandom 0.3.4",
+ "libc",
+]
+
+[[package]]
 name = "js-sys"
 version = "0.3.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3165,9 +3258,9 @@ dependencies = [
 
 [[package]]
 name = "openssl"
-version = "0.10.79"
+version = "0.10.80"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf0b434746ee2832f4f0baf10137e1cabb18cbe6912c69e2e33263c45250f542"
+checksum = "a45fa2aa886c42762255da344f0a0d313e254066c46aad76f300c3d3da62d967"
 dependencies = [
  "bitflags 2.9.4",
  "cfg-if",
@@ -3196,9 +3289,9 @@ checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
 
 [[package]]
 name = "openssl-sys"
-version = "0.9.115"
+version = "0.9.116"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "158fe5b292746440aa6e7a7e690e55aeb72d41505e2804c23c6973ad0e9c9781"
+checksum = "f28a22dc7140cda5f096e5e7724a6962ca81a7f8bfd2979f9b18c11af56318c4"
 dependencies = [
  "cc",
  "libc",
@@ -4249,6 +4342,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3bf829a2d51ab4a5ddf1352d8470c140cadc8301b2ae1789db023f01cedd6ba"
+dependencies = [
+ "cfg-if",
+ "cpufeatures 0.2.17",
+ "digest",
+]
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4578,9 +4682,9 @@ checksum = "55937e1799185b12863d447f42597ed69d9928686b8d88a1df17376a097d8369"
 
 [[package]]
 name = "tar"
-version = "0.4.45"
+version = "0.4.46"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22692a6476a21fa75fdfc11d452fda482af402c008cdbaf3476414e122040973"
+checksum = "3f6221d9a6003c78398e3b239969f352578258df48c8eb051caadae0015bc840"
 dependencies = [
  "filetime",
  "libc",
@@ -4589,7 +4693,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-core"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -4604,7 +4708,7 @@ dependencies = [
 
 [[package]]
 name = "tasm-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4806,7 +4910,7 @@ dependencies = [
 
 [[package]]
 name = "tlb-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -4902,6 +5006,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tungstenite"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d25a406cddcc431a75d3d9afc6a7c0f7428d4891dd973e4d54c56b46127bf857"
+dependencies = [
+ "futures-util",
+ "log",
+ "tokio",
+ "tungstenite",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.7.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4916,7 +5032,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-analysis"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "bitflags 2.9.4",
  "rustc-hash 2.1.1",
@@ -4928,7 +5044,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-compiler"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "dunce",
@@ -4945,7 +5061,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-dataflow"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "rustc-hash 2.1.1",
  "tolk-resolver",
@@ -4954,7 +5070,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-fmt"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -4967,7 +5083,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-linter"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "acton-config",
  "dunce",
@@ -4987,7 +5103,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-macros"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "heck 0.5.0",
  "itertools",
@@ -4998,7 +5114,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-resolver"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "dashmap 7.0.0-rc2",
@@ -5014,7 +5130,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5024,7 +5140,7 @@ dependencies = [
 
 [[package]]
 name = "tolk-ty"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "dunce",
  "log",
@@ -5052,7 +5168,7 @@ dependencies = [
 
 [[package]]
 name = "toml-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "ton-syntax",
@@ -5181,7 +5297,7 @@ dependencies = [
 
 [[package]]
 name = "ton-api"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "log",
@@ -5198,11 +5314,12 @@ dependencies = [
 
 [[package]]
 name = "ton-emulator"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "acton-config",
  "anyhow",
  "base64",
+ "hex",
  "num-traits",
  "rustc-hash 2.1.1",
  "serde",
@@ -5216,7 +5333,7 @@ dependencies = [
 
 [[package]]
 name = "ton-executor"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "hex",
@@ -5232,12 +5349,13 @@ dependencies = [
 
 [[package]]
 name = "ton-indexer"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "base64",
  "crc",
  "num-bigint",
+ "reqwest",
  "serde_json",
  "sha2",
  "ton-executor",
@@ -5247,7 +5365,7 @@ dependencies = [
 
 [[package]]
 name = "ton-json-schema"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "jsonptr",
@@ -5259,8 +5377,9 @@ dependencies = [
 
 [[package]]
 name = "ton-localnet"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
+ "acton-abi-catalog",
  "acton-config",
  "anyhow",
  "axum",
@@ -5268,10 +5387,13 @@ dependencies = [
  "crc",
  "hex",
  "include_dir",
+ "indexmap 2.12.0",
+ "reqwest",
  "rusqlite",
  "serde",
  "serde_json",
  "tokio",
+ "tokio-stream",
  "ton-api",
  "ton-executor",
  "ton-indexer",
@@ -5286,7 +5408,7 @@ dependencies = [
 
 [[package]]
 name = "ton-ls"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -5315,7 +5437,7 @@ dependencies = [
 
 [[package]]
 name = "ton-networks"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "schemars 0.8.22",
@@ -5324,7 +5446,7 @@ dependencies = [
 
 [[package]]
 name = "ton-objs"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "pkg-config",
  "sha2",
@@ -5333,7 +5455,7 @@ dependencies = [
 
 [[package]]
 name = "ton-retrace"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -5352,7 +5474,7 @@ dependencies = [
 
 [[package]]
 name = "ton-source-map"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "pathdiff",
@@ -5361,7 +5483,7 @@ dependencies = [
 
 [[package]]
 name = "ton-syntax"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "memchr",
@@ -5430,7 +5552,7 @@ dependencies = [
 
 [[package]]
 name = "toncenter-keys"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "ton-networks",
 ]
@@ -5506,6 +5628,7 @@ version = "0.6.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d4e6559d53cc268e5031cd8429d05415bc4cb4aefc4aa5d6cc35fbf5b924a1f8"
 dependencies = [
+ "async-compression",
  "bitflags 2.9.4",
  "bytes",
  "futures-core",
@@ -5696,8 +5819,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
+name = "tungstenite"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8628dcc84e5a09eb3d8423d6cb682965dea9133204e8fb3efee74c2a0c259442"
+dependencies = [
+ "bytes",
+ "data-encoding",
+ "http",
+ "httparse",
+ "log",
+ "rand 0.9.3",
+ "sha1",
+ "thiserror 2.0.18",
+ "utf-8",
+]
+
+[[package]]
 name = "tvm-ffi"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "num-bigint",
@@ -5705,12 +5845,22 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 2.0.18",
+ "tvm-ffi-derive",
  "tycho-types",
 ]
 
 [[package]]
+name = "tvm-ffi-derive"
+version = "1.1.0"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.114",
+]
+
+[[package]]
 name = "tvm-logs"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "thiserror 2.0.18",
  "winnow 0.7.13",
@@ -5889,6 +6039,12 @@ name = "urlencoding"
 version = "2.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "daf8dba3b7eb870caf1ddeed7bc9d2a049f3cfdfae7cb521b087cc33ae4c49da"
+
+[[package]]
+name = "utf-8"
+version = "0.7.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
 
 [[package]]
 name = "utf8-width"
@@ -6644,7 +6800,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "1.0.0"
+version = "1.1.0"
 dependencies = [
  "acton-config",
  "anyhow",
@@ -6662,6 +6818,7 @@ dependencies = [
  "tar",
  "tempfile",
  "toml_edit 0.24.0+spec-1.1.0",
+ "tycho-types",
  "urlencoding",
 ]
 
@@ -6772,4 +6929,32 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.114",
+]
+
+[[package]]
+name = "zstd"
+version = "0.13.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e91ee311a569c327171651566e07972200e76fcfe2242a4fa446149a3881c08a"
+dependencies = [
+ "zstd-safe",
+]
+
+[[package]]
+name = "zstd-safe"
+version = "7.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f49c4d5f0abb602a93fb8736af2a4f4dd9512e36f7f570d66e65ff867ed3b9d"
+dependencies = [
+ "zstd-sys",
+]
+
+[[package]]
+name = "zstd-sys"
+version = "2.0.16+zstd.1.5.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "91e19ebc2adc8f83e43039e79776e3fda8ca919132d68a1fed6a5faca2683748"
+dependencies = [
+ "cc",
+ "pkg-config",
 ]

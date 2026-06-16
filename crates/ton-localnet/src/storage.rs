@@ -1,14 +1,13 @@
 use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use indexmap::IndexMap;
 use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::fmt::Display;
 use std::sync::{Arc, Mutex};
 use tycho_types::models::{StdAddr, StdAddrFormat};
-
-pub const EMPTY_CELL_BASE64: &str = "te6cckEBAQEAAgAAAEysuc0=";
 
 pub struct CellStore {
     pub conn: Option<Arc<Mutex<Connection>>>,
@@ -22,12 +21,6 @@ pub struct GlobalLibraryEntry {
     pub publishers: BTreeSet<Addr>,
     pub first_seen_lt: Lt,
     pub last_seen_lt: Lt,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct GlobalLibraryLookup {
-    pub hash: Hash256,
-    pub entry: Option<GlobalLibraryEntry>,
 }
 
 impl CellStore {
@@ -73,6 +66,27 @@ impl CellStore {
             self.boc_by_hash.get(hash).cloned()
         }
     }
+
+    #[must_use]
+    pub fn values(&self) -> Vec<BocBytes> {
+        let Some(conn) = &self.conn else {
+            return self.boc_by_hash.values().cloned().collect();
+        };
+
+        {
+            let conn_guard = conn.lock().expect("Failed to lock DB connection");
+            let Ok(mut stmt) = conn_guard.prepare("SELECT boc FROM cas") else {
+                return Vec::new();
+            };
+            let Ok(rows) = stmt.query_map([], |row| row.get::<_, BocBytes>(0)) else {
+                return Vec::new();
+            };
+            let bocs = rows.filter_map(Result::ok).collect();
+            drop(stmt);
+            drop(conn_guard);
+            bocs
+        }
+    }
 }
 
 impl Default for CellStore {
@@ -106,7 +120,8 @@ impl Display for AccountStatus {
 pub struct AccountMeta {
     pub account_hash: Hash256,
     pub status: AccountStatus,
-    pub cached_balance: Option<u128>,
+    #[serde(default)]
+    pub balance: u128,
     pub last_trans_lt: Option<Lt>,
     pub last_trans_hash: Option<Hash256>,
     pub code_hash: Option<Hash256>,
@@ -127,7 +142,7 @@ impl AccountMeta {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct JettonMasterMeta {
     pub address: Addr,
-    pub admin_address: Addr,
+    pub admin_address: Option<Addr>,
     pub code_hash: Hash256,
     pub data_hash: Hash256,
     pub jetton_content: Value,
@@ -187,8 +202,8 @@ pub struct BlockMeta {
     pub gen_utime: u32,
     pub start_lt: Lt,
     pub end_lt: Lt,
-    pub tx_hash: Hash256,
-    pub block_boc_hash: Hash256,
+    pub tx_hashes: Vec<Hash256>,
+    pub block_hash: Hash256,
 }
 
 impl BlockMeta {
@@ -198,8 +213,8 @@ impl BlockMeta {
             workchain: 0,
             shard: -9223372036854775808,
             seqno: self.seqno,
-            root_hash: self.block_boc_hash,
-            file_hash: self.block_boc_hash,
+            root_hash: self.block_hash,
+            file_hash: self.block_hash,
         }
     }
 }
@@ -245,6 +260,8 @@ pub struct TransactionInfo {
     pub in_msg: Option<MessageInfo>,
     pub out_msgs: Vec<MessageInfo>,
     pub tx_boc: BocBytes,
+    pub account_state_before: Option<AccountStatePreview>,
+    pub account_state_after: Option<AccountStatePreview>,
 }
 
 #[derive(Clone, Debug)]
@@ -273,6 +290,18 @@ pub struct EmulateTraceRecord {
     pub vm_log: String,
     pub executor_logs: String,
     pub actions: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AccountStatePreview {
+    pub hash: Hash256,
+    pub balance: u128,
+    pub status: AccountStatus,
+    pub code_hash: Option<Hash256>,
+    pub data_hash: Option<Hash256>,
+    pub code_boc: Option<BocBytes>,
+    pub data_boc: Option<BocBytes>,
+    pub frozen_hash: Option<Hash256>,
 }
 
 impl TraceNode {
@@ -312,9 +341,10 @@ pub struct History {
     pub msg_by_hash: HashMap<Hash256, MsgMeta>,
     pub msg_to_tx: HashMap<Hash256, Hash256>,
     pub address_names: HashMap<Addr, String>,
-    pub jetton_masters: HashMap<Addr, JettonMasterMeta>,
-    pub jetton_wallets: HashMap<Addr, JettonWalletMeta>,
-    pub nft_items: HashMap<Addr, NftItemMeta>,
+    pub jetton_masters: IndexMap<Addr, JettonMasterMeta>,
+    pub jetton_wallets: IndexMap<Addr, JettonWalletMeta>,
+    pub nft_items: IndexMap<Addr, NftItemMeta>,
+    pub asset_detection_checked: HashSet<Addr>,
     pub compiler_abis: HashMap<Hash256, Value>,
 }
 
@@ -337,9 +367,10 @@ impl History {
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
             address_names,
-            jetton_masters: HashMap::new(),
-            jetton_wallets: HashMap::new(),
-            nft_items: HashMap::new(),
+            jetton_masters: IndexMap::new(),
+            jetton_wallets: IndexMap::new(),
+            nft_items: IndexMap::new(),
+            asset_detection_checked: HashSet::new(),
             compiler_abis: HashMap::new(),
         }
     }
@@ -355,9 +386,10 @@ impl History {
             msg_by_hash: HashMap::new(),
             msg_to_tx: HashMap::new(),
             address_names,
-            jetton_masters: HashMap::new(),
-            jetton_wallets: HashMap::new(),
-            nft_items: HashMap::new(),
+            jetton_masters: IndexMap::new(),
+            jetton_wallets: IndexMap::new(),
+            nft_items: IndexMap::new(),
+            asset_detection_checked: HashSet::new(),
             compiler_abis: HashMap::new(),
         }
     }
@@ -426,8 +458,10 @@ impl History {
 pub struct ReverseLtKey(pub core::cmp::Reverse<Lt>, pub Hash256);
 
 pub struct Indexes {
+    pub account_deltas_by_addr: HashMap<Addr, BTreeMap<Seqno, AccountDelta>>,
     pub tx_by_account: HashMap<Addr, BTreeMap<ReverseLtKey, Hash256>>,
-    pub tx_by_block: HashMap<Seqno, Hash256>,
+    pub tx_by_block: HashMap<Seqno, Vec<Hash256>>,
+    pub tx_by_out_msg: HashMap<Hash256, Hash256>,
 }
 
 impl Default for Indexes {
@@ -440,8 +474,10 @@ impl Indexes {
     #[must_use]
     pub fn new() -> Self {
         Self {
+            account_deltas_by_addr: HashMap::new(),
             tx_by_account: HashMap::new(),
             tx_by_block: HashMap::new(),
+            tx_by_out_msg: HashMap::new(),
         }
     }
 }
@@ -542,8 +578,9 @@ impl MessagePool {
 
 pub struct PendingCommit {
     pub block_meta: BlockMeta,
-    pub tx_meta: TxMeta,
-    pub delta: AccountDelta,
+    pub tx_metas: Vec<TxMeta>,
+    pub deltas: Vec<AccountDelta>,
     pub out_msg_hashes: Vec<Hash256>,
     pub msg_to_tx: Vec<(Hash256, Hash256)>,
+    pub deferred_msg_hashes: Vec<Hash256>,
 }

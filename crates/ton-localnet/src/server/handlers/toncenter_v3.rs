@@ -1,6 +1,6 @@
 use super::utils::parse_method_name;
 use crate::api::toncenter_v3;
-use crate::localnet::{Localnet, LocalnetTransaction};
+use crate::localnet::{Localnet, LocalnetAddressInfo, LocalnetTransaction};
 use crate::server::models::{
     EmulateTraceRequest, GetAccountStatesV3Request, GetAddressInformationV3Request,
     GetJettonMastersRequest, GetJettonWalletsRequest, GetNftItemsRequest,
@@ -8,7 +8,7 @@ use crate::server::models::{
     GetTransactionsV3Query, RunGetMethodRequest, SendBocRequest,
 };
 use crate::storage::{JettonMasterMeta, TraceNode};
-use crate::types::{Addr, Hash256};
+use crate::types::{Addr, BocBytes, Hash256};
 use axum::{
     Json,
     body::Bytes,
@@ -43,9 +43,9 @@ pub async fn get_traces(
     };
 
     if let Some(msg_hash) = msg_hash {
-        handle_v3_result(node.get_traces_by_message_hash(msg_hash), v3::map_traces).await
+        handle_v3_traces_result(node.get_traces_by_message_hash(msg_hash)).await
     } else if let Some(tx_hash) = tx_hash {
-        handle_v3_result(node.get_traces(tx_hash), v3::map_traces).await
+        handle_v3_traces_result(node.get_traces(tx_hash)).await
     } else {
         v3_bad_request("Either `msg_hash` or `tx_hash` is required")
     }
@@ -77,22 +77,16 @@ pub async fn get_account_states_v3(
         Err(e) => return v3_bad_request(e.to_string()),
     };
 
-    let mut states = Vec::with_capacity(parsed.addresses.len());
-    let mut context_by_address = HashMap::with_capacity(parsed.addresses.len());
+    let states_with_info = match node.get_account_states(parsed.addresses, None).await {
+        Ok(states) => states,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let mut states = Vec::with_capacity(states_with_info.len());
+    let mut context_by_address = HashMap::with_capacity(states_with_info.len());
 
-    for address in parsed.addresses {
-        let state = match node
-            .get_address_information(address.to_string(), None)
-            .await
-        {
-            Ok(state) => state,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
-        let info = match collect_address_info(node.as_ref(), address).await {
-            Ok(info) => info,
-            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        };
-
+    for state_with_info in states_with_info {
+        let address = state_with_info.state.address;
+        let info = map_address_info(state_with_info.info);
         context_by_address.insert(
             address,
             v3::AccountStateContext {
@@ -101,7 +95,7 @@ pub async fn get_account_states_v3(
                 user_friendly: as_user_friendly(address),
             },
         );
-        states.push(state);
+        states.push(state_with_info.state);
     }
 
     (
@@ -174,7 +168,7 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
         return emulate_bad_request("invalid request: boc is required");
     }
 
-    if let Err(e) = base64::engine::general_purpose::STANDARD.decode(&boc) {
+    if let Err(e) = BocBytes::from_base64(&boc) {
         return emulate_bad_request(format!("invalid request: invalid boc: {e}"));
     }
 
@@ -764,15 +758,19 @@ async fn build_emulate_v1_extra_data(
     let mut metadata = serde_json::Map::new();
     let mut pending_jetton_masters = BTreeSet::new();
 
-    for address in &addresses {
-        let info = collect_address_info(node, *address).await?;
+    let infos = node
+        .get_address_infos(addresses.iter().copied().collect())
+        .await?;
+    for raw_info in infos {
+        let address = raw_info.address;
+        let info = map_address_info(raw_info);
         pending_jetton_masters.extend(info.extra_jetton_masters.iter().copied());
 
         if include_address_book {
             address_book.insert(
                 address.to_string(),
                 json!({
-                    "user_friendly": as_user_friendly(*address),
+                    "user_friendly": as_user_friendly(address),
                     "domain": Value::Null,
                     "interfaces": info.interfaces.into_iter().collect::<Vec<_>>(),
                 }),
@@ -791,12 +789,14 @@ async fn build_emulate_v1_extra_data(
     }
 
     if include_metadata {
-        for master_address in pending_jetton_masters {
-            let key = master_address.to_string();
-            if metadata.contains_key(&key) {
-                continue;
-            }
-            let info = collect_address_info(node, master_address).await?;
+        let missing_master_addresses = pending_jetton_masters
+            .into_iter()
+            .filter(|address| !metadata.contains_key(&address.to_string()))
+            .collect::<Vec<_>>();
+        let infos = node.get_address_infos(missing_master_addresses).await?;
+        for raw_info in infos {
+            let key = raw_info.address.to_string();
+            let info = map_address_info(raw_info);
             if info.token_info.is_empty() {
                 continue;
             }
@@ -839,80 +839,41 @@ fn collect_trace_addresses(trace: &TraceNode, out: &mut BTreeSet<Addr>) {
     }
 }
 
-async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<AddressInfo> {
+fn map_address_info(info: LocalnetAddressInfo) -> AddressInfo {
     let mut out = AddressInfo::default();
-    let address_str = address.to_string();
 
-    if let Ok(state) = node
-        .get_address_information(address_str.clone(), None)
-        .await
-        && let Some(code_hash) = state.code_hash
-    {
+    if let Some(code_hash) = info.code_hash {
         let wallet_type = categorize_wallet(CellHashBytes(code_hash.0));
         if let Some(interface_name) = wallet_type.interface_name() {
             out.interfaces.insert(interface_name.to_string());
         }
     }
 
-    let wallets = node
-        .get_jetton_wallets(
-            Some(address_str.clone()),
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
-        .await?;
-    if let Some(wallet) = wallets.first() {
+    if let Some(wallet) = info.jetton_wallet {
         out.interfaces.insert("jetton_wallet".to_string());
         out.token_info
-            .push(v3::map_jetton_wallet_token_info(wallet));
+            .push(v3::map_jetton_wallet_token_info(&wallet));
         out.extra_jetton_masters.insert(wallet.jetton_address);
     }
 
-    let masters = node
-        .get_jetton_masters(Some(address_str.clone()), None, Some(1), Some(0))
-        .await?;
-    if let Some(master) = masters.first() {
+    if let Some(master) = info.jetton_master {
         out.interfaces.insert("jetton_master".to_string());
         out.token_info
-            .push(v3::map_jetton_master_token_info(master));
+            .push(v3::map_jetton_master_token_info(&master));
     }
 
-    let items = node
-        .get_nft_items(
-            Some(address_str.clone()),
-            None,
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
-        .await?;
-    if let Some(item) = items.first() {
+    if let Some(item) = info.nft_item {
         out.interfaces.insert("nft_item".to_string());
-        out.token_info.push(v3::map_nft_item_token_info(item));
+        out.token_info.push(v3::map_nft_item_token_info(&item));
     }
 
-    let collections = node
-        .get_nft_items(
-            None,
-            None,
-            Some(address_str),
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
-        .await?;
-    if let Some(item) = collections.first() {
+    if let Some(item) = info.nft_collection_item {
         out.interfaces.insert("nft_collection".to_string());
-        out.token_info.push(v3::map_nft_collection_token_info(item));
+        out.token_info
+            .push(v3::map_nft_collection_token_info(&item));
     }
 
-    Ok(out)
+    out
 }
 
 fn as_user_friendly(address: Addr) -> String {
@@ -1051,6 +1012,29 @@ where
         Ok(res) => (StatusCode::OK, Json(mapper(&res))).into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
+}
+
+async fn handle_v3_traces_result(
+    result: impl Future<Output = anyhow::Result<TraceNode>>,
+) -> Response {
+    match result.await {
+        Ok(trace) => (StatusCode::OK, Json(v3::map_traces(&trace))).into_response(),
+        Err(e) if is_trace_not_found_error(&e) => (
+            StatusCode::OK,
+            Json(json!({
+                "address_book": {},
+                "metadata": {},
+                "traces": [],
+            })),
+        )
+            .into_response(),
+        Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+fn is_trace_not_found_error(error: &anyhow::Error) -> bool {
+    let message = error.to_string();
+    message.starts_with("Trace not found for message ") || message == "Root transaction not found"
 }
 
 fn v3_bad_request(error: impl Into<String>) -> Response {

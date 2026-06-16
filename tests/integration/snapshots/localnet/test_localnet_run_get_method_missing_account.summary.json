@@ -1,0 +1,43 @@
+{
+  "existing_no_code": {
+    "exit_code": -13,
+    "gas_used": 0,
+    "has_error": false,
+    "stack": [
+      {
+        "type": "num",
+        "value": "101248"
+      }
+    ],
+    "status": 200
+  },
+  "v2": {
+    "exit_code": -13,
+    "gas_used": 0,
+    "last_transaction_id": {
+      "@type": "internal.transactionId",
+      "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+      "lt": "0"
+    },
+    "ok": true,
+    "stack": [
+      [
+        "num",
+        "0x18b80"
+      ]
+    ],
+    "status": 200
+  },
+  "v3": {
+    "exit_code": -13,
+    "gas_used": 0,
+    "has_error": false,
+    "stack": [
+      {
+        "type": "num",
+        "value": "101248"
+      }
+    ],
+    "status": 200
+  }
+}

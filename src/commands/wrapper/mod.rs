@@ -28,7 +28,8 @@ struct WrapperModel {
     contract_name: String,
     abi: ContractABI,
     code_boc64: String,
-    storage: Option<ABIResolvedStruct>,
+    storage_ty_idx: Option<TyIdx>,
+    storage_type_name: Option<String>,
     incoming_messages: Vec<ABIResolvedStruct>,
     incoming_external_messages: Vec<ABIResolvedStruct>,
     storage_path: Option<PathBuf>,
@@ -135,12 +136,12 @@ fn build_model(
     let mapped_wrapper_output_dir = mappings
         .as_ref()
         .and_then(|mappings| mappings.get("@wrappers").cloned());
-    let storage = abi.resolve_storage_struct()?;
+    let storage_ty_idx = storage_ty_idx(&abi);
+    let storage_type_name = storage_ty_idx.map(|ty_idx| abi.render_param_type(ty_idx));
     let incoming_messages = abi.resolve_incoming_message_structs()?;
     let incoming_external_messages = abi.resolve_incoming_external_message_structs()?;
-    let storage_path = storage
-        .iter()
-        .find_map(|storage| find_type_path(&source_map, &storage.name));
+    let storage_path =
+        storage_ty_idx.and_then(|ty_idx| find_type_decl_path(&source_map, &abi, ty_idx));
     let message_paths = incoming_messages
         .iter()
         .chain(incoming_external_messages.iter())
@@ -181,7 +182,8 @@ fn build_model(
         contract_name,
         abi,
         code_boc64,
-        storage,
+        storage_ty_idx,
+        storage_type_name,
         incoming_messages,
         incoming_external_messages,
         storage_path,
@@ -192,6 +194,12 @@ fn build_model(
         mappings,
         format_options,
     })
+}
+
+fn storage_ty_idx(abi: &ContractABI) -> Option<TyIdx> {
+    abi.storage
+        .storage_at_deployment_ty_idx
+        .or(abi.storage.storage_ty_idx)
 }
 
 fn format_generated_tolk(
@@ -542,6 +550,21 @@ fn find_type_path(source_map: &SourceMap, type_name: &str) -> Option<PathBuf> {
     })
 }
 
+fn find_type_decl_path(
+    source_map: &SourceMap,
+    abi: &ContractABI,
+    ty_idx: TyIdx,
+) -> Option<PathBuf> {
+    let type_name = match abi.ty_by_idx(ty_idx)? {
+        Ty::StructRef { struct_name, .. } => struct_name,
+        Ty::AliasRef { alias_name, .. } => alias_name,
+        Ty::EnumRef { enum_name } => enum_name,
+        _ => return None,
+    };
+
+    find_type_path(source_map, type_name)
+}
+
 fn collect_wrapper_import_paths(
     abi: &ContractABI,
     source_map: &SourceMap,
@@ -613,7 +636,10 @@ fn collect_wrapper_import_paths(
         }
     }
 
-    paths.into_iter().collect()
+    paths
+        .into_iter()
+        .filter(|path| !is_implicit_stdlib_common_path(path))
+        .collect()
 }
 
 fn collect_rendered_type_dependencies(
@@ -755,14 +781,15 @@ fn generate_wrapper(model: &WrapperModel) -> String {
 
     code.push('\n');
 
-    if let (Some(storage), Some(storage_path)) = (&model.storage, &model.storage_path) {
+    if let (Some(storage_type_name), Some(storage_path)) =
+        (&model.storage_type_name, &model.storage_path)
+    {
         let import_path = get_import_path(proot, root, storage_path, mappings.as_ref());
         let display = import_path.display().to_string();
         let display = display.trim_start_matches("./").trim_end_matches(".tolk");
         let _ = writeln!(
             code,
-            "/// Storage `{}` is defined in `{display}`",
-            storage.name
+            "/// Storage `{storage_type_name}` is defined in `{display}`"
         );
     }
     let _ = writeln!(code, "struct {contract} {{");
@@ -770,11 +797,11 @@ fn generate_wrapper(model: &WrapperModel) -> String {
     code.push_str("    stateInit: ContractState? = null\n");
     code.push_str("}\n\n");
 
-    if let Some(storage) = &model.storage {
+    if let Some(storage_type_name) = &model.storage_type_name {
         code.push_str(&generate_from_storage(
             contract,
             &model.contract_id,
-            &storage.name,
+            storage_type_name,
         ));
     } else {
         code.push_str(&generate_empty_from_storage(contract, &model.contract_id));
@@ -824,14 +851,14 @@ fn generate_from_storage(
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     let _ = writeln!(
         code,
-        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null): {contract_name} {{"
+        "fun {contract_name}.fromStorage(storage: {storage_name}, toShard: AddressShardingOptions? = null, workchain: int8 = BASECHAIN): {contract_name} {{"
     );
     code.push_str("    val stateInit = ContractState {\n");
     let _ = writeln!(code, "        code: build(\"{contract_build_name}\"),");
     code.push_str("        data: storage.toCell(),\n");
     code.push_str("    };\n");
     code.push_str(
-        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+        "    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();\n",
     );
     let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
     code.push_str("}\n");
@@ -859,14 +886,14 @@ fn generate_empty_from_storage(contract_name: &str, contract_build_name: &str) -
     code.push_str("/// Creates a contract wrapper instance from the storage data\n");
     let _ = writeln!(
         code,
-        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null): {contract_name} {{"
+        "fun {contract_name}.fromStorage(toShard: AddressShardingOptions? = null, workchain: int8 = BASECHAIN): {contract_name} {{"
     );
     code.push_str("    val stateInit = ContractState {\n");
     let _ = writeln!(code, "        code: build(\"{contract_build_name}\"),");
     code.push_str("        data: createEmptyCell(),\n");
     code.push_str("    };\n");
     code.push_str(
-        "    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();\n",
+        "    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();\n",
     );
     let _ = writeln!(code, "    return {contract_name} {{ address, stateInit }}");
     code.push_str("}\n");
@@ -1239,8 +1266,16 @@ fn generate_test(model: &WrapperModel) -> String {
     code.push_str(&import_stdlib("emulation/testing"));
     code.push_str(&import_stdlib("testing/expect"));
 
-    for messages_path in &model.message_paths {
-        let types_import = get_import_path(proot, root, messages_path, mappings.as_ref());
+    let mut test_import_paths = model.message_paths.iter().collect::<BTreeSet<_>>();
+    if model
+        .storage_ty_idx
+        .is_some_and(|ty_idx| model.abi.resolve_single_struct(ty_idx, "storage").is_err())
+    {
+        test_import_paths.extend(model.wrapper_import_paths.iter());
+    }
+
+    for import_path in test_import_paths {
+        let types_import = get_import_path(proot, root, import_path, mappings.as_ref());
         code.push_str(&gen_import_path(types_import));
     }
 
@@ -1254,7 +1289,7 @@ fn generate_test(model: &WrapperModel) -> String {
     code.push_str(&generate_setup_test(
         contract,
         &model.abi,
-        model.storage.as_ref(),
+        model.storage_ty_idx,
     ));
 
     format!("{}\n", code.trim())
@@ -1289,11 +1324,29 @@ fn get_import_path(
     what: &Path,
     mappings: Option<&BTreeMap<String, String>>,
 ) -> PathBuf {
+    if is_stdlib_import_path(what) {
+        return what.to_path_buf();
+    }
+
     if let Some(mapped_import) = resolve_mapped_import(project_root, what, mappings) {
         return mapped_import;
     }
 
     get_relative_import(project_root, where_, what)
+}
+
+fn is_implicit_stdlib_common_path(path: &Path) -> bool {
+    let path = path.to_string_lossy().replace('\\', "/");
+    path == "@stdlib/common"
+        || path == "@stdlib/common.tolk"
+        || path.ends_with("/tolk-stdlib/common.tolk")
+}
+
+fn is_stdlib_import_path(path: &Path) -> bool {
+    path.components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str())
+        .is_some_and(|component| component == "@stdlib")
 }
 
 fn resolve_mapped_import(
@@ -1353,7 +1406,7 @@ fn normalize_abs_path(project_root: &Path, path: &Path) -> PathBuf {
 fn generate_setup_test(
     contract_name: &str,
     abi: &ContractABI,
-    storage: Option<&ABIResolvedStruct>,
+    storage_ty_idx: Option<TyIdx>,
 ) -> String {
     let mut code = String::new();
 
@@ -1375,24 +1428,32 @@ fn generate_setup_test(
     code.push('\n');
     code.push_str("    // Initialize and deploy the contract with default values\n");
 
-    if let Some(storage) = storage {
-        let _ = write!(code, "    val contract = {contract_name}.fromStorage({{");
+    if let Some(storage_ty_idx) = storage_ty_idx {
+        if let Ok(storage) = abi.resolve_single_struct(storage_ty_idx, "storage") {
+            let _ = write!(code, "    val contract = {contract_name}.fromStorage({{");
 
-        let storage_fields = storage
-            .fields
-            .iter()
-            .map(|f| {
-                if let Some(default_value) = abi.typed_cell_payload_default_value(f.ty_idx) {
-                    format!(" {}: {default_value}.toCell()", f.name)
-                } else {
-                    format!(" {}: {}", f.name, abi.default_value(f.ty_idx))
-                }
-            })
-            .collect::<Vec<_>>()
-            .join(",");
+            let storage_fields = storage
+                .fields
+                .iter()
+                .map(|f| {
+                    if let Some(default_value) = abi.typed_cell_payload_default_value(f.ty_idx) {
+                        format!(" {}: {default_value}.toCell()", f.name)
+                    } else {
+                        format!(" {}: {}", f.name, abi.default_value(f.ty_idx))
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(",");
 
-        code.push_str(&storage_fields);
-        code.push_str(" });\n");
+            code.push_str(&storage_fields);
+            code.push_str(" });\n");
+        } else {
+            let _ = writeln!(
+                code,
+                "    val contract = {contract_name}.fromStorage({});",
+                abi.default_value(storage_ty_idx)
+            );
+        }
     } else {
         let _ = writeln!(code, "    val contract = {contract_name}.fromStorage();");
     }

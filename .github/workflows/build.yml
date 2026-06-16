@@ -58,7 +58,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
         with:
           tool: just@1.49.0,nextest@0.9.133
           fallback: none
@@ -98,6 +98,16 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-${{ runner.arch }}-build-ui-
 
+      - name: Restore Playwright cache
+        id: test-ui-e2e-playwright-cache
+        uses: actions/cache/restore@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: &linux-test-ui-e2e-playwright-cache-path |
+            ~/.cache/ms-playwright
+          key: ${{ runner.os }}-${{ runner.arch }}-playwright-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-playwright-
+
       - name: Build acton binary
         env:
           ACTON_RELEASE_CHANNEL: trunk
@@ -115,6 +125,21 @@ jobs:
         run: |
           acton --help
 
+      - name: Run Test UI E2E
+        id: test-ui-e2e
+        env:
+          ACTON_E2E_BIN: ${{ github.workspace }}/target/${{ env.TARGET_NAME }}/release/acton
+        run: just test-ui-e2e-run
+
+      - name: Upload Test UI E2E artifacts
+        if: failure() && steps.test-ui-e2e.outcome == 'failure'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-ui-e2e-results
+          path: test-results/acton-test-ui-e2e
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Run tests
         run: |
           just test
@@ -125,6 +150,13 @@ jobs:
         with:
           path: *linux-build-ui-bun-cache-path
           key: ${{ steps.bun-cache.outputs.cache-primary-key }}
+
+      - name: Save Playwright cache
+        if: github.ref == 'refs/heads/master' && steps.test-ui-e2e-playwright-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: *linux-test-ui-e2e-playwright-cache-path
+          key: ${{ steps.test-ui-e2e-playwright-cache.outputs.cache-primary-key }}
 
       - name: Prepare trunk archive
         if: github.ref == 'refs/heads/master' && github.repository == 'ton-blockchain/acton'
@@ -177,9 +209,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
         with:
-          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.45.1
+          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.46.1
           fallback: none
 
       - name: Download TON objects archive
@@ -215,7 +247,7 @@ jobs:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
         with:
           tool: just@1.49.0
           fallback: none
@@ -280,7 +312,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@a2352fc6ce487f030a3aa709482d57823eadfb37 # v2.75.16
+        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
         with:
           tool: just@1.49.0,nextest@0.9.133
           fallback: none

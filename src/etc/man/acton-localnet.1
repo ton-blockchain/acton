@@ -47,6 +47,22 @@ Path to a SQLite database for persistent node state.
 Maximum \fB/api\fR requests per second to simulate provider rate limits.
 .RE
 .sp
+\fB\-\-response\-delay\-ms\fR \fIms\fR
+.RS 4
+Delay TonCenter v2/v3 and Emulate API responses.
+.RE
+.sp
+\fB\-\-block\-interval\-ms\fR \fIms\fR
+.RS 4
+Localnet block production interval.
+.RE
+.sp
+\fB\-\-no\-mining\fR
+.RS 4
+Disable automatic block production. Mine blocks manually with
+\fBacton localnet mine\fR or \fBPOST /acton_mine\fR\&.
+.RE
+.sp
 \fB\-\-load\-state\fR \fIpath\fR
 .RS 4
 Load Localnet state from a JSON snapshot before startup.
@@ -57,9 +73,15 @@ Load Localnet state from a JSON snapshot before startup.
 Dump Localnet state to a JSON snapshot on shutdown.
 .RE
 .sp
+\fB\-\-require\-auth\fR
+.RS 4
+Require a token for all Localnet HTTP API, control, emulate, and streaming
+endpoints. The server prints the token on startup.
+.RE
+.sp
 \fB\-\-load\-state\fR and \fB\-\-db\-path\fR cannot be used together in the same run.
 .SS "acton localnet airdrop"
-Send TON from the local faucet to an address.
+Send GRAM from the local faucet to an address.
 .SS "Synopsis"
 \fBacton localnet airdrop\fR [\fIoptions\fR] \fIaddress\fR
 .SS "Options"
@@ -69,14 +91,107 @@ Send TON from the local faucet to an address.
 Recipient address.
 .RE
 .sp
-\fB\-a\fR, \fB\-\-amount\fR \fIton\fR
+\fB\-a\fR, \fB\-\-amount\fR \fIgram\fR
 .RS 4
-Amount of TON to request.
+Amount of GRAM to request.
 .RE
 .sp
 \fB\-p\fR, \fB\-\-port\fR \fIport\fR
 .RS 4
 Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton localnet mine"
+Mine localnet blocks manually.
+.SS "Synopsis"
+\fBacton localnet mine\fR [\fIoptions\fR] [\fIn\fR]
+.SS "Options"
+.sp
+\fIn\fR
+.RS 4
+Number of blocks to mine. Defaults to \fB1\fR\&.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton localnet increase-time"
+Increase the localnet virtual clock.
+.SS "Synopsis"
+\fBacton localnet increase\-time\fR [\fIoptions\fR] \fIseconds\fR
+.SS "Options"
+.sp
+\fIseconds\fR
+.RS 4
+Seconds to add to the virtual localnet clock.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton localnet set-time"
+Set the localnet virtual clock.
+.SS "Synopsis"
+\fBacton localnet set\-time\fR [\fIoptions\fR] \fItimestamp\fR
+.SS "Options"
+.sp
+\fItimestamp\fR
+.RS 4
+Unix timestamp in seconds. The timestamp cannot be lower than the latest mined
+block time.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
+.SS "acton localnet set-next-block-timestamp"
+Set a one\-shot timestamp for the next localnet block.
+.SS "Synopsis"
+\fBacton localnet set\-next\-block\-timestamp\fR [\fIoptions\fR] \fItimestamp\fR
+.SS "Options"
+.sp
+\fItimestamp\fR
+.RS 4
+Unix timestamp in seconds for the next mined block. The timestamp is consumed
+by the next automatic or manually mined block and cannot be lower than the
+latest mined block time.
+.RE
+.sp
+\fB\-p\fR, \fB\-\-port\fR \fIport\fR
+.RS 4
+Localnet server port.
+.RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
 .RE
 .SS "acton localnet status"
 Inspect the current localnet status.
@@ -93,6 +208,12 @@ Localnet server port.
 .RS 4
 Print machine\-readable JSON.
 .RE
+.sp
+\fB\-\-auth\-token\fR \fItoken\fR
+.RS 4
+Localnet API token for a server started with \fB\-\-require\-auth\fR\&. If omitted,
+Acton reads \fBACTON_LOCALNET_AUTH_TOKEN\fR\&.
+.RE
 .SH "CONFIGURATION"
 You can store defaults in \fBActon.toml\fR:
 .sp
@@ -104,6 +225,9 @@ fork\-net = "testnet"
 fork\-block\-number = 55000000
 accounts = ["deployer", "user"]
 rate\-limit = 1
+response\-delay\-ms = 300
+block\-interval\-ms = 500
+no\-mining = false
 .fi
 .RE
 .sp
@@ -121,6 +245,31 @@ becomes \fBMOCK_REMOTE_API_KEY\fR\&.
 Acton loads \fB\&.env\fR automatically, so the simplest setup during project work is
 usually to keep these keys there and use shell environment variables only for
 one\-off overrides or CI.
+.SH "LOCALNET API AUTH"
+\fBacton localnet start \-\-require\-auth\fR protects every Localnet HTTP route under
+\fB/api/*\fR, \fB/acton_*\fR, \fB/api/emulate/*\fR, and \fB/api/streaming/*\fR\&. Static UI files
+remain public, but the bundled UI does not receive the token from the server.
+When a protected API request returns \fB401\fR, the bundled UI shows a token overlay;
+paste the printed token there before using protected API views. The key button
+in the sidebar footer reopens the same overlay.
+.sp
+When auth is enabled, the server prints a localnet API token. Pass it as either:
+.sp
+.RS 4
+.nf
+Authorization: Bearer <TOKEN>
+X\-API\-Key: <TOKEN>
+.fi
+.RE
+.sp
+\fBAuthorization: Bearer\fR is the preferred form. \fBX\-API\-Key\fR is accepted for
+TonCenter\-compatible clients. Browser WebSocket clients can pass \fBtoken=<TOKEN>\fR
+only on \fB/api/streaming/v2/ws\fR\&.
+.sp
+For CLI subcommands that call localnet control routes, pass \fB\-\-auth\-token\fR or
+set \fBACTON_LOCALNET_AUTH_TOKEN\fR\&. If \fBACTON_LOCALNET_AUTH_TOKEN\fR is set when
+starting with \fB\-\-require\-auth\fR, localnet uses that value; otherwise it generates
+and prints a fresh token.
 .SH "RUNTIME MODEL"
 .sp
 .RS 4
@@ -147,6 +296,34 @@ endpoints, and the bundled localnet UI
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'the node produces a block every \fB\-\-block\-interval\-ms\fR milliseconds, defaults
+to 500 ms, and still creates empty blocks when no transactions are queued
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-no\-mining\fR or \fB[localnet].no\-mining = true\fR disables automatic block
+production; use \fBacton localnet mine [N]\fR or \fBPOST /acton_mine\fR to create
+blocks manually
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'localnet has a virtual clock for block and transaction time; use
+\fBacton localnet increase\-time\fR, \fBacton localnet set\-time\fR, or
+\fBacton localnet set\-next\-block\-timestamp\fR to move it without waiting for real
+time
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'messages accepted through \fBsend_boc\fR, \fBacton_sendInternalMessage\fR, or the
+faucet are queued and included on a later automatic or manually mined block
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'a block can include multiple transactions; locally generated internal
+messages are processed in the same block when possible
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'the bundled UI is a single\-page explorer app, so routes like \fB/explorer\fR,
 \fB/tokens\fR, \fB/nfts\fR, and per\-address or per\-transaction pages are served from
 the same frontend shell
@@ -159,12 +336,28 @@ status, and snapshot tooling
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-require\-auth\fR protects read and write API routes, including read\-only
+streaming endpoints
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'when \fB\-\-port\fR and \fB[localnet].port\fR are both absent, the current runtime
 fallback is \fB5411\fR
 .RE
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-rate\-limit\fR applies to \fB/api/*\fR endpoints, not admin endpoints
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-response\-delay\-ms\fR applies only to \fB/api/v2\fR, \fB/api/v3\fR, and
+\fB/api/emulate/v1\fR endpoints; streaming, control, and UI routes are not
+delayed
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR can change the response delay while the
+server is running, and \fBGET /acton_nodeInfo\fR reports the current value
 .RE
 .sp
 .RS 4
@@ -189,8 +382,61 @@ JSON state snapshot without stopping the server
 the current node state with a JSON state snapshot
 .RE
 .sp
-Control endpoints are not authenticated and are intended only for local
-development. Do not expose the localnet server publicly.
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_snapshot\fR creates a runtime in\-memory recovery point and returns
+its id
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_revert\fR with \fB{"id":1}\fR restores a runtime recovery point and
+invalidates that point plus every newer point
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setShardAccount\fR with
+\fB{"address":"<ADDR>","shard_account":"<BASE64_BOC>"}\fR replaces the selected
+account state with a base64\-encoded \fBShardAccount\fR BOC
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_sendInternalMessage\fR with \fB{"boc":"<BASE64_BOC>"}\fR sends a
+base64\-encoded internal message BOC through the local internal queue
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_mine\fR with optional \fB{"blocks":N}\fR mines queued and/or empty
+blocks manually; \fBN\fR defaults to \fB1\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_increaseTime\fR with \fB{"seconds":3600}\fR adds seconds to the
+virtual localnet clock
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setTime\fR with \fB{"timestamp":1710000000}\fR sets the current
+virtual Unix time
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNextBlockTimestamp\fR with \fB{"timestamp":1710000600}\fR sets a
+one\-shot timestamp for the next mined block
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fBPOST /acton_setNetworkConditions\fR with \fB{"response_delay_ms":300}\fR updates
+simulated network latency; use \fB0\fR to disable response delay
+.RE
+.sp
+TonCenter\-compatible message endpoints such as \fB/api/v2/sendBoc\fR and
+\fB/api/v3/message\fR accept external\-in messages only. Use
+\fB/acton_sendInternalMessage\fR when local tooling needs to inject a raw internal
+message.
+.sp
+Control endpoints are unauthenticated by default for local development. Use
+\fB\-\-require\-auth\fR when another local process, browser page, or test harness should
+not be able to read or mutate the running localnet without the token. Do not
+expose the localnet server publicly.
 .SH "PERSISTENCE"
 .sp
 .RS 4

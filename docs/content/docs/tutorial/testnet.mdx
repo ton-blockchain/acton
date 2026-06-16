@@ -4,7 +4,7 @@ description: "Create a funded testnet wallet, deploy the poll, verify source cod
 ---
 
 <Callout type="warn" title="Testnet only">
-  All commands on this page target testnet. TON testnet has no real value, but treat the wallet
+  All commands on this page target testnet. Testnet GRAM has no real value, but treat the wallet
   mnemonic with the same care as a mainnet wallet — never commit it to git.
 </Callout>
 
@@ -25,7 +25,7 @@ $ acton wallet new --name testnet-deployer --local --airdrop --version v5r1
 To check wallet balances run acton wallet list --balance.
 ```
 
-`--airdrop` requests test TON from the configured faucet. If the faucet is rate-limited, fund the wallet manually via the [Testnet Giver Bot](https://t.me/testgiver_ton_bot).
+`--airdrop` requests test GRAM from the configured faucet. If the faucet is rate-limited, fund the wallet manually via the [Testnet Giver Bot](https://t.me/testgiver_ton_bot).
 
 ```bash
 acton wallet list --balance
@@ -81,7 +81,7 @@ Awaiting trace... [Attempt 1/20]
 Trace settled with 2 transaction(s)
 N/A -> external
 └── ext-in 0x7369676e -> EQD36X..ur8XSS A                                       gas=4939
-    └── empty 0.05 TON -> EQBa78..XUMpRe B                                      gas=625
+    └── empty 0.05 GRAM -> EQBa78..XUMpRe B                                      gas=625
 
 Deployed Poll contract to kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi_U
 Owner is kQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8c8Y
@@ -103,7 +103,7 @@ Remote Account
   Address:           kQBa78G2p3zgNdJeCdO3KFv6hI7N55UxOegiplShSGXUMi/U
   Raw Address:       0:5aefc1b6a77ce035d25e09d3b7285bfa848ecde7953139e822a654a14865d432
   Status:            active
-  Balance:           0.049958332 TON
+  Balance:           0.049958332 GRAM
   Last Tx LT:        69241750000003
   Last Tx Hash:      cfvZg4EhUBUFvNNavnJ6y9Woe0IRPRscrZndA2ShzUw=
   Code Hash:         0x9e77c11a8c480d325165387def822b80043c61c41144e938a20e9924b1deb486
@@ -133,7 +133,7 @@ $ acton verify Poll --address EQC9R1p... --net testnet
 View at: https://verifier.ton.org/EQC9R1p...?testnet
 ```
 
-When `--dry-run` is not used, the final verification transaction sends `0.1 TON` unless the verifier backend reports that the same code hash is already verified.
+When `--dry-run` is not used, the final verification transaction sends `0.1 GRAM` unless the verifier backend reports that the same code hash is already verified.
 
 ## Send a vote and retrace the transaction
 
@@ -171,8 +171,8 @@ Awaiting trace... [Attempt 1/20]
 Trace settled with 3 transaction(s)
 N/A -> external
 └── ext-in 0x7369676e -> EQD36X..ur8XSS A             gas=4939
-    └── 0x694d6f6e 0.1 TON -> EQBa78..XUMpRe B        gas=4111
-        └── 0x694d6f6e 0.05 TON -> EQAHvY..Kbp9gT C   gas=1406
+    └── 0x694d6f6e 0.1 GRAM -> EQBa78..XUMpRe B        gas=4111
+        └── 0x694d6f6e 0.05 GRAM -> EQAHvY..Kbp9gT C   gas=1406
             └── account created
 
 Results: option0=1, option1=0
@@ -199,8 +199,8 @@ Trace Summary
 Trace Tree
 N/A -> external
 └── ext-in 0x7369676e -> EQD36X..ur8XSS A   gas=4939
-    └── Vote 0.1 TON -> Poll B              gas=4111
-        └── Vote 0.05 TON -> Voter C        gas=1406
+    └── Vote 0.1 GRAM -> Poll B              gas=4111
+        └── Vote 0.05 GRAM -> Voter C        gas=1406
             └── account created
 ```
 
@@ -223,21 +223,21 @@ Transaction Details:
   Sender:         UQD36XRy1ISfSB8zmlSQKBsa5bmeixAWwD6vUUhOXXur8SlX
   LT:             69241811000003
   Time:           13.05.2026, 00:23:03
-  Amount In:      0.100000000 TON
+  Amount In:      0.100000000 GRAM
 
 Fees & Balance:
-  Balance Before: 0.049958332 TON
-  Amount Sent:    0.050000000 TON
-  Total Fee:      0.000326935 TON
-  Gas Fee:        0.000274068 TON
-  Balance After:  0.099525662 TON
+  Balance Before: 0.049958332 GRAM
+  Amount Sent:    0.050000000 GRAM
+  Total Fee:      0.000326935 GRAM
+  Gas Fee:        0.000274068 GRAM
+  Balance After:  0.099525662 GRAM
 
 Compute Phase:
   Success:        Yes
   Exit Code:      0
   VM Steps:       78
   Gas Used:       4111
-  Gas Fees:       0.000274068 TON
+  Gas Fees:       0.000274068 GRAM
 
 Action Phase:
   Success:        Yes
@@ -247,7 +247,7 @@ Out Actions:
   1. Send Message
      Mode:           PAY_FEES_SEPARATELY
      Destination:    UQAHvYVFogKzuNpQLwqimwGqKM_Ceg757jxn9cPTYSKbp4XW
-     Value:          0.050000000 TON
+     Value:          0.050000000 GRAM
      Bounce:         Yes
      Body Hash:      0xa1234d20a2eb8fca273a9d8aba3c438a253c3984ea880b0fcb9d6f38db55260f
 

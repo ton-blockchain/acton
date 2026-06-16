@@ -60,3 +60,34 @@ get fun `test at stdlib interleaved stdout order`() {
         "integration/snapshots/test-runner/keeps_stdout_and_stderr_separated_when_stderr_happens_first/preserves_stdout_order_during_interleaved_println_and_eprintln.stdout.txt",
     );
 }
+
+#[test]
+fn no_capture_prints_stdout_and_stderr_live_without_console_blocks() {
+    let test_code = format!(
+        r#"
+{TEST_IMPORTS}
+
+get fun `test at stdlib no capture live output`() {{
+    println("live-stdout-1");
+    eprintln("live-stderr-1");
+    println("live-stdout-2");
+}}
+"#
+    );
+
+    ProjectBuilder::new("at-stdlib-no-capture-live-output")
+        .test_file("stdlib_io", &test_code)
+        .build()
+        .acton()
+        .test()
+        .no_capture()
+        .run()
+        .success()
+        .assert_passed(1)
+        .assert_snapshot_matches(
+            "integration/snapshots/test-runner/keeps_stdout_and_stderr_separated_when_stderr_happens_first/no_capture_prints_stdout_and_stderr_live_without_console_blocks.stdout.txt",
+        )
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/test-runner/keeps_stdout_and_stderr_separated_when_stderr_happens_first/no_capture_prints_stdout_and_stderr_live_without_console_blocks.stderr.txt",
+        );
+}

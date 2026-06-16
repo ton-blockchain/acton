@@ -1,17 +1,28 @@
-
-Remote Account
+Basic Information
   Network:           localnet
-  Address:           [WALLET_ADDRESS_BASE]
   Raw Address:       0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c
   Status:            active
-  Balance:           99.998981997 TON
+  Contract:          WalletV4r2
+  Balance:           [TON_BALANCE] GRAM
   Last Tx LT:        3
   Last Tx Hash:      [TX_HASH]
   Code Hash:         0xfeb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0
   Data Hash:         0xedcec1db765c9ca1ef98e8507707483dfbb869e87ab4f06bafce18df2ff9446c
 
-Local Match
-  Contract:          <none>
+Storage
+  WalletV4r2Storage {
+      seqno: 1,
+      subwalletId: 698983191,
+      publicKey: 76272186050566279163040038748792344521503364478398705319249212365083262662181,
+      plugins: map<bits264, void> {},
+  }
 
-Decoded Storage
-  <local ABI not found>
+Get Methods
+  get_plugin_list(): lisp_list<WalletV4r2PluginListEntry>
+  is_plugin_installed(workchain: int32, addrHash: int): bool
+  get_public_key(): int
+  seqno(): uint32
+  get_subwallet_id(): uint32
+
+hint: To run get method: acton rpc call --net localnet [WALLET_ADDRESS_BASE] <METHOD> [ARGS...]
+hint: To view full ABI: acton doc abi WalletV4r2

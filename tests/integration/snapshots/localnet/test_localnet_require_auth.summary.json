@@ -1,0 +1,42 @@
+{
+  "authorized": {
+    "bearer_ok": true,
+    "bearer_status": 200,
+    "options_status": 200,
+    "status_command_running": true,
+    "x_api_key_ok": true,
+    "x_api_key_status": 200
+  },
+  "ui": {
+    "has_bootstrap_token": false,
+    "html_shell": true,
+    "leaks_token": false,
+    "status": 200
+  },
+  "unauthorized": {
+    "control": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "ok": false,
+      "status": 401
+    },
+    "emulate": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "ok": false,
+      "status": 401
+    },
+    "sse": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "ok": false,
+      "status": 401
+    },
+    "v2": {
+      "code": 401,
+      "error": "Unauthorized: missing or invalid localnet API token",
+      "ok": false,
+      "status": 401
+    }
+  }
+}

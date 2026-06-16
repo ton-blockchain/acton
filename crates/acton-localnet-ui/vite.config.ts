@@ -29,7 +29,7 @@ export default defineConfig({
   server: {
     port: 3006,
     proxy: {
-      "/api": {
+      "^/api(?:/|$)": {
         target: localnetTarget,
         changeOrigin: true,
       },

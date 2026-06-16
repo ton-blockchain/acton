@@ -13,7 +13,7 @@
 //! *   **Transaction Discovery**: Locating the transaction and its containing blocks.
 //! *   **State Reconstruction**: Reconstructing the exact account state prior to the transaction
 //!     by re-playing all preceding transactions in the same block.
-//! *   **Library Resolution**: Resolving exotic library cells via external APIs (TonCenter/Dton).
+//! *   **Library Resolution**: Resolving exotic library cells via `TonCenter`.
 //! *   **Execution Replay**: Sequential replay of all account transactions within the same master‑block.
 //! *   **Detailed Reporting**: Providing a breakdown of money movements, VM logs, and generated actions.
 //!
@@ -21,11 +21,9 @@
 //!
 //! This library can work without API keys, but a `TonCenter` API key is strongly
 //! recommended for higher limits and faster execution.
-//! You can also provide a Dton API key for alternative library resolution.
 //!
 //! *   `TONCENTER_MAINNET_API_KEY`: Your `TonCenter` mainnet V3 API key.
 //! *   `TONCENTER_TESTNET_API_KEY`: Your `TonCenter` testnet V3 API key.
-//! *   `DTON_API_KEY`: (Optional) Your dton.io API key for fallback library lookups.
 //!
 //! # Main Entry Points
 //!

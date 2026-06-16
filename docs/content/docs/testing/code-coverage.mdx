@@ -46,8 +46,8 @@ The browser view does not require `--coverage-format lcov`; the UI receives cove
 Combine `--coverage` with file paths or `--filter` as usual:
 
 ```bash
-# Run specific test file with coverage
-acton test counter.test.tolk --coverage
+# Run one or more selected test files with coverage
+acton test counter.test.tolk wallet.test.tolk --coverage
 
 # Run tests matching a pattern with coverage
 acton test --filter "test increase" --coverage

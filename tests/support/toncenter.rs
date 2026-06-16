@@ -12,10 +12,11 @@ use std::time::{Duration, Instant};
 use ton::ton_core::types::TonAddress;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
+use tycho_types::boc::Boc;
 use tycho_types::cell::HashBytes;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::{Dict, RawDict};
-use tycho_types::models::{IntAddr, StdAddr};
+use tycho_types::models::{IntAddr, ShardAccount, StdAddr};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
@@ -314,12 +315,185 @@ pub(crate) fn toncenter_v2_account_info_ok_response(
     }
 }
 
+pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
+    balance: i64,
+    code_boc64: &str,
+    data_boc64: &str,
+    state: &str,
+    frozen_hash: &str,
+    lt: &str,
+    hash: &str,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "balance": balance.to_string(),
+                "code": code_boc64,
+                "data": data_boc64,
+                "state": state,
+                "frozen_hash": frozen_hash,
+                "last_transaction_id": {
+                    "lt": lt,
+                    "hash": hash,
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "result": {
+                "last": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
+            }
+        })
+        .to_string(),
+    }
+}
+
+pub(crate) fn toncenter_v2_shard_account_cell_ok_response(
+    shard_account: &ShardAccount,
+) -> ToncenterV2MockResponse {
+    ToncenterV2MockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "ok": true,
+            "result": {
+                "bytes": Boc::encode_base64(to_cell(shard_account))
+            }
+        })
+        .to_string(),
+    }
+}
+
 pub(crate) fn format_captured_requests(requests: &[CapturedToncenterRequest]) -> String {
     let mut out = String::new();
     for request in requests {
         let _ = writeln!(out, "{} {}", request.method, request.path);
     }
     out
+}
+
+pub(crate) fn write_fork_account_cache_summary(
+    project_path: &Path,
+    network_name: &str,
+    fork_block_number: u64,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_files:\n");
+    let cache_dir = project_path
+        .join("build")
+        .join("cache")
+        .join(network_name)
+        .join(fork_block_number.to_string());
+    match fs::read_dir(cache_dir) {
+        Ok(entries) => {
+            let mut file_names = entries
+                .map(|entry| {
+                    entry
+                        .expect("failed to read fork account cache directory entry")
+                        .file_name()
+                        .to_string_lossy()
+                        .into_owned()
+                })
+                .collect::<Vec<_>>();
+            file_names.sort();
+            if file_names.is_empty() {
+                out.push_str("<empty>\n");
+            } else {
+                for file_name in file_names {
+                    let _ = writeln!(out, "{file_name}");
+                }
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache directory: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache summary");
+}
+
+pub(crate) fn write_fork_account_cache_tree_summary(
+    project_path: &Path,
+    network_name: &str,
+    output_file_name: &str,
+    requests: &[CapturedToncenterRequest],
+) {
+    let mut out = String::new();
+    out.push_str("requests:\n");
+    let formatted_requests = format_captured_requests(requests);
+    if formatted_requests.is_empty() {
+        out.push_str("<none>\n");
+    } else {
+        out.push_str(&formatted_requests);
+    }
+
+    out.push_str("cache_tree:\n");
+    let cache_root = project_path.join("build").join("cache").join(network_name);
+    match collect_cache_tree_entries(&cache_root) {
+        Ok(entries) if entries.is_empty() => out.push_str("<empty>\n"),
+        Ok(entries) => {
+            for entry in entries {
+                let _ = writeln!(out, "{entry}");
+            }
+        }
+        Err(err) if err.kind() == ErrorKind::NotFound => out.push_str("<missing>\n"),
+        Err(err) => panic!("failed to read fork account cache tree: {err}"),
+    }
+
+    fs::write(project_path.join(output_file_name), out)
+        .expect("failed to write fork account cache tree summary");
+}
+
+fn collect_cache_tree_entries(root: &Path) -> std::io::Result<Vec<String>> {
+    fn collect(
+        root: &Path,
+        relative_prefix: &Path,
+        entries: &mut Vec<String>,
+    ) -> std::io::Result<()> {
+        let mut children = fs::read_dir(root)?.collect::<Result<Vec<_>, _>>()?;
+        children.sort_by_key(fs::DirEntry::file_name);
+
+        for child in children {
+            let child_name = child.file_name();
+            let child_relative = relative_prefix.join(&child_name);
+            let file_type = child.file_type()?;
+            if file_type.is_dir() {
+                entries.push(format!("{}/", child_relative.to_string_lossy()));
+                collect(&child.path(), &child_relative, entries)?;
+            } else if file_type.is_file() {
+                entries.push(child_relative.to_string_lossy().into_owned());
+            }
+        }
+
+        Ok(())
+    }
+
+    let mut entries = Vec::new();
+    collect(root, Path::new(""), &mut entries)?;
+    Ok(entries)
 }
 
 pub(crate) fn toncenter_v2_verify_registry_address_response(

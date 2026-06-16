@@ -210,7 +210,7 @@ pub struct TraceInMessage {
     pub sender: Option<IntAddr>,
     /// Contract address that received the message.
     pub contract: IntAddr,
-    /// Amount of nanoton sent with the message.
+    /// Amount of nanograms sent with the message.
     pub amount: Option<u64>,
     /// Opcode extracted from the message body.
     pub opcode: Option<u32>,
@@ -237,24 +237,26 @@ pub struct TraceEmulatedTx {
     pub c5: Option<Cell>,
     /// Detailed VM execution logs.
     pub vm_logs: Arc<str>,
+    /// Missing global-library hashes reported by the native emulator.
+    pub missing_libraries: Vec<String>,
 }
 
 /// Breakdown of money movements and fees within the transaction.
 ///
-/// All values are in nanoton (10^-9 TON).
+/// All values are in nanograms (10^-9 GRAM).
 ///
 /// # Example
 ///
 /// ```ignore
 /// let money = &result.money;
-/// println!("Fees: {} nanoton", money.total_fees);
-/// println!("Balance after: {} nanoton", money.balance_after);
+/// println!("Fees: {} nanograms", money.total_fees);
+/// println!("Balance after: {} nanograms", money.balance_after);
 /// ```
 #[derive(Debug, Clone)]
 pub struct TraceMoneyResult {
     /// Balance of the account **before** the transaction execution.
     pub balance_before: u64,
-    /// Sum of all nanotons sent via *internal* outgoing messages.
+    /// Sum of all nanograms sent via *internal* outgoing messages.
     /// External messages are excluded as they carry no value.
     pub sent_total: u64,
     /// Total fees of the transaction (including storage, gas and action fees).
@@ -289,63 +291,6 @@ pub struct TraceResult {
     pub money: TraceMoneyResult,
     /// Full details of the emulated transaction execution results.
     pub emulated_tx: TraceEmulatedTx,
-}
-
-// --- API State Types ---
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub(crate) enum StateFromAPI {
-    #[serde(rename = "uninit")]
-    Uninit,
-    #[serde(rename = "active")]
-    Active {
-        data: Option<String>,
-        code: Option<String>,
-    },
-    #[serde(rename = "frozen")]
-    Frozen {
-        #[serde(rename = "stateHash")]
-        state_hash: String,
-    },
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AccountFromAPI {
-    pub balance: AccountBalance,
-    pub state: StateFromAPI,
-    pub last: Option<LastTxRef>,
-    #[serde(rename = "storageStat")]
-    pub storage_stat: Option<StorageStat>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct AccountBalance {
-    pub coins: String,
-    pub currencies: HashMap<String, String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct LastTxRef {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StorageStat {
-    #[serde(rename = "lastPaid")]
-    pub last_paid: u64,
-    #[serde(rename = "duePayment")]
-    pub due_payment: Option<String>,
-    pub used: StorageUsed,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub(crate) struct StorageUsed {
-    pub bits: u64,
-    pub cells: u64,
-    #[serde(rename = "publicCells")]
-    pub public_cells: Option<u64>,
 }
 
 // --- Blocks API ---

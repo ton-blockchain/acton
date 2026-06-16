@@ -1,0 +1,5 @@
+trace_count: 3
+skipped_traces_count: 2
+trace_names: Trace 1,visible-deploy,visible-ping
+transaction_counts: 1,1,1
+treasury_deploy_flags: true,false,false

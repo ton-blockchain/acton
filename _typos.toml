@@ -17,6 +17,8 @@ extend-exclude = [
   "src/commands/new/templates/*/app/**",
   "src/commands/new/templates/*/wrappers-ts/**",
   "src/commands/new/templates/*/package-lock.json",
+  "crates/acton-abi-catalog/data/data-abis.json",
+  "*.csv",
 ]
 
 [default]

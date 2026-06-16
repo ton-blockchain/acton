@@ -23,6 +23,7 @@ docs/out
 **/node_modules
 **/target
 **/.eslintcache
+test-results/
 
 # OS files
 .DS_Store
@@ -39,3 +40,6 @@ libraries.toml
 AGENTS.md
 block.tlb
 debug.entitlements
+.codegraph/
+.playwright-mcp/
+.mcp.json

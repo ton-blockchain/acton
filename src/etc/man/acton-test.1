@@ -6,7 +6,7 @@
 .SH "NAME"
 acton\-test \[em] Discover and run Tolk smart contract tests
 .SH "SYNOPSIS"
-\fBacton test\fR [\fIoptions\fR] [\fIpath\fR]
+\fBacton test\fR [\fIoptions\fR] [\fIpath\fR\[u2026]]
 .SH "DESCRIPTION"
 Discover and execute tests from \fB\&.test.tolk\fR files.
 .sp
@@ -16,11 +16,13 @@ browser UI for exploring results.
 .SH "OPTIONS"
 .SS "Discovery Options"
 .sp
-\fIpath\fR
+\fIpath\fR\[u2026]
 .RS 4
-Test file or directory to run.
+Test files or directories to run.
 .sp
 If omitted, Acton discovers tests from the resolved project root.
+.sp
+May be passed multiple times.
 .RE
 .sp
 \fB\-f\fR, \fB\-\-filter\fR \fIpattern\fR
@@ -86,6 +88,18 @@ Currently supported value: \fBfull\fR\&.
 Full backtraces also raise executor verbosity to collect source locations and
 call stacks without opening the debugger.
 .RE
+.sp
+\fB\-\-no\-capture\fR
+.RS 4
+Print test \fBprintln\fR and \fBeprintln\fR output as it is produced.
+.sp
+The output is still captured for reporters such as JUnit and the test UI.
+Executor debug logs from \fB\-\-verbose\fR, including \fBdebug.dumpStack()\fR, are not
+printed live by this flag.
+.sp
+This flag is not supported with \fB\-\-mutate\fR, because mutation testing executes
+child test processes and captures their output for mutation reports.
+.RE
 .SS "Coverage Options"
 .sp
 \fB\-\-coverage\fR
@@ -145,6 +159,30 @@ Exit non\-zero when the current run differs from the baseline snapshot.
 .sp
 Requires \fB\-\-baseline\-snapshot\fR\&.
 .RE
+.sp
+\fB\-\-gas\-profile\fR \fIpath\fR
+.RS 4
+Write a gas\-weighted execution profile.
+.sp
+By default, Acton records contract transactions produced by test messages.
+Combine with \fB\-\-ui\fR to browse the profile as a flamegraph in the Test UI.
+.RE
+.sp
+\fB\-\-gas\-profile\-format\fR \fIformat\fR
+.RS 4
+Execution profile output format.
+.sp
+Possible values: \fBcpuprofile\fR, \fBcollapsed\fR\&.
+Defaults to \fBcpuprofile\fR\&.
+.RE
+.sp
+\fB\-\-gas\-profile\-include\-tests\fR
+.RS 4
+Include \fB\&.test.tolk\fR unit\-test get\-method execution in the gas profile.
+.sp
+Use this when the expensive work is called directly from a unit test instead of
+through a contract message transaction.
+.RE
 .SS "Reporting Options"
 .sp
 \fB\-\-reporter\fR \fIformat\fR[,\fIformat\fR\[u2026]]_
@@ -200,6 +238,19 @@ Fork remote blockchain state for account resolution.
 \fB\-\-fork\-block\-number\fR \fIseqno\fR
 .RS 4
 Historical block sequence number to fork from.
+.sp
+When a fork block number is set, Acton caches resolved remote accounts under
+\fBbuild/cache/<network>/<seqno>/<workchain>_<address\-hash>.json\fR\&. Later test
+runs with the same fork network, block number, and address read that file before
+calling the remote API.
+.RE
+.sp
+\fB\-\-no\-fork\-cache\fR
+.RS 4
+Disable persistent account cache for pinned fork block numbers. Use this when
+you want every test run to fetch forked accounts from the remote API. The
+regular \fB\-\-clear\-cache\fR flag removes this cache together with the rest of
+\fBbuild/cache\fR\&.
 .RE
 .SS "Tracing Options"
 .sp
@@ -383,8 +434,19 @@ coverage summaries, files, and annotated source
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile \-\-ui\fR adds a \fBProfile\fR tab to the browser UI; the top\-level
+view is grouped by contract, and selected tests with recorded samples get a
+per\-test profile next to \fBInfo\fR, \fBTransactions\fR, and \fBLogs\fR
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB\-\-junit\-path\fR matters when the JUnit reporter is enabled; it defaults to
 \fB[test].junit\-path\fR, or \fBtest\-results\fR when it is not configured
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-no\-capture\fR prints \fBprintln\fR and \fBeprintln\fR output during the test run,
+while keeping captured stdout and stderr available to non\-console reporters
 .RE
 .sp
 .RS 4
@@ -458,6 +520,23 @@ transaction chain
 .RE
 .sp
 .RS 4
+\h'-04'\(bu\h'+03'gas execution profiles are written only to the explicit path passed to
+\fB\-\-gas\-profile\fR; relative paths are resolved from the project root
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile\-format cpuprofile\fR writes Chrome DevTools\-compatible JSON;
+\fB\-\-gas\-profile\-format collapsed\fR writes folded stacks for flamegraph\-style
+tooling
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile\-include\-tests\fR records \fB\&.test.tolk\fR unit\-test get\-method
+execution; the Test UI hides Acton runtime frames from the per\-test profile,
+but exported \fBcpuprofile\fR and \fBcollapsed\fR files remain complete
+.RE
+.sp
+.RS 4
 \h'-04'\(bu\h'+03'\fB[test.fuzz]\fR applies only to parameterized tests that explicitly opt in with
 \fB@test.fuzz\fR, \fB@test.fuzz(<runs>)\fR, or \fB@test.fuzz({ ... })\fR
 .RE
@@ -522,6 +601,9 @@ reporter = ["console"]
 filter = ".*jetton.*"
 junit\-path = "reports"
 junit\-merge = false
+gas\-profile = "build/gas.cpuprofile"
+gas\-profile\-format = "cpuprofile"
+gas\-profile\-include\-tests = false
 
 [test.fuzz]
 runs = 512
@@ -554,6 +636,11 @@ comparison mode and does not overwrite the snapshot file
 .sp
 .RS 4
 \h'-04'\(bu\h'+03'\fB\-\-fail\-on\-diff\fR requires \fB\-\-baseline\-snapshot\fR
+.RE
+.sp
+.RS 4
+\h'-04'\(bu\h'+03'\fB\-\-gas\-profile\-format\fR and \fB\-\-gas\-profile\-include\-tests\fR affect output only
+when \fB\-\-gas\-profile\fR or \fB[test].gas\-profile\fR is configured
 .RE
 .sp
 .RS 4
@@ -652,7 +739,17 @@ acton test
 .RE
 .sp
 .RS 4
-\h'-04' 2.\h'+01'Filter tests by name:
+\h'-04' 2.\h'+01'Run selected test files/directories:
+.sp
+.RS 4
+.nf
+acton test tests/wallet.test.tolk tests/jetton
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 3.\h'+01'Filter tests by name:
 .sp
 .RS 4
 .nf
@@ -662,7 +759,7 @@ acton test \-\-filter "wallet.*"
 .RE
 .sp
 .RS 4
-\h'-04' 3.\h'+01'Show executor debug logs from \fBdebug.*\fR helpers:
+\h'-04' 4.\h'+01'Show executor debug logs from \fBdebug.*\fR helpers:
 .sp
 .RS 4
 .nf
@@ -672,7 +769,7 @@ acton test \-\-verbose \-\-filter "debug.*"
 .RE
 .sp
 .RS 4
-\h'-04' 4.\h'+01'Generate coverage and JUnit output:
+\h'-04' 5.\h'+01'Generate coverage and JUnit output:
 .sp
 .RS 4
 .nf
@@ -683,7 +780,7 @@ acton test \-\-coverage \-\-coverage\-format lcov \-\-reporter junit \(rs
 .RE
 .sp
 .RS 4
-\h'-04' 5.\h'+01'Fail the run when line coverage drops below 85%:
+\h'-04' 6.\h'+01'Fail the run when line coverage drops below 85%:
 .sp
 .RS 4
 .nf
@@ -693,7 +790,7 @@ acton test \-\-coverage \-\-coverage\-minimum\-percent 85
 .RE
 .sp
 .RS 4
-\h'-04' 6.\h'+01'Compare gas usage against a baseline:
+\h'-04' 7.\h'+01'Compare gas usage against a baseline:
 .sp
 .RS 4
 .nf
@@ -703,27 +800,48 @@ acton test \-\-baseline\-snapshot build/gas\-baseline.json \-\-fail\-on\-diff
 .RE
 .sp
 .RS 4
-\h'-04' 7.\h'+01'Run mutation testing for one contract:
+\h'-04' 8.\h'+01'Write a collapsed gas execution profile:
+.sp
+.RS 4
+.nf
+acton test \-\-gas\-profile build/gas.collapsed \-\-gas\-profile\-format collapsed
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 9.\h'+01'Open Test UI with gas profile flamegraphs:
+.sp
+.RS 4
+.nf
+acton test \-\-gas\-profile build/gas.cpuprofile \-\-ui
+.fi
+.RE
+.RE
+.sp
+.RS 4
+\h'-04' 10.\h'+01'Run mutation testing for one contract:
+.RE
 .sp
 .RS 4
 .nf
 acton test \-\-mutate \-\-mutate\-contract Wallet
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 8.\h'+01'Run mutation testing only for changed lines in the current worktree:
+\h'-04' 11.\h'+01'Run mutation testing only for changed lines in the current worktree:
+.RE
 .sp
 .RS 4
 .nf
 acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff worktree
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 9.\h'+01'Run mutation testing for selected levels on the current branch:
+\h'-04' 12.\h'+01'Run mutation testing for selected levels on the current branch:
+.RE
 .sp
 .RS 4
 .nf
@@ -731,10 +849,9 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-diff branch \(rs
                                              \-\-mutation\-levels critical,major
 .fi
 .RE
-.RE
 .sp
 .RS 4
-\h'-04' 10.\h'+01'Re\-run one specific mutant from a previous report:
+\h'-04' 13.\h'+01'Re\-run one specific mutant from a previous report:
 .RE
 .sp
 .RS 4
@@ -744,7 +861,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-id 2
 .RE
 .sp
 .RS 4
-\h'-04' 11.\h'+01'Resume an unfinished mutation session:
+\h'-04' 14.\h'+01'Resume an unfinished mutation session:
 .RE
 .sp
 .RS 4
@@ -755,7 +872,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-session\-id wall
 .RE
 .sp
 .RS 4
-\h'-04' 12.\h'+01'Fail the run when mutation score drops below 85%:
+\h'-04' 15.\h'+01'Fail the run when mutation score drops below 85%:
 .RE
 .sp
 .RS 4
@@ -765,7 +882,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-minimum\-percent
 .RE
 .sp
 .RS 4
-\h'-04' 13.\h'+01'Limit mutation testing to four workers:
+\h'-04' 16.\h'+01'Limit mutation testing to four workers:
 .RE
 .sp
 .RS 4
@@ -775,7 +892,7 @@ acton test \-\-mutate \-\-mutate\-contract Wallet \-\-mutation\-workers 4
 .RE
 .sp
 .RS 4
-\h'-04' 14.\h'+01'Debug a forked\-state failure with traces and the UI:
+\h'-04' 17.\h'+01'Debug a forked\-state failure with traces and the UI:
 .RE
 .sp
 .RS 4
@@ -787,7 +904,7 @@ acton test tests/wallet.test.tolk \-\-fork\-net testnet \(rs
 .RE
 .sp
 .RS 4
-\h'-04' 15.\h'+01'Enforce a gas baseline in CI:
+\h'-04' 18.\h'+01'Enforce a gas baseline in CI:
 .RE
 .sp
 .RS 4

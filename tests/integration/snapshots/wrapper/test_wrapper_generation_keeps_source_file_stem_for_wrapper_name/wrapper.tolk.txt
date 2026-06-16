@@ -14,12 +14,15 @@ struct ConfiguredFile {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun ConfiguredFile.fromStorage(toShard: AddressShardingOptions? = null): ConfiguredFile {
+fun ConfiguredFile.fromStorage(
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): ConfiguredFile {
     val stateInit = ContractState {
         code: build("configured_file"),
         data: createEmptyCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return ConfiguredFile { address, stateInit };
 }
 

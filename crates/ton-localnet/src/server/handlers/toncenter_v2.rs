@@ -20,7 +20,7 @@ pub async fn send_boc(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SendBocRequest>,
 ) -> Json<Value> {
-    handle_result(node.send_boc(payload.boc), v2::map_block_transactions).await
+    handle_result(node.send_boc(payload.boc), v2::map_send_boc).await
 }
 
 pub async fn run_get_method(

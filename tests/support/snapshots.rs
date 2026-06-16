@@ -59,8 +59,17 @@ fn normalize_output_internal(
 
 fn normalize_dynamic_output(content: String) -> String {
     normalize_dynamic_slice_output(normalize_dynamic_mutation_output(
-        normalize_up_snapshot_text(content),
+        normalize_awaiting_progress_output(normalize_up_snapshot_text(content)),
     ))
+}
+
+fn normalize_awaiting_progress_output(content: String) -> String {
+    let content = regex!(r"(?m)^(Awaiting transaction\.\.\. \[Attempt \d+/\d+\]\n)+")
+        .replace_all(&content, "Awaiting transaction... [Attempt 1/20]\n")
+        .into_owned();
+    regex!(r"(?m)^(Awaiting trace\.\.\. \[Attempt \d+/\d+\]\n)+")
+        .replace_all(&content, "Awaiting trace... [Attempt 1/20]\n")
+        .into_owned()
 }
 
 fn normalize_dynamic_slice_output(content: String) -> String {

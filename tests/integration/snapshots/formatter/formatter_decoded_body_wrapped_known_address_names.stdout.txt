@@ -11,7 +11,7 @@
   ✓ formatter decoded body wrapped known addresses [TIME]
     └─ Test output:
        N/A -> sender A
-       └── FmWrappedKnownAddressBody 0.05 TON -> fm_wrapped_known_address_sink B       gas=333
+       └── FmWrappedKnownAddressBody 0.05 GRAM -> fm_wrapped_known_address_sink B      gas=333
                internalTransferMsg: {
                    queryId: 0
                    newAdminAddress: [WALLET_ADDRESS_BASE] (not_deployer)

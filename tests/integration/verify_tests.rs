@@ -1,9 +1,10 @@
 use crate::support::TestOutputExt;
 use crate::support::project::{Project, ProjectBuilder};
-use crate::support::toncenter::spawn_toncenter_v2_mock_with_capture;
 use crate::support::toncenter::{
+    spawn_toncenter_v2_mock_with_capture, spawn_toncenter_v3_mock,
     toncenter_v2_send_boc_client_error_response, toncenter_v2_send_boc_ok_response,
     toncenter_v2_verify_quorum_response, toncenter_v2_verify_registry_address_response,
+    toncenter_v3_account_states_ok_response,
 };
 use crate::support::verifier::{VerifierMockResponse, spawn_verifier_mock};
 #[cfg(unix)]
@@ -12,7 +13,7 @@ use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 use toncenter_keys::{TONCENTER_MAINNET_API_KEY_ENV, TONCENTER_TESTNET_API_KEY_ENV};
 use tycho_types::boc::Boc;
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder};
 
 const SIMPLE_CONTRACT: &str = r"
 fun onInternalMessage(in: InMessage) {}
@@ -39,9 +40,15 @@ keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region sh
 const VERIFY_TEST_ADDRESS: &str = "EQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7AHot";
 const TEST_TONCENTER_MAINNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V2_URL";
 const TEST_TONCENTER_TESTNET_V2_URL_ENV: &str = "ACTON_TEST_TONCENTER_TESTNET_V2_URL";
+const TEST_TONCENTER_MAINNET_V3_URL_ENV: &str = "ACTON_TEST_TONCENTER_MAINNET_V3_URL";
 const VERIFY_BACKENDS_ENV: &str = "ACTON_VERIFY_BACKENDS";
 const VERIFY_TEST_REGISTRY_ADDRESS: &str = "EQD-BJSVUJviud_Qv7Ymfd3qzXdrmV525e3YDzWQoHIAiInL";
 const VERIFY_TEST_API_KEY: &str = "verify-test-api-key";
+const VERIFY_TEST_MAINNET_ADDRESS: &str = "UQC2jeGorIAFh2LXwsDjHfRK-GSo9UzchdIEMh24A7T7ACfo";
+const VERIFY_TEST_CODE_HASH: &str =
+    "e67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973";
+const VERIFY_TEST_SOURCE_BUNDLE_HASH: &str =
+    "a7f1d1a6aabbccddeeff00112233445566778899aabbccddeeff001122334455";
 
 static VERIFY_BACKEND_MOCK_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
@@ -71,6 +78,18 @@ fn build_verify_backend_project(name: &str) -> Project {
         .build();
     write_deployer_wallets(project.path());
     project
+}
+
+fn compile_simple_contract_boc_base64(project: &Project) -> String {
+    project
+        .acton()
+        .compile("contracts/simple.tolk")
+        .base64_only()
+        .run()
+        .success()
+        .get_stdout()
+        .trim()
+        .to_owned()
 }
 
 fn verify_backend_mock_guard() -> std::sync::MutexGuard<'static, ()> {
@@ -815,6 +834,291 @@ fn test_verify_debug_mode_prints_source_details_and_builds_multipart_upload() {
         body.contains("\"folder\":\"contracts\""),
         "multipart request must include verifier folder metadata, got: {body}"
     );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-success");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "code_hash": VERIFY_TEST_CODE_HASH,
+            "compiled_code_hash": VERIFY_TEST_CODE_HASH,
+            "verification_result": "match",
+            "source_bundle_hash": VERIFY_TEST_SOURCE_BUNDLE_HASH,
+            "source_storage": {
+                "provider": "git",
+                "commit": "0123456789abcdef",
+                "bundle_path": format!("sources/{VERIFY_TEST_CODE_HASH}/{VERIFY_TEST_SOURCE_BUNDLE_HASH}")
+            },
+            "onchain_registration": {
+                "status": "confirmed",
+                "master_address": VERIFY_TEST_REGISTRY_ADDRESS,
+                "verification_record_address": "EQCsdKYwUaXkgJkz2l0ol6qT_WxeRbE_wBCwnEybmR0u5TO8"
+            }
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_network("mainnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_sends_new_api_payload_and_reports_success.stdout.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured[0].method, "POST");
+    assert_eq!(captured[0].path, "/api/v1/verify");
+    let body = String::from_utf8_lossy(&captured[0].body);
+    assert!(
+        body.contains("name=\"code_hash\"") && body.contains(VERIFY_TEST_CODE_HASH),
+        "multipart request must include target code hash, got: {body}"
+    );
+    assert!(
+        !body.contains("name=\"address\""),
+        "multipart request must not include address when --address is omitted, got: {body}"
+    );
+    assert!(
+        body.contains("name=\"language\"") && body.contains("tolk"),
+        "multipart request must include Tolk language, got: {body}"
+    );
+    assert!(
+        body.contains("name=\"compile_params\"") && body.contains("\"compiler_version\":\"1.4.1\""),
+        "multipart request must include compiler params, got: {body}"
+    );
+    assert!(
+        body.contains("name=\"sources\"")
+            && body.contains("\"path\":\"contracts/simple.tolk\"")
+            && body.contains("\"is_entrypoint\":true"),
+        "multipart request must include source metadata, got: {body}"
+    );
+    assert!(
+        body.contains("name=\"files\"") && body.contains("filename=\"contracts/simple.tolk\""),
+        "multipart request must upload source files under matching paths, got: {body}"
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_address_option_validates_deployed_code_hash() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-address-validation");
+    let contract_code_boc = compile_simple_contract_boc_base64(&project);
+    let (toncenter_url, toncenter_handle, toncenter_captured) =
+        spawn_toncenter_v3_mock(vec![toncenter_v3_account_states_ok_response(
+            VERIFY_TEST_ADDRESS,
+            Some(&contract_code_boc),
+            "active",
+        )]);
+    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "address": VERIFY_TEST_MAINNET_ADDRESS,
+            "code_hash": VERIFY_TEST_CODE_HASH,
+            "compiled_code_hash": VERIFY_TEST_CODE_HASH,
+            "verification_result": "match",
+            "source_bundle_hash": null
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &toncenter_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .run()
+        .success();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_address_option_validates_deployed_code_hash.stdout.txt",
+    );
+
+    toncenter_handle.join().expect("mock toncenter must finish");
+    mock_handle.join().expect("mock verifier must finish");
+
+    let toncenter_captured = toncenter_captured
+        .lock()
+        .expect("captured toncenter requests mutex poisoned");
+    assert_eq!(
+        toncenter_captured.len(),
+        1,
+        "expected exactly one account state request"
+    );
+    assert!(
+        toncenter_captured[0]
+            .path
+            .starts_with("/accountStates?address="),
+        "expected accountStates request, got: {}",
+        toncenter_captured[0].path
+    );
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-address-mismatch");
+    let wrong_code_boc = Boc::encode_base64(Cell::default());
+    let (toncenter_url, toncenter_handle, _toncenter_captured) =
+        spawn_toncenter_v3_mock(vec![toncenter_v3_account_states_ok_response(
+            VERIFY_TEST_ADDRESS,
+            Some(&wrong_code_boc),
+            "active",
+        )]);
+
+    let output = project
+        .acton()
+        .env(TEST_TONCENTER_MAINNET_V3_URL_ENV, &toncenter_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_address(VERIFY_TEST_ADDRESS)
+        .verify_network("mainnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash.stdout.txt",
+    );
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_address_option_rejects_mismatched_deployed_code_hash.stderr.txt",
+    );
+
+    toncenter_handle.join().expect("mock toncenter must finish");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_reports_mismatch() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-mismatch");
+    let (mock_url, mock_handle, _captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 200,
+        body: serde_json::json!({
+            "code_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+            "compiled_code_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+            "verification_result": "mismatch",
+            "source_bundle_hash": null,
+            "source_storage": null,
+            "onchain_registration": null
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_network("mainnet")
+        .run()
+        .failure();
+
+    output.assert_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_reports_mismatch.stdout.txt",
+    );
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_reports_mismatch.stderr.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+}
+
+#[allow(clippy::significant_drop_tightening)]
+#[test]
+fn test_verify_new_verifier_reports_http_error_body() {
+    let _guard = verify_backend_mock_guard();
+    let project = build_verify_backend_project("verify-new-verifier-http-error");
+    let (mock_url, mock_handle, captured) = spawn_verifier_mock(vec![VerifierMockResponse {
+        status: 400,
+        body: serde_json::json!({
+            "error": "new verifier rejected sources"
+        })
+        .to_string(),
+        headers: vec![],
+    }]);
+
+    let output = project
+        .acton()
+        .env("ACTON_NEW_VERIFY_BACKEND", &mock_url)
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_network("mainnet")
+        .run()
+        .failure();
+
+    output.assert_stderr_snapshot_matches(
+        "integration/snapshots/verify/test_verify_new_verifier_reports_http_error_body.stderr.txt",
+    );
+
+    mock_handle.join().expect("mock verifier must finish");
+
+    let captured = captured
+        .lock()
+        .expect("captured verifier requests mutex poisoned");
+    assert_eq!(captured.len(), 1, "expected exactly one verifier request");
+    assert_eq!(captured[0].path, "/api/v1/verify");
+}
+
+#[test]
+fn test_verify_new_verifier_rejects_wallet_option() {
+    let project = build_verify_backend_project("verify-new-verifier-wallet-option");
+
+    project
+        .acton()
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_network("mainnet")
+        .wallet("deployer")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/test_verify_new_verifier_rejects_wallet_option.stderr.txt",
+        );
+}
+
+#[test]
+fn test_verify_new_verifier_rejects_tonconnect_option() {
+    let project = build_verify_backend_project("verify-new-verifier-tonconnect-option");
+
+    project
+        .acton()
+        .verify()
+        .new_verifier()
+        .verify_contract("simple")
+        .verify_network("mainnet")
+        .arg("--tonconnect")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/verify/test_verify_new_verifier_rejects_tonconnect_option.stderr.txt",
+        );
 }
 
 #[allow(clippy::significant_drop_tightening)]

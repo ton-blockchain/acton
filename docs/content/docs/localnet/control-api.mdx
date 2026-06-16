@@ -1,0 +1,151 @@
+---
+title: Localnet Control
+description: >-
+  Acton-only control routes for local state, wallets, address names, compiler
+  ABI metadata, simulated network conditions, and raw local message injection.
+
+
+  These routes are intended for local development tooling and should not be
+  exposed publicly. They are unauthenticated by default, and --require-auth
+  protects them together with other localnet HTTP routes. Rate limiting applies
+  only to /api routes, and response delay applies only to TonCenter-compatible
+  API routes; control routes remain available when --rate-limit or
+  --response-delay-ms is enabled.
+full: true
+sidebarTitle: Control API
+_openapi:
+  toc:
+    - depth: 2
+      title: Fund an account
+      url: '#fund-an-account'
+    - depth: 2
+      title: Get address names
+      url: '#get-address-names'
+    - depth: 2
+      title: Set an address name
+      url: '#set-an-address-name'
+    - depth: 2
+      title: Get compiler ABI metadata
+      url: '#get-compiler-abi-metadata'
+    - depth: 2
+      title: Register compiler ABI metadata
+      url: '#register-compiler-abi-metadata'
+    - depth: 2
+      title: Dump local state
+      url: '#dump-local-state'
+    - depth: 2
+      title: Load local state
+      url: '#load-local-state'
+    - depth: 2
+      title: Create a runtime recovery point
+      url: '#create-a-runtime-recovery-point'
+    - depth: 2
+      title: Revert to a runtime recovery point
+      url: '#revert-to-a-runtime-recovery-point'
+    - depth: 2
+      title: Set a ShardAccount
+      url: '#set-a-shardaccount'
+    - depth: 2
+      title: Send a raw internal message
+      url: '#send-a-raw-internal-message'
+    - depth: 2
+      title: List startup wallets
+      url: '#list-startup-wallets'
+    - depth: 2
+      title: Set simulated network conditions
+      url: '#set-simulated-network-conditions'
+    - depth: 2
+      title: Get node status
+      url: '#get-node-status'
+  structuredData:
+    headings:
+      - content: Fund an account
+        id: fund-an-account
+      - content: Get address names
+        id: get-address-names
+      - content: Set an address name
+        id: set-an-address-name
+      - content: Get compiler ABI metadata
+        id: get-compiler-abi-metadata
+      - content: Register compiler ABI metadata
+        id: register-compiler-abi-metadata
+      - content: Dump local state
+        id: dump-local-state
+      - content: Load local state
+        id: load-local-state
+      - content: Create a runtime recovery point
+        id: create-a-runtime-recovery-point
+      - content: Revert to a runtime recovery point
+        id: revert-to-a-runtime-recovery-point
+      - content: Set a ShardAccount
+        id: set-a-shardaccount
+      - content: Send a raw internal message
+        id: send-a-raw-internal-message
+      - content: List startup wallets
+        id: list-startup-wallets
+      - content: Set simulated network conditions
+        id: set-simulated-network-conditions
+      - content: Get node status
+        id: get-node-status
+    contents:
+      - content: >-
+          Credits an address with local funds and mines the resulting transfer
+          transaction.
+        heading: fund-an-account
+      - content: >-
+          Returns local names for the requested addresses. Missing names are
+          returned as null.
+        heading: get-address-names
+      - content: Sets or updates the local name for an address.
+        heading: set-an-address-name
+      - content: >-
+          Returns registered compiler ABI metadata for the requested code
+          hashes. Missing ABI entries are returned as null.
+        heading: get-compiler-abi-metadata
+      - content: >-
+          Registers one or more compiler ABI payloads for later explorer and API
+          lookups by code hash.
+        heading: register-compiler-abi-metadata
+      - content: Writes a JSON state snapshot without stopping the server.
+        heading: dump-local-state
+      - content: Replaces the current node state with a JSON state snapshot.
+        heading: load-local-state
+      - content: >-
+          Creates an in-memory recovery point for the current localnet state.
+          Recovery points are process-local and are not persisted across
+          restart.
+        heading: create-a-runtime-recovery-point
+      - content: >-
+          Restores a previously created recovery point and invalidates that
+          point plus every newer recovery point.
+        heading: revert-to-a-runtime-recovery-point
+      - content: >-
+          Replaces the selected account state with a base64-encoded ShardAccount
+          BOC.
+        heading: set-a-shardaccount
+      - content: >-
+          Injects a base64-encoded internal message BOC into the local internal
+          queue. TonCenter-compatible message endpoints accept external-in
+          messages only.
+        heading: send-a-raw-internal-message
+      - content: Returns wallets selected when the localnet server started.
+        heading: list-startup-wallets
+      - content: >-
+          Updates simulated network conditions while the localnet server is
+          running and returns the updated values. Set response_delay_ms to 0 to
+          disable response delay. Current values are also available from
+          /acton_nodeInfo.
+        heading: set-simulated-network-conditions
+      - content: >-
+          Returns uptime, latest block seqno, local or remote state-source
+          information, and current simulated network conditions.
+        heading: get-node-status
+---
+
+{/* @generated by `bun run generated-source`. Do not edit directly. */}
+
+Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
+
+These routes are intended for local development tooling and should not be exposed publicly. They are unauthenticated by default, and --require-auth protects them together with other localnet HTTP routes. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+
+<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_snapshot","method":"post"},{"path":"/acton_revert","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

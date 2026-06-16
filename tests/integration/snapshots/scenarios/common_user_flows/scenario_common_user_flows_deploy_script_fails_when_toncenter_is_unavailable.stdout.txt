@@ -1,3 +1,13 @@
 Script finished with [EXIT_STATUS] 100
   Re-run with --backtrace full to get more information
-Failed to send message to real network: Failed to send BOC: error sending request for url ([LOCALHOST_URL]/sendBoc): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])
+Failed to send message to real network: could not reach network toncenter-down while sending external message from wallet deployer; likely causes:
+- network API endpoint is not running or is unreachable
+- configured api.v2 URL points to the wrong host or port
+- a firewall, proxy, or temporary service outage blocked the request
+
+Possible fix:
+- check that the configured api.v2 endpoint is reachable
+- retry after the remote API starts responding
+
+Details:
+Failed to send BOC: error sending request for url ([LOCALHOST_URL]/sendBoc): client error (Connect): tcp connect error: Connection refused ([OS_ERROR])

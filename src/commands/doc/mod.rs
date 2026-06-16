@@ -1,6 +1,10 @@
+use crate::commands::rpc::{
+    find_local_contract_by_abi_name, find_local_contract_by_config_name, load_rpc_config,
+};
 use acton_config::color::OwoColorize;
 use anyhow::{Context, Result, anyhow};
 use tasm_core::spec::{SpecInstruction, load_tvm_specification};
+use tolk_compiler::abi::ContractABI;
 
 const FIELD_LABEL_WIDTH: usize = 14;
 
@@ -104,6 +108,48 @@ pub fn doc_tvm_cmd(
         }
         print_text_instruction(instruction);
     }
+    Ok(())
+}
+
+pub fn doc_abi_cmd(contract_name: &str) -> Result<()> {
+    let contract_name = contract_name.trim();
+    if contract_name.is_empty() {
+        anyhow::bail!("Contract name cannot be empty");
+    }
+
+    let config = load_rpc_config()?;
+    if let Some(local_contract) = find_local_contract_by_config_name(contract_name, &config)? {
+        if let Some(abi) = local_contract.abi.as_deref() {
+            return print_abi_json(abi);
+        }
+
+        if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_name) {
+            return print_abi_json(catalog_contract.abi().as_ref());
+        }
+
+        anyhow::bail!(
+            "Local contract '{}' was found, but it does not declare ABI",
+            local_contract.contract_name
+        );
+    }
+
+    if let Some(catalog_contract) = acton_abi_catalog::find_contract_by_name(contract_name) {
+        return print_abi_json(catalog_contract.abi().as_ref());
+    }
+
+    if let Some(local_contract) = find_local_contract_by_abi_name(contract_name, &config)?
+        && let Some(abi) = local_contract.abi.as_deref()
+    {
+        return print_abi_json(abi);
+    }
+
+    anyhow::bail!(
+        "Contract ABI '{contract_name}' not found in local Acton.toml contracts or bundled ABI catalog"
+    );
+}
+
+fn print_abi_json(abi: &ContractABI) -> Result<()> {
+    println!("{}", serde_json::to_string_pretty(abi)?);
     Ok(())
 }
 

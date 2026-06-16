@@ -15,12 +15,16 @@ struct Counter {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun Counter.fromStorage(storage: Storage, toShard: AddressShardingOptions? = null): Counter {
+fun Counter.fromStorage(
+    storage: Storage,
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): Counter {
     val stateInit = ContractState {
         code: build("Counter"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return Counter { address, stateInit };
 }
 

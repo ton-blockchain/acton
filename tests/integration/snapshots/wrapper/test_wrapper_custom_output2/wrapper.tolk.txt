@@ -13,12 +13,15 @@ struct MyContract {
 }
 
 /// Creates a contract wrapper instance from the storage data
-fun MyContract.fromStorage(toShard: AddressShardingOptions? = null): MyContract {
+fun MyContract.fromStorage(
+    toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
+): MyContract {
     val stateInit = ContractState {
         code: build("my_contract"),
         data: createEmptyCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return MyContract { address, stateInit };
 }
 

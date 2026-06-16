@@ -19,12 +19,13 @@ struct NftCollection {
 fun NftCollection.fromStorage(
     storage: NftCollectionStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): NftCollection {
     val stateInit = ContractState {
         code: build("NftCollection"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return NftCollection { address, stateInit };
 }
 

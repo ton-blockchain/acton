@@ -74,7 +74,7 @@ SUBCOMMANDS
               Use a secure native store for mnemonic storage when available.
 
           --airdrop
-              Request testnet TON after wallet creation.
+              Request testnet GRAM after wallet creation.
 
           --faucet-url url
               Faucet URL for automatic testnet airdrop.
@@ -272,7 +272,8 @@ AIRDROP DETAILS
        o  testnet requests a PoW challenge from the faucet, solves it locally,
           and submits a claim
 
-       o  localnet sends a fixed faucet transfer through Localnet
+       o  localnet sends a fixed faucet transfer through Localnet and waits
+          until the wallet balance includes the credited amount
 
        After a successful interactive testnet wallet airdrop, Acton briefly
        waits for the balance to appear and lets you skip that wait by pressing

@@ -1,0 +1,139 @@
+{
+  "abi_schema_version": "1.0",
+  "contract_name": "WalletV1r1",
+  "author": "TON Core",
+  "version": "1.1",
+  "description": "Wallet V1 R1 is a TON wallet for holding TON and sending signed transfers, using simple seqno replay protection.",
+  "unique_types": [
+    {
+      "kind": "void"
+    },
+    {
+      "kind": "int"
+    },
+    {
+      "kind": "slice"
+    },
+    {
+      "kind": "cell"
+    },
+    {
+      "kind": "builder"
+    },
+    {
+      "kind": "bool"
+    },
+    {
+      "kind": "coins"
+    },
+    {
+      "kind": "address"
+    },
+    {
+      "kind": "intN",
+      "n": 32
+    },
+    {
+      "kind": "uintN",
+      "n": 32
+    },
+    {
+      "kind": "intN",
+      "n": 64
+    },
+    {
+      "kind": "uintN",
+      "n": 64
+    },
+    {
+      "kind": "AliasRef",
+      "alias_name": "WalletV1r1IncomingExternalMessage"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV1r1SignedExternal"
+    },
+    {
+      "kind": "bitsN",
+      "n": 512
+    },
+    {
+      "kind": "remaining"
+    },
+    {
+      "kind": "StructRef",
+      "struct_name": "WalletV1r1Storage"
+    },
+    {
+      "kind": "uintN",
+      "n": 256
+    }
+  ],
+  "struct_instantiations": [],
+  "alias_instantiations": [],
+  "declarations": [
+    {
+      "kind": "struct",
+      "name": "WalletV1r1Storage",
+      "ty_idx": 16,
+      "fields": [
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Replay-protection sequence number."
+        },
+        {
+          "name": "publicKey",
+          "ty_idx": 17,
+          "description": "Stored Ed25519 public key used to verify signed external requests."
+        }
+      ],
+      "description": "Persistent Wallet V1 R1 state."
+    },
+    {
+      "kind": "struct",
+      "name": "WalletV1r1SignedExternal",
+      "ty_idx": 13,
+      "fields": [
+        {
+          "name": "signature",
+          "ty_idx": 14,
+          "description": "Ed25519 signature over seqno and the optional outgoing-message tail."
+        },
+        {
+          "name": "seqno",
+          "ty_idx": 9,
+          "description": "Request sequence number expected to match storage.seqno."
+        },
+        {
+          "name": "outgoing",
+          "ty_idx": 15,
+          "description": "Raw tail after seqno: empty or exactly one `mode:uint8` followed by one message ref."
+        }
+      ],
+      "description": "External-in request authenticated by Ed25519 signature over seqno and optional outgoing-message tail."
+    },
+    {
+      "kind": "alias",
+      "name": "WalletV1r1IncomingExternalMessage",
+      "ty_idx": 12,
+      "target_ty_idx": 13,
+      "description": "External-in message body accepted by Wallet V1 R1."
+    }
+  ],
+  "incoming_messages": [],
+  "incoming_external": [
+    {
+      "body_ty_idx": 12
+    }
+  ],
+  "outgoing_messages": [],
+  "emitted_events": [],
+  "storage": {
+    "storage_ty_idx": 16
+  },
+  "get_methods": [],
+  "thrown_errors": [],
+  "compiler_name": "tolk",
+  "compiler_version": "1.4.1"
+}

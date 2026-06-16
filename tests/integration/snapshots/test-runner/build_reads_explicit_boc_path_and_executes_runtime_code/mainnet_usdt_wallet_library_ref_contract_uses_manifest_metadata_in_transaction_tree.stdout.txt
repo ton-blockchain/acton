@@ -1,0 +1,16 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/build_mainnet_usdt_wallet_library_ref_transaction_tree.test.tolk (1 test)
+  ✓ mainnet usdt wallet library ref transaction tree [TIME]
+    └─ Test output:
+       N/A -> deployer A
+       └── MainnetUsdtTopUp 0.1 GRAM -> Mainnet USDT Wallet Code B                     gas=1000
+           queryId: 0
+           └── account created
+
+ ✓ 1 passed in 1 file

@@ -1,0 +1,1 @@
+Error: --wallet cannot be used with --new; the new verifier registers source bundles server-side

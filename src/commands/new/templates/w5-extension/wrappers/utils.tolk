@@ -21,12 +21,13 @@ fun WalletV5.deployCodeLib(): cell {
 fun WalletV5.fromLibraryStorage(
     storage: Storage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): WalletV5 {
     val stateInit = ContractState {
         code: WalletV5.deployCodeLib(),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return WalletV5 { address, stateInit };
 }
 

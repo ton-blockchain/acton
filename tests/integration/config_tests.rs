@@ -88,6 +88,49 @@ get fun `test-profiled-transaction`() {
 }
 "#;
 
+const GAS_PROFILED_UNIT_TEST: &str = r"
+struct X {
+    seed: int
+}
+
+fun X.create(): X {
+    return X { seed: 17 };
+}
+
+@noinline
+fun X.mix(self, value: int): int {
+    return (value + self.seed) * 3;
+}
+
+@noinline
+fun X.heavyJob(self): int {
+    var acc = self.seed;
+    repeat (8) {
+        acc = self.mix(acc);
+    }
+    return acc;
+}
+
+get fun `test gas profile heavy unit helper`() {
+    val x = X.create();
+    val result = x.heavyJob();
+    if (result == 0) {
+        throw 901;
+    }
+}
+";
+
+fn toolchain_mismatch_snapshot_path(
+    stable_path: &'static str,
+    trunk_path: &'static str,
+) -> &'static str {
+    if build_info::is_trunk_build() {
+        trunk_path
+    } else {
+        stable_path
+    }
+}
+
 #[test]
 fn test_filter_via_config() {
     ProjectBuilder::new("filter-config")
@@ -157,8 +200,39 @@ acton = "0.0.0"
         .run_script_cmd("hello")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
             "integration/snapshots/config/test_toolchain_acton_version_mismatch.stderr.txt",
+            "integration/snapshots/config/test_toolchain_acton_version_mismatch.trunk.stderr.txt",
+        ));
+}
+
+#[test]
+fn test_toolchain_acton_trunk_build_mismatch_suggests_trunk_config_value() {
+    if !build_info::is_trunk_build() {
+        return;
+    }
+
+    let project = ProjectBuilder::new("toolchain-trunk-version-mismatch")
+        .script_config("hello", "echo should-not-run")
+        .build();
+
+    let config_path = project.path().join("Acton.toml");
+    let mut toml_content = fs::read_to_string(&config_path).expect("Read Acton.toml");
+    toml_content.push_str(
+        r#"
+[toolchain]
+acton = "1.0.0"
+"#,
+    );
+    fs::write(config_path, toml_content).expect("Write Acton.toml");
+
+    project
+        .acton()
+        .run_script_cmd("hello")
+        .run()
+        .failure()
+        .assert_stderr_snapshot_matches(
+            "integration/snapshots/config/test_toolchain_acton_trunk_build_mismatch.stderr.txt",
         );
 }
 
@@ -242,9 +316,10 @@ acton = "v{}"
         .run_script_cmd("hello")
         .run()
         .failure()
-        .assert_stderr_snapshot_matches(
+        .assert_stderr_snapshot_matches(toolchain_mismatch_snapshot_path(
             "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.stderr.txt",
-        );
+            "integration/snapshots/config/test_toolchain_acton_v_prefixed_current_version.trunk.stderr.txt",
+        ));
 }
 
 #[test]
@@ -879,4 +954,49 @@ fn test_fail_on_diff_via_config_without_baseline_snapshot_mode_succeeds() {
         !stderr.contains("`--fail-on-diff` requires `--baseline-snapshot`"),
         "snapshot mode with fail-on-diff from config must not require baseline, stderr:\n{stderr}"
     );
+}
+
+#[test]
+fn test_gas_profile_via_config_exports_devtools_profile() {
+    let project = ProjectBuilder::new("gas-profile-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .with_test_config(TestConfig {
+            gas_profile: Some("gas.cpuprofile".to_string()),
+            gas_profile_include_tests: Some(true),
+            ..Default::default()
+        })
+        .build();
+
+    let output = project.acton().test().run().success();
+
+    output
+        .assert_contains("Gas profile saved to gas.cpuprofile")
+        .assert_file_snapshot_matches(
+            "gas.cpuprofile",
+            "integration/snapshots/config/test_gas_profile_via_config_exports_devtools_profile.cpuprofile",
+        );
+}
+
+#[test]
+fn test_gas_profile_format_collapsed_via_config_exports_collapsed_stacks() {
+    let project = ProjectBuilder::new("gas-profile-collapsed-config")
+        .contract("simple", SIMPLE_CONTRACT)
+        .test_file("profile", GAS_PROFILED_UNIT_TEST)
+        .with_test_config(TestConfig {
+            gas_profile: Some("gas.collapsed".to_string()),
+            gas_profile_format: Some("collapsed".to_string()),
+            gas_profile_include_tests: Some(true),
+            ..Default::default()
+        })
+        .build();
+
+    let output = project.acton().test().run().success();
+
+    output
+        .assert_contains("Gas profile saved to gas.collapsed")
+        .assert_file_snapshot_matches(
+            "gas.collapsed",
+            "integration/snapshots/config/test_gas_profile_format_collapsed_via_config_exports_collapsed_stacks.collapsed",
+        );
 }

@@ -1,0 +1,6 @@
+  → Contract: simple
+  → Compiling contract
+  ✓ Compiled successfully
+  → Code hash: 0xe67eec3bd481c7910c87a061e60ca509e82edd687a0e1c8bf1b437e6de3e6973
+  → Contract address: [WALLET_ADDRESS_BASE]
+  → Checking deployed code hash for address

@@ -16,6 +16,7 @@ export type StorageLeafValue =
   | {
       readonly kind: "scalar"
       readonly value: string
+      readonly rawValue?: string
     }
   | {
       readonly kind: "boolean"
@@ -58,9 +59,10 @@ export type StorageDiffNode =
       readonly entries: readonly StorageDiffEntry[]
     }
 
-const scalar = (value: string): StorageLeafValue => ({
+const scalar = (value: string, rawValue?: string): StorageLeafValue => ({
   kind: "scalar",
   value,
+  rawValue,
 })
 
 const nullValue = (): StorageLeafValue => ({
@@ -120,7 +122,7 @@ const stringifyParsedValue = (value: ParsedValue): string => {
       const renderedEntries = value.entries
         .map(entry => `${stringifyParsedValue(entry.key)} => ${stringifyParsedValue(entry.value)}`)
         .join(", ")
-      return `map { ${renderedEntries} }`
+      return `${value.typeName ?? "map"} { ${renderedEntries} }`
     }
   }
 }
@@ -137,7 +139,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
       return booleanValue(value.value)
     }
     case "scalar": {
-      return scalar(value.value)
+      return scalar(value.value, value.rawValue)
     }
     case "address": {
       return addressValue(value.value)
@@ -158,7 +160,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
           key: stringifyParsedValue(entry.key),
           value: normalizeParsedValue(entry.value),
         })),
-        "map",
+        value.typeName ?? "map",
         "map",
       )
     }
@@ -252,7 +254,7 @@ const areLeafValuesEqual = (before: StorageLeafValue, after: StorageLeafValue): 
   }
 
   if (before.kind === "scalar" && after.kind === "scalar") {
-    return before.value === after.value
+    return (before.rawValue ?? before.value) === (after.rawValue ?? after.value)
   }
 
   return false

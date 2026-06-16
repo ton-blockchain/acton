@@ -19,12 +19,13 @@ struct JettonWallet {
 fun JettonWallet.fromStorage(
     storage: WalletStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): JettonWallet {
     val stateInit = ContractState {
         code: build("JettonWallet"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return JettonWallet { address, stateInit };
 }
 

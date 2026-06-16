@@ -1,9 +1,8 @@
-//! Internal HTTP clients for interacting with external TON APIs (`TonCenter`, `TonHub`, DTON).
+//! Internal HTTP clients for interacting with external TON APIs (`TonCenter`, `TonHub`).
 
 use crate::Network;
-use crate::types::{
-    AccountFromAPI, BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse,
-};
+use crate::types::{BlockInfo, BlocksResponse, TransactionData, TransactionTransactionsResponse};
+use anyhow::Context;
 use reqwest::Client;
 use reqwest::header::USER_AGENT;
 use serde::Deserialize;
@@ -13,6 +12,8 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 use toncenter_keys::api_key as toncenter_api_key;
+use tycho_types::boc::Boc;
+use tycho_types::prelude::Cell;
 
 const USE_PROXY_ENV: &str = "ACTON_USE_PROXY";
 const TONCENTER_MIN_REQUEST_INTERVAL: Duration = Duration::from_millis(1200);
@@ -256,11 +257,137 @@ impl TonCenterClient {
 
         Ok(lib_data.to_string())
     }
+
+    /// Fetches all blockchain config parameters for a masterchain block using V2 API.
+    pub(crate) async fn get_config_all(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getConfigAll",
+            self.base_url.replace("/api/v3", "/api/v2")
+        );
+
+        let mut request = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .query(&[("seqno", seqno.to_string())]);
+
+        if let Some(key) = &self.api_key {
+            request = request.header("X-API-Key", key);
+        }
+
+        self.maybe_wait_for_rate_limit().await;
+        let response = request.send().await?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigAllResponse {
+            ok: bool,
+            result: Option<TonCenterConfigInfo>,
+            error: Option<String>,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigInfo {
+            config: TonCenterConfigCell,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterConfigCell {
+            bytes: String,
+        }
+
+        let data: TonCenterConfigAllResponse = response
+            .json()
+            .await
+            .context("Failed to parse TonCenter getConfigAll response")?;
+
+        if !data.ok {
+            anyhow::bail!(
+                "{}",
+                data.error
+                    .unwrap_or_else(|| "TonCenter returned ok=false for getConfigAll".into())
+            );
+        }
+
+        let config_boc = data
+            .result
+            .ok_or_else(|| anyhow::anyhow!("TonCenter getConfigAll response has no result"))?
+            .config
+            .bytes;
+
+        Boc::decode_base64(&config_boc).context("Failed to decode blockchain config BOC data")
+    }
+
+    /// Fetches a serialized `ShardAccount` cell using V2 API.
+    pub(crate) async fn get_shard_account_cell(
+        &self,
+        seqno: u32,
+        address: &str,
+    ) -> anyhow::Result<Cell> {
+        let url = format!(
+            "{}/getShardAccountCell",
+            self.base_url.replace("/api/v3", "/api/v2")
+        );
+        let query = [
+            ("address", address.to_owned()),
+            ("seqno", seqno.to_string()),
+        ];
+
+        let mut request = self
+            .client
+            .get(url)
+            .header(USER_AGENT, user_agent())
+            .query(&query);
+
+        if let Some(key) = &self.api_key {
+            request = request.header("X-API-Key", key);
+        }
+
+        self.maybe_wait_for_rate_limit().await;
+        let response = request.send().await?;
+        if !response.status().is_success() {
+            anyhow::bail!("TonCenter V2 returned status: {}", response.status());
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterShardAccountCellResponse {
+            ok: bool,
+            result: Option<TonCenterTvmCell>,
+            error: Option<String>,
+        }
+
+        #[derive(Deserialize)]
+        struct TonCenterTvmCell {
+            bytes: String,
+        }
+
+        let data: TonCenterShardAccountCellResponse = response
+            .json()
+            .await
+            .context("Failed to parse getShardAccountCell response")?;
+
+        if !data.ok {
+            anyhow::bail!(
+                "{}",
+                data.error
+                    .unwrap_or_else(|| "TonCenter returned ok=false for getShardAccountCell".into())
+            );
+        }
+
+        let cell_boc = data
+            .result
+            .ok_or_else(|| anyhow::anyhow!("TonCenter getShardAccountCell response has no result"))?
+            .bytes;
+
+        Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
+    }
 }
 
 /// Client for `TonHub` (TON API v4).
 ///
-/// Used for fetching account snapshots and master-block configurations.
+/// Used for fetching account transaction `BoCs` and master-block metadata.
 pub(crate) struct TonHubClient {
     client: Client,
     base_url: String,
@@ -336,118 +463,5 @@ impl TonHubClient {
         response_data
             .block
             .ok_or_else(|| anyhow::anyhow!("Block info is missing in response"))
-    }
-
-    /// Fetches an account snapshot at a specific master-block sequence number.
-    pub(crate) async fn get_account(
-        &self,
-        seqno: u32,
-        address: &str,
-    ) -> anyhow::Result<AccountFromAPI> {
-        let url = format!("{}/block/{}/{}", self.base_url, seqno, address);
-
-        #[derive(Deserialize)]
-        struct AccountResponse {
-            account: AccountFromAPI,
-        }
-
-        let response = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .send()
-            .await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonHub API error {status}: {text}");
-        }
-        let response_data: AccountResponse = serde_json::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonHub response: {e}. Body: {text}"))?;
-        Ok(response_data.account)
-    }
-
-    /// Fetches the global configuration for a specific master-block sequence number.
-    pub(crate) async fn get_config(&self, seqno: u32) -> anyhow::Result<String> {
-        let url = format!("{}/block/{}/config", self.base_url, seqno);
-
-        #[derive(Deserialize)]
-        struct ConfigResponse {
-            config: ConfigData,
-        }
-
-        #[derive(Deserialize)]
-        struct ConfigData {
-            cell: String,
-        }
-
-        let response = self
-            .client
-            .get(url)
-            .header(USER_AGENT, user_agent())
-            .send()
-            .await?;
-        let status = response.status();
-        let text = response.text().await?;
-        if !status.is_success() {
-            anyhow::bail!("TonHub API error {status}: {text}");
-        }
-        let response_data: ConfigResponse = serde_json::from_str(&text)
-            .map_err(|e| anyhow::anyhow!("Failed to decode TonHub response: {e}. Body: {text}"))?;
-        Ok(response_data.config.cell)
-    }
-}
-
-/// Client for dton.io GraphQL API.
-///
-/// Primarily used as a fallback for fetching library cells.
-pub(crate) struct DtonClient {
-    client: Client,
-    api_key: String,
-}
-
-impl DtonClient {
-    /// Creates a new Dton client with an optional API key.
-    pub(crate) fn new(api_key: Option<String>) -> Self {
-        Self {
-            client: http_client_builder()
-                .build()
-                .expect("failed to build dton HTTP client"),
-            api_key: api_key.unwrap_or_else(|| "fpYxhGTWfIe3ZEf2s6vvgAGmps_qnNmD".to_string()),
-        }
-    }
-
-    /// Fetches a library cell by its hash via GraphQL.
-    pub(crate) async fn get_lib(&self, network: Network, hash: &str) -> anyhow::Result<String> {
-        let endpoint = match network {
-            Network::Mainnet => format!("https://dton.io/{}/graphql", self.api_key),
-            Network::Testnet => format!("https://testnet.dton.io/{}/graphql", self.api_key),
-            Network::Localnet | Network::Custom(_) => {
-                anyhow::bail!("Network {network} is not yet supported in retrace")
-            }
-        };
-
-        let query = serde_json::json!({
-            "query": format!("query fetchAuthor {{ get_lib(lib_hash: \"{}\") }}", hash),
-            "variables": {}
-        });
-
-        let response: serde_json::Value = self
-            .client
-            .post(endpoint)
-            .header(USER_AGENT, user_agent())
-            .json(&query)
-            .send()
-            .await?
-            .json()
-            .await?;
-
-        let lib_data = response
-            .get("data")
-            .and_then(|v| v.get("get_lib"))
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| anyhow::anyhow!("Library not found on DTON"))?;
-
-        Ok(lib_data.to_string())
     }
 }

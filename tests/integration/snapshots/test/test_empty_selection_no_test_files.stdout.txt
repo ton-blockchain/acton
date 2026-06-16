@@ -10,4 +10,4 @@
 
  ✓ 0 passed in 0 files
 
-No test files found. Check the test path or add a *.test.tolk file.
+No test files found. Check the test paths or add a *.test.tolk file.

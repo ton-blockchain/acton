@@ -18,6 +18,10 @@ thiserror = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tycho-types = { workspace = true }
+tvm-ffi-derive = { workspace = true, optional = true }
+
+[features]
+derive = ["dep:tvm-ffi-derive"]
 
 [lints]
 workspace = true

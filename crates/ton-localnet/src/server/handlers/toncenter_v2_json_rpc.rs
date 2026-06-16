@@ -7,7 +7,9 @@ use crate::server::models::{
     GetConfigAllRequest, GetConfigParamRequest, GetLibrariesRequest, GetTransactionsRequest,
     JsonRpcRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest, TryLocateTxRequest,
 };
+use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
+use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
 use base64::Engine;
@@ -17,6 +19,8 @@ use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
+    State(api_calls): State<ApiCallLog>,
+    OriginalUri(original_uri): OriginalUri,
     Json(payload): Json<JsonRpcRequest>,
 ) -> impl IntoResponse {
     tracing::debug!(
@@ -25,6 +29,10 @@ pub async fn json_rpc(
         payload.id
     );
 
+    let start = ApiCallLog::start();
+    let method = payload.method.clone();
+    let call_type = classify_json_rpc_call(&method);
+    let request_id = payload.id.clone();
     let id_str = match &payload.id {
         Value::String(s) => s.clone(),
         Value::Number(n) => n.to_string(),
@@ -34,7 +42,7 @@ pub async fn json_rpc(
 
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
 
-    match result {
+    let mut response = match result {
         Ok(resp) => resp,
         Err(e) => (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -48,6 +56,29 @@ pub async fn json_rpc(
             })),
         )
             .into_response(),
+    };
+
+    api_calls.record(
+        ApiCallInput {
+            call_type,
+            api_family: ApiCallFamily::JsonRpc,
+            http_method: "POST".to_owned(),
+            path: original_uri.path().to_owned(),
+            method,
+            request_id,
+            status_code: response.status().as_u16(),
+        },
+        start,
+    );
+    response.extensions_mut().insert(ApiCallAlreadyRecorded);
+
+    response
+}
+
+fn classify_json_rpc_call(method: &str) -> ApiCallType {
+    match method {
+        "sendBoc" | "sendBocReturnHash" => ApiCallType::Write,
+        _ => ApiCallType::Read,
     }
 }
 
@@ -64,9 +95,7 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
     let res: Value = match method {
         "sendBoc" => {
             let req: SendBocRequest = parse_params(params, method)?;
-            node.send_boc(req.boc)
-                .await
-                .map(|r| v2::map_block_transactions(&r))?
+            node.send_boc(req.boc).await.map(|r| v2::map_send_boc(&r))?
         }
         "sendBocReturnHash" => {
             let req: SendBocRequest = parse_params(params, method)?;

@@ -1,11 +1,13 @@
 pub mod api;
 pub mod executor;
+mod indexer;
 mod localnet;
 pub mod node;
 mod node_snapshot;
 pub mod remote;
 pub mod server;
 pub mod storage;
+pub mod streaming;
 pub mod types;
-pub use localnet::Localnet;
-pub use server::{ServerArgs, run_server};
+pub use localnet::{DEFAULT_BLOCK_INTERVAL_MS, Localnet};
+pub use server::{ServerArgs, StartupWallet, run_server};

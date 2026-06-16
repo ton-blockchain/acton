@@ -18,12 +18,13 @@ struct SimpleExtension {
 fun SimpleExtension.fromStorage(
     storage: ExtensionStorage,
     toShard: AddressShardingOptions? = null,
+    workchain: int8 = BASECHAIN,
 ): SimpleExtension {
     val stateInit = ContractState {
         code: build("SimpleExtension"),
         data: storage.toCell(),
     };
-    val address = AutoDeployAddress { stateInit, toShard }.calculateAddress();
+    val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
     return SimpleExtension { address, stateInit };
 }
 

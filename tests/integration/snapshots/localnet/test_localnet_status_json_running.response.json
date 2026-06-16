@@ -1,9 +1,12 @@
 {
+  "current_unix_time": "[CURRENT_UNIX_TIME]",
   "fork_block_number": null,
   "fork_network": null,
-  "last_block_seqno": 0,
+  "last_block_seqno": "[LAST_BLOCK_SEQNO]",
+  "next_block_timestamp": null,
   "port": "[PORT]",
   "running": true,
   "state_source": "local",
+  "time_offset_seconds": "[TIME_OFFSET_SECONDS]",
   "uptime_seconds": "[UPTIME_SECONDS]"
 }

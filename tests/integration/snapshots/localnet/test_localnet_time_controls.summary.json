@@ -1,0 +1,28 @@
+{
+  "increase_time": {
+    "block_advanced_by_requested_delta": true,
+    "offset_at_least_requested": true,
+    "ok": true
+  },
+  "invalid_backwards": {
+    "code": 500,
+    "error_contains_latest_block": true,
+    "ok": false
+  },
+  "invalid_zero_increase": {
+    "code": 500,
+    "error": "seconds must be greater than 0",
+    "ok": false
+  },
+  "next_block_timestamp": {
+    "block_matches_requested_timestamp": true,
+    "fund_ok": true,
+    "pending_cleared_after_mine": true,
+    "pending_matches_requested_timestamp": true,
+    "tx_now_matches_block": true
+  },
+  "set_time": {
+    "block_at_or_after_requested_time": true,
+    "ok": true
+  }
+}

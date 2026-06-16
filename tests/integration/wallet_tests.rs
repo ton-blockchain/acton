@@ -1799,7 +1799,7 @@ fn test_wallet_list_balance_plain_uses_mocked_toncenter() {
 
     output.assert_contains("Available wallets:");
     output.assert_contains("balance-wallet");
-    output.assert_contains("2.4457 TON");
+    output.assert_contains("2.4457 GRAM");
 
     let captured = captured
         .lock()
@@ -1970,7 +1970,7 @@ fn test_wallet_list_balance_handles_toncenter_failure() {
     toncenter_handle.join().expect("mock toncenter must finish");
 
     output.assert_contains("balance-wallet");
-    output.assert_contains("0 TON");
+    output.assert_contains("0 GRAM");
 }
 
 #[test]
@@ -2184,7 +2184,7 @@ fn test_wallet_new_all_fields_interactive() {
     session.expect("Wallet type:");
     session.send_line("", "failed to select default wallet type");
 
-    session.expect("Request testnet TON from faucet now?");
+    session.expect("Request testnet GRAM from faucet now?");
     session.send_line("", "failed to keep default no-airdrop option");
 
     session.expect("Wallet successfully created and added to");

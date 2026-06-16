@@ -54,6 +54,18 @@ OPTIONS
        --fork-block-number seqno
            Historical block sequence number to fork from.
 
+           When a fork block number is set, Acton caches resolved remote
+           accounts under
+           build/cache/<network>/<seqno>/<workchain>_<address-hash>.json. Later
+           script runs with the same fork network, block number, and address
+           read that file before calling the remote API.
+
+       --no-fork-cache
+           Disable persistent account cache for pinned fork block numbers. Use
+           this when you want every script run to fetch forked accounts from
+           the remote API. The regular --clear-cache flag removes this cache
+           together with the rest of build/cache.
+
    Broadcasting Options
        --net network
            Broadcast to the selected network. If omitted, the script runs in
@@ -153,10 +165,12 @@ SCRIPT ARGUMENTS
        o  cell, slice, and bitsN accept plain BoC hex without C{} or CS{}
           prefixes
 
+       o  any_address accepts an internal address or the addr_none literal
+
        o  arrays accept [item1, item2]
 
        Unsupported parameter types currently include structs, tuple, map, dict,
-       builder, any_address and other complex types.
+       builder and other complex types.
 
 SIDE EFFECTS
        acton script always compiles and executes the selected script. With
@@ -201,17 +215,24 @@ EXAMPLES
 
               TONCENTER_MAINNET_API_KEY=your-key acton script query.tolk --fork-net mainnet
 
-       5. Broadcast a deploy flow and print explorer links:
+       5. Run against a protected localnet:
+
+              ACTON_LOCALNET_AUTH_TOKEN=localnet-token acton script scripts/deploy.tolk --net localnet
+
+       6. Broadcast a deploy flow and print explorer links:
 
               acton script scripts/deploy.tolk --net testnet --explorer tonscan
 
-       6. Broadcast through TON Connect instead of local wallet keys:
+       7. Broadcast through TON Connect instead of local wallet keys:
 
               acton script scripts/deploy.tolk --net testnet --tonconnect
 
 TONCENTER API KEYS
        Built-in mainnet/testnet requests read TONCENTER_MAINNET_API_KEY or
        TONCENTER_TESTNET_API_KEY, depending on the selected network.
+
+       Protected localnet requests read ACTON_LOCALNET_AUTH_TOKEN. Use the
+       token printed by acton localnet start --require-auth.
 
        For custom:<name>, Acton reads <NORMALIZED_NAME>_API_KEY. Custom network
        names are uppercased and non-alphanumeric characters are replaced with

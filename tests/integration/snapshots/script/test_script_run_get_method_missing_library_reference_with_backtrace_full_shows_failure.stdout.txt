@@ -1,0 +1,10 @@
+  Installing standard library [ACTON_VERSION]
+Cannot execute get method currentCounter (117456)
+exit_code=9
+Library 0203C5B6BBC1E62F94E08C4177FCC59533B6E3F7FD80C5A006BB1B5C900BCC1C is missing, which is what causes this error
+This most likely happened because the library is not registered in tests
+To manually register library use testing.registerLibrary(code) somewhere in setupTests()-like function
+Learn more about libraries in documentation: [ACTON_DOCS_URL]/libraries
+at @stdlib/common[LINE]
+Description: Cell underflow
+Phase: Compute phase

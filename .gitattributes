@@ -1,5 +1,10 @@
 * text=auto eol=lf
 
+# e2e tests
+crates/**/e2e/__image_snapshots__/*.png filter=lfs diff=lfs merge=lfs -text
+
+docs/**/*.png filter=lfs diff=lfs merge=lfs -text
+
 # Generated schema
 crates/acton-config/schemas/*.json linguist-generated=true text=auto eol=lf
 

@@ -1,0 +1,9 @@
+{
+  "api_delay_observed": true,
+  "api_request_ok": true,
+  "initial_response_delay_ms": 0,
+  "node_info_after_reset_response_delay_ms": 0,
+  "node_info_response_delay_ms": 250,
+  "reset_response_delay_ms": 0,
+  "set_response_delay_ms": 250
+}

@@ -58,7 +58,23 @@ For the minimal local build/test flow, install:
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
-5. GitHub CLI (`gh`) (used by `just sync-artifacts`)
+5. Git LFS (required for files tracked through LFS)
+   ```bash
+   # macOS
+   brew install git-lfs
+
+   # Linux (Debian/Ubuntu)
+   sudo apt install git-lfs
+
+   git lfs install
+   ```
+6. Playwright Chromium (required for Test UI E2E; `just test-ui-e2e` also
+   installs it automatically)
+   ```bash
+   bun ci
+   just install-test-ui-e2e-browsers
+   ```
+7. GitHub CLI (`gh`) (used by `just sync-artifacts`)
 
 - macOS:
   ```bash
@@ -77,7 +93,7 @@ Optional CLI tools:
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
-  cargo install cargo-deny --version 0.19.4 --locked
+  cargo install cargo-deny --version 0.19.6 --locked
   ```
 - `cargo-audit` (RustSec advisory checks for `just check-audit` / `just check-security`)
   ```bash
@@ -85,7 +101,7 @@ Optional CLI tools:
   ```
 - `typos-cli` (spell checker for `just typos`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install typos-cli --version 1.45.1 --locked
+  cargo install typos-cli --version 1.46.1 --locked
   ```
 - `cargo-llvm-cov` (optional, for coverage)
   ```bash
@@ -103,6 +119,13 @@ System dependencies:
   ```bash
   sudo apt install libsodium-dev libmicrohttpd-dev pkg-config
   ```
+
+For Linux Test UI E2E runs, Playwright may require extra browser libraries.
+If Chromium fails to start, run:
+
+```bash
+bun run playwright install --with-deps chromium
+```
 
 For first-time Linux TON artifact builds (closer to CI), install the extended
 toolchain set:
@@ -139,7 +162,7 @@ What this does:
 ## Building from source
 
 Acton links static TON artifacts (`libemulator.a`, `libtolk.a`) from the
-upstream `ton-blockchain/ton` repository branch `pmakhnev/acton`.
+upstream `ton-blockchain/ton` repository branch `acton`.
 
 ### Artifact ownership and verification
 
@@ -158,6 +181,21 @@ The verification bypass `TON_OBJS_DISABLE_ARCHIVE_SHA_VERIFY` exists as an
 escape hatch, but it should stay unset for normal contributor builds. When set
 to anything other than `0` / `false`, build-time archive verification is
 disabled.
+
+### Bundled mainnet config
+
+Acton embeds a default mainnet blockchain config for local emulation in
+`crates/ton-executor/src/default_config.boc64`. Refresh it from TonCenter with:
+
+```bash
+cargo xtask update-default-config
+```
+
+The task fetches `getConfigAll`, validates that `result.config.bytes` is a valid
+BOC, and writes the base64 string into the bundled config file. The
+`ton-executor` test suite also checks the bundled value against TonCenter when
+the endpoint is available; network, HTTP, or invalid-response failures are
+reported as a skipped check rather than a failing test.
 
 ### Option 1: sync prebuilt `objs` with xtask
 
@@ -194,7 +232,7 @@ just build-dev
 Clone the TON repository from the Acton repo root:
 
 ```bash
-git clone --branch pmakhnev/acton https://github.com/ton-blockchain/ton.git ton-repo --recurse-submodules
+git clone --branch acton https://github.com/ton-blockchain/ton.git ton-repo --recurse-submodules
 ```
 
 Build the static artifacts with the script for your platform.
@@ -257,6 +295,38 @@ Equivalent explicit form (with env):
 ```bash
 SNAPSHOTS=overwrite just test
 ```
+
+### Test UI E2E
+
+Run browser E2E tests against a real `acton test --ui` server:
+
+```bash
+just test-ui-e2e
+```
+
+This target builds UI bundles, builds the debug Acton binary with those fresh
+assets embedded, installs Playwright Chromium, type-checks the E2E test files,
+creates a temporary Jetton template project under `/tmp`, starts
+`acton test --ui --coverage`, and checks the Test UI in headless Chromium.
+
+When an intentional visual change requires new screenshots:
+
+```bash
+just test-ui-e2e-update
+```
+
+Commit the updated files under
+`crates/acton-test-ui/e2e/__image_snapshots__/`.
+
+Useful E2E environment variables:
+
+- `ACTON_E2E_BIN`: override the Acton binary used by the fixture.
+- `ACTON_E2E_TMPDIR`: override the parent directory for temporary projects.
+- `ACTON_E2E_KEEP_TEMP=1`: keep the generated project for debugging.
+
+CI runs these visual E2E tests on macOS so the committed `*-darwin.png`
+snapshots are compared on the same OS family. Linux local runs still check the
+browser workflows, but skip visual snapshot assertions.
 
 Run specific suites:
 
@@ -503,9 +573,9 @@ cache-pruning helpers and should not be used casually.
 Use this as a quick local matrix before pushing:
 
 | Change type                                                                                                  | Required local checks                                                                                           |
-|--------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+| ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
 | Rust-only code                                                                                               | `just check`                                                                                                    |
-| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`                                                                |
+| UI code (`crates/acton-*-ui`, root `package.json`)                                                           | `just check` + `just build-ui` + `just check-ui`; for Test UI behavior/screenshots also run `just test-ui-e2e`  |
 | Dependency or lockfile changes (`Cargo.lock`, root `bun.lock`, tree-sitter/code extension package manifests) | `just check-security`                                                                                           |
 | Standard library / docgen inputs (`lib/`, `crates/tolk-compiler/assets/tolk-stdlib`, linter rule metadata)   | `just check` + `acton docgen` and commit generated docs                                                         |
 | Docs site content/config/dependencies (`docs/`)                                                              | `just check-docs`                                                                                               |
@@ -532,6 +602,15 @@ run:
 just build-ui
 just check-ui
 ```
+
+If your PR changes Test UI behavior or visuals, also run:
+
+```bash
+just test-ui-e2e
+```
+
+Use `just test-ui-e2e-update` only when the visual change is intentional and
+commit the regenerated screenshots.
 
 Recommended extended local validation before opening a PR:
 
@@ -574,6 +653,8 @@ Rules:
 
 - `TONCENTER_MAINNET_API_KEY`: API key for TonCenter mainnet requests.
 - `TONCENTER_TESTNET_API_KEY`: API key for TonCenter testnet requests.
+- `VITE_LOCALNET_TONCENTER_API_KEY`: API key sent by the localnet UI to
+  TonCenter-compatible `/api/v2` and `/api/v3` endpoints.
 - `DISABLE_TMP_DIR_CLEANUP_IN_TESTS=1`: preserve temp test directories.
 - `ACTON_LOG_DIR`: custom directory for Acton debug logs.
 

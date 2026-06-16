@@ -1,0 +1,1232 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Acton Localnet Control API",
+    "version": "1.0.0",
+    "description": "Local development control endpoints exposed by the Acton localnet server. These routes are intended for local tooling and are not authenticated."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5411",
+      "description": "Default localnet server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Localnet Control",
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling, are not authenticated, and should not be exposed publicly. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+    }
+  ],
+  "paths": {
+    "/acton_fundAccount": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "fundAccount",
+        "summary": "Fund an account",
+        "description": "Queues a local faucet transfer to credit an address. The transfer is included on the next automatic or manually mined block.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FundAccountRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "amount": 1000000000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/FundAccountResponse"
+          }
+        }
+      }
+    },
+    "/acton_getAddressName": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getAddressName",
+        "summary": "Get address names",
+        "description": "Returns local names for the requested addresses. Missing names are returned as null.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/AddressQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/AddressNamesResponse"
+          }
+        }
+      }
+    },
+    "/acton_setAddressName": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setAddressName",
+        "summary": "Set an address name",
+        "description": "Sets or updates the local name for an address.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetAddressNameRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "name": "deployer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_getCompilerAbi": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getCompilerAbi",
+        "summary": "Get compiler ABI metadata",
+        "description": "Returns extended contract ABI metadata for the requested code hashes. Missing ABI entries are returned as null.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/CodeHashQuery"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/CompilerAbisResponse"
+          }
+        }
+      }
+    },
+    "/acton_registerCompilerAbis": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "registerCompilerAbis",
+        "summary": "Register compiler ABI metadata",
+        "description": "Registers one or more compiler ABI payloads for later explorer and API lookups by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterCompilerAbisRequest"
+              },
+              "example": {
+                "entries": [
+                  {
+                    "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
+                    "compiler_abi": {
+                      "types": [],
+                      "getters": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_dumpState": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "dumpState",
+        "summary": "Dump local state",
+        "description": "Writes a JSON state snapshot without stopping the server.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatePathRequest"
+              },
+              "example": {
+                "path": "snapshots/localnet.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_loadState": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "loadState",
+        "summary": "Load local state",
+        "description": "Replaces the current node state with a JSON state snapshot.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatePathRequest"
+              },
+              "example": {
+                "path": "snapshots/localnet.json"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_snapshot": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "createRecoveryPoint",
+        "summary": "Create a runtime recovery point",
+        "description": "Creates an in-memory recovery point for the current localnet state. Recovery points are process-local and are not persisted across restart.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecoveryPointResponse"
+          }
+        }
+      }
+    },
+    "/acton_revert": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "revertRecoveryPoint",
+        "summary": "Revert to a runtime recovery point",
+        "description": "Restores a previously created recovery point and invalidates that point plus every newer recovery point.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevertRecoveryPointRequest"
+              },
+              "example": {
+                "id": 1
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RecoveryPointResponse"
+          }
+        }
+      }
+    },
+    "/acton_setShardAccount": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setShardAccount",
+        "summary": "Set a ShardAccount",
+        "description": "Replaces the selected account state with a base64-encoded ShardAccount BOC.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetShardAccountRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "shard_account": "te6ccgEBAQEA..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_sendInternalMessage": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "sendInternalMessage",
+        "summary": "Send a raw internal message",
+        "description": "Injects a base64-encoded internal message BOC into the local internal queue. TonCenter-compatible message endpoints accept external-in messages only.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendBocRequest"
+              },
+              "example": {
+                "boc": "te6ccgEBAQEA..."
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/SendInternalMessageResponse"
+          }
+        }
+      }
+    },
+    "/acton_getStartupWallets": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getStartupWallets",
+        "summary": "List startup wallets",
+        "description": "Returns wallets selected when the localnet server started.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/StartupWalletsResponse"
+          }
+        }
+      }
+    },
+    "/acton_mine": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "mineBlocks",
+        "summary": "Mine localnet blocks",
+        "description": "Manually mines queued and/or empty localnet blocks. When the request body is omitted or blocks is not provided, one block is mined.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MineBlocksRequest"
+              },
+              "example": {
+                "blocks": 3
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/MineBlocksResponse"
+          }
+        }
+      }
+    },
+    "/acton_increaseTime": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "increaseTime",
+        "summary": "Increase localnet virtual time",
+        "description": "Adds seconds to the localnet virtual unix clock used for future blocks, live emulation, get methods, and TonCenter-compatible time fields.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncreaseTimeRequest"
+              },
+              "example": {
+                "seconds": 3600
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setTime": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setTime",
+        "summary": "Set localnet virtual time",
+        "description": "Sets the localnet virtual unix clock. The timestamp cannot be lower than the latest mined block timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTimeRequest"
+              },
+              "example": {
+                "timestamp": 1893456000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setNextBlockTimestamp": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setNextBlockTimestamp",
+        "summary": "Set next localnet block timestamp",
+        "description": "Sets a one-shot unix timestamp for the next mined localnet block. The timestamp cannot be lower than the latest mined block timestamp.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNextBlockTimestampRequest"
+              },
+              "example": {
+                "timestamp": 1893456000
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/TimeControlResponse"
+          }
+        }
+      }
+    },
+    "/acton_setNetworkConditions": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "setNetworkConditions",
+        "summary": "Set simulated network conditions",
+        "description": "Updates simulated network conditions while the localnet server is running and returns the updated values. Set response_delay_ms to 0 to disable response delay. Current values are also available from /acton_nodeInfo.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetNetworkConditionsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NetworkConditionsResponse"
+          }
+        }
+      }
+    },
+    "/acton_nodeInfo": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "nodeInfo",
+        "summary": "Get node status",
+        "description": "Returns uptime, latest block seqno, local or remote state-source information, and current simulated network conditions.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NodeInfoResponse"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "parameters": {
+      "AddressQuery": {
+        "name": "address",
+        "in": "query",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/components/schemas/Address"
+          }
+        }
+      },
+      "CodeHashQuery": {
+        "name": "code_hash",
+        "in": "query",
+        "required": true,
+        "style": "form",
+        "explode": true,
+        "schema": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/components/schemas/Hash"
+          }
+        }
+      }
+    },
+    "responses": {
+      "NullResponse": {
+        "description": "Successful wrapped response with null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "StringOrNullResponse": {
+        "description": "Successful wrapped response with a string or null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "AddressNamesResponse": {
+        "description": "Successful wrapped response with address names keyed by requested address.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "JsonOrNullResponse": {
+        "description": "Successful wrapped response with JSON metadata or null result.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "nullable": true
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "CompilerAbisResponse": {
+        "description": "Successful wrapped response with extended contract ABI metadata keyed by requested code hash.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "allOf": [
+                          {
+                            "$ref": "#/components/schemas/ExtendedContractABI"
+                          }
+                        ],
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "FundAccountResponse": {
+        "description": "Successful faucet response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/FundAccountResultWrapper"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "SendInternalMessageResponse": {
+        "description": "Successful internal message injection response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/SendMessageResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "StartupWalletsResponse": {
+        "description": "Successful startup wallets response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/StartupWallet"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "MineBlocksResponse": {
+        "description": "Successful manual mining response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/MineBlocksResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RecoveryPointResponse": {
+        "description": "Successful runtime recovery point response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/RecoveryPointResult"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "NetworkConditionsResponse": {
+        "description": "Successful simulated network conditions response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/NetworkConditions"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "TimeControlResponse": {
+        "description": "Successful localnet virtual time update response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/LocalnetTimeInfo"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "NodeInfoResponse": {
+        "description": "Successful node status response.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/NodeInfo"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Address": {
+        "type": "string",
+        "description": "TON address in raw or user-friendly format."
+      },
+      "Hash": {
+        "type": "string",
+        "description": "Hash in hex or base64 format."
+      },
+      "Base64Boc": {
+        "type": "string",
+        "description": "Base64-encoded TON BOC."
+      },
+      "LocalnetBlockId": {
+        "type": "object",
+        "required": ["workchain", "shard", "seqno", "root_hash", "file_hash"],
+        "properties": {
+          "workchain": {
+            "type": "integer"
+          },
+          "shard": {
+            "type": "integer"
+          },
+          "seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "root_hash": {
+            "type": "string"
+          },
+          "file_hash": {
+            "type": "string"
+          }
+        }
+      },
+      "SuccessEnvelope": {
+        "type": "object",
+        "required": ["ok", "result", "@extra"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "result": {},
+          "@extra": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorEnvelope": {
+        "type": "object",
+        "required": ["ok", "error", "code", "@extra"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [false]
+          },
+          "error": {
+            "type": "string"
+          },
+          "code": {
+            "type": "integer"
+          },
+          "@extra": {
+            "type": "string"
+          }
+        }
+      },
+      "FundAccountRequest": {
+        "type": "object",
+        "required": ["address", "amount"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "amount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Amount in nanograms."
+          }
+        }
+      },
+      "FundAccountResultWrapper": {
+        "type": "object",
+        "required": ["ok", "result"],
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "enum": [true]
+          },
+          "result": {
+            "$ref": "#/components/schemas/FundAccountResult"
+          }
+        }
+      },
+      "FundAccountResult": {
+        "type": "object",
+        "required": ["tx_hash", "block_seqno"],
+        "properties": {
+          "tx_hash": {
+            "type": "string"
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "SetAddressNameRequest": {
+        "type": "object",
+        "required": ["address", "name"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CompilerAbiRegistration": {
+        "type": "object",
+        "required": ["code_hash", "compiler_abi"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "compiler_abi": {}
+        }
+      },
+      "ContractAbiLink": {
+        "type": "object",
+        "required": ["kind", "title", "url", "scope"],
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "scope": {
+            "type": "string"
+          }
+        }
+      },
+      "ExtendedContractABI": {
+        "type": "object",
+        "required": ["compiler_abi", "code_hashes", "links"],
+        "properties": {
+          "compiler_abi": {},
+          "display_name": {
+            "type": "string"
+          },
+          "code_hashes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          },
+          "links": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContractAbiLink"
+            }
+          }
+        }
+      },
+      "RegisterCompilerAbisRequest": {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompilerAbiRegistration"
+            }
+          }
+        }
+      },
+      "StatePathRequest": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        }
+      },
+      "SetShardAccountRequest": {
+        "type": "object",
+        "required": ["address", "shard_account"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "shard_account": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "SendBocRequest": {
+        "type": "object",
+        "required": ["boc"],
+        "properties": {
+          "boc": {
+            "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "MineBlocksRequest": {
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Number of blocks to mine."
+          }
+        }
+      },
+      "MineBlocksResult": {
+        "type": "object",
+        "required": ["blocks_mined", "last_block_seqno", "blocks"],
+        "properties": {
+          "blocks_mined": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LocalnetBlockId"
+            }
+          }
+        }
+      },
+      "RevertRecoveryPointRequest": {
+        "type": "object",
+        "required": ["id"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Recovery point id returned by /acton_snapshot."
+          }
+        }
+      },
+      "RecoveryPointResult": {
+        "type": "object",
+        "required": ["id", "block_seqno"],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "block_seqno": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Latest block seqno captured by the recovery point."
+          }
+        }
+      },
+      "IncreaseTimeRequest": {
+        "type": "object",
+        "required": ["seconds"],
+        "properties": {
+          "seconds": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Seconds to add to the localnet virtual clock."
+          }
+        }
+      },
+      "SetTimeRequest": {
+        "type": "object",
+        "required": ["timestamp"],
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds for the localnet virtual clock."
+          }
+        }
+      },
+      "SetNextBlockTimestampRequest": {
+        "type": "object",
+        "required": ["timestamp"],
+        "properties": {
+          "timestamp": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Unix timestamp in seconds for the next mined localnet block."
+          }
+        }
+      },
+      "LocalnetTimeInfo": {
+        "type": "object",
+        "required": [
+          "current_unix_time",
+          "time_offset_seconds",
+          "next_block_timestamp"
+        ],
+        "properties": {
+          "current_unix_time": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "time_offset_seconds": {
+            "type": "integer",
+            "description": "Offset in seconds applied to wall-clock unix time."
+          },
+          "next_block_timestamp": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pending one-shot timestamp for the next mined block, if configured."
+          }
+        }
+      },
+      "SetNetworkConditionsRequest": {
+        "type": "object",
+        "required": ["response_delay_ms"],
+        "properties": {
+          "response_delay_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Response delay in milliseconds for /api/v2, /api/v3, and /api/emulate/v1 responses. Use 0 to disable."
+          }
+        }
+      },
+      "NetworkConditions": {
+        "type": "object",
+        "required": ["response_delay_ms"],
+        "properties": {
+          "response_delay_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Response delay in milliseconds for TonCenter-compatible API responses."
+          }
+        }
+      },
+      "SendMessageResult": {
+        "type": "object",
+        "required": ["@type", "hash"],
+        "properties": {
+          "@type": {
+            "type": "string",
+            "enum": ["ok"]
+          },
+          "hash": {
+            "type": "string"
+          },
+          "hash_norm": {
+            "type": "string"
+          }
+        }
+      },
+      "StartupWallet": {
+        "type": "object",
+        "required": [
+          "name",
+          "mnemonic",
+          "version",
+          "network",
+          "address",
+          "public_key",
+          "wallet_id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "mnemonic": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "version": {
+            "type": "string"
+          },
+          "network": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "public_key": {
+            "type": "string"
+          },
+          "wallet_id": {
+            "type": "integer"
+          }
+        }
+      },
+      "NodeInfo": {
+        "type": "object",
+        "required": [
+          "uptime_seconds",
+          "last_block_seqno",
+          "current_unix_time",
+          "time_offset_seconds",
+          "next_block_timestamp",
+          "state_source",
+          "fork_network",
+          "fork_block_number",
+          "network_conditions"
+        ],
+        "properties": {
+          "uptime_seconds": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "last_block_seqno": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "current_unix_time": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "time_offset_seconds": {
+            "type": "integer"
+          },
+          "next_block_timestamp": {
+            "type": "integer",
+            "nullable": true
+          },
+          "state_source": {
+            "type": "string",
+            "enum": ["local", "remote"]
+          },
+          "fork_network": {
+            "type": "string",
+            "nullable": true
+          },
+          "fork_block_number": {
+            "type": "integer",
+            "nullable": true
+          },
+          "network_conditions": {
+            "$ref": "#/components/schemas/NetworkConditions"
+          }
+        }
+      }
+    }
+  }
+}

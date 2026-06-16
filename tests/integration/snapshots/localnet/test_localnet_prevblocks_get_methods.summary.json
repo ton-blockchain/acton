@@ -1,0 +1,6 @@
+{
+  "latest_prev_mc_seqno_matches_query_seqno": true,
+  "prev_key_seqno_matches_latest_prev_mc_seqno": true,
+  "prev_mc_blocks_100_first_seqno_matches_expected": true,
+  "prev_mc_blocks_count_positive": true
+}

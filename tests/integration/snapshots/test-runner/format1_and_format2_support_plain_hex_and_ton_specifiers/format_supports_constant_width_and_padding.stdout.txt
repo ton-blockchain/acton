@@ -1,0 +1,27 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/fmt_behavior.test.tolk (1 test)
+  ✓ y stdlib format width padding [TIME]
+    └─ Test output:
+       flag={:5} value=|hi   |
+       flag={:>5} value=|   hi|
+       flag={:_>5} value=|___hi|
+       flag={:>>5} value=|>>>hi|
+       flag={:.^7} value=|..hi...|
+       flag={:05} value=|00042|
+       flag={:06x} value=|0000ff|
+       flag={:X} value=|0xff|
+       flag={:08X} value=|0x0000ff|
+       flag={:b} value=|1010|
+       flag={:B} value=|0b1010|
+       flag={:08B} value=|0b001010|
+       flag={:0>6x} value=|000-ff|
+       flag={:>12ton} value=|    1.5 GRAM|
+       flag={:0>8:x} value=|000000ff|
+       flag={:*>6} value=|****ok|
+
+ ✓ 1 passed in 1 file
