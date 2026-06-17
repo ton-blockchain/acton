@@ -1,4 +1,4 @@
-import type * as React from "react"
+import * as React from "react"
 import {useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import type {Cell} from "@ton/core"

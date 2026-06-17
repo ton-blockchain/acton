@@ -1,3 +1,5 @@
+/* eslint-disable unicorn/prefer-spread */
+
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"

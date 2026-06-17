@@ -512,7 +512,7 @@ const toParsedValue = (value: unknown, typeContext?: ParsedValueTypeContext): Pa
     const typeName = typeof objectValue.$ === "string" ? objectValue.$ : undefined
     if (
       typeName === "void" &&
-      Object.hasOwn(objectValue, "value") &&
+      Object.prototype.hasOwnProperty.call(objectValue, "value") &&
       objectValue.value === undefined
     ) {
       return {kind: "void"}
@@ -689,7 +689,9 @@ const tryDecodeMessageWithCandidates = (
       }
 
       return parsedBody
-    } catch {}
+    } catch {
+      continue
+    }
   }
 
   if (bouncedOpcodeName) {
@@ -779,7 +781,9 @@ const tryDecodeStorageSliceWithAbi = (
         name: getBodyTypeName(ctx.symbols, candidate),
         value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate}),
       }
-    } catch {}
+    } catch {
+      continue
+    }
   }
 
   return undefined
