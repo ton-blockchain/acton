@@ -58,7 +58,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
         with:
           tool: just@1.49.0,nextest@0.9.133
           fallback: none
@@ -209,9 +209,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
         with:
-          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.46.1
+          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.47.2
           fallback: none
 
       - name: Download TON objects archive
@@ -247,7 +247,7 @@ jobs:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
         with:
           tool: just@1.49.0
           fallback: none
@@ -312,7 +312,7 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@184183c2401be73c3bf42c2e61268aa5855379c1 # v2.78.1
+        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
         with:
           tool: just@1.49.0,nextest@0.9.133
           fallback: none

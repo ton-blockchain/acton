@@ -26,43 +26,8 @@
     "uuid": ">=14.0.0",
     "ws": ">=8.21.0"
   },
-  "prettier": {
-    "arrowParens": "avoid",
-    "bracketSpacing": false,
-    "printWidth": 100,
-    "semi": false,
-    "singleQuote": false,
-    "tabWidth": 2,
-    "trailingComma": "all",
-    "useTabs": false,
-    "overrides": [
-      {
-        "files": [
-          "*.yaml",
-          "*.yml"
-        ],
-        "options": {
-          "tabWidth": 2
-        }
-      }
-    ]
-  },
   "devDependencies": {
-    "@eslint/js": "^9.25.0",
-    "@playwright/test": "1.59.0",
-    "eslint": "^9.25.0",
-    "eslint-config-prettier": "^10.1.5",
-    "eslint-import-resolver-typescript": "^4.3.4",
-    "eslint-plugin-functional": "^9.0.1",
-    "eslint-plugin-import-x": "^4.16.1",
-    "eslint-plugin-jsx-a11y": "^6.10.2",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.19",
-    "eslint-plugin-unicorn": "^56.0.1",
-    "eslint-plugin-unused-imports": "^4.1.4",
-    "globals": "^16.0.0",
-    "prettier": "3.4.2",
-    "typescript-eslint": "^8.30.1"
+    "@biomejs/biome": "^2.5.0",
+    "@playwright/test": "1.59.0"
   }
 }

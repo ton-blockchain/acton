@@ -75,7 +75,8 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  background: linear-gradient(135deg, rgb(228 232 238 / 85%), rgb(244 246 248 / 88%)),
+  background:
+    linear-gradient(135deg, rgb(228 232 238 / 85%), rgb(244 246 248 / 88%)),
     var(--tonscan-bg-secondary);
   overflow: hidden;
 }

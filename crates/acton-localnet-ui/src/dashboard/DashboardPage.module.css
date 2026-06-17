@@ -146,11 +146,8 @@
   height: 22px;
   border-radius: 999px;
   border: 1px solid var(--litenode-border-control);
-  background: radial-gradient(
-      circle at 50% 50%,
-      var(--litenode-workspace-dot) 0 1px,
-      transparent 1px 100%
-    ),
+  background:
+    radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
     linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
   background-size:
     4px 4px,
@@ -525,11 +522,8 @@
   height: 25px;
   border-radius: 999px;
   border: 1px solid var(--litenode-border-control);
-  background: radial-gradient(
-      circle at 50% 50%,
-      var(--litenode-workspace-dot) 0 1px,
-      transparent 1px 100%
-    ),
+  background:
+    radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
     linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
   background-size:
     4px 4px,

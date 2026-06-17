@@ -1,0 +1,152 @@
+{
+  "$schema": "node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "crates/acton-localnet-ui/**",
+      "crates/acton-shared-ui/**",
+      "crates/acton-test-ui/**"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "bracketSpacing": false
+  },
+  "javascript": {
+    "formatter": {
+      "arrowParentheses": "asNeeded",
+      "quoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "all"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "preset": "all"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "all",
+      "a11y": {
+        "preset": "all",
+        "noAriaHiddenOnFocusable": "off",
+        "noNoninteractiveElementInteractions": "off",
+        "noStaticElementInteractions": "off",
+        "noSvgWithoutTitle": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "useFocusableInteractive": "off",
+        "useSemanticElements": "off"
+      },
+      "complexity": {
+        "preset": "all",
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noImportantStyles": "off",
+        "noUselessContinue": "off",
+        "noUselessFragments": "off",
+        "noUselessReturn": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useMaxParams": "off",
+        "useSimpleNumberKeys": "off",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "correctness": {
+        "preset": "all",
+        "noEmptyPattern": "off",
+        "noNodejsModules": "off",
+        "noProcessGlobal": "off",
+        "noSolidDestructuredProps": "off",
+        "noUndeclaredDependencies": "off",
+        "noUnresolvedImports": "off",
+        "useExhaustiveDependencies": "off",
+        "useImageSize": "off",
+        "useImportExtensions": "off",
+        "useJsonImportAttributes": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      },
+      "performance": {
+        "preset": "all",
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noImgElement": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "noReExportAll": "off",
+        "useSolidForComponent": "off",
+        "useTopLevelRegex": "off"
+      },
+      "style": {
+        "preset": "all",
+        "noContinue": "off",
+        "noDefaultExport": "off",
+        "noDescendingSpecificity": "off",
+        "noEnum": "off",
+        "noExcessiveLinesPerFile": "off",
+        "noHexColors": "off",
+        "noImplicitBoolean": "off",
+        "noIncrementDecrement": "off",
+        "noInferrableTypes": "off",
+        "noJsxLiterals": "off",
+        "noMagicNumbers": "off",
+        "noNestedTernary": "off",
+        "noNonNullAssertion": "off",
+        "noParameterProperties": "off",
+        "noProcessEnv": "off",
+        "noTernary": "off",
+        "useBlockStatements": "off",
+        "useCollapsedElseIf": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentCurlyBraces": "off",
+        "useConsistentMethodSignatures": "off",
+        "useConsistentObjectDefinitions": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useDefaultSwitchClause": "off",
+        "useDestructuring": "off",
+        "useErrorCause": "off",
+        "useExponentiationOperator": "off",
+        "useExportsLast": "off",
+        "useImportType": "off",
+        "useNamingConvention": "off",
+        "useSelfClosingElements": "off"
+      },
+      "security": {
+        "preset": "all",
+        "noDangerouslySetInnerHtml": "off",
+        "noSecrets": "off"
+      },
+      "suspicious": {
+        "preset": "all",
+        "noArrayIndexKey": "off",
+        "noBitwiseOperators": "off",
+        "noConfusingVoidType": "off",
+        "noConsole": "off",
+        "noDoubleEquals": "off",
+        "noDuplicateProperties": "off",
+        "noEmptyBlock": "off",
+        "noEmptyBlockStatements": "off",
+        "noImportCycles": "off",
+        "noLeakedRender": "off",
+        "noPrototypeBuiltins": "off",
+        "noReactForwardRef": "off",
+        "noReactSpecificProps": "off",
+        "noShadow": "off",
+        "noSkippedTests": "off",
+        "noUnnecessaryConditions": "off",
+        "useAwait": "off",
+        "useIterableCallbackReturn": "off"
+      }
+    }
+  }
+}
