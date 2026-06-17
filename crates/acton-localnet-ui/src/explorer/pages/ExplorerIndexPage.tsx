@@ -1,5 +1,5 @@
 import {AlertCircle, History, Search, X} from "lucide-react"
-import type * as React from "react"
+import * as React from "react"
 import {useCallback, useEffect, useState} from "react"
 import {useNavigate} from "react-router-dom"
 

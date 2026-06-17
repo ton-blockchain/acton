@@ -7,7 +7,7 @@ import {
   Unplug,
   Wallet as WalletIcon,
 } from "lucide-react"
-import type * as React from "react"
+import * as React from "react"
 import {Button, Card, CardContent, CardDescription, CardHeader, CardTitle} from "@acton/shared-ui"
 import {formatUnits} from "@ton/walletkit"
 import {Link} from "react-router-dom"

@@ -36,7 +36,7 @@ import type {
   Transaction,
   VerificationSourceResponse,
 } from "../api/types"
-import type {TonClient} from "../api/client"
+import {TonClient} from "../api/client"
 import {addressKey, buildMessageNamesByOpcodeHex} from "../api/compilerAbi"
 
 import {AddressLabel} from "./AddressLabel"
