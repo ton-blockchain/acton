@@ -15,6 +15,11 @@ import type {TonClient} from "../api/client"
 
 type AddressName = string | undefined
 
+interface TonAssetsAccount {
+  readonly address: string
+  readonly name: string
+}
+
 interface AddressBookContextValue {
   readonly getCachedName: (address: string) => AddressName | undefined
   readonly fetchName: (address: string) => Promise<AddressName>
@@ -25,6 +30,15 @@ interface AddressBookContextValue {
 }
 
 const AddressBookContext = createContext<AddressBookContextValue | undefined>(undefined)
+const TON_ASSETS_ACCOUNTS_URL =
+  "https://raw.githubusercontent.com/tonkeeper/ton-assets/main/accounts.json"
+const TON_ASSETS_ACCOUNTS_CACHE_KEY = "acton.tonAssets.accounts.v1"
+const TON_ASSETS_ACCOUNTS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
+
+interface TonAssetsAccountsCache {
+  readonly savedAt: number
+  readonly accounts: readonly TonAssetsAccount[]
+}
 
 const normalizeKey = (address: string) => {
   try {
@@ -44,6 +58,7 @@ export const AddressBookProvider: React.FC<{
   children: React.ReactNode
 }> = ({client, children}) => {
   const cacheRef = useRef(new Map<string, AddressName>())
+  const tonAssetsRef = useRef(new Map<string, string>())
   const pendingRef = useRef(new Map<string, Promise<AddressName>>())
   const pendingBatchRef = useRef(new Map<string, PendingNameRequest>())
   const batchScheduledRef = useRef(false)
@@ -52,7 +67,10 @@ export const AddressBookProvider: React.FC<{
   const getCachedName = useCallback((address: string) => {
     if (!address) return
     const key = normalizeKey(address)
-    return cacheRef.current.get(key)
+    if (cacheRef.current.has(key)) {
+      return cacheRef.current.get(key) ?? tonAssetsRef.current.get(key)
+    }
+    return tonAssetsRef.current.get(key)
   }, [])
 
   const updateNames = useCallback((entries: readonly (readonly [string, AddressName])[]) => {
@@ -68,6 +86,52 @@ export const AddressBookProvider: React.FC<{
     (address: string, name: AddressName) => updateNames([[address, name]]),
     [updateNames],
   )
+
+  useEffect(() => {
+    let isActive = true
+
+    const loadTonAssetsAccounts = async () => {
+      try {
+        const cached = readTonAssetsAccountsCache()
+        if (cached) {
+          const next = buildTonAssetsAccountsMap(cached.accounts)
+          if (next.size > 0) {
+            tonAssetsRef.current = next
+            setVersion(prev => prev + 1)
+          }
+          if (Date.now() - cached.savedAt < TON_ASSETS_ACCOUNTS_CACHE_TTL_MS) {
+            return
+          }
+        }
+
+        const response = await fetch(TON_ASSETS_ACCOUNTS_URL)
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`)
+        }
+
+        const accounts = (await response.json()) as unknown
+        if (!Array.isArray(accounts)) {
+          throw new TypeError("ton-assets accounts.json must be an array.")
+        }
+
+        const validAccounts = accounts.filter(isTonAssetsAccount)
+        const next = buildTonAssetsAccountsMap(validAccounts)
+
+        if (isActive && next.size > 0) {
+          tonAssetsRef.current = next
+          writeTonAssetsAccountsCache(validAccounts)
+          setVersion(prev => prev + 1)
+        }
+      } catch (error) {
+        console.warn("Failed to load ton-assets account names:", error)
+      }
+    }
+
+    void loadTonAssetsAccounts()
+    return () => {
+      isActive = false
+    }
+  }, [])
 
   const flushPendingBatch = useCallback(() => {
     batchScheduledRef.current = false
@@ -86,7 +150,10 @@ export const AddressBookProvider: React.FC<{
         })
         updateNames(entries)
         for (const request of requests) {
-          request.resolve(namesByAddress[request.address])
+          request.resolve(
+            namesByAddress[request.address] ??
+              tonAssetsRef.current.get(normalizeKey(request.address)),
+          )
         }
       })
       .catch(error => {
@@ -95,7 +162,7 @@ export const AddressBookProvider: React.FC<{
         const entries = requests.map(request => [request.address, undefined] as const)
         updateNames(entries)
         for (const request of requests) {
-          request.resolve(missingName)
+          request.resolve(missingName ?? tonAssetsRef.current.get(normalizeKey(request.address)))
         }
       })
   }, [client, updateNames])
@@ -113,7 +180,7 @@ export const AddressBookProvider: React.FC<{
       if (!address) return
       const key = normalizeKey(address)
       if (cacheRef.current.has(key)) {
-        return cacheRef.current.get(key)
+        return cacheRef.current.get(key) ?? tonAssetsRef.current.get(key)
       }
       const pending = pendingRef.current.get(key)
       if (pending) return pending
@@ -179,15 +246,55 @@ export const useAddressName = (address: string) => {
     }
     let isActive = true
     const cached = getCachedName(address)
-    if (cached === undefined) {
-      void fetchName(address).then(next => {
-        if (isActive) setName(next)
-      })
-    }
+    void fetchName(address).then(next => {
+      if (isActive) setName(next ?? cached)
+    })
     return () => {
       isActive = false
     }
   }, [address, fetchName, getCachedName])
 
   return name
+}
+
+function buildTonAssetsAccountsMap(accounts: readonly TonAssetsAccount[]): Map<string, string> {
+  const next = new Map<string, string>()
+  for (const account of accounts) {
+    next.set(normalizeKey(account.address), account.name)
+  }
+  return next
+}
+
+function readTonAssetsAccountsCache(): TonAssetsAccountsCache | undefined {
+  try {
+    const raw = globalThis.localStorage?.getItem(TON_ASSETS_ACCOUNTS_CACHE_KEY)
+    if (!raw) return undefined
+    return JSON.parse(raw) as TonAssetsAccountsCache
+  } catch {
+    return undefined
+  }
+}
+
+function writeTonAssetsAccountsCache(accounts: readonly TonAssetsAccount[]): void {
+  try {
+    globalThis.localStorage?.setItem(
+      TON_ASSETS_ACCOUNTS_CACHE_KEY,
+      JSON.stringify({savedAt: Date.now(), accounts}),
+    )
+  } catch {
+    // Ignore storage quota and privacy-mode errors; network loading still works for this session.
+  }
+}
+
+function isTonAssetsAccount(value: unknown): value is TonAssetsAccount {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    "address" in value &&
+    "name" in value &&
+    typeof value.address === "string" &&
+    typeof value.name === "string" &&
+    value.address.length > 0 &&
+    value.name.length > 0
+  )
 }
