@@ -359,7 +359,7 @@ export interface V3Message {
 
 export interface JettonMaster {
   readonly address: string
-  readonly admin_address: string
+  readonly admin_address: string | null
   readonly code_hash: string
   readonly data_hash: string
   readonly jetton_content: {

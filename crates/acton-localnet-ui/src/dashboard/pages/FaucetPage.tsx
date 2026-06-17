@@ -194,6 +194,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
     event?.preventDefault()
     const trimmedAddress = address.trim()
     const parsedAddress = parseAddress(trimmedAddress)
+    const tonAmountNano = amountNano
     if (!parsedAddress) {
       showToast({
         variant: "error",
@@ -202,7 +203,7 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       })
       return
     }
-    if (!isJettonMode && amountNano === undefined) {
+    if (!isJettonMode && tonAmountNano === undefined) {
       showToast({
         variant: "error",
         title: "Invalid amount",
@@ -218,12 +219,10 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       if (isJettonMode) {
         await mintJettons(parsedAddress, normalized)
       } else {
-        await client.fundAccount(normalized, amountNano as number)
-        showToast({
-          variant: "success",
-          title: "Transfer sent",
-          description: `Sent ${amount.trim()} GRAM to ${formatAddress(normalized, true, addressFormat)}.`,
-        })
+        if (tonAmountNano === undefined) {
+          return
+        }
+        await sendTons(normalized, tonAmountNano)
       }
     } catch (submitError) {
       showToast({
@@ -239,6 +238,19 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  async function sendTons(normalized: string, nanoAmount: number) {
+    const msgHash = await client.fundAccount(normalized, nanoAmount)
+    await showFaucetSuccessToast({
+      title: "Transfer sent",
+      description: (
+        <>
+          Sent {amount.trim()} GRAM to {formatAddress(normalized, true, addressFormat)}.
+        </>
+      ),
+      msgHash,
+    })
   }
 
   async function mintJettons(recipientAddress: Address, normalized: string) {
@@ -259,6 +271,9 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
     }
     if (!master.mintable) {
       throw new Error("This jetton master is not mintable.")
+    }
+    if (!master.admin_address) {
+      throw new Error("This jetton master has no admin address, so faucet cannot mint it.")
     }
 
     const adminAddress = parseAddress(master.admin_address)
@@ -283,16 +298,35 @@ export const FaucetPage: React.FC<FaucetPageProps> = ({client}) => {
       recipient: recipientAddress,
       jettonAmount,
     })
-    const msgHash = await client.sendInternalMessage(boc)
-    const txHash = await waitForTraceTransactionHash(msgHash)
-
     const symbol = jettonSymbol(master)
-    showToast({
-      variant: "success",
+    const msgHash = await client.sendInternalMessage(boc)
+    await showFaucetSuccessToast({
       title: "Mint sent",
       description: (
-        <span>
+        <>
           Minted {amount.trim()} {symbol} to {formatAddress(normalized, true, addressFormat)}.
+        </>
+      ),
+      msgHash,
+    })
+  }
+
+  async function showFaucetSuccessToast({
+    title,
+    description,
+    msgHash,
+  }: {
+    readonly title: string
+    readonly description: React.ReactNode
+    readonly msgHash: string
+  }) {
+    const txHash = await waitForTraceTransactionHash(msgHash)
+    showToast({
+      variant: "success",
+      title,
+      description: (
+        <span>
+          {description}
           {txHash && (
             <>
               <br />
