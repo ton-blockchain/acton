@@ -6,7 +6,6 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": true,
     "includes": [
       "crates/acton-localnet-ui/**",
       "crates/acton-shared-ui/**",
