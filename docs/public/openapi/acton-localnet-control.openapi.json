@@ -1080,11 +1080,7 @@
       },
       "LocalnetTimeInfo": {
         "type": "object",
-        "required": [
-          "current_unix_time",
-          "time_offset_seconds",
-          "next_block_timestamp"
-        ],
+        "required": ["current_unix_time", "time_offset_seconds", "next_block_timestamp"],
         "properties": {
           "current_unix_time": {
             "type": "integer",

@@ -62,5 +62,26 @@
     "prettier": "3.4.2",
     "tailwindcss": "^4.0.0",
     "typescript": "^5"
+  },
+  "prettier": {
+    "arrowParens": "avoid",
+    "bracketSpacing": false,
+    "printWidth": 100,
+    "semi": false,
+    "singleQuote": false,
+    "tabWidth": 2,
+    "trailingComma": "all",
+    "useTabs": false,
+    "overrides": [
+      {
+        "files": [
+          "*.yaml",
+          "*.yml"
+        ],
+        "options": {
+          "tabWidth": 2
+        }
+      }
+    ]
   }
 }
