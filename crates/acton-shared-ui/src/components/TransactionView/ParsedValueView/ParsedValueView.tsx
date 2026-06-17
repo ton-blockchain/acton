@@ -13,6 +13,10 @@ const INTEGER_SCALAR_PATTERN = /^-?\d+$/
 
 type ParsedScalarValue = Extract<ParsedValue, {readonly kind: "scalar"}>
 
+interface AddressFormatOptions {
+  readonly testOnly?: boolean
+}
+
 function ParsedTypeLabel({typeName}: {readonly typeName: string}): React.JSX.Element {
   return <span className={styles.parsedTypeLabel}>{typeName}</span>
 }
@@ -21,11 +25,13 @@ function ParsedValueRow({
   label,
   value,
   contracts,
+  addressFormat,
   onContractClick,
 }: {
   readonly label: string
   readonly value: ParsedValue
   readonly contracts: Map<string, ContractData>
+  readonly addressFormat?: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
 }): React.JSX.Element {
   return (
@@ -35,6 +41,7 @@ function ParsedValueRow({
         <ParsedValueView
           value={value}
           contracts={contracts}
+          addressFormat={addressFormat}
           onContractClick={onContractClick}
           fieldName={label}
         />
@@ -46,10 +53,12 @@ function ParsedValueRow({
 function ParsedMapEntry({
   entry,
   contracts,
+  addressFormat,
   onContractClick,
 }: {
   readonly entry: ParsedValueMapEntry
   readonly contracts: Map<string, ContractData>
+  readonly addressFormat?: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
 }): React.JSX.Element {
   return (
@@ -60,6 +69,7 @@ function ParsedMapEntry({
           <ParsedValueView
             value={entry.key}
             contracts={contracts}
+            addressFormat={addressFormat}
             onContractClick={onContractClick}
           />
         </div>
@@ -70,6 +80,7 @@ function ParsedMapEntry({
           <ParsedValueView
             value={entry.value}
             contracts={contracts}
+            addressFormat={addressFormat}
             onContractClick={onContractClick}
           />
         </div>
@@ -81,6 +92,7 @@ function ParsedMapEntry({
 interface ParsedValueViewProps {
   readonly value: ParsedValue
   readonly contracts: Map<string, ContractData>
+  readonly addressFormat?: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
   readonly fallbackTypeName?: string
   readonly fieldName?: string
@@ -89,6 +101,7 @@ interface ParsedValueViewProps {
 export function ParsedValueView({
   value,
   contracts,
+  addressFormat,
   onContractClick,
   fallbackTypeName,
   fieldName,
@@ -105,6 +118,7 @@ export function ParsedValueView({
         <ContractChip
           address={value.value}
           contracts={contracts}
+          addressFormat={addressFormat}
           onContractClick={onContractClick}
         />
       )
@@ -151,6 +165,7 @@ export function ParsedValueView({
                 label={`[${index}]`}
                 value={item}
                 contracts={contracts}
+                addressFormat={addressFormat}
                 onContractClick={onContractClick}
               />
             ))}
@@ -174,6 +189,7 @@ export function ParsedValueView({
                   label={entry.key}
                   value={entry.value}
                   contracts={contracts}
+                  addressFormat={addressFormat}
                   onContractClick={onContractClick}
                 />
               ))}
@@ -195,6 +211,7 @@ export function ParsedValueView({
                   key={`map-entry-${index}`}
                   entry={entry}
                   contracts={contracts}
+                  addressFormat={addressFormat}
                   onContractClick={onContractClick}
                 />
               ))}

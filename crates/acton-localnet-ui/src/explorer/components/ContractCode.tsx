@@ -41,6 +41,8 @@ import type {
   V3RunGetMethodStackEntry,
   VerificationSourceResponse,
 } from "../api/types"
+import {useAddressFormat} from "../hooks/useNetworkInfo"
+import type {AddressFormatOptions} from "./utils"
 
 import funcGrammarRaw from "../../../../../docs/grammars/grammar-func.json"
 import tasmGrammarRaw from "../../../../../docs/grammars/grammar-tasm.json"
@@ -145,6 +147,7 @@ export const ContractCode: React.FC<ContractCodeProps> = ({
   const [activeStorageTab, setActiveStorageTab] = useState<StorageTab>("parsed")
   const [activeSourceTab, setActiveSourceTab] = useState<SourceTab>("verified")
   const [activeAbiTab, setActiveAbiTab] = useState<AbiTab>("view")
+  const addressFormat = useAddressFormat()
 
   const codeData = useMemo(() => {
     if (!codeBoc) return
@@ -258,6 +261,7 @@ export const ContractCode: React.FC<ContractCodeProps> = ({
             storageData={storageData}
             parsedStorage={parsedStorage}
             contracts={contracts}
+            addressFormat={addressFormat}
             onContractClick={onContractClick}
             unavailableMessage={storageUnavailableMessage}
           />
@@ -300,6 +304,7 @@ function StoragePanel({
   storageData,
   parsedStorage,
   contracts,
+  addressFormat,
   onContractClick,
   unavailableMessage,
 }: {
@@ -313,6 +318,7 @@ function StoragePanel({
   }
   readonly parsedStorage?: ReturnType<typeof decodeStorageDataCell>
   readonly contracts: Map<string, ContractData>
+  readonly addressFormat: AddressFormatOptions
   readonly onContractClick?: (address: string) => void
   readonly unavailableMessage: string
 }): React.JSX.Element {
@@ -371,6 +377,7 @@ function StoragePanel({
               <ParsedValueView
                 value={parsedStorage.value}
                 contracts={contracts}
+                addressFormat={addressFormat}
                 onContractClick={onContractClick}
                 fallbackTypeName={parsedStorage.name}
               />
@@ -410,7 +417,11 @@ function SourcePanel({
   readonly verifiedSource?: VerificationSourceResponse
 }): React.JSX.Element {
   const activeSourceTab = activeTab === "verified" && !verifiedSource ? "decompiled" : activeTab
-  const sourceTabs: readonly {tab: SourceTab; label: string; verified?: boolean}[] = [
+  const sourceTabs: readonly {
+    tab: SourceTab
+    label: string
+    verified?: boolean
+  }[] = [
     ...(verifiedSource ? [{tab: "verified" as const, label: "Verified code", verified: true}] : []),
     {tab: "decompiled", label: "disasm"},
     {tab: "base64", label: "base64"},
@@ -702,63 +713,65 @@ function AbiGetMethodItem({
       {method.description && <p className={styles.abiMethodDescription}>{method.description}</p>}
 
       {canRenderSimpleArgs ? (
-        <div className={styles.abiArgsGrid}>
-          {method.parameters.map((parameter, index) => {
-            const input = simpleArgInputs[index]
-            if (!input) return
-            const inputId = `${argsInputId}-${parameter.name}-${index}`
+        <>
+          <div className={styles.abiArgsGrid}>
+            {method.parameters.map((parameter, index) => {
+              const input = simpleArgInputs[index]
+              if (!input) return
+              const inputId = `${argsInputId}-${parameter.name}-${index}`
 
-            return (
-              <label
-                className={styles.abiArgField}
-                key={`${parameter.name}-${index}`}
-                htmlFor={inputId}
-              >
-                <span className={styles.abiArgLabel}>
-                  <strong>{parameter.name}</strong>
-                  <code>{formatType(symbols, parameter.ty_idx)}</code>
-                </span>
-                {input.kind === "bool" ? (
-                  <select
-                    id={inputId}
-                    className={styles.abiArgInput}
-                    value={argValues[index] ?? "false"}
-                    onChange={event => {
-                      setArgValues(values =>
-                        values.map((value, valueIndex) =>
-                          valueIndex === index ? event.target.value : value,
-                        ),
-                      )
-                      setJsonError(undefined)
-                    }}
-                  >
-                    {input.nullable && <option value="">null</option>}
-                    <option value="false">false</option>
-                    <option value="true">true</option>
-                  </select>
-                ) : (
-                  <input
-                    id={inputId}
-                    className={styles.abiArgInput}
-                    value={argValues[index] ?? ""}
-                    placeholder={placeholderForSimpleArg(input)}
-                    inputMode={input.kind === "number" ? "decimal" : "text"}
-                    spellCheck={false}
-                    onChange={event => {
-                      setArgValues(values =>
-                        values.map((value, valueIndex) =>
-                          valueIndex === index ? event.target.value : value,
-                        ),
-                      )
-                      setJsonError(undefined)
-                    }}
-                  />
-                )}
-              </label>
-            )
-          })}
+              return (
+                <label
+                  className={styles.abiArgField}
+                  key={`${parameter.name}-${index}`}
+                  htmlFor={inputId}
+                >
+                  <span className={styles.abiArgLabel}>
+                    <strong>{formatTolkIdentifier(parameter.name)}</strong>
+                    <code>{formatType(symbols, parameter.ty_idx)}</code>
+                  </span>
+                  {input.kind === "bool" ? (
+                    <select
+                      id={inputId}
+                      className={styles.abiArgInput}
+                      value={argValues[index] ?? "false"}
+                      onChange={event => {
+                        setArgValues(values =>
+                          values.map((value, valueIndex) =>
+                            valueIndex === index ? event.target.value : value,
+                          ),
+                        )
+                        setJsonError(undefined)
+                      }}
+                    >
+                      {input.nullable && <option value="">null</option>}
+                      <option value="false">false</option>
+                      <option value="true">true</option>
+                    </select>
+                  ) : (
+                    <input
+                      id={inputId}
+                      className={styles.abiArgInput}
+                      value={argValues[index] ?? ""}
+                      placeholder={placeholderForSimpleArg(input)}
+                      inputMode={input.kind === "number" ? "decimal" : "text"}
+                      spellCheck={false}
+                      onChange={event => {
+                        setArgValues(values =>
+                          values.map((value, valueIndex) =>
+                            valueIndex === index ? event.target.value : value,
+                          ),
+                        )
+                        setJsonError(undefined)
+                      }}
+                    />
+                  )}
+                </label>
+              )
+            })}
+          </div>
           {jsonError && <div className={styles.abiError}>{jsonError}</div>}
-        </div>
+        </>
       ) : hasParameters ? (
         <div className={styles.abiStackInputBlock}>
           <label className={styles.abiStackLabel} htmlFor={argsInputId}>
@@ -960,7 +973,10 @@ function AbiStorageSection({
 }): React.JSX.Element {
   const rows = [
     {label: "storage", tyIdx: storage.storage_ty_idx},
-    {label: "storageAtDeployment", tyIdx: storage.storage_at_deployment_ty_idx},
+    {
+      label: "storageAtDeployment",
+      tyIdx: storage.storage_at_deployment_ty_idx,
+    },
   ].filter((row): row is {label: string; tyIdx: number} => row.tyIdx !== undefined)
 
   return (
@@ -1663,7 +1679,10 @@ function tupleItemToV3StackEntry(item: TupleItem): V3RunGetMethodStackEntry {
       return {type: item.type, value: item.cell.toBoc().toString("base64")}
     }
     case "tuple": {
-      return {type: "tuple", value: item.items.map(value => tupleItemToV3StackEntry(value))}
+      return {
+        type: "tuple",
+        value: item.items.map(value => tupleItemToV3StackEntry(value)),
+      }
     }
     case "nan": {
       throw new Error("NaN tuple items cannot be passed to runGetMethod.")
@@ -1682,7 +1701,10 @@ function v3StackEntryToTupleItem(entry: V3RunGetMethodStackEntry): TupleItem {
     case "cell":
     case "slice":
     case "builder": {
-      return {type: entry.type, cell: Cell.fromBase64(extractStackBoc(entry.value, entry.type))}
+      return {
+        type: entry.type,
+        cell: Cell.fromBase64(extractStackBoc(entry.value, entry.type)),
+      }
     }
     case "tuple":
     case "list": {
@@ -1949,8 +1971,15 @@ function formatTolkDocComment(description: string, indentSpaces: number): string
     .join("\n")
 }
 
+function formatTolkIdentifier(value: string): string {
+  if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+    return value
+  }
+  return `\`${value.replaceAll("\\", "\\\\").replaceAll("`", "\\`")}\``
+}
+
 function formatTolkFieldName(value: string): string {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) ? value : JSON.stringify(value)
+  return formatTolkIdentifier(value)
 }
 
 function sanitizeTolkTypeName(value: string): string {
@@ -1963,9 +1992,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function formatGetMethodSignature(method: ABIGetMethod, symbols: SymTable): string {
   const params = method.parameters
-    .map(parameter => `${parameter.name}: ${formatType(symbols, parameter.ty_idx)}`)
+    .map(
+      parameter =>
+        `${formatTolkIdentifier(parameter.name)}: ${formatType(symbols, parameter.ty_idx)}`,
+    )
     .join(", ")
-  return `get fun ${method.name}(${params}): ${formatType(symbols, method.return_ty_idx)}`
+  return `get fun ${formatTolkIdentifier(method.name)}(${params}): ${formatType(
+    symbols,
+    method.return_ty_idx,
+  )}`
 }
 
 function formatArgsPlaceholder(method: ABIGetMethod, symbols: SymTable): string {
@@ -2192,7 +2227,7 @@ function formatTypeBlock(
     case "StructRef": {
       const fields = symbols.structFieldsOf(tyIdx, false)
       if (fields.length === 0) {
-        return `${ty.struct_name} {}`
+        return `${formatTolkIdentifier(ty.struct_name)} {}`
       }
       const baseIndent = "    ".repeat(depth)
       const fieldIndent = "    ".repeat(depth + 1)
@@ -2204,16 +2239,16 @@ function formatTypeBlock(
             depth + 1,
             new Set(visited),
           ).trimStart()
-          return `${fieldIndent}${field.name}: ${renderedType}`
+          return `${fieldIndent}${formatTolkFieldName(field.name)}: ${renderedType}`
         })
         .join("\n")
-      return `${baseIndent}${ty.struct_name} {\n${fieldLines}\n${baseIndent}}`
+      return `${baseIndent}${formatTolkIdentifier(ty.struct_name)} {\n${fieldLines}\n${baseIndent}}`
     }
     case "AliasRef": {
       const targetTyIdx = tryAliasTargetTyIdx(symbols, tyIdx)
       return targetTyIdx === undefined
-        ? ty.alias_name
-        : `${"    ".repeat(depth)}${ty.alias_name} =\n${formatTypeBlock(
+        ? formatTolkIdentifier(ty.alias_name)
+        : `${"    ".repeat(depth)}${formatTolkIdentifier(ty.alias_name)} =\n${formatTypeBlock(
             symbols,
             targetTyIdx,
             depth + 1,
@@ -2258,7 +2293,7 @@ function formatTyFallback(ty: Ty, symbols: SymTable): string {
       return formatGenericName(ty.alias_name, ty.type_args_ty_idx, symbols)
     }
     case "EnumRef": {
-      return ty.enum_name
+      return formatTolkIdentifier(ty.enum_name)
     }
     case "nullable": {
       return `${formatType(symbols, ty.inner_ty_idx)}?`
@@ -2293,9 +2328,11 @@ function formatGenericName(
   symbols: SymTable,
 ): string {
   if (typeArgsTyIdx === undefined || typeArgsTyIdx.length === 0) {
-    return name
+    return formatTolkIdentifier(name)
   }
-  return `${name}<${typeArgsTyIdx.map(tyIdx => formatType(symbols, tyIdx)).join(", ")}>`
+  return `${formatTolkIdentifier(name)}<${typeArgsTyIdx
+    .map(tyIdx => formatType(symbols, tyIdx))
+    .join(", ")}>`
 }
 
 function formatDeclarationTolk(declaration: AbiDeclaration, symbols: SymTable): string {
@@ -2303,24 +2340,30 @@ function formatDeclarationTolk(declaration: AbiDeclaration, symbols: SymTable): 
     case "struct": {
       const prefix = declaration.prefix ? ` (${formatTolkPrefix(declaration.prefix)})` : ""
       if (declaration.fields.length === 0) {
-        return `struct${prefix} ${declaration.name} {}`
+        return `struct${prefix} ${formatTolkIdentifier(declaration.name)} {}`
       }
       const fields = declaration.fields
         .map(field => {
           const comment = field.description ? `${formatTolkDocComment(field.description, 4)}\n` : ""
-          return `${comment}    ${field.name}: ${formatType(symbols, field.client_ty_idx ?? field.ty_idx)}`
+          return `${comment}    ${formatTolkFieldName(field.name)}: ${formatType(
+            symbols,
+            field.client_ty_idx ?? field.ty_idx,
+          )}`
         })
         .join("\n")
-      return `struct${prefix} ${declaration.name} {\n${fields}\n}`
+      return `struct${prefix} ${formatTolkIdentifier(declaration.name)} {\n${fields}\n}`
     }
     case "alias": {
-      return `type ${declaration.name} = ${formatType(symbols, declaration.target_ty_idx)}`
+      return `type ${formatTolkIdentifier(declaration.name)} = ${formatType(
+        symbols,
+        declaration.target_ty_idx,
+      )}`
     }
     case "enum": {
       const members = declaration.members
-        .map(member => `    ${member.name} = ${member.value}`)
+        .map(member => `    ${formatTolkIdentifier(member.name)} = ${member.value}`)
         .join("\n")
-      return `enum ${declaration.name} {\n${members}\n}`
+      return `enum ${formatTolkIdentifier(declaration.name)} {\n${members}\n}`
     }
   }
 }

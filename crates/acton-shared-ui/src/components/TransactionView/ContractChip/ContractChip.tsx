@@ -1,31 +1,51 @@
 import type React from "react"
 import {useCallback, useEffect, useState} from "react"
+import {Address} from "@ton/core"
 
 import type {ContractData} from "@/types/transaction"
 
 import styles from "./ContractChip.module.css"
 
+interface AddressFormatOptions {
+  readonly testOnly?: boolean
+}
+
 interface ContractChipProps {
   readonly address: string | undefined
   readonly contracts: Map<string, ContractData>
+  readonly addressFormat?: AddressFormatOptions
   readonly trimSoloAddress?: boolean
   readonly onContractClick?: (address: string) => void
+}
+
+function formatChipAddress(
+  address: string,
+  addressFormat: AddressFormatOptions | undefined,
+): string {
+  if (!addressFormat) return address
+  try {
+    return Address.parse(address).toString(addressFormat)
+  } catch {
+    return address
+  }
 }
 
 export function ContractChip({
   address,
   contracts,
+  addressFormat,
   trimSoloAddress = true,
   onContractClick,
 }: ContractChipProps): React.JSX.Element {
   const [isCopied, setIsCopied] = useState(false)
+  const displayAddress = address ? formatChipAddress(address, addressFormat) : undefined
 
   const handleCopy = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
-      if (address) {
+      if (displayAddress) {
         navigator.clipboard
-          .writeText(address)
+          .writeText(displayAddress)
           .then(() => {
             setIsCopied(true)
           })
@@ -34,17 +54,17 @@ export function ContractChip({
           })
       }
     },
-    [address],
+    [displayAddress],
   )
 
   const handleChipClick = useCallback(
     (event: React.MouseEvent) => {
       event.stopPropagation()
-      if (address && onContractClick) {
-        onContractClick(address)
+      if (displayAddress && onContractClick) {
+        onContractClick(displayAddress)
       }
     },
-    [address, onContractClick],
+    [displayAddress, onContractClick],
   )
 
   useEffect((): (() => void) | undefined => {
@@ -96,10 +116,11 @@ export function ContractChip({
     return <span className={styles.contractChip}>Unknown</span>
   }
 
-  const contractInfo = contracts.get(address)
+  const visibleAddress = displayAddress ?? address
+  const contractInfo = contracts.get(address) ?? contracts.get(visibleAddress)
   const isClickable = onContractClick !== undefined
-  const shortAddress = `${address.slice(0, 6)}…${address.slice(-6)}`
-  const fallbackAddress = trimSoloAddress ? shortAddress : address
+  const shortAddress = `${visibleAddress.slice(0, 6)}…${visibleAddress.slice(-6)}`
+  const fallbackAddress = trimSoloAddress ? shortAddress : visibleAddress
 
   const chipContent = (
     <>
