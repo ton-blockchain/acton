@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "$schema": "node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -28,12 +28,119 @@
     }
   },
   "assist": {
-    "enabled": true
+    "enabled": true,
+    "actions": {
+      "preset": "all"
+    }
   },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true
+      "preset": "all",
+      "a11y": {
+        "preset": "all",
+        "noAriaHiddenOnFocusable": "off",
+        "noNoninteractiveElementInteractions": "off",
+        "noStaticElementInteractions": "off",
+        "noSvgWithoutTitle": "off",
+        "useAriaPropsSupportedByRole": "off",
+        "useFocusableInteractive": "off",
+        "useSemanticElements": "off"
+      },
+      "complexity": {
+        "preset": "all",
+        "noExcessiveCognitiveComplexity": "off",
+        "noExcessiveLinesPerFunction": "off",
+        "noImportantStyles": "off",
+        "noUselessFragments": "off",
+        "noUselessReturn": "off",
+        "noUselessUndefined": "off",
+        "noVoid": "off",
+        "useMaxParams": "off",
+        "useSimplifiedLogicExpression": "off"
+      },
+      "correctness": {
+        "preset": "all",
+        "noNodejsModules": "off",
+        "noProcessGlobal": "off",
+        "noSolidDestructuredProps": "off",
+        "noUndeclaredDependencies": "off",
+        "noUnresolvedImports": "off",
+        "useExhaustiveDependencies": "off",
+        "useImageSize": "off",
+        "useImportExtensions": "off",
+        "useJsonImportAttributes": "off",
+        "useQwikValidLexicalScope": "off",
+        "useUniqueElementIds": "off"
+      },
+      "performance": {
+        "preset": "all",
+        "noAwaitInLoops": "off",
+        "noBarrelFile": "off",
+        "noImgElement": "off",
+        "noJsxPropsBind": "off",
+        "noNamespaceImport": "off",
+        "noReExportAll": "off",
+        "useSolidForComponent": "off",
+        "useTopLevelRegex": "off"
+      },
+      "style": {
+        "preset": "all",
+        "noContinue": "off",
+        "noDefaultExport": "off",
+        "noDescendingSpecificity": "off",
+        "noEnum": "off",
+        "noExcessiveLinesPerFile": "off",
+        "noHexColors": "off",
+        "noImplicitBoolean": "off",
+        "noIncrementDecrement": "off",
+        "noInferrableTypes": "off",
+        "noJsxLiterals": "off",
+        "noMagicNumbers": "off",
+        "noNestedTernary": "off",
+        "noNonNullAssertion": "off",
+        "noParameterProperties": "off",
+        "noProcessEnv": "off",
+        "noTernary": "off",
+        "useBlockStatements": "off",
+        "useCollapsedElseIf": "off",
+        "useConsistentArrowReturn": "off",
+        "useConsistentCurlyBraces": "off",
+        "useConsistentMethodSignatures": "off",
+        "useConsistentObjectDefinitions": "off",
+        "useConsistentTypeDefinitions": "off",
+        "useDefaultSwitchClause": "off",
+        "useDestructuring": "off",
+        "useErrorCause": "off",
+        "useExportsLast": "off",
+        "useNamingConvention": "off",
+        "useSelfClosingElements": "off"
+      },
+      "security": {
+        "preset": "all",
+        "noDangerouslySetInnerHtml": "off",
+        "noSecrets": "off"
+      },
+      "suspicious": {
+        "preset": "all",
+        "noArrayIndexKey": "off",
+        "noBitwiseOperators": "off",
+        "noConfusingVoidType": "off",
+        "noConsole": "off",
+        "noDoubleEquals": "off",
+        "noDuplicateProperties": "off",
+        "noEmptyBlock": "off",
+        "noEmptyBlockStatements": "off",
+        "noImportCycles": "off",
+        "noLeakedRender": "off",
+        "noReactForwardRef": "off",
+        "noReactSpecificProps": "off",
+        "noShadow": "off",
+        "noSkippedTests": "off",
+        "noUnnecessaryConditions": "off",
+        "useAwait": "off",
+        "useIterableCallbackReturn": "off"
+      }
     }
   }
 }
