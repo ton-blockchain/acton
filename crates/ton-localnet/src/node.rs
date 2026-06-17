@@ -559,6 +559,11 @@ impl Node {
             ignore_chksig: false,
             prev_blocks_info: self.prev_blocks_info_before_block(seqno),
         };
+        let provider = match &self.state_source {
+            StateSource::Remote(provider) => Some(provider.clone()),
+            StateSource::Local => None,
+        };
+        self.register_message_state_init_libraries(&dst, provider.as_ref(), &msg_boc, lt)?;
         let global_libs = self.build_vm_global_libs_boc()?;
 
         let exec_result = self.executor.execute(
@@ -698,6 +703,7 @@ impl Node {
             Some(new_account_boc),
             lt,
         )?;
+        self.register_account_code_libraries(&dst, None, new_account_boc, lt)?;
 
         self.detect_assets(&dst)?;
 
@@ -930,7 +936,39 @@ impl Node {
         shard_account_boc: &BocBytes,
         lt: Lt,
     ) -> anyhow::Result<()> {
-        let mut pending = Self::collect_code_library_refs_from_shard_account(shard_account_boc)?;
+        let pending = Self::collect_code_library_refs_from_shard_account(shard_account_boc)?;
+        self.register_code_library_refs(account, provider, pending, lt)
+    }
+
+    fn register_message_state_init_libraries(
+        &mut self,
+        account: &Addr,
+        provider: Option<&RemoteProvider>,
+        msg_boc: &BocBytes,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
+        let cell = Boc::decode(msg_boc).context("Failed to decode inbound message BOC")?;
+        let msg = cell
+            .parse::<Message<'_>>()
+            .context("Failed to parse inbound message")?;
+        let Some(init) = msg.init else {
+            return Ok(());
+        };
+        let Some(code) = init.code else {
+            return Ok(());
+        };
+
+        let pending = Self::collect_library_refs(&code)?;
+        self.register_code_library_refs(account, provider, pending, lt)
+    }
+
+    fn register_code_library_refs(
+        &mut self,
+        account: &Addr,
+        provider: Option<&RemoteProvider>,
+        mut pending: Vec<Hash256>,
+        lt: Lt,
+    ) -> anyhow::Result<()> {
         let mut processed = HashSet::new();
 
         while let Some(hash) = pending.pop() {
@@ -1547,9 +1585,15 @@ impl Node {
     }
 
     pub fn get_shard_account(&mut self, addr: &Addr) -> anyhow::Result<BocBytes> {
-        if let Some(meta) = self.latest.accounts.get(addr)
+        if let Some(meta) = self.latest.accounts.get(addr).cloned()
             && let Some(boc) = self.cas.get(&meta.account_hash)
         {
+            let provider = match &self.state_source {
+                StateSource::Remote(provider) => Some(provider.clone()),
+                StateSource::Local => None,
+            };
+            let lt = meta.last_trans_lt.unwrap_or(self.globals.global_lt);
+            self.register_account_code_libraries(addr, provider.as_ref(), &boc, lt)?;
             return Ok(boc);
         }
 
@@ -1589,6 +1633,11 @@ impl Node {
             Some(&shard_account_boc),
             lt,
         )?;
+        let provider = match &self.state_source {
+            StateSource::Remote(provider) => Some(provider.clone()),
+            StateSource::Local => None,
+        };
+        self.register_account_code_libraries(addr, provider.as_ref(), &shard_account_boc, lt)?;
         self.detect_assets(addr)?;
 
         Ok(())
@@ -3189,6 +3238,55 @@ mod tests {
     }
 
     #[test]
+    fn set_shard_account_registers_cached_code_reference_libraries() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x25);
+        let library = make_lib_root(25);
+        let hash = Hash256(*library.repr_hash().as_array());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+
+        node.set_shard_account(&account, account_boc)
+            .expect("imported account code library must be registered");
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
+    }
+
+    #[test]
+    fn get_shard_account_registers_cached_code_reference_libraries_for_cached_account() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x26);
+        let library = make_lib_root(26);
+        let hash = Hash256(*library.repr_hash().as_array());
+        node.cas.put(Boc::encode(library.clone()).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let account_boc =
+            make_active_shard_account_boc_with_state(account, Some(code_ref), None, Dict::new(), 1);
+        let meta = store_test_account_meta(&mut node, &account_boc, AccountStatus::Active);
+        node.latest.accounts.insert(account, meta);
+
+        assert!(
+            found_library_entry(&node, hash).is_none(),
+            "test must start without a registered code library"
+        );
+        assert_eq!(
+            node.get_shard_account(&account)
+                .expect("cached account must load"),
+            account_boc
+        );
+
+        let entry = found_library_entry(&node, hash).expect("code library must appear globally");
+        assert_eq!(entry.lib_boc, Boc::encode(library).into());
+        assert!(entry.publishers.contains(&account));
+    }
+
+    #[test]
     fn account_code_library_reference_from_cache_registers_nested_libraries() {
         let mut node = make_test_node(Box::new(NoopExecutor));
         let account = test_addr(0x24);
@@ -3686,6 +3784,75 @@ mod tests {
                 .expect("must query lib hash")
                 .is_some(),
             "executor libs dict must include published library"
+        );
+    }
+
+    #[allow(clippy::significant_drop_tightening)]
+    #[test]
+    fn state_init_code_library_reference_is_registered_before_execute() {
+        let recorded_libs = Arc::new(Mutex::new(Vec::<Option<BocBytes>>::new()));
+        let recorded_prev_blocks_info = Arc::new(Mutex::new(Vec::<PrevBlocksInfo>::new()));
+        let executor = RecordingExecutor {
+            recorded_libs: Arc::clone(&recorded_libs),
+            recorded_prev_blocks_info,
+        };
+        let mut node = make_test_node(Box::new(executor));
+
+        let destination = test_addr(0xF1);
+        let library = make_lib_root(18);
+        let hash = Hash256(*library.repr_hash().as_array());
+        node.cas.put(Boc::encode(library).into(), hash);
+
+        let code_ref = CellBuilder::build_library(&HashBytes(hash.0));
+        let state_init = StateInit {
+            split_depth: None,
+            special: None,
+            code: Some(code_ref),
+            data: None,
+            libraries: Dict::new(),
+        };
+        let message_info = IntMsgInfo {
+            ihr_disabled: true,
+            bounce: true,
+            bounced: false,
+            src: GIVER_ADDR.into(),
+            dst: destination.into(),
+            ihr_fee: Default::default(),
+            value: CurrencyCollection::new(1),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        };
+        let message = OwnedMessage {
+            info: MsgInfo::Int(message_info),
+            init: Some(state_init),
+            body: Default::default(),
+            layout: None,
+        };
+
+        node.send_internal_boc(
+            BocRepr::encode(message)
+                .expect("message must serialize")
+                .into(),
+        )
+        .expect("message must be queued");
+        let _ = node.mine_one();
+
+        let calls = recorded_libs.lock().expect("recorded libs mutex poisoned");
+        assert!(!calls.is_empty(), "executor must be invoked");
+        let libs_boc = calls[0]
+            .as_ref()
+            .expect("state init code library must be passed to executor");
+        let libs_cell = Boc::decode(libs_boc).expect("libs boc must decode");
+        let mut slice = libs_cell.as_slice_allow_exotic();
+        let dict =
+            Dict::<HashBytes, LibDescr>::load_from_root_ext(&mut slice, Cell::empty_context())
+                .expect("libs dict must decode");
+        assert!(
+            dict.get(HashBytes(hash.0))
+                .expect("must query lib hash")
+                .is_some(),
+            "executor libs dict must include state init code library"
         );
     }
 

@@ -316,8 +316,8 @@ fn map_v3_message(
         "import_fee": "0",
         "created_lt": msg.created_lt.to_string(),
         "created_at": tx_utime.to_string(),
-        "bounce": false,
-        "bounced": false,
+        "bounce": msg.bounce,
+        "bounced": msg.bounced,
         "ihr_disabled": true,
         "message_content": {
             "hash": msg.body_hash.to_base64(),

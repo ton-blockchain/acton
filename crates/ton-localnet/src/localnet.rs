@@ -142,6 +142,8 @@ pub struct LocalnetMessage {
     pub hash_norm: Option<Hash256>,
     pub source: Option<Addr>,
     pub destination: Option<Addr>,
+    pub bounce: bool,
+    pub bounced: bool,
     pub value: u128,
     pub body_hash: Hash256,
     pub body: BocBytes,
@@ -2107,6 +2109,8 @@ pub(crate) fn convert_to_tx_struct(
             hash_norm: None,
             source: None,
             destination: None,
+            bounce: false,
+            bounced: false,
             value: 0,
             body_hash: Hash256([0; 32]),
             body: Vec::new().into(),
@@ -2195,14 +2199,22 @@ pub(crate) fn convert_to_message_struct(
     let body_hash = Hash256(*body_cell.repr_hash().as_array());
     let body_bytes = Boc::encode(body_cell);
 
-    let (fwd_fee, ihr_fee) = match &msg.info {
-        MsgInfo::Int(info) => (info.fwd_fee.into(), info.ihr_fee.into()),
-        _ => (0, 0),
+    let (fwd_fee, ihr_fee, bounce, bounced) = match &msg.info {
+        MsgInfo::Int(info) => (
+            info.fwd_fee.into(),
+            info.ihr_fee.into(),
+            info.bounce,
+            info.bounced,
+        ),
+        _ => (0, 0, false, false),
     };
 
-    // Extract opcode (first 32 bits)
+    // Extract opcode, skipping the bounce prefix for bounced internal messages.
     let mut opcode = None;
     let mut body_slice = msg.body;
+    if bounced {
+        let _ = body_slice.load_uint(32);
+    }
     if body_slice.size_bits() >= 32
         && let Ok(op) = body_slice.load_uint(32)
     {
@@ -2223,6 +2235,8 @@ pub(crate) fn convert_to_message_struct(
         hash_norm,
         source: meta.src,
         destination: meta.dst,
+        bounce,
+        bounced,
         value: meta.value.unwrap_or(0),
         body_hash,
         body: body_bytes.into(),
@@ -2395,4 +2409,94 @@ fn handle_lookup_block(
     };
 
     Ok(block.block_id())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tycho_types::boc::BocRepr;
+    use tycho_types::cell::{CellSliceParts, HashBytes};
+    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage};
+
+    const REGULAR_OPCODE: u32 = 0x178d_4519;
+    const BOUNCE_PREFIX: u32 = 0xffff_ffff;
+
+    #[test]
+    fn convert_to_message_struct_extracts_regular_internal_opcode() {
+        let message = internal_message_boc(false, &[REGULAR_OPCODE]);
+        let hash = message.hash().expect("message must hash");
+        let mapped =
+            convert_to_message_struct(&message_meta(hash), &message).expect("message must map");
+
+        assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
+        assert!(!mapped.bounced);
+    }
+
+    #[test]
+    fn convert_to_message_struct_extracts_bounced_opcode_after_prefix() {
+        let message = internal_message_boc(true, &[BOUNCE_PREFIX, REGULAR_OPCODE]);
+        let hash = message.hash().expect("message must hash");
+        let mapped =
+            convert_to_message_struct(&message_meta(hash), &message).expect("message must map");
+
+        assert_eq!(mapped.opcode, Some(REGULAR_OPCODE));
+        assert!(mapped.bounced);
+    }
+
+    fn internal_message_boc(bounced: bool, body_words: &[u32]) -> BocBytes {
+        let mut body = CellBuilder::new();
+        for word in body_words {
+            body.store_u32(*word).expect("body word must store");
+        }
+        let body = body.build().expect("body cell must build");
+        let message = OwnedMessage {
+            info: MsgInfo::Int(IntMsgInfo {
+                ihr_disabled: true,
+                bounce: false,
+                bounced,
+                src: IntAddr::Std(test_std_addr(0x11)),
+                dst: IntAddr::Std(test_std_addr(0x22)),
+                value: CurrencyCollection::new(1),
+                ihr_fee: Default::default(),
+                fwd_fee: Default::default(),
+                created_at: 0,
+                created_lt: 0,
+            }),
+            init: None,
+            body: CellSliceParts::from(body),
+            layout: None,
+        };
+
+        BocRepr::encode(message)
+            .expect("internal message must encode")
+            .into()
+    }
+
+    fn message_meta(hash: Hash256) -> MsgMeta {
+        MsgMeta {
+            msg_hash: hash,
+            msg_boc_hash: hash,
+            src: Some(test_addr(0x11)),
+            dst: Some(test_addr(0x22)),
+            value: Some(1),
+            bounce: Some(false),
+            created_lt: Some(0),
+            created_at: Some(0),
+        }
+    }
+
+    fn test_addr(byte: u8) -> Addr {
+        Addr {
+            workchain: 0,
+            addr: [byte; 32],
+        }
+    }
+
+    fn test_std_addr(byte: u8) -> StdAddr {
+        StdAddr {
+            anycast: None,
+            address: HashBytes([byte; 32]),
+            workchain: 0,
+        }
+    }
 }
