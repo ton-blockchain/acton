@@ -28,38 +28,13 @@
       "trailingCommas": "all"
     }
   },
+  "assist": {
+    "enabled": true
+  },
   "linter": {
     "enabled": true,
     "rules": {
-      "recommended": true,
-      "a11y": {
-        "noAriaHiddenOnFocusable": "off",
-        "noStaticElementInteractions": "off",
-        "useAriaPropsSupportedByRole": "off",
-        "useFocusableInteractive": "off",
-        "useSemanticElements": "off"
-      },
-      "correctness": {
-        "useExhaustiveDependencies": "off"
-      },
-      "complexity": {
-        "noUselessFragments": "off"
-      },
-      "security": {
-        "noDangerouslySetInnerHtml": "off"
-      },
-      "style": {
-        "noNonNullAssertion": "off"
-      },
-      "suspicious": {
-        "noDoubleEquals": "off",
-        "noArrayIndexKey": "off",
-        "noConfusingVoidType": "off",
-        "useIterableCallbackReturn": "off"
-      }
+      "recommended": true
     }
-  },
-  "assist": {
-    "enabled": false
   }
 }
