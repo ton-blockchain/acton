@@ -30,6 +30,7 @@ import logoDark from "@/public/logo-dark.svg"
 import {baseUrl} from "@/lib/metadata"
 
 const landingOgImage = `${baseUrl}/og/home/image.png`
+const lendingCDN = "https://strapi-images-data.s3.eu-central-1.amazonaws.com"
 
 export const metadata: Metadata = {
   title: "Acton — a unified toolchain for TON",
@@ -82,8 +83,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
       "Use Tolk itself for testing. Unit tests, transaction flows, and cross‑contract interaction — without switching languages.",
     description2: "50x faster than TypeScript + JS sandbox.",
     icon: FlaskConical,
-    url: "https://cdn.tapps.ninja/tolk/01-tolk-tests-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/01-tolk-tests-poster.png",
+    url: `${lendingCDN}/tolk/01-tolk-tests-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/01-tolk-tests-poster.png`,
   },
   {
     title: "dApp-ready contracts",
@@ -91,8 +92,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
     description: "Generate TypeScript wrappers for frontend and end‑to‑end testing.",
     description2: "TON Connect and React as the UI — Tolk and TON Blockchain as the backend.",
     icon: CodeXml,
-    url: "https://cdn.tapps.ninja/tolk/02-dApp-ready-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/02-dApp-ready-poster.png",
+    url: `${lendingCDN}/tolk/02-dApp-ready-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/02-dApp-ready-poster.png`,
   },
   {
     title: "Friendly for AI agents",
@@ -101,8 +102,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
       "Skills and manuals available out of the box. Acton is a modern CLI tool that becomes an agent's runtime.",
     description2: "Built for humans — perfect for AI.",
     icon: Bot,
-    url: "https://cdn.tapps.ninja/tolk/03-ai-friendly-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/03-ai-friendly-poster.png",
+    url: `${lendingCDN}/tolk/03-ai-friendly-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/03-ai-friendly-poster.png`,
   },
   {
     title: "Debugger, done right",
@@ -111,8 +112,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
       "Test failed with exit code 9? Stop exactly at the exception, inspect the call stack, local variables, lazy fields, and more.",
     description2: "Works for fully‑optimized production contracts, in all IDEs.",
     icon: Bug,
-    url: "https://cdn.tapps.ninja/tolk/04-debugger-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/04-debugger-poster.png",
+    url: `${lendingCDN}/tolk/04-debugger-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/04-debugger-poster.png`,
   },
   {
     title: "Faucet and deployment",
@@ -121,8 +122,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
       "Not only develop, but deploy, verify, and configure your contracts. Acton manages wallets and faucet top‑ups on testnet.",
     description2: "Arbitrary on‑chain scripts — just using Tolk.",
     icon: Wallet,
-    url: "https://cdn.tapps.ninja/tolk/05-faucet-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/05-faucet-poster.png",
+    url: `${lendingCDN}/tolk/05-faucet-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/05-faucet-poster.png`,
   },
   {
     title: "IDE integration",
@@ -130,8 +131,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
     description: "Linter and formatter to keep code style consistent. All rules are configurable.",
     description2: "VS Code, JetBrains, Cursor, Zed, and other LSP‑based editors.",
     icon: FileCode,
-    url: "https://cdn.tapps.ninja/tolk/06-ide-integration-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/06-ide-integration-poster.png",
+    url: `${lendingCDN}/tolk/06-ide-integration-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/06-ide-integration-poster.png`,
   },
   {
     title: "Test UI: visualize traces",
@@ -140,8 +141,8 @@ const VIDEO_FEATURES: FeatureWithVideo[] = [
       "Inspect transaction trees, messages, fees, storage changes — for every test, in a clean dev‑oriented UI.",
     description2: "Raw binary data decoded based on Tolk ABI.",
     icon: MonitorPlay,
-    url: "https://cdn.tapps.ninja/tolk/07-test-ui-no-outro.mp4",
-    poster: "https://cdn.tapps.ninja/tolk/07-test-ui-poster.png",
+    url: `${lendingCDN}/tolk/07-test-ui-no-outro.mp4`,
+    poster: `${lendingCDN}/tolk/07-test-ui-poster.png`,
   },
 ]
 
