@@ -18,6 +18,9 @@ pub(crate) const LOCALNET_GLOBAL_ID: i32 = -3;
 /// block is a full basechain shard block (`workchain = 0`, full shard prefix).
 pub(crate) const LOCALNET_SHARD: ShardIdent = ShardIdent::BASECHAIN;
 
+/// Number of recent masterchain refs kept in localnet state/proof context.
+pub(crate) const MASTERCHAIN_PREV_BLOCKS_LIMIT: usize = 16;
+
 /// Transaction data needed to include one executed localnet transaction in a block.
 ///
 /// `TxMeta` is the localnet index metadata used by API handlers, while
@@ -126,6 +129,8 @@ pub(crate) struct MasterchainBlockBuildResult {
 pub(crate) struct BuiltShardState {
     /// Serialized `ShardStateUnsplit` root cell.
     pub cell: Cell,
+    /// Representation hash of the `ShardAccounts` dictionary root.
+    pub accounts_hash: HashBytes,
     /// Sum of native token balances for accounts included in this state.
     pub total_balance: u128,
 }

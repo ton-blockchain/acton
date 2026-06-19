@@ -262,12 +262,20 @@ async fn get_account_state(node: &Localnet, request: GetAccountState) -> anyhow:
     let header = node.get_block_header(seqno).await?;
     let address = convert::addr_from_account_id(&request.account);
     let block_data = node.get_block_data(seqno).await?;
+    let shard_state = node.get_shard_state_cell(seqno).await?;
     let masterchain_block_data = node.get_masterchain_block_data(seqno).await?;
+    let masterchain_state = node.get_masterchain_state_cell(seqno).await?;
     let shard_account = node
         .get_shard_account_cell(address.to_string(), Some(seqno))
         .await?;
     let id = block_id_for_existing_request(node, &request.id, &header.id).await?;
-    let cells = proof::account_state_cells(&shard_account, &block_data, &masterchain_block_data)?;
+    let cells = proof::account_state_cells(
+        &shard_account,
+        &block_data,
+        &shard_state,
+        &masterchain_block_data,
+        &masterchain_state,
+    )?;
     let shardblk = convert::block_id_ext(&header.id);
 
     Ok(Response::AccountState(AccountState {
@@ -576,12 +584,15 @@ async fn lookup_block_masterchain_proofs(
     let client_mc_block_boc = node
         .get_masterchain_block_data(client_mc_header.id.seqno)
         .await?;
+    let client_mc_state = node
+        .get_masterchain_state_cell(client_mc_header.id.seqno)
+        .await?;
     let client_mc_block =
         Boc::decode(&client_mc_block_boc).context("Failed to decode client masterchain block")?;
 
     Ok((
         proof::merkle_proof_boc(client_mc_block)?,
-        proof::state_proof_from_block_boc(&client_mc_block_boc)?,
+        proof::state_proof_from_cell(client_mc_state)?,
     ))
 }
 
@@ -856,7 +867,8 @@ async fn get_config(node: &Localnet, request: ConfigRequest) -> anyhow::Result<R
     let workchain = request.id.workchain;
     let (state_proof, config_proof) = if workchain == MASTERCHAIN_WORKCHAIN {
         let masterchain_block_data = node.get_masterchain_block_data(seqno).await?;
-        proof::config_proofs(&masterchain_block_data)?
+        let masterchain_state = node.get_masterchain_state_cell(seqno).await?;
+        proof::config_proofs(&masterchain_block_data, masterchain_state)?
     } else {
         (proof::empty_cell_boc(), proof::empty_cell_boc())
     };

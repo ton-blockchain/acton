@@ -1,5 +1,7 @@
+use crate::block::merkle::{OldStateCells, collect_path_to_hash};
 use crate::block::types::{
-    LOCALNET_GLOBAL_ID, MasterchainBlockBuildContext, MasterchainBlockBuildResult,
+    LOCALNET_GLOBAL_ID, MASTERCHAIN_PREV_BLOCKS_LIMIT, MasterchainBlockBuildContext,
+    MasterchainBlockBuildResult,
 };
 use crate::types::Hash256;
 use anyhow::Context;
@@ -29,16 +31,9 @@ use tycho_types::prelude::HashBytes;
 pub(crate) fn create_masterchain_block_boc(
     ctx: MasterchainBlockBuildContext<'_>,
 ) -> anyhow::Result<MasterchainBlockBuildResult> {
-    let new_state = masterchain_state_cell(&ctx)?;
+    let new_state = create_masterchain_state_cell(&ctx)?;
     let old_state = ctx.prev_state.clone().unwrap_or_else(|| new_state.clone());
-    let state_update = MerkleUpdate {
-        old_hash: *old_state.repr_hash(),
-        new_hash: *new_state.repr_hash(),
-        old_depth: old_state.depth(0),
-        new_depth: new_state.depth(0),
-        old: old_state,
-        new: new_state.clone(),
-    };
+    let state_update = masterchain_state_update(&old_state, &new_state, ctx.config_cell)?;
     let info = masterchain_block_info(&ctx)?;
     let extra = masterchain_block_extra(&ctx)?;
     let block = Block {
@@ -60,22 +55,6 @@ pub(crate) fn create_masterchain_block_boc(
         state_root_hash: Hash256::from(new_state.repr_hash()),
         state_cell: new_state,
     })
-}
-
-/// Extracts the post-block masterchain state from a stored masterchain block.
-///
-/// New masterchain blocks use the previous state's root as the old half of their
-/// Merkle update. Keeping this extraction in the block module lets `Node` avoid
-/// knowing the internal TL-B layout of a block when it prepares the next mining
-/// step.
-pub(crate) fn masterchain_state_from_block_cell(block_cell: &Cell) -> anyhow::Result<Cell> {
-    let block = block_cell
-        .parse::<Block>()
-        .context("Failed to parse masterchain block")?;
-    let state_update = block
-        .load_state_update()
-        .context("Failed to load masterchain state update")?;
-    Ok(state_update.new)
 }
 
 /// Builds block-level masterchain extra that links the block to localnet shards.
@@ -154,7 +133,9 @@ fn masterchain_block_info(ctx: &MasterchainBlockBuildContext<'_>) -> anyhow::Res
 /// libraries, but its custom `McStateExtra` contains the blockchain config, old
 /// masterchain block refs, and a `ShardHashes` dictionary describing the single
 /// basechain shard block created by the same mining step.
-fn masterchain_state_cell(ctx: &MasterchainBlockBuildContext<'_>) -> anyhow::Result<Cell> {
+pub(crate) fn create_masterchain_state_cell(
+    ctx: &MasterchainBlockBuildContext<'_>,
+) -> anyhow::Result<Cell> {
     let custom = McStateExtra {
         shards: shard_hashes(ctx)?,
         config: blockchain_config(ctx.config_cell),
@@ -196,6 +177,34 @@ fn masterchain_state_cell(ctx: &MasterchainBlockBuildContext<'_>) -> anyhow::Res
         custom: Some(custom),
     };
     CellBuilder::build_from(&state).context("Failed to serialize masterchain state")
+}
+
+fn masterchain_state_update(
+    old_state: &Cell,
+    new_state: &Cell,
+    config_cell: &Cell,
+) -> anyhow::Result<MerkleUpdate> {
+    let old_cells = OldStateCells::new(if old_state.repr_hash() == new_state.repr_hash() {
+        Vec::new()
+    } else {
+        old_state_config_path(old_state, config_cell.repr_hash())?
+    });
+
+    MerkleUpdate::create(old_state.as_ref(), new_state.as_ref(), old_cells)
+        .build()
+        .context("Failed to build masterchain state update")
+}
+
+fn old_state_config_path(
+    old_state: &Cell,
+    config_hash: &HashBytes,
+) -> anyhow::Result<Vec<HashBytes>> {
+    let mut path = Vec::new();
+    anyhow::ensure!(
+        collect_path_to_hash(old_state.as_ref(), config_hash, &mut path),
+        "Masterchain state does not reference blockchain config"
+    );
+    Ok(path)
 }
 
 /// Builds the shard dictionary entry that links masterchain state to basechain.
@@ -247,8 +256,8 @@ fn blockchain_config(config_root: &Cell) -> BlockchainConfig {
 /// Builds the `old_mc_blocks` dictionary for masterchain state history.
 ///
 /// The zero-state reference is always present because tonlib expects a root
-/// entry. Every stored previous localnet masterchain block is then added as a
-/// non-key block reference; localnet does not model key blocks.
+/// entry. Recent previous localnet masterchain blocks are then added as non-key
+/// block references; localnet does not model key blocks.
 fn old_mc_blocks_info(
     prev_blocks: &[crate::storage::MasterchainBlockMeta],
 ) -> anyhow::Result<AugDict<u32, KeyMaxLt, KeyBlockRef>> {
@@ -272,7 +281,7 @@ fn old_mc_blocks_info(
         ),
     );
 
-    for block in prev_blocks {
+    for block in prev_blocks.iter().rev().take(MASTERCHAIN_PREV_BLOCKS_LIMIT) {
         entries.insert(
             block.seqno,
             (

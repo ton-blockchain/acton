@@ -5,7 +5,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder};
 use tycho_types::merkle::MerkleProof;
 use tycho_types::models::ShardAccount;
-use tycho_types::models::block::{Block, ShardDescription, ShardHashes, ShardIdent};
+use tycho_types::models::block::{ShardDescription, ShardHashes, ShardIdent};
 use tycho_types::models::currency::CurrencyCollection;
 use tycho_types::prelude::HashBytes;
 
@@ -35,13 +35,17 @@ pub(super) fn all_shards_info_data(header: &LocalnetBlockHeader) -> anyhow::Resu
 
 /// Builds account proof/state cells for `liteServer.accountState`.
 ///
-/// The account proof uses the real post-block shard state stored in the block's
+/// The account proof uses the real post-block shard state declared by the block's
 /// Merkle update, so tonlib can compare the state hash declared by the block
-/// header with the state root it virtualizes from the proof.
+/// header with the state root it virtualizes from the proof. The stored block
+/// BOC itself may keep `state_update` pruned to avoid retaining full account
+/// dictionaries in every empty block.
 pub(super) fn account_state_cells(
     shard_account_boc: &BocBytes,
     block_boc: &BocBytes,
+    shard_state_cell: &Cell,
     masterchain_block_boc: &BocBytes,
+    masterchain_state_cell: &Cell,
 ) -> anyhow::Result<AccountStateCells> {
     let shard_account_cell =
         Boc::decode(shard_account_boc).context("Failed to decode ShardAccount BOC")?;
@@ -60,9 +64,9 @@ pub(super) fn account_state_cells(
     };
 
     let block_cell = Boc::decode(block_boc).context("Failed to decode block BOC")?;
-    let shard_state_cell = shard_state_from_block(&block_cell)?;
-    let proof = two_root_proof(block_cell, shard_state_cell)?;
-    let shard_proof = masterchain_shard_proof_from_boc(masterchain_block_boc)?;
+    let proof = two_root_proof(block_cell, shard_state_cell.clone())?;
+    let shard_proof =
+        masterchain_shard_proof(masterchain_block_boc, masterchain_state_cell.clone())?;
 
     Ok(AccountStateCells {
         shard_proof,
@@ -80,10 +84,13 @@ pub(super) fn account_state_cells(
 /// it extracts `McStateExtra.config`.
 pub(super) fn config_proofs(
     masterchain_block_boc: &BocBytes,
+    masterchain_state_cell: Cell,
 ) -> anyhow::Result<(Vec<u8>, Vec<u8>)> {
     let block = Boc::decode(masterchain_block_boc).context("Failed to decode masterchain block")?;
-    let state = shard_state_from_block(&block)?;
-    Ok((merkle_proof_boc(block)?, merkle_proof_boc(state)?))
+    Ok((
+        merkle_proof_boc(block)?,
+        merkle_proof_boc(masterchain_state_cell)?,
+    ))
 }
 
 /// Builds the `liteServer.shardInfo.shard_descr` `BoC` for localnet's shard.
@@ -120,16 +127,13 @@ pub(super) fn merkle_proof_boc(cell: Cell) -> anyhow::Result<Vec<u8>> {
     merkle_proof_cell(cell).map(Boc::encode)
 }
 
-/// Builds a single-root `MerkleProof` for the post-state declared by a block `BoC`.
+/// Builds a single-root `MerkleProof` for a full post-state cell.
 ///
-/// Stored localnet masterchain blocks contain a normal `MerkleUpdate`. `LiteAPI`
-/// proof responses often need the virtualized post-state root separately from
-/// the block root, so this helper extracts `state_update.new` and wraps it in the
-/// same proof cell shape used for block roots.
-pub(super) fn state_proof_from_block_boc(block_boc: &BocBytes) -> anyhow::Result<Vec<u8>> {
-    let block_cell = Boc::decode(block_boc).context("Failed to decode block BoC")?;
-    let state = shard_state_from_block(&block_cell)?;
-    merkle_proof_boc(state)
+/// Stored localnet masterchain blocks may contain a pruned `MerkleUpdate`.
+/// `LiteAPI` proof responses still need the virtualized post-state root
+/// separately from the block root, so callers pass a rebuilt full state cell.
+pub(super) fn state_proof_from_cell(state_cell: Cell) -> anyhow::Result<Vec<u8>> {
+    merkle_proof_boc(state_cell)
 }
 
 fn shard_hashes(header: &LocalnetBlockHeader) -> anyhow::Result<ShardHashes> {
@@ -162,20 +166,12 @@ const fn localnet_shard_description(header: &LocalnetBlockHeader) -> ShardDescri
     }
 }
 
-fn shard_state_from_block(block_cell: &Cell) -> anyhow::Result<Cell> {
-    let block = block_cell
-        .parse::<Block>()
-        .context("Failed to parse block cell")?;
-    let state_update = block
-        .load_state_update()
-        .context("Failed to load block state update")?;
-    Ok(state_update.new)
-}
-
-fn masterchain_shard_proof_from_boc(masterchain_block_boc: &BocBytes) -> anyhow::Result<Vec<u8>> {
+fn masterchain_shard_proof(
+    masterchain_block_boc: &BocBytes,
+    masterchain_state_cell: Cell,
+) -> anyhow::Result<Vec<u8>> {
     let block = Boc::decode(masterchain_block_boc).context("Failed to decode masterchain block")?;
-    let state = shard_state_from_block(&block)?;
-    two_root_proof(block, state)
+    two_root_proof(block, masterchain_state_cell)
 }
 
 fn two_root_proof(block_cell: Cell, state_cell: Cell) -> anyhow::Result<Vec<u8>> {

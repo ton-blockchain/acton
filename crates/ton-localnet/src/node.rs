@@ -1,8 +1,11 @@
 use crate::LocalnetError;
 use crate::block::{
-    create_block_boc, create_masterchain_block_boc, file_hash as block_file_hash,
-    masterchain_state_from_block_cell,
-    types::{BlockBuildContext, BlockTransaction, MasterchainBlockBuildContext},
+    create_block_boc, create_masterchain_block_boc, create_masterchain_state_cell,
+    create_shard_state_cell, file_hash as block_file_hash,
+    types::{
+        BlockBuildContext, BlockTransaction, MASTERCHAIN_PREV_BLOCKS_LIMIT,
+        MasterchainBlockBuildContext,
+    },
 };
 use crate::executor::{ExecContext, TvmExecutor};
 use crate::localnet::{LocalnetBlockId, compute_normalized_ext_in_hash};
@@ -64,8 +67,6 @@ pub struct Node {
 }
 
 const CASCADE_TX_HARD_LIMIT: usize = 10_000;
-const PREV_BLOCKS_LIMIT: usize = 16;
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NodeClockInfo {
     pub current_unix_time: u32,
@@ -474,18 +475,21 @@ impl Node {
             .map(|commit| commit.block_tx.clone())
             .collect::<Vec<_>>();
         let prev_masterchain_block = self.history.masterchain_blocks.last().cloned();
-        let prev_masterchain_blocks = self.history.masterchain_blocks.clone();
+        let prev_masterchain_blocks = self
+            .history
+            .masterchain_blocks
+            .iter()
+            .rev()
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .cloned()
+            .collect::<Vec<_>>();
         let prev_masterchain_state = if let Some(block) = &prev_masterchain_block {
             if let Some(state) = &self.latest_masterchain_state
                 && Hash256::from(state.repr_hash()) == block.state_root_hash
             {
                 Some(state.clone())
             } else {
-                let block_cell = self
-                    .cas
-                    .get_cell(&block.block_hash)
-                    .context("Previous masterchain block BOC missing")?;
-                Some(masterchain_state_from_block_cell(&block_cell)?)
+                Some(self.get_masterchain_state_cell(block.seqno)?)
             }
         } else {
             None
@@ -585,11 +589,11 @@ impl Node {
             .iter()
             .rev()
             .filter(|block| block.seqno <= seqno)
-            .take(PREV_BLOCKS_LIMIT)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
             .map(|block| block.block_id().into())
             .collect::<Vec<_>>();
 
-        if last_mc_blocks.len() < PREV_BLOCKS_LIMIT {
+        if last_mc_blocks.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
             last_mc_blocks.push(zero_block.clone());
         }
 
@@ -601,11 +605,11 @@ impl Node {
             .iter()
             .rev()
             .filter(|block| block.seqno <= seqno && block.seqno % 100 == 0)
-            .take(PREV_BLOCKS_LIMIT)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
             .map(|block| block.block_id().into())
             .collect::<Vec<_>>();
 
-        if last_mc_blocks_100.len() < PREV_BLOCKS_LIMIT {
+        if last_mc_blocks_100.len() < MASTERCHAIN_PREV_BLOCKS_LIMIT {
             last_mc_blocks_100.push(zero_block);
         }
 
@@ -1526,6 +1530,52 @@ impl Node {
             .ok_or_else(|| LocalnetError::BlockDataNotFound { seqno }.into())
     }
 
+    /// Rebuilds the full post-block shard state for a mined localnet block.
+    ///
+    /// Stored shard block BOCs may keep their `state_update` pruned so empty
+    /// blocks do not retain a full account dictionary forever. Proof builders
+    /// that need to read accounts should use this reconstructed state instead of
+    /// extracting `state_update.new` from the block body.
+    pub fn get_shard_state_cell(&self, seqno: Seqno) -> anyhow::Result<Cell> {
+        let block = self
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        let accounts = self.accounts_after_block(seqno);
+
+        create_shard_state_cell(
+            &self.cas,
+            &accounts,
+            block.seqno,
+            block.gen_utime,
+            block.end_lt,
+        )
+    }
+
+    fn accounts_after_block(&self, seqno: Seqno) -> HashMap<Addr, AccountMeta> {
+        let mut accounts = self.latest.accounts.clone();
+        if seqno >= self.globals.head_seqno {
+            return accounts;
+        }
+
+        for deltas in self
+            .history
+            .deltas_by_seqno
+            .iter()
+            .skip(seqno as usize)
+            .rev()
+        {
+            for delta in deltas.iter().rev() {
+                if let Some(old_meta) = &delta.old_meta {
+                    accounts.insert(delta.addr, old_meta.clone());
+                } else {
+                    accounts.remove(&delta.addr);
+                }
+            }
+        }
+
+        accounts
+    }
+
     /// Returns the serialized TON masterchain block `BoC` for a mined localnet block.
     ///
     /// Masterchain blocks are mined together with basechain blocks and stored in
@@ -1539,6 +1589,59 @@ impl Node {
         self.cas
             .get(&block.block_hash)
             .ok_or_else(|| LocalnetError::BlockDataNotFound { seqno }.into())
+    }
+
+    /// Rebuilds the full post-block masterchain state for a mined localnet block.
+    ///
+    /// Stored masterchain block BOCs may keep their `state_update` pruned to avoid
+    /// serializing the large config subtree on every mined block. Proof builders
+    /// that need to read config or shard hashes should use this full in-memory
+    /// state instead of extracting `state_update.new` from the block body.
+    pub fn get_masterchain_state_cell(&self, seqno: Seqno) -> anyhow::Result<Cell> {
+        let block = self
+            .get_masterchain_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+
+        if seqno == self.globals.head_seqno
+            && let Some(state) = &self.latest_masterchain_state
+            && Hash256::from(state.repr_hash()) == block.state_root_hash
+        {
+            return Ok(state.clone());
+        }
+
+        let shard_block = self
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        let prev_block = block
+            .prev_seqno
+            .and_then(|prev_seqno| self.get_masterchain_block_header(prev_seqno));
+        let prev_blocks = self
+            .history
+            .masterchain_blocks
+            .iter()
+            .rev()
+            .filter(|prev| prev.seqno < seqno)
+            .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let state = create_masterchain_state_cell(&MasterchainBlockBuildContext {
+            seqno,
+            gen_utime: block.gen_utime,
+            start_lt: block.start_lt,
+            end_lt: block.end_lt,
+            prev_block: prev_block.as_ref(),
+            prev_state: None,
+            shard_block: &shard_block,
+            config_cell: &self.config_cell,
+            prev_blocks: &prev_blocks,
+        })?;
+
+        anyhow::ensure!(
+            Hash256::from(state.repr_hash()) == block.state_root_hash,
+            "Rebuilt masterchain state root does not match block metadata for seqno {seqno}"
+        );
+        Ok(state)
     }
 
     #[must_use]
@@ -2417,6 +2520,7 @@ mod tests {
     use ton_executor::DEFAULT_CONFIG;
     use tycho_types::cell::{Cell, CellBuilder, Lazy, Store};
     use tycho_types::dict::Dict;
+    use tycho_types::models::block::Block;
     use tycho_types::models::transaction::{
         ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
         Transaction, TxInfo,
@@ -3070,6 +3174,48 @@ mod tests {
     #[test]
     fn mine_block_creates_empty_block_without_pending_messages() {
         let mut node = make_test_node(Box::new(NoopExecutor));
+        let assert_pruned_masterchain_block = |node: &Node, seqno| {
+            let masterchain_block = node
+                .get_masterchain_block_header(seqno)
+                .expect("masterchain block must be stored");
+            let masterchain_block_boc = node
+                .get_masterchain_block_data(seqno)
+                .expect("masterchain block BOC must be stored");
+            let config_boc = node
+                .get_cell(&node.globals.config_boc_hash)
+                .expect("config BOC must be stored");
+            assert!(
+                masterchain_block_boc.len() < config_boc.len() / 4,
+                "masterchain block BOC should not serialize the full config subtree"
+            );
+            let masterchain_state = node
+                .get_masterchain_state_cell(seqno)
+                .expect("masterchain state must be rebuildable");
+            assert_eq!(
+                Hash256::from(masterchain_state.repr_hash()),
+                masterchain_block.state_root_hash
+            );
+            masterchain_block_boc.len()
+        };
+        let assert_pruned_shard_block = |node: &Node, seqno| {
+            let block_boc = node
+                .get_block_data(seqno)
+                .expect("shard block BOC must be stored");
+            let block_cell = Boc::decode(&block_boc).expect("shard block BOC must decode");
+            let block = block_cell.parse::<Block>().expect("shard block must parse");
+            let state_update = block
+                .load_state_update()
+                .expect("shard block state update must load");
+            let shard_state = node
+                .get_shard_state_cell(seqno)
+                .expect("shard state must be rebuildable");
+
+            assert_eq!(
+                Hash256::from(shard_state.repr_hash()),
+                Hash256::from(&state_update.new_hash)
+            );
+            block_boc.len()
+        };
 
         let block = node.mine_block().expect("empty block must be mined");
 
@@ -3079,11 +3225,41 @@ mod tests {
         assert_eq!(block.start_lt, 0);
         assert_eq!(block.end_lt, 0);
         assert_eq!(node.globals.head_seqno, 1);
+        assert_pruned_masterchain_block(&node, 1);
+        assert_pruned_shard_block(&node, 1);
         assert_eq!(
             node.get_block_transactions(&block)
                 .expect("empty block transactions must resolve")
                 .len(),
             0
+        );
+
+        let second_block = node.mine_block().expect("second empty block must be mined");
+
+        assert_eq!(second_block.seqno, 2);
+        assert_eq!(second_block.prev_seqno, Some(1));
+        assert!(second_block.tx_hashes.is_empty());
+        assert_eq!(node.globals.head_seqno, 2);
+        assert_pruned_masterchain_block(&node, 2);
+        assert_pruned_shard_block(&node, 2);
+
+        for expected_seqno in 3..=40 {
+            let block = node.mine_block().expect("empty block must be mined");
+            assert_eq!(block.seqno, expected_seqno);
+            assert!(block.tx_hashes.is_empty());
+        }
+
+        let size_after_limit = assert_pruned_masterchain_block(&node, 20);
+        let later_size = assert_pruned_masterchain_block(&node, 40);
+        assert!(
+            later_size <= size_after_limit + 2048,
+            "masterchain block BOC should stay bounded after old_mc_blocks reaches its limit"
+        );
+        let shard_size_after_limit = assert_pruned_shard_block(&node, 20);
+        let later_shard_size = assert_pruned_shard_block(&node, 40);
+        assert!(
+            later_shard_size <= shard_size_after_limit + 1024,
+            "shard block BOC should stay bounded across empty blocks"
         );
     }
 
@@ -3122,7 +3298,7 @@ mod tests {
             .expect("block BoC must be stored in CAS");
         let block_cell = Boc::decode(&block_boc).expect("block BoC must decode");
         let parsed = block_cell
-            .parse::<tycho_types::models::block::Block>()
+            .parse::<Block>()
             .expect("block must parse as TON block");
 
         assert_eq!(block.file_hash, crate::block::file_hash(&block_boc));

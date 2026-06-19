@@ -42,6 +42,16 @@ pub(super) fn build_old_and_new_states(
     Ok((old_state, new_state))
 }
 
+pub(crate) fn create_shard_state_cell(
+    cas: &CellStore,
+    accounts: &HashMap<Addr, AccountMeta>,
+    seqno: Seqno,
+    gen_utime: u32,
+    gen_lt: Lt,
+) -> anyhow::Result<Cell> {
+    Ok(build_state(cas, accounts, seqno, gen_utime, gen_lt)?.cell)
+}
+
 /// Reconstructs the account metadata map that existed before the block.
 ///
 /// Each executed transaction carries the old account metadata captured before
@@ -76,6 +86,8 @@ fn build_state(
     gen_lt: Lt,
 ) -> anyhow::Result<BuiltShardState> {
     let (shard_accounts, total_balance) = build_shard_accounts(cas, accounts)?;
+    let accounts = Lazy::new(&shard_accounts).context("Failed to wrap shard accounts")?;
+    let accounts_hash = *accounts.inner().repr_hash();
 
     let state = ShardStateUnsplit {
         global_id: LOCALNET_GLOBAL_ID,
@@ -87,7 +99,7 @@ fn build_state(
         min_ref_mc_seqno: 0,
         out_msg_queue_info: Cell::default(),
         before_split: false,
-        accounts: Lazy::new(&shard_accounts).context("Failed to wrap shard accounts")?,
+        accounts,
         overload_history: 0,
         underload_history: 0,
         total_balance: CurrencyCollection::new(total_balance),
@@ -100,6 +112,7 @@ fn build_state(
     Ok(BuiltShardState {
         cell: tycho_types::cell::CellBuilder::build_from(&state)
             .context("Failed to serialize shard state")?,
+        accounts_hash,
         total_balance,
     })
 }

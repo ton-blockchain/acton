@@ -1,8 +1,9 @@
 use crate::block::account_blocks::build_account_blocks;
+use crate::block::merkle::{OldStateCells, collect_path_to_hash};
 use crate::block::messages::{build_in_msg_descr, build_out_msg_descr};
 use crate::block::state::build_old_and_new_states;
 use crate::block::types::{
-    BlockBuildContext, BlockBuildResult, LOCALNET_GLOBAL_ID, LOCALNET_SHARD,
+    BlockBuildContext, BlockBuildResult, BuiltShardState, LOCALNET_GLOBAL_ID, LOCALNET_SHARD,
 };
 use crate::types::{BocBytes, Hash256};
 use anyhow::Context;
@@ -25,14 +26,7 @@ use tycho_types::prelude::HashBytes;
 /// that could pass validator consensus.
 pub(crate) fn create_block_boc(ctx: BlockBuildContext<'_>) -> anyhow::Result<BlockBuildResult> {
     let (old_state, new_state) = build_old_and_new_states(&ctx)?;
-    let state_update = MerkleUpdate {
-        old_hash: *old_state.cell.repr_hash(),
-        new_hash: *new_state.cell.repr_hash(),
-        old_depth: old_state.cell.depth(0),
-        new_depth: new_state.cell.depth(0),
-        old: old_state.cell,
-        new: new_state.cell,
-    };
+    let state_update = shard_state_update(&old_state, &new_state)?;
 
     let info = build_block_info(&ctx)?;
     let fees_collected = ctx
@@ -78,6 +72,34 @@ pub(crate) fn create_block_boc(ctx: BlockBuildContext<'_>) -> anyhow::Result<Blo
         block_boc: Boc::encode(cell).into(),
         block_hash,
     })
+}
+
+fn shard_state_update(
+    old_state: &BuiltShardState,
+    new_state: &BuiltShardState,
+) -> anyhow::Result<MerkleUpdate> {
+    let old_cells = OldStateCells::new(
+        if old_state.cell.repr_hash() == new_state.cell.repr_hash() {
+            Vec::new()
+        } else if old_state.accounts_hash == new_state.accounts_hash {
+            old_state_accounts_path(old_state)?
+        } else {
+            Vec::new()
+        },
+    );
+
+    MerkleUpdate::create(old_state.cell.as_ref(), new_state.cell.as_ref(), old_cells)
+        .build()
+        .context("Failed to build shard state update")
+}
+
+fn old_state_accounts_path(old_state: &BuiltShardState) -> anyhow::Result<Vec<HashBytes>> {
+    let mut path = Vec::new();
+    anyhow::ensure!(
+        collect_path_to_hash(old_state.cell.as_ref(), &old_state.accounts_hash, &mut path),
+        "Shard state does not reference shard accounts"
+    );
+    Ok(path)
 }
 
 /// Creates the `BlockInfo` header for a localnet block.

@@ -325,6 +325,10 @@ pub(crate) enum Request {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<BocBytes>>,
     },
+    GetShardStateCell {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Cell>>,
+    },
     GetMasterchainBlockHeader {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<LocalnetBlockHeader>>,
@@ -332,6 +336,10 @@ pub(crate) enum Request {
     GetMasterchainBlockData {
         seqno: u32,
         resp: oneshot::Sender<anyhow::Result<BocBytes>>,
+    },
+    GetMasterchainStateCell {
+        seqno: u32,
+        resp: oneshot::Sender<anyhow::Result<Cell>>,
     },
     GetBlockTransactions {
         seqno: u32,
@@ -883,6 +891,14 @@ impl Localnet {
         rx.await?
     }
 
+    pub(crate) async fn get_shard_state_cell(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetShardStateCell { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_masterchain_block_header(
         &self,
         seqno: u32,
@@ -898,6 +914,14 @@ impl Localnet {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetMasterchainBlockData { seqno, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub(crate) async fn get_masterchain_state_cell(&self, seqno: u32) -> anyhow::Result<Cell> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetMasterchainStateCell { seqno, resp })
             .await?;
         rx.await?
     }
@@ -1474,12 +1498,20 @@ fn process_loop_request(node: &mut Node, recovery_points: &mut RecoveryPoints, r
             let res = node.get_block_data(seqno);
             let _ = resp.send(res);
         }
+        Request::GetShardStateCell { seqno, resp } => {
+            let res = node.get_shard_state_cell(seqno);
+            let _ = resp.send(res);
+        }
         Request::GetMasterchainBlockHeader { seqno, resp } => {
             let res = handle_get_masterchain_block_header(node, seqno);
             let _ = resp.send(res);
         }
         Request::GetMasterchainBlockData { seqno, resp } => {
             let res = node.get_masterchain_block_data(seqno);
+            let _ = resp.send(res);
+        }
+        Request::GetMasterchainStateCell { seqno, resp } => {
+            let res = node.get_masterchain_state_cell(seqno);
             let _ = resp.send(res);
         }
         Request::GetBlockTransactions { seqno, resp } => {
