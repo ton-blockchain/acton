@@ -29,27 +29,27 @@ fun main() {
     m.<caret>iteratePrev(last);
 }
 ------------------------------------------------------------------------
-4:18 -> 932:14 resolved
-5:17 -> 947:14 resolved
-7:6 -> 833:14 resolved
-8:6 -> 840:14 resolved
-9:6 -> 845:14 resolved
-10:6 -> 856:14 resolved
-11:6 -> 861:14 resolved
-12:6 -> 870:14 resolved
-13:6 -> 881:14 resolved
-14:6 -> 886:14 resolved
-15:6 -> 891:14 resolved
-16:6 -> 896:14 resolved
-17:6 -> 901:14 resolved
-18:6 -> 906:14 resolved
-19:6 -> 917:14 resolved
-20:6 -> 953:14 resolved
-21:6 -> 959:14 resolved
-22:6 -> 965:14 resolved
-23:6 -> 971:14 resolved
-24:6 -> 984:14 resolved
-25:6 -> 997:14 resolved
+4:18 -> 935:14 resolved
+5:17 -> 950:14 resolved
+7:6 -> 836:14 resolved
+8:6 -> 843:14 resolved
+9:6 -> 848:14 resolved
+10:6 -> 859:14 resolved
+11:6 -> 864:14 resolved
+12:6 -> 873:14 resolved
+13:6 -> 884:14 resolved
+14:6 -> 889:14 resolved
+15:6 -> 894:14 resolved
+16:6 -> 899:14 resolved
+17:6 -> 904:14 resolved
+18:6 -> 909:14 resolved
+19:6 -> 920:14 resolved
+20:6 -> 956:14 resolved
+21:6 -> 962:14 resolved
+22:6 -> 968:14 resolved
+23:6 -> 974:14 resolved
+24:6 -> 987:14 resolved
+25:6 -> 1000:14 resolved
 
 ========================================================================
 stdlib map methods on aliases (lib-like)
@@ -79,15 +79,15 @@ fun mainAlias() {
     prices.<caret>exists(1 as uint32);
 }
 ------------------------------------------------------------------------
-13:8 -> 870:14 resolved
-14:8 -> 856:14 resolved
-15:8 -> 861:14 resolved
-16:8 -> 906:14 resolved
-17:8 -> 833:14 resolved
-19:11 -> 870:14 resolved
-20:23 -> 932:14 resolved
-21:11 -> 984:14 resolved
-22:11 -> 845:14 resolved
+13:8 -> 873:14 resolved
+14:8 -> 859:14 resolved
+15:8 -> 864:14 resolved
+16:8 -> 909:14 resolved
+17:8 -> 836:14 resolved
+19:11 -> 873:14 resolved
+20:23 -> 935:14 resolved
+21:11 -> 987:14 resolved
+22:11 -> 848:14 resolved
 
 ========================================================================
 stdlib map methods inside alias methods (lib-style wrappers)
@@ -106,6 +106,6 @@ fun Config.hasParam(self, index: uint32): bool {
     return self.<caret>exists(index);
 }
 ------------------------------------------------------------------------
-3:9 -> 870:14 resolved
-7:16 -> 856:14 resolved
-11:16 -> 845:14 resolved
+3:9 -> 873:14 resolved
+7:16 -> 859:14 resolved
+11:16 -> 848:14 resolved

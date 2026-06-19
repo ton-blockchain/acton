@@ -184,12 +184,12 @@ fun JettonMinter.sendUpgradeMinterCode(
     return net.send(from, genericMsg);
 }
 
-fun JettonMinter.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+fun JettonMinter.sendTopUpGrams(self, from: address, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: TopUpTons {},
+        body: TopUpGrams {},
     });
     return net.send(from, genericMsg);
 }

@@ -43,7 +43,7 @@ const CANNOT_RUN_GET_METHOD_OF_CONTRACT_WITHOUT_CODE = 679
 /// Represents a set of parameters for creating a message.
 struct SendParams {
     /// Value to send with the message.
-    value: coins = ton("0.1")
+    value: coins = grams("0.1")
     /// Whether to bounce the message if the contract does not exist or fails (default: false)
     bounce: bool = false
 }
@@ -764,7 +764,7 @@ fun SendResultList.findTransaction<Msg = unknown>(
 ///     val message = createMessage({
 ///         bounce: false,
 ///         dest: counter.address,
-///         value: ton("1"),
+///         value: grams("1"),
 ///     });
 ///     net.send(deployer.address, message);
 /// }
@@ -839,7 +839,7 @@ fun net.createExternalMessage<TBody>(
                 src,
                 dest,
                 // It is better to fairly calculate the import fee right here or in acton
-                importFee: ton("0.1"),
+                importFee: grams("0.1"),
             },
             init,
             body: TlbEither<TBody, Cell<TBody>>.right(body.__asPayload()),
@@ -894,7 +894,7 @@ fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
 /// ```tolk
 /// val msg = createMessage({
 ///     bounce: false,
-///     value: ton("1"),
+///     value: grams("1"),
 ///     dest: counter.address,
 /// });
 /// val bouncedMsg = msg.bounced();
@@ -906,7 +906,7 @@ fun net.sendExternal(msg: ExternalInMessage): ExternalSendResult {
 /// ```tolk
 /// val bouncedMsg = createMessage({
 ///     bounce: false,
-///     value: ton("0.95"),
+///     value: grams("0.95"),
 ///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();

@@ -111,7 +111,7 @@ fun testing.createTraceIterationCursor(from: address, message: OutMessage): TxCu
 /// ```tolk
 /// val bouncedMsg = createMessage({
 ///     bounce: false,
-///     value: ton("0.95"),
+///     value: grams("0.95"),
 ///     dest: deployer.address,
 ///     body: beginCell().storeUint(0xFFFFFFFF, 32).storeSlice(body.toCell().beginParse()).endCell(),
 /// }).bounced();
@@ -175,7 +175,7 @@ fun testing.treasury(name: string): Treasury {
 
     val deployMsg = createMessage({
         bounce: false,
-        value: ton("10000"),
+        value: grams("10000"),
         dest: { workchain: 0, stateInit },
     });
     // Deploy treasury
@@ -328,7 +328,7 @@ fun testing.setChecksigIgnore(ignore: bool): void {
 ///
 /// Example:
 /// ```tolk
-/// testing.topUp(address, ton("10"));
+/// testing.topUp(address, grams("10"));
 /// ```
 ///
 /// Note: This function for tests only!
@@ -414,7 +414,7 @@ fun testing.registerLibrary(libCell: cell): void {
 ///
 /// Example:
 /// ```tolk
-/// testing.topUp(addr, ton("3"));
+/// testing.topUp(addr, grams("3"));
 /// val saved = testing.saveSnapshot("world-state.json");
 /// expect(saved).toBeTrue();
 /// ```

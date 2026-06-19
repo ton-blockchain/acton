@@ -27,7 +27,7 @@ get fun `test nft: should transfer ownership`() {
         null,
         0,
         createEmptySlice(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveSuccessfulTx<AskToChangeOwnership>({
@@ -65,7 +65,7 @@ get fun `test nft: should transfer ownership and return excesses`() {
         null,
         0,
         createEmptySlice(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveSuccessfulTx<AskToChangeOwnership>({
@@ -102,7 +102,7 @@ get fun `test nft: should not transfer ownership not from owner`() {
         null,
         0,
         createEmptySlice(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
@@ -126,7 +126,7 @@ get fun `test nft: should transfer ownership with notification`() {
     val ownerBeforeTransfer = nftItem.getNftData().ownerAddress;
     expect(ownerBeforeTransfer!).toEqual(nftOwner.address);
 
-    val forwardAmount = ton("0.01");
+    val forwardAmount = grams("0.01");
     val forwardBody = beginCell().storeUint(0, 32).storeString("Hello!").endCell();
     val queryId = 42;
 
@@ -138,7 +138,7 @@ get fun `test nft: should transfer ownership with notification`() {
         null,
         forwardAmount,
         forwardBody,
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveSuccessfulTx<AskToChangeOwnership>({
@@ -178,7 +178,7 @@ get fun `test nft: should get static data`() {
     val result = nftItem.sendRequestStaticData(
         randomTreasury.address,
         queryId,
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveSuccessfulTx<RequestStaticData>({
@@ -213,7 +213,7 @@ get fun `test nft: should fail when receiver in different workchain`() {
         null,
         0,
         createEmptySlice(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
@@ -236,7 +236,7 @@ get fun `test nft: should fail when op not on list`() {
     val result = nftItem.sendAny(
         randomTreasury.address,
         beginCell().storeUint(invalidOpcode, 32).storeUint(queryId, 64).endCell(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveTx({
@@ -262,7 +262,7 @@ get fun `test nft: should fail when response address in different workchain`() {
         null,
         0,
         createEmptySlice(),
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveFailedTx<AskToChangeOwnership>({
@@ -293,7 +293,7 @@ get fun `test nft: should fail with no fwd payload provided`() {
         // missing forward_payload!
         .endCell();
 
-    val result = nftItem.sendAny(nftOwner.address, body, { value: ton("0.05"), bounce: true });
+    val result = nftItem.sendAny(nftOwner.address, body, { value: grams("0.05"), bounce: true });
 
     expect(result).toHaveFailedTx({
         from: nftOwner.address,
@@ -331,7 +331,7 @@ get fun `test nft: should fail with malformed Either fwd payload`() {
         .storeSlice(malformedPayload)
         .endCell();
 
-    val result = nftItem.sendAny(nftOwner.address, body, { value: ton("0.05"), bounce: true });
+    val result = nftItem.sendAny(nftOwner.address, body, { value: grams("0.05"), bounce: true });
 
     expect(result).toHaveFailedTx({
         from: nftOwner.address,
@@ -348,7 +348,7 @@ get fun `test nft: should transfer ownership with forward payload in slice`() {
 
     val nftItem = nftFixture(nftCollection, nftOwner.address);
     val queryId = 42;
-    val forwardAmount = ton("0.01");
+    val forwardAmount = grams("0.01");
 
     // forward_payload as inline slice (not ref)
     val forwardPayloadSlice = beginCell().storeUint(0xDEADBEEF, 32).toSlice();
@@ -361,7 +361,7 @@ get fun `test nft: should transfer ownership with forward payload in slice`() {
         null,
         forwardAmount,
         forwardPayloadSlice,
-        { value: ton("0.05"), bounce: true },
+        { value: grams("0.05"), bounce: true },
     );
 
     expect(result).toHaveSuccessfulTx<AskToChangeOwnership>({
@@ -395,7 +395,7 @@ get fun `test nft: should fail with incomplete transfer body`() {
         // missing new_owner and rest!
         .endCell();
 
-    val result = nftItem.sendAny(nftOwner.address, body, { value: ton("0.05"), bounce: true });
+    val result = nftItem.sendAny(nftOwner.address, body, { value: grams("0.05"), bounce: true });
 
     expect(result).toHaveFailedTx({
         from: nftOwner.address,
@@ -420,7 +420,7 @@ get fun `test nft: bench should deploy 100 nfts via batch deploy`() {
         deployList.set(
             i,
             BatchDeployDictItem {
-                attachTonAmount: ton("0.02"),
+                attachTonAmount: grams("0.02"),
                 initParams: NftItemInitAtDeployment { ownerAddress, content }.toCell(),
             },
         );
@@ -432,7 +432,7 @@ get fun `test nft: bench should deploy 100 nfts via batch deploy`() {
         0,
         deployList,
         {
-            value: ton("5"), // more TON for 100 NFTs
+            value: grams("5"), // more GRAM for 100 NFTs
             bounce: true,
         },
     );

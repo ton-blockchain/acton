@@ -899,7 +899,7 @@ fn test_verify_new_verifier_sends_new_api_payload_and_reports_success() {
         "multipart request must include Tolk language, got: {body}"
     );
     assert!(
-        body.contains("name=\"compile_params\"") && body.contains("\"compiler_version\":\"1.4.1\""),
+        body.contains("name=\"compile_params\"") && body.contains("\"compiler_version\":\"1.4.2\""),
         "multipart request must include compiler params, got: {body}"
     );
     assert!(

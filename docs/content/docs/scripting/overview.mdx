@@ -44,7 +44,7 @@ fun main(libraryCode: cell, duration: int) {
 
     val toReserve = calculateGasFeeWithoutFlatPrice(MASTERCHAIN, gasConsumedForCalculation)
                     + calculateStorageFee(MASTERCHAIN, duration, libraryBits, libraryRefs);
-    println("Storage fee: {:ton}", toReserve);
+    println("Storage fee: {:grams}", toReserve);
 }
 ```
 

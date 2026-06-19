@@ -126,7 +126,7 @@ fun setupTest(): (Counter, Treasury, Treasury) {
     val notDeployer = testing.treasury("notDeployer");
 
     val contract = Counter.fromStorage({ id: 0, owner: deployer.address, counter: 0 });
-    val res = contract.deploy(deployer.address, { value: ton("1") });
+    val res = contract.deploy(deployer.address, { value: grams("1") });
     expect(res).toHaveSuccessfulDeploy({
         to: contract.address,
     });

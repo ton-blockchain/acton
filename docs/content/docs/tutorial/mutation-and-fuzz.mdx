@@ -71,7 +71,7 @@ get fun `test voter exits with AlreadyVoted on duplicate`() {
     val (poll, _, alice, _) = setupTest();
 
     // First vote deploys and sets hasVoted = true.
-    val res1 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val res1 = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(res1).toHaveAllSuccessfulTxs();
 
     val voterAddr = poll.calcVoterAddress(alice.address);
@@ -79,7 +79,7 @@ get fun `test voter exits with AlreadyVoted on duplicate`() {
 
     val directMsg = createMessage({
         bounce: false,
-        value: ton("0.05"),
+        value: grams("0.05"),
         dest: voter.address,
         body: Vote { option: 0 },
     });
@@ -137,7 +137,7 @@ get fun `test fuzz vote option boundary`(option: uint8) {
 
     val voteMessage = createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: poll.address,
         body: Vote { option },
     });

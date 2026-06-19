@@ -11,8 +11,8 @@ fn fmt_supports_mixed_hex_ton_and_plain_placeholders() {
             import "../../lib/testing/expect"
 
             get fun `test fmt mixed placeholders`() {
-                val rendered = format("hex={:x} ton={:ton} label={}", 255, 1500000000, "ok");
-                expect(rendered).toEqual("hex=ff ton=1.5 GRAM label=ok");
+                val rendered = format("hex={:x} grams={:grams} label={}", 255, 1500000000, "ok");
+                expect(rendered).toEqual("hex=ff grams=1.5 GRAM label=ok");
             }
         "#,
         )

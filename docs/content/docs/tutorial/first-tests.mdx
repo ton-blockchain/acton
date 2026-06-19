@@ -25,7 +25,7 @@ fun setupTest(): (Poll, Treasury, Treasury, Treasury) {
         option0: 0,
         option1: 0,
     });
-    val res = poll.deploy(owner.address, { value: ton("0.5") });
+    val res = poll.deploy(owner.address, { value: grams("0.5") });
     expect(res).toHaveSuccessfulDeploy({ to: poll.address });
 
     return (poll, owner, alice, bob);
@@ -42,7 +42,7 @@ fun setupTest(): (Poll, Treasury, Treasury, Treasury) {
 get fun `test alice votes option 0`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val res = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(res).toHaveAllSuccessfulTxs();
 
     val (opt0, opt1) = poll.results();
@@ -75,10 +75,10 @@ $ acton test --filter "alice votes option 0"
 get fun `test alice and bob vote for different options`() {
     val (poll, _, alice, bob) = setupTest();
 
-    val res0 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val res0 = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(res0).toHaveAllSuccessfulTxs();
 
-    val res1 = poll.sendVote(bob.address, 1, { value: ton("0.1") });
+    val res1 = poll.sendVote(bob.address, 1, { value: grams("0.1") });
     expect(res1).toHaveAllSuccessfulTxs();
 
     val (opt0, opt1) = poll.results();
@@ -115,11 +115,11 @@ Press `Ctrl+C` in the terminal to stop the UI server.
 get fun `test alice cannot vote twice`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res1 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val res1 = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(res1).toHaveAllSuccessfulTxs();
 
     // Alice votes a second time.
-    val res2 = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val res2 = poll.sendVote(alice.address, 0, { value: grams("0.1") });
 
     // After fixing the bounce handler on page 5, this will stay at (1, 0).
     // Right now Poll does not undo the optimistic increment, so option0 is wrongly 2.

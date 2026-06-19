@@ -11,7 +11,7 @@
   → Sending sources to backend for verification
   → Using backend: [LOCALHOST_URL]/source
   ℹ Debug mode enabled via ACTON_VERIFY_DEBUG=1
-    → Compiler version: 1.4.1
+    → Compiler version: 1.4.2
     → Source file:
       [ROOT]/contracts/simple.tolk
     → Backend override: [LOCALHOST_URL]

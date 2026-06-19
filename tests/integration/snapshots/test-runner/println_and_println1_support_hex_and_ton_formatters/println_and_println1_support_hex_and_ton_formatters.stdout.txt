@@ -9,7 +9,7 @@
     └─ Test output:
        17
        hex=beef
-       ton=1 GRAM
+       grams=1 GRAM
        plain=ok
 
  ✓ 1 passed in 1 file

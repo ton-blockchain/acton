@@ -23,7 +23,7 @@ fun Counter.fromStorage(storage: Storage): Counter {
 fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
     val msg = createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: self.address,
         body: IncreaseCounter {
             queryId: 0,
@@ -36,7 +36,7 @@ fun Counter.sendIncrease(self, from: address, increaseBy: int): SendResultList {
 fun Counter.sendReset(self, from: address): SendResultList {
     val msg = createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: self.address,
         body: ResetCounter { queryId: 0 },
     });
@@ -53,7 +53,7 @@ fun setupTest(): (Counter, Treasury) {
     val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
-        value: ton("1.0"),
+        value: grams("1.0"),
         dest: { stateInit: counter.init },
     });
     val res = net.send(deployer.address, msg);

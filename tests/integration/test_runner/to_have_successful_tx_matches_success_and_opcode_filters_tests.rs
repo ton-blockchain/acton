@@ -34,7 +34,7 @@ fun onInternalMessage(in: InMessage) {
     }
 
     if (msg.queryId == 20) {
-        reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+        reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
         return;
     }
 
@@ -49,7 +49,7 @@ fun onInternalMessage(in: InMessage) {
     if (msg.queryId == 40) {
         createMessage({
             bounce: false,
-            value: ton("0.1"),
+            value: grams("0.1"),
             dest: in.senderAddress,
             body: BounceNotice { queryId: msg.queryId },
         }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -84,7 +84,7 @@ fun onInternalMessage(in: InMessage) {
     val msg = lazy RouteToSink.fromSlice(in.body);
     createMessage({
         bounce: false,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: msg.sink,
         body: SourceOnlyNotice { queryId: msg.queryId },
     }).send(SEND_MODE_PAY_FEES_SEPARATELY);
@@ -127,7 +127,7 @@ fun deployHarness() {
 
     val deployMsg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: {
             stateInit: harness.init,
         },
@@ -141,7 +141,7 @@ fun deployHarness() {
 fun sendPing(sender: Treasury, harness: Harness, queryId: uint64): SendResultList {
     val msg = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId },
     });
@@ -226,7 +226,7 @@ fun deployContract(sender: Treasury, contractName: string): address {
     val address = AutoDeployAddress { stateInit: init }.calculateAddress();
     val deployRes = net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest: { stateInit: init },
     }));
     expect(deployRes).toHaveSuccessfulDeploy({ to: address });
@@ -240,7 +240,7 @@ get fun `test expected opcode name falls back to source abi`() {
 
     val res = net.send(sender.address, createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: source,
         body: RouteToSink { queryId: 7, sink },
     }));
@@ -249,7 +249,7 @@ get fun `test expected opcode name falls back to source abi`() {
         from: source,
         to: sink,
         opcode: SourceOnlyNotice.__getDeclaredPackPrefix(),
-        value: ton("0.2"),
+        value: grams("0.2"),
     });
 }
 "#;
@@ -328,7 +328,7 @@ get fun `test ae bounced tx opcode filter`() {
 
     val trigger = createMessage({
         bounce: false,
-        value: ton("0.5"),
+        value: grams("0.5"),
         dest: harness.address,
         body: Ping { queryId: 40 },
     });
@@ -343,7 +343,7 @@ get fun `test ae bounced tx opcode filter`() {
 
     val bouncedMsg = createMessage({
         bounce: false,
-        value: ton("0.3"),
+        value: grams("0.3"),
         dest: harness.address,
         body: bouncedBody,
     }).bounced();

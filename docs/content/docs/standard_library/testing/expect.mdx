@@ -20,14 +20,14 @@ Examples:
 expect(total).toEqual(100);
 
 // Comparison
-expect(balance).toBeGreater(ton("1.0"));
+expect(balance).toBeGreater(grams("1.0"));
 
 // Approximate check (useful for gas calculations)
 expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
 
 // Map check
 expect(balances).toContainKey(userAddress);
-expect(balances.mustGet(userAddress)).toEqual(ton("50"));
+expect(balances.mustGet(userAddress)).toEqual(grams("50"));
 ```
 
 ## Definitions
@@ -123,7 +123,7 @@ decimal point insertion, trailing-zero trimming, and normalized integer-style ou
 
 Example:
 ```tolk
-expect(ton("1.5")).toEqualDecimal(ton("1.5"), 9);
+expect(grams("1.5")).toEqualDecimal(grams("1.5"), 9);
 ```
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/testing/expect.tolk#L96" />

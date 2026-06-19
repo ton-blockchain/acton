@@ -67,7 +67,7 @@ Suppose a contract forwards a message and the state should be checked between th
 ```tolk
 val forwardMessage = createMessage({
     bounce: false,
-    value: ton("0.5"),
+    value: grams("0.5"),
     dest: forwarderAddress,
     body: TriggerForward {
         queryId: 7,
@@ -107,7 +107,7 @@ Use [`executeTill<Msg>(...)`](/docs/standard_library/emulation/testing#txcursore
 ```tolk
 val routeMessage = createMessage({
     bounce: false,
-    value: ton("0.5"),
+    value: grams("0.5"),
     dest: routerAddress,
     body: TriggerRoute {
         queryId: 17,
@@ -149,14 +149,14 @@ Each [`testing.createTraceIterationCursor()`](/docs/standard_library/emulation/t
 ```tolk
 val beginMessage = createMessage({
     bounce: false,
-    value: ton("0.5"),
+    value: grams("0.5"),
     dest: raceAddress,
     body: Begin { queryId: 1 },
 });
 
 val attackMessage = createMessage({
     bounce: false,
-    value: ton("0.5"),
+    value: grams("0.5"),
     dest: raceAddress,
     body: Attack { queryId: 2 },
 });
@@ -211,7 +211,7 @@ Use [`close()`](/docs/standard_library/emulation/testing#txcursorclose) when the
 ```tolk
 val forwardMessage = createMessage({
     bounce: false,
-    value: ton("0.5"),
+    value: grams("0.5"),
     dest: forwarderAddress,
     body: TriggerForward {
         queryId: 88,

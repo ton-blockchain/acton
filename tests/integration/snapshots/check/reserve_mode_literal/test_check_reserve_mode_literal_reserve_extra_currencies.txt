@@ -1,16 +1,16 @@
 warning[E015]: reserve mode should use RESERVE_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
-3 |                 reserveExtraCurrenciesOnBalance(ton("0.1"), null, 3);
-  |                                                                   ^ numeric reserve mode literal is used here
+3 |                 reserveExtraCurrenciesOnBalance(grams("0.1"), null, 3);
+  |                                                                     ^ numeric reserve mode literal is used here
   |
   = use named `RESERVE_MODE_*` constants instead of numeric mode literals
 
 help: replace with RESERVE_MODE_* constants
   --> [ROOT]/contracts/main[LINE]
   |
-3 |                 reserveExtraCurrenciesOnBalance(ton("0.1"), null, 3);
-  |                                                                   ^ RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST
+3 |                 reserveExtraCurrenciesOnBalance(grams("0.1"), null, 3);
+  |                                                                     ^ RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_AT_MOST
 
 
 1 issue can be fixed automatically, rerun with --fix flag.

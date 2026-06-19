@@ -76,7 +76,7 @@ fun onInternalMessage(in: InMessage) {
             };
             val outMsg = createMessage({
                 bounce: BounceMode.Only256BitsOfBody,
-                value:  ton("0.05"),
+                value:  grams("0.05"),
                 dest:   { stateInit: voterInit },
                 body:   msg,
             });
@@ -162,7 +162,7 @@ acton wrapper Poll
 get fun `test non-owner cannot close poll`() {
     val (poll, _, alice, _) = setupTest();
 
-    val res = poll.sendClosePoll(alice.address, { value: ton("0.05") });
+    val res = poll.sendClosePoll(alice.address, { value: grams("0.05") });
     expect(res).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,
@@ -175,10 +175,10 @@ get fun `test non-owner cannot close poll`() {
 get fun `test owner closes poll`() {
     val (poll, owner, alice, _) = setupTest();
 
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveAllSuccessfulTxs();
 
-    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    val closeRes = poll.sendClosePoll(owner.address, { value: grams("0.05") });
     expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
 
     expect(poll.isClosed()).toEqual(true);
@@ -187,10 +187,10 @@ get fun `test owner closes poll`() {
 get fun `test vote rejected after close`() {
     val (poll, owner, alice, _) = setupTest();
 
-    val closeRes = poll.sendClosePoll(owner.address, { value: ton("0.05") });
+    val closeRes = poll.sendClosePoll(owner.address, { value: grams("0.05") });
     expect(closeRes).toHaveSuccessfulTx({ from: owner.address, to: poll.address });
 
-    val voteRes = poll.sendVote(alice.address, 0, { value: ton("0.1") });
+    val voteRes = poll.sendVote(alice.address, 0, { value: grams("0.1") });
     expect(voteRes).toHaveFailedTx({
         from:     alice.address,
         to:       poll.address,

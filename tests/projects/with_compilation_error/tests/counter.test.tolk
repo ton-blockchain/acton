@@ -25,7 +25,7 @@ fun setupTest(): (Counter, Treasury) {
     val deployer = testing.treasury("deployer");
     val msg = createMessage({
         bounce: false,
-        value: ton("1.0"),
+        value: grams("1.0"),
         dest: { stateInit: counter.init },
     });
     val res = net.send(deployer.address, msg);

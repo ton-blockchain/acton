@@ -47,7 +47,7 @@ get fun `test al out actions list traversal order`() {
     val dest = randomAddress("al_out_actions_order");
     val msg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 1,
@@ -58,8 +58,8 @@ get fun `test al out actions list traversal order`() {
     val newCode = beginCell().storeUint(0xAB, 8).endCell();
     contract.setCodePostponed(newCode);
     msg.send(SEND_MODE_REGULAR | SEND_MODE_BOUNCE_ON_ACTION_FAIL);
-    reserveToncoinsOnBalance(
-        ton("0.05"),
+    reserveGramsOnBalance(
+        grams("0.05"),
         RESERVE_MODE_ALL_BUT_AMOUNT | RESERVE_MODE_BOUNCE_ON_ACTION_FAIL
     );
     changeLib(createEmptyCell(), 2);
@@ -87,7 +87,7 @@ get fun `test al parse out actions from c5`() {
 
     createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 2,
@@ -97,7 +97,7 @@ get fun `test al parse out actions from c5`() {
 
     createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 3,
@@ -137,7 +137,7 @@ get fun `test al get send message at null non send`() {
     contract.setCodePostponed(beginCell().storeUint(1, 1).endCell());
     createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 4,
@@ -171,7 +171,7 @@ get fun `test al get send message body inline left`() {
 
     createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 7,
@@ -206,7 +206,7 @@ get fun `test al get send message body ref right`() {
 
     createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: RefPayload {
             queryId: 9,
@@ -264,7 +264,7 @@ get fun `test al out message out actions helper`() {
     val dest = randomAddress("al_out_message_helper");
     val msg = createMessage({
         bounce: false,
-        value: ton("1"),
+        value: grams("1"),
         dest,
         body: InlinePayload {
             queryId: 55,
@@ -295,7 +295,7 @@ fn get_send_message_helpers_return_null_for_reserve_and_change_library_actions()
         "al-stdlib-get-send-message-helpers-null-for-reserve-and-change-library",
         r#"
 get fun `test al get send message helpers null for reserve and change library`() {
-    reserveToncoinsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(1, RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
     changeLib(beginCell().storeUint(0xEE, 8).endCell(), 2);
 
     val outActions = testing.outActions();

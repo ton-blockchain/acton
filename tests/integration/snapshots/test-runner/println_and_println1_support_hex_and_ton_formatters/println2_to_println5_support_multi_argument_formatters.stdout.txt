@@ -8,7 +8,7 @@
   ✓ println2 to println5 formatters [TIME]
     └─ Test output:
        left + right
-       hex=ff ton=2.5 GRAM label=ok
+       hex=ff grams=2.5 GRAM label=ok
        a b c d
        1 2 3 4 5
        hello world

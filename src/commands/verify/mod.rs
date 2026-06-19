@@ -199,7 +199,7 @@ pub fn verify_cmd(
         });
     }
 
-    let version = compiler_version.unwrap_or_else(|| "1.4.1".to_owned());
+    let version = compiler_version.unwrap_or_else(|| "1.4.2".to_owned());
 
     if new_verifier {
         return verify_with_new_verifier(

@@ -4,6 +4,6 @@ Step 1 (before):
      13| get fun `test wallet: owner can send jettons`() {
      14|     val (minter, deployer, notDeployer) = setupTest();
                                                    ^^^^^^^^^^^
-     15|     val transferAmount = ton("5");
+     15|     val transferAmount = grams("5");
   Registers:
     c4 (storage): cell = empty cell

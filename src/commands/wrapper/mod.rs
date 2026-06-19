@@ -1458,7 +1458,7 @@ fn generate_setup_test(
         let _ = writeln!(code, "    val contract = {contract_name}.fromStorage();");
     }
 
-    code.push_str("    val res = contract.deploy(deployer.address, { value: ton(\"1\") });\n");
+    code.push_str("    val res = contract.deploy(deployer.address, { value: grams(\"1\") });\n");
     code.push_str("    expect(res).toHaveSuccessfulDeploy({ to: contract.address });\n");
     code.push('\n');
     code.push_str("    return (contract, deployer, notDeployer)\n");

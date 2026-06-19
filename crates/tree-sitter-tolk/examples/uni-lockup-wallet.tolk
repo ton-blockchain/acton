@@ -244,7 +244,7 @@ fun onExternalMessage(inMsg: slice) {
     if (!canUseRestricted) {
         effectivelyLocked += totalRestrictedValue;
     }
-    reserveToncoinsOnBalance(effectivelyLocked, 2);
+    reserveGramsOnBalance(effectivelyLocked, 2);
 
     cs.stackMoveToTop();
     while (cs.getRemainingRefsCount()) {

@@ -95,5 +95,5 @@
   "get_methods": [],
   "thrown_errors": [],
   "compiler_name": "tolk",
-  "compiler_version": "1.4.1"
+  "compiler_version": "1.4.2"
 }

@@ -10,14 +10,14 @@
 /// expect(total).toEqual(100);
 ///
 /// // Comparison
-/// expect(balance).toBeGreater(ton("1.0"));
+/// expect(balance).toBeGreater(grams("1.0"));
 ///
 /// // Approximate check (useful for gas calculations)
 /// expect(gasUsed).toBeApproxEqRel(expectedGas, 10); // within 10%
 ///
 /// // Map check
 /// expect(balances).toContainKey(userAddress);
-/// expect(balances.mustGet(userAddress)).toEqual(ton("50"));
+/// expect(balances.mustGet(userAddress)).toEqual(grams("50"));
 /// ```
 
 import "@stdlib/lisp-lists"
@@ -91,7 +91,7 @@ fun Expectation<T>.toEqual<U>(self, expected: U): void {
 ///
 /// Example:
 /// ```tolk
-/// expect(ton("1.5")).toEqualDecimal(ton("1.5"), 9);
+/// expect(grams("1.5")).toEqualDecimal(grams("1.5"), 9);
 /// ```
 fun Expectation<T>.toEqualDecimal(self, expected: T, decimals: int): void {
     Assert.equalDecimal(self.value, expected, decimals, "", self.location);

@@ -34,7 +34,7 @@ fn println_and_println1_support_hex_and_ton_formatters() {
         get fun `test println and println1 formatters`() {
             println(17);
             println("hex={:x}", 48879);
-            println("ton={:ton}", 1000000000);
+            println("grams={:grams}", 1000000000);
             println("plain={}", "ok");
         }
         "#,
@@ -142,7 +142,7 @@ fn println2_to_println5_support_multi_argument_formatters() {
         r#"
         get fun `test println2 to println5 formatters`() {
             println("{} + {}", "left", "right");
-            println("hex={:x} ton={:ton} label={}", 255, 2500000000, "ok");
+            println("hex={:x} grams={:grams} label={}", 255, 2500000000, "ok");
             println("{} {} {} {}", "a", "b", "c", "d");
             println("{} {} {} {} {}", 1, 2, 3, 4, 5);
             println("hello", "world");

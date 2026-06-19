@@ -101,7 +101,7 @@ fun ActonWallet.rawSign(self, data: int): slice {
 ///         counter: 0,
 ///     });
 ///
-///     val result = counter.deploy(deployer.address, ton("0.05"));
+///     val result = counter.deploy(deployer.address, grams("0.05"));
 ///     result.waitForFirstTransaction();
 ///
 ///     println("Deployed counter to {}", counter.address);

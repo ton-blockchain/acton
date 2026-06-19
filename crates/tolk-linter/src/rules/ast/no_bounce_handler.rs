@@ -27,7 +27,7 @@ use tree_sitter::Node;
 ///     val refundMessage = createMessage({
 ///         bounce: BounceMode.Only256BitsOfBody,
 ///         //      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E007: contract sends a message that may bounce but `onBouncedMessage` handler doesn't exist
-///         value: ton("0.1"),
+///         value: grams("0.1"),
 ///         dest,
 ///     });
 ///     refundMessage.send(SEND_MODE_REGULAR);
@@ -45,7 +45,7 @@ use tree_sitter::Node;
 /// ```tolk
 /// val refundMessage = createMessage({
 ///     bounce: BounceMode.NoBounce,
-///     value: ton("0.1"),
+///     value: grams("0.1"),
 ///     dest,
 ///     body: beginCell().endCell(),
 /// });

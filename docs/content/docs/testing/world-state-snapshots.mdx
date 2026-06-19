@@ -24,7 +24,7 @@ import "@acton/testing/expect"
 get fun `test save snapshot`() {
     val target = randomAddress("snapshot-target");
 
-    testing.topUp(target, ton("3"));
+    testing.topUp(target, grams("3"));
     testing.setNow(1_700_023_001);
 
     expect(testing.saveSnapshot("fixtures/world-state.json")).toBeTrue();
@@ -43,7 +43,7 @@ get fun `test load snapshot`() {
 
     expect(testing.loadSnapshot("fixtures/world-state.json")).toBeTrue();
     expect(testing.getNow()).toEqual(1_700_023_001);
-    expect(testing.getAccountBalance(target)).toEqual(ton("3"));
+    expect(testing.getAccountBalance(target)).toEqual(grams("3"));
 }
 ```
 
@@ -91,14 +91,14 @@ import "@acton/testing/expect"
 get fun `test checkpoint and restore`() {
     val target = randomAddress("checkpoint-target");
 
-    testing.topUp(target, ton("5"));
+    testing.topUp(target, grams("5"));
     expect(testing.saveSnapshot("fixtures/checkpoint.json")).toBeTrue();
 
-    testing.topUp(target, ton("7"));
-    expect(testing.getAccountBalance(target)).toEqual(ton("12"));
+    testing.topUp(target, grams("7"));
+    expect(testing.getAccountBalance(target)).toEqual(grams("12"));
 
     expect(testing.loadSnapshot("fixtures/checkpoint.json")).toBeTrue();
-    expect(testing.getAccountBalance(target)).toEqual(ton("5"));
+    expect(testing.getAccountBalance(target)).toEqual(grams("5"));
 }
 ```
 

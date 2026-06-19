@@ -46,7 +46,7 @@ fun setupTest(): (Counter, Treasury, Treasury) {
         owner: deployer.address,
         counter: 0,
     });
-    val res = contract.deploy(deployer.address, { value: ton("1") });
+    val res = contract.deploy(deployer.address, { value: grams("1") });
     expect(res).toHaveSuccessfulDeploy({ to: contract.address });
 
     return (contract, deployer, notDeployer);
@@ -162,7 +162,7 @@ get fun `test example`() {
 
     // 2. Deploy it
     val deployer = testing.treasury("deployer");
-    contract.deploy(deployer.address, { value: ton("1") });
+    contract.deploy(deployer.address, { value: grams("1") });
 }
 ```
 
@@ -185,7 +185,7 @@ contract.sendIncrease(deployer.address, 10);
 
 // With custom value and bounce flag
 contract.sendIncrease(deployer.address, 10, {
-    value: ton("0.5"),
+    value: grams("0.5"),
     bounce: true
 });
 ```

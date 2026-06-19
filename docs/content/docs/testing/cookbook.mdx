@@ -28,7 +28,7 @@ fun setupCounter(): (Counter, Treasury, Treasury) {
         counter: 0,
     });
 
-    val deploy = counter.deploy(deployer.address, { value: ton("1") });
+    val deploy = counter.deploy(deployer.address, { value: grams("1") });
     expect(deploy).toHaveSuccessfulDeploy({ to: counter.address });
 
     return (counter, deployer, outsider);
@@ -153,7 +153,7 @@ Use `net.send(...)` directly when the wrapper would hide the malformed shape:
 ```tolk
 val msg = createMessage({
     bounce: true,
-    value: ton("0.1"),
+    value: grams("0.1"),
     dest: wallet.address,
     body: malformedBody,
 });
@@ -175,7 +175,7 @@ and assert it with `toHaveBouncedTx()`.
 ```tolk
 val bounced = createMessage({
     bounce: false,
-    value: ton("0.1"),
+    value: grams("0.1"),
     dest: counter.address,
     body: IncreaseCounter { increaseBy: 10 },
 }).bounced();
@@ -361,7 +361,7 @@ val owner = testing.treasury("owner");
 val receiver = testing.treasury("receiver");
 val passiveAddress = randomAddress("not-deployed-recipient");
 
-testing.topUp(passiveAddress, ton("0.5"));
+testing.topUp(passiveAddress, grams("0.5"));
 ```
 
 ## Read account state

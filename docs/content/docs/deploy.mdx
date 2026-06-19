@@ -62,7 +62,7 @@ fun main() {
 
     println("Deploying counter to {}", counter.address);
 
-    val result = counter.deploy(deployer.address, { value: ton("0.05") });
+    val result = counter.deploy(deployer.address, { value: grams("0.05") });
     val trace = result.waitForTrace();
     if (trace == null) {
       Assert.fail("Could not find the trace, deployment has failed!");
@@ -103,7 +103,7 @@ fun main() {
         jettonWalletCode: build("JettonWallet"),
     });
 
-    val trace = minter.deploy(deployer.address, { value: ton("0.05") }).waitForTrace();
+    val trace = minter.deploy(deployer.address, { value: grams("0.05") }).waitForTrace();
     if (trace == null) {
       Assert.fail("Could not find the trace, deployment has failed!");
     }

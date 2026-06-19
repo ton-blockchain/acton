@@ -125,12 +125,12 @@ fun JettonWallet.sendInternalTransferStep(
     return net.send(from, genericMsg);
 }
 
-fun JettonWallet.sendTopUpTons(self, from: address, config: SendParams = {}): SendResultList {
+fun JettonWallet.sendTopUpGrams(self, from: address, config: SendParams = {}): SendResultList {
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
         dest: self.address,
-        body: TopUpTons {},
+        body: TopUpGrams {},
     });
     return net.send(from, genericMsg);
 }

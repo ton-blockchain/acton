@@ -8,7 +8,7 @@ fun onBouncedMessage(_: InMessageBounced) {}
 
 const ACTION_FAIL_CONTRACT: &str = r#"
 fun onInternalMessage(_: InMessage) {
-    reserveToncoinsOnBalance(ton("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
+    reserveGramsOnBalance(grams("100"), RESERVE_MODE_BOUNCE_ON_ACTION_FAIL);
 }
 "#;
 
@@ -36,7 +36,7 @@ fn to_have_and_not_have_tx_by_action_exit_code() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                     body: beginCell().storeUint(0x10, 32).endCell(),
                 }}));
@@ -81,7 +81,7 @@ fn to_have_and_not_have_tx_by_compute_phase_skipped() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: missingAddress,
                     body: beginCell().storeUint(0x20, 32).endCell(),
                 }}));
@@ -126,7 +126,7 @@ fn compute_skipped_success_and_exit_code_filters_have_consistent_scalar_semantic
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: missingAddress,
                     body: beginCell().storeUint(0x21, 32).endCell(),
                 }}));
@@ -208,7 +208,7 @@ fn to_have_and_not_have_tx_by_body() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                     body: expectedBody,
                 }}));
@@ -271,7 +271,7 @@ fn to_have_and_not_have_tx_by_state_init() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: initCell }},
                     body: beginCell().storeUint(0xABCDEF02, 32).endCell(),
                 }}));
@@ -333,7 +333,7 @@ fn to_have_and_not_have_tx_by_opcode() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                     body: beginCell().storeUint(0x11223344, 32).storeUint(1, 32).endCell(),
                 }}));
@@ -382,7 +382,7 @@ fn find_transaction_by_explicit_opcode_without_generic() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                     body: beginCell().storeUint(0x55667788, 32).storeUint(5, 32).endCell(),
                 }}));
@@ -434,7 +434,7 @@ fn to_have_tx_with_bounced_opcode_prefix() {
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -449,7 +449,7 @@ fn to_have_tx_with_bounced_opcode_prefix() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());
@@ -500,7 +500,7 @@ fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -515,7 +515,7 @@ fn bounced_opcode_requires_explicit_bounced_flag_on_scalar_path() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());
@@ -572,7 +572,7 @@ fn bounced_opcode_scalar_path_uses_second_word_when_bounced_flag_is_explicit() {
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -583,7 +583,7 @@ fn bounced_opcode_scalar_path_uses_second_word_when_bounced_flag_is_explicit() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());
@@ -634,7 +634,7 @@ fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -645,7 +645,7 @@ fn bounced_opcode_scalar_path_supports_new_fffffffe_prefix() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());
@@ -696,7 +696,7 @@ fn bounced_opcode_predicate_path_uses_second_word_when_bounced_flag_is_explicit(
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -707,7 +707,7 @@ fn bounced_opcode_predicate_path_uses_second_word_when_bounced_flag_is_explicit(
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());
@@ -762,7 +762,7 @@ fn bounced_predicate_false_short_circuits_opcode_predicate() {
 
                 net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("1"),
+                    value: grams("1"),
                     dest: {{ stateInit: init }},
                 }}));
 
@@ -773,7 +773,7 @@ fn bounced_predicate_false_short_circuits_opcode_predicate() {
 
                 val txs = net.send(sender.address, createMessage({{
                     bounce: false,
-                    value: ton("0.5"),
+                    value: grams("0.5"),
                     dest: target,
                     body: bouncedBody,
                 }}).bounced());

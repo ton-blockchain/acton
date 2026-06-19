@@ -154,8 +154,8 @@ overflow will happen at serialization to a cell/builder, NOT at assignment.
 type coins = builtin
 ```
 
-`coins` is a special primitive representing "nanotoncoins". One TON = 10^9 nanotoncoins.
-You can create coins with `ton()` function: `ton("0.05")` (actually, `int` 50000000 at runtime).
+`coins` is a special primitive representing "nanograms". One GRAM = 10^9 nanograms.
+You can create coins with `grams()` function: `grams("0.05")` (actually, `int` 50000000 at runtime).
 Arithmetic operations on `coins` degrade to 257-bit `int` type.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L74" />
@@ -522,6 +522,19 @@ See [T.toTuple](#ttotuple) for explanation and examples.
 
 <SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L274" />
 
+## `grams`
+
+```tolk
+@pure
+fun grams(floatString: string): coins
+```
+
+Converts a constant floating-point string to nanograms.
+Example: `grams("0.05")` is equal to 50000000.
+Note, that `grams()` requires a constant string; `grams(some_var)` is an error.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L285" />
+
 ## `ton`
 
 ```tolk
@@ -529,11 +542,10 @@ See [T.toTuple](#ttotuple) for explanation and examples.
 fun ton(floatString: string): coins
 ```
 
-Converts a constant floating-point string to nanotoncoins.
-Example: `ton("0.05")` is equal to 50000000.
-Note, that `ton()` requires a constant string; `ton(some_var)` is an error.
+Deprecated alias for [grams](#grams).
+From Tolk v1.5, it will become @deprecated("""use `grams("0.05")` instead of `ton("0.05")`""")
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L285" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L291" />
 
 ## `min`
 
@@ -544,7 +556,7 @@ fun min(x: int, y: int): int
 
 Computes the minimum of two integers.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L290" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L296" />
 
 ## `max`
 
@@ -555,7 +567,7 @@ fun max(x: int, y: int): int
 
 Computes the maximum of two integers.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L295" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L301" />
 
 ## `minMax`
 
@@ -567,7 +579,7 @@ fun minMax(x: int, y: int): (int, int)
 Sorts two integers.
 Example: `minMax(x, y)` with (x=20, y=10) and with (x=10, y=20) returns (10, 20)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L301" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L307" />
 
 ## `abs`
 
@@ -578,7 +590,7 @@ fun abs(x: int): int
 
 Computes the absolute value of an integer.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L306" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L312" />
 
 ## `sign`
 
@@ -589,7 +601,7 @@ fun sign(x: int): int
 
 Returns the sign of an integer: `-1` if x \< 0, `0` if x == 0, `1` if x > 0.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L311" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L317" />
 
 ## `divMod`
 
@@ -600,7 +612,7 @@ fun divMod(x: int, y: int): (int, int)
 
 Computes the quotient and remainder of x / y. Example: divMod(112,3) = (37,1)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L316" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L322" />
 
 ## `modDiv`
 
@@ -611,7 +623,7 @@ fun modDiv(x: int, y: int): (int, int)
 
 Computes the remainder and quotient of x / y. Example: modDiv(112,3) = (1,37)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L321" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L327" />
 
 ## `mulDivFloor`
 
@@ -623,7 +635,7 @@ fun mulDivFloor(x: int, y: int, z: int): int
 Computes multiple-then-divide: floor(x * y / z).
 The intermediate result is stored in a 513-bit integer to prevent precision loss.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L327" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L333" />
 
 ## `mulDivRound`
 
@@ -634,7 +646,7 @@ fun mulDivRound(x: int, y: int, z: int): int
 
 Similar to [mulDivFloor](#muldivfloor), but rounds the result: round(x * y / z).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L332" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L338" />
 
 ## `mulDivCeil`
 
@@ -645,7 +657,7 @@ fun mulDivCeil(x: int, y: int, z: int): int
 
 Similar to [mulDivFloor](#muldivfloor), but ceils the result: ceil(x * y / z).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L337" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L343" />
 
 ## `mulDivMod`
 
@@ -656,7 +668,7 @@ fun mulDivMod(x: int, y: int, z: int): (int, int)
 
 Computes the quotient and remainder of (x * y / z). Example: mulDivMod(112,3,10) = (33,6)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L342" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L348" />
 
 ## `contract`
 
@@ -667,7 +679,7 @@ struct contract
 `contract` is a built-in struct, it has only static methods.
 Example: `contract.getCode()` and other methods.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L353" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L359" />
 
 ## `contract.getAddress`
 
@@ -679,7 +691,7 @@ fun contract.getAddress(): address
 Returns the internal address of the current smart contract.
 If necessary, it can be parsed further using [address.getWorkchain](#addressgetworkchain) and others.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L357" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L363" />
 
 ## `contract.getOriginalBalance`
 
@@ -688,9 +700,9 @@ If necessary, it can be parsed further using [address.getWorkchain](#addressgetw
 fun contract.getOriginalBalance(): coins
 ```
 
-Returns the balance (in nanotoncoins) of the smart contract at the start of Computation Phase.
+Returns the balance (in nanograms) of the smart contract at the start of Computation Phase.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L362" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L368" />
 
 ## `contract.getOriginalBalanceWithExtraCurrencies`
 
@@ -701,7 +713,7 @@ fun contract.getOriginalBalanceWithExtraCurrencies(): [coins, ExtraCurrenciesMap
 
 Same as [contract.getOriginalBalance](#contractgetoriginalbalance), but also returns the balance in extra currencies.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L367" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L373" />
 
 ## `contract.getData`
 
@@ -712,7 +724,7 @@ fun contract.getData(): cell
 
 Returns the persistent contract storage cell. It can be parsed or modified with slice and builder primitives later.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L372" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L378" />
 
 ## `contract.setData`
 
@@ -722,7 +734,7 @@ fun contract.setData(c: cell): void
 
 Sets the persistent contract storage.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L377" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L383" />
 
 ## `contract.getCode`
 
@@ -733,7 +745,7 @@ fun contract.getCode(): cell
 
 Retrieves code of smart-contract from c7.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L381" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L387" />
 
 ## `contract.setCodePostponed`
 
@@ -743,7 +755,7 @@ fun contract.setCodePostponed(newCode: cell): void
 
 Creates an output action that would change this smart contract code after successful termination of the current run.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L386" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L392" />
 
 ## `MASTERCHAIN`
 
@@ -751,7 +763,7 @@ Creates an output action that would change this smart contract code after succes
 const MASTERCHAIN = -1
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L394" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L400" />
 
 ## `BASECHAIN`
 
@@ -759,7 +771,7 @@ const MASTERCHAIN = -1
 const BASECHAIN = 0
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L395" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L401" />
 
 ## `blockchain`
 
@@ -770,7 +782,7 @@ struct blockchain
 `blockchain` is a built-in struct, it has only static methods.
 Example: `blockchain.configParam(16)` and other methods.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L399" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L405" />
 
 ## `blockchain.now`
 
@@ -781,7 +793,7 @@ fun blockchain.now(): int
 
 Returns current Unix timestamp (in seconds).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L402" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L408" />
 
 ## `blockchain.logicalTime`
 
@@ -792,7 +804,7 @@ fun blockchain.logicalTime(): int
 
 Returns the logical time of the current transaction.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L407" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L413" />
 
 ## `blockchain.currentBlockLogicalTime`
 
@@ -803,7 +815,7 @@ fun blockchain.currentBlockLogicalTime(): int
 
 Returns the starting logical time of the current block.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L412" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L418" />
 
 ## `blockchain.configParam`
 
@@ -814,7 +826,7 @@ fun blockchain.configParam(x: int): cell?
 
 Returns the value of the global configuration parameter with integer index `i` as a `cell` or `null` value.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L417" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L423" />
 
 ## `commitContractDataAndActions`
 
@@ -826,7 +838,7 @@ Commits current state of registers `c4` (persistent data) and `c5` (actions)
 so that the current execution is considered "successful" with the saved values even if an exception
 in Computation Phase is thrown later.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L424" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L430" />
 
 ## `PackOptions`
 
@@ -845,7 +857,7 @@ struct PackOptions {
 
 PackOptions allows you to control behavior of `obj.toCell()` and similar functions.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L433" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L439" />
 
 ## `UnpackOptions`
 
@@ -868,7 +880,7 @@ struct UnpackOptions {
 
 UnpackOptions allows you to control behavior of `MyStruct.fromCell(c)` and similar functions.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L445" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L451" />
 
 ## `T.toCell`
 
@@ -885,7 +897,7 @@ contract.setData(st.toCell());
 Internally, a builder is created, all fields are serialized one by one, and a builder is flushed
 (beginCell() + serialize fields + endCell()).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L467" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L473" />
 
 ## `T.fromCell`
 
@@ -901,7 +913,7 @@ var st = MyStorage.fromCell(contract.getData());
 Internally, a cell is unpacked to a slice, and that slice is parsed
 (packedCell.beginParse() + read from slice).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L477" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L483" />
 
 ## `T.fromSlice`
 
@@ -919,7 +931,7 @@ If a slice is corrupted, an exception is thrown (most likely, excode 9 "cell und
 Note, that a passed slice is NOT mutated, its internal pointer is NOT shifted.
 If you need to mutate it, like `cs.loadInt()`, consider calling `cs.loadAny<CounterIncrement>()`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L489" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L495" />
 
 ## `slice.loadAny`
 
@@ -937,7 +949,7 @@ Similar to `MyStorage.fromSlice(cs)`, but called as a slice method and mutates t
 Note: `options.assertEndAfterReading` is ignored by this function, because it's actually intended
 to read data from the middle.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L501" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L507" />
 
 ## `slice.skipAny`
 
@@ -953,7 +965,7 @@ struct TwoInts { a: int32; b: int32; }
 cs.skipAny<TwoInts>();    // skips 64 bits
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L511" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L517" />
 
 ## `builder.storeAny`
 
@@ -968,7 +980,7 @@ Similar to `builder.storeUint()` and others, but allows storing structures.
 var b = beginCell().storeUint(32).storeAny(msgBody).endCell();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L520" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L526" />
 
 ## `T.forceLoadLazyObject`
 
@@ -993,7 +1005,7 @@ match (msg) {     // it's a lazy match, without creating a union on the stack
 Note: while [slice.assertEnd](#sliceassertend) may seem reasonable, these checks are avoided in practice,
 because the purpose of `lazy` is to auto-detect and load only necessary fields, not up to the end.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L539" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L545" />
 
 ## `Cell<T>.load`
 
@@ -1011,7 +1023,7 @@ var st = MyStorage.fromCell(contract.getData());
 var extra = st.extra.load();   // it's ExtraData, unpacked from loaded ref
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L551" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L557" />
 
 ## `Cell<T>.beginParse`
 
@@ -1022,7 +1034,7 @@ fun Cell<T>.beginParse(self): slice
 
 Converts a typed cell into a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L556" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L562" />
 
 ## `Cell<T>.hash`
 
@@ -1033,7 +1045,7 @@ fun Cell<T>.hash(self): uint256
 
 Returns hash of a typed cell, same as [cell.hash](#cellhash).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L561" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L567" />
 
 ## `RemainingBitsAndRefs`
 
@@ -1050,7 +1062,7 @@ struct JettonMessage {
 ```
 When you deserialize JettonMessage, forwardPayload contains "everything left after reading fields above".
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L573" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L579" />
 
 ## `createEmptyCell`
 
@@ -1062,7 +1074,7 @@ fun createEmptyCell(): cell
 Creates a cell with zero bits and references.
 Equivalent to `beginCell().endCell()`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L577" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L583" />
 
 ## `createEmptySlice`
 
@@ -1074,7 +1086,7 @@ fun createEmptySlice(): slice
 Creates a slice with zero remaining bits and references.
 Equivalent to `beginCell().endCell().beginParse()`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L583" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L589" />
 
 ## `stringCrc32`
 
@@ -1090,7 +1102,7 @@ const op = stringCrc32("some_str") // = 4013618352 = 0xEF3AF4B0
 ```
 Note: `stringCrc32(slice_var)` does NOT work! It accepts a constant string and works at compile-time.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L597" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L603" />
 
 ## `stringCrc16`
 
@@ -1106,7 +1118,7 @@ const op = stringCrc16("some_str") // = 53407 = 0xD09F
 ```
 Note: `stringCrc16(slice_var)` does NOT work! It accepts a constant string and works at compile-time.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L607" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L613" />
 
 ## `stringSha256`
 
@@ -1123,7 +1135,7 @@ const hash = stringSha256("some_crypto_key")
 Note: it's a compile-time function, `stringSha256(slice_var)` does NOT work!
 Use [slice.bitsHash](#slicebitshash) or [slice.hash](#slicehash) (declared below) to hash a slice without/with its refs at runtime.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L618" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L624" />
 
 ## `stringSha256_32`
 
@@ -1139,7 +1151,7 @@ const minihash = stringSha256_32("some_crypto_key")
 ```
 Note: `stringSha256_32(slice_var)` does NOT work! It accepts a constant string and works at compile-time.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L628" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L634" />
 
 ## `stringToBase256`
 
@@ -1155,7 +1167,7 @@ const value = stringToBase256("AB") // = 16706 (65*256 + 66)
 ```
 Note: `stringToBase256(slice_var)` does NOT work! It accepts a constant string and works at compile-time.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L638" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L644" />
 
 ## `cell.hash`
 
@@ -1167,7 +1179,7 @@ fun cell.hash(self): uint256
 Computes the representation hash of a cell and returns it as a 256-bit unsigned integer.
 Useful for signing and checking signatures of arbitrary entities represented by a tree of cells.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L645" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L651" />
 
 ## `slice.hash`
 
@@ -1179,7 +1191,7 @@ fun slice.hash(self): uint256
 Computes the hash of a slice and returns it as a 256-bit unsigned integer.
 The result is the same as [cell.hash](#cellhash) for a cell containing data and references from this slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L651" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L657" />
 
 ## `builder.hash`
 
@@ -1191,7 +1203,7 @@ fun builder.hash(self): uint256
 Computes the hash of a builder and returns it as a 256-bit unsigned integer.
 The same as "transform builder to cell + calc hash of that cell", but without cell creation.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L657" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L663" />
 
 ## `slice.bitsHash`
 
@@ -1203,7 +1215,7 @@ fun slice.bitsHash(self): uint256
 Computes sha256 of the data bits of a slice (without refs).
 If the bit length is not divisible by eight, throws a cell underflow exception.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L663" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L669" />
 
 ## `cell.hashEqual`
 
@@ -1215,7 +1227,7 @@ fun cell.hashEqual(self, another: cell): bool
 Checks whether two cells are equal by comparing their hashes.
 Used internally by the compiler for operators `==` and `!=` on cells.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L669" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L675" />
 
 ## `isSignatureValid`
 
@@ -1224,14 +1236,11 @@ Used internally by the compiler for operators `==` and `!=` on cells.
 fun isSignatureValid(hash: uint256, signature: slice, publicKey: uint256): bool
 ```
 
-Checks the Ed25519-`signature` of a `hash` (uint256, usually computed as the hash of some data)
-using `publicKey` (also represented by a 256-bit unsigned integer).
+Checks an Ed25519 signature where the signed message is the 32-byte big-endian encoding of `hash`.
+Use this when off-chain code signed a 32-byte hash or digest value.
 The signature must contain at least 512 data bits; only the first 512 bits are used.
-Note that `CHKSIGNU` creates a 256-bit slice with the hash and calls `CHKSIGNS`.
-That is, if parameter `hash` is computed as the hash of some data, these data are hashed twice,
-the second hashing occurring inside `CHKSIGNS`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L679" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L682" />
 
 ## `isSliceSignatureValid`
 
@@ -1240,13 +1249,13 @@ the second hashing occurring inside `CHKSIGNS`.
 fun isSliceSignatureValid(data: slice, signature: slice, publicKey: int): bool
 ```
 
-Checks whether `signature` is a valid Ed25519-signature of the data portion of slice `data` using `publicKey`,
-similarly to [isSignatureValid](#issignaturevalid).
+Checks an Ed25519 signature where the signed message is the data bytes of slice `data`.
+References of `data` are ignored.
 If the bit length of `data` is not divisible by eight, throws a cell underflow exception.
-The verification of Ed25519 signatures is the standard one,
-with sha256 used to reduce `data` to the 256-bit number that is actually signed.
+This function does not hash `data`; if off-chain code signed SHA-256(data), use
+`isSignatureValid(data.bitsHash(), signature, publicKey)` instead.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L688" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L691" />
 
 ## `random`
 
@@ -1257,7 +1266,7 @@ struct random
 `random` is a built-in struct, it has only static methods.
 Example: `random.uint256()` and other methods.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L694" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L697" />
 
 ## `random.uint256`
 
@@ -1268,7 +1277,7 @@ fun random.uint256(): uint256
 Generates a new pseudo-random unsigned 256-bit integer x.
 Ensure you've called [random.initialize](#randominitialize) in advance to make it unpredictable!
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L698" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L701" />
 
 ## `random.range`
 
@@ -1280,7 +1289,7 @@ Generates a new pseudo-random integer z in the range 0..limit−1 (or limit..−
 More precisely, an unsigned random value x is generated as in random; then z := x * limit / 2^256 is computed.
 Ensure you've called [random.initialize](#randominitialize) in advance to make it unpredictable!
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L704" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L707" />
 
 ## `random.getSeed`
 
@@ -1291,7 +1300,7 @@ fun random.getSeed(): uint256
 
 Returns the current random seed used to generate pseudo-random numbers.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L708" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L711" />
 
 ## `random.setSeed`
 
@@ -1301,7 +1310,7 @@ fun random.setSeed(seed: uint256): void
 
 Sets the random seed to the provided value.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L713" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L716" />
 
 ## `random.initializeBy`
 
@@ -1311,7 +1320,7 @@ fun random.initializeBy(mixSeedWith: uint256): void
 
 Initializes (mixes) random seed with the provided value.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L717" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L720" />
 
 ## `random.initialize`
 
@@ -1323,7 +1332,7 @@ Mixes the random seed with this transaction's logical time ([blockchain.logicalT
 LTIME is the network ordering value for this transaction (not unixtime).
 Typically, call once before [random.uint256](#randomuint256) / [random.range](#randomrange).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L723" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L726" />
 
 ## `cell.calculateSize`
 
@@ -1342,7 +1351,7 @@ The total count of visited cells `x` cannot exceed non-negative `maxCells`;
 otherwise the computation is aborted before visiting the `(maxCells + 1)`-st cell and
 a zero flag is returned to indicate failure.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L741" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L744" />
 
 ## `slice.calculateSize`
 
@@ -1355,7 +1364,7 @@ Similar to [cell.calculateSize](#cellcalculatesize), but accepting a slice inste
 The returned value of `x` does not take into account the cell that contains the slice itself;
 however, its data bits and cell references are accounted for in `y` and `z`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L748" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L751" />
 
 ## `cell.calculateSizeStrict`
 
@@ -1365,7 +1374,7 @@ fun cell.calculateSizeStrict(self, maxCells: int): (int, int, int)
 
 A non-quiet version of [cell.calculateSize](#cellcalculatesize) that throws a cell overflow exception (`8`) on failure.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L753" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L756" />
 
 ## `slice.calculateSizeStrict`
 
@@ -1375,7 +1384,7 @@ fun slice.calculateSizeStrict(self, maxCells: int): (int, int, int)
 
 A non-quiet version of [slice.calculateSize](#slicecalculatesize) that throws a cell overflow exception (`8`) on failure.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L757" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L760" />
 
 ## `cell?.depth`
 
@@ -1387,7 +1396,7 @@ fun cell?.depth(self): int
 Returns the depth of a cell: 0 if no references, otherwise 1 + maximum of depths of all references.
 When called for `null`, returns 0.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L762" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L765" />
 
 ## `slice.depth`
 
@@ -1398,7 +1407,7 @@ fun slice.depth(self): int
 
 Returns the depth of a cell: 0 if no references, otherwise 1 + maximum of depths of all references.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L767" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L770" />
 
 ## `builder.depth`
 
@@ -1409,7 +1418,7 @@ fun builder.depth(self): int
 
 Returns the depth of a builder: 0 if no references, otherwise 1 + maximum of depths of all references.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L772" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L775" />
 
 ## `debug`
 
@@ -1420,7 +1429,7 @@ struct debug
 `debug` is a built-in struct, it has only static methods.
 Example: `debug.print(v)` and other methods.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L784" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L787" />
 
 ## `debug.print`
 
@@ -1430,7 +1439,7 @@ fun debug.print<T>(x: T): void
 
 Dump a variable to the debug log as a raw TVM stack value.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L787" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L790" />
 
 ## `debug.printString`
 
@@ -1440,7 +1449,7 @@ fun debug.printString(x: string): void
 
 Dump a string to the debug log.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L791" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L794" />
 
 ## `debug.dumpStack`
 
@@ -1450,7 +1459,7 @@ fun debug.dumpStack(): void
 
 Dumps the stack (at most the top 255 values) and shows the total stack depth.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L795" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L798" />
 
 ## `createEmptyMap`
 
@@ -1469,7 +1478,7 @@ var m: map<int8, int32> = createEmptyMap();
 var m: map<int8, int32> = [];
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L819" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L822" />
 
 ## `createMapFromLowLevelDict`
 
@@ -1482,7 +1491,7 @@ Converts a low-level TVM dictionary to a typed map.
 Actually, does nothing: accepts an "optional cell" and returns the same "optional cell",
 so if you specify key/value types incorrectly, it will fail later, at `map.get` and similar.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L827" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L830" />
 
 ## `map<K, V>.toLowLevelDict`
 
@@ -1494,7 +1503,7 @@ fun map<K, V>.toLowLevelDict(self): dict
 Converts a high-level map to a low-level TVM dictionary.
 Actually, does nothing: returns the same "optional cell".
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L833" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L836" />
 
 ## `map<K, V>.isEmpty`
 
@@ -1507,7 +1516,7 @@ Checks whether a map is empty (whether a cell is null).
 
 Note: a check `m == null` will not work, use `m.isEmpty()`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L840" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L843" />
 
 ## `map<K, V>.exists`
 
@@ -1518,7 +1527,7 @@ fun map<K, V>.exists(self, key: K): bool
 
 Checks whether a key exists in a map.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L845" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L848" />
 
 ## `map<K, V>.get`
 
@@ -1535,7 +1544,7 @@ if (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L856" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L859" />
 
 ## `map<K, V>.mustGet`
 
@@ -1546,7 +1555,7 @@ fun map<K, V>.mustGet(self, key: K, throwIfNotFound: int = 9): V
 
 Gets an element by key and throws if it doesn't exist.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L861" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L864" />
 
 ## `map<K, V>.set`
 
@@ -1561,7 +1570,7 @@ m.set(k, 3);
 ```
 Since it returns `self`, calls may be chained.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L870" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L873" />
 
 ## `map<K, V>.setAndGetPrevious`
 
@@ -1578,7 +1587,7 @@ if (prev.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L881" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L884" />
 
 ## `map<K, V>.replaceIfExists`
 
@@ -1589,7 +1598,7 @@ fun map<K, V>.replaceIfExists(mutate self, key: K, value: V): bool
 
 Sets an element only if the key already exists. Returns whether an element was replaced.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L886" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L889" />
 
 ## `map<K, V>.replaceAndGetPrevious`
 
@@ -1600,7 +1609,7 @@ fun map<K, V>.replaceAndGetPrevious(mutate self, key: K, value: V): MapLookupRes
 
 Sets an element only if the key already exists and returns the previous element at that key.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L891" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L894" />
 
 ## `map<K, V>.addIfNotExists`
 
@@ -1611,7 +1620,7 @@ fun map<K, V>.addIfNotExists(mutate self, key: K, value: V): bool
 
 Sets an element only if the key does not exist. Returns whether an element was added.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L896" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L899" />
 
 ## `map<K, V>.addOrGetExisting`
 
@@ -1622,7 +1631,7 @@ fun map<K, V>.addOrGetExisting(mutate self, key: K, value: V): MapLookupResult<V
 
 Sets an element only if the key does not exist. If exists, returns an old value.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L901" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L904" />
 
 ## `map<K, V>.delete`
 
@@ -1633,7 +1642,7 @@ fun map<K, V>.delete(mutate self, key: K): bool
 
 Delete an element at the key. Returns whether an element was deleted.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L906" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L909" />
 
 ## `map<K, V>.deleteAndGetDeleted`
 
@@ -1650,7 +1659,7 @@ if (prev.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L917" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L920" />
 
 ## `map<K, V>.findFirst`
 
@@ -1671,7 +1680,7 @@ while (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L932" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L935" />
 
 ## `map<K, V>.findLast`
 
@@ -1692,7 +1701,7 @@ while (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L947" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L950" />
 
 ## `map<K, V>.findKeyGreater`
 
@@ -1704,7 +1713,7 @@ fun map<K, V>.findKeyGreater(self, pivotKey: K): MapEntry<K, V>
 Finds an element with key > pivotKey.
 Don't forget to check `isFound` before using `getKey()` and `loadValue()` of the result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L953" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L956" />
 
 ## `map<K, V>.findKeyGreaterOrEqual`
 
@@ -1716,7 +1725,7 @@ fun map<K, V>.findKeyGreaterOrEqual(self, pivotKey: K): MapEntry<K, V>
 Finds an element with key >= pivotKey.
 Don't forget to check `isFound` before using `getKey()` and `loadValue()` of the result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L959" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L962" />
 
 ## `map<K, V>.findKeyLess`
 
@@ -1728,7 +1737,7 @@ fun map<K, V>.findKeyLess(self, pivotKey: K): MapEntry<K, V>
 Finds an element with key \< pivotKey.
 Don't forget to check `isFound` before using `getKey()` and `loadValue()` of the result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L965" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L968" />
 
 ## `map<K, V>.findKeyLessOrEqual`
 
@@ -1740,7 +1749,7 @@ fun map<K, V>.findKeyLessOrEqual(self, pivotKey: K): MapEntry<K, V>
 Finds an element with key \<= pivotKey.
 Don't forget to check `isFound` before using `getKey()` and `loadValue()` of the result.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L971" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L974" />
 
 ## `map<K, V>.iterateNext`
 
@@ -1759,7 +1768,7 @@ while (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L984" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L987" />
 
 ## `map<K, V>.iteratePrev`
 
@@ -1778,7 +1787,7 @@ while (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L997" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1000" />
 
 ## `MapLookupResult`
 
@@ -1799,7 +1808,7 @@ if (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1010" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1013" />
 
 ## `MapLookupResult<TValue>.loadValue`
 
@@ -1808,7 +1817,7 @@ if (r.isFound) {
 fun MapLookupResult<TValue>.loadValue(self): TValue
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1015" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1018" />
 
 ## `MapLookupResult<slice>.loadValue`
 
@@ -1817,7 +1826,7 @@ fun MapLookupResult<TValue>.loadValue(self): TValue
 fun MapLookupResult<slice>.loadValue(self): slice
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1024" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1027" />
 
 ## `MapEntry`
 
@@ -1839,7 +1848,7 @@ while (r.isFound) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1038" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1041" />
 
 ## `MapEntry<K, V>.getKey`
 
@@ -1848,7 +1857,7 @@ while (r.isFound) {
 fun MapEntry<K, V>.getKey(self): K
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1044" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1047" />
 
 ## `MapEntry<K, V>.loadValue`
 
@@ -1857,7 +1866,7 @@ fun MapEntry<K, V>.getKey(self): K
 fun MapEntry<K, V>.loadValue(self): V
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1051" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1054" />
 
 ## `MapEntry<K, slice>.loadValue`
 
@@ -1866,7 +1875,7 @@ fun MapEntry<K, V>.loadValue(self): V
 fun MapEntry<K, slice>.loadValue(self): slice
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1060" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1063" />
 
 ## `string.beginParse`
 
@@ -1878,7 +1887,7 @@ fun string.beginParse(self): slice
 Begins parsing the string content. Use for accessing raw bytes.
 Remember that a string may be a snake: not just "ab", but "a" + (ref "b").
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1076" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1079" />
 
 ## `string.literalSlice`
 
@@ -1894,7 +1903,7 @@ const s: slice = "hello".literalSlice()
 ```
 Unlike `beginParse()`, it works at compile-time and is allowed in constant expressions.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1086" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1089" />
 
 ## `string.crc32`
 
@@ -1909,7 +1918,7 @@ const op = "some_str".crc32()  // = 4013618352 = 0xEF3AF4B0
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1095" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1098" />
 
 ## `string.crc16`
 
@@ -1924,7 +1933,7 @@ const op = "some_str".crc16()  // = 53407 = 0xD09F
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1104" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1107" />
 
 ## `string.sha256`
 
@@ -1939,7 +1948,7 @@ const hash = "some_crypto_key".sha256()
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1113" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1116" />
 
 ## `string.sha256_32`
 
@@ -1954,7 +1963,7 @@ const minihash = "some_crypto_key".sha256_32()
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1122" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1125" />
 
 ## `string.hexToSlice`
 
@@ -1969,7 +1978,7 @@ const v = "abcdef".hexToSlice()  // = slice with 3 bytes: 0xAB,0xCD,0xEF
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1131" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1134" />
 
 ## `string.toBase256`
 
@@ -1984,7 +1993,7 @@ const value = "AB".toBase256() // = 16706 (65*256 + 66)
 ```
 Note: this is a compile-time method, it works only with string literals.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1140" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1143" />
 
 ## `stringHexToSlice`
 
@@ -2000,7 +2009,7 @@ const v = stringHexToSlice("abcdef") // = slice with 3 bytes: 0xAB,0xCD,0xEF
 ```
 Note: `stringHexToSlice(slice_var)` does NOT work! It accepts a constant string and works at compile-time.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1156" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1159" />
 
 ## `cell.beginParse`
 
@@ -2011,7 +2020,7 @@ fun cell.beginParse(self): slice
 
 Converts a cell into a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1162" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1165" />
 
 ## `slice.assertEnd`
 
@@ -2021,7 +2030,7 @@ fun slice.assertEnd(self): void
 
 Checks if a slice is empty. If not, throws an exception with code 9.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1167" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1170" />
 
 ## `slice.loadRef`
 
@@ -2032,7 +2041,7 @@ fun slice.loadRef(mutate self): cell
 
 Loads the next reference from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1171" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1174" />
 
 ## `slice.preloadRef`
 
@@ -2043,7 +2052,7 @@ fun slice.preloadRef(self): cell
 
 Preloads the next reference from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1176" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1179" />
 
 ## `slice.loadInt`
 
@@ -2054,7 +2063,7 @@ fun slice.loadInt(mutate self, len: int): int
 
 Loads a signed len-bit integer from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1181" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1184" />
 
 ## `slice.loadUint`
 
@@ -2065,7 +2074,7 @@ fun slice.loadUint(mutate self, len: int): int
 
 Loads an unsigned len-bit integer from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1186" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1189" />
 
 ## `slice.loadBits`
 
@@ -2076,7 +2085,7 @@ fun slice.loadBits(mutate self, len: int): slice
 
 Loads the first `0 ≤ len ≤ 1023` bits from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1191" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1194" />
 
 ## `slice.preloadInt`
 
@@ -2087,7 +2096,7 @@ fun slice.preloadInt(self, len: int): int
 
 Preloads a signed len-bit integer from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1196" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1199" />
 
 ## `slice.preloadUint`
 
@@ -2098,7 +2107,7 @@ fun slice.preloadUint(self, len: int): int
 
 Preloads an unsigned len-bit integer from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1201" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1204" />
 
 ## `slice.preloadBits`
 
@@ -2109,7 +2118,7 @@ fun slice.preloadBits(self, len: int): slice
 
 Preloads the first `0 ≤ len ≤ 1023` bits from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1206" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1209" />
 
 ## `slice.loadCoins`
 
@@ -2118,9 +2127,9 @@ Preloads the first `0 ≤ len ≤ 1023` bits from a slice.
 fun slice.loadCoins(mutate self): coins
 ```
 
-Loads the serialized amount of nanotoncoins (any unsigned integer up to `2^120 - 1`).
+Loads the serialized amount of nanograms (any unsigned integer up to `2^120 - 1`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1211" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1214" />
 
 ## `slice.loadBool`
 
@@ -2131,7 +2140,7 @@ fun slice.loadBool(mutate self): bool
 
 Loads a boolean from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1216" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1219" />
 
 ## `slice.skipBits`
 
@@ -2142,7 +2151,7 @@ fun slice.skipBits(mutate self, len: int): self
 
 Shifts a slice pointer to len bits forward.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1221" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1224" />
 
 ## `slice.getFirstBits`
 
@@ -2153,7 +2162,7 @@ fun slice.getFirstBits(self, len: int): slice
 
 Returns the first `0 ≤ len ≤ 1023` bits of a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1226" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1229" />
 
 ## `slice.removeLastBits`
 
@@ -2164,7 +2173,7 @@ fun slice.removeLastBits(mutate self, len: int): self
 
 Returns all but the last `0 ≤ len ≤ 1023` bits of a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1231" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1234" />
 
 ## `slice.getLastBits`
 
@@ -2175,7 +2184,7 @@ fun slice.getLastBits(self, len: int): slice
 
 Returns the last `0 ≤ len ≤ 1023` bits of a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1236" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1239" />
 
 ## `slice.getMiddleBits`
 
@@ -2187,7 +2196,7 @@ fun slice.getMiddleBits(self, offset: int, len: int): slice
 Returns `0 ≤ len ≤ 1023` bits of a slice starting from `0 ≤ offset ≤ 1023`.
 (in other words, extracts a bit substring `[offset, len)` out of the slice)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1242" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1245" />
 
 ## `slice.loadDict`
 
@@ -2198,7 +2207,7 @@ fun slice.loadDict(mutate self): dict
 
 Loads a dictionary (TL HashMapE structure, represented as TVM cell) from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1247" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1250" />
 
 ## `slice.preloadDict`
 
@@ -2209,7 +2218,7 @@ fun slice.preloadDict(self): dict
 
 Preloads a dictionary (cell) from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1252" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1255" />
 
 ## `slice.skipDict`
 
@@ -2220,7 +2229,7 @@ fun slice.skipDict(mutate self): self
 
 Skip a dictionary from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1257" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1260" />
 
 ## `slice.loadMaybeRef`
 
@@ -2232,7 +2241,7 @@ fun slice.loadMaybeRef(mutate self): cell?
 Loads (Maybe ^Cell) from a slice.
 In other words, loads 1 bit: if it's true, loads the first ref, otherwise returns `null`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1263" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1266" />
 
 ## `slice.preloadMaybeRef`
 
@@ -2243,7 +2252,7 @@ fun slice.preloadMaybeRef(self): cell?
 
 Preloads (Maybe ^Cell) from a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1268" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1271" />
 
 ## `slice.skipMaybeRef`
 
@@ -2254,7 +2263,7 @@ fun slice.skipMaybeRef(mutate self): self
 
 Skips (Maybe ^Cell) in a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1273" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1276" />
 
 ## `slice.loadString`
 
@@ -2265,7 +2274,7 @@ fun slice.loadString(mutate self): string
 
 Loads a string from a slice. A string is a nested ref, so just load a ref.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1278" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1281" />
 
 ## `beginCell`
 
@@ -2276,7 +2285,7 @@ fun beginCell(): builder
 
 Creates a new empty builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1291" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1294" />
 
 ## `builder.endCell`
 
@@ -2287,7 +2296,7 @@ fun builder.endCell(self): cell
 
 Converts a builder into an ordinary cell.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1296" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1299" />
 
 ## `builder.toSlice`
 
@@ -2299,7 +2308,7 @@ fun builder.toSlice(self): slice
 Converts a builder into a slice.
 The same as `b.endCell().beginParse()`
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1302" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1305" />
 
 ## `builder.storeRef`
 
@@ -2310,7 +2319,7 @@ fun builder.storeRef(mutate self, c: cell): self
 
 Stores a reference to a cell into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1307" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1310" />
 
 ## `builder.storeInt`
 
@@ -2321,7 +2330,7 @@ fun builder.storeInt(mutate self, x: int, len: int): self
 
 Stores a signed len-bit integer into a builder (`0 ≤ len ≤ 257`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1312" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1315" />
 
 ## `builder.storeUint`
 
@@ -2332,7 +2341,7 @@ fun builder.storeUint(mutate self, x: int, len: int): self
 
 Stores an unsigned len-bit integer into a builder (`0 ≤ len ≤ 256`).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1317" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1320" />
 
 ## `builder.storeSlice`
 
@@ -2343,7 +2352,7 @@ fun builder.storeSlice(mutate self, s: slice): self
 
 Stores a slice into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1322" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1325" />
 
 ## `builder.storeString`
 
@@ -2354,7 +2363,7 @@ fun builder.storeString(mutate self, s: string): self
 
 Stores a string into a builder (it's a TVM cell, stored as a ref).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1327" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1330" />
 
 ## `builder.storeAddress`
 
@@ -2365,7 +2374,7 @@ fun builder.storeAddress(mutate self, addr: address): self
 
 Stores an internal address into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1332" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1335" />
 
 ## `builder.storeAddressOpt`
 
@@ -2377,7 +2386,7 @@ fun builder.storeAddressOpt(mutate self, addrOrNull: address?): self
 Stores an internal address or '00' if the parameter is `null`.
 '00' (two zero bits) is a standard representation of a "missing" ("none") address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1338" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1341" />
 
 ## `builder.storeAddressAny`
 
@@ -2388,7 +2397,7 @@ fun builder.storeAddressAny(mutate self, addrAny: any_address): self
 
 Stores "any address" (internal/external/none) into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1343" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1346" />
 
 ## `builder.storeAddressNone`
 
@@ -2399,7 +2408,7 @@ fun builder.storeAddressNone(mutate self): self
 
 Stores a "none address": '00' (two zero bits) is TL addr_none$00.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1348" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1351" />
 
 ## `builder.storeCoins`
 
@@ -2408,9 +2417,9 @@ Stores a "none address": '00' (two zero bits) is TL addr_none$00.
 fun builder.storeCoins(mutate self, x: coins): self
 ```
 
-Stores the amount of nanotoncoins into a builder.
+Stores the amount of nanograms into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1353" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1356" />
 
 ## `builder.storeBool`
 
@@ -2421,7 +2430,7 @@ fun builder.storeBool(mutate self, x: bool): self
 
 Stores a boolean into a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1358" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1361" />
 
 ## `builder.storeDict`
 
@@ -2433,7 +2442,7 @@ fun builder.storeDict(mutate self, c: dict): self
 Stores a low-level TVM dictionary (optional cell) into a builder.
 In other words, if `c` is null, stores `0`; if `c` is not null, stores `1` and a reference to `c`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1364" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1367" />
 
 ## `builder.storeMaybeRef`
 
@@ -2445,7 +2454,7 @@ fun builder.storeMaybeRef(mutate self, c: cell?): self
 Stores (Maybe ^Cell) into a builder.
 In other words, if `c` is null, stores `0`; if `c` is not null, stores `1` and a reference to `c`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1370" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1373" />
 
 ## `builder.storeBuilder`
 
@@ -2456,7 +2465,7 @@ fun builder.storeBuilder(mutate self, from: builder): self
 
 Concatenates two builders.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1375" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1378" />
 
 ## `slice.remainingRefsCount`
 
@@ -2467,7 +2476,7 @@ fun slice.remainingRefsCount(self): int
 
 Returns the number of references in a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1385" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1388" />
 
 ## `slice.remainingBitsCount`
 
@@ -2478,7 +2487,7 @@ fun slice.remainingBitsCount(self): int
 
 Returns the number of data bits in a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1390" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1393" />
 
 ## `slice.remainingBitsAndRefsCount`
 
@@ -2489,7 +2498,7 @@ fun slice.remainingBitsAndRefsCount(self): (int, int)
 
 Returns both the number of data bits and the number of references in a slice.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1395" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1398" />
 
 ## `slice.isEmpty`
 
@@ -2500,7 +2509,7 @@ fun slice.isEmpty(self): bool
 
 Checks whether a slice is empty (i.e., contains no bits of data and no cell references).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1400" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1403" />
 
 ## `slice.isEndOfBits`
 
@@ -2511,7 +2520,7 @@ fun slice.isEndOfBits(self): bool
 
 Checks whether a slice has no bits of data.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1405" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1408" />
 
 ## `slice.isEndOfRefs`
 
@@ -2522,7 +2531,7 @@ fun slice.isEndOfRefs(self): bool
 
 Checks whether a slice has no references.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1410" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1413" />
 
 ## `slice.bitsEqual`
 
@@ -2533,7 +2542,7 @@ fun slice.bitsEqual(self, b: slice): bool
 
 Checks whether data parts of two slices coincide.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1415" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1418" />
 
 ## `builder.refsCount`
 
@@ -2544,7 +2553,7 @@ fun builder.refsCount(self): int
 
 Returns the number of cell references already stored in a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1420" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1423" />
 
 ## `builder.bitsCount`
 
@@ -2555,7 +2564,7 @@ fun builder.bitsCount(self): int
 
 Returns the number of data bits already stored in a builder.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1425" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1428" />
 
 ## `address`
 
@@ -2571,7 +2580,7 @@ address("0:527964d55cfa6eb731f4bfc07e9d025098097ef8505519e853986279bd8400d8")
 ```
 Returns `address`, which can be stored in a struct, compared with `==`, etc.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1440" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1443" />
 
 ## `address.getWorkchainAndHash`
 
@@ -2582,7 +2591,7 @@ fun address.getWorkchainAndHash(self): (int8, uint256)
 
 Extracts workchain and hash from a standard (internal) address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1445" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1448" />
 
 ## `address.getWorkchain`
 
@@ -2593,7 +2602,7 @@ fun address.getWorkchain(self): int8
 
 Extracts workchain from a standard (internal) address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1450" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1453" />
 
 ## `createAddressNone`
 
@@ -2607,7 +2616,7 @@ Note! Use this in combination with EXTERNAL addresses (e.g. for [createExternalL
 To represent "internal or none" address (which you most likely need to),
 use `address?` (nullable) and `null` accordingly.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1458" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1461" />
 
 ## `any_address.isNone`
 
@@ -2619,7 +2628,7 @@ fun any_address.isNone(self): bool
 Returns if "any address" is "none".
 In TL/B, it's addr_none$00.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1464" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1467" />
 
 ## `any_address.isInternal`
 
@@ -2632,7 +2641,7 @@ Returns if "any address" is a standard (internal) address: workchain + hash.
 Then it can be safely cast to `address`.
 In TL/B, it's addr_std$10.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1471" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1474" />
 
 ## `any_address.isExternal`
 
@@ -2644,7 +2653,7 @@ fun any_address.isExternal(self): bool
 Returns if "any address" is an external address, used to communication with the outside world.
 In TL/B, it's addr_extern$01.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1477" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1480" />
 
 ## `any_address.getWorkchainAndHash`
 
@@ -2656,7 +2665,7 @@ fun any_address.getWorkchainAndHash(self): (int8, uint256)
 Extracts workchain and hash from a standard (internal) address.
 If the address is not internal, throws a cell deserialization exception.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1483" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1486" />
 
 ## `any_address.getWorkchain`
 
@@ -2668,7 +2677,7 @@ fun any_address.getWorkchain(self): int8
 Extracts workchain from a standard (internal) address.
 If the address is not internal, throws a cell deserialization exception.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1489" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1492" />
 
 ## `any_address.castToInternal`
 
@@ -2681,7 +2690,7 @@ Casts `any_address` to `address` checking that "any" is actually "internal".
 E.g., `addr = myAny.castToInternal()` does the check and returns `address`.
 To skip the runtime check, use unsafe type casting instead: `addr = myAny as address`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1496" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1499" />
 
 ## `address.bitsEqual`
 
@@ -2695,7 +2704,7 @@ Checks whether two addresses are equal. Equivalent to `a == b`.
 Deprecated! Left for smoother transition from FunC, where you used `slice` everywhere.
 Use just `a == b` and `a != b` to compare addresses, don't use bitsEqual.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1503" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1506" />
 
 ## `slice.loadAddress`
 
@@ -2707,7 +2716,7 @@ fun slice.loadAddress(mutate self): address
 Loads a standard (internal) address (containing workchain + hash). In TL/B, it's `MsgAddressInt`.
 If an address is incorrect or is not internal, throws a deserialization exception (code 9).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1510" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1513" />
 
 ## `slice.loadAddressOpt`
 
@@ -2721,7 +2730,7 @@ If an address is incorrect or is not internal/none, throws a deserialization exc
 '00' (two zero bits) is a standard representation of a "missing" ("none") address.
 As a result, you get either `address` (for internal) or `null` (for none).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1518" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1521" />
 
 ## `slice.loadAddressAny`
 
@@ -2732,7 +2741,7 @@ fun slice.loadAddressAny(mutate self): any_address
 
 Loads a valid "any address" (internal/external/none). In TL/B, it's `MsgAddress`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1523" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1526" />
 
 ## `RESERVE_MODE_EXACT_AMOUNT`
 
@@ -2740,9 +2749,9 @@ Loads a valid "any address" (internal/external/none). In TL/B, it's `MsgAddress`
 const RESERVE_MODE_EXACT_AMOUNT = 0
 ```
 
-mode = 0: Reserve exact amount of nanotoncoins
+mode = 0: Reserve exact amount of nanograms
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1533" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1536" />
 
 ## `RESERVE_MODE_ALL_BUT_AMOUNT`
 
@@ -2752,7 +2761,7 @@ const RESERVE_MODE_ALL_BUT_AMOUNT = 1
 
 +1: Actually reserves all but amount, meaning `currentContractBalance - amount`
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1535" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1538" />
 
 ## `RESERVE_MODE_AT_MOST`
 
@@ -2762,7 +2771,7 @@ const RESERVE_MODE_AT_MOST = 2
 
 +2: Actually set `min(amount, currentContractBalance)` (without this mode, if amount is greater, the action will fail)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1537" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1540" />
 
 ## `RESERVE_MODE_INCREASE_BY_ORIGINAL_BALANCE`
 
@@ -2772,7 +2781,7 @@ const RESERVE_MODE_INCREASE_BY_ORIGINAL_BALANCE = 4
 
 +4: `amount` is increased by the _original_ balance of the current account (before the compute phase).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1539" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1542" />
 
 ## `RESERVE_MODE_NEGATE_AMOUNT`
 
@@ -2782,7 +2791,7 @@ const RESERVE_MODE_NEGATE_AMOUNT = 8
 
 +8: Actually sets `amount = -amount` before performing any further actions.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1541" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1544" />
 
 ## `RESERVE_MODE_BOUNCE_ON_ACTION_FAIL`
 
@@ -2792,29 +2801,40 @@ const RESERVE_MODE_BOUNCE_ON_ACTION_FAIL = 16
 
 +16: If this action fails, the transaction will be bounced.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1543" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1546" />
+
+## `reserveGramsOnBalance`
+
+```tolk
+fun reserveGramsOnBalance(nanoGrams: coins, reserveMode: int): void
+```
+
+Creates an output action which would reserve GRAMs on balance.
+For `reserveMode` consider constants above.
+
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1550" />
 
 ## `reserveToncoinsOnBalance`
 
 ```tolk
-fun reserveToncoinsOnBalance(nanoTonCoins: coins, reserveMode: int): void
+@deprecated("use `reserveGramsOnBalance` instead of `reserveToncoinsOnBalance`")
+fun reserveToncoinsOnBalance(nanoGrams: coins, reserveMode: int): void
 ```
 
-Creates an output action which would reserve Toncoins on balance.
-For `reserveMode` consider constants above.
+Deprecated alias for [reserveGramsOnBalance](#reservegramsonbalance).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1547" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1554" />
 
 ## `reserveExtraCurrenciesOnBalance`
 
 ```tolk
-fun reserveExtraCurrenciesOnBalance(nanoTonCoins: coins, extraAmount: dict, reserveMode: int): void
+fun reserveExtraCurrenciesOnBalance(nanoGrams: coins, extraAmount: dict, reserveMode: int): void
 ```
 
-Similar to [reserveToncoinsOnBalance](#reservetoncoinsonbalance), but also accepts a dictionary extraAmount (represented by a cell or null)
-with extra currencies. In this way currencies other than Toncoin can be reserved.
+Similar to [reserveGramsOnBalance](#reservegramsonbalance), but also accepts a dictionary extraAmount (represented by a cell or null)
+with extra currencies. In this way currencies other than GRAM can be reserved.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1552" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1560" />
 
 ## `SEND_MODE_REGULAR`
 
@@ -2824,7 +2844,7 @@ const SEND_MODE_REGULAR = 0
 
 mode = 0 is used for ordinary messages; the gas fees are deducted from the sending amount; action phases should NOT be ignored.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1566" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1574" />
 
 ## `SEND_MODE_PAY_FEES_SEPARATELY`
 
@@ -2834,7 +2854,7 @@ const SEND_MODE_PAY_FEES_SEPARATELY = 1
 
 +1 means that the sender wants to pay transfer fees separately.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1568" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1576" />
 
 ## `SEND_MODE_IGNORE_ERRORS`
 
@@ -2844,7 +2864,7 @@ const SEND_MODE_IGNORE_ERRORS = 2
 
 +2 means that any errors arising while processing this message during the action phase should be ignored.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1570" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1578" />
 
 ## `SEND_MODE_BOUNCE_ON_ACTION_FAIL`
 
@@ -2854,7 +2874,7 @@ const SEND_MODE_BOUNCE_ON_ACTION_FAIL = 16
 
 in the case of action fail - bounce transaction. No effect if SEND_MODE_IGNORE_ERRORS (+2) is used.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1572" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1580" />
 
 ## `SEND_MODE_DESTROY`
 
@@ -2864,7 +2884,7 @@ const SEND_MODE_DESTROY = 32
 
 mode = 32 means that the current account must be destroyed if its resulting balance is zero.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1574" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1582" />
 
 ## `SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE`
 
@@ -2874,7 +2894,7 @@ const SEND_MODE_CARRY_ALL_REMAINING_MESSAGE_VALUE = 64
 
 mode = 64 is used for messages that carry all the remaining value of the inbound message in addition to the value initially indicated in the new message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1576" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1584" />
 
 ## `SEND_MODE_CARRY_ALL_BALANCE`
 
@@ -2884,7 +2904,7 @@ const SEND_MODE_CARRY_ALL_BALANCE = 128
 
 mode = 128 is used for messages that are to carry all the remaining balance of the current smart contract (instead of the value originally indicated in the message).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1578" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1586" />
 
 ## `SEND_MODE_ESTIMATE_FEE_ONLY`
 
@@ -2894,7 +2914,7 @@ const SEND_MODE_ESTIMATE_FEE_ONLY = 1024
 
 do not create an action, only estimate fee.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1580" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1588" />
 
 ## `ExtraCurrenciesMap`
 
@@ -2902,11 +2922,11 @@ do not create an action, only estimate fee.
 type ExtraCurrenciesMap = map<int32, varuint32>
 ```
 
-`ExtraCurrenciesMap` represents a dictionary of "extra currencies" other than TON coin.
+`ExtraCurrenciesMap` represents a dictionary of "extra currencies" other than GRAM.
 They can be attached to a message (incoming and outgoing) and stored on contract's balance.
 It's a dictionary `[currencyID => amount]` (amount is like `coins`, but encoded with a high precision).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1588" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1596" />
 
 ## `ContractState`
 
@@ -2920,7 +2940,7 @@ struct ContractState {
 `ContractState` is "code + data" of a contract.
 Used in outgoing messages (StateInit) to initialize a destination contract.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1592" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1600" />
 
 ## `AddressShardingOptions`
 
@@ -2934,7 +2954,7 @@ struct AddressShardingOptions {
 `AddressShardingOptions` provides settings to calculate an address in another shard.
 Consider [createMessage](#createmessage) and [address.calculateSameAddressInAnotherShard](#addresscalculatesameaddressinanothershard) for usage.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1599" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1607" />
 
 ## `AutoDeployAddress`
 
@@ -2964,7 +2984,7 @@ because in TON, the address of a contract, by definition, is a hash of its initi
 You can also use it without sending a message.
 See [AutoDeployAddress.calculateAddress](#autodeployaddresscalculateaddress).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1621" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1629" />
 
 ## `AutoDeployAddress.buildAddress`
 
@@ -2979,7 +2999,7 @@ Since late 2025 (TVM 12 has a cheap "builder-to-slice" instruction),
 there is no need to use this function.
 Historically its purpose was to avoid creating a cell and to return `builder` with a valid address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1631" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1639" />
 
 ## `AutoDeployAddress.calculateAddress`
 
@@ -2996,7 +3016,7 @@ val jwAddress = jwDeployed.calculateAddress();
 ```
 Just instead of `dest` for [createMessage](#createmessage), you use it is to calculate a jetton/nft address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1643" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1651" />
 
 ## `AutoDeployAddress.addressMatches`
 
@@ -3015,7 +3035,7 @@ val fromJW = jwDeployed.addressMatches(senderAddress);
 Just instead of `dest` for [createMessage](#createmessage), you use it is to check whether a sender is a jetton/nft.
 Deprecated since late 2025 (TVM 12 with a cheap "builder-to-slice" instruction), to be removed later.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1655" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1663" />
 
 ## `BounceMode`
 
@@ -3046,7 +3066,7 @@ fun onBouncedMessage(in: InMessageBounced) {
 }
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1677" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1685" />
 
 ## `OldBounceMode`
 
@@ -3058,7 +3078,7 @@ type OldBounceMode = bool
 Before TVM-12, `bounce` was only true or false.
 Now, use `enum BounceMode` instead. "true" behaves like `Only256BitsOfBody`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1686" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1694" />
 
 ## `CreateMessageOptions`
 
@@ -3066,7 +3086,7 @@ Now, use `enum BounceMode` instead. "true" behaves like `Only256BitsOfBody`.
 struct CreateMessageOptions<TBody = void> {
     /// whether a message will bounce back on error, and what piece of outgoing `body` it will contain
     bounce: BounceMode | OldBounceMode
-    /// message value: attached tons (or tons + extra currencies)
+    /// message value: attached grams (or grams + extra currencies)
     value: coins | (coins, ExtraCurrenciesMap)
     /// destination is either a provided address, or is auto-calculated by stateInit
     dest: address               // either just send a message to some address
@@ -3081,7 +3101,7 @@ struct CreateMessageOptions<TBody = void> {
 Options for creating an outgoing message.
 Consider [createMessage](#createmessage) for examples.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1691" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1699" />
 
 ## `createMessage`
 
@@ -3095,7 +3115,7 @@ Typically, you just send it. In advanced scenarios, you can estimate fees or eve
 ```
 val reply = createMessage({
     bounce: BounceMode.NoBounce,
-    value: ton("0.05"),
+    value: grams("0.05"),
     dest: senderAddress,
     body: RequestedInfo { ... }    // note: no toCell! just pass an object
 });
@@ -3107,7 +3127,7 @@ Hint: don't call `body.toCell()`, pass `body` directly!
       (if body is large, the compiler will automatically wrap it into a cell)
 If you need an empty body, just miss the field `body`, fill other 3 fields.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1721" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1729" />
 
 ## `ExtOutLogBucket`
 
@@ -3127,7 +3147,7 @@ body: DepositData { ... }
 and external indexers can index your emitted logs by destination address without parsing body.
 Serialization details: '01' (addr_extern) + 256 (len) + 0x00 (prefix) + 248 bits = 267 in total
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1735" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1743" />
 
 ## `CreateExternalLogMessageOptions`
 
@@ -3145,7 +3165,7 @@ struct CreateExternalLogMessageOptions<TBody = void> {
 Options for creating an external outgoing message.
 Consider [createExternalLogMessage](#createexternallogmessage) for examples.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1741" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1749" />
 
 ## `createExternalLogMessage`
 
@@ -3168,7 +3188,7 @@ Hint: don't call `body.toCell()`, pass `body` directly!
       (if body is small, it will be inlined without an expensive cell creation)
       (if body is large, the compiler will automatically wrap it into a cell)
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1763" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1771" />
 
 ## `UnsafeBodyNoRef`
 
@@ -3194,7 +3214,7 @@ createMessage({
 Another example: your body contains `builder` or `RemainingBitsAndRefs`: unpredictable size.
 If you guarantee it's small and refs won't clash with code/data, avoid creating a cell.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1782" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1790" />
 
 ## `OutMessage`
 
@@ -3207,7 +3227,7 @@ struct OutMessage {
 OutMessage is a result of [createMessage](#createmessage).
 Essentially, it's a composed message cell, ready to be sent.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1788" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1796" />
 
 ## `OutMessage.send`
 
@@ -3218,7 +3238,7 @@ fun OutMessage.send(self, sendMode: int): void
 Sends a ready message cell.
 For `sendMode`, see the constants above (SEND_MODE_*).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1794" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1802" />
 
 ## `OutMessage.sendAndEstimateFee`
 
@@ -3226,7 +3246,7 @@ For `sendMode`, see the constants above (SEND_MODE_*).
 fun OutMessage.sendAndEstimateFee(self, sendMode: int): coins
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1797" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1805" />
 
 ## `OutMessage.estimateFeeWithoutSending`
 
@@ -3235,7 +3255,7 @@ fun OutMessage.sendAndEstimateFee(self, sendMode: int): coins
 fun OutMessage.estimateFeeWithoutSending(self, sendMode: int): coins
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1800" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1808" />
 
 ## `OutMessage.hash`
 
@@ -3244,7 +3264,7 @@ fun OutMessage.estimateFeeWithoutSending(self, sendMode: int): coins
 fun OutMessage.hash(self): uint256
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1804" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1812" />
 
 ## `StateInit`
 
@@ -3263,7 +3283,7 @@ But for everyday tasks, it's too complicated. It is not used in practice.
 To represent code+data, consider [ContractState](#contractstate).
 To represent sharding (fixedPrefixLength, formerly splitDepth), consider [AutoDeployAddress](#autodeployaddress).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1813" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1821" />
 
 ## `StateInit.calcHashCodeData`
 
@@ -3280,7 +3300,7 @@ createMessage({
     ...
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1828" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1836" />
 
 ## `StateInit.calcHashPrefixCodeData`
 
@@ -3291,7 +3311,7 @@ fun StateInit.calcHashPrefixCodeData(fixedPrefixLength: uint5, code: cell, data:
 
 Calculates a hash of StateInit if fixedPrefixLength+code+data are set.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1837" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1845" />
 
 ## `address.buildSameAddressInAnotherShard`
 
@@ -3306,7 +3326,7 @@ Since late 2025 (TVM 12 has a cheap "builder-to-slice" instruction),
 there is no need to use this function.
 Historically its purpose was to avoid creating a cell and to return `builder` with a valid address.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1852" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1860" />
 
 ## `address.calculateSameAddressInAnotherShard`
 
@@ -3326,7 +3346,7 @@ result       | 01010101aaa...aaa |   address of A in same shard as B
 More precisely, self (input) is 267 bits: '100' (std addr no anycast) + workchainA + "aaaa...a".
 The result is also 267 bits: '100' + workchainB + "bb" (D bits) + "aa...a" (256-D bits).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1867" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1875" />
 
 ## `address.fromValidBuilder`
 
@@ -3340,7 +3360,7 @@ Converts a builder containing a valid address to `address` (slice under the hood
 Deprecated! Since late 2025 (TVM 12 has a cheap "builder-to-slice" instruction),
 all compiler built-ins return `address` directly, not `builder`.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1874" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1882" />
 
 ## `address.fromWorkchainAndHash`
 
@@ -3356,7 +3376,7 @@ createMessage({
     ...                        // so, don't call this function in such a case
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1886" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1894" />
 
 ## `sendRawMessage`
 
@@ -3367,14 +3387,14 @@ fun sendRawMessage(msg: cell, mode: int): void
 Sends a raw message — a correctly serialized TL object `Message X`.
 In practice, you'll use a high-level wrapper [createMessage](#createmessage).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1897" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1905" />
 
 ## `InMessage`
 
 ```tolk
 struct InMessage {
     senderAddress: address          // an internal address from which the message arrived
-    valueCoins: coins               // ton amount attached to an incoming message
+    valueCoins: coins               // GRAM amount attached to an incoming message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to an incoming message
     originalForwardFee: coins       // fee that was paid by the sender
     createdLt: uint64               // logical time when a message was created
@@ -3392,14 +3412,14 @@ fun onInternalMessage(in: InMessage) {
     in.body            // actually gets from a TVM stack
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1914" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1922" />
 
 ## `InMessageBounced`
 
 ```tolk
 struct InMessageBounced {
     senderAddress: address          // an internal address from which the message was bounced
-    valueCoins: coins               // ton amount attached to a message
+    valueCoins: coins               // GRAM amount attached to a message
     valueExtra: ExtraCurrenciesMap  // extra currencies attached to a message
     originalForwardFee: coins       // commission that the sender has paid to send this message
     createdLt: uint64               // logical time when a message was created (and bounced)
@@ -3420,7 +3440,7 @@ fun onBouncedMessage(in: InMessageBounced) {
     val originalOpcode = in.bouncedBody.loadUint(32);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1935" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1943" />
 
 ## `RichBounceBody`
 
@@ -3445,7 +3465,7 @@ fun onBouncedMessage(in: InMessageBounced) {
     // use rich.xxx to get exitCode, gasUsed, and so on
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1955" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1963" />
 
 ## `RichBounceComputePhaseInfo`
 
@@ -3458,7 +3478,7 @@ struct RichBounceComputePhaseInfo {
 
 Describes compute phase details of a bounced message.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1964" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1972" />
 
 ## `RichBounceOriginalMsgInfo`
 
@@ -3475,10 +3495,10 @@ Describes original outgoing message fields (besides body) of a bounced message.
 ```
 createMessage({
     bounce: BounceMode.RichBounce,
-    value: ton("0.05")   // it will be `valueCoins` if this message is bounced
+    value: grams("0.05")   // it will be `valueCoins` if this message is bounced
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1975" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1983" />
 
 ## `slice.skipBouncedPrefix`
 
@@ -3490,7 +3510,7 @@ fun slice.skipBouncedPrefix(mutate self): self
 Skip 0xFFFFFFFF prefix (when a message is bounced).
 Used when parsing `in.bounceBody` for "not rich" `BounceMode.Only256BitsOfBody` bounces.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1984" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1992" />
 
 ## `slice.loadMessageFlags`
 
@@ -3502,7 +3522,7 @@ fun slice.loadMessageFlags(mutate self): int
 
 Load msgFlags from incoming message body (4 bits).
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1989" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1997" />
 
 ## `slice.loadMessageOp`
 
@@ -3513,7 +3533,7 @@ fun slice.loadMessageOp(mutate self): int
 
 Loads a message opcode (32-bit integer) when parsing message body manually.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L1995" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2003" />
 
 ## `builder.storeMessageOp`
 
@@ -3525,7 +3545,7 @@ fun builder.storeMessageOp(mutate self, op: int): self
 
 Stores a message opcode (32-bit integer) when composing an output message manually.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2000" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2008" />
 
 ## `slice.loadMessageQueryId`
 
@@ -3537,7 +3557,7 @@ fun slice.loadMessageQueryId(mutate self): int
 
 Loads a message queryId (64-bit integer, immediately following the opcode) when parsing message body manually.
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2006" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2014" />
 
 ## `slice.skipMessageQueryId`
 
@@ -3547,7 +3567,7 @@ Loads a message queryId (64-bit integer, immediately following the opcode) when 
 fun slice.skipMessageQueryId(mutate self): self
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2011" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2019" />
 
 ## `builder.storeMessageQueryId`
 
@@ -3557,5 +3577,5 @@ fun slice.skipMessageQueryId(mutate self): self
 fun builder.storeMessageQueryId(mutate self, queryId: int): self
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2016" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/crates/tolk-compiler/assets/tolk-stdlib/common.tolk#L2024" />
 

@@ -16,7 +16,7 @@ get fun `test owner can transfer ownership`() {
     val res = contract.sendChangeOwner(
         deployer.address,
         notDeployer.address,
-        { value: ton("0.05") },
+        { value: grams("0.05") },
     );
     expect(res).toHaveSuccessfulTx<ChangeOwner>({
         from: deployer.address,
@@ -32,7 +32,7 @@ get fun `test non-owner cannot transfer ownership`() {
     val res = contract.sendChangeOwner(
         notDeployer.address,
         notDeployer.address,
-        { value: ton("0.05") },
+        { value: grams("0.05") },
     );
     expect(res).toHaveFailedTx({
         from: notDeployer.address,
@@ -49,7 +49,7 @@ get fun `test unknown message fails with named error`() {
     val res = contract.sendAny(
         deployer.address,
         beginCell().storeUint(0x999, 32).endCell(),
-        { value: ton("0.05") },
+        { value: grams("0.05") },
     );
     expect(res).toHaveFailedTx({
         from: deployer.address,
@@ -57,7 +57,7 @@ get fun `test unknown message fails with named error`() {
         exitCode: Errors.InvalidMessage,
     });
 
-    val res2 = contract.sendAny(deployer.address, createEmptyCell(), { value: ton("0.05") });
+    val res2 = contract.sendAny(deployer.address, createEmptyCell(), { value: grams("0.05") });
     expect(res2).toHaveSuccessfulTx({
         from: deployer.address,
         to: contract.address,
@@ -69,7 +69,7 @@ fun setupTest(): (Empty, Treasury, Treasury) {
     val notDeployer = testing.treasury("notDeployer");
 
     val contract = Empty.fromStorage({ owner: deployer.address });
-    val res = contract.deploy(deployer.address, { value: ton("0.05") });
+    val res = contract.deploy(deployer.address, { value: grams("0.05") });
     expect(res).toHaveSuccessfulDeploy({
         to: contract.address,
     });

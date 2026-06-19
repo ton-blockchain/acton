@@ -82,7 +82,7 @@ fun main() {
         counter: 0,
     });
 
-    val result = counter.deploy(deployer.address, { value: ton("0.05") });
+    val result = counter.deploy(deployer.address, { value: grams("0.05") });
     if (result.waitForFirstTransaction() == null) {
         return;
     }
@@ -199,7 +199,7 @@ fun main() {
 
     val msg = createMessage({
         bounce: true,
-        value: ton("0.1"),
+        value: grams("0.1"),
         dest: someContractAddress,
         body: SomeMessage { param: 42 },
     });
@@ -212,7 +212,7 @@ fun main() {
 <Callout type="warn">
     Be extremely careful with `--net`. While local tests allow arbitrary big values, sending messages with large values to the real blockchain will spend real GRAM.
 
-    **Recommendation:** Use smaller values like `ton("0.05")` or `ton("0.1")` for most operations.
+    **Recommendation:** Use smaller values like `grams("0.05")` or `grams("0.1")` for most operations.
 </Callout>
 
 ## Waiting for transactions
@@ -231,13 +231,13 @@ fun main() {
         owner: deployer.address,
         counter: 0,
     });
-    val deployResult = counter.deploy(deployer.address, { value: ton("0.05") });
+    val deployResult = counter.deploy(deployer.address, { value: grams("0.05") });
     deployResult.waitForFirstTransaction(); // Wait for deployment
 
     println("Counter deployed at {}", counter.address);
 
     // Send increase message
-    val increaseResult = counter.sendIncreaseCounter(deployer.address, 5, { value: ton("0.05") });
+    val increaseResult = counter.sendIncreaseCounter(deployer.address, 5, { value: grams("0.05") });
     increaseResult.waitForTrace(); // Wait for the full message chain
 
     println("Counter increased!");

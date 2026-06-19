@@ -4,7 +4,7 @@ import "@acton/emulation/network"
 import "@wrappers/SimpleExtension.gen"
 import "utils/common"
 
-const DEFAULT_SUB_AMOUNT = ton("0.27")
+const DEFAULT_SUB_AMOUNT = grams("0.27")
 const DEFAULT_PAYMENT_INTERVAL = 3600
 
 fun main() {
@@ -18,7 +18,7 @@ fun main() {
         paymentTimeInterval: env<int>("DEFAULT_PAYMENT_INTERVAL") ?? DEFAULT_PAYMENT_INTERVAL,
     });
 
-    val res = extension.deploy(deployer.address, { value: ton("0.5"), bounce: false });
+    val res = extension.deploy(deployer.address, { value: grams("0.5"), bounce: false });
 
     if (res.waitForFirstTransaction() == null) {
         return;

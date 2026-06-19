@@ -309,18 +309,18 @@ get fun `test gas: transfer storage fee should follow config`() {
     });
 }
 
-get fun `test gas: forward ton transfer should fail when fees are insufficient`() {
+get fun `test gas: forward GRAM transfer should fail when fees are insufficient`() {
     val (minter, deployer, notDeployer) = setupTest();
-    val senderWallet = mintTo(minter, deployer, deployer.address, ton("2"));
+    val senderWallet = mintTo(minter, deployer, deployer.address, grams("2"));
 
     val res = senderWallet.sendTransfer(
         deployer.address,
         LOW_TRANSFER_MSG_VALUE,
-        ton("1"),
+        grams("1"),
         notDeployer.address,
         deployer.address,
         null,
-        ton("0.5"),
+        grams("0.5"),
         null,
     );
     expect(res).toHaveFailedTx<AskToTransfer>({
@@ -517,17 +517,17 @@ get fun `test gas: burn gas fee should follow config`() {
     });
 }
 
-get fun `test gas: burn should fail when sent tons are clearly insufficient`() {
+get fun `test gas: burn should fail when sent grams are clearly insufficient`() {
     val (minter, deployer, _) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("1"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("1"));
 
     val res = wallet.sendAskToBurn(
         deployer.address,
         0,
-        ton("1"),
+        grams("1"),
         deployer.address,
         null,
-        { bounce: false, value: ton("0.0001") },
+        { bounce: false, value: grams("0.0001") },
     );
     expect(res).toHaveFailedTx<AskToBurn>({
         from: deployer.address,
@@ -538,7 +538,7 @@ get fun `test gas: burn should fail when sent tons are clearly insufficient`() {
 
 get fun `test gas: wallet storage fee should be measurable`() {
     val (minter, deployer, _) = setupTest();
-    val wallet = mintTo(minter, deployer, deployer.address, ton("1"));
+    val wallet = mintTo(minter, deployer, deployer.address, grams("1"));
 
     val state = testing.getAccountState(wallet.address);
     expect(state).toBeNotNull();

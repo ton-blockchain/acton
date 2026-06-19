@@ -63,7 +63,7 @@ fun main() {
         option1: 0,
         isClosed: false,
     });
-    val res = poll.deploy(deployer.address, { value: ton("0.05") });
+    val res = poll.deploy(deployer.address, { value: grams("0.05") });
     println(res.waitForTrace());
 
     println("Deployed Poll contract to {}", poll.address);
@@ -151,7 +151,7 @@ fun main(pollAddress: address, option: uint8) {
     val voter = scripts.wallet(promptWallet("Select voter address"));
     val poll = Poll.fromAddress(pollAddress);
 
-    val res = poll.sendVote(voter.address, option, { value: ton("0.1") });
+    val res = poll.sendVote(voter.address, option, { value: grams("0.1") });
     println(res.waitForTrace());
 
     val (option0, option1) = poll.results();
