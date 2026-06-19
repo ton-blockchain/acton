@@ -537,7 +537,7 @@ fn localnet_starts_and_serves_masterchain_info() {
 #[test]
 fn localnet_mines_empty_blocks_on_interval_without_transactions() {
     let project = ProjectBuilder::new("localnet-empty-interval-blocks").build();
-    let node = project.localnet().start();
+    let node = project.localnet().args(["--mine-empty-blocks"]).start();
 
     let initial_seqno = latest_masterchain_seqno(&node);
     let empty_block_seqno = initial_seqno + 1;
@@ -629,6 +629,7 @@ fn localnet_no_mining_mines_only_on_request() {
         "default_mine": {
             "ok": mine_default["ok"].as_bool(),
             "blocks_mined": default_payload["blocks_mined"].as_u64(),
+            "skipped_empty_blocks": default_payload["skipped_empty_blocks"].as_u64(),
             "block_count": default_payload["blocks"].as_array().map(Vec::len),
             "seqno_delta": after_default_seqno - initial_seqno,
         },
@@ -663,7 +664,7 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
     let acton_toml_path = project.path().join("Acton.toml");
     let mut acton_toml =
         fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
-    acton_toml.push_str("\n[localnet]\nno-mining = true\n");
+    acton_toml.push_str("\n[localnet]\nno-mining = true\nmine-empty-blocks = true\n");
     fs::write(&acton_toml_path, acton_toml).expect("failed to enable no-mining in Acton.toml");
 
     let node = project.localnet().require_auth().start();
@@ -790,7 +791,12 @@ fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
 
     let node = project
         .localnet()
-        .args(["--no-mining", "--db-path", db_path_arg.as_str()])
+        .args([
+            "--no-mining",
+            "--mine-empty-blocks",
+            "--db-path",
+            db_path_arg.as_str(),
+        ])
         .start();
 
     let first_mine = node.post_json("/acton_mine", &json!({}));
@@ -867,7 +873,12 @@ fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
 
     let restarted = project
         .localnet()
-        .args(["--no-mining", "--db-path", db_path_arg.as_str()])
+        .args([
+            "--no-mining",
+            "--mine-empty-blocks",
+            "--db-path",
+            db_path_arg.as_str(),
+        ])
         .start();
     let restarted_seqno = latest_masterchain_seqno(&restarted);
     let restarted_target =
@@ -2885,7 +2896,13 @@ fn localnet_send_boc_return_hash_waits_for_scheduled_block_before_transaction_ap
 
     let node = project
         .localnet()
-        .args(["--accounts", "deployer", "--block-interval-ms", "3000"])
+        .args([
+            "--accounts",
+            "deployer",
+            "--block-interval-ms",
+            "3000",
+            "--mine-empty-blocks",
+        ])
         .start();
     let initial_seqno = latest_masterchain_seqno(&node);
     wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
@@ -3016,8 +3033,7 @@ fn localnet_supports_emulate_v1_emulate_trace() {
         serde_json::to_string_pretty(&response).unwrap_or_default()
     );
 
-    let explicit_seqno =
-        wait_for_masterchain_seqno_at_least(&node, response_seqno.max(1), Duration::from_secs(5));
+    let explicit_seqno = response_seqno.max(0) as u32;
     let response_with_seqno = node.post_json(
         "/api/emulate/v1/emulateTrace",
         &json!({
@@ -3039,7 +3055,7 @@ fn localnet_supports_emulate_v1_emulate_trace() {
     );
     assert_eq!(
         response_with_seqno["mc_block_seqno"].as_i64(),
-        Some(explicit_seqno),
+        Some(i64::from(explicit_seqno)),
         "Unexpected mc_block_seqno for explicit emulate request:\n{}",
         serde_json::to_string_pretty(&response_with_seqno).unwrap_or_default()
     );
@@ -3667,7 +3683,7 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
     let project = ProjectBuilder::new("localnet-batch-faucet-scheduled-block").build();
     let node = project
         .localnet()
-        .args(["--block-interval-ms", "3000"])
+        .args(["--block-interval-ms", "3000", "--mine-empty-blocks"])
         .start();
     let initial_seqno = latest_masterchain_seqno(&node);
     wait_for_masterchain_seqno_at_least(&node, initial_seqno + 1, Duration::from_secs(6));
@@ -3820,7 +3836,7 @@ fn localnet_supports_v3_account_states_endpoint() {
     let node = project
         .localnet()
         .before_start(super::super::support::project::ActonCommand::build)
-        .args(["--accounts", "deployer"])
+        .args(["--accounts", "deployer", "--mine-empty-blocks"])
         .start();
     append_localnet_network(project.path(), &node.base_url());
 

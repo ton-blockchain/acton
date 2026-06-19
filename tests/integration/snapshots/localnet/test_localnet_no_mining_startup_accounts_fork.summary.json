@@ -1,7 +1,7 @@
 {
   "manual_mining": {
     "mine_ok": true,
-    "seqno_delta": 1,
+    "seqno_delta": 0,
     "seqno_stable_after_start": true
   },
   "startup_wallet": {

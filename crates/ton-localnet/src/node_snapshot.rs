@@ -1,7 +1,7 @@
 use crate::node::{GIVER_ADDR, GIVER_BALANCE, Node};
 use crate::storage::{
     self, AccountDelta, AccountMeta, AccountStatus, BlockMeta, Globals, Indexes, JettonMasterMeta,
-    MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
+    MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use anyhow::Context;
@@ -24,6 +24,8 @@ pub(crate) struct NodeStateSnapshot {
     pub next_block_timestamp: Option<u32>,
     pub latest_accounts: Vec<(Addr, AccountMeta)>,
     pub history_blocks: Vec<BlockMeta>,
+    #[serde(default)]
+    pub history_masterchain_blocks: Vec<MasterchainBlockMeta>,
     pub history_deltas_by_seqno: Vec<Vec<AccountDelta>>,
     pub history_tx_by_hash: Vec<(Hash256, TxMeta)>,
     pub history_msg_by_hash: Vec<(Hash256, MsgMeta)>,
@@ -170,6 +172,7 @@ impl Node {
             next_block_timestamp: self.next_block_timestamp,
             latest_accounts,
             history_blocks: self.history.blocks.clone(),
+            history_masterchain_blocks: self.history.masterchain_blocks.clone(),
             history_deltas_by_seqno: self.history.deltas_by_seqno.clone(),
             history_tx_by_hash,
             history_msg_by_hash,
@@ -244,6 +247,7 @@ impl Node {
 
         self.latest.accounts = snapshot.latest_accounts.into_iter().collect();
         self.history.blocks = snapshot.history_blocks;
+        self.history.masterchain_blocks = snapshot.history_masterchain_blocks;
         self.history.deltas_by_seqno = snapshot.history_deltas_by_seqno;
         self.history.tx_by_hash = snapshot.history_tx_by_hash.into_iter().collect();
         self.history.msg_by_hash = snapshot.history_msg_by_hash.into_iter().collect();
@@ -312,6 +316,7 @@ impl Node {
 
             tx.execute("DELETE FROM cas", [])?;
             tx.execute("DELETE FROM blocks", [])?;
+            tx.execute("DELETE FROM masterchain_blocks", [])?;
             tx.execute("DELETE FROM transactions", [])?;
             tx.execute("DELETE FROM messages", [])?;
             tx.execute("DELETE FROM accounts", [])?;
@@ -328,6 +333,14 @@ impl Node {
                 let block_data = serde_json::to_vec(block)?;
                 tx.execute(
                     "INSERT OR REPLACE INTO blocks (seqno, data) VALUES (?1, ?2)",
+                    rusqlite::params![block.seqno, block_data],
+                )?;
+            }
+
+            for block in &snapshot.history_masterchain_blocks {
+                let block_data = serde_json::to_vec(block)?;
+                tx.execute(
+                    "INSERT OR REPLACE INTO masterchain_blocks (seqno, data) VALUES (?1, ?2)",
                     rusqlite::params![block.seqno, block_data],
                 )?;
             }
