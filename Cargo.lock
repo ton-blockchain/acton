@@ -5419,7 +5419,6 @@ dependencies = [
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
- "sha2",
  "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
