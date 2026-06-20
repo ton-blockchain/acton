@@ -134,6 +134,33 @@ pub struct SetShardAccountRequest {
 }
 
 #[derive(Deserialize)]
+pub struct ChangeAccountStateRequest {
+    pub address: String,
+    pub state: ChangeAccountStatePayload,
+    #[serde(default = "default_true")]
+    pub mine: bool,
+}
+
+const fn default_true() -> bool {
+    true
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+pub enum ChangeAccountStatePayload {
+    #[serde(rename = "nonexist")]
+    Nonexist,
+    #[serde(rename = "uninit")]
+    Uninit { balance: Option<String> },
+    #[serde(rename = "frozen")]
+    Frozen {
+        source: Option<String>,
+        frozen_hash: Option<String>,
+        balance: Option<String>,
+    },
+}
+
+#[derive(Deserialize)]
 pub struct GetTracesQuery {
     #[serde(alias = "hash")]
     pub tx_hash: Option<String>,

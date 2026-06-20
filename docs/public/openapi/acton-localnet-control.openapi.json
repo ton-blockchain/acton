@@ -260,6 +260,37 @@
         }
       }
     },
+    "/acton_changeAccountState": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "changeAccountState",
+        "summary": "Change account state",
+        "description": "Changes the selected local account state to nonexist, uninit, or frozen. When state is frozen with source=current, set mine=false to queue the synthetic freeze transaction for the next mined block instead of committing a block immediately.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangeAccountStateRequest"
+              },
+              "example": {
+                "address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "mine": false,
+                "state": {
+                  "type": "frozen",
+                  "source": "current"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
     "/acton_sendInternalMessage": {
       "post": {
         "tags": ["Localnet Control"],
@@ -976,6 +1007,105 @@
           },
           "shard_account": {
             "$ref": "#/components/schemas/Base64Boc"
+          }
+        }
+      },
+      "ChangeAccountStateRequest": {
+        "type": "object",
+        "required": ["address", "state"],
+        "properties": {
+          "address": {
+            "$ref": "#/components/schemas/Address"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ChangeAccountStatePayload"
+          },
+          "mine": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to commit the state change immediately. Defaults to true. false is supported only for frozen source=current and queues the synthetic freeze transaction for the next automatic or manual block."
+          }
+        }
+      },
+      "ChangeAccountStatePayload": {
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateNonexist"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateUninit"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateFrozenFromCurrent"
+          },
+          {
+            "$ref": "#/components/schemas/ChangeAccountStateFrozenWithHash"
+          }
+        ],
+        "description": "Target local account state. Frozen accounts can be derived from the current active StateInit hash with source=current, or set from an explicit frozen_hash."
+      },
+      "ChangeAccountStateNonexist": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["nonexist"]
+          }
+        }
+      },
+      "ChangeAccountStateUninit": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["uninit"]
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "default": "0",
+            "description": "Optional nanotons balance for the uninitialized account. Defaults to 0."
+          }
+        }
+      },
+      "ChangeAccountStateFrozenFromCurrent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "source"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["frozen"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["current"],
+            "description": "Freeze the current active account by replacing its StateInit with the StateInit representation hash and preserving its balance."
+          }
+        }
+      },
+      "ChangeAccountStateFrozenWithHash": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["type", "frozen_hash"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["frozen"]
+          },
+          "frozen_hash": {
+            "type": "string",
+            "description": "Explicit 32-byte frozen StateInit hash, encoded as hex or base64."
+          },
+          "balance": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "default": "0",
+            "description": "Optional nanotons balance for the frozen account. Defaults to 0."
           }
         }
       },

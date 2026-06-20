@@ -119,6 +119,14 @@ pub struct LocalnetAccountStateWithInfo {
     pub info: LocalnetAddressInfo,
 }
 
+#[derive(Debug, Clone)]
+pub enum LocalnetAccountStateChange {
+    Nonexist,
+    Uninit { balance: u128 },
+    FrozenFromCurrent,
+    Frozen { frozen_hash: Hash256, balance: u128 },
+}
+
 impl LocalnetAccountState {
     pub fn empty(address: Addr, block_id: LocalnetBlockId, sync_utime: u64) -> Self {
         Self {
@@ -305,6 +313,12 @@ pub(crate) enum Request {
     SetShardAccount {
         address: Addr,
         shard_account: BocBytes,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    ChangeAccountState {
+        address: Addr,
+        change: LocalnetAccountStateChange,
+        mine: bool,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
     GetTransactions {
@@ -721,6 +735,25 @@ impl Localnet {
             .send(Request::SetShardAccount {
                 address,
                 shard_account,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn change_account_state(
+        &self,
+        address_str: String,
+        change: LocalnetAccountStateChange,
+        mine: bool,
+    ) -> anyhow::Result<()> {
+        let address = Self::parse_addr(&address_str)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::ChangeAccountState {
+                address,
+                change,
+                mine,
                 resp,
             })
             .await?;
@@ -1529,6 +1562,15 @@ fn process_loop_request(
             resp,
         } => {
             let res = node.set_shard_account(&address, shard_account);
+            let _ = resp.send(res);
+        }
+        Request::ChangeAccountState {
+            address,
+            change,
+            mine,
+            resp,
+        } => {
+            let res = node.change_account_state(&address, change, mine);
             let _ = resp.send(res);
         }
         Request::GetTransactions {

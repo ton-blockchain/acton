@@ -1,7 +1,7 @@
 use super::handlers::utils::get_extra;
 use super::handlers::{
-    create_recovery_point, detect_address, detect_hash, dump_state, emulate_trace_v1, faucet,
-    get_account_states_v3, get_address_balance, get_address_information,
+    change_account_state, create_recovery_point, detect_address, detect_hash, dump_state,
+    emulate_trace_v1, faucet, get_account_states_v3, get_address_balance, get_address_information,
     get_address_information_v3, get_address_name, get_address_state, get_api_calls,
     get_block_header, get_block_transactions, get_block_transactions_ext, get_blocks_v3,
     get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
@@ -144,6 +144,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/acton_snapshot", post(create_recovery_point))
         .route("/acton_revert", post(revert_recovery_point))
         .route("/acton_setShardAccount", post(set_shard_account))
+        .route("/acton_changeAccountState", post(change_account_state))
         .route("/acton_sendInternalMessage", post(send_internal_message))
         .route("/acton_getStartupWallets", get(get_startup_wallets))
         .route("/acton_setNetworkConditions", post(set_network_conditions))

@@ -1952,6 +1952,353 @@ fn localnet_admin_set_shard_account_updates_selected_account() {
 }
 
 #[test]
+fn localnet_admin_change_account_state_updates_selected_account() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let active = extract_marker_value(&deploy_output.get_stdout(), "TRACKED_CONTRACT=");
+    wait_until_address_state_active(&node, &active, Duration::from_secs(12));
+    let active_raw = unpack_address(&node, &active);
+
+    let uninit = "0:4444444444444444444444444444444444444444444444444444444444444444";
+    let explicit_frozen = "0:5555555555555555555555555555555555555555555555555555555555555555";
+    let nonexist = "0:6666666666666666666666666666666666666666666666666666666666666666";
+
+    let freeze_current = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let active_after_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+    let freeze_current_tx_response = wait_for_v3_transactions_response(
+        &node,
+        &format!("/api/v3/transactions?account={active}&limit=1&sort=desc"),
+        Duration::from_secs(5),
+    );
+    let freeze_current_tx = &v3_transactions_from_response(&freeze_current_tx_response)[0];
+
+    let set_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "uninit",
+                "balance": "1000000000",
+            },
+        }),
+    );
+    let uninit_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={uninit}"),
+        Duration::from_secs(5),
+    );
+
+    let frozen_hash = hex::encode([0x77; 32]);
+    let set_explicit_frozen = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "frozen_hash": frozen_hash,
+                "balance": "2000000000",
+            },
+        }),
+    );
+    let explicit_frozen_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={explicit_frozen}"),
+        Duration::from_secs(5),
+    );
+
+    let set_nonexist = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": nonexist,
+            "state": {
+                "type": "nonexist",
+            },
+        }),
+    );
+    let nonexist_after_set = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={nonexist}"),
+        Duration::from_secs(5),
+    );
+
+    let invalid_current_balance = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+                "balance": "1",
+            },
+        }),
+    );
+
+    let snapshot = json!({
+        "deploy_active": {
+            "ok": true,
+        },
+        "freeze_current": summarize_admin_response(&freeze_current),
+        "active_after_freeze": summarize_shard_account_cell_response(&active_after_freeze, Some(&active_raw)),
+        "freeze_current_tx": summarize_admin_freeze_transaction(freeze_current_tx, &active_raw),
+        "set_uninit": summarize_admin_response(&set_uninit),
+        "uninit_after_set": summarize_shard_account_cell_response(&uninit_after_set, Some(uninit)),
+        "set_explicit_frozen": summarize_admin_response(&set_explicit_frozen),
+        "explicit_frozen_after_set": summarize_shard_account_cell_response(&explicit_frozen_after_set, Some(explicit_frozen)),
+        "set_nonexist": summarize_admin_response(&set_nonexist),
+        "nonexist_after_set": summarize_shard_account_cell_response(&nonexist_after_set, None),
+        "invalid_current_balance": summarize_admin_response(&invalid_current_balance),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_updates_selected_account.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_change_account_state_current_freeze_rejects_non_active_accounts() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state-non-active").build();
+    let node = project.localnet().start();
+
+    let nonexist = "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let uninit = "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+    let explicit_frozen = "0:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
+
+    let freeze_nonexist = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": nonexist,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+
+    let set_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "uninit",
+                "balance": "1000000000",
+            },
+        }),
+    );
+    let freeze_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let uninit_after_failed_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={uninit}"),
+        Duration::from_secs(5),
+    );
+
+    let set_explicit_frozen = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "frozen_hash": hex::encode([0xcc; 32]),
+                "balance": "2000000000",
+            },
+        }),
+    );
+    let freeze_already_frozen = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": explicit_frozen,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let explicit_frozen_after_failed_freeze = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={explicit_frozen}"),
+        Duration::from_secs(5),
+    );
+
+    let snapshot = json!({
+        "nonexist": {
+            "freeze_current": summarize_admin_response(&freeze_nonexist),
+        },
+        "uninit": {
+            "set": summarize_admin_response(&set_uninit),
+            "freeze_current": summarize_admin_response(&freeze_uninit),
+            "after_failed_freeze": summarize_shard_account_cell_response(&uninit_after_failed_freeze, Some(uninit)),
+        },
+        "already_frozen": {
+            "set": summarize_admin_response(&set_explicit_frozen),
+            "freeze_current": summarize_admin_response(&freeze_already_frozen),
+            "after_failed_freeze": summarize_shard_account_cell_response(&explicit_frozen_after_failed_freeze, Some(explicit_frozen)),
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_current_freeze_rejects_non_active_accounts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_admin_change_account_state_can_defer_current_freeze_until_manual_mine() {
+    let project = ProjectBuilder::new("localnet-admin-change-account-state-deferred")
+        .contract("tracked", CHILD_CONTRACT)
+        .script_file("deploy_tracked", DEPLOY_TRACKED_CONTRACT_SCRIPT)
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer", "--no-mining"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let deploy_output = project
+        .acton()
+        .script("scripts/deploy_tracked.tolk")
+        .verify_network("localnet")
+        .run()
+        .success();
+    let active = extract_marker_value(&deploy_output.get_stdout(), "TRACKED_CONTRACT=");
+    let active_raw = unpack_address(&node, &active);
+
+    let deploy_mine = node.post_json("/acton_mine", &json!({}));
+    wait_until_address_state_active(&node, &active, Duration::from_secs(12));
+
+    let active_std = std_addr_from_raw(&active_raw);
+    let internal_boc = base64::engine::general_purpose::STANDARD.encode(
+        build_internal_message_boc(test_std_addr(0x77), active_std, 50_000_000),
+    );
+    let send_internal = node.post_json(
+        "/acton_sendInternalMessage",
+        &json!({
+            "boc": internal_boc,
+        }),
+    );
+    let defer_freeze = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": active,
+            "mine": false,
+            "state": {
+                "type": "frozen",
+                "source": "current",
+            },
+        }),
+    );
+    let before_mine = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+
+    let mine_deferred = node.post_json("/acton_mine", &json!({}));
+    let after_mine = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getShardAccountCell?address={active}"),
+        Duration::from_secs(5),
+    );
+    let tx_response = wait_for_v3_transactions_response(
+        &node,
+        &format!("/api/v3/transactions?account={active}&limit=2&sort=desc"),
+        Duration::from_secs(5),
+    );
+    let txs = v3_transactions_from_response(&tx_response);
+    let freeze_tx = &txs[0];
+    let previous_tx = &txs[1];
+
+    let invalid_deferred_uninit = node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": "0:7777777777777777777777777777777777777777777777777777777777777777",
+            "mine": false,
+            "state": {
+                "type": "uninit",
+            },
+        }),
+    );
+
+    let snapshot = json!({
+        "deploy_mine": summarize_mine_response(&deploy_mine),
+        "send_internal": summarize_admin_response(&send_internal),
+        "defer_freeze": summarize_admin_response(&defer_freeze),
+        "before_mine": summarize_shard_account_cell_response(&before_mine, Some(&active_raw)),
+        "mine_deferred": summarize_mine_response(&mine_deferred),
+        "after_mine": summarize_shard_account_cell_response(&after_mine, Some(&active_raw)),
+        "transactions": {
+            "count": txs.len(),
+            "freeze": summarize_admin_freeze_transaction(freeze_tx, &active_raw),
+            "same_mc_block_seqno": freeze_tx["mc_block_seqno"] == previous_tx["mc_block_seqno"],
+            "freeze_prev_matches_previous": freeze_tx["prev_trans_lt"] == previous_tx["lt"],
+            "previous_end_status": previous_tx["end_status"],
+            "previous_compute_exit_code": previous_tx.pointer("/description/compute_ph/exit_code").cloned().unwrap_or(Value::Null),
+        },
+        "invalid_deferred_uninit": summarize_admin_response(&invalid_deferred_uninit),
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&snapshot, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_admin_change_account_state_can_defer_current_freeze_until_manual_mine.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_raw_internal_messages_use_acton_endpoint() {
     let project = ProjectBuilder::new("localnet-raw-internal-message").build();
     let node = project.localnet().start();
@@ -4993,6 +5340,42 @@ fn summarize_admin_response(response: &Value) -> Value {
     response
 }
 
+fn summarize_admin_freeze_transaction(tx: &Value, expected_destination: &str) -> Value {
+    let source = tx.pointer("/in_msg/source").and_then(Value::as_str);
+    let destination = tx.pointer("/in_msg/destination").and_then(Value::as_str);
+    let lt = tx.get("lt").and_then(Value::as_str).unwrap_or_default();
+    let prev_trans_lt = tx
+        .get("prev_trans_lt")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    let mc_block_seqno = tx
+        .get("mc_block_seqno")
+        .and_then(Value::as_u64)
+        .unwrap_or_default();
+
+    json!({
+        "orig_status": tx["orig_status"],
+        "end_status": tx["end_status"],
+        "source_zero": source == Some("0:0000000000000000000000000000000000000000000000000000000000000000"),
+        "destination_matches": destination == Some(expected_destination),
+        "lt_nonzero": lt != "0" && !lt.is_empty(),
+        "prev_trans_lt_nonzero": prev_trans_lt != "0" && !prev_trans_lt.is_empty(),
+        "mc_block_seqno_positive": mc_block_seqno > 0,
+        "storage_status_change": tx.pointer("/description/storage_ph/status_change").cloned().unwrap_or(Value::Null),
+    })
+}
+
+fn summarize_mine_response(response: &Value) -> Value {
+    let payload = response_payload(response);
+    json!({
+        "ok": response["ok"],
+        "blocks_mined": payload["blocks_mined"],
+        "skipped_empty_blocks": payload["skipped_empty_blocks"],
+        "block_count": payload["blocks"].as_array().map(Vec::len),
+        "last_block_seqno_positive": payload["last_block_seqno"].as_u64().unwrap_or_default() > 0,
+    })
+}
+
 fn wait_for_ok_response(
     node: &crate::support::localnet::LocalnetHandle,
     query: &str,
@@ -5345,6 +5728,24 @@ fn test_std_addr(byte: u8) -> StdAddr {
         anycast: None,
         address: HashBytes([byte; 32]),
         workchain: 0,
+    }
+}
+
+fn std_addr_from_raw(raw: &str) -> StdAddr {
+    let (workchain, hash_hex) = raw
+        .split_once(':')
+        .unwrap_or_else(|| panic!("raw address must contain workchain:hash: {raw}"));
+    let workchain = workchain
+        .parse::<i8>()
+        .unwrap_or_else(|e| panic!("raw address workchain must be i8: {e}"));
+    let bytes =
+        hex::decode(hash_hex).unwrap_or_else(|e| panic!("raw address hash must be hex: {e}"));
+    let address = <[u8; 32]>::try_from(bytes.as_slice())
+        .unwrap_or_else(|_| panic!("raw address hash must be exactly 32 bytes: {raw}"));
+    StdAddr {
+        anycast: None,
+        address: HashBytes(address),
+        workchain,
     }
 }
 

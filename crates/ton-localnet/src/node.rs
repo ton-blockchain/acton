@@ -8,7 +8,9 @@ use crate::block::{
     },
 };
 use crate::executor::{ExecContext, TvmExecutor};
-use crate::localnet::{LocalnetBlockId, compute_normalized_ext_in_hash};
+use crate::localnet::{
+    LocalnetAccountStateChange, LocalnetBlockId, compute_normalized_ext_in_hash,
+};
 use crate::remote::{
     RemoteProvider, account_meta_from_shard_account, fetch_remote_library,
     fetch_remote_shard_account,
@@ -33,10 +35,14 @@ use tokio::sync::broadcast;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
+use tycho_types::models::transaction::{
+    ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
+    Transaction,
+};
 use tycho_types::models::{
-    AccountState, CurrencyCollection, IntMsgInfo, LibDescr, Message, MsgInfo, OptionalAccount,
-    OwnedMessage, ShardAccount, TxInfo,
+    Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
+    Message, MsgInfo, OptionalAccount, OwnedMessage, ShardAccount, StdAddr, StoragePhase, TxInfo,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -64,6 +70,7 @@ pub struct Node {
     pub next_block_timestamp: Option<u32>,
     pub config_cell: Cell,
     pub latest_masterchain_state: Option<Cell>,
+    pub pending_freeze_current: VecDeque<Addr>,
 }
 
 const CASCADE_TX_HARD_LIMIT: usize = 10_000;
@@ -329,6 +336,7 @@ impl Node {
             next_block_timestamp: None,
             config_cell,
             latest_masterchain_state: None,
+            pending_freeze_current: VecDeque::new(),
         };
         node.rebuild_global_libraries_from_accounts()?;
         Ok(node)
@@ -468,6 +476,32 @@ impl Node {
             }
         }
 
+        while let Some(addr) = self.pending_freeze_current.pop_front() {
+            match self.build_freeze_account_transaction(&addr, seqno, gen_utime) {
+                Ok(commit) => {
+                    tx_commits.push(commit);
+                }
+                Err(e) => {
+                    tracing::error!(
+                        "Block collation skipped deferred account freeze {}: {:?}",
+                        addr,
+                        e
+                    );
+                }
+            }
+        }
+
+        self.commit_transaction_block(seqno, prev_lt, gen_utime, tx_commits, deferred_msg_hashes)
+    }
+
+    fn commit_transaction_block(
+        &mut self,
+        seqno: Seqno,
+        prev_lt: Lt,
+        gen_utime: u32,
+        tx_commits: Vec<TransactionCommit>,
+        deferred_msg_hashes: Vec<Hash256>,
+    ) -> anyhow::Result<BlockMeta> {
         let tx_hashes = tx_commits
             .iter()
             .map(|commit| commit.tx_meta.tx_hash)
@@ -1758,7 +1792,7 @@ impl Node {
             .cas
             .get_cell(tx_hash)
             .or_else(|| Boc::decode(tx_boc).ok())
-            .and_then(|cell| cell.parse::<tycho_types::models::Transaction>().ok())
+            .and_then(|cell| cell.parse::<Transaction>().ok())
             .and_then(|tx| tx.state_update.load().ok())
         else {
             return (None, None);
@@ -1954,6 +1988,235 @@ impl Node {
         self.detect_assets(addr)?;
 
         Ok(())
+    }
+
+    pub fn change_account_state(
+        &mut self,
+        addr: &Addr,
+        change: LocalnetAccountStateChange,
+        mine: bool,
+    ) -> anyhow::Result<()> {
+        if !mine {
+            return match change {
+                LocalnetAccountStateChange::FrozenFromCurrent => {
+                    self.pending_freeze_current.push_back(*addr);
+                    Ok(())
+                }
+                _ => anyhow::bail!("`mine: false` is only supported with frozen `source: current`"),
+            };
+        }
+
+        let shard_account_boc = match change {
+            LocalnetAccountStateChange::Nonexist => Self::empty_shard_account_boc()?,
+            LocalnetAccountStateChange::Uninit { balance } => {
+                Self::account_shard_account_boc(addr, AccountState::Uninit, balance)?
+            }
+            LocalnetAccountStateChange::FrozenFromCurrent => {
+                return self.freeze_account_from_current(addr);
+            }
+            LocalnetAccountStateChange::Frozen {
+                frozen_hash,
+                balance,
+            } => Self::account_shard_account_boc(
+                addr,
+                AccountState::Frozen(HashBytes(frozen_hash.0)),
+                balance,
+            )?,
+        };
+
+        self.set_shard_account(addr, shard_account_boc)
+    }
+
+    fn freeze_account_from_current(&mut self, addr: &Addr) -> anyhow::Result<()> {
+        let seqno = self.globals.head_seqno + 1;
+        let prev_lt = self.globals.global_lt;
+        let gen_utime = self.next_block_gen_utime()?;
+        let commit = self.build_freeze_account_transaction(addr, seqno, gen_utime)?;
+        self.commit_transaction_block(seqno, prev_lt, gen_utime, vec![commit], Vec::new())?;
+        Ok(())
+    }
+
+    fn build_freeze_account_transaction(
+        &mut self,
+        addr: &Addr,
+        seqno: Seqno,
+        gen_utime: u32,
+    ) -> anyhow::Result<TransactionCommit> {
+        let old_shard_account_boc = self.get_shard_account(addr)?;
+        let old_shard_account_cell = Boc::decode(&old_shard_account_boc)
+            .context("Failed to decode current ShardAccount BOC")?;
+        let old_shard_account = old_shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse current ShardAccount BOC")?;
+        let old_account_state_hash = Hash256::from(old_shard_account.account.inner().repr_hash());
+        let old_meta = self.latest.accounts.get(addr).cloned();
+
+        let frozen_account = Self::frozen_account_from_shard_account(addr, &old_shard_account)?;
+        let new_account_state_cell =
+            CellBuilder::build_from(OptionalAccount(Some(frozen_account.clone())))
+                .context("Failed to serialize frozen account state")?;
+        let new_account_state_hash = Hash256::from(new_account_state_cell.repr_hash());
+        self.cas.put(
+            Boc::encode(new_account_state_cell).into(),
+            new_account_state_hash,
+        );
+
+        let lt = self.globals.global_lt + self.globals.lt_step;
+        self.globals.global_lt = lt;
+
+        let in_msg_cell = self.build_admin_state_change_message(addr, lt, gen_utime)?;
+        let in_msg_boc = BocBytes::from(Boc::encode(in_msg_cell.clone()));
+        let in_msg_hash = in_msg_boc.hash()?;
+        self.cas.put(in_msg_boc, in_msg_hash);
+        let in_msg_meta = parse_msg_meta_from_cell(&in_msg_cell, in_msg_hash)
+            .context("Failed to parse synthetic freeze message")?;
+        self.history.msg_by_hash.insert(in_msg_hash, in_msg_meta);
+
+        let previous_tx = old_meta
+            .as_ref()
+            .and_then(|meta| Some((HashBytes(meta.last_trans_hash?.0), meta.last_trans_lt?)));
+        let tx = Transaction {
+            account: HashBytes(addr.addr),
+            lt,
+            prev_trans_hash: previous_tx.map_or(old_shard_account.last_trans_hash, |tx| tx.0),
+            prev_trans_lt: previous_tx
+                .as_ref()
+                .map_or(old_shard_account.last_trans_lt, |tx| tx.1),
+            now: gen_utime,
+            out_msg_count: tycho_types::num::Uint15::ZERO,
+            orig_status: old_meta
+                .as_ref()
+                .map_or(tycho_types::models::AccountStatus::NotExists, |meta| {
+                    tycho_account_status(meta.status.clone())
+                }),
+            end_status: tycho_types::models::AccountStatus::Frozen,
+            in_msg: Some(in_msg_cell),
+            out_msgs: Default::default(),
+            total_fees: CurrencyCollection::ZERO,
+            state_update: Lazy::new(&HashUpdate {
+                old: HashBytes(old_account_state_hash.0),
+                new: HashBytes(new_account_state_hash.0),
+            })
+            .context("Failed to build synthetic freeze transaction state update")?,
+            info: Lazy::new(&TxInfo::Ordinary(OrdinaryTxInfo {
+                credit_first: false,
+                storage_phase: Some(StoragePhase {
+                    storage_fees_collected: Default::default(),
+                    storage_fees_due: None,
+                    status_change: AccountStatusChange::Frozen,
+                }),
+                credit_phase: None,
+                compute_phase: ComputePhase::Skipped(SkippedComputePhase {
+                    reason: ComputePhaseSkipReason::NoGas,
+                }),
+                action_phase: None,
+                aborted: true,
+                bounce_phase: None,
+                destroyed: false,
+            }))
+            .context("Failed to build synthetic freeze transaction info")?,
+        };
+        let tx_boc = BocBytes::from(BocRepr::encode(tx)?);
+        let tx_hash = tx_boc.hash()?;
+        self.cas.put(tx_boc.clone(), tx_hash);
+        let tx_cell = Boc::decode(&tx_boc).context("Failed to decode synthetic freeze tx BOC")?;
+
+        let new_shard_account_boc = Self::shard_account_boc(
+            OptionalAccount(Some(frozen_account)),
+            HashBytes(tx_hash.0),
+            lt,
+        )?;
+        let new_shard_account_cell = Boc::decode(&new_shard_account_boc)
+            .context("Failed to decode frozen ShardAccount BOC")?;
+        let new_shard_account = new_shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse frozen ShardAccount BOC")?;
+        let new_meta = account_meta_from_shard_account(
+            &new_shard_account,
+            &new_shard_account_boc,
+            &mut self.cas,
+        )?;
+        let _ =
+            store_account_state_cell_from_shard_account_boc(&mut self.cas, &new_shard_account_boc);
+
+        let tx_meta = TxMeta {
+            tx_hash,
+            account: *addr,
+            lt,
+            now: gen_utime,
+            success: true,
+            compute_exit_code: Some(0),
+            action_result_code: Some(0),
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+            in_msg_hash: Some(in_msg_hash),
+            out_msg_hashes: Vec::new(),
+            block_seqno: seqno,
+        };
+
+        let delta = AccountDelta {
+            addr: *addr,
+            old_hash: old_meta.as_ref().map(|meta| meta.account_hash),
+            new_hash: Some(new_meta.account_hash),
+            old_meta,
+            new_meta: Some(new_meta.clone()),
+        };
+
+        self.clear_detected_assets(addr);
+        self.latest.accounts.insert(*addr, new_meta);
+        self.update_public_libraries_from_account_diff(
+            addr,
+            Some(&old_shard_account_boc),
+            Some(&new_shard_account_boc),
+            lt,
+        )?;
+        self.detect_assets(addr)?;
+
+        Ok(TransactionCommit {
+            block_tx: BlockTransaction {
+                tx_meta: tx_meta.clone(),
+                old_meta: delta.old_meta.clone(),
+                tx_cell,
+                old_account_state_hash,
+                new_account_state_hash,
+            },
+            tx_meta,
+            delta,
+            out_msg_hashes: Vec::new(),
+            msg_to_tx: vec![(in_msg_hash, tx_hash)],
+        })
+    }
+
+    fn build_admin_state_change_message(
+        &self,
+        addr: &Addr,
+        created_lt: Lt,
+        created_at: u32,
+    ) -> anyhow::Result<Cell> {
+        let zero_addr = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+        let message_info = IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: zero_addr.into(),
+            dst: addr.into(),
+            ihr_fee: Default::default(),
+            value: CurrencyCollection::ZERO,
+            fwd_fee: Default::default(),
+            created_lt,
+            created_at,
+        };
+        let message = OwnedMessage {
+            info: MsgInfo::Int(message_info),
+            init: None,
+            body: Default::default(),
+            layout: None,
+        };
+        CellBuilder::build_from(&message).context("Failed to build synthetic freeze message")
     }
 
     fn persist_account_meta(&self, addr: &Addr, meta: &AccountMeta) -> anyhow::Result<()> {
@@ -2218,10 +2481,62 @@ impl Node {
     }
 
     fn empty_shard_account_boc() -> anyhow::Result<BocBytes> {
-        let sa = ShardAccount {
-            account: tycho_types::cell::Lazy::new(&OptionalAccount(None))?,
-            last_trans_hash: HashBytes([0u8; 32]),
+        Self::shard_account_boc(OptionalAccount(None), HashBytes::ZERO, 0)
+    }
+
+    fn account_shard_account_boc(
+        addr: &Addr,
+        state: AccountState,
+        balance: u128,
+    ) -> anyhow::Result<BocBytes> {
+        let account = Account {
+            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            storage_stat: Default::default(),
             last_trans_lt: 0,
+            balance: CurrencyCollection::new(balance),
+            state,
+        };
+        Self::shard_account_boc(OptionalAccount(Some(account)), HashBytes::ZERO, 0)
+    }
+
+    fn frozen_account_from_shard_account(
+        addr: &Addr,
+        shard_account: &ShardAccount,
+    ) -> anyhow::Result<Account> {
+        let optional_account = shard_account
+            .account
+            .load()
+            .context("Failed to load current account state")?;
+        let mut account = optional_account
+            .0
+            .context("Cannot freeze non-existing account from current state")?;
+
+        let state_hash = match account.state.clone() {
+            AccountState::Active(state_init) => {
+                let state_cell = CellBuilder::build_from(state_init)
+                    .context("Failed to serialize current StateInit")?;
+                HashBytes(*state_cell.repr_hash().as_array())
+            }
+            AccountState::Uninit => {
+                anyhow::bail!("Cannot freeze uninitialized account from current state")
+            }
+            AccountState::Frozen(_) => anyhow::bail!("Account is already frozen"),
+        };
+
+        account.address = IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr)));
+        account.state = AccountState::Frozen(state_hash);
+        Ok(account)
+    }
+
+    fn shard_account_boc(
+        optional_account: OptionalAccount,
+        last_trans_hash: HashBytes,
+        last_trans_lt: u64,
+    ) -> anyhow::Result<BocBytes> {
+        let sa = ShardAccount {
+            account: Lazy::new(&optional_account)?,
+            last_trans_hash,
+            last_trans_lt,
         };
         let mut builder = CellBuilder::new();
         sa.store_into(&mut builder, Cell::empty_context())?;
@@ -2247,7 +2562,9 @@ impl Node {
 
     #[must_use]
     pub fn has_pending_messages(&self) -> bool {
-        !self.pool.external.is_empty() || !self.pool.internal.is_empty()
+        !self.pool.external.is_empty()
+            || !self.pool.internal.is_empty()
+            || !self.pending_freeze_current.is_empty()
     }
 
     pub fn faucet(&mut self, addr: &Addr, amount: u128) -> anyhow::Result<Hash256> {
@@ -2364,6 +2681,15 @@ fn account_state_snapshot_from_optional_account(
         code,
         data,
         frozen_hash,
+    }
+}
+
+const fn tycho_account_status(status: AccountStatus) -> tycho_types::models::AccountStatus {
+    match status {
+        AccountStatus::Active => tycho_types::models::AccountStatus::Active,
+        AccountStatus::Uninit => tycho_types::models::AccountStatus::Uninit,
+        AccountStatus::Frozen => tycho_types::models::AccountStatus::Frozen,
+        AccountStatus::Nonexist => tycho_types::models::AccountStatus::NotExists,
     }
 }
 

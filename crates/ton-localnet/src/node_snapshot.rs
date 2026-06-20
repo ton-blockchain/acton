@@ -43,6 +43,8 @@ pub(crate) struct NodeStateSnapshot {
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
     pub pool_rr_turn: bool,
+    #[serde(default)]
+    pub pending_freeze_current: VecDeque<Addr>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -187,6 +189,7 @@ impl Node {
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
             pool_rr_turn: self.pool.rr_turn,
+            pending_freeze_current: self.pending_freeze_current.clone(),
         })
     }
 
@@ -265,6 +268,7 @@ impl Node {
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;
         self.pool.rr_turn = snapshot.pool_rr_turn;
+        self.pending_freeze_current = snapshot.pending_freeze_current;
 
         self.globals = Globals {
             head_seqno: snapshot.globals.head_seqno,

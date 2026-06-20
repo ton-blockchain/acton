@@ -1,0 +1,84 @@
+{
+  "active_after_freeze": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": false,
+    "data_present": false,
+    "frozen_hash_present": true,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "frozen"
+  },
+  "deploy_active": {
+    "ok": true
+  },
+  "explicit_frozen_after_set": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": false,
+    "data_present": false,
+    "frozen_hash_present": true,
+    "last_trans_hash_nonzero": false,
+    "last_trans_lt": "zero",
+    "ok": true,
+    "state": "frozen"
+  },
+  "freeze_current": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "freeze_current_tx": {
+    "destination_matches": true,
+    "end_status": "frozen",
+    "lt_nonzero": true,
+    "mc_block_seqno_positive": true,
+    "orig_status": "active",
+    "prev_trans_lt_nonzero": true,
+    "source_zero": true,
+    "storage_status_change": "frozen"
+  },
+  "invalid_current_balance": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "`balance` cannot be used with frozen `source: current`",
+    "ok": false
+  },
+  "nonexist_after_set": {
+    "cell_type": "tvm.cell",
+    "last_trans_hash_nonzero": false,
+    "last_trans_lt": "zero",
+    "ok": true,
+    "state": "nonexist"
+  },
+  "set_explicit_frozen": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "set_nonexist": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "set_uninit": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "uninit_after_set": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": false,
+    "data_present": false,
+    "frozen_hash_present": false,
+    "last_trans_hash_nonzero": false,
+    "last_trans_lt": "zero",
+    "ok": true,
+    "state": "uninitialized"
+  }
+}

@@ -1,0 +1,76 @@
+{
+  "after_mine": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": false,
+    "data_present": false,
+    "frozen_hash_present": true,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "frozen"
+  },
+  "before_mine": {
+    "address_matches": true,
+    "balance_positive": true,
+    "cell_type": "tvm.cell",
+    "code_present": true,
+    "data_present": true,
+    "frozen_hash_present": false,
+    "last_trans_hash_nonzero": true,
+    "last_trans_lt": "nonzero",
+    "ok": true,
+    "state": "active"
+  },
+  "defer_freeze": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": null
+  },
+  "deploy_mine": {
+    "block_count": 1,
+    "blocks_mined": 1,
+    "last_block_seqno_positive": true,
+    "ok": true,
+    "skipped_empty_blocks": 0
+  },
+  "invalid_deferred_uninit": {
+    "@extra": "[EXTRA]",
+    "code": 500,
+    "error": "`mine: false` is only supported with frozen `source: current`",
+    "ok": false
+  },
+  "mine_deferred": {
+    "block_count": 1,
+    "blocks_mined": 1,
+    "last_block_seqno_positive": true,
+    "ok": true,
+    "skipped_empty_blocks": 0
+  },
+  "send_internal": {
+    "@extra": "[EXTRA]",
+    "ok": true,
+    "result": {
+      "@type": "ok",
+      "hash": "[HASH]"
+    }
+  },
+  "transactions": {
+    "count": 2,
+    "freeze": {
+      "destination_matches": true,
+      "end_status": "frozen",
+      "lt_nonzero": true,
+      "mc_block_seqno_positive": true,
+      "orig_status": "active",
+      "prev_trans_lt_nonzero": true,
+      "source_zero": true,
+      "storage_status_change": "frozen"
+    },
+    "freeze_prev_matches_previous": true,
+    "previous_compute_exit_code": 0,
+    "previous_end_status": "active",
+    "same_mc_block_seqno": true
+  }
+}

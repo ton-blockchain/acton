@@ -1,11 +1,12 @@
 use super::utils::handle_result;
 use crate::api::toncenter_v2 as v2;
-use crate::localnet::{Localnet, LocalnetMiningMode};
+use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
-    FaucetRequest, GetApiCallsRequest, GetVerifiedSourceRequest, IncreaseTimeRequest,
-    MineBlocksRequest, RegisterCompilerAbisRequest, RevertRecoveryPointRequest, SendBocRequest,
-    SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
-    SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest, StatePathRequest,
+    ChangeAccountStatePayload, ChangeAccountStateRequest, FaucetRequest, GetApiCallsRequest,
+    GetVerifiedSourceRequest, IncreaseTimeRequest, MineBlocksRequest, RegisterCompilerAbisRequest,
+    RevertRecoveryPointRequest, SendBocRequest, SetAddressNameRequest, SetMiningModeRequest,
+    SetNetworkConditionsRequest, SetNextBlockTimestampRequest, SetShardAccountRequest,
+    SetTimeRequest, StatePathRequest,
 };
 use crate::server::{
     ApiCallLog, NetworkConditions, NetworkConditionsInfo, StartupWallet, StateSourceInfo,
@@ -207,6 +208,21 @@ pub async fn set_shard_account(
 ) -> Json<Value> {
     handle_result(
         node.set_shard_account(payload.address, payload.shard_account),
+        |()| Value::Null,
+    )
+    .await
+}
+
+pub async fn change_account_state(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<ChangeAccountStateRequest>,
+) -> Json<Value> {
+    handle_result(
+        async move {
+            let change = parse_account_state_change(payload.state)?;
+            node.change_account_state(payload.address, change, payload.mine)
+                .await
+        },
         |()| Value::Null,
     )
     .await
@@ -420,6 +436,51 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
         return Ok(parsed);
     }
     anyhow::bail!("Invalid hash format")
+}
+
+fn parse_account_state_change(
+    payload: ChangeAccountStatePayload,
+) -> anyhow::Result<LocalnetAccountStateChange> {
+    match payload {
+        ChangeAccountStatePayload::Nonexist => Ok(LocalnetAccountStateChange::Nonexist),
+        ChangeAccountStatePayload::Uninit { balance } => Ok(LocalnetAccountStateChange::Uninit {
+            balance: parse_optional_balance(balance)?,
+        }),
+        ChangeAccountStatePayload::Frozen {
+            source,
+            frozen_hash,
+            balance,
+        } => match (source.as_deref(), frozen_hash.as_deref()) {
+            (Some("current"), None) => {
+                if balance.is_some() {
+                    anyhow::bail!("`balance` cannot be used with frozen `source: current`");
+                }
+                Ok(LocalnetAccountStateChange::FrozenFromCurrent)
+            }
+            (Some("current"), Some(_)) => {
+                anyhow::bail!("`frozen_hash` cannot be used with frozen `source: current`")
+            }
+            (None, Some(hash)) => Ok(LocalnetAccountStateChange::Frozen {
+                frozen_hash: parse_hash_any(hash)?,
+                balance: parse_optional_balance(balance)?,
+            }),
+            (Some(other), _) => anyhow::bail!(
+                "Unsupported frozen account state source `{other}`; supported value is `current`"
+            ),
+            (None, None) => anyhow::bail!(
+                "Frozen account state requires either `source: current` or `frozen_hash`"
+            ),
+        },
+    }
+}
+
+fn parse_optional_balance(balance: Option<String>) -> anyhow::Result<u128> {
+    let Some(balance) = balance else {
+        return Ok(0);
+    };
+    balance
+        .parse::<u128>()
+        .map_err(|_| anyhow::anyhow!("Invalid balance: {balance}"))
 }
 
 #[cfg(test)]
