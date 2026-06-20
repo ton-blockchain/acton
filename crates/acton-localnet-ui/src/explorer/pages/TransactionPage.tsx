@@ -89,6 +89,10 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
   const {fetchName} = useAddressBook()
   const addressFormat = useAddressFormat()
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
+  const selectedTransactionLt = useMemo(() => {
+    const requestedHash = hash.toLowerCase()
+    return traces.find(tx => tx.transaction.hash().toString("hex") === requestedHash)?.lt
+  }, [hash, traces])
 
   const handleContractClick = (address: string) => {
     const formattedAddr = normalizeAddress(address, addressFormat)
@@ -355,6 +359,7 @@ export const TransactionPage: React.FC<TransactionPageProps> = ({client}) => {
                 contracts={contracts}
                 compilerAbisByCodeHash={compilerAbisByCodeHash}
                 allContracts={[]}
+                selectedTransactionLt={selectedTransactionLt}
                 onContractClick={handleContractClick}
               />
             </div>

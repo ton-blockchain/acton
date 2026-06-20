@@ -61,6 +61,7 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly allContracts: readonly BackendContractInfo[]
+  readonly selectedTransactionLt?: string
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
@@ -197,6 +198,7 @@ export function TransactionTree({
   contracts,
   compilerAbisByCodeHash,
   allContracts,
+  selectedTransactionLt,
   onContractClick,
   renderSourceLocation,
 }: TransactionTreeProps): React.JSX.Element {
@@ -211,6 +213,7 @@ export function TransactionTree({
 
   const [selectedTransaction, setSelectedTransaction] = useState<TransactionInfo | undefined>()
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
+  const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
   const [treeLayout, setTreeLayout] = useState<TreeLayout>(INITIAL_TREE_LAYOUT)
 
@@ -731,11 +734,10 @@ export function TransactionTree({
   }
 
   useEffect(() => {
-    // deselect transaction if we select other transaction details
-    if (transactions.length >= 0) {
-      setSelectedTransaction(undefined)
-    }
-  }, [transactions.length])
+    setSelectedTransaction(
+      selectedTransactionLt ? transactionMap.get(selectedTransactionLt) : undefined,
+    )
+  }, [selectedTransactionLt, transactionMap])
 
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
@@ -780,9 +782,51 @@ export function TransactionTree({
     }
   }, [treeData, treeLayout])
 
+  useLayoutEffect(() => {
+    const container = treeContainerRef.current
+    const wrapper = treeWrapperRef.current
+    const selectedLt = selectedTransaction?.lt
+    if (!container || !wrapper || !selectedLt) {
+      return
+    }
+
+    const selectedNode = [
+      ...wrapper.querySelectorAll<SVGCircleElement>('circle[aria-label^="Transaction "]'),
+    ].find(node => node.getAttribute("aria-label") === `Transaction ${selectedLt}`)
+
+    if (!selectedNode) {
+      return
+    }
+
+    const containerRect = container.getBoundingClientRect()
+    const nodeRect = selectedNode.getBoundingClientRect()
+    const inlineMargin = Math.min(96, container.clientWidth / 4)
+    const nodeLeft = nodeRect.left - containerRect.left
+    const nodeRight = nodeRect.right - containerRect.left
+
+    if (nodeLeft >= inlineMargin && nodeRight <= container.clientWidth - inlineMargin) {
+      return
+    }
+
+    const nodeCenter = container.scrollLeft + nodeLeft + nodeRect.width / 2
+    const maxScrollLeft = container.scrollWidth - container.clientWidth
+    const nextScrollLeft = Math.max(
+      0,
+      Math.min(maxScrollLeft, nodeCenter - container.clientWidth / 2),
+    )
+
+    if (Math.abs(container.scrollLeft - nextScrollLeft) > 1) {
+      container.scrollTo({left: nextScrollLeft})
+    }
+  }, [selectedTransaction?.lt, treeLayout])
+
   return (
     <div className={styles.container}>
-      <div className={styles.treeContainer} style={{height: `${treeLayout.height}px`}}>
+      <div
+        className={styles.treeContainer}
+        ref={treeContainerRef}
+        style={{height: `${treeLayout.height}px`}}
+      >
         <div
           className={styles.treeWrapper}
           ref={treeWrapperRef}
