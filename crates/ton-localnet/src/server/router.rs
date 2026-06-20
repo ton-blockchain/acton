@@ -7,15 +7,15 @@ use super::handlers::{
     get_blocks_v3, get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
     get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
     get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
-    get_shard_account_cell, get_shards, get_startup_wallets, get_status, get_traces,
-    get_transactions, get_transactions_by_message_v3, get_transactions_std, get_transactions_v3,
-    get_verified_source, import_recovery_point, increase_time, json_rpc, list_recovery_points,
-    load_state, lookup_block, mine_blocks, pack_address, register_compiler_abis,
-    revert_recovery_point, run_get_method, run_get_method_std, run_get_method_v3, send_boc,
-    send_boc_return_hash, send_internal_message, send_message_v3, set_address_name,
-    set_mining_mode, set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
-    streaming_sse, streaming_ws, try_locate_result_tx, try_locate_source_tx, try_locate_tx,
-    unpack_address,
+    get_shard_account_cell, get_shards, get_startup_wallets, get_status, get_token_data,
+    get_traces, get_transactions, get_transactions_by_message_v3, get_transactions_std,
+    get_transactions_v3, get_verified_source, get_wallet_information, import_recovery_point,
+    increase_time, json_rpc, list_recovery_points, load_state, lookup_block, mine_blocks,
+    pack_address, register_compiler_abis, revert_recovery_point, run_get_method,
+    run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message,
+    send_message_v3, set_address_name, set_mining_mode, set_network_conditions,
+    set_next_block_timestamp, set_shard_account, set_time, streaming_sse, streaming_ws,
+    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::{
     ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
@@ -71,6 +71,8 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
             "/v2/getExtendedAddressInformation",
             get(get_extended_address_information),
         )
+        .route("/v2/getWalletInformation", get(get_wallet_information))
+        .route("/v2/getTokenData", get(get_token_data))
         .route("/v2/getTransactions", get(get_transactions))
         .route("/v2/getTransactionsStd", get(get_transactions_std))
         .route("/v2/tryLocateTx", get(try_locate_tx))

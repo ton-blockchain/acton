@@ -1,6 +1,6 @@
 use crate::node::Node;
 use crate::storage::{self, AccountStatus, JettonMasterMeta, NftItemMeta};
-use crate::types::{Addr, Hash256};
+use crate::types::{Addr, BocBytes, Hash256};
 use tycho_types::boc::Boc;
 
 impl Node {
@@ -109,6 +109,8 @@ impl Node {
             ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data, libs.as_deref())
         {
             let wallet_code_hash = Hash256::from(jetton_data.jetton_wallet_code.repr_hash());
+            let wallet_code = BocBytes::from(Boc::encode(jetton_data.jetton_wallet_code.clone()));
+            self.cas.put(wallet_code, wallet_code_hash);
             let jetton_content = ton_indexer::jettons::resolve_jetton_content(
                 ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
             );

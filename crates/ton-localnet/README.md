@@ -65,6 +65,36 @@ For non-existing accounts, `status` is returned as `uninitialized` (v2-compatibl
 
 `use_v2` query parameter is accepted for compatibility with TonCenter v3 schema.
 
+## `/api/v2/getWalletInformation`
+
+`/api/v2/getWalletInformation` is implemented for both the GET endpoint and
+the TonCenter v2 JSON-RPC method.
+
+The response uses TonCenter v2 `ext.accounts.walletInformation` shape:
+
+- `wallet` is detected from the account code hash using the local wallet
+  catalogue.
+- `wallet_type` uses TonCenter v2-style names such as `wallet v4 r2`.
+- `seqno` is returned when the wallet supports the `seqno` get method.
+- `balance`, `account_state`, and `last_transaction_id` are read from local
+  account state.
+
+## `/api/v2/getTokenData`
+
+`/api/v2/getTokenData` is implemented for both the GET endpoint and the
+TonCenter v2 JSON-RPC method.
+
+The local node returns TonCenter v2 token-data shapes for detected:
+
+- Jetton masters (`ext.tokens.jettonMasterData`)
+- Jetton wallets (`ext.tokens.jettonWalletData`)
+- NFT items (`ext.tokens.nftItemData`)
+- NFT collections when collection metadata can be inferred from indexed NFT
+  items (`ext.tokens.nftCollectionData`)
+
+Jetton wallet code is loaded from the local CAS by the indexed
+`jetton_wallet_code_hash`.
+
 ## `/api/v3/accountStates`
 
 `/api/v3/accountStates` is implemented with TonCenter v3-compatible repeated

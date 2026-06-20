@@ -305,6 +305,10 @@ pub(crate) enum Request {
         addresses: Vec<Addr>,
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAddressInfo>>>,
     },
+    GetCellBoc {
+        hash: Hash256,
+        resp: oneshot::Sender<anyhow::Result<Option<BocBytes>>>,
+    },
     GetShardAccountCell {
         address: Addr,
         seqno: Option<u32>,
@@ -793,6 +797,12 @@ impl Localnet {
         self.tx
             .send(Request::GetAddressInfos { addresses, resp })
             .await?;
+        rx.await?
+    }
+
+    pub async fn get_cell_boc(&self, hash: Hash256) -> anyhow::Result<Option<BocBytes>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::GetCellBoc { hash, resp }).await?;
         rx.await?
     }
 
@@ -1680,6 +1690,9 @@ fn process_loop_request(
         Request::GetAddressInfos { addresses, resp } => {
             let res = handle_get_address_infos(node, addresses);
             let _ = resp.send(res);
+        }
+        Request::GetCellBoc { hash, resp } => {
+            let _ = resp.send(Ok(node.get_cell(&hash)));
         }
         Request::GetShardAccountCell {
             address,
