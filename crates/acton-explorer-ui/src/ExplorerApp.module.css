@@ -20,8 +20,7 @@
 .headerInner {
   width: 100%;
   max-width: 1136px;
-  min-height: 51px;
-  padding-top: 2px;
+  height: 51px;
   margin-inline: auto;
   display: flex;
   align-items: center;
@@ -42,30 +41,29 @@
   color: var(--tonscan-text-primary);
   font-size: var(--font-size-md);
   font-weight: 750;
-  line-height: 1.1;
+  line-height: 1;
   text-decoration: none;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .nav {
   display: flex;
   align-items: baseline;
-  gap: 4px;
+  gap: 10px;
   margin-left: 0;
 }
 
 .navLink {
   display: inline-block;
   box-sizing: border-box;
-  min-height: 34px;
-  padding: 9px 10px;
+  padding: 0;
   border: 0;
-  border-radius: 8px;
   background: transparent;
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
-  line-height: 1.1;
+  line-height: 1;
   text-decoration: none;
   cursor: pointer;
   transition:
@@ -94,7 +92,6 @@
 
 .navLink:hover,
 .githubButton:hover {
-  background: var(--litenode-control-hover);
   color: var(--tonscan-text-primary);
 }
 
@@ -133,21 +130,13 @@
     padding: 0 16px;
   }
 
-  .headerInner {
-    min-height: 51px;
-  }
-
-  .brand {
-    font-size: var(--font-size-sm);
-  }
-
   .nav {
     margin-left: 0;
-    gap: 2px;
+    gap: 10px;
   }
 
   .navLink {
-    padding: 0 8px;
+    padding: 0;
   }
 
   .headerActions {

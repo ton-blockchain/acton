@@ -5,6 +5,7 @@ import type {FC} from "react"
 import {BrowserRouter, Link, Navigate, Route, Routes} from "react-router-dom"
 
 import {TonClient} from "../../acton-localnet-ui/src/explorer/api/client"
+import {getBundledCompilerAbis} from "../../acton-localnet-ui/src/explorer/api/compilerAbiCatalog"
 import {AddressBookProvider} from "../../acton-localnet-ui/src/explorer/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "../../acton-localnet-ui/src/explorer/hooks/useExplorerRoutes"
 import {StaticNetworkInfoProvider} from "../../acton-localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
@@ -44,6 +45,7 @@ export const ExplorerApp: FC = () => {
         addressNameBaseUrl: "",
         localnetControlEnabled: false,
         toncenterApiKey: TONCENTER_API_KEY,
+        compilerAbiLoader: getBundledCompilerAbis,
       }),
     [],
   )

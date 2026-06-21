@@ -22,6 +22,7 @@ docs/out
 **/dist
 **/node_modules
 **/target
+**/.wrangler
 **/.eslintcache
 test-results/
 

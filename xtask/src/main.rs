@@ -14,6 +14,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum CliCommand {
+    DeployExplorer(tasks::deploy_explorer::DeployExplorerArgs),
     Dist(tasks::dist::DistArgs),
     GithubCleanup(tasks::github_cleanup::GithubCleanupArgs),
     Hello,
@@ -30,6 +31,7 @@ fn main() -> Result<()> {
     let args = Cli::parse();
 
     match args.command {
+        CliCommand::DeployExplorer(args) => tasks::deploy_explorer::run(args),
         CliCommand::Dist(args) => tasks::dist::run(args),
         CliCommand::GithubCleanup(args) => tasks::github_cleanup::run(args),
         CliCommand::Hello => tasks::hello::run(),

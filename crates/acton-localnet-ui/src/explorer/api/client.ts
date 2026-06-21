@@ -31,7 +31,12 @@ interface TonClientOptions {
   readonly localnetApiToken?: string
   readonly onUnauthorized?: () => void
   readonly toncenterApiKey?: string
+  readonly compilerAbiLoader?: CompilerAbiLoader
 }
+
+type CompilerAbiLoader = (
+  codeHashes: readonly string[],
+) => Promise<Record<string, ExtendedContractABI | null>>
 
 interface FaucetResponse {
   readonly ok?: boolean
@@ -228,6 +233,7 @@ export class TonClient {
   private readonly localnetApiToken: string | undefined
   private readonly onUnauthorized: (() => void) | undefined
   private readonly toncenterApiKey: string | undefined
+  private readonly compilerAbiLoader: CompilerAbiLoader | undefined
   private readonly pendingGetRequests = new Map<string, Promise<unknown>>()
 
   constructor({
@@ -238,6 +244,7 @@ export class TonClient {
     localnetApiToken,
     onUnauthorized,
     toncenterApiKey,
+    compilerAbiLoader,
   }: TonClientOptions) {
     this.v2BaseUrl = v2BaseUrl
     this.v3BaseUrl = v3BaseUrl
@@ -246,6 +253,7 @@ export class TonClient {
     this.localnetApiToken = localnetApiToken?.trim() || undefined
     this.onUnauthorized = onUnauthorized
     this.toncenterApiKey = toncenterApiKey?.trim() || undefined
+    this.compilerAbiLoader = compilerAbiLoader
   }
 
   async getAddressInformation(address: string): Promise<AddressInformation> {
@@ -556,13 +564,13 @@ export class TonClient {
   async getCompilerAbis(
     codeHashes: readonly string[],
   ): Promise<Record<string, ExtendedContractABI | null>> {
-    if (!this.localnetControlEnabled) {
-      return {}
-    }
-
     const uniqueCodeHashes = [...new Set(codeHashes.filter(Boolean))]
     if (uniqueCodeHashes.length === 0) {
       return {}
+    }
+
+    if (!this.localnetControlEnabled) {
+      return this.compilerAbiLoader?.(uniqueCodeHashes) ?? {}
     }
 
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getCompilerAbi")

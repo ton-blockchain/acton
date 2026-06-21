@@ -23,5 +23,5 @@
     },
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "../acton-localnet-ui/src/explorer"]
+  "include": ["src", "functions", "../acton-localnet-ui/src/explorer"]
 }
