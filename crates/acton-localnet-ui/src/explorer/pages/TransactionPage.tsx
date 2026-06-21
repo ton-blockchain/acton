@@ -94,9 +94,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
-  const selectedTransactionLt = useMemo(() => {
+  const selectedTransactionId = useMemo(() => {
     const requestedHash = hash.toLowerCase()
-    return traces.find(tx => tx.transaction.hash().toString("hex") === requestedHash)?.lt
+    return traces.find(tx => tx.transaction.hash().toString("hex") === requestedHash)?.id
   }, [hash, traces])
 
   fetchNameRef.current = fetchName
@@ -323,7 +323,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
                     <div className={styles.detailsList}>
                       {rootTraceTransactions.map(tx => (
                         <TraceTransactionNode
-                          key={tx.lt}
+                          key={tx.id}
                           tx={tx}
                           contracts={contracts}
                           compilerAbisByCodeHash={compilerAbisByCodeHash}
@@ -342,7 +342,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
                 contracts={contracts}
                 compilerAbisByCodeHash={compilerAbisByCodeHash}
                 allContracts={[]}
-                selectedTransactionLt={selectedTransactionLt}
+                selectedTransactionId={selectedTransactionId}
                 onContractClick={handleContractClick}
               />
             </div>

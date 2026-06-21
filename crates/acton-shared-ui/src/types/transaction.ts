@@ -61,6 +61,7 @@ export type ParsedValue =
 
 // eslint-disable-next-line functional/type-declaration-immutability
 export interface TransactionInfo {
+  readonly id: string
   readonly lt: string
   readonly address: Address | undefined
   readonly transaction: Transaction

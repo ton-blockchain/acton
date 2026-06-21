@@ -61,7 +61,7 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly allContracts: readonly BackendContractInfo[]
-  readonly selectedTransactionLt?: string
+  readonly selectedTransactionId?: string
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
@@ -198,7 +198,7 @@ export function TransactionTree({
   contracts,
   compilerAbisByCodeHash,
   allContracts,
-  selectedTransactionLt,
+  selectedTransactionId,
   onContractClick,
   renderSourceLocation,
 }: TransactionTreeProps): React.JSX.Element {
@@ -226,18 +226,18 @@ export function TransactionTree({
   const transactionMap = useMemo(() => {
     const map: Map<string, TransactionInfo> = new Map()
     for (const tx of transactions) {
-      map.set(tx.lt, tx)
+      map.set(tx.id, tx)
     }
     return map
   }, [transactions])
 
-  const handleNodeClick = (lt: string): void => {
-    const transaction = transactionMap.get(lt)
+  const handleNodeClick = (id: string): void => {
+    const transaction = transactionMap.get(id)
     if (!transaction) return
 
     forceHideTooltip()
 
-    if (selectedTransaction?.lt === lt) {
+    if (selectedTransaction?.id === id) {
       setSelectedTransaction(undefined)
     } else {
       setSelectedTransaction(transaction)
@@ -349,7 +349,8 @@ export function TransactionTree({
       const contractLetter = thisAddress ? (targetContract?.letter ?? "?") : "?"
 
       const lt = tx.lt
-      const isSelected = selectedTransaction?.lt === lt
+      const id = tx.id
+      const isSelected = selectedTransaction?.id === id
 
       const hasExternalOut = [...tx.transaction.outMessages.values()].some(outMessage => {
         return outMessage.info.type === "external-out"
@@ -361,7 +362,7 @@ export function TransactionTree({
               name: "",
               attributes: {
                 isExternalOut: true,
-                parentLt: lt,
+                parentId: id,
               },
               children: [],
             },
@@ -376,6 +377,7 @@ export function TransactionTree({
             inMessage?.info.src?.toString() ??
             "unknown",
           to: inMessage?.info.dest?.toString() ?? "unknown",
+          id,
           lt,
           success: isSuccess ? "✓" : "✗",
           exitCode: exitCode?.toString() ?? "0",
@@ -499,8 +501,8 @@ export function TransactionTree({
     }
 
     if (nodeDatum.attributes?.isExternalOut) {
-      const parentLt = nodeDatum.attributes.parentLt as string
-      const parentTx = transactionMap.get(parentLt)
+      const parentId = nodeDatum.attributes.parentId as string
+      const parentTx = transactionMap.get(parentId)
 
       const externalOutMessage = [...(parentTx?.transaction.outMessages.values() ?? [])].find(
         message => message.info.type === "external-out",
@@ -568,8 +570,8 @@ export function TransactionTree({
 
     const opcode = (nodeDatum.attributes?.opcode as string | undefined) ?? "empty opcode"
     const isSelected = nodeDatum.attributes?.isSelected as boolean
-    const lt = nodeDatum.attributes?.lt as string
-    const tx = transactionMap.get(lt)
+    const id = nodeDatum.attributes?.id as string
+    const tx = transactionMap.get(id)
     const exitCode = (nodeDatum.attributes?.exitCode as string | undefined) ?? "0"
     const hasFailureDetails = exitCode !== "0"
     const successMark = nodeDatum.attributes?.success as string | undefined
@@ -608,7 +610,7 @@ export function TransactionTree({
           r={15}
           role="button"
           tabIndex={0}
-          aria-label={`Transaction ${lt}`}
+          aria-label={`Transaction ${id}`}
           fill={
             isFailed
               ? "var(--transaction-tree-failed-node-fill)"
@@ -619,11 +621,11 @@ export function TransactionTree({
           stroke={isFailed ? "var(--transaction-tree-failed-node-stroke)" : "var(--text-primary)"}
           strokeWidth={isFailed ? 2 : 1.5}
           onClick={() => {
-            handleNodeClick(lt)
+            handleNodeClick(id)
           }}
           onKeyDown={event => {
             if (event.key === "Enter" || event.key === " ") {
-              handleNodeClick(lt)
+              handleNodeClick(id)
             }
           }}
           onMouseEnter={event => {
@@ -735,9 +737,9 @@ export function TransactionTree({
 
   useEffect(() => {
     setSelectedTransaction(
-      selectedTransactionLt ? transactionMap.get(selectedTransactionLt) : undefined,
+      selectedTransactionId ? transactionMap.get(selectedTransactionId) : undefined,
     )
-  }, [selectedTransactionLt, transactionMap])
+  }, [selectedTransactionId, transactionMap])
 
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
@@ -785,14 +787,14 @@ export function TransactionTree({
   useLayoutEffect(() => {
     const container = treeContainerRef.current
     const wrapper = treeWrapperRef.current
-    const selectedLt = selectedTransaction?.lt
-    if (!container || !wrapper || !selectedLt) {
+    const selectedId = selectedTransaction?.id
+    if (!container || !wrapper || !selectedId) {
       return
     }
 
     const selectedNode = [
       ...wrapper.querySelectorAll<SVGCircleElement>('circle[aria-label^="Transaction "]'),
-    ].find(node => node.getAttribute("aria-label") === `Transaction ${selectedLt}`)
+    ].find(node => node.getAttribute("aria-label") === `Transaction ${selectedId}`)
 
     if (!selectedNode) {
       return
@@ -818,7 +820,7 @@ export function TransactionTree({
     if (Math.abs(container.scrollLeft - nextScrollLeft) > 1) {
       container.scrollTo({left: nextScrollLeft})
     }
-  }, [selectedTransaction?.lt, treeLayout])
+  }, [selectedTransaction?.id, treeLayout])
 
   return (
     <div className={styles.container}>

@@ -94,6 +94,7 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
     const {outActions, actionsCell} = parseActions(tx.actions)
 
     const info: TransactionInfo = {
+      id: parsedTx.hash().toString("hex"),
       lt: tx.lt,
       address: bigintToAddress(parsedTx.address),
       transaction: parsedTx,

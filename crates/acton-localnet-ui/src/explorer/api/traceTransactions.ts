@@ -23,12 +23,14 @@ export const buildTraceTransactionInfos = (
   transactionsMap: Record<string, V3Transaction>,
   traceRoot?: V3TraceNode,
 ): TransactionInfo[] => {
-  const txs = Object.values(transactionsMap)
-  const txByHash = buildTransactionsHashMap(transactionsMap)
-  const infoByLt = new Map<string, TransactionInfo>()
+  const transactionIdsByHash = buildTransactionIdsByHash(transactionsMap)
+  const infoById = new Map<string, TransactionInfo>()
+  const infosByLt = new Map<string, TransactionInfo[]>()
 
-  const txInfos = txs.map(tx => {
+  const txInfos = Object.entries(transactionsMap).map(([mapKey, tx]) => {
+    const id = transactionHashKey(tx.hash || mapKey)
     const info: TransactionInfo = {
+      id,
       lt: tx.lt,
       address: parseTonAddress(tx.account),
       transaction: synthesizeTransaction(tx),
@@ -49,78 +51,84 @@ export const buildTraceTransactionInfos = (
       parent: undefined,
       children: [],
     }
-    infoByLt.set(tx.lt, info)
+    infoById.set(id, info)
+    infosByLt.set(tx.lt, [...(infosByLt.get(tx.lt) ?? []), info])
     return info
   })
 
-  const parentByChildLt = new Map<string, string>()
-  addTraceTreeRelations(traceRoot, txByHash, parentByChildLt)
-  for (const tx of txs) {
+  const parentByChildId = new Map<string, string>()
+  addTraceTreeRelations(traceRoot, transactionIdsByHash, parentByChildId)
+  for (const [mapKey, tx] of Object.entries(transactionsMap)) {
+    const parentId = transactionHashKey(tx.hash || mapKey)
     for (const childLt of childTransactionLts(tx)) {
-      addParentRelation(parentByChildLt, tx.lt, childLt)
+      const childInfos = infosByLt.get(childLt)
+      if (childInfos?.length === 1) {
+        addParentRelation(parentByChildId, parentId, childInfos[0].id)
+      }
     }
   }
 
-  const childrenByParentLt = buildChildrenByParentLt(parentByChildLt)
-  for (const [lt, info] of infoByLt) {
-    const parentLt = parentByChildLt.get(lt)
-    if (parentLt) {
-      info.parent = infoByLt.get(parentLt)
+  const childrenByParentId = buildChildrenByParentId(parentByChildId)
+  for (const info of txInfos) {
+    const parentId = parentByChildId.get(info.id)
+    if (parentId) {
+      info.parent = infoById.get(parentId)
     }
-    info.children = (childrenByParentLt.get(lt) ?? [])
-      .map(childLt => infoByLt.get(childLt))
+    info.children = (childrenByParentId.get(info.id) ?? [])
+      .map(childId => infoById.get(childId))
       .filter((child): child is TransactionInfo => child !== undefined)
   }
 
   return txInfos
 }
 
-const buildTransactionsHashMap = (
+const buildTransactionIdsByHash = (
   transactionsMap: Record<string, V3Transaction>,
-): Map<string, V3Transaction> => {
-  const txByHash = new Map<string, V3Transaction>()
+): Map<string, string> => {
+  const idsByHash = new Map<string, string>()
   for (const [mapKey, tx] of Object.entries(transactionsMap)) {
-    txByHash.set(transactionHashKey(mapKey), tx)
-    txByHash.set(transactionHashKey(tx.hash), tx)
+    const id = transactionHashKey(tx.hash || mapKey)
+    idsByHash.set(transactionHashKey(mapKey), id)
+    idsByHash.set(transactionHashKey(tx.hash), id)
   }
-  return txByHash
+  return idsByHash
 }
 
 const addTraceTreeRelations = (
   node: V3TraceNode | undefined,
-  txByHash: ReadonlyMap<string, V3Transaction>,
-  parentByChildLt: Map<string, string>,
+  transactionIdsByHash: ReadonlyMap<string, string>,
+  parentByChildId: Map<string, string>,
 ): void => {
   if (!node) return
 
-  const parentTx = txByHash.get(transactionHashKey(node.tx_hash))
+  const parentId = transactionIdsByHash.get(transactionHashKey(node.tx_hash))
   for (const childNode of node.children ?? []) {
-    const childTx = txByHash.get(transactionHashKey(childNode.tx_hash))
-    if (parentTx && childTx) {
-      addParentRelation(parentByChildLt, parentTx.lt, childTx.lt)
+    const childId = transactionIdsByHash.get(transactionHashKey(childNode.tx_hash))
+    if (parentId && childId) {
+      addParentRelation(parentByChildId, parentId, childId)
     }
-    addTraceTreeRelations(childNode, txByHash, parentByChildLt)
+    addTraceTreeRelations(childNode, transactionIdsByHash, parentByChildId)
   }
 }
 
 const addParentRelation = (
-  parentByChildLt: Map<string, string>,
-  parentLt: string,
-  childLt: string,
+  parentByChildId: Map<string, string>,
+  parentId: string,
+  childId: string,
 ): void => {
-  if (parentLt !== childLt && !parentByChildLt.has(childLt)) {
-    parentByChildLt.set(childLt, parentLt)
+  if (parentId !== childId && !parentByChildId.has(childId)) {
+    parentByChildId.set(childId, parentId)
   }
 }
 
-const buildChildrenByParentLt = (
-  parentByChildLt: ReadonlyMap<string, string>,
+const buildChildrenByParentId = (
+  parentByChildId: ReadonlyMap<string, string>,
 ): Map<string, string[]> => {
-  const childrenByParentLt = new Map<string, string[]>()
-  for (const [childLt, parentLt] of parentByChildLt) {
-    childrenByParentLt.set(parentLt, [...(childrenByParentLt.get(parentLt) ?? []), childLt])
+  const childrenByParentId = new Map<string, string[]>()
+  for (const [childId, parentId] of parentByChildId) {
+    childrenByParentId.set(parentId, [...(childrenByParentId.get(parentId) ?? []), childId])
   }
-  return childrenByParentLt
+  return childrenByParentId
 }
 
 const childTransactionLts = (tx: V3Transaction): readonly string[] => {
