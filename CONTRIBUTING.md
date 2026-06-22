@@ -89,7 +89,7 @@ Optional CLI tools:
 
 - `cargo-shear` (unused dependency linter for `just check-deps`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install cargo-shear --version 1.11.2 --locked
+  cargo install cargo-shear --version 1.13.1 --locked
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
