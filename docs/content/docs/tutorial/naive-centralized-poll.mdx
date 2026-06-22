@@ -44,7 +44,15 @@ With a small number of voters it works correctly.
 
 ## The wall
 
-TON contracts store persistent data in a **cell tree**. A single cell holds at most 1023 bits and up to 4 references. The full tree must fit in the TVM stack when the contract runs. One `address → bool` entry per voter fills up that tree long before a popular poll ends.
+TON contracts store persistent data in a cell tree. A single cell holds at most **1023 bits** and up to **4 references**.
+
+While the TVM lazily traverses this tree via cell references rather than loading the entire state into memory, there is a hard protocol limit: **a single contract's persistent state is strictly capped at a maximum of 65,536 unique cells.**
+
+Furthermore, as the official TON documentation explicitly warns:
+
+> *"Every map that is expected to grow beyond 1,000 values is dangerous. In the TVM map, key access is asymptotically logarithmic, meaning that gas consumption continuously increases to find keys as the map grows."*
+
+Because of this, storing an `address → bool` entry per voter in a single contract is a fatal architectural flaw. It will rapidly hit the hard 65k cell ceiling, and even before that, gas costs to update and query the dictionary will skyrocket, rendering the contract economically unviable long before a popular poll ends.
 
 More fundamentally: **TON itself shards**. Different contracts run in parallel on different shards. A single contract holding all voter state becomes a sequential bottleneck — every vote is a write to the same storage.
 
