@@ -54,7 +54,7 @@ For the minimal local build/test flow, install:
    ```bash
    cargo install cargo-nextest --version 0.9.133 --locked
    ```
-4. Bun (required for UI packages)
+4. Bun (required for UI packages; version pinned in `package.json`)
    ```bash
    curl -fsSL https://bun.sh/install | bash
    ```
