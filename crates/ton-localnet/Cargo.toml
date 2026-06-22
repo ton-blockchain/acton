@@ -31,7 +31,7 @@ serde_json = { workspace = true }
 reqwest = { workspace = true }
 indexmap = { workspace = true }
 axum = { workspace = true }
-tower-http = { workspace = true, features = ["compression-br", "compression-gzip", "cors", "trace", "fs"] }
+tower-http = { workspace = true, features = ["compression-gzip", "cors", "trace", "fs"] }
 tower = { workspace = true }
 tower_governor = { workspace = true }
 tracing = { workspace = true }

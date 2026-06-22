@@ -126,7 +126,12 @@ fs2 = "0.4" # build cache locking
 quick-junit = "0.5.2" # junit format for tests
 
 # disasm for blockchain addresses
-reqwest = { version = "0.12", features = ["json", "blocking", "multipart"] }
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "blocking",
+  "multipart",
+  "default-tls",
+] }
 urlencoding = "2.1"
 base64 = "0.22.1"
 rand = "0.8"
@@ -163,7 +168,7 @@ zstd = "0.13.3"
 # axum for test ui
 axum = { version = "0.8.1", features = ["ws"] }
 tower-http = { version = "0.6.2", features = ["fs", "cors"] }
-tower_governor = "0.8.0"
+tower_governor = { version = "0.8.0", default-features = false, features = ["axum"] }
 opener = "0.8.4"
 tokio-stream = "0.1.18"
 
