@@ -52,7 +52,7 @@ For the minimal local build/test flow, install:
    ```
 3. `cargo-nextest` (required Rust test runner for non-doc tests)
    ```bash
-   cargo install cargo-nextest --version 0.9.133 --locked
+   cargo install cargo-nextest --version 0.9.137 --locked
    ```
 4. Bun (required for UI packages)
    ```bash
