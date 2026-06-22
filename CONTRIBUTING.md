@@ -48,7 +48,7 @@ For the minimal local build/test flow, install:
 1. Rust toolchain (`rustup`, `cargo`)
 2. `just` (task runner)
    ```bash
-   cargo install just --version 1.49.0 --locked
+   cargo install just --version 1.52.0 --locked
    ```
 3. `cargo-nextest` (required Rust test runner for non-doc tests)
    ```bash
