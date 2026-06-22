@@ -410,36 +410,6 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: Delete download artifacts
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          github-token: ${{ github.token }}
-          # language=JavaScript
-          script: |
-            const {
-              data: artifacts,
-            } = await github.rest.actions.listWorkflowRunArtifacts({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id: context.runId,
-            });
-
-            if (artifacts.total_count === 0) {
-              core.warning('No downloadable artifacts to delete');
-              return;
-            } else {
-              core.info(`Found ${artifacts.total_count} artifacts to delete`);
-            }
-
-            for (const artifact of artifacts.artifacts) {
-              core.info(`Deleting artifact ${artifact.name} (${artifact.id})`);
-              await github.rest.actions.deleteArtifact({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                artifact_id: artifact.id,
-              });
-            }
-
       - name: Display structure of downloaded files
         run: ls -lhR artifacts
 
