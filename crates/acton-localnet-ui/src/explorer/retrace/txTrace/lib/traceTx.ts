@@ -1,5 +1,5 @@
-import {retrace} from "txtracer-core"
-import type {TraceResult} from "txtracer-core/dist/types"
+import {RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK, retrace} from "txtracer-core"
+import type {RetraceNetworkConfig, TraceResult} from "txtracer-core"
 import {compileCellWithMapping, decompileCell} from "ton-assembly/dist/runtime/instr"
 import {createMappingInfo} from "ton-assembly/dist/trace/mapping"
 import {type Step, type TraceInfo} from "ton-assembly/dist/trace"
@@ -21,17 +21,24 @@ import {
   TxTraceError,
 } from "./errors"
 
-function getRetraceTestnetFlag(network: ExplorerNetworkInfo): boolean {
-  if (network.id === "mainnet") {
-    return false
-  }
-  if (network.id === "testnet") {
-    return true
+function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkConfig {
+  if (network.api) {
+    return {
+      testnet: network.testOnly,
+      v2BaseUrl: network.api.v2BaseUrl,
+      v3BaseUrl: network.api.v3BaseUrl,
+      toncenterApiKey: network.api.toncenterApiKey,
+    }
   }
 
-  throw new TxTraceError(
-    `Retrace is not supported for ${network.label}. Only Mainnet and Testnet are supported.`,
-  )
+  if (network.id === "mainnet") {
+    return RETRACE_MAINNET_NETWORK
+  }
+  if (network.id === "testnet") {
+    return RETRACE_TESTNET_NETWORK
+  }
+
+  throw new TxTraceError(`Retrace is not configured for ${network.label}.`)
 }
 
 async function doTrace(
@@ -39,7 +46,7 @@ async function doTrace(
   network: ExplorerNetworkInfo,
 ): Promise<{readonly result: TraceResult; readonly network: ExplorerNetworkInfo}> {
   try {
-    const result = await retrace(getRetraceTestnetFlag(network), hash.toLowerCase())
+    const result = await retrace(getRetraceNetworkConfig(network), hash.toLowerCase())
     return {result, network}
   } catch (e: unknown) {
     let message = "An unknown error occurred."
@@ -50,11 +57,11 @@ async function doTrace(
       message = String(e)
     }
 
-    if (/status code 429/i.test(message)) {
+    if (/status code 429|HTTP 429|\(429\)/i.test(message)) {
       throw new TooManyRequests(undefined, e)
     }
 
-    if (/status code 422/i.test(message)) {
+    if (/status code 422|HTTP 422|\(422\)/i.test(message)) {
       throw new TxHashInvalidError(undefined, e)
     }
 

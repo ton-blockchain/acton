@@ -1,0 +1,75 @@
+.root {
+  min-width: 0;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 16px;
+  background: var(--tonscan-card-bg);
+  overflow: visible;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 0 0 18px;
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.title {
+  color: var(--litenode-text);
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 0 16px 0 0;
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition: color var(--transition-duration-fast);
+}
+
+.closeButton:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.content {
+  min-width: 0;
+  border-radius: 0 0 16px 16px;
+}
+
+.loadingState,
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 360px;
+}
+
+.errorState {
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+}
+
+.errorTitle {
+  color: var(--tonscan-error);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.errorMessage {
+  max-width: 760px;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1.45;
+}

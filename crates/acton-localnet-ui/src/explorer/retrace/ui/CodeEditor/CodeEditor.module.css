@@ -97,10 +97,22 @@
 
 .editorWrapper {
   position: relative;
+  display: flex;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
 
   background-color: var(--color-background-primary);
+}
+
+.editor {
+  flex: 1;
+  width: 100% !important;
+  min-width: 0;
+  min-height: 0;
 }
 
 .editorWrapperWithBorderRadius {

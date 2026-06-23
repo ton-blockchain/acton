@@ -1,32 +1,87 @@
 .container {
+  --trace-line-height: 21px;
+  --trace-line-number-width: 47px;
+  --trace-scrollbar-thumb: rgb(100 100 100 / 24%);
+  --trace-scrollbar-thumb-active: rgb(100 100 100 / 40%);
+  --trace-scrollbar-thumb-hover: rgb(100 100 100 / 50%);
+
   flex: 1;
+  box-sizing: border-box;
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 0;
-  padding: var(--spacing-sm) 0 var(--spacing-xs) 0;
-  background-color: var(--color-background-primary);
+  padding: 0;
+  background-color: var(--trace-editor-background);
+  scrollbar-color: var(--trace-scrollbar-thumb) transparent;
+  scrollbar-width: auto;
+}
+
+.container::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.container::-webkit-scrollbar-thumb {
+  min-height: 24px;
+  border: 0;
+  border-radius: 0;
+  background-color: var(--trace-scrollbar-thumb);
+  transition: background-color 160ms ease;
+}
+
+.container:hover::-webkit-scrollbar-thumb,
+.container:focus-within::-webkit-scrollbar-thumb {
+  background-color: var(--trace-scrollbar-thumb-active);
+}
+
+.container::-webkit-scrollbar-thumb:hover {
+  background-color: var(--trace-scrollbar-thumb-hover);
+}
+
+.container::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .stepItem {
+  position: relative;
+  flex: 0 0 auto;
+  box-sizing: border-box;
   border: none;
   background: transparent;
   border-radius: 0;
-  padding: 4px 15px 4px 6px;
-  min-height: 24px;
+  padding: 0;
+  min-height: var(--trace-line-height);
   display: grid;
-  grid-template-columns: 24px minmax(0, 1fr) auto;
+  grid-template-columns: var(--trace-line-number-width) minmax(0, 1fr) auto;
   align-items: center;
-  gap: var(--spacing-mds);
+  gap: 0;
   text-align: left;
-  color: var(--color-text-primary);
+  color: var(--trace-editor-text);
+  font-family: "JetBrains Mono", var(--font-family-mono), monospace;
+  font-size: 14px;
+  line-height: var(--trace-line-height);
   cursor: pointer;
   transition: background-color var(--transition-duration-fast) ease;
 }
 
 .stepItem:hover {
+  background-color: transparent;
+}
+
+.stepItem:hover::before {
+  position: absolute;
+  inset: 0 0 0 var(--trace-line-number-width);
+  content: "";
   background-color: var(--editor-clickable-line-bg);
+  pointer-events: none;
 }
 
 .stepItem:focus-visible {
@@ -35,27 +90,45 @@
 }
 
 .stepItemActive {
+  background-color: transparent;
+  box-shadow: none;
+}
+
+.stepItemActive::before,
+.stepItemActive:hover::before {
+  position: absolute;
+  inset: 0 0 0 var(--trace-line-number-width);
+  content: "";
   background-color: var(--color-highlight-bg);
-  box-shadow: inset 3px 0 0 var(--color-primary);
+  pointer-events: none;
+}
+
+.stepItem > * {
+  position: relative;
+  z-index: 1;
 }
 
 .stepIndex {
   min-width: 0;
-  padding: 0 5px 0 0;
+  padding: 0 22px 0 0;
   border-radius: 0;
   background: transparent;
-  color: var(--color-text-secondary);
-  font-family: var(--font-family-mono), monospace;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  color: var(--trace-editor-line-number);
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
-  line-height: 1.2;
+  line-height: var(--trace-line-height);
   text-align: right;
 }
 
+.stepItemActive .stepIndex {
+  color: var(--trace-editor-active-line-number);
+}
+
 .stepName {
-  font-family: var(--font-family-mono), monospace;
-  font-size: var(--font-size-sm);
+  font-family: inherit;
+  font-size: inherit;
   color: var(--syntax-keyword);
   white-space: nowrap;
   flex-shrink: 0;
@@ -69,26 +142,26 @@
   display: inline-flex;
   align-items: baseline;
   min-width: 0;
-  gap: var(--spacing-sm);
+  gap: 8px;
   overflow: hidden;
-  line-height: 1.2;
+  line-height: var(--trace-line-height);
 }
 
 .stepArgs {
   display: block;
-  font-family: var(--font-family-mono), monospace;
-  font-size: var(--font-size-sm);
+  font-family: inherit;
+  font-size: inherit;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .stepArgText {
-  color: var(--color-text-primary);
+  color: var(--trace-editor-text);
 }
 
 .stepArgSeparator {
-  color: var(--color-text-secondary);
+  color: var(--trace-editor-text);
 }
 
 .stepArgStackRegister {
@@ -113,9 +186,12 @@
 }
 
 .stepGas {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  color: var(--trace-editor-line-number);
+  padding-right: 10px;
+  padding-left: 16px;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: var(--trace-line-height);
   white-space: nowrap;
 }
 

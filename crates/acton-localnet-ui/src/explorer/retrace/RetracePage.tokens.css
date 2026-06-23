@@ -75,6 +75,10 @@
     rgb(255 243 205 / 55%) 65%,
     rgb(255 243 205 / 0%) 100%
   );
+  --trace-editor-background: #fffffe;
+  --trace-editor-text: #000;
+  --trace-editor-line-number: #237893;
+  --trace-editor-active-line-number: #0b216f;
 
   --color-details-header: var(--color-background-primary);
 
@@ -317,6 +321,10 @@ html.dark-theme .retraceRoot {
     rgb(var(--color-error-rgb, 255, 0, 0), 0.05) 65%,
     rgb(var(--color-error-rgb, 255, 0, 0), 0) 100%
   );
+  --trace-editor-background: #1c1c1e;
+  --trace-editor-text: #d4d4d4;
+  --trace-editor-line-number: #858585;
+  --trace-editor-active-line-number: #c6c6c6;
 
   --color-details-header: var(--color-background-primary);
 

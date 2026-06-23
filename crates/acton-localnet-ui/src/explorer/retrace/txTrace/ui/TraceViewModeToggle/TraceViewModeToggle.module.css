@@ -7,41 +7,71 @@
 .toggle {
   display: inline-flex;
   width: fit-content;
-  background-color: var(--color-background-secondary);
-  border-radius: var(--border-radius-full);
-  padding: 4px;
-  gap: 4px;
+  align-items: center;
+  gap: 0;
+  min-height: 34px;
+  padding: 0;
+  margin: 0 0 -1px;
+  overflow-x: auto;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  scrollbar-width: none;
+}
+
+.toggle::-webkit-scrollbar {
+  display: none;
 }
 
 .button {
-  border: none;
-  background: transparent;
-  color: var(--color-text-secondary);
-  border-radius: var(--border-radius-full);
-  padding: var(--spacing-xs) var(--spacing-sm);
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  font-size: var(--font-size-xs);
+  min-height: 34px;
+  padding: 8px 18px;
+  gap: 8px;
+  border: 1px solid var(--tonscan-border);
+  border-left-width: 0;
+  border-radius: 0;
+  color: var(--tonscan-text-secondary);
+  background: var(--tonscan-row-hover);
+  font: inherit;
+  font-size: 13px;
   font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast) ease,
-    color var(--transition-duration-fast) ease;
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.button:first-child {
+  border-left-width: 1px;
+  border-radius: 8px 0 0;
+}
+
+.button:last-child {
+  border-radius: 0 8px 0 0;
 }
 
 .button:hover {
-  color: var(--color-text-primary);
+  color: var(--tonscan-text-primary);
 }
 
 .buttonActive {
-  background-color: var(--color-background-primary);
-  color: var(--color-text-primary);
-  box-shadow: var(--shadow-sm);
+  position: relative;
+  z-index: 1;
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-bg);
+  border-bottom-color: var(--tonscan-border);
 }
 
 .icon {
-  font-size: 14px;
+  width: 16px;
+  height: 16px;
+  color: currentColor;
+  flex: 0 0 auto;
 }
 
 @media (width <= 768px) {
@@ -50,6 +80,6 @@
   }
 
   .button {
-    padding: 4px var(--spacing-xs);
+    padding: 8px 12px;
   }
 }

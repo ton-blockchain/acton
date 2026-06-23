@@ -98,6 +98,9 @@ interface CodeEditorProps {
 
   /** Optional explicit Monaco model path to avoid sharing models between editors */
   readonly modelPath?: string
+
+  /** Use tighter Monaco gutters for embedded read-only trace views. */
+  readonly compactGutter?: boolean
 }
 
 // use local instance of monaco
@@ -139,6 +142,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   funcGasByLine,
   needFloatingTip = lineExecutionData && language === "tasm",
   modelPath,
+  compactGutter = false,
 }) => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const [editorReady, setEditorReady] = useState(false)
@@ -365,6 +369,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
         }
       >
         <Editor
+          className={styles.editor}
           height="100%"
           width="100%"
           language={language}
@@ -385,7 +390,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             insertSpaces: true,
             detectIndentation: false,
             fontFamily: "JetBrains Mono",
-            glyphMargin: true,
+            glyphMargin: !compactGutter,
+            lineDecorationsWidth: compactGutter ? 6 : undefined,
+            lineNumbersMinChars: compactGutter ? 2 : undefined,
             folding: true,
             foldingStrategy: "auto",
             stickyScroll: {enabled: false},

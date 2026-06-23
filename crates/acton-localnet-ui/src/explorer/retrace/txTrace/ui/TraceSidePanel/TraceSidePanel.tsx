@@ -103,6 +103,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
           <div className={styles.navigationControls}>
             <Button
               variant="ghost"
+              size="sm"
               onClick={onFirst}
               className={styles.navButton}
               disabled={!canGoPrev || totalSteps === 0}
@@ -113,6 +114,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={onPrev}
               className={styles.navButton}
               disabled={!canGoPrev || totalSteps === 0}
@@ -123,6 +125,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={onNext}
               className={styles.navButton}
               disabled={!canGoNext || totalSteps === 0}
@@ -133,6 +136,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             </Button>
             <Button
               variant="ghost"
+              size="sm"
               onClick={onLast}
               className={styles.navButton}
               disabled={!canGoNext || totalSteps === 0}

@@ -1,5 +1,5 @@
 import {Cell, loadTransaction} from "@ton/core"
-import type {TraceResult} from "txtracer-core/dist/types"
+import type {TraceResult} from "txtracer-core"
 
 import type {TransactionInfo} from "@acton/shared-ui"
 
@@ -20,8 +20,8 @@ export function toTransactionInfo(result: TraceResult): TransactionInfo {
     outActions: result.emulatedTx.actions,
     contractName: undefined,
     contractAbi: undefined,
-    shardAccountBefore: "",
-    shardAccountAfter: "",
+    shardAccountBefore: result.account.shardAccountBefore,
+    shardAccountAfter: result.account.shardAccountAfter,
     accountBalanceBefore: result.money.balanceBefore,
     accountBalanceAfter: result.money.balanceAfter,
     parsedBody: undefined,

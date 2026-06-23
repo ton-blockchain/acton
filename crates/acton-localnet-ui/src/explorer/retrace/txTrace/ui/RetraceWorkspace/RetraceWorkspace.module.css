@@ -1,0 +1,146 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 12px;
+  min-height: 0;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.toolbarLeft {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.statusContainer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  margin-left: 18px;
+  margin-bottom: 6px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: 0;
+  height: clamp(520px, 66vh, 720px);
+  min-height: 0;
+  padding: 0;
+  border-radius: 0 0 16px 16px;
+  overflow: hidden;
+  background: var(--tonscan-card-bg);
+}
+
+.codeArea {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 0 0 0 16px;
+  background: var(--color-background-primary);
+}
+
+.codeEditorWrapper {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.codeEditorHidden {
+  display: none;
+}
+
+.editorLoader {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.editorLoader > * {
+  margin-top: 0;
+}
+
+.stackItemOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 0 0 0 16px;
+  background: var(--color-background-primary);
+}
+
+.sidePanel {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace .sidePanel {
+  border-left: 1px solid var(--tonscan-border);
+  border-radius: 0 0 16px 0;
+  box-shadow: none;
+}
+
+@media (width <= 980px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(420px, 1fr) minmax(340px, 0.8fr);
+    height: auto;
+    min-height: 0;
+  }
+
+  .codeArea {
+    border-radius: 0;
+  }
+
+  .stackItemOverlay {
+    border-radius: 0;
+  }
+
+  .workspace .sidePanel {
+    border-top: 1px solid var(--tonscan-border);
+    border-left: 0;
+    border-radius: 0 0 16px 16px;
+  }
+}
+
+@media (width <= 768px) {
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbarLeft {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .statusContainer {
+    justify-content: flex-start;
+    margin-bottom: 8px;
+  }
+}

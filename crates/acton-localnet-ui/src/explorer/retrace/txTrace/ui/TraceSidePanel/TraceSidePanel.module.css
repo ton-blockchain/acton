@@ -13,13 +13,14 @@
 .stepDetails {
   background-color: var(--color-background-primary);
   height: 100%;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .stepHeader {
-  padding: var(--spacing-md) var(--spacing-md) 0 var(--spacing-md);
+  padding: 12px var(--spacing-md) 0 var(--spacing-md);
   background-color: var(--color-background-primary);
   border-bottom: 1px solid var(--color-divider);
   margin-bottom: 0;
@@ -65,7 +66,8 @@
 
 .stackViewerContainer {
   flex: 1;
-  overflow: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   padding: var(--spacing-md);
@@ -92,30 +94,21 @@
   justify-content: space-between;
   gap: var(--spacing-sm);
   padding: 0;
-  margin-bottom: var(--spacing-md);
+  margin-bottom: 12px;
 }
 
 .navButton {
   background-color: var(--color-background-secondary);
   border: none;
   border-radius: 6px;
-  padding: 8px 16px;
+  height: 32px;
+  padding: 0 12px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
   flex: 1;
   transition: border-color 0.2s;
   color: var(--color-text-secondary);
-}
-
-.stepDetails {
-  height: 100%;
-  overflow: hidden;
-}
-
-.stackViewerContainer {
-  flex-shrink: 1;
-  min-height: 150px;
 }
 
 @media (width <= 768px) {
@@ -127,9 +120,11 @@
 
   .stepDetails {
     height: 100%;
+    min-height: 0;
   }
 
   .stackViewerContainer {
     flex: 1;
+    min-height: 0;
   }
 }
