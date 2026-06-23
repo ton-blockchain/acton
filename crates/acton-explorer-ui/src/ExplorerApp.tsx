@@ -42,11 +42,13 @@ const DEFAULT_CUSTOM_NETWORK_NAME = "Devnet"
 const SHARED_NETWORK_NAME_QUERY_PARAM = "network.name"
 const SHARED_NETWORK_V2_QUERY_PARAM = "network.v2"
 const SHARED_NETWORK_V3_QUERY_PARAM = "network.v3"
+const SHARED_NETWORK_TEST_ONLY_QUERY_PARAM = "network.testOnly"
 const SHARED_NETWORK_ACTIONS_QUERY_PARAM = "network.actions"
 const SHARED_NETWORK_QUERY_PARAMS = [
   SHARED_NETWORK_NAME_QUERY_PARAM,
   SHARED_NETWORK_V2_QUERY_PARAM,
   SHARED_NETWORK_V3_QUERY_PARAM,
+  SHARED_NETWORK_TEST_ONLY_QUERY_PARAM,
   SHARED_NETWORK_ACTIONS_QUERY_PARAM,
 ] as const
 
@@ -258,12 +260,14 @@ const createCustomExplorerNetwork = ({
   v2BaseUrl,
   v3BaseUrl,
   toncenterApiKey,
+  testOnly,
   supportsActions,
 }: {
   readonly label: string
   readonly v2BaseUrl: string
   readonly v3BaseUrl: string
   readonly toncenterApiKey?: string
+  readonly testOnly: boolean
   readonly supportsActions: boolean
 }): SelectableExplorerNetwork => {
   const normalizedV2BaseUrl = normalizeCustomApiUrl(v2BaseUrl, "V2 endpoint")
@@ -272,7 +276,7 @@ const createCustomExplorerNetwork = ({
   return {
     id: customNetworkId(normalizedV3BaseUrl),
     label: normalizedLabel,
-    testOnly: false,
+    testOnly,
     supportsActions,
     api: {
       v2BaseUrl: normalizedV2BaseUrl,
@@ -300,6 +304,7 @@ const readSharedCustomExplorerNetwork = (): SelectableExplorerNetwork | undefine
       v2BaseUrl,
       v3BaseUrl,
       toncenterApiKey: undefined,
+      testOnly: isTruthyQueryValue(params.get(SHARED_NETWORK_TEST_ONLY_QUERY_PARAM)),
       supportsActions: isTruthyQueryValue(params.get(SHARED_NETWORK_ACTIONS_QUERY_PARAM)),
     })
   } catch {
@@ -342,6 +347,7 @@ const createNetworkShareUrl = (network: SelectableExplorerNetwork): string => {
     url.searchParams.set(SHARED_NETWORK_NAME_QUERY_PARAM, network.label)
     url.searchParams.set(SHARED_NETWORK_V2_QUERY_PARAM, network.api.v2BaseUrl)
     url.searchParams.set(SHARED_NETWORK_V3_QUERY_PARAM, network.api.v3BaseUrl)
+    url.searchParams.set(SHARED_NETWORK_TEST_ONLY_QUERY_PARAM, network.testOnly ? "1" : "0")
     if (network.supportsActions) {
       url.searchParams.set(SHARED_NETWORK_ACTIONS_QUERY_PARAM, "1")
     }
@@ -399,6 +405,7 @@ function NetworkDropdown({
   const [customV2Url, setCustomV2Url] = useState("")
   const [customV3Url, setCustomV3Url] = useState("")
   const [customApiKey, setCustomApiKey] = useState("")
+  const [customTestOnly, setCustomTestOnly] = useState(true)
   const [customSupportsActions, setCustomSupportsActions] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const selectedNetwork = networks.find(network => network.id === value) ?? networks[0]
@@ -409,6 +416,7 @@ function NetworkDropdown({
     setCustomV2Url("")
     setCustomV3Url("")
     setCustomApiKey("")
+    setCustomTestOnly(true)
     setCustomSupportsActions(false)
   }, [])
   const closeDropdown = useCallback(() => {
@@ -422,6 +430,7 @@ function NetworkDropdown({
     setCustomV2Url("")
     setCustomV3Url("")
     setCustomApiKey("")
+    setCustomTestOnly(true)
     setCustomSupportsActions(false)
   }, [])
 
@@ -435,6 +444,7 @@ function NetworkDropdown({
     setCustomV2Url(network.api.v2BaseUrl)
     setCustomV3Url(network.api.v3BaseUrl)
     setCustomApiKey(network.api.toncenterApiKey ?? "")
+    setCustomTestOnly(network.testOnly)
     setCustomSupportsActions(network.supportsActions)
   }, [])
 
@@ -449,6 +459,7 @@ function NetworkDropdown({
         v2BaseUrl: customV2Url,
         v3BaseUrl: customV3Url,
         toncenterApiKey: customApiKey,
+        testOnly: customTestOnly,
         supportsActions: customSupportsActions,
       })
       if (networkFormMode.type === "edit") {
@@ -473,6 +484,7 @@ function NetworkDropdown({
     customApiKey,
     customName,
     customSupportsActions,
+    customTestOnly,
     customV2Url,
     customV3Url,
     networkFormMode,
@@ -701,6 +713,20 @@ function NetworkDropdown({
                     autoComplete="off"
                     disabled={!isNetworkFormOpen}
                   />
+                </label>
+                <label className={styles.networkCheckboxRow}>
+                  <input
+                    type="checkbox"
+                    checked={customTestOnly}
+                    disabled={!isNetworkFormOpen}
+                    onChange={event => setCustomTestOnly(event.target.checked)}
+                  />
+                  <span className={styles.networkCheckboxText}>
+                    <span className={styles.networkCheckboxLabel}>Testnet addresses</span>
+                    <span className={styles.networkCheckboxDescription}>
+                      Copy addresses and open links as testnet addresses.
+                    </span>
+                  </span>
                 </label>
                 <label className={styles.networkCheckboxRow}>
                   <input
