@@ -1,0 +1,42 @@
+.exitCode {
+  font-size: var(--font-size-xsm);
+  font-weight: var(--font-weight-medium);
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  display: inline-block;
+  cursor: help;
+  transition: all 0.2s ease;
+}
+
+.success {
+  background-color: var(--color-success-bg);
+  color: var(--color-success-text);
+}
+
+.error {
+  background-color: var(--color-error-bg);
+  color: var(--color-error-text);
+}
+
+.exitCodeName {
+  font-weight: var(--font-weight-normal);
+  opacity: 0.8;
+}
+
+.tooltipContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.tooltipLabel {
+  font-weight: var(--font-weight-semibold);
+}
+
+.tooltipDescription {
+  margin-top: var(--spacing-xs);
+}
+
+.tooltipPhase {
+  margin-top: var(--spacing-xs);
+}

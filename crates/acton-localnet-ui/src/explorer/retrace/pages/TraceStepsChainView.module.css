@@ -1,0 +1,130 @@
+.container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--spacing-sm) 0 var(--spacing-xs) 0;
+  background-color: var(--color-background-primary);
+}
+
+.stepItem {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 4px 15px 4px 6px;
+  min-height: 24px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-mds);
+  text-align: left;
+  color: var(--color-text-primary);
+  cursor: pointer;
+  transition: background-color var(--transition-duration-fast) ease;
+}
+
+.stepItem:hover {
+  background-color: var(--editor-clickable-line-bg);
+}
+
+.stepItem:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.stepItemActive {
+  background-color: var(--color-highlight-bg);
+  box-shadow: inset 3px 0 0 var(--color-primary);
+}
+
+.stepIndex {
+  min-width: 0;
+  padding: 0 5px 0 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-family-mono), monospace;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  text-align: right;
+}
+
+.stepName {
+  font-family: var(--font-family-mono), monospace;
+  font-size: var(--font-size-sm);
+  color: var(--syntax-keyword);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.stepNameImplicitRet {
+  color: var(--color-warning-text);
+}
+
+.stepInstruction {
+  display: inline-flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: var(--spacing-sm);
+  overflow: hidden;
+  line-height: 1.2;
+}
+
+.stepArgs {
+  display: block;
+  font-family: var(--font-family-mono), monospace;
+  font-size: var(--font-size-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stepArgText {
+  color: var(--color-text-primary);
+}
+
+.stepArgSeparator {
+  color: var(--color-text-secondary);
+}
+
+.stepArgStackRegister {
+  color: var(--syntax-number);
+}
+
+.stepArgControlRegister {
+  color: var(--syntax-number);
+}
+
+.stepArgHexBlob {
+  color: var(--syntax-number);
+  font-style: italic;
+}
+
+.stepArgNumber {
+  color: var(--syntax-number);
+}
+
+.stepArgImplicitRet {
+  color: var(--color-warning-text);
+}
+
+.stepGas {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.emptyState {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  padding: var(--spacing-md);
+  background-color: var(--color-background-primary);
+}

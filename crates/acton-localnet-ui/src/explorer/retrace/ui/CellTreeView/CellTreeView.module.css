@@ -1,0 +1,113 @@
+.cellNode {
+  padding: 4px;
+  border-radius: 4px;
+  border-left: 1px solid var(--color-divider);
+  margin-top: var(--spacing-xs);
+  margin-bottom: var(--spacing-xs);
+  display: block;
+  width: 100%;
+}
+
+.cellNodeColor1 {
+  background-color: var(--cell-bg-color-1);
+}
+
+.cellNodeColor1:hover {
+  background-color: var(--cell-bg-color-1-hover);
+}
+
+.cellNodeColor2 {
+  background-color: var(--cell-bg-color-2);
+}
+
+.cellNodeColor2:hover {
+  background-color: var(--cell-bg-color-2-hover);
+}
+
+.cellNodeColor3 {
+  background-color: var(--cell-bg-color-3);
+}
+
+.cellNodeColor3:hover {
+  background-color: var(--cell-bg-color-3-hover);
+}
+
+.cellNodeColor4 {
+  background-color: var(--cell-bg-color-4);
+}
+
+.cellNodeColor4:hover {
+  background-color: var(--cell-bg-color-4-hover);
+}
+
+.cellNodeColor5 {
+  background-color: var(--cell-bg-color-5);
+}
+
+.cellNodeColor5:hover {
+  background-color: var(--cell-bg-color-5-hover);
+}
+
+.cellInfo {
+  padding: var(--spacing-sm) var(--spacing-xl) var(--spacing-sm) var(--spacing-sm);
+  border-radius: var(--border-radius-sm);
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  display: block;
+  position: relative;
+  margin-left: var(--spacing-sm);
+  transition: background-color var(--transition-duration-fast) ease;
+}
+
+.cellTextContent {
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.cellTextContent strong {
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+}
+
+.cellInfoClickable {
+  cursor: pointer;
+}
+
+.cellRefs {
+  padding-left: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+}
+
+.refsToggle {
+  display: inline-block;
+  margin-right: 4px;
+  user-select: none;
+}
+
+.copyButton {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  padding: 2px;
+  border: none;
+  background-color: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color 0.1s ease;
+  line-height: 1;
+}
+
+.copyButton:hover {
+  color: var(--color-text-primary);
+  background-color: transparent;
+  border: none;
+}
+
+.copyButton svg {
+  display: block;
+}
+
+.copyButton.copied svg {
+  stroke: var(--color-success);
+}

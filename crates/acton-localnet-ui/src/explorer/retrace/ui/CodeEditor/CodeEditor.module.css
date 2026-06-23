@@ -1,0 +1,165 @@
+:global(.monaco-editor .highlighted-line) {
+  background-color: var(--color-highlight-bg) !important;
+  cursor: grab !important;
+}
+
+:global(.monaco-editor .implicit-ret-line) {
+  position: relative;
+  background: var(--color-highlight-gradient) !important;
+}
+
+:global(.monaco-editor .faded-text) {
+  opacity: 0.9 !important;
+  color: var(--editor-faded-text-color) !important;
+}
+
+:global(.monaco-editor .clickable-line) {
+  cursor: pointer !important;
+  background-color: var(--editor-clickable-line-bg) !important;
+  transition: background-color var(--transition-duration-fast) ease;
+}
+
+:global(.monaco-editor .clickable-line-decoration) {
+  width: 3px !important;
+  margin-left: 3px;
+  background-color: var(--color-primary) !important;
+}
+
+:global(.monaco-editor .hovered-line) {
+  background-color: var(--editor-hovered-line-bg) !important;
+  border-left: 3px solid var(--editor-hovered-line-border) !important;
+  cursor: grab !important;
+}
+
+:global(.monaco-editor .source-map-hovered-line) {
+  background-color: rgb(255 215 0 / 25%) !important;
+  border-left: 4px solid #ffd700 !important;
+  transition: background-color 0.2s ease;
+  box-shadow: inset 0 0 0 1px rgb(255 215 0 / 20%) !important;
+}
+
+:global(.monaco-editor .precise-highlight) {
+  background-color: rgb(255 0 0 / 10%) !important;
+  box-shadow: inset 0 0 0 2px rgb(255 0 0 / 20%) !important;
+  border-radius: var(--border-radius-sm) !important;
+  font-weight: bold !important;
+}
+
+:global(.monaco-editor .source-map-group-0) {
+  background-color: rgb(255 107 107 / 15%) !important;
+  border-left: 3px solid #ff6b6b !important;
+}
+
+:global(.monaco-editor .source-map-group-1) {
+  background-color: rgb(78 205 196 / 15%) !important;
+  border-left: 3px solid #4ecdc4 !important;
+}
+
+:global(.monaco-editor .source-map-group-2) {
+  background-color: rgb(69 183 209 / 15%) !important;
+  border-left: 3px solid #45b7d1 !important;
+}
+
+:global(.monaco-editor .source-map-group-3) {
+  background-color: rgb(150 206 180 / 15%) !important;
+  border-left: 3px solid #96ceb4 !important;
+}
+
+:global(.monaco-editor .source-map-group-4) {
+  background-color: rgb(255 234 167 / 15%) !important;
+  border-left: 3px solid #ffeaa7 !important;
+}
+
+:global(.monaco-editor .source-map-group-5) {
+  background-color: rgb(221 160 221 / 15%) !important;
+  border-left: 3px solid #dda0dd !important;
+}
+
+:global(.monaco-editor .source-map-group-6) {
+  background-color: rgb(152 216 200 / 15%) !important;
+  border-left: 3px solid #98d8c8 !important;
+}
+
+:global(.monaco-editor .source-map-group-7) {
+  background-color: rgb(247 220 111 / 15%) !important;
+  border-left: 3px solid #f7dc6f !important;
+}
+
+:global(.monaco-editor .source-map-group-8) {
+  background-color: rgb(187 143 206 / 15%) !important;
+  border-left: 3px solid #bb8fce !important;
+}
+
+:global(.monaco-editor .source-map-group-9) {
+  background-color: rgb(133 193 233 / 15%) !important;
+  border-left: 3px solid #85c1e9 !important;
+}
+
+.editorWrapper {
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+
+  background-color: var(--color-background-primary);
+}
+
+.editorWrapperWithBorderRadius {
+  composes: editorWrapper;
+  border-radius: var(--border-radius-lg);
+}
+
+.editorWrapperWithoutBorderRadius {
+  composes: editorWrapper;
+  border-radius: 0 !important;
+}
+
+.editorHint {
+  position: absolute;
+  bottom: var(--spacing-md);
+  right: var(--spacing-md);
+  background-color: var(--color-hint-background);
+  color: var(--color-hint-text);
+  padding: 8px 12px;
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-xs);
+  display: flex;
+  align-items: center;
+  z-index: 100;
+  opacity: 0.5;
+  transition: opacity var(--transition-duration-normal);
+  backdrop-filter: blur(var(--blur-radius-sm));
+  user-select: none;
+}
+
+.editorHint:hover {
+  opacity: 0.75;
+}
+
+kbd {
+  background-color: var(--color-hint-kbd-background);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  color: var(--color-hint-text);
+  display: inline-block;
+  font-size: var(--font-size-xs);
+  padding: 3px 6px;
+  margin: 0 var(--spacing-xs);
+  font-family: var(--font-family-mono), serif;
+}
+
+.clickIcon {
+  font-size: 1.1em;
+  margin: 0 var(--spacing-xs);
+  vertical-align: middle;
+}
+
+.hintDivider {
+  margin: 0 var(--spacing-sm);
+  color: var(--color-hint-divider-text);
+}
+
+@media (width <= 768px) {
+  .editorHint {
+    display: none;
+  }
+}

@@ -1,0 +1,145 @@
+.container {
+  background-color: var(--color-background-secondary);
+  border-radius: var(--border-radius-sm);
+  padding: var(--spacing-sm);
+  overflow: auto;
+  white-space: pre-wrap;
+  position: relative;
+}
+
+.container:hover .copyButton {
+  opacity: 1;
+  visibility: visible;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+  line-height: 1;
+  margin-top: -3px;
+}
+
+.title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.copyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs);
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  border-radius: var(--border-radius-sm);
+  color: var(--color-text-secondary);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.2s ease,
+    visibility 0.2s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.copyButton:hover {
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+}
+
+.copyButton:active {
+  background-color: var(--color-border);
+}
+
+.copyButton.copied {
+  opacity: 1;
+  visibility: visible;
+  color: var(--color-success, #22c55e);
+}
+
+.copyButton.copied svg {
+  animation: popIn 0.2s ease-out;
+}
+
+.copyButton svg {
+  display: block;
+  flex-shrink: 0;
+}
+
+.content {
+  font-family: var(--font-family-mono), monospace;
+  font-size: var(--font-size-xs);
+  line-height: 1.4;
+}
+
+.contentAssembly {
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.contentHex {
+  color: var(--color-text-secondary);
+  word-break: break-all;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.contentSmallHex {
+  color: var(--color-text-secondary);
+  word-break: break-all;
+  max-height: 50px;
+  overflow-y: auto;
+}
+
+.inlineContainer {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  position: relative;
+}
+
+.inlineContainer:hover .inlineCopyButton {
+  opacity: 1;
+  visibility: visible;
+}
+
+.contentInline {
+  background: var(--color-background-secondary);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.inlineCopyButton {
+  padding: calc(var(--spacing-xs) * 0.5);
+  min-width: 20px;
+  min-height: 20px;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.inlineCopyButton.copied {
+  opacity: 1;
+  visibility: visible;
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}

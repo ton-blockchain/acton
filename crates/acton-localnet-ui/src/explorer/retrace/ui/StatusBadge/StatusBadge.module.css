@@ -1,0 +1,38 @@
+.statusBase {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: var(--font-weight-medium);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-md);
+  font-size: var(--font-size-sm);
+  border: 1px solid;
+}
+
+.statusSuccess {
+  composes: statusBase;
+  color: var(--color-success-text);
+  background-color: var(--color-success-bg);
+  border-color: var(--status-badge-success-border-color);
+}
+
+.statusFailed {
+  composes: statusBase;
+  color: var(--color-error-text);
+  background-color: var(--color-error-bg);
+  border-color: var(--status-badge-failed-border-color);
+}
+
+.statusWarning {
+  composes: statusBase;
+  color: var(--color-warning-text, #8a6d3b);
+  background-color: var(--color-warning-bg, #fff8e1);
+  border-color: var(--status-badge-warning-border-color);
+}
+
+.statusPending {
+  composes: statusBase;
+  color: var(--color-warning-text);
+  background-color: var(--color-warning-bg);
+  border-color: var(--status-badge-pending-border-color);
+}

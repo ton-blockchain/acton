@@ -1,0 +1,44 @@
+.addressValue {
+  color: var(--color-primary);
+  text-decoration: none;
+  background-color: rgb(var(--color-primary-rgb), 0.08);
+  border-radius: var(--border-radius-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: default;
+  font-family: var(--font-family-mono), monospace;
+  font-size: var(--font-size-sm);
+  line-height: var(--font-size-base);
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.addressValue:hover {
+  text-decoration: none;
+}
+
+.copyIcon {
+  color: var(--color-primary);
+}
+
+.copyIcon:hover {
+  opacity: 1;
+  background-color: rgb(var(--color-primary-rgb), 0.1);
+}
+
+.copyIcon.copied {
+  color: var(--color-primary);
+  opacity: 1;
+  background-color: transparent;
+}
+
+.copyIcon.copied svg {
+  stroke: var(--color-primary);
+  animation: popIn 0.2s ease-out;
+}

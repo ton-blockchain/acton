@@ -1,0 +1,61 @@
+.container {
+  width: 100%;
+}
+
+.label {
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+  margin-bottom: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.contentWrapper {
+  position: relative;
+  border-radius: var(--border-radius-sm);
+  background-color: var(--table-code-bg-color);
+  border: 1px solid var(--color-border);
+}
+
+.contentWrapper:hover .copyButton {
+  opacity: 1;
+}
+
+.content {
+  font-family: "JetBrains Mono", var(--font-family-mono), monospace;
+  font-size: var(--font-size-xss);
+  color: var(--table-code-text-color);
+  padding: var(--spacing-sm) var(--spacing-sm) var(--spacing-sm) var(--spacing-mds);
+  margin-top: 0;
+  margin-bottom: 0;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  overflow-x: auto;
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
+
+.copyButton {
+  position: absolute;
+  top: var(--spacing-sm);
+  right: var(--spacing-sm);
+  z-index: 1;
+  line-height: 1 !important;
+  background-color: var(--color-background-primary);
+  border: 0;
+  opacity: 0;
+}
+
+.copyButton:hover {
+  opacity: 1;
+}
+
+.copyButton svg {
+  width: 16px;
+  height: 16px;
+  stroke: var(--color-text-secondary);
+}
+
+.copyButton:hover svg {
+  stroke: var(--color-text-primary);
+}

@@ -1,0 +1,48 @@
+.opcodeChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text-primary);
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.opcodeText {
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.opcodeSubText {
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  background-color: var(--color-background-primary);
+  opacity: 0;
+  border-radius: 2px;
+  padding: 0;
+}
+
+.opcodeChip:hover .copyButton {
+  opacity: 1;
+}
+
+.copyButton:active {
+  transform: scale(0.95);
+}
+
+.copyButton svg {
+  width: 12px;
+  height: 12px;
+}

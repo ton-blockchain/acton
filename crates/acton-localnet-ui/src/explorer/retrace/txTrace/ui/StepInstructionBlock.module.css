@@ -1,0 +1,39 @@
+.stepInstructionContainer {
+  overflow: hidden;
+
+  background-color: var(--color-background-secondary);
+  border-radius: 4px;
+  position: relative;
+  text-align: center;
+
+  margin-bottom: var(--spacing-md);
+}
+
+.instructionWindow {
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+  width: 100%;
+}
+
+.instructionItem {
+  display: flex;
+  align-items: center;
+  justify-content: left;
+  padding-top: 1px;
+  white-space: nowrap;
+  width: 100%;
+  box-sizing: border-box;
+  gap: 8px;
+  margin-left: var(--spacing-sm);
+  font-family: var(--font-family-mono), monospace;
+}
+
+.instructionName {
+  font-weight: 500;
+}
+
+.instructionGas {
+  color: #777;
+  font-size: 0.9em;
+}

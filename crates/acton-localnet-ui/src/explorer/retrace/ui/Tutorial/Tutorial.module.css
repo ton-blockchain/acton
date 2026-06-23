@@ -1,0 +1,226 @@
+.progressBar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: rgb(var(--color-neutral-rgb), 0.2);
+  z-index: calc(var(--z-index-modal) + 101);
+}
+
+.progressFill {
+  height: 100%;
+  background-color: var(--color-primary);
+  transition: width var(--transition-duration-normal) ease;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: calc(var(--z-index-modal) + 100);
+  animation: fadeIn var(--transition-duration-normal) ease-out;
+  pointer-events: none;
+}
+
+.centeredOverlay {
+  background-color: rgb(var(--color-black-rgb), 0.4);
+  backdrop-filter: blur(var(--blur-radius-sm));
+  pointer-events: auto;
+}
+
+.spotlight {
+  position: fixed;
+  background-color: transparent;
+  border-radius: var(--border-radius-md);
+  box-shadow:
+    0 0 0 9999px rgb(var(--color-black-rgb), 0.6),
+    0 0 20px rgb(var(--color-primary-rgb), 0.3),
+    inset 0 0 0 2px var(--color-primary);
+  z-index: calc(var(--z-index-modal) + 101);
+  animation: spotlight var(--transition-duration-normal) ease-out;
+}
+
+.spotlight.spotlightAnimated {
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tooltip {
+  position: fixed;
+  background-color: var(--color-background-modal);
+  border-radius: var(--border-radius-lg);
+  width: 380px;
+  max-width: calc(100vw - 40px);
+  box-shadow: var(--shadow-lg);
+  z-index: calc(var(--z-index-modal) + 102);
+  animation: slideIn var(--transition-duration-normal) ease-out;
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--color-border);
+}
+
+.tooltip.animated {
+  transition:
+    top 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+    left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-lg) var(--spacing-lg) var(--spacing-sm);
+}
+
+.title {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: var(--color-text-placeholder);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--border-radius-full);
+  transition: all var(--transition-duration-fast) ease;
+  line-height: 1;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeButton:hover {
+  background-color: var(--color-neutral-bg);
+  color: var(--color-text-secondary);
+}
+
+.body {
+  padding: 0 var(--spacing-lg) var(--spacing-md);
+}
+
+.text {
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+  margin: 0;
+}
+
+.footer {
+  padding: 0 var(--spacing-lg) var(--spacing-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.stepCounter {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+.keyboardHint {
+  font-size: 10px;
+  color: var(--color-text-placeholder);
+  font-weight: var(--font-weight-normal);
+  margin-top: 2px;
+  opacity: 0.7;
+}
+
+.actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.button {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: var(--border-radius-full);
+  background-color: var(--color-neutral-bg);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all var(--transition-duration-fast) ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.button svg {
+  stroke: var(--color-text-secondary);
+}
+
+.button:hover:not(:disabled) {
+  background-color: var(--color-neutral-bg-hover);
+  transform: scale(1.05);
+}
+
+.button:hover:not(:disabled) svg {
+  stroke: var(--color-text-primary);
+}
+
+.button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.primaryButton {
+  background-color: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background-color: var(--color-primary);
+  opacity: 0.9;
+  transform: scale(1.05);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+    filter: blur(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
+}
+
+@keyframes spotlight {
+  from {
+    box-shadow:
+      0 0 0 9999px rgb(var(--color-black-rgb), 0.8),
+      0 0 0 rgb(var(--color-primary-rgb), 0),
+      inset 0 0 0 0 var(--color-primary);
+  }
+
+  to {
+    box-shadow:
+      0 0 0 9999px rgb(var(--color-black-rgb), 0.6),
+      0 0 20px rgb(var(--color-primary-rgb), 0.3),
+      inset 0 0 0 2px var(--color-primary);
+  }
+}
