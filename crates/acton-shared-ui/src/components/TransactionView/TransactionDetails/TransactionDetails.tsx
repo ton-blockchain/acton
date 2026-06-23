@@ -175,6 +175,7 @@ export function TransactionDetails({
   const canLoadActions =
     !hasResolvedActions &&
     actionPhase !== null &&
+    actionPhase !== undefined &&
     actionPhase.totalActions > 0 &&
     loadActions !== undefined
   const canToggleActions = hasResolvedActions || canLoadActions
