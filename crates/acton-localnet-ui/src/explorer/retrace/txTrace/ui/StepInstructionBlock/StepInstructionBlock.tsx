@@ -1,12 +1,8 @@
 import React, {useState, useEffect, useRef, memo} from "react"
 
-import styles from "./StepInstructionBlock.module.css"
+import type {InstructionDetail} from "@retrace/txTrace/lib/types"
 
-export interface InstructionDetail {
-  readonly name: string
-  readonly gasCost: number
-  readonly instructionText?: string
-}
+import styles from "./StepInstructionBlock.module.css"
 
 interface StepInstructionBlockProps {
   readonly steps: readonly InstructionDetail[]

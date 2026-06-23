@@ -4,8 +4,8 @@ import {type StackElement} from "ton-assembly/dist/trace"
 import {Cell} from "@ton/core"
 
 import {DataBlock} from "@acton/shared-ui"
-import CellTreeView from "@retrace/ui/CellTreeView/CellTreeView"
-import AddressDetails from "@retrace/ui/AddressDetails"
+import CellTreeView from "@retrace/txTrace/ui/stack/CellTreeView/CellTreeView"
+import AddressDetails from "@retrace/txTrace/ui/stack/AddressDetails"
 
 import styles from "./StackItemDetails.module.css"
 
@@ -30,7 +30,8 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({itemData, title, onC
   const cellFromItem = (itemData: StackElement) => {
     if (itemData.$ === "Cell" && itemData?.boc) {
       return Cell.fromHex(itemData.boc)
-    }if ((itemData.$ === "Slice" || itemData.$ === "Builder") && itemData?.hex) {
+    }
+    if ((itemData.$ === "Slice" || itemData.$ === "Builder") && itemData?.hex) {
       return Cell.fromHex(itemData.hex)
     }
     return null

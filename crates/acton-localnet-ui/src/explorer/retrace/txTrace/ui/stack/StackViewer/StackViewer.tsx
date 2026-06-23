@@ -3,7 +3,7 @@ import {type StackElement} from "ton-assembly/dist/trace"
 import {Cell} from "@ton/core"
 import {motion, AnimatePresence} from "framer-motion"
 
-import {CopyButton} from "@retrace/CopyButton/CopyButton"
+import {CopyValueButton} from "@acton/shared-ui"
 
 import styles from "./StackViewer.module.css"
 
@@ -139,9 +139,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
         return (
           <div className={styles.integerItem} key={keyPrefix}>
             {value} <span className={styles.integerItemHexValue}>({hexPresentation})</span>
-            <CopyButton
+            <CopyValueButton
               className={styles.integerItemCopyButton}
-              title="Copy integer value"
+              label="integer value"
               value={value.toString()}
             />
           </div>
@@ -168,9 +168,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
               <div className={styles.stackItemDetails}>
                 Bits: {cell.bits.length}, Refs: {cell.refs.length}
               </div>
-              <CopyButton
+              <CopyValueButton
                 className={styles.cellItemCopyButton}
-                title="Copy cell as BoC"
+                label="cell as BoC"
                 value={element.boc}
               />
             </div>
@@ -201,9 +201,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
                 <div className={styles.stackItemValue}>
                   {expandedItem === keyPrefix ? string : truncateMiddle(string, 35)}
                 </div>
-                <CopyButton
+                <CopyValueButton
                   className={styles.addressItemCopyButton}
-                  title="Copy address as base64"
+                  label="address as base64"
                   value={readable}
                 />
               </div>
@@ -227,9 +227,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
                 : expandedItem === keyPrefix
                   ? element.hex
                   : truncateMiddle(element.hex, 35)}
-              <CopyButton
+              <CopyValueButton
                 className={styles.sliceItemCopyButton}
-                title="Copy slice as BoC"
+                label="slice as BoC"
                 value={element.hex}
               />
             </div>
@@ -262,9 +262,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
             <div className={styles.stackItemDetails}>
               Bits: {cell.bits.length}, Refs: {cell.refs.length}
             </div>
-            <CopyButton
+            <CopyValueButton
               className={styles.builderItemCopyButton}
-              title="Copy builder as BoC"
+              label="builder as BoC"
               value={element.hex}
             />
           </div>
@@ -286,9 +286,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
             <div className={styles.stackItemValue}>
               {expandedItem === keyPrefix ? element.name : truncateMiddle(element.name, 35)}
             </div>
-            <CopyButton
+            <CopyValueButton
               className={styles.continuationItemCopyButton}
-              title="Copy continuation"
+              label="continuation"
               value={element.name}
             />
             {expandedItem === keyPrefix && (
@@ -321,9 +321,9 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
             <div className={styles.stackItemValue}>
               {expandedItem === keyPrefix ? element.value : truncateMiddle(element.value, 35)}
             </div>
-            <CopyButton
+            <CopyValueButton
               className={styles.addressItemCopyButton}
-              title="Copy address as base64"
+              label="address as base64"
               value={element.value}
             />
           </div>

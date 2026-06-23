@@ -2,7 +2,7 @@ import {useParams} from "react-router-dom"
 
 import TracePage from "@retrace/pages/TracePage"
 
-import "./retrace.css"
+import "./RetracePage.tokens.css"
 import styles from "./RetracePage.module.css"
 
 export function RetracePage() {

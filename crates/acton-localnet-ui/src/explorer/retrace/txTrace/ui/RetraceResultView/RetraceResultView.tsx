@@ -1,24 +1,16 @@
 import React, {memo, useMemo} from "react"
 
-import {type TraceInfo} from "ton-assembly/dist/trace"
-import type {TraceResult} from "txtracer-core/dist/types"
+import {
+  type BackendContractInfo,
+  type ContractData,
+  DataBlock,
+  TransactionDetails,
+} from "@acton/shared-ui"
 
-import {type BackendContractInfo, type ContractData, TransactionDetails} from "@acton/shared-ui"
-
-import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
-import type {ExitCode} from "@retrace/txTrace/lib/traceTx"
+import type {RetraceResultAndCode} from "@retrace/txTrace/lib/types"
 import {toTransactionInfo} from "@retrace/txTrace/lib/toTransactionInfo"
-import {VMLogsView} from "@retrace/txTrace/ui/index"
 
-import {RetraceExtraDetails} from "./RetraceExtraDetails"
-
-export interface RetraceResultAndCode {
-  readonly result: TraceResult
-  readonly code: string
-  readonly trace: TraceInfo
-  readonly exitCode: ExitCode | undefined
-  readonly network: ExplorerNetworkInfo
-}
+import {RetraceExtraDetails} from "../RetraceExtraDetails"
 
 interface RetraceResultViewProps {
   readonly result: RetraceResultAndCode
@@ -31,7 +23,7 @@ const RetraceResultViewFc: React.FC<RetraceResultViewProps> = ({result}) => {
   const transactionInfo = useMemo(() => toTransactionInfo(result.result), [result.result])
 
   return (
-    <div className="retrace-result-container">
+    <div>
       <TransactionDetails
         tx={transactionInfo}
         contracts={EMPTY_CONTRACTS}
@@ -40,20 +32,28 @@ const RetraceResultViewFc: React.FC<RetraceResultViewProps> = ({result}) => {
       <RetraceExtraDetails result={result} />
 
       {result.result.emulatedTx.vmLogs && (
-        <VMLogsView
-          title="VM Logs"
-          logs={result.result.emulatedTx.vmLogs}
-          isExpandable={true}
+        <DataBlock
+          copyLabel="VM Logs"
+          data={result.result.emulatedTx.vmLogs}
           defaultExpanded={false}
+          label="VM Logs"
+          maxHeight={420}
+          collapsible={true}
+          variant="standalone"
+          wrap={true}
         />
       )}
 
       {result.result.emulatedTx.executorLogs && (
-        <VMLogsView
-          title="Executor Logs"
-          logs={result.result.emulatedTx.executorLogs}
-          isExpandable={true}
+        <DataBlock
+          copyLabel="Executor Logs"
+          data={result.result.emulatedTx.executorLogs}
           defaultExpanded={false}
+          label="Executor Logs"
+          maxHeight={420}
+          collapsible={true}
+          variant="standalone"
+          wrap={true}
         />
       )}
     </div>

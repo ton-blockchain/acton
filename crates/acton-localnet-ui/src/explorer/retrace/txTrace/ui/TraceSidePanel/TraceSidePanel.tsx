@@ -3,11 +3,9 @@ import React from "react"
 import type {StackElement} from "ton-assembly/dist/trace"
 
 import {Button} from "@acton/shared-ui"
-import StackViewer from "@retrace/ui/StackViewer"
-import {
-  StepInstructionBlock,
-  type InstructionDetail,
-} from "@retrace/txTrace/ui/StepInstructionBlock"
+import type {InstructionDetail} from "@retrace/txTrace/lib/types"
+import StackViewer from "@retrace/txTrace/ui/stack/StackViewer"
+import {StepInstructionBlock} from "@retrace/txTrace/ui/StepInstructionBlock"
 
 import styles from "./TraceSidePanel.module.css"
 
@@ -28,7 +26,7 @@ export interface TraceSidePanelProps {
   readonly onFirst?: () => void
   readonly onLast?: () => void
 
-  readonly instructionDetails?: InstructionDetail[]
+  readonly instructionDetails?: readonly InstructionDetail[]
   readonly cumulativeGas?: number
   readonly showGas?: boolean
 
@@ -58,7 +56,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
   onStackItemClick,
   className,
 }) => {
-  const hasData = totalSteps > 0 && currentStep
+  const hasData = totalSteps > 0 && Boolean(currentStep)
 
   return (
     <div className={`${styles.sidePanel} ${className || ""}`}>
@@ -78,7 +76,6 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             {statusMessage && <span className={styles.statusMessage}>{statusMessage}</span>}
           </div>
 
-          {/* StepInstructionBlock for TracePage */}
           {instructionDetails.length > 0 && (
             <StepInstructionBlock
               steps={instructionDetails}
@@ -87,7 +84,6 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             />
           )}
 
-          {/* Simple instruction block */}
           {instructionDetails.length === 0 && (
             <div className={styles.stepInstructionBlock}>
               <span className={styles.stepInstruction}>
@@ -104,7 +100,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
             </div>
           )}
 
-          <div className={`${styles.navigationControls} navigation-controls`}>
+          <div className={styles.navigationControls}>
             <Button
               variant="ghost"
               onClick={onFirst}
@@ -148,7 +144,7 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
           </div>
         </div>
 
-        <div className={`${styles.stackViewerContainer} stack-viewer`}>
+        <div className={styles.stackViewerContainer}>
           <div className={styles.stackHeader}>
             <span>Stack</span>
           </div>

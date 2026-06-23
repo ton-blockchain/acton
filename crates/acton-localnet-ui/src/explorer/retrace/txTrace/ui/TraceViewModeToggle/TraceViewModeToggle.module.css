@@ -1,0 +1,55 @@
+.root {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.toggle {
+  display: inline-flex;
+  width: fit-content;
+  background-color: var(--color-background-secondary);
+  border-radius: var(--border-radius-full);
+  padding: 4px;
+  gap: 4px;
+}
+
+.button {
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary);
+  border-radius: var(--border-radius-full);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast) ease,
+    color var(--transition-duration-fast) ease;
+}
+
+.button:hover {
+  color: var(--color-text-primary);
+}
+
+.buttonActive {
+  background-color: var(--color-background-primary);
+  color: var(--color-text-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.icon {
+  font-size: 14px;
+}
+
+@media (width <= 768px) {
+  .toggle {
+    display: flex;
+  }
+
+  .button {
+    padding: 4px var(--spacing-xs);
+  }
+}

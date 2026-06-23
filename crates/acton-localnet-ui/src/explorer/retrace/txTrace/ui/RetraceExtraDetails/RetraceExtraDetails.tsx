@@ -3,7 +3,7 @@ import {beginCell, Cell, loadTransaction, storeMessage} from "@ton/core"
 
 import {DataBlock} from "@acton/shared-ui"
 
-import type {RetraceResultAndCode} from "./RetraceResultView"
+import type {RetraceResultAndCode} from "@retrace/txTrace/lib/types"
 
 import styles from "./RetraceExtraDetails.module.css"
 

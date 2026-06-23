@@ -8,10 +8,10 @@ import {parse, print} from "ton-assembly/dist/text"
 import * as l from "ton-assembly/dist/logs"
 import {Cell} from "@ton/core"
 
-import type {AssemblyMapping, InstructionInfo} from "ton-source-map"
+import type {AssemblyMapping} from "ton-source-map"
 
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
-import type {RetraceResultAndCode} from "@retrace/txTrace/ui"
+import type {ExitCode, RetraceResultAndCode} from "./types"
 
 import {
   NetworkError,
@@ -20,12 +20,6 @@ import {
   TxNotFoundError,
   TxTraceError,
 } from "./errors"
-
-export type ExitCode = {
-  readonly num: number
-  readonly description: string
-  readonly info: undefined | InstructionInfo
-}
 
 function getRetraceTestnetFlag(network: ExplorerNetworkInfo): boolean {
   if (network.id === "mainnet") {
@@ -91,8 +85,8 @@ export function findException(reversedEntries: l.VmLine[]) {
       }
     }
     if (it.$ === "VmUnknown" && it.text.includes("unhandled out-of-gas exception")) {
-        return {text: it.text, num: -14}
-      }
+      return {text: it.text, num: -14}
+    }
     return undefined
   })
   const exceptionWithDescription = mapped.find(it => {

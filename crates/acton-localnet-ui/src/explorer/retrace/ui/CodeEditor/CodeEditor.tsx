@@ -5,7 +5,7 @@ import * as monaco from "monaco-editor"
 
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 
-import type {ExitCode} from "@retrace/txTrace/lib/traceTx"
+import type {ExitCode} from "@retrace/txTrace/lib/types"
 
 import type {LinesExecutionData} from "@retrace/txTrace/hooks"
 

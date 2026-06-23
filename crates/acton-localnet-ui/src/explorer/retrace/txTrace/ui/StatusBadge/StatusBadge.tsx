@@ -1,8 +1,6 @@
 import React from "react"
 
-import {EXIT_CODE_DESCRIPTIONS} from "@acton/shared-ui"
-
-import {Tooltip} from "@retrace/ui/Tooltip"
+import {EXIT_CODE_DESCRIPTIONS, Tooltip} from "@acton/shared-ui"
 
 import styles from "./StatusBadge.module.css"
 

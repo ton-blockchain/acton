@@ -99,10 +99,33 @@
 }
 
 .stackItemCopyButton {
-  opacity: 0;
   position: absolute;
   top: 0.15rem;
   right: var(--spacing-xs);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: var(--spacing-sm);
+  padding: var(--spacing-xs);
+  border: none;
+  border-radius: var(--border-radius-sm);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--transition-duration-fast) ease,
+    background-color var(--transition-duration-fast) ease;
+}
+
+.stackItemCopyButton:hover {
+  opacity: 1;
+  background-color: rgb(var(--color-primary-rgb), 0.1);
+}
+
+.stackItemCopyButton svg {
+  width: var(--font-size-sm);
+  height: var(--font-size-sm);
+  display: block;
+  stroke: currentcolor;
 }
 
 .nullItem {
