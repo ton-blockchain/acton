@@ -1492,11 +1492,17 @@ impl Node {
             return self.get_address_information(addr);
         }
 
-        self.indexes
-            .account_deltas_by_addr
-            .get(addr)
-            .and_then(|deltas| deltas.range(..=seqno).next_back())
-            .and_then(|(_, delta)| delta.new_meta.clone())
+        if let Some(deltas) = self.indexes.account_deltas_by_addr.get(addr) {
+            if let Some((_, delta)) = deltas.range(..=seqno).next_back() {
+                return delta.new_meta.clone();
+            }
+            return deltas
+                .values()
+                .next()
+                .and_then(|delta| delta.old_meta.clone());
+        }
+
+        self.get_address_information(addr)
     }
 
     #[must_use]
@@ -3911,6 +3917,41 @@ mod tests {
             node.get_shard_account_at_block(&account, Some(3))
                 .expect("must return latest active state"),
             active_boc
+        );
+    }
+
+    #[test]
+    fn get_shard_account_at_block_uses_old_meta_before_first_delta() {
+        let mut node = make_test_node(Box::new(NoopExecutor));
+        let account = test_addr(0x24);
+        let remote_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 100_000_000);
+        let changed_boc =
+            make_active_shard_account_boc_with_state(account, None, None, Dict::new(), 90_000_000);
+        let remote_meta = store_test_account_meta(&mut node, &remote_boc, AccountStatus::Active);
+        let changed_meta = store_test_account_meta(&mut node, &changed_boc, AccountStatus::Active);
+
+        node.latest.accounts.insert(account, changed_meta.clone());
+        node.indexes
+            .account_deltas_by_addr
+            .entry(account)
+            .or_default()
+            .insert(
+                3,
+                AccountDelta {
+                    addr: account,
+                    old_hash: Some(remote_meta.account_hash),
+                    new_hash: Some(changed_meta.account_hash),
+                    old_meta: Some(remote_meta),
+                    new_meta: Some(changed_meta),
+                },
+            );
+        node.globals.head_seqno = 4;
+
+        assert_eq!(
+            node.get_shard_account_at_block(&account, Some(2))
+                .expect("must return fork baseline state before first local delta"),
+            remote_boc
         );
     }
 

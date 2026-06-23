@@ -1,4 +1,7 @@
-use serde::{Deserialize, Serialize};
+use serde::{
+    Deserialize, Deserializer, Serialize,
+    de::{self, Error as _},
+};
 use serde_json::Value;
 
 #[derive(Deserialize)]
@@ -66,15 +69,58 @@ pub struct GetVerifiedSourceRequest {
 pub struct GetTransactionsRequest {
     pub address: String,
     #[serde(default = "default_limit")]
+    #[serde(deserialize_with = "deserialize_usize_from_string_or_number")]
     pub limit: usize,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_optional_u64_from_string_or_number")]
     pub lt: Option<u64>,
     pub hash: Option<String>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_optional_u64_from_string_or_number")]
     pub to_lt: Option<u64>,
 }
 
 #[must_use]
 pub const fn default_limit() -> usize {
     10
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum NumberParam {
+    Number(u64),
+    String(String),
+}
+
+fn deserialize_optional_u64_from_string_or_number<'de, D>(
+    deserializer: D,
+) -> Result<Option<u64>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Option::<NumberParam>::deserialize(deserializer)?
+        .map(parse_number_param)
+        .transpose()
+}
+
+fn deserialize_usize_from_string_or_number<'de, D>(deserializer: D) -> Result<usize, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = parse_number_param(NumberParam::deserialize(deserializer)?)?;
+    usize::try_from(value).map_err(|_| D::Error::custom("value does not fit into usize"))
+}
+
+fn parse_number_param<E>(param: NumberParam) -> Result<u64, E>
+where
+    E: de::Error,
+{
+    match param {
+        NumberParam::Number(value) => Ok(value),
+        NumberParam::String(value) => value
+            .parse()
+            .map_err(|_| E::custom(format!("expected unsigned integer string, got `{value}`"))),
+    }
 }
 
 #[derive(Deserialize)]
@@ -336,4 +382,61 @@ pub struct GetNftItemsRequest {
     pub sort_by_last_transaction_lt: Option<bool>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_transactions_request_accepts_numeric_cursor_params() {
+        let request: GetTransactionsRequest = serde_json::from_value(serde_json::json!({
+            "address": "EQB0HzdrKy0awerTp1P3kgttmalQYfpbCiRKLg88SR5MUamv",
+            "limit": 1,
+            "lt": 8,
+            "hash": "i91zjBL5M6ewi4wcL1JvqpQx/Um/hxHDXUD7FUDSq/I=",
+            "to_lt": 2,
+            "archival": true
+        }))
+        .expect("numeric transaction cursor params must parse");
+
+        assert_eq!(request.limit, 1);
+        assert_eq!(request.lt, Some(8));
+        assert_eq!(
+            request.hash.as_deref(),
+            Some("i91zjBL5M6ewi4wcL1JvqpQx/Um/hxHDXUD7FUDSq/I=")
+        );
+        assert_eq!(request.to_lt, Some(2));
+    }
+
+    #[test]
+    fn get_transactions_request_accepts_string_cursor_params() {
+        let request: GetTransactionsRequest = serde_json::from_value(serde_json::json!({
+            "address": "EQB0HzdrKy0awerTp1P3kgttmalQYfpbCiRKLg88SR5MUamv",
+            "limit": "1",
+            "lt": "8",
+            "hash": "i91zjBL5M6ewi4wcL1JvqpQx/Um/hxHDXUD7FUDSq/I=",
+            "to_lt": "2",
+            "archival": true
+        }))
+        .expect("string transaction cursor params must parse");
+
+        assert_eq!(request.limit, 1);
+        assert_eq!(request.lt, Some(8));
+        assert_eq!(
+            request.hash.as_deref(),
+            Some("i91zjBL5M6ewi4wcL1JvqpQx/Um/hxHDXUD7FUDSq/I=")
+        );
+        assert_eq!(request.to_lt, Some(2));
+    }
+
+    #[test]
+    fn get_transactions_request_uses_default_limit() {
+        let request: GetTransactionsRequest = serde_json::from_value(serde_json::json!({
+            "address": "EQB0HzdrKy0awerTp1P3kgttmalQYfpbCiRKLg88SR5MUamv"
+        }))
+        .expect("request without explicit limit must parse");
+
+        assert_eq!(request.limit, default_limit());
+    }
 }

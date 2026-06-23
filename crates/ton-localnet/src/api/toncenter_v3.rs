@@ -244,7 +244,7 @@ fn map_v3_block(block: &LocalnetBlock) -> Value {
 
     serde_json::json!({
         "workchain": block.workchain,
-        "shard": block.shard.to_string(),
+        "shard": format_v3_shard_id(block.shard),
         "seqno": block.seqno,
         "root_hash": block.root_hash.to_base64(),
         "file_hash": block.file_hash.to_base64(),
@@ -278,9 +278,13 @@ fn map_v3_block(block: &LocalnetBlock) -> Value {
 fn map_v3_block_id(block: &crate::localnet::LocalnetBlockId) -> Value {
     serde_json::json!({
         "workchain": block.workchain,
-        "shard": block.shard.to_string(),
+        "shard": format_v3_shard_id(block.shard),
         "seqno": block.seqno,
     })
+}
+
+fn format_v3_shard_id(shard: i64) -> String {
+    format!("{:X}", shard as u64)
 }
 
 fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
@@ -346,7 +350,7 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         ),
         "block_ref": {
             "workchain": 0,
-            "shard": "-9223372036854775808",
+            "shard": format_v3_shard_id(i64::MIN),
             "seqno": tx.mc_block_seqno,
         },
         "mc_block_seqno": tx.mc_block_seqno,
@@ -915,7 +919,7 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
         ),
         "block_ref": {
             "workchain": 0,
-            "shard": "-9223372036854775808",
+            "shard": format_v3_shard_id(i64::MIN),
             "seqno": tx.meta.block_seqno
         },
         "mc_block_seqno": tx.meta.block_seqno,
@@ -1350,7 +1354,11 @@ const fn map_account_state_status(status: &AccountStatus) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{map_jetton_masters, map_nft_collection_token_info, map_nft_item_token_info};
+    use super::{
+        format_v3_shard_id, map_blocks_response, map_jetton_masters, map_nft_collection_token_info,
+        map_nft_item_token_info,
+    };
+    use crate::localnet::{LocalnetBlock, LocalnetBlockId};
     use crate::storage::{JettonMasterMeta, NftItemMeta};
     use crate::types::Hash256;
     use serde_json::json;
@@ -1449,6 +1457,49 @@ mod tests {
         assert_eq!(
             token_info["description"].as_str(),
             Some("Collection description")
+        );
+    }
+
+    #[test]
+    fn blocks_response_formats_shards_as_toncenter_v3_hex_strings() {
+        let block_id = LocalnetBlockId {
+            workchain: 0,
+            shard: i64::MIN,
+            seqno: 41,
+            root_hash: Hash256([1; 32]),
+            file_hash: Hash256([2; 32]),
+        };
+        let masterchain_block_ref = LocalnetBlockId {
+            workchain: -1,
+            shard: i64::MIN,
+            seqno: 42,
+            root_hash: Hash256([3; 32]),
+            file_hash: Hash256([4; 32]),
+        };
+        let response = map_blocks_response(&[LocalnetBlock {
+            workchain: 0,
+            shard: i64::MIN,
+            seqno: 43,
+            root_hash: Hash256([5; 32]),
+            file_hash: Hash256([6; 32]),
+            gen_utime: 123,
+            start_lt: 1,
+            end_lt: 2,
+            tx_count: 1,
+            prev_blocks: vec![block_id],
+            masterchain_block_ref: Some(masterchain_block_ref),
+        }]);
+
+        let block = &response["blocks"][0];
+        assert_eq!(format_v3_shard_id(i64::MIN), "8000000000000000");
+        assert_eq!(block["shard"].as_str(), Some("8000000000000000"));
+        assert_eq!(
+            block["prev_blocks"][0]["shard"].as_str(),
+            Some("8000000000000000")
+        );
+        assert_eq!(
+            block["masterchain_block_ref"]["shard"].as_str(),
+            Some("8000000000000000")
         );
     }
 }
