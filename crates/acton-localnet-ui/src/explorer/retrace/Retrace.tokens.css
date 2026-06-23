@@ -55,7 +55,7 @@
   --color-text-on-primary: #fff;
   --color-text-link: var(--color-primary);
   --color-text-inverted: #fff;
-  --color-text-inverted-only-on-ligth: #fff;
+  --color-text-inverted-only-on-light: #fff;
   --editor-faded-text-color: #777;
 
   --color-background-primary: var(--tonscan-card-bg, #fff);
@@ -305,7 +305,7 @@ html.dark-theme .retraceRoot {
   --color-text-on-primary: #fff;
   --color-text-link: var(--color-primary);
   --color-text-inverted: #1c1c1e;
-  --color-text-inverted-only-on-ligth: #fff;
+  --color-text-inverted-only-on-light: #fff;
   --editor-faded-text-color: #aaa;
 
   --color-background-primary: var(--tonscan-card-bg, #18181b);
