@@ -82,6 +82,7 @@ const TREE_NODE_SIZE = {x: 200, y: 120} as const
 const TREE_SEPARATION = {siblings: 0.7, nonSiblings: 1} as const
 const TREE_MIN_SIZE = {height: 80, width: 800} as const
 const TREE_PADDING = {top: 8, right: 32, bottom: 8, left: 50} as const
+const TREE_DETAILS_GAP = 15
 const TREE_EDGE_LABEL = {width: 150, height: 64, failedHeight: 84, x: -180, y: -40} as const
 
 const INITIAL_TREE_LAYOUT: TreeLayout = {
@@ -771,7 +772,7 @@ export function TransactionTree({
     const nextLayout: TreeLayout = {
       height: Math.max(
         TREE_MIN_SIZE.height,
-        Math.ceil(groupRect.height + TREE_PADDING.top + TREE_PADDING.bottom),
+        Math.ceil(groupRect.height + TREE_PADDING.top + TREE_PADDING.bottom + TREE_DETAILS_GAP),
       ),
       width: Math.max(
         TREE_MIN_SIZE.width,

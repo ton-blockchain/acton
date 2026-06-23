@@ -30,7 +30,7 @@ import styles from "../DashboardPage.module.css"
 
 const HOME_RECENT_TRANSACTIONS_REFRESH_MS = 2000
 const HOME_NODE_INFO_REFRESH_MS = 1000
-const MASTERCHAIN_BLOCK_SHARD = "-9223372036854775808"
+const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
 
 interface HomePageProps {
   readonly client: TonClient

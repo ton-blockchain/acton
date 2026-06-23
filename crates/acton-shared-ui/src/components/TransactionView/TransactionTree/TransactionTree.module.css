@@ -17,6 +17,8 @@
   height: auto;
   overflow: auto hidden;
   position: relative;
+  padding-bottom: 15px;
+  box-sizing: border-box;
 }
 
 .treeWrapper {
@@ -178,10 +180,14 @@
 
 .transactionDetails {
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
-  margin: 15px var(--spacing-md) var(--spacing-2xl);
+  margin: 0 var(--spacing-md) var(--spacing-2xl);
 }
 
 @media (max-width: 520px) {
+  .treeContainer {
+    padding-bottom: 0;
+  }
+
   .transactionDetails {
     margin: 0 0 var(--spacing-xl);
   }
