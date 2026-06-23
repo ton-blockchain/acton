@@ -178,8 +178,7 @@
 
 .transactionDetails {
   border-radius: 0 0 var(--border-radius-md) var(--border-radius-md);
-  background-color: var(--bg-color);
-  margin: 0 var(--spacing-md) var(--spacing-2xl);
+  margin: 15px var(--spacing-md) var(--spacing-2xl);
 }
 
 @media (max-width: 520px) {

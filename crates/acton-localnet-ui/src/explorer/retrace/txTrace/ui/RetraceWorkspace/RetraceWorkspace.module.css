@@ -39,7 +39,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 400px;
   gap: 0;
-  height: clamp(520px, 66vh, 720px);
+  height: var(--retrace-workspace-height);
   min-height: 0;
   padding: 0;
   border-radius: 0 0 16px 16px;

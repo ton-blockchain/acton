@@ -1,6 +1,6 @@
 .transactionDetailsContainer {
   border-radius: var(--border-radius-md);
-  background-color: var(--bg-color);
+  background-color: var(--tonscan-card-bg, var(--bg-color));
   border: 1px solid var(--border-color);
   position: relative;
   line-height: 1.6;
@@ -47,6 +47,21 @@
   font-size: 0.8125rem;
   flex-grow: 1;
   box-sizing: border-box;
+}
+
+.messageRouteValue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.messageRouteAction {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
 }
 
 .triggerRoute {
@@ -193,10 +208,21 @@
   color: var(--text-primary);
 }
 
+.actionsToggleButton:disabled {
+  color: var(--text-muted);
+  cursor: wait;
+  opacity: 0.7;
+}
+
 .actionsToggleText {
   margin-left: var(--spacing-xs);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
+}
+
+.actionsLoadError {
+  color: var(--color-failed);
+  font-size: var(--font-size-xs);
 }
 
 .parsedBodySection {

@@ -1,10 +1,10 @@
 import * as React from "react"
-import {useState} from "react"
+import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import type {Cell} from "@ton/core"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
-import type {ContractData, TransactionInfo} from "@/types/transaction"
+import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
 import {DataBlock, fmt} from "@/index"
 import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
@@ -37,6 +37,8 @@ export interface TransactionDetailsProps {
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
+  readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
+  readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
 }
 
 export function TransactionDetails({
@@ -46,10 +48,24 @@ export function TransactionDetails({
   allContracts,
   onContractClick,
   renderSourceLocation,
+  loadActions,
+  renderMessageRouteAction,
 }: TransactionDetailsProps): React.JSX.Element {
   const [showActions, setShowActions] = useState(false)
   const [showStateInit, setShowStateInit] = useState(false)
   const [expandedStorageLt, setExpandedStorageLt] = useState<string | undefined>()
+  const [loadedActions, setLoadedActions] = useState<LoadedTransactionActions | undefined>()
+  const [isLoadingActions, setIsLoadingActions] = useState(false)
+  const [loadActionsError, setLoadActionsError] = useState<string | undefined>()
+  const currentTxIdRef = useRef(tx.id)
+
+  useEffect(() => {
+    currentTxIdRef.current = tx.id
+    setShowActions(false)
+    setLoadedActions(undefined)
+    setIsLoadingActions(false)
+    setLoadActionsError(undefined)
+  }, [tx.id])
 
   const description = tx.transaction.description
   if (description.type !== "generic" && description.type !== "tick-tock") {
@@ -69,6 +85,7 @@ export function TransactionDetails({
   const computePhase = getTransactionComputePhase(tx.transaction)
   const actionPhase = getTransactionActionPhase(tx.transaction)
   const triggerLabel = getTransactionTriggerLabel(tx.transaction)
+  const messageRouteAction = renderMessageRouteAction?.(tx)
 
   if (!computePhase) {
     return (
@@ -133,6 +150,8 @@ export function TransactionDetails({
 
   const opcode = getTransactionOpcode(tx.transaction)
   const opcodeName = resolveTransactionOpcodeName(tx, contracts, allContracts)
+  const resolvedOutActions = loadedActions?.outActions ?? tx.outActions
+  const resolvedExecutorActions = loadedActions?.executorActions ?? tx.executorActions
 
   const sentTotal = [...tx.transaction.outMessages.values()].reduce(
     (accumulator: bigint, message) =>
@@ -152,40 +171,88 @@ export function TransactionDetails({
         ? "Intact"
         : "Changed"
 
+  const hasResolvedActions = resolvedOutActions.length > 0
+  const canLoadActions =
+    !hasResolvedActions && actionPhase != null && actionPhase.totalActions > 0 && loadActions !== undefined
+  const canToggleActions = hasResolvedActions || canLoadActions
+  const handleActionsToggle = async () => {
+    if (hasResolvedActions) {
+      setShowActions(!showActions)
+      return
+    }
+
+    if (!canLoadActions || isLoadingActions) {
+      return
+    }
+
+    const requestedTxId = tx.id
+    setIsLoadingActions(true)
+    setLoadActionsError(undefined)
+    try {
+      const nextActions = await loadActions(tx)
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      if (nextActions.outActions.length === 0) {
+        setLoadActionsError("No actions returned by retrace")
+        return
+      }
+
+      setLoadedActions(nextActions)
+      setShowActions(true)
+    } catch (error) {
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setLoadActionsError(error instanceof Error ? error.message : "Failed to load actions")
+    } finally {
+      if (currentTxIdRef.current === requestedTxId) {
+        setIsLoadingActions(false)
+      }
+    }
+  }
+
   return (
     <div className={styles.transactionDetailsContainer}>
       <div className={styles.detailRow}>
         <div className={styles.detailLabel}>{isTickTock ? "Trigger" : "Message Route"}</div>
         <div className={styles.heightDetailValue}>
-          {isTickTock ? (
-            <span className={styles.triggerRoute}>
-              <span className={styles.triggerKind}>{triggerLabel ?? "Tick-Tock"}</span>
-              <span aria-hidden="true">→</span>
-              <ContractChip
-                address={tx.address?.toString()}
-                contracts={contracts}
-                onContractClick={onContractClick}
-              />
-            </span>
-          ) : (
-            <span className={styles.triggerRoute}>
-              {sourceLabel ? (
-                <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
-              ) : (
+          <div className={styles.messageRouteValue}>
+            {isTickTock ? (
+              <span className={styles.triggerRoute}>
+                <span className={styles.triggerKind}>{triggerLabel ?? "Tick-Tock"}</span>
+                <span aria-hidden="true">→</span>
                 <ContractChip
-                  address={tx.transaction.inMessage?.info.src?.toString()}
+                  address={tx.address?.toString()}
                   contracts={contracts}
                   onContractClick={onContractClick}
                 />
-              )}
-              {" → "}
-              <ContractChip
-                address={tx.transaction.inMessage?.info.dest?.toString()}
-                contracts={contracts}
-                onContractClick={onContractClick}
-              />
-            </span>
-          )}
+              </span>
+            ) : (
+              <span className={styles.triggerRoute}>
+                {sourceLabel ? (
+                  <span className={styles.messageEndpointBadge}>{sourceLabel}</span>
+                ) : (
+                  <ContractChip
+                    address={tx.transaction.inMessage?.info.src?.toString()}
+                    contracts={contracts}
+                    onContractClick={onContractClick}
+                  />
+                )}
+                {" → "}
+                <ContractChip
+                  address={tx.transaction.inMessage?.info.dest?.toString()}
+                  contracts={contracts}
+                  onContractClick={onContractClick}
+                />
+              </span>
+            )}
+            {messageRouteAction && (
+              <span className={styles.messageRouteAction}>{messageRouteAction}</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -532,18 +599,17 @@ export function TransactionDetails({
                 <div className={styles.multiColumnItemTitle}>Total Actions</div>
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {fmt.formatNumber(actionPhase.totalActions)}
-                  {tx.outActions.length > 0 && (
+                  {canToggleActions && (
                     <button
                       type="button"
-                      onClick={() => {
-                        setShowActions(!showActions)
-                      }}
+                      onClick={() => void handleActionsToggle()}
                       className={styles.actionsToggleButton}
                       aria-label={showActions ? "Hide actions" : "Show actions"}
+                      disabled={isLoadingActions}
                     >
                       {showActions ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
                       <span className={styles.actionsToggleText}>
-                        {showActions ? "Hide" : "Show"}
+                        {isLoadingActions ? "Loading" : showActions ? "Hide" : "Show"}
                       </span>
                     </button>
                   )}
@@ -553,16 +619,17 @@ export function TransactionDetails({
           ) : (
             <div className={styles.multiColumnItemValue}>No action phase</div>
           )}
+          {loadActionsError && <div className={styles.actionsLoadError}>{loadActionsError}</div>}
         </div>
       </div>
 
-      {showActions && tx.outActions.length > 0 && (
+      {showActions && hasResolvedActions && (
         <div className={styles.labeledSectionRow}>
           <div className={styles.labeledSectionTitle}>Actions Details</div>
           <div className={styles.labeledSectionContent}>
             <ActionsSummary
-              actions={tx.outActions}
-              executorActions={tx.executorActions}
+              actions={resolvedOutActions}
+              executorActions={resolvedExecutorActions}
               contracts={contracts}
               contractAddress={tx.address?.toString() ?? ""}
               renderSourceLocation={renderSourceLocation}

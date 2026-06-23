@@ -125,8 +125,8 @@ interface AccountDetailsProps {
   readonly accountLoading?: boolean
   readonly showHoldersTab?: boolean
   readonly client: TonClient
-  readonly onAddressClick?: (addr: string) => void
-  readonly onTransactionClick?: (hash: string) => void
+  readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
+  readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
   readonly activeTabHash?: string
@@ -210,7 +210,7 @@ interface HistoryAddressChipProps {
   readonly address: string
   readonly fallback: string
   readonly highlighted: boolean
-  readonly onAddressClick?: (addr: string) => void
+  readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onHoverAddressChange: (address: string | undefined) => void
 }
 
@@ -859,8 +859,8 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       } ${isHighlighted ? styles.newTransactionRow : ""} ${
                         continuesTrace ? styles.actionChainContinues : ""
                       } ${continuesFromTrace ? styles.actionChainContinuation : ""}`}
-                      onClick={() => {
-                        if (info.transactionHash) onTransactionClick?.(info.transactionHash)
+                      onClick={event => {
+                        if (info.transactionHash) onTransactionClick?.(info.transactionHash, event)
                       }}
                     >
                       <TableCell className={`${styles.time} ${styles.timeColumn}`}>
@@ -941,10 +941,10 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       className={`${styles.row} ${styles.clickableRow} ${
                         isHighlighted ? styles.newTransactionRow : ""
                       }`}
-                      onClick={() => {
+                      onClick={event => {
                         const txHash = hashToHex(transactionHash)
                         if (!txHash) return
-                        onTransactionClick?.(txHash)
+                        onTransactionClick?.(txHash, event)
                       }}
                     >
                       <TableCell className={`${styles.time} ${styles.timeColumn}`}>
@@ -1130,7 +1130,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                     <TableRow
                       key={holder.address}
                       className={`${styles.row} ${styles.clickableRow}`}
-                      onClick={() => onAddressClick?.(holder.owner)}
+                      onClick={event => onAddressClick?.(holder.owner, event)}
                     >
                       <TableCell>
                         <button
@@ -1138,7 +1138,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                           className={styles.address}
                           onClick={e => {
                             e.stopPropagation()
-                            onAddressClick?.(holder.owner)
+                            onAddressClick?.(holder.owner, e)
                           }}
                         >
                           <AddressLabel address={holder.owner} />
@@ -1150,7 +1150,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                           className={styles.address}
                           onClick={e => {
                             e.stopPropagation()
-                            onAddressClick?.(holder.address)
+                            onAddressClick?.(holder.address, e)
                           }}
                         >
                           <AddressLabel address={holder.address} />
@@ -1337,7 +1337,7 @@ function HistoryAddressChip({
   const handleAddressClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
       event.stopPropagation()
-      onAddressClick?.(address)
+      onAddressClick?.(address, event)
     },
     [address, onAddressClick],
   )

@@ -1025,25 +1025,68 @@ export interface StreamingTransactionsEvent {
   readonly transactions: readonly V3Transaction[]
 }
 
+export interface V3TransactionStoragePhase {
+  readonly storage_fees_collected?: string
+  readonly storage_fees_due?: string
+  readonly status_change?: string
+}
+
+export interface V3TransactionComputePhase {
+  readonly skipped: boolean
+  readonly reason?: string
+  readonly success: boolean
+  readonly msg_state_used?: boolean
+  readonly account_activated?: boolean
+  readonly gas_fees?: string
+  readonly gas_used?: string
+  readonly gas_limit?: string
+  readonly gas_credit?: string
+  readonly mode?: number
+  readonly exit_code: number
+  readonly exit_arg?: number
+  readonly vm_steps?: number
+  readonly vm_init_state_hash?: string
+  readonly vm_final_state_hash?: string
+}
+
+export interface V3TransactionActionPhase {
+  readonly success: boolean
+  readonly valid?: boolean
+  readonly no_funds?: boolean
+  readonly status_change?: string
+  readonly result_code: number
+  readonly result_arg?: number
+  readonly tot_actions?: number
+  readonly spec_actions?: number
+  readonly skipped_actions?: number
+  readonly msgs_created?: number
+  readonly total_fwd_fees?: string
+  readonly total_action_fees?: string
+  readonly action_list_hash?: string
+  readonly tot_msg_size?: {
+    readonly cells?: string
+    readonly bits?: string
+  }
+}
+
+export interface V3TransactionDescription {
+  readonly type: string
+  readonly aborted: boolean
+  readonly destroyed?: boolean
+  readonly credit_first?: boolean
+  readonly is_tock?: boolean
+  readonly storage_ph?: V3TransactionStoragePhase
+  readonly compute_ph: V3TransactionComputePhase
+  readonly action: V3TransactionActionPhase
+}
+
 export interface V3TransactionListItem {
   readonly account: string
   readonly hash: string
   readonly lt: string
   readonly now: number
   readonly total_fees: string
-  readonly description: {
-    readonly type: string
-    readonly aborted: boolean
-    readonly compute_ph: {
-      readonly skipped: boolean
-      readonly success: boolean
-      readonly exit_code: number
-    }
-    readonly action: {
-      readonly success: boolean
-      readonly result_code: number
-    }
-  }
+  readonly description: V3TransactionDescription
   readonly in_msg?: V3Message | null
   readonly out_msgs: readonly V3Message[]
   readonly block_ref: {
@@ -1152,46 +1195,7 @@ export interface V3Transaction {
   readonly total_fees: string
   readonly prev_trans_hash: string
   readonly prev_trans_lt: string
-  readonly description: {
-    readonly type: string
-    readonly aborted: boolean
-    readonly compute_ph: {
-      readonly skipped: boolean
-      readonly success: boolean
-      readonly msg_state_used?: boolean
-      readonly account_activated?: boolean
-      readonly gas_fees?: string
-      readonly gas_used?: string
-      readonly gas_limit?: string
-      readonly gas_credit?: string
-      readonly mode?: number
-      readonly exit_code: number
-      readonly exit_arg?: number
-      readonly vm_steps?: number
-      readonly vm_init_state_hash?: string
-      readonly vm_final_state_hash?: string
-    }
-    readonly action: {
-      readonly success: boolean
-      readonly valid?: boolean
-      readonly no_funds?: boolean
-      readonly result_code: number
-      readonly result_arg?: number
-      readonly tot_actions?: number
-      readonly spec_actions?: number
-      readonly skipped_actions?: number
-      readonly msgs_created?: number
-      readonly total_fwd_fees?: string
-      readonly total_action_fees?: string
-      readonly action_list_hash?: string
-      readonly tot_msg_size?: {
-        readonly cells?: string
-        readonly bits?: string
-      }
-    }
-    readonly credit_first?: boolean
-    readonly destroyed?: boolean
-  }
+  readonly description: V3TransactionDescription
   readonly in_msg?: V3Message | null
   readonly out_msgs: readonly V3Message[]
   readonly block_ref: {

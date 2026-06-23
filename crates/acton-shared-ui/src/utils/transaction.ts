@@ -4,6 +4,7 @@ import {
   Cell,
   loadOutList,
   loadTransaction,
+  type Message,
   type OutAction,
   type Transaction,
 } from "@ton/core"
@@ -228,17 +229,100 @@ export function getTransactionSourceLabel(tx: Transaction): string | undefined {
   return getTransactionTriggerLabel(tx)
 }
 
+type SendMessageAction = Extract<OutAction, {type: "sendMsg"}>
+
+const optionalAddressEquals = (
+  left: Address | null | undefined,
+  right: Address | null | undefined,
+): boolean => left?.toString() === right?.toString()
+
+const cellHashEquals = (left: Cell, right: Cell): boolean =>
+  left.hash().toString("hex") === right.hash().toString("hex")
+
+const internalMessagesEqual = (left: Message, right: Message): boolean => {
+  if (left.info.type !== "internal" || right.info.type !== "internal") {
+    return false
+  }
+
+  return (
+    optionalAddressEquals(left.info.src, right.info.src) &&
+    optionalAddressEquals(left.info.dest, right.info.dest) &&
+    left.info.value.coins === right.info.value.coins &&
+    left.info.bounce === right.info.bounce &&
+    left.info.bounced === right.info.bounced &&
+    left.info.createdLt === right.info.createdLt &&
+    left.info.createdAt === right.info.createdAt &&
+    cellHashEquals(left.body, right.body)
+  )
+}
+
+const relaxedInternalMessageMatchesChild = (
+  actionMessage: SendMessageAction["outMsg"],
+  childMessage: Message,
+): boolean => {
+  if (actionMessage.info.type !== "internal" || childMessage.info.type !== "internal") {
+    return false
+  }
+
+  if (
+    actionMessage.info.src &&
+    !optionalAddressEquals(actionMessage.info.src, childMessage.info.src)
+  ) {
+    return false
+  }
+
+  if (
+    actionMessage.info.createdLt !== 0n &&
+    actionMessage.info.createdLt !== childMessage.info.createdLt
+  ) {
+    return false
+  }
+
+  if (
+    actionMessage.info.createdAt !== 0 &&
+    actionMessage.info.createdAt !== childMessage.info.createdAt
+  ) {
+    return false
+  }
+
+  return (
+    optionalAddressEquals(actionMessage.info.dest, childMessage.info.dest) &&
+    actionMessage.info.value.coins === childMessage.info.value.coins &&
+    actionMessage.info.bounce === childMessage.info.bounce &&
+    actionMessage.info.bounced === childMessage.info.bounced &&
+    cellHashEquals(actionMessage.body, childMessage.body)
+  )
+}
+
 export function computeSendMode(tx: TransactionInfo): number | undefined {
-  const sender = tx.transaction.inMessage?.info.src
-  if (!sender) return undefined
+  const inMessage = tx.transaction.inMessage
+  if (inMessage?.info.type !== "internal") return undefined
 
   const parent = tx.parent
   if (!parent) return undefined
 
+  const parentInternalOutMessages = [...parent.transaction.outMessages.values()].filter(
+    message => message.info.type === "internal",
+  )
+  const parentOutMessageIndex = parentInternalOutMessages.findIndex(message =>
+    internalMessagesEqual(message, inMessage),
+  )
+  if (parentOutMessageIndex === -1) {
+    return undefined
+  }
+
+  let internalSendMessageIndex = 0
   for (const action of parent.outActions) {
+    if (action.type !== "sendMsg" || action.outMsg.info.type !== "internal") {
+      continue
+    }
+
+    const actionIndex = internalSendMessageIndex
+    internalSendMessageIndex += 1
+
     if (
-      action.type === "sendMsg" &&
-      action.outMsg.info.dest?.toString() === tx.address?.toString()
+      actionIndex === parentOutMessageIndex &&
+      relaxedInternalMessageMatchesChild(action.outMsg, inMessage)
     ) {
       return action.mode as number
     }

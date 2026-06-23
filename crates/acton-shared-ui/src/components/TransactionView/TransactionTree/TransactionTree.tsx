@@ -11,7 +11,7 @@ import {
 } from "react-d3-tree"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
-import type {ContractData, TransactionInfo} from "@/types/transaction"
+import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
 import {fmt} from "@/index"
 import {
   getTransactionActionPhase,
@@ -64,6 +64,9 @@ interface TransactionTreeProps {
   readonly selectedTransactionId?: string
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
+  readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => React.ReactNode
+  readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
 }
 
 interface TreeLayout {
@@ -201,6 +204,9 @@ export function TransactionTree({
   selectedTransactionId,
   onContractClick,
   renderSourceLocation,
+  renderSelectedTransactionExtra,
+  renderSelectedTransactionMessageRouteAction,
+  loadActions,
 }: TransactionTreeProps): React.JSX.Element {
   const {
     tooltip,
@@ -211,7 +217,9 @@ export function TransactionTree({
     calculateOptimalPosition,
   } = useTooltip()
 
-  const [selectedTransaction, setSelectedTransaction] = useState<TransactionInfo | undefined>()
+  const [selectedTransactionIdState, setSelectedTransactionIdState] = useState<
+    string | undefined
+  >(selectedTransactionId)
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)
@@ -237,10 +245,10 @@ export function TransactionTree({
 
     forceHideTooltip()
 
-    if (selectedTransaction?.id === id) {
-      setSelectedTransaction(undefined)
+    if (selectedTransactionIdState === id) {
+      setSelectedTransactionIdState(undefined)
     } else {
-      setSelectedTransaction(transaction)
+      setSelectedTransactionIdState(id)
     }
   }
 
@@ -350,7 +358,7 @@ export function TransactionTree({
 
       const lt = tx.lt
       const id = tx.id
-      const isSelected = selectedTransaction?.id === id
+      const isSelected = selectedTransactionIdState === id
 
       const hasExternalOut = [...tx.transaction.outMessages.values()].some(outMessage => {
         return outMessage.info.type === "external-out"
@@ -441,7 +449,7 @@ export function TransactionTree({
       },
       children: [],
     } satisfies RawNodeDatum
-  }, [rootTransactions, contracts, selectedTransaction, allContracts])
+  }, [rootTransactions, contracts, selectedTransactionIdState, allContracts])
 
   const renderCustomNodeElement = ({nodeDatum}: CustomNodeElementProps): React.JSX.Element => {
     if (nodeDatum.attributes?.isRoot === "hidden") {
@@ -736,10 +744,12 @@ export function TransactionTree({
   }
 
   useEffect(() => {
-    setSelectedTransaction(
-      selectedTransactionId ? transactionMap.get(selectedTransactionId) : undefined,
-    )
-  }, [selectedTransactionId, transactionMap])
+    setSelectedTransactionIdState(selectedTransactionId)
+  }, [selectedTransactionId])
+
+  const selectedTransaction = useMemo(() => {
+    return selectedTransactionIdState ? transactionMap.get(selectedTransactionIdState) : undefined
+  }, [selectedTransactionIdState, transactionMap])
 
   useLayoutEffect(() => {
     const wrapper = treeWrapperRef.current
@@ -787,7 +797,7 @@ export function TransactionTree({
   useLayoutEffect(() => {
     const container = treeContainerRef.current
     const wrapper = treeWrapperRef.current
-    const selectedId = selectedTransaction?.id
+    const selectedId = selectedTransactionIdState
     if (!container || !wrapper || !selectedId) {
       return
     }
@@ -820,7 +830,7 @@ export function TransactionTree({
     if (Math.abs(container.scrollLeft - nextScrollLeft) > 1) {
       container.scrollTo({left: nextScrollLeft})
     }
-  }, [selectedTransaction?.id, treeLayout])
+  }, [selectedTransactionIdState, treeLayout])
 
   return (
     <div className={styles.container}>
@@ -895,7 +905,10 @@ export function TransactionTree({
             allContracts={allContracts}
             onContractClick={onContractClick}
             renderSourceLocation={renderSourceLocation}
+            loadActions={loadActions}
+            renderMessageRouteAction={renderSelectedTransactionMessageRouteAction}
           />
+          {renderSelectedTransactionExtra?.(selectedTransaction)}
         </div>
       )}
     </div>

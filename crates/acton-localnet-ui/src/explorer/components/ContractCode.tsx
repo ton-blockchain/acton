@@ -4,6 +4,7 @@ import type {CSSProperties, FC, JSX, ReactNode} from "react"
 
 import {
   decodeStorageDataCell,
+  DataBlock,
   jetbrainsDarculaTheme,
   jetbrainsLightTheme,
   ParsedValueView,
@@ -2491,10 +2492,14 @@ function ContractTextPanel({
   readonly wrap?: boolean
 }): JSX.Element {
   return (
-    <section className={styles.dataPanel}>
-      <CopyTextButton className={styles.copyButton} title={title} value={value} />
+    <DataBlock
+      className={styles.sourceDataBlock}
+      variant="standalone"
+      copyLabel={title}
+      copyValue={value}
+    >
       <CodeContent value={value} language={language} wrap={wrap} />
-    </section>
+    </DataBlock>
   )
 }
 

@@ -3,6 +3,7 @@ import type {FC} from "react"
 
 import type {TonClient} from "../api/client"
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import styles from "./Tokens.module.css"
 import {
@@ -16,7 +17,7 @@ import {toRawAddress} from "./utils"
 interface TokensProps {
   readonly wallets: JettonWallet[]
   readonly client: TonClient
-  readonly onAddressClick?: (addr: string) => void
+  readonly onAddressClick?: (addr: string, event?: ExplorerNavigationClickEvent) => void
 }
 
 export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
@@ -97,7 +98,7 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
             <div
               key={w.address}
               className={styles.walletItem}
-              onClick={() => onAddressClick?.(w.jetton)}
+              onClick={event => onAddressClick?.(w.jetton, event)}
               onKeyDown={e => {
                 if (e.key === "Enter" || e.key === " ") {
                   onAddressClick?.(w.jetton)

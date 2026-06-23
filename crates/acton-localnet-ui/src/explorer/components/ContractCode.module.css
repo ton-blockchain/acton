@@ -155,40 +155,14 @@
   background: var(--tonscan-bg);
 }
 
-.sourceShell .dataPanel {
+.sourceDataBlock {
   border-radius: 0 8px 8px;
 }
 
-.copyButton {
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  color: var(--tonscan-text-secondary);
-  cursor: pointer;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 84%, transparent);
-  border: 1px solid var(--tonscan-border);
-  border-radius: 8px;
-  backdrop-filter: blur(8px);
-  transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+.sourceDataBlock > div {
+  border-radius: inherit;
 }
 
-.copyButton:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-control-hover);
-  border-color: var(--tonscan-border);
-}
-
-.copyButton:focus-visible,
 .tab:focus-visible,
 .editorTab:focus-visible,
 .abiRunButton:focus-visible,

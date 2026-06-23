@@ -34,6 +34,7 @@ import {
 import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
+import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import styles from "./AccountPage.module.css"
 
@@ -60,6 +61,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const navigate = useNavigate()
   const location = useLocation()
   const routes = useExplorerRoutePaths()
+  const openPath = useOpenExplorerPath()
   const {addressFormat, network} = useNetworkInfo()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
@@ -373,8 +375,8 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     }
   }
 
-  const handleTransactionClick = (hash: string) => {
-    void navigate(routes.transactionPath(hash))
+  const handleTransactionClick = (hash: string, event?: ExplorerNavigationClickEvent) => {
+    openPath(routes.transactionPath(hash), event)
   }
 
   useEffect(() => {
@@ -723,13 +725,9 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     }
   }, [accountAddressKey, activeTab, client, isJettonMasterAccount])
 
-  const handleSearch = (addr: string) => {
+  const handleSearch = (addr: string, event?: ExplorerNavigationClickEvent) => {
     const finalAddr = addr ? normalizeAddress(addr, addressFormat) : ""
-    if (finalAddr) {
-      void navigate(routes.addressPath(finalAddr))
-    } else {
-      void navigate(routes.rootPath)
-    }
+    openPath(finalAddr ? routes.addressPath(finalAddr) : routes.rootPath, event)
   }
 
   const handleTabChange = (tab: string) => {

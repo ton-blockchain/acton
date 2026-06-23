@@ -192,6 +192,10 @@
   --z-index-modal: 1050;
   --z-index-tooltip: 1100;
 
+  --retrace-workspace-height: clamp(520px, 66vh, 720px);
+  --retrace-workspace-narrow-height: 760px;
+  --retrace-toolbar-height: 43px;
+
   --table-border-color: var(--color-divider);
   --table-section-divider-bg: var(--color-background-secondary);
   --table-th-text-color: var(--color-text-secondary);

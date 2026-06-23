@@ -1,14 +1,152 @@
 .container {
+  max-width: 100%;
+}
+
+.label {
+  margin-bottom: var(--spacing-xs);
+  color: var(--color-text-secondary, var(--text-secondary));
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.contentWrapper {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--tonscan-border, var(--color-border, var(--border-color)));
+  background: var(--tonscan-bg, var(--table-code-bg-color, var(--bg-color)));
+}
+
+.contentBody {
+  position: relative;
+  min-width: 0;
+}
+
+.inline .contentWrapper {
+  border-radius: var(--border-radius-md);
+}
+
+.standalone .contentWrapper {
+  border-radius: 12px;
+}
+
+.collapsibleHeader {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 42px;
+  padding: 0 var(--spacing-sm);
+  color: var(--tonscan-text-secondary, var(--color-text-secondary, var(--text-secondary)));
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  text-align: left;
+  transition:
+    color var(--transition-duration-fast);
+}
+
+.collapsibleHeader:hover {
+  color: var(--tonscan-text-primary, var(--color-text-primary, var(--text-primary)));
+}
+
+.collapsibleHeader:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px
+    var(--litenode-focus, color-mix(in srgb, currentColor 22%, transparent));
+}
+
+.collapsibleHeader svg {
+  flex: 0 0 auto;
+  margin-right: var(--spacing-xs);
+}
+
+.collapsible .contentBody {
+  border-top: 1px solid var(--tonscan-border, var(--color-border, var(--border-color)));
+}
+
+.content,
+.childrenContent {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  color: var(--tonscan-text-primary, var(--table-code-text-color, var(--text-secondary)));
+  background: transparent;
+}
+
+.content {
   font-family: var(--font-mono), monospace;
   font-size: var(--font-size-xs);
-  background-color: var(--bg-color);
-  color: var(--text-secondary);
-  padding: var(--spacing-mds) var(--spacing-mds) calc(var(--spacing-mds) - 2px);
-  border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
+  line-height: 1.4;
+  padding: var(--spacing-mds) 54px calc(var(--spacing-mds) - 2px) var(--spacing-mds);
+  white-space: pre;
+  word-break: normal;
+}
+
+.contentBody .content {
+  padding-right: 54px;
+}
+
+.contentWrap {
+  overflow-wrap: anywhere;
   word-break: break-all;
   white-space: pre-wrap;
-  line-height: 1.4;
-  max-width: 100%;
-  overflow-x: auto;
+}
+
+.copyButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  box-sizing: border-box;
+  flex: 0 0 30px;
+  padding: 0;
+  color: var(--tonscan-text-secondary, var(--color-text-secondary, var(--text-secondary)));
+  cursor: pointer;
+  background: color-mix(
+    in srgb,
+    var(--tonscan-card-bg, var(--color-background-primary, var(--bg-color))) 84%,
+    transparent
+  );
+  border: 1px solid var(--tonscan-border, var(--color-border, var(--border-color)));
+  border-radius: 8px;
+  opacity: 0;
+  backdrop-filter: blur(8px);
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
+}
+
+.contentWrapper:hover .copyButton,
+.copyButton:focus-visible {
+  opacity: 1;
+}
+
+.copyButton:hover {
+  color: var(--tonscan-text-primary, var(--color-text-primary, var(--text-primary)));
+  background: var(--litenode-control-hover, var(--hover-bg));
+}
+
+.copyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--litenode-focus, color-mix(in srgb, currentColor 22%, transparent));
+}
+
+.copyButton svg {
+  flex: 0 0 auto;
 }

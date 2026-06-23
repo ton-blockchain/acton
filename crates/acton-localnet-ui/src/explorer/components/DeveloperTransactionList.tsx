@@ -2,6 +2,7 @@ import type {FC, ReactNode} from "react"
 
 import {addressKey} from "../api/compilerAbi"
 import type {V3Message, V3TransactionListItem} from "../api/types"
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {AddressLabel} from "./AddressLabel"
 import {formatNano, formatTimeAgo, hashToHex} from "./utils"
@@ -42,8 +43,12 @@ interface DeveloperTransactionListProps {
   readonly emptyState?: ReactNode
   readonly maxRows?: number
   readonly messageNamesByAddress?: MessageNamesByAddress
-  readonly onTransactionClick?: (hashHex: string, transaction: TransactionListItem) => void
-  readonly onAddressClick?: (address: string) => void
+  readonly onTransactionClick?: (
+    hashHex: string,
+    transaction: TransactionListItem,
+    event?: ExplorerNavigationClickEvent,
+  ) => void
+  readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
 }
 
 export const DeveloperTransactionListSkeleton: FC<{
@@ -138,9 +143,9 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
               <tr
                 key={row.key}
                 className={`${styles.row} ${canOpenTransaction ? styles.rowInteractive : ""}`}
-                onClick={() => {
+                onClick={event => {
                   if (hashHex) {
-                    onTransactionClick?.(hashHex, row.transaction)
+                    onTransactionClick?.(hashHex, row.transaction, event)
                   }
                 }}
                 title={row.statusLabel}
@@ -186,7 +191,7 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
 
 const EndpointCell: FC<{
   readonly endpoint: DeveloperEndpoint
-  readonly onAddressClick?: (address: string) => void
+  readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({endpoint, onAddressClick}) => {
   if (endpoint.kind === "text") {
     return (
@@ -210,7 +215,7 @@ const EndpointCell: FC<{
       className={styles.addressButton}
       onClick={event => {
         event.stopPropagation()
-        onAddressClick(endpoint.address)
+        onAddressClick(endpoint.address, event)
       }}
     >
       <AddressLabel address={endpoint.address} fallback={endpoint.fallback} />

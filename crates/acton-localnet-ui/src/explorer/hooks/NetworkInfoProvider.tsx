@@ -6,16 +6,18 @@ import type {LocalnetNodeInfo} from "../api/types"
 
 import {
   NetworkInfoContext,
+  type ExplorerApiConfig,
   type ExplorerNetworkInfo,
   type NetworkInfoContextValue,
 } from "./useNetworkInfo"
 
 interface NetworkInfoProviderProps {
   readonly client: TonClient
+  readonly api: ExplorerApiConfig
   readonly children: ReactNode
 }
 
-export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, children}) => {
+export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, api, children}) => {
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
 
   useEffect(() => {
@@ -52,6 +54,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, child
         label: "Localnet",
         testOnly: true,
         supportsActions: false,
+        api,
       }
     }
     if (normalizedForkNetwork === "mainnet") {
@@ -60,6 +63,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, child
         label: "Mainnet",
         testOnly: false,
         supportsActions: true,
+        api,
       }
     }
     if (normalizedForkNetwork === "testnet") {
@@ -68,6 +72,7 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, child
         label: "Testnet",
         testOnly: true,
         supportsActions: true,
+        api,
       }
     }
     return {
@@ -75,8 +80,9 @@ export const NetworkInfoProvider: FC<NetworkInfoProviderProps> = ({client, child
       label: forkNetwork ?? "Custom",
       testOnly: true,
       supportsActions: false,
+      api,
     }
-  }, [forkNetwork, isFork, normalizedForkNetwork])
+  }, [api, forkNetwork, isFork, normalizedForkNetwork])
   const addressFormat = useMemo(
     () => ({
       testOnly: network.testOnly,

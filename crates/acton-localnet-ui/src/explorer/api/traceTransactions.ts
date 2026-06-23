@@ -7,12 +7,14 @@ import {
   Dictionary,
   loadStateInit,
   type AccountStatus,
+  type AccountStatusChange,
   type Message,
   type StateInit,
   type Transaction,
   type TransactionActionPhase,
   type TransactionComputePhase,
   type TransactionDescription,
+  type TransactionStoragePhase,
 } from "@ton/core"
 
 import {hashToHex} from "../components/utils"
@@ -276,6 +278,53 @@ const mapAccountStatus = (status: string | undefined): AccountStatus => {
   }
 }
 
+const mapAccountStatusChange = (status: string | undefined): AccountStatusChange => {
+  switch (status) {
+    case undefined:
+    case "unchanged":
+    case "acst_unchanged": {
+      return "unchanged"
+    }
+    case "frozen":
+    case "acst_frozen": {
+      return "frozen"
+    }
+    case "deleted":
+    case "acst_deleted": {
+      return "deleted"
+    }
+    default: {
+      throw new Error(`Unsupported account status change: ${status}`)
+    }
+  }
+}
+
+const synthesizeStoragePhase = (
+  storage: V3Transaction["description"]["storage_ph"],
+): TransactionStoragePhase | undefined => {
+  if (!storage) {
+    return undefined
+  }
+
+  return {
+    storageFeesCollected: parseBigInt(storage.storage_fees_collected),
+    storageFeesDue:
+      storage.storage_fees_due === undefined ? undefined : parseBigInt(storage.storage_fees_due),
+    statusChange: mapAccountStatusChange(storage.status_change),
+  }
+}
+
+const synthesizeRequiredStoragePhase = (
+  storage: V3Transaction["description"]["storage_ph"],
+): TransactionStoragePhase => {
+  const storagePhase = synthesizeStoragePhase(storage)
+  if (!storagePhase) {
+    throw new Error("Tick-tock transaction is missing storage phase")
+  }
+
+  return storagePhase
+}
+
 const synthesizeComputePhase = (
   compute: V3Transaction["description"]["compute_ph"],
 ): TransactionComputePhase => {
@@ -309,7 +358,7 @@ const synthesizeActionPhase = (tx: V3Transaction): TransactionActionPhase | unde
     success: action.success,
     valid: action.valid ?? true,
     noFunds: action.no_funds ?? false,
-    statusChange: "unchanged",
+    statusChange: mapAccountStatusChange(action.status_change),
     totalFwdFees:
       action.total_fwd_fees === undefined ? undefined : parseBigInt(action.total_fwd_fees),
     totalActionFees:
@@ -328,17 +377,35 @@ const synthesizeActionPhase = (tx: V3Transaction): TransactionActionPhase | unde
   }
 }
 
-const synthesizeDescription = (tx: V3Transaction): TransactionDescription => ({
-  type: "generic",
-  creditFirst: tx.description.credit_first ?? true,
-  storagePhase: undefined,
-  creditPhase: undefined,
-  computePhase: synthesizeComputePhase(tx.description.compute_ph),
-  actionPhase: synthesizeActionPhase(tx),
-  bouncePhase: undefined,
-  aborted: tx.description.aborted,
-  destroyed: tx.description.destroyed ?? false,
-})
+const isTickTockDescription = (description: V3Transaction["description"]): boolean => {
+  return description.type === "tick_tock" || description.type === "tick-tock"
+}
+
+const synthesizeDescription = (tx: V3Transaction): TransactionDescription => {
+  if (isTickTockDescription(tx.description)) {
+    return {
+      type: "tick-tock",
+      isTock: tx.description.is_tock ?? false,
+      storagePhase: synthesizeRequiredStoragePhase(tx.description.storage_ph),
+      computePhase: synthesizeComputePhase(tx.description.compute_ph),
+      actionPhase: synthesizeActionPhase(tx),
+      aborted: tx.description.aborted,
+      destroyed: tx.description.destroyed ?? false,
+    }
+  }
+
+  return {
+    type: "generic",
+    creditFirst: tx.description.credit_first ?? true,
+    storagePhase: synthesizeStoragePhase(tx.description.storage_ph),
+    creditPhase: undefined,
+    computePhase: synthesizeComputePhase(tx.description.compute_ph),
+    actionPhase: synthesizeActionPhase(tx),
+    bouncePhase: undefined,
+    aborted: tx.description.aborted,
+    destroyed: tx.description.destroyed ?? false,
+  }
+}
 
 const synthesizeTransaction = (tx: V3Transaction): Transaction => {
   const outMessages = Dictionary.empty<number, Message>(Dictionary.Keys.Uint(15))

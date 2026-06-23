@@ -13,6 +13,7 @@ import {
 } from "../components/DeveloperTransactionList"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
+import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../hooks/useTransactionMessageNames"
 
 import styles from "./BlocksPage.module.css"
@@ -56,8 +57,8 @@ interface BlockDetailsState {
 }
 
 export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
-  const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
+  const openPath = useOpenExplorerPath()
   const {prefetchNames} = useAddressBook()
   const [state, setState] = useState<BlocksPageState>({
     transactions: [],
@@ -151,11 +152,11 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
             transactions={state.transactions}
             maxRows={LAST_TRANSACTION_MESSAGES_LIMIT}
             messageNamesByAddress={messageNamesByAddress}
-            onTransactionClick={hashHex => {
-              void navigate(routes.transactionPath(hashHex))
+            onTransactionClick={(hashHex, _transaction, event) => {
+              openPath(routes.transactionPath(hashHex), event)
             }}
-            onAddressClick={address => {
-              void navigate(routes.addressPath(address))
+            onAddressClick={(address, event) => {
+              openPath(routes.addressPath(address), event)
             }}
           />
         )}
@@ -166,14 +167,14 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
             blocks={state.masterchainBlocks}
             isLoading={state.isLoading}
             emptyLabel="No masterchain blocks yet."
-            onOpenBlock={block => void navigate(blockPath(block))}
+            onOpenBlock={(block, event) => openPath(blockPath(block), event)}
           />
           <BlockTableSection
             title="Last workchain blocks"
             blocks={state.workchainBlocks}
             isLoading={state.isLoading}
             emptyLabel="No workchain blocks yet."
-            onOpenBlock={block => void navigate(blockPath(block))}
+            onOpenBlock={(block, event) => openPath(blockPath(block), event)}
           />
         </div>
       </section>
@@ -185,6 +186,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
   const params = useParams<{workchain: string; shard: string; seqno: string}>()
   const navigate = useNavigate()
   const routes = useExplorerRoutePaths()
+  const openPath = useOpenExplorerPath()
   const {prefetchNames} = useAddressBook()
   const workchain = Number(params.workchain)
   const shard = params.shard ?? ""
@@ -354,14 +356,14 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
                 blocks={state.shardchainBlocks}
                 isLoading={false}
                 emptyLabel="No shardchain blocks for this masterchain block."
-                onOpenBlock={block => void navigate(blockPath(block))}
+                onOpenBlock={(block, event) => openPath(blockPath(block), event)}
               />
             ) : null}
 
             <BlockTransactionsTable
               transactions={state.transactions}
-              onOpenAccount={address => void navigate(routes.addressPath(address))}
-              onOpenTransaction={hash => void navigate(routes.transactionPath(hash))}
+              onOpenAccount={(address, event) => openPath(routes.addressPath(address), event)}
+              onOpenTransaction={(hash, event) => openPath(routes.transactionPath(hash), event)}
             />
           </>
         )}
@@ -375,7 +377,7 @@ const BlockTableSection: FC<{
   readonly blocks: readonly V3Block[]
   readonly isLoading: boolean
   readonly emptyLabel: string
-  readonly onOpenBlock: (block: V3Block) => void
+  readonly onOpenBlock: (block: V3Block, event?: ExplorerNavigationClickEvent) => void
 }> = ({title, blocks, isLoading, emptyLabel, onOpenBlock}) => {
   if (isLoading) {
     return <BlockTableSkeleton title={title} rows={4} />
@@ -403,7 +405,7 @@ const BlockTableSection: FC<{
                 key={blockKey(block)}
                 className={styles.blocksTableRow}
                 tabIndex={0}
-                onClick={() => onOpenBlock(block)}
+                onClick={event => onOpenBlock(block, event)}
                 onKeyDown={event => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault()
@@ -433,8 +435,8 @@ const BlockTableSection: FC<{
 
 const BlockTransactionsTable: FC<{
   readonly transactions: readonly V3TransactionListItem[]
-  readonly onOpenAccount: (address: string) => void
-  readonly onOpenTransaction: (hash: string) => void
+  readonly onOpenAccount: (address: string, event?: ExplorerNavigationClickEvent) => void
+  readonly onOpenTransaction: (hash: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({transactions, onOpenAccount, onOpenTransaction}) => {
   if (transactions.length === 0) {
     return <TableStateBlock title="Transactions">No transactions in this block.</TableStateBlock>
@@ -460,7 +462,7 @@ const BlockTransactionsTable: FC<{
                 key={`${transaction.hash}:${transaction.lt}`}
                 className={styles.blocksTableRow}
                 tabIndex={0}
-                onClick={() => onOpenTransaction(transaction.hash)}
+                onClick={event => onOpenTransaction(transaction.hash, event)}
                 onKeyDown={event => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault()
@@ -475,7 +477,7 @@ const BlockTransactionsTable: FC<{
                     className={styles.blocksCellButton}
                     onClick={event => {
                       event.stopPropagation()
-                      onOpenAccount(transaction.account)
+                      onOpenAccount(transaction.account, event)
                     }}
                   >
                     <AddressLabel address={transaction.account} fallback="Account" />

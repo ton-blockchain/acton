@@ -54,6 +54,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
 }
 
 .status {
@@ -97,6 +98,35 @@
 
 .link:hover {
   text-decoration: underline;
+}
+
+.selectedRetraceSection {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 12px;
+}
+
+.retraceInlineButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  color: var(--tonscan-accent);
+  background: transparent;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--transition-duration-fast);
+}
+
+.retraceInlineButton:hover,
+.retraceInlineButtonActive {
+  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
 }
 
 .tabsContainer {

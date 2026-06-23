@@ -55,6 +55,10 @@
   min-height: 360px;
 }
 
+.loadingState {
+  min-height: calc(var(--retrace-toolbar-height) + var(--retrace-workspace-height));
+}
+
 .errorState {
   gap: 8px;
   padding: 24px;
@@ -72,4 +76,10 @@
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   line-height: 1.45;
+}
+
+@media (width <= 980px) {
+  .loadingState {
+    min-height: calc(var(--retrace-toolbar-height) + var(--retrace-workspace-narrow-height));
+  }
 }

@@ -5,6 +5,7 @@ export interface ExplorerRoutes {
   readonly blocksPath: string
   readonly addressPath: (address: string) => string
   readonly transactionPath: (hash: string) => string
+  readonly transactionTracePath: (hash: string) => string
 }
 
 export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
@@ -16,6 +17,7 @@ export const createExplorerRoutes = (basePath: string): ExplorerRoutes => {
     blocksPath: path("/blocks"),
     addressPath: address => path(`/address/${encodeURIComponent(address)}`),
     transactionPath: hash => path(`/tx/${encodeURIComponent(hash)}`),
+    transactionTracePath: hash => path(`/tx/${encodeURIComponent(hash)}/trace`),
   }
 }
 

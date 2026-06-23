@@ -3,6 +3,7 @@ import {useMemo, useState} from "react"
 import type {FC} from "react"
 
 import type {NftItem} from "../api/types"
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {AddressLabel} from "./AddressLabel"
 import {
@@ -15,7 +16,7 @@ import styles from "./Nfts.module.css"
 
 interface NftsProps {
   readonly items: NftItem[]
-  readonly onAddressClick?: (addr: string) => void
+  readonly onAddressClick?: (addr: string, event?: ExplorerNavigationClickEvent) => void
 }
 
 const getContentString = (content: Record<string, unknown>, key: string): string | undefined => {
@@ -86,7 +87,7 @@ export const Nfts: FC<NftsProps> = ({items, onAddressClick}) => {
             <div
               key={item.address}
               className={styles.nftItem}
-              onClick={() => onAddressClick?.(item.address)}
+              onClick={event => onAddressClick?.(item.address, event)}
               onKeyDown={event => {
                 if (event.key === "Enter" || event.key === " ") {
                   onAddressClick?.(item.address)

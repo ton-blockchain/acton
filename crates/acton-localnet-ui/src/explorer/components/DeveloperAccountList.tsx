@@ -1,6 +1,7 @@
 import type {FC, ReactNode} from "react"
 
 import type {V3AccountState} from "../api/types"
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {AddressLabel} from "./AddressLabel"
 import {formatNano} from "./utils"
@@ -17,7 +18,7 @@ interface DeveloperAccountListProps {
   readonly className?: string
   readonly title?: string
   readonly emptyState?: ReactNode
-  readonly onAddressClick?: (address: string) => void
+  readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
 }
 
 export const DeveloperAccountListSkeleton: FC<{
@@ -95,7 +96,7 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
               <tr
                 key={account.address}
                 className={`${styles.row} ${canOpenAccount ? styles.rowInteractive : ""}`}
-                onClick={() => onAddressClick?.(account.address)}
+                onClick={event => onAddressClick?.(account.address, event)}
                 onKeyDown={event => {
                   if (!canOpenAccount) {
                     return
@@ -135,7 +136,7 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
 
 const AccountCell: FC<{
   readonly account: DeveloperAccountListItem
-  readonly onAddressClick?: (address: string) => void
+  readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({account, onAddressClick}) => {
   if (!onAddressClick) {
     return (
@@ -151,7 +152,7 @@ const AccountCell: FC<{
       className={styles.addressButton}
       onClick={event => {
         event.stopPropagation()
-        onAddressClick(account.address)
+        onAddressClick(account.address, event)
       }}
     >
       <AddressLabel address={account.address} />

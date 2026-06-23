@@ -83,6 +83,12 @@ export interface TransactionInfo {
   children: readonly TransactionInfo[]
 }
 
+export interface LoadedTransactionActions {
+  readonly actions: Cell | undefined
+  readonly outActions: readonly OutAction[]
+  readonly executorActions?: readonly BackendExecutorAction[]
+}
+
 export interface ContractData {
   readonly displayName: string
   readonly address: Address
