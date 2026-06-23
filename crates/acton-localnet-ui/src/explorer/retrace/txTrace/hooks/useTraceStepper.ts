@@ -101,25 +101,29 @@ export function useTraceStepper(trace: TraceInfo | undefined): UseTraceStepperRe
 
   const findStepByLine = useCallback(
     (line: number) => {
-      if (!trace?.steps.length) {
+      if (trace === undefined || trace.steps.length === 0) {
         return
       }
       const map: Record<number, number[]> = {}
       trace.steps.forEach((step, idx) => {
         if (step.loc !== undefined) {
           const stepLine = step.loc.line + 1
-          ;(map[stepLine] ??= []).push(idx)
+          if (map[stepLine] === undefined) {
+            map[stepLine] = []
+          }
+          map[stepLine].push(idx)
         }
       })
-      if (!map[line]?.length) {
+      const lineSteps = map[line]
+      if (lineSteps === undefined || lineSteps.length === 0) {
         return
       }
-      const idxInLine = map[line].indexOf(selectedStep)
+      const idxInLine = lineSteps.indexOf(selectedStep)
       setTransitionType("click")
-      if (idxInLine !== -1 && idxInLine < map[line].length - 1) {
-        setSelectedStep(map[line][idxInLine + 1])
+      if (idxInLine !== -1 && idxInLine < lineSteps.length - 1) {
+        setSelectedStep(lineSteps[idxInLine + 1])
       } else {
-        setSelectedStep(map[line][0])
+        setSelectedStep(lineSteps[0])
       }
     },
     [trace, selectedStep],

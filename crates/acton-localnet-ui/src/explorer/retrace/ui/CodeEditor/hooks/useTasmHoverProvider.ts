@@ -136,11 +136,5 @@ export const useTasmHoverProvider = ({
     return () => {
       provider.dispose()
     }
-  }, [
-    monaco,
-    lineExecutionData,
-    showInstructionDocs,
-    enabled,
-    editorReady,
-  ])
+  }, [monaco, lineExecutionData, showInstructionDocs, enabled, editorReady])
 }

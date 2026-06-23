@@ -3,9 +3,9 @@ import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
 
 import {DARK_THEME, LIGHT_THEME} from "../themes"
-import {funcLanguageDefinition} from "../languages/FuncLanguageDefinition"
-import {tasmLanguageDefinition} from "../languages/TasmLanguageDefinition"
-import {tolkLanguageDefinition} from "../languages/TolkLanguageDefinition"
+import {funcLanguageDefinition} from "../languages/func-language-definition"
+import {tasmLanguageDefinition} from "../languages/tasm-language-definition"
+import {tolkLanguageDefinition} from "../languages/tolk-language-definition"
 import {FUNC_LANGUAGE_ID, TASM_LANGUAGE_ID, TOLK_LANGUAGE_ID} from "../languages"
 
 export type SupportedLanguage = "tasm" | "func" | "tolk"

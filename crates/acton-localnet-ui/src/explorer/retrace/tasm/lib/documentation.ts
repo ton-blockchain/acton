@@ -17,7 +17,7 @@ export function generateAsmDoc(instruction: AsmInstruction): string | null {
 
   const actualInstructionDescription = [
     "```",
-    instruction.name + " " + args,
+    `${instruction.name} ${args}`,
     "```",
     stackInfo,
     `- Gas: \`${gas}\``,
@@ -25,7 +25,7 @@ export function generateAsmDoc(instruction: AsmInstruction): string | null {
     "",
     short,
     "",
-    details ? "**Details:**\n\n" + details : "",
+    details ? `**Details:**\n\n${details}` : "",
     "",
   ]
 
@@ -36,7 +36,7 @@ export function generateAsmDoc(instruction: AsmInstruction): string | null {
 
     return [
       "```",
-      instruction.fiftInstruction.actual_name + fiftInfoDescription,
+      `${instruction.fiftInstruction.actual_name}${fiftInfoDescription}`,
       "```",
       "",
       instruction.fiftInstruction.description ?? "",

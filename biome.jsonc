@@ -149,39 +149,5 @@
         "useIterableCallbackReturn": "off"
       }
     }
-  },
-  "overrides": [
-    {
-      "includes": ["crates/acton-localnet-ui/src/explorer/retrace/**"],
-      "linter": {
-        "rules": {
-          "a11y": {
-            "noAutofocus": "off",
-            "noInteractiveElementToNoninteractiveRole": "off",
-            "noNoninteractiveElementToInteractiveRole": "off",
-            "useButtonType": "off",
-            "useKeyWithClickEvents": "off"
-          },
-          "correctness": {
-            "useParseIntRadix": "off"
-          },
-          "style": {
-            "noExcessiveClassesPerFile": "off",
-            "noSubstr": "off",
-            "useAtIndex": "off",
-            "useConsistentMemberAccessibility": "off",
-            "useExplicitLengthCheck": "off",
-            "useFilenamingConvention": "off",
-            "useTemplate": "off"
-          },
-          "suspicious": {
-            "noAssignInExpressions": "off",
-            "noEmptySource": "off",
-            "noForIn": "off",
-            "noParametersOnlyUsedInRecursion": "off"
-          }
-        }
-      }
-    }
-  ]
+  }
 }

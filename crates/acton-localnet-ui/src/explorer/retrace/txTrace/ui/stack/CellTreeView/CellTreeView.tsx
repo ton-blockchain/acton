@@ -143,6 +143,7 @@ const CellTreeView: React.FC<CellTreeViewProps> = ({cell, depth = 0, maxBitsLeng
           )}
         </div>
         <button
+          type="button"
           className={`${styles.copyButton} ${copied ? styles.copied : ""}`}
           onClick={handleCopyToClipboard}
           title="Copy BoC (Hex)"

@@ -67,7 +67,12 @@ export default function TransactionRetracePanel({txHash, onClose}: TransactionRe
     <div className={`${styles.root} retraceRoot`}>
       <div className={styles.header}>
         <div className={styles.title}>Retrace</div>
-        <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close retrace">
+        <button
+          type="button"
+          className={styles.closeButton}
+          onClick={onClose}
+          aria-label="Close retrace"
+        >
           <X size={16} />
         </button>
       </div>

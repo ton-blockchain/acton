@@ -11,8 +11,8 @@ const truncateMiddle = (text: string, maxLength: number = 30): JSX.Element => {
   if (text.length <= maxLength) return <>{text}</>
 
   const partLength = Math.floor(maxLength / 2)
-  const start = text.substring(0, partLength)
-  const end = text.substring(text.length - partLength)
+  const start = text.slice(0, partLength)
+  const end = text.slice(text.length - partLength)
 
   return (
     <span title={text} className={styles.truncatedMiddle}>
@@ -87,11 +87,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
     }
   }
 
-  const renderStackElement = (
-    element: StackElement,
-    keyPrefix: string,
-    originalIndex: number,
-  ): JSX.Element => {
+  const renderStackElement = (element: StackElement, keyPrefix: string): JSX.Element => {
     const handleItemClick = () => {
       switch (element.$) {
         case "Cell":
@@ -294,6 +290,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
             {expandedItem === keyPrefix && (
               <div className={styles.stackItemFullview}>
                 <button
+                  type="button"
                   className={styles.closeBtn}
                   onClick={e => {
                     e.stopPropagation()
@@ -338,7 +335,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
                 const nestedKeyPrefix = `${keyPrefix}-${i}`
                 return (
                   <div className={styles.tupleElement} key={nestedKeyPrefix}>
-                    {renderStackElement(el, nestedKeyPrefix, originalIndex)}
+                    {renderStackElement(el, nestedKeyPrefix)}
                   </div>
                 )
               })}
@@ -396,7 +393,7 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
                   className={styles.stackElement}
                 >
                   <div className={styles.stackIndex}>{originalIndex}</div>
-                  {renderStackElement(element, key, originalIndex)}
+                  {renderStackElement(element, key)}
                 </motion.div>
               ))}
             </AnimatePresence>

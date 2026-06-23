@@ -60,7 +60,10 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
     () => calculateCumulativeGasSinceBegin(result.trace, selectedStep),
     [result.trace, selectedStep],
   )
-  const implicitRet = useMemo(() => getImplicitRet(result.trace, selectedStep), [result.trace, selectedStep])
+  const implicitRet = useMemo(
+    () => getImplicitRet(result.trace, selectedStep),
+    [result.trace, selectedStep],
+  )
   const stateUpdateHashOk = result.result.stateUpdateHashOk
 
   const handleTraceViewModeChange = useCallback((mode: TraceViewMode) => {

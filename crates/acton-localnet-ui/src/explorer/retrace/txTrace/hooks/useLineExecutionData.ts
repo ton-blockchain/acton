@@ -15,7 +15,7 @@ export interface LineExecutionData {
 
 export function useLineExecutionData(trace: TraceInfo | undefined): LinesExecutionData {
   return useMemo(() => {
-    if (!trace?.steps.length) return {}
+    if (trace === undefined || trace.steps.length === 0) return {}
 
     const map: Record<number, LineExecutionData> = {}
 

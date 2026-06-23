@@ -21,11 +21,7 @@ const AddressDetails: React.FC<AddressDetailsProps> = ({address}) => {
       <div className={styles.addressRow}>
         <div className={styles.addressLabel}>Raw Address:</div>
         <div className={styles.addressValue}>
-          <ContractChip
-            address={rawString}
-            contracts={EMPTY_CONTRACTS}
-            trimSoloAddress={false}
-          />
+          <ContractChip address={rawString} contracts={EMPTY_CONTRACTS} trimSoloAddress={false} />
         </div>
       </div>
       <div className={styles.addressRow}>

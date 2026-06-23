@@ -89,7 +89,12 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({itemData, title, onC
         <div className={styles.header}>
           {title && <h3 className={styles.title}>{title}</h3>}
           {onClose && (
-            <button onClick={onClose} className={styles.closeButton} aria-label="Close details">
+            <button
+              type="button"
+              onClick={onClose}
+              className={styles.closeButton}
+              aria-label="Close details"
+            >
               ×
             </button>
           )}

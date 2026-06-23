@@ -86,7 +86,7 @@ const TraceStepsChainView: React.FC<TraceStepsChainViewProps> = ({
     activeStep?.scrollIntoView({block: "nearest"})
   }, [selectedStep])
 
-  if (!steps.length) {
+  if (steps.length === 0) {
     return (
       <div className={styles.emptyState} role="status" aria-live="polite">
         No trace steps available.

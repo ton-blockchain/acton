@@ -1,1 +1,1 @@
-export {default} from "./StackViewer"
+export {default} from "./stack-viewer"
