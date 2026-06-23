@@ -1265,17 +1265,48 @@ fn localnet_require_auth_protects_http_api() {
         .json()
         .expect("x-api-key v2 response must be JSON");
 
-    let options_status = client
+    let options_response = client
         .request(
             reqwest::Method::OPTIONS,
             format!("{}/api/v2/getMasterchainInfo", node.base_url()),
         )
-        .header("Origin", "http://127.0.0.1:3000")
+        .header("Origin", "https://actonscan.com")
         .header("Access-Control-Request-Method", "GET")
+        .header("Access-Control-Request-Headers", "x-api-key")
         .send()
-        .expect("OPTIONS request must be sent")
-        .status()
-        .as_u16();
+        .expect("OPTIONS request must be sent");
+    let options_status = options_response.status().as_u16();
+    let options_allow_origin = options_response
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+
+    let cors_v3 = client
+        .get(format!("{}/api/v3/nft/items", node.base_url()))
+        .header("Origin", "https://actonscan.com")
+        .send()
+        .expect("CORS v3 request must be sent");
+    let cors_v3_status = cors_v3.status().as_u16();
+    let cors_v3_allow_origin = cors_v3
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let control_cors = client
+        .get(format!("{}/acton_nodeInfo", node.base_url()))
+        .header("Origin", "https://actonscan.com")
+        .send()
+        .expect("control CORS request must be sent");
+    let control_cors_status = control_cors.status().as_u16();
+    let control_cors_allow_origin = control_cors
+        .headers()
+        .get(reqwest::header::ACCESS_CONTROL_ALLOW_ORIGIN)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
 
     let status_output = project
         .acton()
@@ -1317,6 +1348,11 @@ fn localnet_require_auth_protects_http_api() {
             "x_api_key_status": api_key_v2_status,
             "x_api_key_ok": api_key_v2_json["ok"].as_bool(),
             "options_status": options_status,
+            "options_allow_origin": options_allow_origin,
+            "cors_v3_status": cors_v3_status,
+            "cors_v3_allow_origin": cors_v3_allow_origin,
+            "control_cors_status": control_cors_status,
+            "control_cors_allow_origin": control_cors_allow_origin,
             "status_command_running": status_payload["running"].as_bool(),
         },
         "ui": {

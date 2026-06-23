@@ -24,7 +24,7 @@ use crate::server::{
 use axum::{
     Json, Router,
     extract::Request,
-    http::{HeaderValue, Method, StatusCode, header, request::Parts},
+    http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -43,7 +43,7 @@ use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
 use tower_http::compression::CompressionLayer;
-use tower_http::cors::{AllowOrigin, Any, CorsLayer};
+use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
 
 #[cfg(not(debug_assertions))]
@@ -187,17 +187,24 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         record_api_call(request, next, api_calls_for_api.clone())
     }));
 
-    let mut protected_router = Router::new().nest("/api", api_router).merge(acton_router);
+    let mut api_entry_router = Router::new().nest("/api", api_router);
+    let mut control_router = acton_router;
     if let Some(auth_token) = state.auth_token.clone() {
-        protected_router = protected_router.layer(middleware::from_fn(move |request, next| {
+        let api_auth_token = auth_token.clone();
+        api_entry_router = api_entry_router.layer(middleware::from_fn(move |request, next| {
+            require_auth(request, next, api_auth_token.clone())
+        }));
+        control_router = control_router.layer(middleware::from_fn(move |request, next| {
             require_auth(request, next, auth_token.clone())
         }));
     }
+    api_entry_router = api_entry_router.layer(public_api_cors());
+
+    let protected_router = Router::new().merge(api_entry_router).merge(control_router);
 
     let app = Router::new()
         .merge(protected_router)
         .fallback(handle_embedded_ui)
-        .layer(loopback_cors())
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -377,30 +384,11 @@ fn classify_http_call_type(http_method: &str, method: &str, path: &str) -> ApiCa
     }
 }
 
-fn loopback_cors() -> CorsLayer {
+fn public_api_cors() -> CorsLayer {
     CorsLayer::new()
-        .allow_origin(AllowOrigin::predicate(
-            |origin: &HeaderValue, _request_parts: &Parts| is_loopback_origin(origin),
-        ))
+        .allow_origin(Any)
         .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
         .allow_headers(Any)
-}
-
-fn is_loopback_origin(origin: &HeaderValue) -> bool {
-    let Ok(origin) = origin.to_str() else {
-        return false;
-    };
-    let Ok(uri) = origin.parse::<axum::http::Uri>() else {
-        return false;
-    };
-    matches!(uri.scheme_str(), Some("http" | "https")) && uri.host().is_some_and(is_loopback_host)
-}
-
-fn is_loopback_host(host: &str) -> bool {
-    host.eq_ignore_ascii_case("localhost")
-        || host == "127.0.0.1"
-        || host == "::1"
-        || host == "[::1]"
 }
 
 fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -> Response {

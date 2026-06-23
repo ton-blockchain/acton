@@ -2,6 +2,11 @@
   "authorized": {
     "bearer_ok": true,
     "bearer_status": 200,
+    "control_cors_allow_origin": "",
+    "control_cors_status": 401,
+    "cors_v3_allow_origin": "*",
+    "cors_v3_status": 401,
+    "options_allow_origin": "*",
     "options_status": 200,
     "status_command_running": true,
     "x_api_key_ok": true,
