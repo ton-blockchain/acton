@@ -1,5 +1,5 @@
 import {Cell, loadTransaction} from "@ton/core"
-import type {TraceResult} from "txtracer-core"
+import type {TraceResult} from "@ton/retracer-core"
 
 import type {TransactionInfo} from "@acton/shared-ui"
 

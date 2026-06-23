@@ -1,5 +1,5 @@
 import type {TraceInfo} from "ton-assembly/dist/trace"
-import type {TraceResult} from "txtracer-core"
+import type {TraceResult} from "@ton/retracer-core"
 
 import type {InstructionInfo} from "ton-source-map"
 

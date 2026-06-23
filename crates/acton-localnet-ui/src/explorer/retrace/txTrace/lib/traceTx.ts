@@ -1,5 +1,5 @@
-import {RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK, retrace} from "txtracer-core"
-import type {RetraceNetworkConfig, TraceResult} from "txtracer-core"
+import {RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK, retrace} from "@ton/retracer-core"
+import type {RetraceNetworkConfig, TraceResult} from "@ton/retracer-core"
 import {compileCellWithMapping, decompileCell} from "ton-assembly/dist/runtime/instr"
 import {createMappingInfo} from "ton-assembly/dist/trace/mapping"
 import {type Step, type TraceInfo} from "ton-assembly/dist/trace"

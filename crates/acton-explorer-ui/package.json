@@ -35,7 +35,7 @@
     "shiki": "^3.22.0",
     "ton-assembly": "^0.6.1",
     "ton-source-map": "^0.2.2",
-    "txtracer-core": "file:/Users/petrmakhnev/retracer-core-new",
+    "@ton/retracer-core": "0.9.0",
     "vite-plugin-node-polyfills": "^0.28.0"
   },
   "devDependencies": {
