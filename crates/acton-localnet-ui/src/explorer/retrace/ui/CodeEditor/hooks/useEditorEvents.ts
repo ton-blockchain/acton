@@ -2,7 +2,7 @@ import {useCallback, useEffect, useState, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor} from "monaco-editor"
 
-import type {LinesExecutionData} from "@retrace/txTrace/hooks"
+import type {LinesExecutionData} from "../../../txTrace/hooks"
 
 interface UseEditorEventsOptions {
   readonly monaco: typeof monacoTypes | null

@@ -4,9 +4,9 @@ import {type StackElement} from "ton-assembly/dist/trace"
 import {Cell} from "@ton/core"
 
 import {DataBlock} from "@acton/shared-ui"
-import CellTreeView from "@retrace/txTrace/ui/stack/CellTreeView/CellTreeView"
-import AddressDetails from "@retrace/txTrace/ui/stack/AddressDetails"
 
+import AddressDetails from "../AddressDetails"
+import CellTreeView from "../CellTreeView/CellTreeView"
 import styles from "./StackItemDetails.module.css"
 
 interface StackItemDetailsProps {

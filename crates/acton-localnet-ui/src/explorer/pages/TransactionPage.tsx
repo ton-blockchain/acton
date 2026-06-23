@@ -23,9 +23,6 @@ import {
 } from "lucide-react"
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
 
-import TransactionRetracePanel from "@retrace/txTrace/ui/TransactionRetracePanel"
-import {traceTx} from "@retrace/txTrace/lib/traceTx"
-
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
@@ -40,12 +37,15 @@ import {
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
+import {traceTx} from "../retrace/txTrace/lib/traceTx"
+import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 
 import styles from "./TransactionPage.module.css"
 
 interface TransactionPageProps {
   readonly client: TonClient
+  readonly openRetraceOnLoad?: boolean
 }
 
 type TabType = "transactions" | "value-flow"
@@ -121,7 +121,7 @@ const withLoadedTransactionActions = (
     .filter((tx): tx is TransactionInfo => tx !== undefined)
 }
 
-export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
+export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOnLoad = false}) => {
   const {hash: routeHash = ""} = useParams<{hash: string}>()
   const hash = hashToHex(routeHash) ?? routeHash
   const navigate = useNavigate()
@@ -175,6 +175,13 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
     setRetraceAttempt(currentAttempt => currentAttempt + 1)
   }
 
+  const handleCloseRetrace = () => {
+    setExpandedRetraceHash(undefined)
+    if (openRetraceOnLoad) {
+      void navigate(routes.transactionPath(hash), {replace: true})
+    }
+  }
+
   const loadTransactionActions = useCallback(
     async (tx: TransactionInfo): Promise<LoadedTransactionActions> => {
       const txHash = tx.transaction.hash().toString("hex").toLowerCase()
@@ -207,6 +214,21 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
     setRetraceAttempt(0)
     loadedActionsByHashRef.current.clear()
   }, [hash])
+
+  useEffect(() => {
+    if (!openRetraceOnLoad || traces.length === 0) {
+      return
+    }
+
+    const requestedHash = hash.toLowerCase()
+    const selectedTrace = traces.find(
+      tx => tx.transaction.hash().toString("hex").toLowerCase() === requestedHash,
+    )
+    const selectedTraceHash = selectedTrace?.transaction.hash().toString("hex")
+    if (selectedTraceHash) {
+      setExpandedRetraceHash(selectedTraceHash)
+    }
+  }, [hash, openRetraceOnLoad, traces])
 
   useEffect(() => {
     if (!hash) return
@@ -382,9 +404,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client}) => {
         <TransactionRetracePanel
           key={`${txHash}:${retraceAttempt}`}
           txHash={txHash}
-          onClose={() => {
-            setExpandedRetraceHash(undefined)
-          }}
+          onClose={handleCloseRetrace}
         />
       </div>
     )

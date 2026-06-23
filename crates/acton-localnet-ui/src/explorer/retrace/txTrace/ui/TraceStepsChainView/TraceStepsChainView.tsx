@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from "react"
 
-import type {InstructionDetail} from "@retrace/txTrace/lib/types"
+import type {InstructionDetail} from "../../lib/types"
 
 import styles from "./TraceStepsChainView.module.css"
 

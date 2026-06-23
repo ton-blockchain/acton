@@ -1,6 +1,6 @@
 import React, {useState, useEffect, useRef, memo} from "react"
 
-import type {InstructionDetail} from "@retrace/txTrace/lib/types"
+import type {InstructionDetail} from "../../lib/types"
 
 import styles from "./StepInstructionBlock.module.css"
 

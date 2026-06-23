@@ -2,13 +2,13 @@ import {useEffect, useState} from "react"
 import {X} from "lucide-react"
 
 import {useToast} from "@acton/shared-ui"
-import type {RetraceResultAndCode} from "@retrace/txTrace/lib/types"
-import {traceTx} from "@retrace/txTrace/lib/traceTx"
-import InlineLoader from "@retrace/txTrace/ui/InlineLoader"
-import RetraceWorkspace from "@retrace/txTrace/ui/RetraceWorkspace"
 
+import {traceTx} from "../../lib/traceTx"
+import type {RetraceResultAndCode} from "../../lib/types"
+import InlineLoader from "../InlineLoader"
+import RetraceWorkspace from "../RetraceWorkspace"
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
-import "@retrace/RetracePage.tokens.css"
+import "../../../Retrace.tokens.css"
 import styles from "./TransactionRetracePanel.module.css"
 
 type RetracePanelState =

@@ -3,8 +3,9 @@ import {lazy, memo, Suspense, useCallback, useMemo, useState} from "react"
 import type {StackElement} from "ton-assembly/dist/trace"
 
 import {Tooltip} from "@acton/shared-ui"
-import {useLineExecutionData, useTraceStepper} from "@retrace/txTrace/hooks"
-import type {RetraceResultAndCode} from "@retrace/txTrace/lib/types"
+
+import {useLineExecutionData, useTraceStepper} from "../../hooks"
+import type {RetraceResultAndCode} from "../../lib/types"
 import {
   buildInstructionDetails,
   calculateCumulativeGasSinceBegin,
@@ -12,17 +13,17 @@ import {
   getStoredTraceViewMode,
   setStoredTraceViewMode,
   type TraceViewMode,
-} from "@retrace/txTrace/lib/traceViewModel"
-import InlineLoader from "@retrace/txTrace/ui/InlineLoader"
-import StackItemDetails from "@retrace/txTrace/ui/stack/StackItemDetails"
-import StatusBadge from "@retrace/txTrace/ui/StatusBadge"
-import TraceSidePanel from "@retrace/txTrace/ui/TraceSidePanel"
-import TraceStepsChainView from "@retrace/txTrace/ui/TraceStepsChainView"
-import TraceViewModeToggle from "@retrace/txTrace/ui/TraceViewModeToggle"
+} from "../../lib/traceViewModel"
+import InlineLoader from "../InlineLoader"
+import StatusBadge from "../StatusBadge"
+import TraceSidePanel from "../TraceSidePanel"
+import TraceStepsChainView from "../TraceStepsChainView"
+import TraceViewModeToggle from "../TraceViewModeToggle"
+import StackItemDetails from "../stack/StackItemDetails"
 
 import styles from "./RetraceWorkspace.module.css"
 
-const CodeEditor = lazy(() => import("@retrace/ui/CodeEditor"))
+const CodeEditor = lazy(() => import("../../../ui/CodeEditor"))
 
 interface RetraceWorkspaceProps {
   readonly result: RetraceResultAndCode

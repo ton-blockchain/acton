@@ -1,7 +1,7 @@
 import {useCallback, useRef} from "react"
 import type * as monacoTypes from "monaco-editor"
 
-import type {LinesExecutionData} from "@retrace/txTrace/hooks"
+import type {LinesExecutionData} from "../../../txTrace/hooks"
 
 export interface HighlightGroup {
   readonly lines: number[]

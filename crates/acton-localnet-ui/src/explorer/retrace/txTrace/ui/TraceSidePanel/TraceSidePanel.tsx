@@ -3,10 +3,10 @@ import React from "react"
 import type {StackElement} from "ton-assembly/dist/trace"
 
 import {Button} from "@acton/shared-ui"
-import type {InstructionDetail} from "@retrace/txTrace/lib/types"
-import StackViewer from "@retrace/txTrace/ui/stack/StackViewer"
-import {StepInstructionBlock} from "@retrace/txTrace/ui/StepInstructionBlock"
 
+import type {InstructionDetail} from "../../lib/types"
+import {StepInstructionBlock} from "../StepInstructionBlock"
+import StackViewer from "../stack/StackViewer"
 import styles from "./TraceSidePanel.module.css"
 
 export interface TraceSidePanelProps {

@@ -10,7 +10,6 @@ import {AccountPage} from "./explorer/pages/AccountPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
-import {RetracePage} from "./explorer/retrace/RetracePage"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {DashboardPage} from "./dashboard/DashboardPage"
@@ -350,7 +349,7 @@ const AppContent: FC<AppContentProps> = ({
               path="/explorer/tx/:hash/trace"
               element={
                 <DashboardPage {...dashboardProps} embedded>
-                  <RetracePage />
+                  <TransactionPage client={client} openRetraceOnLoad />
                 </DashboardPage>
               }
             />

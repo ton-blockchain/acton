@@ -7,10 +7,8 @@ import {
   TransactionDetails,
 } from "@acton/shared-ui"
 
-import type {RetraceResultAndCode} from "@retrace/txTrace/lib/types"
-import {toTransactionInfo} from "@retrace/txTrace/lib/toTransactionInfo"
-
-import {RetraceExtraDetails} from "../RetraceExtraDetails"
+import {toTransactionInfo} from "../../lib/toTransactionInfo"
+import type {RetraceResultAndCode} from "../../lib/types"
 
 interface RetraceResultViewProps {
   readonly result: RetraceResultAndCode
@@ -29,8 +27,6 @@ const RetraceResultViewFc: React.FC<RetraceResultViewProps> = ({result}) => {
         contracts={EMPTY_CONTRACTS}
         allContracts={EMPTY_CONTRACT_INFOS}
       />
-      <RetraceExtraDetails result={result} />
-
       {result.result.emulatedTx.vmLogs && (
         <DataBlock
           copyLabel="VM Logs"

@@ -20,7 +20,6 @@
       "@acton/shared-ui": ["../acton-shared-ui/src/index.ts"],
       "@acton/shared-ui/*": ["../acton-shared-ui/*"],
       "@/*": ["../acton-shared-ui/src/*"],
-      "@retrace/*": ["../acton-localnet-ui/src/explorer/retrace/*"],
       "@tasm-spec/*": ["../tasm-core/spec/*"]
     },
     "types": ["vite/client", "node"]

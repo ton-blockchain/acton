@@ -2,9 +2,9 @@ import {useEffect} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor, type IMarkdownString, Position} from "monaco-editor"
 
-import {findInstruction, generateAsmDoc} from "@retrace/tasm/lib"
+import {findInstruction, generateAsmDoc} from "../../../tasm/lib"
 
-import type {LinesExecutionData} from "@retrace/txTrace/hooks"
+import type {LinesExecutionData} from "../../../txTrace/hooks"
 
 import {TASM_LANGUAGE_ID} from "../languages"
 

@@ -2,7 +2,7 @@ import {memo} from "react"
 import type {IconType} from "react-icons"
 import {FiCode, FiList} from "react-icons/fi"
 
-import type {TraceViewMode} from "@retrace/txTrace/lib/traceViewModel"
+import type {TraceViewMode} from "../../lib/traceViewModel"
 
 import styles from "./TraceViewModeToggle.module.css"
 

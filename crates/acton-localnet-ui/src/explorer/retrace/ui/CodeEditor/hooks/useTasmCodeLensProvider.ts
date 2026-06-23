@@ -3,7 +3,7 @@ import type * as monacoTypes from "monaco-editor"
 
 import {EXIT_CODE_DESCRIPTIONS} from "@acton/shared-ui"
 
-import type {ExitCode} from "@retrace/txTrace/lib/types"
+import type {ExitCode} from "../../../txTrace/lib/types"
 
 import {TASM_LANGUAGE_ID} from "../languages"
 

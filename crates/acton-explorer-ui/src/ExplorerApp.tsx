@@ -18,7 +18,6 @@ import {BlockDetailsPage, BlocksPage} from "../../acton-localnet-ui/src/explorer
 import {AccountPage} from "../../acton-localnet-ui/src/explorer/pages/AccountPage"
 import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
-import {RetracePage} from "../../acton-localnet-ui/src/explorer/retrace/RetracePage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
 import type {ThemeMode} from "@acton/shared-ui"
 import "@acton/shared-ui/styles/tokens.css"
@@ -909,7 +908,10 @@ export const ExplorerApp: FC = () => {
                       element={<BlockDetailsPage client={client} />}
                     />
                     <Route path="/address/:address" element={<AccountPage client={client} />} />
-                    <Route path="/tx/:hash/trace" element={<RetracePage />} />
+                    <Route
+                      path="/tx/:hash/trace"
+                      element={<TransactionPage client={client} openRetraceOnLoad />}
+                    />
                     <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
                     <Route path="*" element={<Navigate to="/" replace />} />
                   </Routes>

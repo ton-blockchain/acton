@@ -2,7 +2,7 @@ import {useEffect, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor, languages, Position} from "monaco-editor"
 
-import {instructionSpecification} from "@retrace/tasm/lib"
+import {instructionSpecification} from "../../../tasm/lib"
 
 import {TASM_LANGUAGE_ID} from "../languages"
 

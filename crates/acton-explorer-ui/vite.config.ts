@@ -18,7 +18,6 @@ export default defineConfig({
     alias: {
       "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
       "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
-      "@retrace": path.resolve(import.meta.dirname, "../acton-localnet-ui/src/explorer/retrace"),
       "@tasm-spec": path.resolve(import.meta.dirname, "../tasm-core/spec"),
     },
   },

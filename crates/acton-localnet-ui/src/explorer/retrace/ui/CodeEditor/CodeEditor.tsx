@@ -5,11 +5,11 @@ import * as monaco from "monaco-editor"
 
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 
-import type {ExitCode} from "@retrace/txTrace/lib/types"
+import type {ExitCode} from "../../txTrace/lib/types"
 
-import type {LinesExecutionData} from "@retrace/txTrace/hooks"
+import type {LinesExecutionData} from "../../txTrace/hooks"
 
-import {useTolkLanguageProviders} from "@retrace/ui/CodeEditor/hooks/useTolkLanguageProviders"
+import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
 
 import {
   useMonacoSetup,
