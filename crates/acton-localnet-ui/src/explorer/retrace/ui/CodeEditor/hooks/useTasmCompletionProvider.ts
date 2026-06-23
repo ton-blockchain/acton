@@ -42,7 +42,9 @@ export const useTasmCompletionProvider = ({
         const inputText = word.word.toUpperCase()
         const suggestions: languages.CompletionItem[] = []
 
-        for (const [name, instruction] of Object.entries(data.instructions)) {
+        for (const instruction of data.instructions) {
+          const name = instruction.name
+
           if (inputText && !name.startsWith(inputText)) {
             continue
           }

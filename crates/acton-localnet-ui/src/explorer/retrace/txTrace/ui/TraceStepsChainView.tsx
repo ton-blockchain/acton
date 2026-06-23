@@ -1,6 +1,6 @@
 import React, {useEffect, useRef} from "react"
 
-import {type InstructionDetail} from "@retrace/txTrace/ui/StepInstructionBlock"
+import {type InstructionDetail} from "./StepInstructionBlock"
 
 import styles from "./TraceStepsChainView.module.css"
 

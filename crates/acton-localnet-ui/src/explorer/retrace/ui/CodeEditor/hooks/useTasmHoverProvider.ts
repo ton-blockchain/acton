@@ -3,19 +3,47 @@ import type * as monacoTypes from "monaco-editor"
 import {editor, type IMarkdownString, Position} from "monaco-editor"
 
 import {findInstruction, generateAsmDoc} from "@retrace/tasm/lib"
-import {formatVariablesForHover, type FuncVar} from "@retrace/godbolt/lib/func/variables"
 
 import type {LinesExecutionData} from "@retrace/txTrace/hooks"
 
-import {CONTROL_REGISTERS} from "@retrace/common/lib/control-registers/control-registers"
-
 import {TASM_LANGUAGE_ID} from "../languages"
+
+const CONTROL_REGISTERS: Readonly<
+  Record<string, {readonly type: string; readonly description: string}>
+> = {
+  c0: {
+    type: "Continuation",
+    description: "Stores the next or return continuation, similar to a return address.",
+  },
+  c1: {
+    type: "Continuation",
+    description: "Stores the alternative continuation.",
+  },
+  c2: {
+    type: "Continuation",
+    description: "Contains the exception handler (continuation).",
+  },
+  c3: {
+    type: "Continuation",
+    description: "Holds the current dictionary (hashmap of function codes) as a continuation.",
+  },
+  c4: {
+    type: "Cell",
+    description: "Stores persistent data (contract's data section).",
+  },
+  c5: {
+    type: "Cell",
+    description: "Contains output actions.",
+  },
+  c7: {
+    type: "Tuple",
+    description: "Stores temporary data.",
+  },
+} as const
 
 interface UseTasmHoverProviderOptions {
   readonly monaco: typeof monacoTypes | null
   readonly lineExecutionData?: LinesExecutionData
-  readonly getVariablesForLine?: (line: number) => FuncVar[] | undefined
-  readonly showVariablesDocs?: boolean
   readonly showInstructionDocs?: boolean
   readonly editorReady?: boolean
   readonly enabled?: boolean
@@ -24,8 +52,6 @@ interface UseTasmHoverProviderOptions {
 export const useTasmHoverProvider = ({
   monaco,
   lineExecutionData,
-  getVariablesForLine,
-  showVariablesDocs = true,
   showInstructionDocs = true,
   editorReady,
   enabled,
@@ -38,14 +64,6 @@ export const useTasmHoverProvider = ({
         const word = model.getWordAtPosition(position)
         const lineNumber = position.lineNumber
         const hoverContents: IMarkdownString[] = []
-
-        if (showVariablesDocs && getVariablesForLine) {
-          const variables = getVariablesForLine(lineNumber)
-          if (variables && variables.length > 0) {
-            hoverContents.push({value: formatVariablesForHover(variables)})
-            hoverContents.push({value: "---"})
-          }
-        }
 
         if (word) {
           const crInfo = CONTROL_REGISTERS[word.word]
@@ -121,9 +139,7 @@ export const useTasmHoverProvider = ({
   }, [
     monaco,
     lineExecutionData,
-    getVariablesForLine,
     showInstructionDocs,
-    showVariablesDocs,
     enabled,
     editorReady,
   ])

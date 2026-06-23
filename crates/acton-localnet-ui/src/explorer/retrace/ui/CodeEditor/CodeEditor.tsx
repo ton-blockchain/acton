@@ -6,7 +6,6 @@ import * as monaco from "monaco-editor"
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
 
 import type {ExitCode} from "@retrace/txTrace/lib/traceTx"
-import type {FuncVar} from "@retrace/godbolt/lib/func/variables"
 
 import type {LinesExecutionData} from "@retrace/txTrace/hooks"
 
@@ -84,12 +83,6 @@ interface CodeEditorProps {
   /** Callback fired when a user hovers over a line. Used for source map highlighting */
   readonly onLineHover?: (line: number | null) => void
 
-  /** Function to get variable information for a specific line. Used in TASM hover tooltips */
-  readonly getVariablesForLine?: (line: number) => FuncVar[] | undefined
-
-  /** Whether to show variable documentation in hover tooltips for TASM */
-  readonly showVariablesDocs?: boolean
-
   /* -------------------------------- Playground/Editing -------------------------------- */
   /** Callback fired when the code content changes */
   readonly onChange?: (value: string) => void
@@ -110,7 +103,13 @@ interface CodeEditorProps {
 // use local instance of monaco
 loader.config({monaco})
 
-self.MonacoEnvironment = {
+const monacoGlobal = globalThis as typeof globalThis & {
+  MonacoEnvironment?: {
+    getWorker: () => Worker
+  }
+}
+
+monacoGlobal.MonacoEnvironment = {
   getWorker() {
     // basic worker for complex tasks
     return new editorWorker()
@@ -135,8 +134,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   highlightRanges = [],
   markers = [],
   needBorderRadius = true,
-  getVariablesForLine,
-  showVariablesDocs = true,
   showInstructionDocs = true,
   onEditorMount,
   funcGasByLine,
@@ -174,8 +171,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   useTasmHoverProvider({
     monaco,
     lineExecutionData,
-    getVariablesForLine,
-    showVariablesDocs,
     showInstructionDocs,
     editorReady,
     enabled: language === "tasm",
@@ -394,6 +389,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             folding: true,
             foldingStrategy: "auto",
             stickyScroll: {enabled: false},
+            fixedOverflowWidgets: true,
             scrollbar: {
               useShadows: false,
             },

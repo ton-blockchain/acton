@@ -33,7 +33,7 @@ export const useFolding = ({
 
     try {
       editorRef.current.trigger("unfold", "editor.unfoldAll", {})
-    } catch (_) {
+    } catch {
       // ignored
     }
 
@@ -85,7 +85,7 @@ export const useFolding = ({
             levels: 1,
             selectionLines: [range.start],
           })
-        } catch (_) {
+        } catch {
           // ignored
         }
       }

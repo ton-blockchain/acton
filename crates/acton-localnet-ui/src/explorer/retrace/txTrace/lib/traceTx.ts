@@ -1,4 +1,4 @@
-import {retrace, retraceBaseTx} from "txtracer-core"
+import {retrace} from "txtracer-core"
 import type {TraceResult} from "txtracer-core/dist/types"
 import {compileCellWithMapping, decompileCell} from "ton-assembly/dist/runtime/instr"
 import {createMappingInfo} from "ton-assembly/dist/trace/mapping"
@@ -10,15 +10,8 @@ import {Cell} from "@ton/core"
 
 import type {AssemblyMapping, InstructionInfo} from "ton-source-map"
 
-import type {NetworkType, RetraceResultAndCode} from "@retrace/txTrace/ui"
-import type {TransactionInfo} from "@retrace/sandbox/lib/transaction"
-import type {ContractData} from "@retrace/sandbox/lib/contract"
-
-import {
-  type ExtractionResult,
-  extractTxInfoFromLink,
-  SingleHash,
-} from "@retrace/txTrace/lib/links"
+import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
+import type {RetraceResultAndCode} from "@retrace/txTrace/ui"
 
 import {
   NetworkError,
@@ -34,52 +27,26 @@ export type ExitCode = {
   readonly info: undefined | InstructionInfo
 }
 
-export interface SandboxTraceResult {
-  readonly code: string
-  readonly exitCode?: ExitCode
-  readonly traceInfo: TraceInfo
+function getRetraceTestnetFlag(network: ExplorerNetworkInfo): boolean {
+  if (network.id === "mainnet") {
+    return false
+  }
+  if (network.id === "testnet") {
+    return true
+  }
+
+  throw new TxTraceError(
+    `Retrace is not supported for ${network.label}. Only Mainnet and Testnet are supported.`,
+  )
 }
 
-async function retraceAny(info: ExtractionResult): Promise<TraceResult> {
-  if (info.$ === "BaseInfo") {
-    return retraceBaseTx(info.testnet, info.info)
-  }
-  if (info.$ === "SingleHash") {
-    return retrace(info.testnet, info.hash)
-  }
-  if (info.$ === "UnknownNetwork") {
-    return retrace(info.testnet, info.hash)
-  }
-
-  throw new Error("Invalid extraction result")
-}
-
-async function maybeTestnet(link: string): Promise<{result: TraceResult; network: NetworkType}> {
-  const txLinkInfo = extractTxInfoFromLink(link)
-  if (txLinkInfo === undefined && link.startsWith("https://")) {
-    throw new Error("Unsupported link format: " + link)
-  }
-
+async function doTrace(
+  hash: string,
+  network: ExplorerNetworkInfo,
+): Promise<{readonly result: TraceResult; readonly network: ExplorerNetworkInfo}> {
   try {
-    const result = await retraceAny(txLinkInfo ?? SingleHash(link, false))
-    return {result, network: txLinkInfo?.testnet ? "testnet" : "mainnet"}
-  } catch (error: unknown) {
-    if (error instanceof Error && error.message.includes("Cannot find transaction info")) {
-      console.log("Cannot find in mainnet, trying to find in testnet")
-      if (txLinkInfo?.$ === "UnknownNetwork") {
-        txLinkInfo.testnet = true
-      }
-
-      const result = await retraceAny(txLinkInfo ?? SingleHash(link, true))
-      return {result, network: "testnet"}
-    }
-    throw error
-  }
-}
-
-async function doTrace(link: string) {
-  try {
-    return await maybeTestnet(link)
+    const result = await retrace(getRetraceTestnetFlag(network), hash.toLowerCase())
+    return {result, network}
   } catch (e: unknown) {
     let message = "An unknown error occurred."
     if (e instanceof Error) {
@@ -204,31 +171,11 @@ function extractCodeAndTrace(
   return {code, exitCode, traceInfo}
 }
 
-export function traceSandboxTransaction(
-  tx: TransactionInfo,
-  contracts: Map<string, ContractData>,
-): SandboxTraceResult | undefined {
-  const computeInfo = tx.computeInfo
-  if (computeInfo === "skipped") {
-    return undefined
-  }
-
-  const vmLogs = tx.fields.vmLogs as string | undefined
-  if (!vmLogs) {
-    return undefined
-  }
-
-  const contract = contracts.get(tx.address?.toString() ?? "")
-  const codeCell = contract?.stateInit?.code
-  if (!codeCell) {
-    return undefined
-  }
-
-  return extractCodeAndTrace(codeCell, vmLogs)
-}
-
-export async function traceTx(link: string): Promise<RetraceResultAndCode> {
-  const {result, network} = await doTrace(link)
+export async function traceTx(
+  hash: string,
+  network: ExplorerNetworkInfo,
+): Promise<RetraceResultAndCode> {
+  const {result} = await doTrace(hash, network)
   const {code, traceInfo, exitCode} = extractCodeAndTrace(result.codeCell, result.emulatedTx.vmLogs)
   return {result, code, trace: traceInfo, exitCode, network}
 }

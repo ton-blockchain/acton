@@ -1,8 +1,9 @@
 import {useEffect, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 
+import {EXIT_CODE_DESCRIPTIONS} from "@acton/shared-ui"
+
 import type {ExitCode} from "@retrace/txTrace/lib/traceTx"
-import {EXIT_CODE_DESCRIPTIONS} from "@retrace/common/lib/error-codes/error-codes"
 
 import {TASM_LANGUAGE_ID} from "../languages"
 

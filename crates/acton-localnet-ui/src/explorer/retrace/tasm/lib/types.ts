@@ -1,9 +1,6 @@
-import type {
-  FiftInstruction,
-  Instruction,
-  Specification,
-} from "@retrace/spec/specification-schema"
-import tvmSpecData from "@retrace/spec/gen/tvm-specification.json"
+import tvmSpecData from "@tasm-spec/tvm-specification.json"
+
+import type {FiftInstruction, Instruction, Specification} from "./specification"
 
 export interface AsmInstruction {
   readonly name: string

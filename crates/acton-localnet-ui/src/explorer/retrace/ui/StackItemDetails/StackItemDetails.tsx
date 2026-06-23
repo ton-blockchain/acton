@@ -3,8 +3,8 @@ import React from "react"
 import {type StackElement} from "ton-assembly/dist/trace"
 import {Cell} from "@ton/core"
 
+import {DataBlock} from "@acton/shared-ui"
 import CellTreeView from "@retrace/ui/CellTreeView/CellTreeView"
-import DataBlock from "@retrace/ui/DataBlock"
 import AddressDetails from "@retrace/ui/AddressDetails"
 
 import styles from "./StackItemDetails.module.css"
@@ -56,7 +56,7 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({itemData, title, onC
           cellDetailsContent = (
             <>
               <div className={styles.dataSection}>
-                <DataBlock label="" data={rootCell.toBoc().toString("hex")} />
+                <DataBlock data={rootCell.toBoc().toString("hex")} maxHeight={100} />
               </div>
             </>
           )
@@ -66,7 +66,7 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({itemData, title, onC
         cellDetailsContent = (
           <>
             <div className={styles.dataSection}>
-              <DataBlock label="" data={rootCell.toBoc().toString("hex")} />
+              <DataBlock data={rootCell.toBoc().toString("hex")} maxHeight={100} />
             </div>
           </>
         )

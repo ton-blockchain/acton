@@ -2,9 +2,8 @@ import React from "react"
 
 import type {StackElement} from "ton-assembly/dist/trace"
 
-import Button from "@retrace/ui/Button"
+import {Button} from "@acton/shared-ui"
 import StackViewer from "@retrace/ui/StackViewer"
-import StackEditor from "@retrace/ui/StackEditor"
 import {
   StepInstructionBlock,
   type InstructionDetail,
@@ -36,12 +35,6 @@ export interface TraceSidePanelProps {
   readonly placeholderMessage?: string
   readonly statusMessage?: string
 
-  readonly showStackSetup?: boolean
-  readonly onSetupStack?: () => void
-
-  readonly initialStack?: StackElement[]
-  readonly onInitialStackChange?: (stack: StackElement[]) => void
-  readonly hasExecutionResults?: boolean
   readonly onStackItemClick?: (element: StackElement, title: string) => void
   readonly className?: string
 }
@@ -62,15 +55,10 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
   showGas = false,
   placeholderMessage,
   statusMessage,
-  showStackSetup = false,
-  initialStack = [],
-  onInitialStackChange = () => {},
-  hasExecutionResults = false,
   onStackItemClick,
   className,
 }) => {
   const hasData = totalSteps > 0 && currentStep
-  const showInitialStackEditor = showStackSetup && !hasExecutionResults
 
   return (
     <div className={`${styles.sidePanel} ${className || ""}`}>
@@ -161,16 +149,10 @@ const TraceSidePanel: React.FC<TraceSidePanelProps> = ({
         </div>
 
         <div className={`${styles.stackViewerContainer} stack-viewer`}>
-          {showInitialStackEditor ? (
-            <StackEditor stack={initialStack} onStackChange={onInitialStackChange} />
-          ) : (
-            <>
-              <div className={styles.stackHeader}>
-                <span>Stack</span>
-              </div>
-              <StackViewer stack={currentStack} title="" onStackItemClick={onStackItemClick} />
-            </>
-          )}
+          <div className={styles.stackHeader}>
+            <span>Stack</span>
+          </div>
+          <StackViewer stack={currentStack} title="" onStackItemClick={onStackItemClick} />
         </div>
       </div>
     </div>

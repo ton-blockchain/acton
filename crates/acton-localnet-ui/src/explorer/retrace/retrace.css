@@ -1,11 +1,11 @@
-:root {
+.retraceRoot {
   --color-white: #fff;
   --color-white-rgb: 255, 255, 255;
   --color-black: #000;
   --color-black-rgb: 0, 0, 0;
 
-  --color-primary: #007aff;
-  --color-primary-rgb: 0, 122, 255;
+  --color-primary: var(--tonscan-accent, #4e96ff);
+  --color-primary-rgb: 78, 150, 255;
   --color-primary-container-hover: rgb(var(--color-primary-rgb), 0.1);
   --color-primary-container-active: rgb(var(--color-primary-rgb), 0.2);
 
@@ -46,9 +46,9 @@
   --color-neutral-bg-hover-alpha: rgb(var(--color-neutral-rgb), 0.1);
   --color-neutral-bg-alpha: rgb(var(--color-neutral-rgb), 0.2);
 
-  --color-text-primary: #1c1c1e;
-  --color-text-secondary: #636366;
-  --color-text-tertiary: #a0a6ad;
+  --color-text-primary: var(--tonscan-text-primary, #09090b);
+  --color-text-secondary: var(--tonscan-text-secondary, #71717a);
+  --color-text-tertiary: var(--text-muted, #a1a1aa);
   --color-text-secondary-hex: #636366;
   --color-text-placeholder: #a0a0a5;
   --color-text-disabled: #bcbbc0;
@@ -58,17 +58,13 @@
   --color-text-inverted-only-on-ligth: #fff;
   --editor-faded-text-color: #777;
 
-  --color-change-theme-background: #fff;
-  --color-change-theme-border: 1px solid var(--color-border);
-  --color-change-theme-color: var(--color-text-primary);
-
-  --color-background-primary: #fff;
+  --color-background-primary: var(--tonscan-card-bg, #fff);
   --color-background-primary-rgb: var(--color-white-rgb);
-  --color-background-secondary: #f5f5f7;
+  --color-background-secondary: var(--tonscan-bg, #f7f7f8);
   --color-background-secondary-rgb: 245, 245, 247;
-  --color-background-tertiary: #e5e5ea;
+  --color-background-tertiary: var(--tonscan-bg-secondary, #fafafa);
   --color-background-modal: var(--color-background-primary);
-  --color-background-input: #fff;
+  --color-background-input: var(--tonscan-card-bg, #fff);
   --color-background-input-focus: var(--color-background-primary);
   --color-background-error: #fff1f0;
   --color-highlight-bg: #fff3cd;
@@ -82,9 +78,9 @@
 
   --color-details-header: var(--color-background-primary);
 
-  --color-border: #c6c6c8;
+  --color-border: var(--tonscan-border, #e4e4e7);
   --color-border-hover: #6c6c6c;
-  --color-divider: #e5e5ea;
+  --color-divider: var(--tonscan-border, #e4e4e7);
 
   --status-badge-success-border-color: var(--color-success, #34c759);
   --status-badge-failed-border-color: var(--color-error, #ff3b30);
@@ -146,13 +142,11 @@
   --scrollbar-track-color: #f5f5f7;
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 5%);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 10%), 0 2px 4px -1px rgb(0 0 0 / 6%);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 10%), 0 4px 6px -2px rgb(0 0 0 / 5%);
+  --shadow-md: var(--shadow-popover);
+  --shadow-lg: var(--shadow-popover);
 
-  --font-family-sans: system-ui, -apple-system, blinkmacsystemfont, "Segoe UI", roboto, helvetica,
-    arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-  --font-family-mono: "SF Mono", "Menlo", "Monaco", "Consolas", "Liberation Mono", "Courier New",
-    monospace;
+  --font-family-sans: var(--font-family);
+  --font-family-mono: var(--font-mono);
 
   --font-size-xsss: 0.55rem;
   --font-size-xss: 0.65rem;
@@ -234,12 +228,6 @@
 
   --share-button-bg: var(--color-background-primary);
 
-  --settings-dropdown-bg: var(--color-background-primary);
-  --settings-dropdown-border: var(--color-border);
-  --settings-dropdown-shadow: var(--shadow-lg);
-  --settings-item-hover-bg: var(--color-neutral-bg-hover-alpha);
-  --settings-checkbox-accent: var(--color-primary);
-
   font-family: var(--font-family-sans), sans-serif;
   line-height: 1.5;
   font-weight: var(--font-weight-normal);
@@ -252,14 +240,14 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-.dark-theme {
+html.dark-theme .retraceRoot {
   --color-white: #fff;
   --color-white-rgb: 255, 255, 255;
   --color-black: #000;
   --color-black-rgb: 0, 0, 0;
 
-  --color-primary: #0a84ff;
-  --color-primary-rgb: 10, 132, 255;
+  --color-primary: var(--tonscan-accent, #4e96ff);
+  --color-primary-rgb: 78, 150, 255;
   --color-primary-container-hover: rgb(var(--color-primary-rgb), 0.15);
   --color-primary-container-active: rgb(var(--color-primary-rgb), 0.25);
 
@@ -300,9 +288,9 @@
   --color-neutral-bg-hover-alpha: rgb(var(--color-neutral-rgb), 0.2);
   --color-neutral-bg-alpha: rgb(var(--color-neutral-rgb), 0.3);
 
-  --color-text-primary: #fff;
-  --color-text-secondary: #aeaeb2;
-  --color-text-tertiary: #aeaeb2;
+  --color-text-primary: var(--tonscan-text-primary, #fafafa);
+  --color-text-secondary: var(--tonscan-text-secondary, #a1a1aa);
+  --color-text-tertiary: var(--text-muted, #71717a);
   --color-text-secondary-hex: #aeaeb2;
   --color-text-placeholder: #8e8e93;
   --color-text-disabled: #505054;
@@ -312,18 +300,14 @@
   --color-text-inverted-only-on-ligth: #fff;
   --editor-faded-text-color: #aaa;
 
-  --color-change-theme-background: #2c2c2e;
-  --color-change-theme-border: 0;
-  --color-change-theme-color: var(--color-text-primary);
-
-  --color-background-primary: #1c1c1e;
-  --color-background-primary-rgb: 28, 28, 30;
-  --color-background-secondary: #0f0f0f;
+  --color-background-primary: var(--tonscan-card-bg, #18181b);
+  --color-background-primary-rgb: 24, 24, 27;
+  --color-background-secondary: var(--tonscan-bg, #09090b);
   --color-background-secondary-rgb: 44, 44, 46;
-  --color-background-tertiary: #242425;
+  --color-background-tertiary: var(--tonscan-bg-secondary, #18181b);
   --color-background-modal: var(--color-background-secondary);
-  --color-background-input: #2c2c2e;
-  --color-background-input-focus: #3a3a3c;
+  --color-background-input: var(--litenode-surface-hover, #27272a);
+  --color-background-input-focus: var(--litenode-surface-hover, #27272a);
   --color-background-error: #2f1716;
   --color-highlight-bg: #6f3434;
   --color-highlight-gradient: linear-gradient(
@@ -336,9 +320,9 @@
 
   --color-details-header: var(--color-background-primary);
 
-  --color-border: #48484a;
+  --color-border: var(--tonscan-border, #27272a);
   --color-border-hover: #737373;
-  --color-divider: #3a3a3c;
+  --color-divider: var(--tonscan-border, #27272a);
   --color-border-light-alpha: rgb(var(--color-white-rgb), 0.2);
 
   --status-badge-success-border-color: transparent;
@@ -401,8 +385,8 @@
   --scrollbar-track-color: #2c2c2e;
 
   --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 15%);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 20%), 0 2px 4px -1px rgb(0 0 0 / 15%);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 20%), 0 4px 6px -2px rgb(0 0 0 / 15%);
+  --shadow-md: var(--shadow-popover);
+  --shadow-lg: var(--shadow-popover);
 
   --table-border-color: var(--color-divider);
   --table-section-divider-bg: var(--color-background-secondary);
@@ -444,28 +428,12 @@
 
   --share-button-bg: var(--color-background-tertiary);
 
-  --settings-dropdown-bg: var(--color-background-tertiary);
-  --settings-dropdown-border: var(--color-border);
-  --settings-dropdown-shadow: var(--shadow-lg);
-  --settings-item-hover-bg: var(--color-neutral-bg-hover-alpha);
-  --settings-checkbox-accent: var(--color-primary);
 }
 
-#root {
-  background-color: var(--color-background-secondary);
-}
-
-body {
-  margin: 0;
-  font-family: var(--font-family-sans), sans-serif;
-  background-color: var(--color-background-primary);
-  color: var(--color-text-primary);
-}
-
-a {
+.retraceRoot a {
   text-decoration: none;
 }
 
-a:hover {
+.retraceRoot a:hover {
   text-decoration: underline;
 }

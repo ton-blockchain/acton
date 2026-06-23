@@ -86,8 +86,8 @@ export function useTraceStepper(trace: TraceInfo | undefined): UseTraceStepperRe
       if (e.key === "ArrowLeft") handlePrev()
       if (e.key === "ArrowRight") handleNext()
     }
-    window.addEventListener("keydown", onKey)
-    return () => window.removeEventListener("keydown", onKey)
+    globalThis.addEventListener("keydown", onKey)
+    return () => globalThis.removeEventListener("keydown", onKey)
   }, [handlePrev, handleNext])
 
   const highlightLine = useMemo(() => {
@@ -101,7 +101,7 @@ export function useTraceStepper(trace: TraceInfo | undefined): UseTraceStepperRe
 
   const findStepByLine = useCallback(
     (line: number) => {
-      if (!trace || !trace.steps.length) {
+      if (!trace?.steps.length) {
         return
       }
       const map: Record<number, number[]> = {}

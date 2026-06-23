@@ -1,6 +1,5 @@
-import type {GasConsumptionEntry} from "@retrace/spec/specification-schema"
-
 import {type AsmInstruction} from "./types"
+import type {GasConsumptionEntry} from "./specification"
 
 export function generateAsmDoc(instruction: AsmInstruction): string | null {
   const stackInfo = instruction.instruction.signature?.stack_string

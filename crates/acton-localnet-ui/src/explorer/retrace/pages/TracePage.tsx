@@ -1,46 +1,29 @@
 import React, {Suspense, useCallback, useEffect, useRef, useState, lazy} from "react"
-import {
-  FiBook,
-  FiClock,
-  FiCode,
-  FiCpu,
-  FiGithub,
-  FiList,
-  FiMoreHorizontal,
-  FiPlay,
-  FiSearch,
-  FiX,
-} from "react-icons/fi"
+import {FiCode, FiList} from "react-icons/fi"
 
 import {parse as parseVmLogs} from "ton-assembly/dist/logs"
 import {type StackElement} from "ton-assembly/dist/trace"
 
+import {useToast} from "@acton/shared-ui"
+
+import {useNetworkInfo} from "../../hooks/useNetworkInfo"
 import type {RetraceResultAndCode} from "@retrace/txTrace/ui"
 import {RetraceResultView} from "@retrace/txTrace/ui"
 import TraceSidePanel from "@retrace/ui/TraceSidePanel"
 import {normalizeGas, traceTx} from "@retrace/txTrace/lib/traceTx"
 import {useLineExecutionData, useTraceStepper} from "@retrace/txTrace/hooks"
-import SearchInput from "@retrace/ui/SearchInput"
 import InlineLoader from "@retrace/ui/InlineLoader"
 import {type InstructionDetail} from "@retrace/txTrace/ui/StepInstructionBlock"
-import {type TxHistoryEntry, useTxHistory} from "@retrace/lib/useTxHistory"
-import {shortenHash} from "@retrace/lib/format"
-import StatusBadge, {type StatusType} from "@retrace/ui/StatusBadge"
+import StatusBadge from "@retrace/ui/StatusBadge"
 
 import {TooltipHint} from "@retrace/ui/TooltipHint"
-import Badge from "@retrace/ui/Badge"
 
-import {StackItemViewer} from "@retrace/pages/StackItemViewer"
-import TraceStepsChainView from "@retrace/pages/TraceStepsChainView"
-
-import {useGlobalError} from "@retrace/lib/useGlobalError"
-
-import {getRawQueryParam} from "@retrace/common/lib/query-params"
+import StackItemDetails from "@retrace/ui/StackItemDetails"
+import {TraceStepsChainView} from "@retrace/txTrace/ui"
 
 import styles from "./TracePage.module.css"
 
 const CodeEditor = lazy(() => import("@retrace/ui/CodeEditor"))
-const PageHeader = lazy(() => import("@retrace/ui/PageHeader"))
 
 type TraceViewMode = "assembler" | "stepsChain"
 
@@ -102,23 +85,19 @@ interface TracePageProps {
 }
 
 function TracePage({initialTx}: TracePageProps) {
-  const [inputText, setInputText] = useState("")
-  const [headerInputText, setHeaderInputText] = useState("")
   const [result, setResult] = useState<RetraceResultAndCode | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const [detailsExpanded, setDetailsExpanded] = useState(false)
-  const {setError} = useGlobalError()
+  const {showToast} = useToast()
   const [instructionDetails, setInstructionDetails] = useState<InstructionDetail[]>([])
   const [cumulativeGasSinceBegin, setCumulativeGasSinceBegin] = useState<number>(0)
-  const {history, addToHistory, removeFromHistory} = useTxHistory()
-  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
-  const [isInputFocused, setIsInputFocused] = useState(false)
   const [selectedStackItem, setSelectedStackItem] = useState<{
     element: StackElement
     title: string
   } | null>(null)
   const [traceViewMode, setTraceViewMode] = useState<TraceViewMode>(() => getStoredTraceViewMode())
   const autoSubmittedTxRef = useRef<string | undefined>(undefined)
+  const {network} = useNetworkInfo()
 
   const lineExecutionData = useLineExecutionData(result?.trace)
   const {
@@ -137,12 +116,6 @@ function TracePage({initialTx}: TracePageProps) {
     transitionType,
     totalSteps,
   } = useTraceStepper(result?.trace)
-
-  useEffect(() => {
-    const tx = initialTx ?? getRawQueryParam("tx") ?? ""
-    setInputText(tx)
-    setHeaderInputText(tx)
-  }, [initialTx])
 
   useEffect(() => {
     if (result?.trace) {
@@ -169,7 +142,7 @@ function TracePage({initialTx}: TracePageProps) {
         const step = result.trace.steps[i]
         if (step) {
           const gasNum = normalizeGas(step)
-          if (!isNaN(gasNum)) {
+          if (!Number.isNaN(gasNum)) {
             totalGas += gasNum
           }
         }
@@ -180,58 +153,51 @@ function TracePage({initialTx}: TracePageProps) {
     }
   }, [selectedStep, result?.trace?.steps])
 
-  const handleSubmit = useCallback(
-    async (fromHeader: boolean = false, initialTx?: string) => {
-      const textToSubmit = initialTx ?? (fromHeader ? headerInputText : inputText)
-      if (!textToSubmit.trim()) return
+  const traceTransaction = useCallback(
+    async (txHash: string) => {
+      const textToSubmit = txHash.trim()
+      if (!textToSubmit) return
       setLoading(true)
       try {
-        const rr = await traceTx(textToSubmit)
+        const rr = await traceTx(textToSubmit, network)
         setResult(rr)
         setSelectedStackItem(null)
-        if (!fromHeader) {
-          const computeInfo = rr?.result?.emulatedTx?.computeInfo
-          const exitCode = computeInfo === "skipped" ? undefined : computeInfo?.exitCode
-          addToHistory({hash: textToSubmit, exitCode, testnet: rr.network === "testnet"})
-        }
-        setShowHistoryDropdown(false)
-        window.history.pushState({}, "", `?tx=${encodeURIComponent(textToSubmit)}`)
       } catch (e) {
         console.error(e)
-        if (e instanceof Error) {
-          setError(`Failed to trace transaction: ${e.message}`)
-        } else {
-          setError("Failed to trace transaction")
-        }
+        showToast({
+          title: "Failed to trace transaction",
+          description: e instanceof Error ? e.message : "Failed to trace transaction",
+          variant: "error",
+        })
       } finally {
         setLoading(false)
       }
     },
-    [headerInputText, inputText, setError, addToHistory],
+    [network, showToast],
   )
 
   useEffect(() => {
-    const tx = initialTx ?? getRawQueryParam("tx") ?? ""
-    if (!tx || autoSubmittedTxRef.current === tx) {
+    const tx = initialTx ?? ""
+    if (!tx) {
+      autoSubmittedTxRef.current = undefined
+      setResult(undefined)
+      setSelectedStackItem(null)
       return
     }
 
-    autoSubmittedTxRef.current = tx
-    void handleSubmit(false, tx)
-  }, [handleSubmit, initialTx])
+    const autoSubmitKey = `${network.id}:${tx}`
 
-  const handleHeaderSubmit = useCallback(() => {
-    void handleSubmit(true)
-  }, [handleSubmit])
+    if (autoSubmittedTxRef.current === autoSubmitKey) {
+      return
+    }
+
+    autoSubmittedTxRef.current = autoSubmitKey
+    void traceTransaction(tx)
+  }, [traceTransaction, initialTx, network.id])
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-        event.preventDefault()
-        if (!loading) {
-          void handleSubmit(false)
-        }
-      } else if (event.key === "Escape" && selectedStackItem) {
+      if (event.key === "Escape" && selectedStackItem) {
         event.preventDefault()
         setSelectedStackItem(null)
       }
@@ -241,7 +207,7 @@ function TracePage({initialTx}: TracePageProps) {
     return () => {
       document.removeEventListener("keydown", handleKeyDown)
     }
-  }, [handleSubmit, loading, selectedStackItem])
+  }, [selectedStackItem])
 
   const toggleDetails = useCallback(() => setDetailsExpanded(prev => !prev), [])
 
@@ -321,121 +287,7 @@ function TracePage({initialTx}: TracePageProps) {
             {result && !loading && "Transaction traced successfully"}
           </div>
 
-          <div className="sr-only">Press Ctrl+Enter or Cmd+Enter to trace the transaction</div>
-
-          <div className={styles.externalLinksContainer}>
-            <a
-              href="https://github.com/ton-blockchain/txtracer"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="GitHub Repository"
-              className={styles.iconLink}
-              aria-label="View TxTracer source code on GitHub"
-            >
-              <FiGithub size={24} aria-hidden="true" />
-            </a>
-          </div>
-
           <div className={styles.centeredInputContainer}>
-            <header className={styles.txtracerLogo}>
-              <div className={styles.logoDiamond} aria-hidden="true"></div>
-              <h1 data-testid="app-title" className={styles.txtracerLogoH1}>
-                <span>TxTracer</span>
-                <span className={styles.titleTon}>The Open Network</span>
-              </h1>
-            </header>
-
-            <section aria-labelledby="search-heading" className={styles.inputCard}>
-              <h2 id="search-heading" className="sr-only">
-                Transaction Search
-              </h2>
-              <SearchInput
-                value={inputText}
-                onChange={setInputText}
-                onSubmit={() => {
-                  void handleSubmit(false)
-                }}
-                placeholder="Search by transaction hash or explorer link"
-                loading={loading}
-                autoFocus={true}
-                onFocus={() => {
-                  setIsInputFocused(true)
-                }}
-                onBlur={() => {
-                  setIsInputFocused(false)
-                  setTimeout(() => setShowHistoryDropdown(false), 100)
-                }}
-                onInputClick={() => {
-                  if (isInputFocused) {
-                    setShowHistoryDropdown(true)
-                  }
-                }}
-              />
-              {showHistoryDropdown && history.length > 0 && (
-                <ul
-                  className={styles.historyDropdown}
-                  onMouseDown={e => e.preventDefault()}
-                  role="listbox"
-                  aria-label="Transaction history"
-                >
-                  {history.slice(0, Math.min(4, history.length)).map((entry: TxHistoryEntry) => {
-                    const statusType: StatusType =
-                      entry.exitCode === undefined || entry.exitCode === 0 ? "success" : "failed"
-                    return (
-                      <li
-                        key={entry.hash}
-                        onClick={() => {
-                          setInputText(entry.hash)
-                          setShowHistoryDropdown(false)
-                          void handleSubmit(false, entry.hash)
-                        }}
-                        onKeyDown={e => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.preventDefault()
-                            setInputText(entry.hash)
-                            setShowHistoryDropdown(false)
-                            void handleSubmit(false, entry.hash)
-                          }
-                        }}
-                        className={styles.historyItem}
-                        role="option"
-                        tabIndex={0}
-                        aria-selected={false}
-                      >
-                        <FiClock size={16} className={styles.historyItemIcon} aria-hidden="true" />
-                        <span className={styles.historyItemLeft}>
-                          <span className={styles.historyItemText}>
-                            {shortenHash(entry.hash, 16, 16)}
-                          </span>
-                          {entry.testnet && <Badge color="red">Testnet</Badge>}
-                        </span>
-                        <div className={styles.historyItemBadges}>
-                          {entry.exitCode !== undefined && (
-                            <StatusBadge
-                              type={statusType}
-                              exitCode={entry.exitCode}
-                              text={`Exit code: ${entry.exitCode}`}
-                            />
-                          )}
-                        </div>
-                        <button
-                          className={styles.historyItemDeleteButton}
-                          onClick={e => {
-                            e.stopPropagation()
-                            removeFromHistory(entry.hash)
-                          }}
-                          title="Remove from history"
-                          aria-label={`Remove transaction ${shortenHash(entry.hash, 8, 8)} from history`}
-                        >
-                          <FiX size={16} aria-hidden="true" />
-                        </button>
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </section>
-
             {loading ? (
               <InlineLoader
                 message="Tracing transaction"
@@ -443,89 +295,9 @@ function TracePage({initialTx}: TracePageProps) {
                 loading={loading}
               />
             ) : (
-              <section aria-labelledby="features-heading" className={styles.featureCards}>
-                <h2 id="features-heading" className="sr-only">
-                  Available Tools
-                </h2>
-                <a href="/play/" className={styles.featureCard}>
-                  <div className={`${styles.featureCardIcon} ${styles.playgroundIcon}`}>
-                    <FiPlay aria-hidden="true" />
-                  </div>
-                  <h3 className={styles.featureCardTitle}>Playground</h3>
-                  <p className={styles.featureCardDescription}>
-                    Experiment with TVM assembly and FunC code directly in your browser. Write,
-                    test, and debug assembly instructions with real-time execution.
-                  </p>
-                  <span className={styles.featureCardBadge}>Play and Learn</span>
-                </a>
-
-                <a href="/code-explorer/" className={styles.featureCard}>
-                  <div className={`${styles.featureCardIcon} ${styles.explorerIcon}`}>
-                    <FiSearch aria-hidden="true" />
-                  </div>
-                  <h3 className={styles.featureCardTitle}>Code Explorer</h3>
-                  <p className={styles.featureCardDescription}>
-                    Compile FunC or Tolk code to assembly and explore the generated bytecode.
-                    Perfect for understanding how your smart contracts work under the hood.
-                  </p>
-                  <span className={styles.featureCardBadge}>Explore</span>
-                </a>
-
-                <a href="/spec/" className={styles.featureCard}>
-                  <div className={`${styles.featureCardIcon} ${styles.specIcon}`}>
-                    <FiBook aria-hidden="true" />
-                  </div>
-                  <h3 className={styles.featureCardTitle}>TVM Specification</h3>
-                  <p className={styles.featureCardDescription}>
-                    Browse the complete TVM instruction reference with detailed descriptions,
-                    opcodes, stack effects, and control flow information for every instruction.
-                  </p>
-                  <span className={styles.featureCardBadge}>Reference</span>
-                </a>
-
-                <a href="/emulate/" className={styles.featureCard}>
-                  <div className={`${styles.featureCardIcon} ${styles.emulateIcon}`}>
-                    <FiCpu aria-hidden="true" />
-                  </div>
-                  <h3 className={styles.featureCardTitle}>Emulate</h3>
-                  <p className={styles.featureCardDescription}>
-                    Emulate raw messages on TON blockchain. Send single messages or batch multiple
-                    messages together to see the full transaction tree and trace execution flow.
-                  </p>
-                  <span className={styles.featureCardBadge}>Emulator</span>
-                </a>
-
-                <div className={`${styles.featureCard} ${styles.placeholderCard}`}>
-                  <div className={`${styles.featureCardIcon} ${styles.placeholderIcon}`}>
-                    <FiMoreHorizontal aria-hidden="true" />
-                  </div>
-                  <h3 className={styles.featureCardTitle}>More Tools</h3>
-                  <p className={styles.featureCardDescription}>
-                    Additional developer tools and features are coming soon. Stay tuned for updates
-                    to enhance your TON blockchain development experience.
-                  </p>
-                  <span className={styles.featureCardBadge}>Coming Soon</span>
-                </div>
-              </section>
+              <div className={styles.emptyTraceState}>No transaction hash</div>
             )}
           </div>
-
-          <footer>
-            <span className={styles.createBy}>
-              Created by{" "}
-              <a href="https://tonstudio.io" target="_blank" rel="noreferrer">
-                TON Studio
-              </a>
-              {" and "}
-              <a href="https://t.me/toncore" target="_blank" rel="noreferrer">
-                TON Core
-              </a>
-              , powered by{" "}
-              <a href="https://toncenter.com/" target="_blank" rel="noreferrer">
-                TON Center
-              </a>
-            </span>
-          </footer>
         </main>
       )}
 
@@ -536,52 +308,32 @@ function TracePage({initialTx}: TracePageProps) {
             {result && !loading && "Transaction trace loaded successfully"}
           </div>
 
-          <PageHeader
-            pageTitle={""}
-            network={result?.network ?? "mainnet"}
-            beforeLinks={
-              <div className={styles.viewModeControl}>
-                <div className={styles.traceViewToggle} role="group" aria-label="Trace view mode">
-                  {TRACE_VIEW_OPTIONS.map(option => {
-                    const isActive = traceViewMode === option.value
-                    const Icon = option.icon
+          <div className={styles.traceToolbar}>
+            <div className={styles.viewModeControl}>
+              <div className={styles.traceViewToggle} role="group" aria-label="Trace view mode">
+                {TRACE_VIEW_OPTIONS.map(option => {
+                  const isActive = traceViewMode === option.value
+                  const Icon = option.icon
 
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        className={`${styles.traceViewToggleButton} ${isActive ? styles.traceViewToggleButtonActive : ""}`}
-                        onClick={() => {
-                          handleTraceViewModeChange(option.value)
-                        }}
-                        aria-pressed={isActive}
-                      >
-                        <Icon className={styles.traceViewToggleIcon} aria-hidden="true" />
-                        <span>{option.label}</span>
-                      </button>
-                    )
-                  })}
-                </div>
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={`${styles.traceViewToggleButton} ${isActive ? styles.traceViewToggleButtonActive : ""}`}
+                      onClick={() => {
+                        handleTraceViewModeChange(option.value)
+                      }}
+                      aria-pressed={isActive}
+                    >
+                      <Icon className={styles.traceViewToggleIcon} aria-hidden="true" />
+                      <span>{option.label}</span>
+                    </button>
+                  )
+                })}
               </div>
-            }
-          >
+            </div>
+
             <div className={styles.headerContent}>
-              <div
-                className={styles.searchInputContainer}
-                role="search"
-                aria-label="Search for another transaction"
-              >
-                <SearchInput
-                  value={headerInputText}
-                  onChange={setHeaderInputText}
-                  onSubmit={handleHeaderSubmit}
-                  placeholder="Trace another transaction hash"
-                  loading={loading}
-                  autoFocus={false}
-                  compact={true}
-                />
-              </div>
-
               {shouldShowStatusContainer && (
                 <div className={styles.txStatusContainer} role="status" aria-live="polite">
                   {txStatus && (
@@ -600,7 +352,7 @@ function TracePage({initialTx}: TracePageProps) {
                 </div>
               )}
             </div>
-          </PageHeader>
+          </div>
 
           <main className={styles.appContainer}>
             <div
@@ -645,10 +397,10 @@ function TracePage({initialTx}: TracePageProps) {
 
                 {selectedStackItem && (
                   <div className={styles.stackItemOverlay}>
-                    <StackItemViewer
-                      element={selectedStackItem.element}
+                    <StackItemDetails
+                      itemData={selectedStackItem.element}
                       title={selectedStackItem.title}
-                      onBack={handleBackToCode}
+                      onClose={handleBackToCode}
                     />
                   </div>
                 )}

@@ -36,3 +36,21 @@
   background-color: var(--color-warning-bg);
   border-color: var(--status-badge-pending-border-color);
 }
+
+.tooltipContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.tooltipLabel {
+  font-weight: var(--font-weight-semibold);
+}
+
+.tooltipDescription {
+  margin-top: var(--spacing-xs);
+}
+
+.tooltipPhase {
+  margin-top: var(--spacing-xs);
+}

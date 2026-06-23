@@ -1,8 +1,8 @@
 import React from "react"
 
+import {EXIT_CODE_DESCRIPTIONS} from "@acton/shared-ui"
+
 import {Tooltip} from "@retrace/ui/Tooltip"
-import {EXIT_CODE_DESCRIPTIONS} from "@retrace/common/lib/error-codes/error-codes"
-import exitStyles from "@retrace/common/ui/ExitCodeChip/ExitCodeViewer.module.css"
 
 import styles from "./StatusBadge.module.css"
 
@@ -31,10 +31,10 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
 
   if (type === "success") {
     const tooltipContent = (
-      <div className={exitStyles.tooltipContent}>
-        <div className={exitStyles.tooltipSection}>
-          <div className={exitStyles.tooltipLabel}>Description:</div>
-          <div className={exitStyles.tooltipDescription}>Transaction completed successfully</div>
+      <div className={styles.tooltipContent}>
+        <div className={styles.tooltipSection}>
+          <div className={styles.tooltipLabel}>Description:</div>
+          <div className={styles.tooltipDescription}>Transaction completed successfully</div>
         </div>
       </div>
     )
@@ -73,7 +73,8 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
         </span>
       </Tooltip>
     )
-  }if (type === "failed") {
+  }
+  if (type === "failed") {
     const info =
       exitCode === undefined
         ? undefined
@@ -82,18 +83,18 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
     const phase = info?.phase
     const displayName = info?.name ?? "Custom error"
     const tooltipContent = (
-      <div className={exitStyles.tooltipContent}>
-        <div className={exitStyles.tooltipSection}>
-          <div className={exitStyles.tooltipLabel}>Description:</div>
-          <div className={exitStyles.tooltipDescription}>
+      <div className={styles.tooltipContent}>
+        <div className={styles.tooltipSection}>
+          <div className={styles.tooltipLabel}>Description:</div>
+          <div className={styles.tooltipDescription}>
             {exitCode === undefined ? "Unknown error" : displayName}
             {description ? `: ${description}` : ""}
           </div>
         </div>
         {phase && (
-          <div className={exitStyles.tooltipSection}>
-            <div className={exitStyles.tooltipLabel}>Origin:</div>
-            <div className={exitStyles.tooltipPhase}>{phase}</div>
+          <div className={styles.tooltipSection}>
+            <div className={styles.tooltipLabel}>Origin:</div>
+            <div className={styles.tooltipPhase}>{phase}</div>
           </div>
         )}
       </div>
@@ -140,7 +141,8 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
         </span>
       </Tooltip>
     )
-  }if (type === "warning") {
+  }
+  if (type === "warning") {
     return (
       <span
         className={styles.statusWarning}

@@ -2,8 +2,6 @@ import {useEffect, useState} from "react"
 import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
 
-import {useTheme} from "@retrace/lib/useTheme"
-
 import {DARK_THEME, LIGHT_THEME} from "../themes"
 import {funcLanguageDefinition} from "../languages/FuncLanguageDefinition"
 import {tasmLanguageDefinition} from "../languages/TasmLanguageDefinition"
@@ -20,6 +18,15 @@ interface UseMonacoSetupReturn {
   readonly monaco: typeof monacoTypes | null
   readonly isReady: boolean
   readonly isMac: boolean
+}
+
+type MonacoTheme = "light-theme" | "dark-theme"
+
+const getExplorerMonacoTheme = (): MonacoTheme => {
+  if (typeof globalThis.document === "undefined") return "light-theme"
+  return globalThis.document.documentElement.classList.contains("dark-theme")
+    ? "dark-theme"
+    : "light-theme"
 }
 
 const initializeMonaco = (monaco: typeof monacoTypes, language: SupportedLanguage) => {
@@ -44,13 +51,13 @@ const initializeMonaco = (monaco: typeof monacoTypes, language: SupportedLanguag
 
 export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetupReturn => {
   const monaco = useMonaco()
-  const {theme} = useTheme()
+  const [theme, setTheme] = useState<MonacoTheme>(() => getExplorerMonacoTheme())
   const [isReady, setIsReady] = useState(false)
   const [isMac, setIsMac] = useState(false)
 
   useEffect(() => {
-    if (typeof window !== "undefined" && typeof navigator !== "undefined") {
-      setIsMac(navigator.platform.toUpperCase().indexOf("MAC") >= 0)
+    if (typeof globalThis.navigator !== "undefined") {
+      setIsMac(globalThis.navigator.platform.toUpperCase().indexOf("MAC") >= 0)
     }
   }, [])
 
@@ -66,10 +73,30 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
   }, [monaco, language])
 
   useEffect(() => {
+    if (typeof globalThis.document === "undefined") return
+
+    const updateTheme = () => {
+      setTheme(getExplorerMonacoTheme())
+    }
+
+    updateTheme()
+
+    const observer = new MutationObserver(updateTheme)
+    observer.observe(globalThis.document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    })
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
     if (!monaco || !isReady) return
 
     try {
-      monaco.editor.setTheme(theme === "dark" ? "dark-theme" : "light-theme")
+      monaco.editor.setTheme(theme)
     } catch (error) {
       console.error("Failed to set theme:", error)
     }
