@@ -217,9 +217,9 @@ export function TransactionTree({
     calculateOptimalPosition,
   } = useTooltip()
 
-  const [selectedTransactionIdState, setSelectedTransactionIdState] = useState<
-    string | undefined
-  >(selectedTransactionId)
+  const [selectedTransactionIdState, setSelectedTransactionIdState] = useState<string | undefined>(
+    selectedTransactionId,
+  )
   const triggerRectReference = useRef<DOMRect | undefined>(undefined)
   const treeContainerRef = useRef<HTMLDivElement | null>(null)
   const treeWrapperRef = useRef<HTMLDivElement | null>(null)

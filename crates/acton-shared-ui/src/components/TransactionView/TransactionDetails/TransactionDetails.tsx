@@ -173,7 +173,10 @@ export function TransactionDetails({
 
   const hasResolvedActions = resolvedOutActions.length > 0
   const canLoadActions =
-    !hasResolvedActions && actionPhase != null && actionPhase.totalActions > 0 && loadActions !== undefined
+    !hasResolvedActions &&
+    actionPhase !== null &&
+    actionPhase.totalActions > 0 &&
+    loadActions !== undefined
   const canToggleActions = hasResolvedActions || canLoadActions
   const handleActionsToggle = async () => {
     if (hasResolvedActions) {
