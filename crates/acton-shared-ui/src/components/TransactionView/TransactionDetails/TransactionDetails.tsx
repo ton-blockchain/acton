@@ -57,6 +57,8 @@ export function TransactionDetails({
   const [loadedActions, setLoadedActions] = useState<LoadedTransactionActions | undefined>()
   const [isLoadingActions, setIsLoadingActions] = useState(false)
   const [loadActionsError, setLoadActionsError] = useState<string | undefined>()
+  const [isLoadingStorage, setIsLoadingStorage] = useState(false)
+  const [loadStorageError, setLoadStorageError] = useState<string | undefined>()
   const currentTxIdRef = useRef(tx.id)
 
   useEffect(() => {
@@ -65,6 +67,8 @@ export function TransactionDetails({
     setLoadedActions(undefined)
     setIsLoadingActions(false)
     setLoadActionsError(undefined)
+    setIsLoadingStorage(false)
+    setLoadStorageError(undefined)
   }, [tx.id])
 
   const description = tx.transaction.description
@@ -170,6 +174,11 @@ export function TransactionDetails({
       : storageDiff.status === "unchanged"
         ? "Intact"
         : "Changed"
+  const hasStorageAbi = targetAbi !== undefined
+  const storageUnavailableLabel = hasStorageAbi
+    ? "Storage data not loaded"
+    : "Storage data unavailable"
+  const canLoadStorage = storageDiff === undefined && loadActions !== undefined && hasStorageAbi
 
   const hasResolvedActions = resolvedOutActions.length > 0
   const canLoadActions =
@@ -214,6 +223,34 @@ export function TransactionDetails({
     } finally {
       if (currentTxIdRef.current === requestedTxId) {
         setIsLoadingActions(false)
+      }
+    }
+  }
+
+  const handleStorageLoad = async () => {
+    if (!canLoadStorage || isLoadingStorage || !loadActions) {
+      return
+    }
+
+    const requestedTxId = tx.id
+    setIsLoadingStorage(true)
+    setLoadStorageError(undefined)
+    try {
+      await loadActions(tx)
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setExpandedStorageLt(tx.lt)
+    } catch (error) {
+      if (currentTxIdRef.current !== requestedTxId) {
+        return
+      }
+
+      setLoadStorageError(error instanceof Error ? error.message : "Failed to load storage")
+    } finally {
+      if (currentTxIdRef.current === requestedTxId) {
+        setIsLoadingStorage(false)
       }
     }
   }
@@ -428,7 +465,7 @@ export function TransactionDetails({
                 <span className={styles.storageChangeBadge}>{storageChangeLabel}</span>
               )}
               {!storageDiff && (
-                <span className={styles.storageUnavailable}>Storage data unavailable</span>
+                <span className={styles.storageUnavailable}>{storageUnavailableLabel}</span>
               )}
               {hasAccountStatusChange && (
                 <span className={styles.storageAccountStatus}>
@@ -437,6 +474,20 @@ export function TransactionDetails({
                 </span>
               )}
             </div>
+            {!storageDiff && canLoadStorage && (
+              <button
+                type="button"
+                onClick={() => void handleStorageLoad()}
+                className={`${styles.actionsToggleButton} ${styles.storageToggleButton}`}
+                aria-label="Load storage state change"
+                disabled={isLoadingStorage}
+              >
+                <FiChevronDown size={14} />
+                <span className={styles.actionsToggleText}>
+                  {isLoadingStorage ? "Loading" : "Load"}
+                </span>
+              </button>
+            )}
             {storageDiff && (
               <button
                 type="button"
@@ -465,6 +516,7 @@ export function TransactionDetails({
               />
             </div>
           )}
+          {loadStorageError && <div className={styles.actionsLoadError}>{loadStorageError}</div>}
         </div>
       </div>
 

@@ -19,13 +19,18 @@ type RetracePanelState =
 interface TransactionRetracePanelProps {
   readonly txHash: string
   readonly onClose: () => void
+  readonly onResult?: (txHash: string, result: RetraceResultAndCode) => void
 }
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Failed to trace transaction"
 }
 
-export default function TransactionRetracePanel({txHash, onClose}: TransactionRetracePanelProps) {
+export default function TransactionRetracePanel({
+  txHash,
+  onClose,
+  onResult,
+}: TransactionRetracePanelProps) {
   const {network} = useNetworkInfo()
   const {showToast} = useToast()
   const [state, setState] = useState<RetracePanelState>({type: "loading"})
@@ -40,6 +45,7 @@ export default function TransactionRetracePanel({txHash, onClose}: TransactionRe
         const result = await traceTx(txHash, network)
         if (isActive) {
           setState({type: "ready", result})
+          onResult?.(txHash, result)
         }
       } catch (error) {
         if (!isActive) {
@@ -61,7 +67,7 @@ export default function TransactionRetracePanel({txHash, onClose}: TransactionRe
     return () => {
       isActive = false
     }
-  }, [network, showToast, txHash])
+  }, [network, onResult, showToast, txHash])
 
   return (
     <div className={`${styles.root} retraceRoot`}>

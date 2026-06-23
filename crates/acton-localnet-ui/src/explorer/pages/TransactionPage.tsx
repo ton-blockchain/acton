@@ -8,6 +8,7 @@ import {
   TransactionTree,
   ValueFlowTable,
   decodeStorageDataCell,
+  decodeStorageShardAccount,
   getTransactionComputePhase,
   type ValueFlowItem,
 } from "@acton/shared-ui"
@@ -38,6 +39,7 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {traceTx} from "../retrace/txTrace/lib/traceTx"
+import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 
@@ -81,27 +83,14 @@ const buildTransactionsHexIndex = (
   return indexed
 }
 
-const withLoadedTransactionActions = (
+const mapTraceTransactions = (
   transactions: readonly TransactionInfo[],
-  targetHash: string,
-  loadedActions: LoadedTransactionActions,
+  updateTransaction: (tx: TransactionInfo) => TransactionInfo,
 ): TransactionInfo[] => {
   const clonedByOriginal = new Map<TransactionInfo, TransactionInfo>()
-  const normalizedTargetHash = targetHash.toLowerCase()
 
   for (const tx of transactions) {
-    const txHash = tx.transaction.hash().toString("hex").toLowerCase()
-    const clonedTx: TransactionInfo =
-      txHash === normalizedTargetHash
-        ? {
-            ...tx,
-            actions: loadedActions.actions,
-            outActions: loadedActions.outActions,
-            executorActions: loadedActions.executorActions ?? tx.executorActions,
-          }
-        : {...tx}
-
-    clonedByOriginal.set(tx, clonedTx)
+    clonedByOriginal.set(tx, updateTransaction(tx))
   }
 
   for (const tx of transactions) {
@@ -119,6 +108,60 @@ const withLoadedTransactionActions = (
   return transactions
     .map(tx => clonedByOriginal.get(tx))
     .filter((tx): tx is TransactionInfo => tx !== undefined)
+}
+
+const withLoadedTransactionActions = (
+  transactions: readonly TransactionInfo[],
+  targetHash: string,
+  loadedActions: LoadedTransactionActions,
+): TransactionInfo[] => {
+  const normalizedTargetHash = targetHash.toLowerCase()
+
+  return mapTraceTransactions(transactions, tx => {
+    const txHash = tx.transaction.hash().toString("hex").toLowerCase()
+    if (txHash !== normalizedTargetHash) {
+      return {...tx}
+    }
+
+    return {
+      ...tx,
+      actions: loadedActions.actions,
+      outActions: loadedActions.outActions,
+      executorActions: loadedActions.executorActions ?? tx.executorActions,
+    }
+  })
+}
+
+const withRetracedStorage = (
+  transactions: readonly TransactionInfo[],
+  targetHash: string,
+  retraceResult: RetraceResultAndCode,
+): TransactionInfo[] => {
+  const normalizedTargetHash = targetHash.toLowerCase()
+
+  return mapTraceTransactions(transactions, tx => {
+    const txHash = tx.transaction.hash().toString("hex").toLowerCase()
+    if (txHash !== normalizedTargetHash) {
+      return {...tx}
+    }
+
+    const abi = tx.contractAbi
+    const shardAccountBefore =
+      tx.shardAccountBefore || retraceResult.result.account.shardAccountBefore
+    const shardAccountAfter = tx.shardAccountAfter || retraceResult.result.account.shardAccountAfter
+
+    return {
+      ...tx,
+      shardAccountBefore,
+      shardAccountAfter,
+      parsedStorageBefore:
+        tx.parsedStorageBefore ??
+        decodeStorageShardAccount(retraceResult.result.account.shardAccountBefore, abi),
+      parsedStorageAfter:
+        tx.parsedStorageAfter ??
+        decodeStorageShardAccount(retraceResult.result.account.shardAccountAfter, abi),
+    }
+  })
 }
 
 export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOnLoad = false}) => {
@@ -198,12 +241,22 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       }
 
       loadedActionsByHashRef.current.set(txHash, loadedActions)
-      setTraces(currentTraces => withLoadedTransactionActions(currentTraces, txHash, loadedActions))
+      setTraces(currentTraces =>
+        withRetracedStorage(
+          withLoadedTransactionActions(currentTraces, txHash, loadedActions),
+          txHash,
+          retraceResult,
+        ),
+      )
 
       return loadedActions
     },
     [network],
   )
+
+  const handleRetraceResult = useCallback((txHash: string, result: RetraceResultAndCode) => {
+    setTraces(currentTraces => withRetracedStorage(currentTraces, txHash, result))
+  }, [])
 
   useEffect(() => {
     setActiveTab(parseTabType(searchParams.get("tab")))
@@ -405,6 +458,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           key={`${txHash}:${retraceAttempt}`}
           txHash={txHash}
           onClose={handleCloseRetrace}
+          onResult={handleRetraceResult}
         />
       </div>
     )

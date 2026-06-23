@@ -823,6 +823,17 @@ export const decodeStorageDataCell = (
   }
 }
 
+export const decodeStorageShardAccount = (
+  shardAccountBase64: string | null | undefined,
+  abi: ContractABI | undefined,
+): ParsedContractStorage | undefined => {
+  if (!shardAccountBase64 || !abi) {
+    return undefined
+  }
+
+  return tryDecodeStorageWithAbi(shardAccountBase64, abi)
+}
+
 export const resolveMessageOpcodeName = (
   message: ParsableMessage,
   contracts: Map<string, ContractData>,
