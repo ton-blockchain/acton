@@ -8,6 +8,7 @@ pub mod emulation;
 pub mod env;
 pub mod fs;
 pub mod io;
+pub mod json;
 
 #[derive(Clone, Copy)]
 #[repr(usize)]
@@ -38,6 +39,7 @@ impl SearchParamIndex {
 pub fn register<T: BaseExecutor>(executor: &mut T, ctx: &mut Context) {
     io::register_extensions(executor, ctx);
     fs::register_extensions(executor, ctx);
+    json::register_extensions(executor, ctx);
     env::register_extensions(executor, ctx);
     assert::register_extensions(executor, ctx);
     bench::register_extensions(executor, ctx);
