@@ -488,7 +488,7 @@ function buildAbiSearchIndex(
         name: method.name,
         detail: contractName,
         kind: "Get method",
-        targetHash: abiSymbolAnchorId("get-method", method.name, String(method.tvm_method_id)),
+        targetHash: abiSymbolAnchorId("get-method", method.name),
         searchText: `${method.name} ${displayName} ${contractName}`,
       })
     }

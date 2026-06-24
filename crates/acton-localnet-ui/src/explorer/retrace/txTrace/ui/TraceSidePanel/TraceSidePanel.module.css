@@ -66,12 +66,13 @@
 
 .stackViewerContainer {
   flex: 1;
-  min-height: 0;
-  overflow: hidden;
+  overflow: auto;
   display: flex;
   flex-direction: column;
   padding: var(--spacing-md);
   background-color: var(--color-background-primary);
+  flex-shrink: 1;
+  min-height: 150px;
 }
 
 .stackHeader {
@@ -125,6 +126,5 @@
 
   .stackViewerContainer {
     flex: 1;
-    min-height: 0;
   }
 }

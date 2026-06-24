@@ -21,12 +21,19 @@ import {
   TxTraceError,
 } from "./errors"
 
+function absoluteApiBaseUrl(baseUrl: string): string {
+  const fullBase = baseUrl.startsWith("http")
+    ? baseUrl
+    : `${globalThis.location.origin}${baseUrl}`
+  return new URL(fullBase).toString().replace(/\/$/, "")
+}
+
 function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkConfig {
   if (network.api) {
     return {
       testnet: network.testOnly,
-      v2BaseUrl: network.api.v2BaseUrl,
-      v3BaseUrl: network.api.v3BaseUrl,
+      v2BaseUrl: absoluteApiBaseUrl(network.api.v2BaseUrl),
+      v3BaseUrl: absoluteApiBaseUrl(network.api.v3BaseUrl),
       toncenterApiKey: network.api.toncenterApiKey,
     }
   }

@@ -1,7 +1,7 @@
 import React, {type JSX, memo, useState} from "react"
 import {type StackElement} from "ton-assembly/dist/trace"
 import {Cell} from "@ton/core"
-import {motion, AnimatePresence} from "framer-motion"
+import {motion, AnimatePresence, type Variants} from "framer-motion"
 
 import {CopyValueButton} from "@acton/shared-ui"
 
@@ -360,10 +360,10 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, onStackItemClick
     }
   }
 
-  const itemVariants = {
+  const itemVariants: Variants = {
     initial: {opacity: 0, y: 20},
     animate: {opacity: 1, y: 0},
-    exit: {opacity: 0, y: -20},
+    exit: {opacity: 0, y: -20, transition: {duration: 0.08, ease: "easeOut"}},
   }
 
   const itemsToRender = stack.map((el, index) => ({

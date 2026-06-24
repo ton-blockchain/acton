@@ -313,14 +313,14 @@ function AbiGetMethodItem({
     | {readonly status: "error"; readonly error: string}
   >({status: "idle"})
   const hasParameters = method.parameters.length > 0
-  const argsInputId = `args-${method.name}-${method.tvm_method_id}`
+  const argsInputId = `args-${method.name}`
   const symbols = ctx.symbols
   const simpleArgInputs = method.parameters.map(parameter =>
     getSimpleArgInput(symbols, parameter.ty_idx),
   )
   const canRenderSimpleArgs = hasParameters && simpleArgInputs.every(Boolean)
   const canRun = ownerAddress !== undefined && client !== undefined
-  const methodId = abiSymbolAnchorId("get-method", method.name, String(method.tvm_method_id))
+  const methodId = abiSymbolAnchorId("get-method", method.name)
 
   const runMethod = async () => {
     if (!canRun) return
@@ -606,11 +606,10 @@ function AbiMessagesSection({
               <span className={styles.abiCount}>{group.messages.length}</span>
             </header>
             {group.messages.length > 0 ? (
-              group.messages.map((message, index) => (
+              group.messages.map(message => (
                 <AbiMessageRow
-                  key={`${group.title}:${message.body_ty_idx}:${index}`}
+                  key={`${group.title}:${message.body_ty_idx}`}
                   groupTitle={group.title}
-                  index={index}
                   message={message}
                   symbols={symbols}
                   showSymbolAnchors={showSymbolAnchors}
@@ -628,20 +627,18 @@ function AbiMessagesSection({
 
 function AbiMessageRow({
   groupTitle,
-  index,
   message,
   symbols,
   showSymbolAnchors,
 }: {
   readonly groupTitle: string
-  readonly index: number
   readonly message: AbiMessage
   readonly symbols: SymTable
   readonly showSymbolAnchors: boolean
 }): JSX.Element {
   const declaration = getAbiTyDeclaration(symbols, message.body_ty_idx)
   const messageName = declaration?.name ?? `type-${message.body_ty_idx}`
-  const messageId = abiSymbolAnchorId("message", `${groupTitle}-${messageName}`, String(index))
+  const messageId = abiSymbolAnchorId("message", `${groupTitle}-${messageName}`)
 
   return (
     <div id={messageId} className={styles.abiMessageRow}>
@@ -680,7 +677,7 @@ function AbiStorageSection({
         <div className={styles.abiRows}>
           {rows.map(row => {
             const declaration = getAbiTyDeclaration(symbols, row.tyIdx)
-            const storageId = abiSymbolAnchorId("storage", row.label, String(row.tyIdx))
+            const storageId = abiSymbolAnchorId("storage", row.label)
             const showHeader = showStorageLabels || showSymbolAnchors
 
             return (
