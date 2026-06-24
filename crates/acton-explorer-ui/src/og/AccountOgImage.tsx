@@ -6,6 +6,7 @@ export type AccountOgPreview = {
   status?: string
   type?: string
   detail?: string
+  detailLines?: number
   image?: string
   avatarText: string
 }
@@ -75,7 +76,7 @@ export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
               whiteSpace: "nowrap",
             }}
           >
-            {truncateText(preview.title, 24)}
+            {truncateText(preview.title, 21)}
           </div>
           {(preview.status || preview.type) && (
             <div
@@ -90,7 +91,7 @@ export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
               {preview.type && <Badge label={preview.type} variant="muted" />}
             </div>
           )}
-          {preview.detail && (
+          {preview.detail && (preview.detailLines ?? 1) <= 1 && (
             <div
               style={{
                 display: "flex",
@@ -103,6 +104,26 @@ export function AccountOgImage({preview}: {preview: AccountOgPreview}) {
               }}
             >
               {truncateText(preview.detail, 43)}
+            </div>
+          )}
+          {preview.detail && (preview.detailLines ?? 1) > 1 && (
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                marginTop: 30,
+                color: "#f0f0f2",
+                fontSize: 31,
+                fontWeight: 700,
+                lineHeight: 1.2,
+                maxWidth: 780,
+              }}
+            >
+              {wrapText(preview.detail, preview.detailLines ?? 3, 43).map((line, index) => (
+                <div key={index} style={{display: "flex"}}>
+                  {line}
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -206,4 +227,39 @@ export function Badge({label, variant}: {label: string; variant: "success" | "mu
 
 function truncateText(value: string, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength - 1)}…` : value
+}
+
+function wrapText(value: string, maxLines: number, lineLength: number) {
+  const words = value.trim().split(/\s+/)
+  const lines: string[] = []
+  let line = ""
+
+  for (const word of words) {
+    const nextLine = line ? `${line} ${word}` : word
+    if (nextLine.length <= lineLength) {
+      line = nextLine
+      continue
+    }
+
+    if (line) {
+      lines.push(line)
+    }
+    line = word
+
+    if (lines.length === maxLines) {
+      break
+    }
+  }
+
+  if (line && lines.length < maxLines) {
+    lines.push(line)
+  }
+
+  const lastIndex = lines.length - 1
+  const usedWords = lines.join(" ").split(/\s+/).length
+  if (lastIndex >= 0 && usedWords < words.length) {
+    lines[lastIndex] = truncateText(lines[lastIndex], Math.max(2, lineLength - 1))
+  }
+
+  return lines
 }

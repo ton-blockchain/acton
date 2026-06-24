@@ -7,6 +7,7 @@ import type {FC, ReactNode} from "react"
 import type {TonClient} from "../api/client"
 import type {V3Block, V3TransactionListItem} from "../api/types"
 import {AddressLabel} from "../components/AddressLabel"
+import {Breadcrumbs} from "../components/Breadcrumbs"
 import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
@@ -130,6 +131,7 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
 
   return (
     <div className={styles.container}>
+      <Breadcrumbs items={[{label: "Blocks"}]} />
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>Blocks</h1>
@@ -298,6 +300,12 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
 
   return (
     <div className={styles.container}>
+      <Breadcrumbs
+        items={[
+          {label: "Blocks", path: routes.blocksPath},
+          {label: hasValidRoute ? `${title} ${seqno}` : title},
+        ]}
+      />
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>{title}</h1>

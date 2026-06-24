@@ -7,6 +7,7 @@ import type {FC, ReactNode} from "react"
 
 import {TonClient} from "./explorer/api/client"
 import {AccountPage} from "./explorer/pages/AccountPage"
+import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
@@ -334,6 +335,22 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <ExplorerIndexPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/abi"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <AbiCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/abi/:slug"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <AbiDetailsPage />
                 </DashboardPage>
               }
             />

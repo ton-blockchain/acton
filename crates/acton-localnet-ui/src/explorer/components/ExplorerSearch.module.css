@@ -114,6 +114,7 @@
   border-radius: 12px;
   background-color: var(--litenode-surface);
   box-shadow: var(--litenode-shadow-popover);
+  font-family: var(--font-family);
   overflow-y: auto;
 }
 
@@ -183,14 +184,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.historyAddressValue {
-  font-family: inherit;
-}
-
-.historyHashValue {
-  font-family: var(--font-mono);
 }
 
 .nameMatchButton {

@@ -16,6 +16,10 @@ import type {
 } from "../../acton-localnet-ui/src/explorer/hooks/useNetworkInfo"
 import {BlockDetailsPage, BlocksPage} from "../../acton-localnet-ui/src/explorer/pages/BlocksPage"
 import {AccountPage} from "../../acton-localnet-ui/src/explorer/pages/AccountPage"
+import {
+  AbiCatalogPage,
+  AbiDetailsPage,
+} from "../../acton-localnet-ui/src/explorer/pages/AbiCatalogPage"
 import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
@@ -889,11 +893,11 @@ export const ExplorerApp: FC = () => {
                         <span className={styles.brandText}>actonscan</span>
                       </Link>
                       <nav className={styles.nav} aria-label="Explorer navigation">
-                        <Link className={styles.navLink} to="/">
-                          Explore
-                        </Link>
                         <Link className={styles.navLink} to="/blocks">
                           Blocks
+                        </Link>
+                        <Link className={styles.navLink} to="/abi">
+                          ABI
                         </Link>
                       </nav>
                     </div>
@@ -929,6 +933,8 @@ export const ExplorerApp: FC = () => {
                   <Routes>
                     <Route path="/" element={<ExplorerIndexPage />} />
                     <Route path="/blocks" element={<BlocksPage client={client} />} />
+                    <Route path="/abi" element={<AbiCatalogPage />} />
+                    <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                     <Route
                       path="/block/:workchain/:shard/:seqno"
                       element={<BlockDetailsPage client={client} />}

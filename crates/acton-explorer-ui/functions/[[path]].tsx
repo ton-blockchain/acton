@@ -1,4 +1,5 @@
 import {ImageResponse} from "@cloudflare/pages-plugin-vercel-og/api"
+import abiCatalogData from "../../acton-abi-catalog/data/data-abis.json"
 import {AccountOgImage, type AccountOgPreview} from "../src/og/AccountOgImage"
 
 const OG_IMAGE_VERSION = "5"
@@ -30,11 +31,41 @@ type RouteMetadata = {
   url: string
 }
 
+type AbiCatalogBundle = {
+  readonly contracts: readonly AbiCatalogContract[]
+}
+
+type AbiCatalogContract = {
+  readonly displayName?: string
+  readonly hashes?: readonly string[]
+  readonly compilerAbi?: AbiCatalogCompilerAbi
+}
+
+type AbiCatalogCompilerAbi = {
+  readonly contract_name?: string
+  readonly description?: string
+  readonly author?: string
+  readonly version?: string
+  readonly get_methods?: readonly unknown[]
+  readonly incoming_messages?: readonly unknown[]
+  readonly incoming_external?: readonly unknown[]
+  readonly outgoing_messages?: readonly unknown[]
+  readonly emitted_events?: readonly unknown[]
+  readonly declarations?: readonly unknown[]
+  readonly thrown_errors?: readonly unknown[]
+}
+
+const ABI_CATALOG = abiCatalogData as AbiCatalogBundle
+
 export async function onRequest(context: PagesContext) {
   const url = new URL(context.request.url)
 
   if (url.pathname === "/og/account.png") {
     return renderAccountOgPng(context)
+  }
+
+  if (url.pathname === "/og/abi.png") {
+    return renderAbiOgPng(context)
   }
 
   const metadata = await getRouteMetadata(url, context.env)
@@ -80,6 +111,26 @@ async function renderAccountOgPng(context: PagesContext) {
   })
 }
 
+async function renderAbiOgPng(context: PagesContext) {
+  const url = new URL(context.request.url)
+  const preview = getAbiPreview(url.searchParams.get("slug") || "")
+  const image = new ImageResponse(<AccountOgImage preview={preview} />, {
+    width: OG_IMAGE_WIDTH,
+    height: OG_IMAGE_HEIGHT,
+    headers: {
+      "cache-control": "public, max-age=14400",
+    },
+  })
+  const bytes = await image.arrayBuffer()
+
+  return new Response(bytes, {
+    headers: {
+      "content-type": "image/png",
+      "cache-control": "public, max-age=14400",
+    },
+  })
+}
+
 function shouldInjectHtml(request: Request, response: Response) {
   if (request.method !== "GET") {
     return false
@@ -88,6 +139,18 @@ function shouldInjectHtml(request: Request, response: Response) {
 }
 
 async function getRouteMetadata(url: URL, env: Env): Promise<RouteMetadata | undefined> {
+  const abiSlug = abiSlugFromPath(url.pathname)
+  if (abiSlug) {
+    const preview = getAbiPreview(abiSlug)
+    const title = `${preview.title} ABI · actonscan`
+    const description = abiMetadataDescription(preview)
+    const image = absoluteUrl(
+      url,
+      `/og/abi.png?slug=${encodeURIComponent(abiSlug)}&v=${OG_IMAGE_VERSION}`,
+    )
+    return {title, description, image, url: url.href}
+  }
+
   const address = addressFromPath(url.pathname)
   if (!address) {
     return undefined
@@ -101,6 +164,19 @@ async function getRouteMetadata(url: URL, env: Env): Promise<RouteMetadata | und
     `/og/account.png?address=${encodeURIComponent(address)}&v=${OG_IMAGE_VERSION}`,
   )
   return {title, description, image, url: url.href}
+}
+
+function abiSlugFromPath(pathname: string) {
+  const match = pathname.match(/^\/abi\/([^/?#]+)$/)
+  if (!match) {
+    return undefined
+  }
+
+  try {
+    return decodeURIComponent(match[1] || "").trim()
+  } catch {
+    return match[1]?.trim()
+  }
 }
 
 function addressFromPath(pathname: string) {
@@ -195,6 +271,152 @@ function fallbackAccountPreview(address: string): AccountOgPreview {
     image: undefined,
     avatarText: "A",
   }
+}
+
+function getAbiPreview(slug: string): AccountOgPreview {
+  const entry = findAbiCatalogEntry(slug)
+  if (!entry) {
+    return fallbackAbiPreview(slug)
+  }
+
+  const {contract, index} = entry
+  const compilerAbi = contract.compilerAbi
+  const title = catalogDisplayName(contract, index)
+  const contractName = stringValue(compilerAbi?.contract_name) || title
+  const stats = abiStats(compilerAbi)
+  const description =
+    stringValue(compilerAbi?.description) ||
+    stats ||
+    [stringValue(compilerAbi?.author), stringValue(compilerAbi?.version)]
+      .filter(Boolean)
+      .join(" · ")
+
+  return {
+    title,
+    subtitle: contractName,
+    shortAddress: "ABI",
+    rawAddress: description || "Known ABI catalog entry",
+    status: undefined,
+    type: "ABI",
+    detail: description || "Known ABI catalog entry",
+    detailLines: 3,
+    image: undefined,
+    avatarText: "A",
+  }
+}
+
+function fallbackAbiPreview(slug: string): AccountOgPreview {
+  const title = slug ? slug.replace(/-/g, " ") : "ABI"
+  return {
+    title,
+    subtitle: "ABI",
+    shortAddress: "ABI",
+    rawAddress: "Known ABI catalog entry",
+    status: undefined,
+    type: "ABI",
+    detail: "Known ABI catalog entry",
+    detailLines: 3,
+    image: undefined,
+    avatarText: "A",
+  }
+}
+
+function abiMetadataDescription(preview: AccountOgPreview) {
+  const detail = preview.detail || preview.rawAddress
+  return `${detail}${/[.!?]$/.test(detail) ? "" : "."} View it on actonscan.`
+}
+
+function findAbiCatalogEntry(slug: string) {
+  const normalizedSlug = slug.trim().toLowerCase()
+  if (!normalizedSlug) {
+    return undefined
+  }
+
+  const baseSlugs = ABI_CATALOG.contracts.map((contract, index) =>
+    slugifyCatalogName(catalogDisplayName(contract, index)),
+  )
+  const duplicatedSlugs = new Set(
+    baseSlugs.filter((baseSlug, index) => baseSlugs.indexOf(baseSlug) !== index),
+  )
+
+  for (const [index, contract] of ABI_CATALOG.contracts.entries()) {
+    const baseSlug = baseSlugs[index]
+    const codeHashes = (contract.hashes ?? []).map(normalizeCodeHash).filter(Boolean)
+    const candidate = duplicatedSlugs.has(baseSlug)
+      ? `${baseSlug}-${codeHashes[0]?.slice(0, 8) ?? index + 1}`
+      : baseSlug
+    if (candidate === normalizedSlug) {
+      return {contract, index}
+    }
+  }
+
+  return undefined
+}
+
+function catalogDisplayName(contract: AbiCatalogContract, index: number): string {
+  return contract.displayName || contract.compilerAbi?.contract_name || `ABI ${index + 1}`
+}
+
+function slugifyCatalogName(name: string): string {
+  const slug = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+
+  return slug || "abi"
+}
+
+function normalizeCodeHash(codeHash: string): string {
+  const trimmed = codeHash.trim()
+  const hex = trimmed.replace(/^0x/i, "").toLowerCase()
+  if (/^[0-9a-f]{64}$/.test(hex)) {
+    return hex
+  }
+
+  return base64ToHex(trimmed) ?? hex
+}
+
+function base64ToHex(value: string): string | undefined {
+  try {
+    const base64 = value.replace(/-/g, "+").replace(/_/g, "/")
+    const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")
+    const binary = atob(padded)
+    if (binary.length !== 32) {
+      return undefined
+    }
+
+    return Array.from(binary, char => char.charCodeAt(0).toString(16).padStart(2, "0")).join("")
+  } catch {
+    return undefined
+  }
+}
+
+function abiStats(compilerAbi: AbiCatalogCompilerAbi | undefined) {
+  const getMethods = compilerAbi?.get_methods?.length ?? 0
+  const messages =
+    (compilerAbi?.incoming_messages?.length ?? 0) +
+    (compilerAbi?.incoming_external?.length ?? 0) +
+    (compilerAbi?.outgoing_messages?.length ?? 0) +
+    (compilerAbi?.emitted_events?.length ?? 0)
+  const declarations = compilerAbi?.declarations?.length ?? 0
+  const errors = compilerAbi?.thrown_errors?.length ?? 0
+  const parts = [
+    formatCount(getMethods, "get method"),
+    formatCount(messages, "message"),
+    formatCount(declarations, "declaration"),
+    formatCount(errors, "error"),
+  ].filter((part): part is string => Boolean(part))
+
+  return parts.join(" · ")
+}
+
+function formatCount(count: number, label: string) {
+  if (count === 0) {
+    return undefined
+  }
+
+  return `${count} ${label}${count === 1 ? "" : "s"}`
 }
 
 async function fetchToncenterJson(
