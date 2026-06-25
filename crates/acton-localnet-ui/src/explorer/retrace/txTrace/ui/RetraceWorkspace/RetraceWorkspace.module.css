@@ -239,6 +239,7 @@
   display: flex;
   flex: 0 0 auto;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
   min-width: 0;
   min-height: 40px;
@@ -300,17 +301,11 @@
   font-weight: var(--font-weight-medium);
 }
 
-.sourceDebugLocation,
-.sourceDebugInstruction {
+.sourceDebugLocation {
   min-width: 0;
   overflow: hidden;
-  font-family: var(--font-family-mono);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.sourceDebugInstruction {
-  color: var(--color-primary);
 }
 
 .sourceDebugWarning {

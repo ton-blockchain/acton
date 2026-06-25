@@ -20,11 +20,13 @@ import {
   useTasmCompletionProvider,
   useTasmInlayProvider,
   useImplicitRetInlayProvider,
+  useSourceDebugValuesProvider,
   useFuncLanguageProviders,
   useFolding,
   type SupportedLanguage,
   type HighlightGroup,
   type HighlightRange,
+  type SourceDebugVariableValue,
 } from "./hooks"
 
 import styles from "./CodeEditor.module.css"
@@ -104,6 +106,9 @@ interface CodeEditorProps {
 
   /** Use tighter Monaco gutters for embedded read-only trace views. */
   readonly compactGutter?: boolean
+
+  /** Source-debug locals used for VS Code-like inline values and hovers. */
+  readonly sourceDebugVariables?: readonly SourceDebugVariableValue[]
 }
 
 // use local instance of monaco
@@ -147,6 +152,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   needFloatingTip = lineExecutionData && language === "tasm",
   modelPath,
   compactGutter = false,
+  sourceDebugVariables,
 }) => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
   const [editorReady, setEditorReady] = useState(false)
@@ -233,6 +239,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     editorRef,
     markers,
     enabled: language === "tolk",
+  })
+
+  useSourceDebugValuesProvider({
+    monaco,
+    editorRef,
+    editorReady,
+    languageId: language,
+    variables: sourceDebugVariables,
+    enabled: sourceDebugVariables !== undefined && sourceDebugVariables.length > 0,
   })
 
   const {collapseInactiveBlocks} = useFolding({

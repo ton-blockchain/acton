@@ -242,11 +242,8 @@ function SourceDebugToolbar({
         {currentStep && (
           <>
             <span className={styles.sourceDebugLocation}>
-              {sourceLocationLabel(currentStep.location)}
+              {`at ${sourceLocationLabel(currentStep.location)}`}
             </span>
-            {currentStep.instruction && (
-              <span className={styles.sourceDebugInstruction}>{currentStep.instruction}</span>
-            )}
           </>
         )}
         {truncated && <span className={styles.sourceDebugWarning}>truncated</span>}
@@ -312,6 +309,11 @@ function SourceVariableIcon() {
   )
 }
 
+function sourceVariableTooltip(variable: SourceTraceVariable): string {
+  const typeLabel = variable.type ? ` {${variable.type}}` : ""
+  return `${variable.name}${typeLabel} = ${variable.value}`
+}
+
 function SourceVariableRow({
   variable,
   depth,
@@ -373,7 +375,7 @@ function SourceVariableRow({
           ) : null}
         </button>
         <SourceVariableIcon />
-        <span className={styles.sourceVariableExpression}>
+        <span className={styles.sourceVariableExpression} title={sourceVariableTooltip(variable)}>
           <span className={styles.sourceVariableName}>{variable.name}</span>
           <span className={styles.sourceVariableEquals}> = </span>
           {variable.type && (
@@ -491,6 +493,8 @@ function SourceDebugResizableSection({
           role="separator"
           aria-label={`Resize ${title}`}
           aria-orientation="horizontal"
+          aria-valuemin={SOURCE_DEBUG_SECTION_MIN_HEIGHT}
+          aria-valuenow={Math.round(height)}
           onPointerDown={event => resizePartnerId && onResizeStart(id, resizePartnerId, event)}
         />
       )}
@@ -1032,6 +1036,7 @@ function SourceFilesEditor({
               needFloatingTip={false}
               showInstructionDocs={false}
               compactGutter
+              sourceDebugVariables={currentSourceStep?.locals ?? []}
             />
           </Suspense>
         </div>
@@ -1041,6 +1046,9 @@ function SourceFilesEditor({
             role="separator"
             aria-label="Resize debug panel"
             aria-orientation="vertical"
+            aria-valuemin={SOURCE_DEBUG_PANEL_MIN_WIDTH}
+            aria-valuemax={SOURCE_DEBUG_PANEL_MAX_WIDTH}
+            aria-valuenow={sourceDebugPanelWidth}
             onPointerDown={startSourceDebugPanelResize}
           />
         )}
