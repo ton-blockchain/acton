@@ -48,11 +48,11 @@ For the minimal local build/test flow, install:
 1. Rust toolchain (`rustup`, `cargo`)
 2. `just` (task runner)
    ```bash
-   cargo install just --version 1.49.0 --locked
+   cargo install just --version 1.52.0 --locked
    ```
 3. `cargo-nextest` (required Rust test runner for non-doc tests)
    ```bash
-   cargo install cargo-nextest --version 0.9.133 --locked
+   cargo install cargo-nextest --version 0.9.137 --locked
    ```
 4. Bun (required for UI packages; version pinned in `package.json`)
    ```bash
@@ -89,11 +89,11 @@ Optional CLI tools:
 
 - `cargo-shear` (unused dependency linter for `just check-deps`, also needed by `just check` / `just check-ci`)
   ```bash
-  cargo install cargo-shear --version 1.11.2 --locked
+  cargo install cargo-shear --version 1.13.1 --locked
   ```
 - `cargo-deny` (dependency policy checks for `just check`, also used by `just check-security`)
   ```bash
-  cargo install cargo-deny --version 0.19.6 --locked
+  cargo install cargo-deny --version 0.19.8 --locked
   ```
 - `cargo-audit` (RustSec advisory checks for `just check-audit` / `just check-security`)
   ```bash

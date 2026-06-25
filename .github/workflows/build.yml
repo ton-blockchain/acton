@@ -44,7 +44,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -58,9 +58,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive
@@ -195,7 +195,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -209,9 +209,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,cargo-shear@1.11.2,typos@1.47.2
+          tool: just@1.52.0,cargo-shear@1.13.1,typos@1.47.2
           fallback: none
 
       - name: Download TON objects archive
@@ -242,14 +242,14 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0
+          tool: just@1.52.0
           fallback: none
 
       - name: Setup Bun
@@ -298,7 +298,7 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -312,9 +312,9 @@ jobs:
         run: rustup toolchain install
 
       - name: Installing additional Rust components
-        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,nextest@0.9.133
+          tool: just@1.52.0,nextest@0.9.137
           fallback: none
 
       - name: Download TON objects archive

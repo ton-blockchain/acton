@@ -40,14 +40,14 @@ jobs:
 
     steps:
       - name: Check out Acton repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
       - name: Install cargo-deny
-        uses: taiki-e/install-action@4bc351f7f2614e48088386e2a0ad917ca3a7e4ba # v2.81.5
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
         with:
-          tool: just@1.49.0,cargo-deny@0.19.6,cargo-audit@0.22.1
+          tool: just@1.52.0,cargo-deny@0.19.8,cargo-audit@0.22.1
           fallback: none
 
       - name: Run cargo-deny
