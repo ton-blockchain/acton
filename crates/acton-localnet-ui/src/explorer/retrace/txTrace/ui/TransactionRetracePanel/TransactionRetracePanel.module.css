@@ -1,11 +1,11 @@
 .root {
   position: relative;
-  z-index: var(--z-index-modal);
+  z-index: 1;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  width: var(--retrace-flow-width, 100vw);
-  max-width: var(--retrace-flow-width, 100vw);
+  width: min(var(--retrace-flow-width, 100vw), var(--retrace-panel-max-width));
+  max-width: min(var(--retrace-flow-width, 100vw), var(--retrace-panel-max-width));
   height: var(--retrace-panel-height);
   min-height: 560px;
   margin-left: calc(-1 * var(--retrace-flow-offset, 0px));
@@ -16,10 +16,11 @@
   background: var(--tonscan-card-bg);
   overflow: visible;
   --retrace-panel-header-height: 44px;
+  --retrace-panel-max-width: 1800px;
   --retrace-panel-viewport-height: 100vh;
   --retrace-panel-height: calc(
-    var(--retrace-panel-viewport-height) + var(--retrace-panel-header-height) +
-      var(--retrace-toolbar-height)
+    var(--retrace-panel-viewport-height) +
+    var(--retrace-panel-header-height)
   );
   --retrace-workspace-height: var(--retrace-panel-viewport-height);
   --retrace-workspace-narrow-height: var(--retrace-panel-viewport-height);

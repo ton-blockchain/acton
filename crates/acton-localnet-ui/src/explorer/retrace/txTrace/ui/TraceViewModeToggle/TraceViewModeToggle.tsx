@@ -23,6 +23,7 @@ interface TraceViewModeToggleProps {
 function TraceViewModeToggleFc({value, onChange}: TraceViewModeToggleProps) {
   return (
     <div className={styles.root}>
+      <span className={styles.label}>View mode:</span>
       <div className={styles.toggle} role="group" aria-label="Trace view mode">
         {TRACE_VIEW_OPTIONS.map(option => {
           const isActive = value === option.value

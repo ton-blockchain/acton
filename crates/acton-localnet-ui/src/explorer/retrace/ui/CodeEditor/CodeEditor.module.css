@@ -39,15 +39,8 @@
 }
 
 :global(.monaco-editor .source-debug-frame-line) {
-  background-color: rgb(91 126 190 / 28%) !important;
-  box-shadow: inset 0 0 0 1px rgb(91 126 190 / 18%) !important;
-}
-
-:global(.monaco-editor .source-debug-inline-value) {
-  color: #7f8794 !important;
-  font-style: normal !important;
-  opacity: 0.95;
-  white-space: pre;
+  background-color: var(--source-debug-frame-line-bg) !important;
+  box-shadow: inset 0 0 0 1px var(--source-debug-frame-line-ring) !important;
 }
 
 :global(.monaco-editor .precise-highlight) {

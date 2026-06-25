@@ -17,6 +17,8 @@ type RetracePanelState =
   | {readonly type: "ready"; readonly result: RetraceResultAndCode}
   | {readonly type: "error"; readonly message: string}
 
+const MAX_RETRACE_FLOW_WIDTH = 1800
+
 interface TransactionRetracePanelProps {
   readonly client: TonClient
   readonly txHash: string
@@ -43,13 +45,26 @@ export default function TransactionRetracePanel({
   useLayoutEffect(() => {
     const updateFlowMetrics = () => {
       const root = rootRef.current
-      const anchor = root?.parentElement ?? root
-      if (!anchor) {
+      if (!root) {
         return
       }
 
-      const offset = Math.max(0, Math.round(anchor.getBoundingClientRect().left))
-      const width = Math.round(document.documentElement.clientWidth || window.innerWidth)
+      const anchor = root.parentElement ?? root
+      const viewportWidth = Math.round(
+        document.documentElement.clientWidth || globalThis.innerWidth,
+      )
+      const availableRect = root.closest("main")?.getBoundingClientRect()
+      const availableLeft = Math.max(0, Math.round(availableRect?.left ?? 0))
+      const availableRight = Math.min(
+        viewportWidth,
+        Math.round(availableRect?.right ?? viewportWidth),
+      )
+      const availableWidth = Math.max(0, availableRight - availableLeft)
+      const flowContainerLeft = availableWidth > 0 ? availableLeft : 0
+      const flowContainerWidth = availableWidth || viewportWidth
+      const width = Math.min(flowContainerWidth, MAX_RETRACE_FLOW_WIDTH)
+      const flowLeft = flowContainerLeft + Math.round((flowContainerWidth - width) / 2)
+      const offset = Math.round(anchor.getBoundingClientRect().left - flowLeft)
       setFlowMetrics(current =>
         current.offset === offset && current.width === width ? current : {offset, width},
       )
@@ -59,16 +74,25 @@ export default function TransactionRetracePanel({
 
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateFlowMetrics)
-    const observedElement = rootRef.current?.parentElement
-    if (resizeObserver && observedElement) {
-      resizeObserver.observe(observedElement)
+    const flowContainer = rootRef.current?.closest("main")
+    const observedElements = [
+      rootRef.current?.parentElement,
+      flowContainer,
+      flowContainer?.parentElement,
+    ]
+    if (resizeObserver) {
+      for (const element of observedElements) {
+        if (element) {
+          resizeObserver.observe(element)
+        }
+      }
     }
 
-    window.addEventListener("resize", updateFlowMetrics)
+    globalThis.addEventListener("resize", updateFlowMetrics)
 
     return () => {
       resizeObserver?.disconnect()
-      window.removeEventListener("resize", updateFlowMetrics)
+      globalThis.removeEventListener("resize", updateFlowMetrics)
     }
   }, [])
 
@@ -114,12 +138,12 @@ export default function TransactionRetracePanel({
   return (
     <div ref={rootRef} className={`${styles.root} retraceRoot`} style={rootStyle}>
       <div className={styles.header}>
-        <div className={styles.title}>Retrace</div>
+        <div className={styles.title}>Debug</div>
         <button
           type="button"
           className={styles.closeButton}
           onClick={onClose}
-          aria-label="Close retrace"
+          aria-label="Close debug panel"
         >
           <X size={16} />
         </button>

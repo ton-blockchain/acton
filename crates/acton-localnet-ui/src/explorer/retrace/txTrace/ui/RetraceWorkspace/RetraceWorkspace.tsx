@@ -2,6 +2,7 @@ import {
   type CSSProperties,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
+  Fragment,
   lazy,
   memo,
   Suspense,
@@ -15,12 +16,10 @@ import {
 import type {StackElement} from "ton-assembly/dist/trace"
 import {
   Braces,
-  Bug,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileCode2,
-  ListTree,
   SkipBack,
   SkipForward,
 } from "lucide-react"
@@ -41,9 +40,13 @@ import {
   buildInstructionDetails,
   calculateCumulativeGasSinceBegin,
   getImplicitRet,
+  getStoredSourceDebugCollapsedSections,
   getStoredSourceDebugPanelWidth,
+  getStoredSourceDebugSectionHeights,
   getStoredTraceViewMode,
+  setStoredSourceDebugCollapsedSections,
   setStoredSourceDebugPanelWidth,
+  setStoredSourceDebugSectionHeights,
   setStoredTraceViewMode,
   type TraceViewMode,
 } from "../../lib/traceViewModel"
@@ -62,10 +65,24 @@ type WorkspaceTab = "trace" | "sources"
 type SourceEditorLanguage = "tolk" | "func" | "tasm"
 type SourceDebugSectionId = "exception" | "locals" | "callStack"
 
+interface TraceStepToolbarModel {
+  readonly selectedStep: number
+  readonly totalSteps: number
+  readonly locationLabel?: string
+  readonly instructionLabel?: string
+  readonly instructionGasLabel?: string
+  readonly gasLabel?: string
+  readonly truncated?: boolean
+  readonly onFirst: () => void
+  readonly onPrev: () => void
+  readonly onNext: () => void
+  readonly onLast: () => void
+}
+
 const SOURCE_DEBUG_SECTION_MIN_HEIGHT = 72
 const SOURCE_DEBUG_PANEL_DEFAULT_WIDTH = 360
 const SOURCE_DEBUG_PANEL_MIN_WIDTH = 280
-const SOURCE_DEBUG_PANEL_MAX_WIDTH = 720
+const SOURCE_DEBUG_PANEL_MAX_WIDTH = 1080
 const SOURCE_DEBUG_EDITOR_MIN_WIDTH = 360
 
 const DEFAULT_SOURCE_DEBUG_SECTION_HEIGHTS: Record<SourceDebugSectionId, number> = {
@@ -83,6 +100,13 @@ const DEFAULT_SOURCE_DEBUG_COLLAPSED: Record<SourceDebugSectionId, boolean> = {
 interface RetraceWorkspaceProps {
   readonly result: RetraceResultAndCode
   readonly className?: string
+}
+
+function hasVisibleSourceBundles(result: RetraceResultAndCode): boolean {
+  return (
+    result.verifiedSource?.bundles.some(bundle => visibleSourceBundle(bundle).files.length > 0) ??
+    false
+  )
 }
 
 function normalizeSourcePath(path: string): string {
@@ -168,85 +192,126 @@ function clampSourceDebugPanelWidth(width: number, layoutWidth: number): number 
   return Math.min(maxWidth, Math.max(SOURCE_DEBUG_PANEL_MIN_WIDTH, width))
 }
 
-function SourceDebugToolbar({
+function ToolbarSeparator({className}: {readonly className?: string}) {
+  return (
+    <span
+      className={
+        className ? `${styles.sourceDebugSeparator} ${className}` : styles.sourceDebugSeparator
+      }
+      aria-hidden="true"
+    />
+  )
+}
+
+function TraceStepToolbar({
   selectedStep,
   totalSteps,
-  currentStep,
+  locationLabel,
+  instructionLabel,
+  instructionGasLabel,
+  gasLabel,
   truncated,
   onFirst,
   onPrev,
   onNext,
   onLast,
-}: {
-  readonly selectedStep: number
-  readonly totalSteps: number
-  readonly currentStep?: SourceTraceStep
-  readonly truncated: boolean
-  readonly onFirst: () => void
-  readonly onPrev: () => void
-  readonly onNext: () => void
-  readonly onLast: () => void
-}) {
+}: TraceStepToolbarModel) {
   const canGoPrev = totalSteps > 0 && selectedStep > 0
   const canGoNext = totalSteps > 0 && selectedStep < totalSteps - 1
+  const metaItems: {readonly key: string; readonly node: ReactNode}[] = []
+
+  if (instructionLabel) {
+    metaItems.push({
+      key: "instruction",
+      node: <span className={styles.sourceDebugInstruction}>{instructionLabel}</span>,
+    })
+  }
+  if (instructionGasLabel) {
+    metaItems.push({
+      key: "instruction-gas",
+      node: <span className={styles.sourceDebugInstructionGas}>{instructionGasLabel}</span>,
+    })
+  }
+  if (gasLabel) {
+    metaItems.push({
+      key: "gas",
+      node: <span className={styles.sourceDebugGas}>{gasLabel}</span>,
+    })
+  }
+  if (truncated) {
+    metaItems.push({
+      key: "truncated",
+      node: <span className={styles.sourceDebugWarning}>truncated</span>,
+    })
+  }
 
   return (
-    <div className={styles.sourceDebugToolbar} aria-label="Source trace controls">
-      <div className={styles.sourceDebugNavigation}>
-        <button
-          type="button"
-          className={styles.sourceDebugIconButton}
-          onClick={onFirst}
-          disabled={!canGoPrev}
-          title="Go to first source step"
-          aria-label="Go to first source step"
-        >
-          <SkipBack size={15} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.sourceDebugIconButton}
-          onClick={onPrev}
-          disabled={!canGoPrev}
-          title="Previous source step"
-          aria-label="Previous source step"
-        >
-          <ChevronLeft size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.sourceDebugIconButton}
-          onClick={onNext}
-          disabled={!canGoNext}
-          title="Next source step"
-          aria-label="Next source step"
-        >
-          <ChevronRight size={16} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className={styles.sourceDebugIconButton}
-          onClick={onLast}
-          disabled={!canGoNext}
-          title="Go to last source step"
-          aria-label="Go to last source step"
-        >
-          <SkipForward size={15} aria-hidden="true" />
-        </button>
+    <div className={styles.sourceDebugToolbar} aria-label="Trace step controls">
+      <div className={styles.sourceDebugMeta}>
+        {metaItems.map((item, index) => (
+          <Fragment key={item.key}>
+            {index > 0 && <ToolbarSeparator />}
+            {item.node}
+          </Fragment>
+        ))}
       </div>
 
-      <div className={styles.sourceDebugStepInfo}>
-        <span className={styles.sourceDebugStepCounter}>
-          {totalSteps > 0 ? `Step ${selectedStep + 1} of ${totalSteps}` : "No source steps"}
+      {metaItems.length > 0 && <ToolbarSeparator className={styles.sourceDebugGroupSeparator} />}
+
+      <div className={styles.sourceDebugControls}>
+        <span className={styles.sourceDebugStepPart}>
+          <span className={styles.sourceDebugStepCounter}>
+            {totalSteps > 0 ? `Step ${selectedStep + 1} of ${totalSteps}` : "No trace steps"}
+          </span>
+          {locationLabel && <span className={styles.sourceDebugLocation}>{locationLabel}</span>}
         </span>
-        {currentStep && (
-          <>
-            <span className={styles.sourceDebugLocation}>
-              {`at ${sourceLocationLabel(currentStep.location)}`}
-            </span>
-          </>
-        )}
-        {truncated && <span className={styles.sourceDebugWarning}>truncated</span>}
+
+        <div className={styles.sourceDebugNavigation}>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onFirst}
+            disabled={!canGoPrev}
+            title="Go to first trace step"
+            aria-label="Go to first trace step"
+            data-testid="go-to-first-step-button"
+          >
+            <SkipBack size={15} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onPrev}
+            disabled={!canGoPrev}
+            title="Previous trace step"
+            aria-label="Previous trace step"
+            data-testid="prev-step-button"
+          >
+            <ChevronLeft size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onNext}
+            disabled={!canGoNext}
+            title="Next trace step"
+            aria-label="Next trace step"
+            data-testid="next-step-button"
+          >
+            <ChevronRight size={16} aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            className={styles.sourceDebugIconButton}
+            onClick={onLast}
+            disabled={!canGoNext}
+            title="Go to last trace step"
+            aria-label="Go to last trace step"
+            data-testid="go-to-last-step-button"
+          >
+            <SkipForward size={15} aria-hidden="true" />
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -412,10 +477,10 @@ function SourceCallFrameIcon() {
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <circle cx="8" cy="8" r="6.5" fill="transparent" stroke="#DB6068" />
+      <circle cx="8" cy="8" r="6.5" fill="transparent" stroke="currentColor" />
       <path
         d="M7.25726 12H8.2744V7.32741H9.82869V6.43027H8.2744V5.48C8.2744 5.12 8.52012 4.87429 8.8744 4.87429H9.88012V4H8.77726C7.8744 4 7.25726 4.57143 7.25726 5.40571V6.43027H6.12012V7.32741H7.25726V12Z"
-        fill="#DB6068"
+        fill="currentColor"
       />
     </svg>
   )
@@ -511,22 +576,30 @@ function SourceDebugPanel({
   readonly selectedCallFrameIndex: number | null
   readonly onCallFrameSelect: (index: number) => void
 }) {
-  const [collapsedSections, setCollapsedSections] = useState(DEFAULT_SOURCE_DEBUG_COLLAPSED)
-  const [sectionHeights, setSectionHeights] = useState(DEFAULT_SOURCE_DEBUG_SECTION_HEIGHTS)
+  const [collapsedSections, setCollapsedSections] = useState(() =>
+    getStoredSourceDebugCollapsedSections(DEFAULT_SOURCE_DEBUG_COLLAPSED),
+  )
+  const [sectionHeights, setSectionHeights] = useState(() =>
+    getStoredSourceDebugSectionHeights(
+      DEFAULT_SOURCE_DEBUG_SECTION_HEIGHTS,
+      SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+    ),
+  )
   const sectionElementsRef = useRef<Partial<Record<SourceDebugSectionId, HTMLElement | null>>>({})
 
-  const setSectionElement = useCallback(
-    (id: SourceDebugSectionId, element: HTMLElement | null) => {
-      sectionElementsRef.current[id] = element
-    },
-    [],
-  )
+  const setSectionElement = useCallback((id: SourceDebugSectionId, element: HTMLElement | null) => {
+    sectionElementsRef.current[id] = element
+  }, [])
 
   const toggleSection = useCallback((id: SourceDebugSectionId) => {
-    setCollapsedSections(current => ({
-      ...current,
-      [id]: !current[id],
-    }))
+    setCollapsedSections(current => {
+      const next = {
+        ...current,
+        [id]: !current[id],
+      }
+      setStoredSourceDebugCollapsedSections(next)
+      return next
+    })
   }, [])
 
   const startSectionResize = useCallback(
@@ -568,6 +641,7 @@ function SourceDebugPanel({
       const previousUserSelect = document.body.style.userSelect
       document.body.style.cursor = "row-resize"
       document.body.style.userSelect = "none"
+      let latestSectionHeights = measuredHeights
       setSectionHeights(measuredHeights)
 
       const handlePointerMove = (moveEvent: globalThis.PointerEvent) => {
@@ -582,28 +656,34 @@ function SourceDebugPanel({
           SOURCE_DEBUG_SECTION_MIN_HEIGHT,
           pairedHeight - nextHeight,
         )
+        const nextSectionHeights = {
+          ...measuredHeights,
+          [id]: nextHeight,
+          [partnerId]: nextPartnerHeight,
+        }
+        latestSectionHeights = nextSectionHeights
         setSectionHeights(current =>
           current[id] === nextHeight && current[partnerId] === nextPartnerHeight
             ? current
-            : {
-                ...current,
-                [id]: nextHeight,
-                [partnerId]: nextPartnerHeight,
-              },
+            : nextSectionHeights,
         )
       }
 
       const finishResize = () => {
         document.body.style.cursor = previousCursor
         document.body.style.userSelect = previousUserSelect
-        window.removeEventListener("pointermove", handlePointerMove)
-        window.removeEventListener("pointerup", finishResize)
-        window.removeEventListener("pointercancel", finishResize)
+        setStoredSourceDebugSectionHeights(
+          latestSectionHeights,
+          SOURCE_DEBUG_SECTION_MIN_HEIGHT,
+        )
+        globalThis.removeEventListener("pointermove", handlePointerMove)
+        globalThis.removeEventListener("pointerup", finishResize)
+        globalThis.removeEventListener("pointercancel", finishResize)
       }
 
-      window.addEventListener("pointermove", handlePointerMove)
-      window.addEventListener("pointerup", finishResize)
-      window.addEventListener("pointercancel", finishResize)
+      globalThis.addEventListener("pointermove", handlePointerMove)
+      globalThis.addEventListener("pointerup", finishResize)
+      globalThis.addEventListener("pointercancel", finishResize)
     },
     [collapsedSections, sectionHeights],
   )
@@ -628,9 +708,7 @@ function SourceDebugPanel({
       return undefined
     }
 
-    return visibleSectionIds
-      .slice(startIndex + 1)
-      .find(sectionId => !collapsedSections[sectionId])
+    return visibleSectionIds.slice(startIndex + 1).find(sectionId => !collapsedSections[sectionId])
   }
 
   return (
@@ -639,7 +717,6 @@ function SourceDebugPanel({
         <SourceDebugResizableSection
           id="exception"
           title="Exception"
-          icon={<Bug size={14} aria-hidden="true" />}
           collapsed={collapsedSections.exception}
           height={sectionHeights.exception}
           grow={true}
@@ -660,7 +737,6 @@ function SourceDebugPanel({
       <SourceDebugResizableSection
         id="locals"
         title="Locals"
-        icon={<Bug size={14} aria-hidden="true" />}
         collapsed={collapsedSections.locals}
         height={sectionHeights.locals}
         grow={true}
@@ -676,7 +752,6 @@ function SourceDebugPanel({
       <SourceDebugResizableSection
         id="callStack"
         title="Call Stack"
-        icon={<ListTree size={14} aria-hidden="true" />}
         collapsed={collapsedSections.callStack}
         height={sectionHeights.callStack}
         grow={true}
@@ -711,7 +786,6 @@ function SourceDebugPanel({
           <div className={styles.sourceDebugEmpty}>No frames</div>
         )}
       </SourceDebugResizableSection>
-
     </aside>
   )
 }
@@ -720,17 +794,19 @@ function SourceFilesEditor({
   bundles,
   traceId,
   sourceTrace,
+  onToolbarModelChange,
 }: {
   readonly bundles: readonly SourceBundle[]
   readonly traceId: string
   readonly sourceTrace?: SourceTraceResponse
+  readonly onToolbarModelChange: (model: TraceStepToolbarModel | null) => void
 }) {
   const [activeBundleHash, setActiveBundleHash] = useState(bundles[0]?.source_bundle_hash ?? "")
   const activeBundle =
     bundles.find(bundle => bundle.source_bundle_hash === activeBundleHash) ?? bundles[0]
   const [activePath, setActivePath] = useState(activeBundle ? defaultSourcePath(activeBundle) : "")
   const activeFile = activeBundle
-    ? findSourceFile(activeBundle.files, activePath) ?? activeBundle.files[0]
+    ? (findSourceFile(activeBundle.files, activePath) ?? activeBundle.files[0])
     : undefined
   const code = activeFile ? decodeSourceFile(activeFile) : ""
   const activeSourceTrace =
@@ -756,9 +832,9 @@ function SourceFilesEditor({
     ? Math.min(activeSourceStepIndex, sourceSteps.length - 1)
     : 0
   const selectedCallFrameLocation =
-    selectedCallFrameIndex !== null
-      ? (currentSourceStep?.call_stack[selectedCallFrameIndex]?.location ?? null)
-      : null
+    selectedCallFrameIndex === null
+      ? null
+      : (currentSourceStep?.call_stack[selectedCallFrameIndex]?.location ?? null)
   const highlightedSourceLine =
     currentSourceStep &&
     activeFile &&
@@ -775,16 +851,15 @@ function SourceFilesEditor({
       : undefined
   const shouldHighlightSelectedCallFrame =
     selectedCallFrameLine !== undefined && selectedCallFrameLine !== highlightedSourceLine
-  const frameHighlightGroups =
-    shouldHighlightSelectedCallFrame
-      ? [
-          {
-            lines: [selectedCallFrameLine],
-            color: "#5b7ebe",
-            className: "source-debug-frame-line",
-          },
-        ]
-      : []
+  const frameHighlightGroups = shouldHighlightSelectedCallFrame
+    ? [
+        {
+          lines: [selectedCallFrameLine],
+          color: "var(--source-debug-frame-line-ruler)",
+          className: "source-debug-frame-line",
+        },
+      ]
+    : []
   const centerSourceLine = selectedCallFrameLine ?? highlightedSourceLine
 
   useEffect(() => {
@@ -823,11 +898,45 @@ function SourceFilesEditor({
     setActivePath(defaultSourcePath(bundle))
   }
 
-  const goToSourceStep = useCallback((step: number) => {
-    const lastStep = Math.max(0, sourceSteps.length - 1)
-    setShouldCenterSourceStep(true)
-    setActiveSourceStepIndex(Math.max(0, Math.min(step, lastStep)))
-  }, [sourceSteps.length])
+  const goToSourceStep = useCallback(
+    (step: number) => {
+      const lastStep = Math.max(0, sourceSteps.length - 1)
+      setShouldCenterSourceStep(true)
+      setActiveSourceStepIndex(Math.max(0, Math.min(step, lastStep)))
+    },
+    [sourceSteps.length],
+  )
+
+  useEffect(() => {
+    return () => onToolbarModelChange(null)
+  }, [onToolbarModelChange])
+
+  useEffect(() => {
+    if (!activeSourceTrace) {
+      onToolbarModelChange(null)
+      return
+    }
+
+    onToolbarModelChange({
+      selectedStep: currentSourceStepIndex,
+      totalSteps: sourceSteps.length,
+      locationLabel: currentSourceStep
+        ? `at ${sourceLocationLabel(currentSourceStep.location)}`
+        : undefined,
+      truncated: activeSourceTrace.truncated,
+      onFirst: () => goToSourceStep(0),
+      onPrev: () => goToSourceStep(currentSourceStepIndex - 1),
+      onNext: () => goToSourceStep(currentSourceStepIndex + 1),
+      onLast: () => goToSourceStep(sourceSteps.length - 1),
+    })
+  }, [
+    activeSourceTrace,
+    currentSourceStep,
+    currentSourceStepIndex,
+    goToSourceStep,
+    onToolbarModelChange,
+    sourceSteps.length,
+  ])
 
   const handleSourceFileSelect = (path: string) => {
     setShouldCenterSourceStep(false)
@@ -883,14 +992,14 @@ function SourceFilesEditor({
         document.body.style.cursor = previousCursor
         document.body.style.userSelect = previousUserSelect
         setStoredSourceDebugPanelWidth(latestWidth)
-        window.removeEventListener("pointermove", handlePointerMove)
-        window.removeEventListener("pointerup", finishResize)
-        window.removeEventListener("pointercancel", finishResize)
+        globalThis.removeEventListener("pointermove", handlePointerMove)
+        globalThis.removeEventListener("pointerup", finishResize)
+        globalThis.removeEventListener("pointercancel", finishResize)
       }
 
-      window.addEventListener("pointermove", handlePointerMove)
-      window.addEventListener("pointerup", finishResize)
-      window.addEventListener("pointercancel", finishResize)
+      globalThis.addEventListener("pointermove", handlePointerMove)
+      globalThis.addEventListener("pointerup", finishResize)
+      globalThis.addEventListener("pointercancel", finishResize)
     },
     [sourceDebugPanelWidth],
   )
@@ -939,8 +1048,8 @@ function SourceFilesEditor({
       }
     }
 
-    window.addEventListener("keydown", handleKeyDown)
-    return () => window.removeEventListener("keydown", handleKeyDown)
+    globalThis.addEventListener("keydown", handleKeyDown)
+    return () => globalThis.removeEventListener("keydown", handleKeyDown)
   }, [activeSourceTrace, currentSourceStepIndex, goToSourceStep, sourceSteps.length])
 
   if (!activeBundle || !activeFile) {
@@ -976,19 +1085,6 @@ function SourceFilesEditor({
             </button>
           ))}
         </div>
-      )}
-
-      {activeSourceTrace && (
-        <SourceDebugToolbar
-          selectedStep={currentSourceStepIndex}
-          totalSteps={sourceSteps.length}
-          currentStep={currentSourceStep}
-          truncated={activeSourceTrace.truncated}
-          onFirst={() => goToSourceStep(0)}
-          onPrev={() => goToSourceStep(currentSourceStepIndex - 1)}
-          onNext={() => goToSourceStep(currentSourceStepIndex + 1)}
-          onLast={() => goToSourceStep(sourceSteps.length - 1)}
-        />
       )}
 
       <div className={styles.sourceFileTabs} role="tablist" aria-label="Source files">
@@ -1070,7 +1166,10 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
     title: string
   } | null>(null)
   const [traceViewMode, setTraceViewMode] = useState<TraceViewMode>(() => getStoredTraceViewMode())
-  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>("trace")
+  const [workspaceTab, setWorkspaceTab] = useState<WorkspaceTab>(() =>
+    hasVisibleSourceBundles(result) ? "sources" : "trace",
+  )
+  const [sourceToolbarModel, setSourceToolbarModel] = useState<TraceStepToolbarModel | null>(null)
 
   const lineExecutionData = useLineExecutionData(result.trace)
   const {
@@ -1083,8 +1182,6 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
     handleNext,
     goToFirstStep,
     goToLastStep,
-    canGoPrev,
-    canGoNext,
     findStepByLine,
     transitionType,
     totalSteps,
@@ -1118,6 +1215,8 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
     setWorkspaceTab(tab)
     if (tab === "sources") {
       setSelectedStackItem(null)
+    } else {
+      setSourceToolbarModel(null)
     }
   }, [])
 
@@ -1143,23 +1242,27 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
     }
   }, [hasSourceBundles, workspaceTab])
 
+  const currentInstructionGas = instructionDetails[selectedStep]?.gasCost
+  const traceToolbarModel: TraceStepToolbarModel = {
+    selectedStep,
+    totalSteps,
+    instructionLabel: currentStep?.instructionName,
+    instructionGasLabel: Number.isFinite(currentInstructionGas)
+      ? `${currentInstructionGas} gas`
+      : undefined,
+    gasLabel: totalSteps > 0 ? `Used gas: ${cumulativeGasSinceBegin}` : undefined,
+    onFirst: goToFirstStep,
+    onPrev: handlePrev,
+    onNext: handleNext,
+    onLast: goToLastStep,
+  }
+  const activeToolbarModel = workspaceTab === "sources" ? sourceToolbarModel : traceToolbarModel
+
   return (
-    <section className={`${styles.root} ${className ?? ""}`} aria-label="Transaction retrace">
+    <section className={`${styles.root} ${className ?? ""}`} aria-label="Transaction debug">
       <div className={styles.toolbar}>
         <div className={styles.toolbarLeft}>
-          <div className={styles.primaryTabs} role="tablist" aria-label="Retrace views">
-            <button
-              type="button"
-              className={`${styles.primaryTab} ${
-                workspaceTab === "trace" ? styles.primaryTabActive : ""
-              }`}
-              onClick={() => handleWorkspaceTabChange("trace")}
-              role="tab"
-              aria-selected={workspaceTab === "trace"}
-            >
-              <Braces size={16} aria-hidden="true" />
-              Trace
-            </button>
+          <div className={styles.primaryTabs} role="tablist" aria-label="Debug views">
             {hasSourceBundles && (
               <button
                 type="button"
@@ -1174,6 +1277,18 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
                 Sources
               </button>
             )}
+            <button
+              type="button"
+              className={`${styles.primaryTab} ${
+                workspaceTab === "trace" ? styles.primaryTabActive : ""
+              }`}
+              onClick={() => handleWorkspaceTabChange("trace")}
+              role="tab"
+              aria-selected={workspaceTab === "trace"}
+            >
+              <Braces size={16} aria-hidden="true" />
+              Disassembled
+            </button>
           </div>
 
           {workspaceTab === "trace" && (
@@ -1193,6 +1308,12 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
             </div>
           )}
         </div>
+
+        {activeToolbarModel && (
+          <div className={styles.toolbarRight}>
+            <TraceStepToolbar {...activeToolbarModel} />
+          </div>
+        )}
       </div>
 
       <div
@@ -1209,6 +1330,7 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
                 bundles={sourceBundles}
                 traceId={result.result.emulatedTx.lt.toString()}
                 sourceTrace={result.sourceTrace}
+                onToolbarModelChange={setSourceToolbarModel}
               />
             ) : traceViewMode === "assembler" ? (
               <Suspense
@@ -1256,20 +1378,7 @@ function RetraceWorkspaceFc({result, className}: RetraceWorkspaceProps) {
 
         {workspaceTab === "trace" && (
           <TraceSidePanel
-            selectedStep={selectedStep}
-            totalSteps={totalSteps}
-            currentStep={currentStep}
             currentStack={currentStack}
-            canGoPrev={canGoPrev}
-            canGoNext={canGoNext}
-            onPrev={handlePrev}
-            onNext={handleNext}
-            onFirst={goToFirstStep}
-            onLast={goToLastStep}
-            showGas={true}
-            placeholderMessage="No trace steps available."
-            instructionDetails={instructionDetails}
-            cumulativeGas={cumulativeGasSinceBegin}
             onStackItemClick={handleStackItemClick}
             className={styles.sidePanel}
           />

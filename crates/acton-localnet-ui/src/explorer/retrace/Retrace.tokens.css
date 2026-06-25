@@ -79,6 +79,21 @@
   --trace-editor-text: #000;
   --trace-editor-line-number: #237893;
   --trace-editor-active-line-number: #0b216f;
+  --source-debug-variable-name-color: #b36632;
+  --source-debug-variable-icon-color: #b98525;
+  --source-debug-variable-type-color: #6f7784;
+  --source-debug-variable-equals-color: #8d96a2;
+  --source-debug-variable-value-color: #5f6875;
+  --source-debug-variable-hover-bg: rgb(20 31 46 / 5.5%);
+  --source-debug-call-frame-name-color: #4b5563;
+  --source-debug-call-frame-location-color: #7b8491;
+  --source-debug-call-frame-icon-color: #db6068;
+  --source-debug-call-frame-active-bg: #2a4371;
+  --source-debug-call-frame-active-name-color: #f3f6ff;
+  --source-debug-call-frame-active-location-color: #bac4d8;
+  --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
+  --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
+  --source-debug-frame-line-ruler: #5b7ebe;
 
   --color-details-header: var(--color-background-primary);
 
@@ -195,6 +210,8 @@
   --retrace-workspace-height: clamp(520px, 66vh, 720px);
   --retrace-workspace-narrow-height: 760px;
   --retrace-toolbar-height: 43px;
+  --trace-view-mode-active-bg: #050607;
+  --trace-view-mode-active-text: #fff;
 
   --table-border-color: var(--color-divider);
   --table-section-divider-bg: var(--color-background-secondary);
@@ -329,6 +346,21 @@ html.dark-theme .retraceRoot {
   --trace-editor-text: #d4d4d4;
   --trace-editor-line-number: #858585;
   --trace-editor-active-line-number: #c6c6c6;
+  --source-debug-variable-name-color: #f0ac81;
+  --source-debug-variable-icon-color: #d6ae58;
+  --source-debug-variable-type-color: #9aa1ab;
+  --source-debug-variable-equals-color: #d8dbe0;
+  --source-debug-variable-value-color: #e1e4e8;
+  --source-debug-variable-hover-bg: rgb(255 255 255 / 4.5%);
+  --source-debug-call-frame-name-color: #d9dce2;
+  --source-debug-call-frame-location-color: #8c9098;
+  --source-debug-call-frame-icon-color: #db6068;
+  --source-debug-call-frame-active-bg: #2a4371;
+  --source-debug-call-frame-active-name-color: #f3f6ff;
+  --source-debug-call-frame-active-location-color: #bac4d8;
+  --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
+  --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
+  --source-debug-frame-line-ruler: #5b7ebe;
 
   --color-details-header: var(--color-background-primary);
 

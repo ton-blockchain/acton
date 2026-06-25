@@ -1,7 +1,20 @@
 .root {
   display: flex;
+  align-self: center;
   align-items: center;
+  gap: 8px;
   min-width: 0;
+  min-height: var(--retrace-toolbar-height);
+  margin-left: 24px;
+}
+
+.label {
+  flex: 0 0 auto;
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
 .toggle {
@@ -9,13 +22,13 @@
   width: fit-content;
   align-items: center;
   gap: 0;
-  min-height: 34px;
-  padding: 0;
-  margin: 0 0 -1px;
+  min-height: 24px;
+  padding: 1px;
+  margin: 0;
   overflow-x: auto;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 6px;
+  background: var(--color-background-primary);
   scrollbar-width: none;
 }
 
@@ -26,16 +39,15 @@
 .button {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
-  padding: 8px 18px;
-  gap: 8px;
-  border: 1px solid var(--tonscan-border);
-  border-left-width: 0;
-  border-radius: 0;
+  min-height: 20px;
+  padding: 3px 8px;
+  gap: 6px;
+  border: 0;
+  border-radius: 4px;
   color: var(--tonscan-text-secondary);
-  background: var(--tonscan-row-hover);
+  background: transparent;
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: var(--font-weight-medium);
   line-height: 1.2;
   white-space: nowrap;
@@ -47,29 +59,33 @@
 }
 
 .button:first-child {
-  border-left-width: 1px;
-  border-radius: 8px 0 0;
+  border-radius: 4px;
 }
 
 .button:last-child {
-  border-radius: 0 8px 0 0;
+  border-radius: 4px;
 }
 
 .button:hover {
   color: var(--tonscan-text-primary);
+  background: var(--tonscan-row-hover);
 }
 
 .buttonActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
-  border-bottom-color: var(--tonscan-border);
+  color: var(--trace-view-mode-active-text);
+  background: var(--trace-view-mode-active-bg);
+}
+
+.buttonActive:hover {
+  color: var(--trace-view-mode-active-text);
+  background: var(--trace-view-mode-active-bg);
 }
 
 .icon {
-  width: 16px;
-  height: 16px;
+  width: 13px;
+  height: 13px;
   color: currentColor;
   flex: 0 0 auto;
 }
@@ -80,6 +96,6 @@
   }
 
   .button {
-    padding: 8px 12px;
+    padding: 3px 7px;
   }
 }

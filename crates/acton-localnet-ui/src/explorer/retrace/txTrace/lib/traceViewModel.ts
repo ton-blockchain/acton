@@ -8,6 +8,8 @@ export type TraceViewMode = "assembler" | "stepsChain"
 
 const TRACE_VIEW_MODE_STORAGE_KEY = "txtracer-trace-view-mode"
 const SOURCE_DEBUG_PANEL_WIDTH_STORAGE_KEY = "txtracer-source-debug-panel-width"
+const SOURCE_DEBUG_SECTION_HEIGHTS_STORAGE_KEY = "txtracer-source-debug-section-heights"
+const SOURCE_DEBUG_COLLAPSED_SECTIONS_STORAGE_KEY = "txtracer-source-debug-collapsed-sections"
 
 function isTraceViewMode(value: string | null): value is TraceViewMode {
   return value === "assembler" || value === "stepsChain"
@@ -29,6 +31,76 @@ export function getStoredSourceDebugPanelWidth(defaultWidth: number): number {
 
 export function setStoredSourceDebugPanelWidth(width: number): void {
   localStorage.setItem(SOURCE_DEBUG_PANEL_WIDTH_STORAGE_KEY, Math.round(width).toString())
+}
+
+export function getStoredSourceDebugSectionHeights<T extends string>(
+  defaultHeights: Record<T, number>,
+  minHeight: number,
+): Record<T, number> {
+  const stored = localStorage.getItem(SOURCE_DEBUG_SECTION_HEIGHTS_STORAGE_KEY)
+  if (!stored) {
+    return defaultHeights
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<Record<T, unknown>>
+    return Object.fromEntries(
+      (Object.entries(defaultHeights) as [T, number][]).map(([sectionId, defaultHeight]) => {
+        const storedHeight = Number(parsed[sectionId])
+        return [
+          sectionId,
+          Number.isFinite(storedHeight) && storedHeight >= minHeight
+            ? Math.round(storedHeight)
+            : defaultHeight,
+        ]
+      }),
+    ) as Record<T, number>
+  } catch {
+    return defaultHeights
+  }
+}
+
+export function setStoredSourceDebugSectionHeights<T extends string>(
+  heights: Record<T, number>,
+  minHeight: number,
+): void {
+  const storedHeights = Object.fromEntries(
+    (Object.entries(heights) as [T, number][]).map(([sectionId, height]) => [
+      sectionId,
+      Math.max(minHeight, Math.round(height)),
+    ]),
+  )
+  localStorage.setItem(SOURCE_DEBUG_SECTION_HEIGHTS_STORAGE_KEY, JSON.stringify(storedHeights))
+}
+
+export function getStoredSourceDebugCollapsedSections<T extends string>(
+  defaultCollapsed: Record<T, boolean>,
+): Record<T, boolean> {
+  const stored = localStorage.getItem(SOURCE_DEBUG_COLLAPSED_SECTIONS_STORAGE_KEY)
+  if (!stored) {
+    return defaultCollapsed
+  }
+
+  try {
+    const parsed = JSON.parse(stored) as Partial<Record<T, unknown>>
+    return Object.fromEntries(
+      (Object.entries(defaultCollapsed) as [T, boolean][]).map(([sectionId, defaultValue]) => [
+        sectionId,
+        typeof parsed[sectionId] === "boolean" ? parsed[sectionId] : defaultValue,
+      ]),
+    ) as Record<T, boolean>
+  } catch {
+    return defaultCollapsed
+  }
+}
+
+export function setStoredSourceDebugCollapsedSections<T extends string>(
+  collapsedSections: Record<T, boolean>,
+): void {
+  localStorage.setItem(
+    SOURCE_DEBUG_COLLAPSED_SECTIONS_STORAGE_KEY,
+    JSON.stringify(collapsedSections),
+  )
 }
 
 function extractFirstTransactionInstructions(vmLogs: string): readonly string[] {

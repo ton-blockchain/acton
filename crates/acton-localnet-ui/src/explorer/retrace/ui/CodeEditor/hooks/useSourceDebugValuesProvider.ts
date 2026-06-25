@@ -26,10 +26,6 @@ interface UseSourceDebugValuesProviderOptions {
   readonly enabled?: boolean
 }
 
-const MAX_INLINE_VALUES_PER_LINE = 4
-const MAX_INLINE_CHILDREN = 4
-const MAX_INLINE_VALUE_LENGTH = 180
-const MAX_INLINE_SCALAR_LENGTH = 64
 const MAX_HOVER_CHILDREN = 16
 const MAX_HOVER_DEPTH = 4
 const MAX_HOVER_SCALAR_LENGTH = 240
@@ -74,31 +70,6 @@ function buildSourceDebugValueRecords(
   return records
 }
 
-function compactVariableValue(variable: SourceDebugVariableValue, depth = 0): string {
-  if (variable.children.length === 0 || depth >= 2) {
-    return scalarPreview(variable.value, MAX_INLINE_SCALAR_LENGTH)
-  }
-
-  const children = variable.children
-    .slice(0, MAX_INLINE_CHILDREN)
-    .map(child => `${child.name}: ${compactVariableValue(child, depth + 1)}`)
-  if (variable.children.length > MAX_INLINE_CHILDREN) {
-    children.push("...")
-  }
-
-  const childrenPreview = children.join(", ")
-  if (isPlaceholderValue(variable.value)) {
-    return childrenPreview
-  }
-
-  return `${scalarPreview(variable.value, MAX_INLINE_SCALAR_LENGTH)} ${childrenPreview}`
-}
-
-function compactRecordValue(record: SourceDebugValueRecord): string {
-  const preview = compactVariableValue(record)
-  return truncateText(preview, MAX_INLINE_VALUE_LENGTH)
-}
-
 function detailedVariableValue(variable: SourceDebugVariableValue, depth = 0): string {
   if (variable.children.length === 0 || depth >= MAX_HOVER_DEPTH) {
     return scalarPreview(variable.value, MAX_HOVER_SCALAR_LENGTH)
@@ -120,38 +91,23 @@ function detailedVariableValue(variable: SourceDebugVariableValue, depth = 0): s
   return valuePrefix ? `${valuePrefix}\n${childLines.join("\n")}` : childLines.join("\n")
 }
 
-function expressionMap(records: readonly SourceDebugValueRecord[]): ReadonlyMap<string, SourceDebugValueRecord> {
+function expressionMap(
+  records: readonly SourceDebugValueRecord[],
+): ReadonlyMap<string, SourceDebugValueRecord> {
   return new Map(records.map(record => [record.expression, record]))
-}
-
-function inlineValuesForLine(
-  lineContent: string,
-  recordsByExpression: ReadonlyMap<string, SourceDebugValueRecord>,
-): string[] {
-  const values: string[] = []
-  const seen = new Set<string>()
-
-  for (const match of lineContent.matchAll(IDENTIFIER_PATTERN)) {
-    const record = recordsByExpression.get(match[0])
-    if (!record || seen.has(record.expression)) {
-      continue
-    }
-
-    seen.add(record.expression)
-    values.push(`${record.expression} = ${compactRecordValue(record)}`)
-    if (values.length >= MAX_INLINE_VALUES_PER_LINE) {
-      break
-    }
-  }
-
-  return values
 }
 
 function hoverRecordAtPosition(
   lineContent: string,
   position: Position,
   recordsByExpression: ReadonlyMap<string, SourceDebugValueRecord>,
-): {readonly record: SourceDebugValueRecord; readonly startColumn: number; readonly endColumn: number} | undefined {
+):
+  | {
+      readonly record: SourceDebugValueRecord
+      readonly startColumn: number
+      readonly endColumn: number
+    }
+  | undefined {
   for (const match of lineContent.matchAll(IDENTIFIER_PATTERN)) {
     const token = match[0]
     const startColumn = (match.index ?? 0) + 1
@@ -198,69 +154,6 @@ export const useSourceDebugValuesProvider = ({
 }: UseSourceDebugValuesProviderOptions): void => {
   const records = useMemo(() => buildSourceDebugValueRecords(variables), [variables])
   const recordsByExpression = useMemo(() => expressionMap(records), [records])
-
-  useEffect(() => {
-    if (!monaco || !editorReady || !enabled || records.length === 0) {
-      return
-    }
-
-    const editorInstance = editorRef.current
-    const currentModel = editorInstance?.getModel()
-    if (!editorInstance || !currentModel) {
-      return
-    }
-
-    const decorations = editorInstance.createDecorationsCollection()
-
-    const renderInlineValues = () => {
-      const model = editorInstance.getModel()
-      if (!model || model.uri.toString() !== currentModel.uri.toString()) {
-        decorations.clear()
-        return
-      }
-
-      const nextDecorations: monacoTypes.editor.IModelDeltaDecoration[] = []
-      for (const visibleRange of editorInstance.getVisibleRanges()) {
-        for (
-          let lineNumber = visibleRange.startLineNumber;
-          lineNumber <= visibleRange.endLineNumber;
-          lineNumber++
-        ) {
-          const values = inlineValuesForLine(model.getLineContent(lineNumber), recordsByExpression)
-          if (values.length === 0) {
-            continue
-          }
-
-          const column = model.getLineMaxColumn(lineNumber)
-          nextDecorations.push({
-            range: new monaco.Range(lineNumber, column, lineNumber, column),
-            options: {
-              after: {
-                content: `  ${values.join(", ")}`,
-                inlineClassName: "source-debug-inline-value",
-                cursorStops: monaco.editor.InjectedTextCursorStops.None,
-              },
-              stickiness: monaco.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges,
-            },
-          })
-        }
-      }
-
-      decorations.set(nextDecorations)
-    }
-
-    const scrollDisposable = editorInstance.onDidScrollChange(renderInlineValues)
-    const layoutDisposable = editorInstance.onDidLayoutChange(renderInlineValues)
-    const contentDisposable = editorInstance.onDidChangeModelContent(renderInlineValues)
-    renderInlineValues()
-
-    return () => {
-      scrollDisposable.dispose()
-      layoutDisposable.dispose()
-      contentDisposable.dispose()
-      decorations.clear()
-    }
-  }, [monaco, editorRef, editorReady, enabled, records.length, recordsByExpression])
 
   useEffect(() => {
     if (!monaco || !editorReady || !enabled || records.length === 0) {

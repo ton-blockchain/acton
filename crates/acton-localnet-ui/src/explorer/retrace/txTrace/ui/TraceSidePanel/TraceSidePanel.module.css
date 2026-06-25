@@ -1,115 +1,52 @@
 .sidePanel {
+  display: flex;
+  flex-direction: column;
   width: 400px;
   height: 100%;
   min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-radius: var(--border-radius-lg);
-  background-color: var(--color-background-primary);
-  box-shadow: var(--shadow-sm);
   overflow: hidden;
+  border-radius: 0;
+  background: var(--tonscan-card-bg);
+  box-shadow: none;
 }
 
 .stepDetails {
-  background-color: var(--color-background-primary);
-  height: 100%;
-  min-height: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
+  min-height: 0;
   overflow: hidden;
-}
-
-.stepHeader {
-  padding: 12px var(--spacing-md) 0 var(--spacing-md);
-  background-color: var(--color-background-primary);
-  border-bottom: 1px solid var(--color-divider);
-  margin-bottom: 0;
-}
-
-.stepHeaderTop {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
-}
-
-.stepCounter {
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-}
-
-.stepInstructionBlock {
-  display: flex;
-  align-items: center;
-  margin-bottom: var(--spacing-md);
-  background-color: var(--color-background-secondary);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  border-radius: var(--border-radius-sm);
-}
-
-.stepInstruction {
-  font-family: var(--font-family-mono), monospace;
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-text-primary);
-}
-
-.stepGas {
-  color: var(--table-gas-value-color);
-  font-weight: var(--font-weight-medium);
-  margin-left: var(--spacing-sm);
-  white-space: nowrap;
-  font-size: var(--font-size-sm);
+  background: var(--tonscan-card-bg);
 }
 
 .stackViewerContainer {
-  flex: 1;
-  overflow: auto;
   display: flex;
   flex-direction: column;
-  padding: var(--spacing-md);
-  background-color: var(--color-background-primary);
+  flex: 1;
   flex-shrink: 1;
   min-height: 150px;
+  overflow: auto;
+  padding: 10px 12px 12px;
+  background-color: var(--tonscan-card-bg);
 }
 
 .stackHeader {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--spacing-xs);
-  font-size: var(--font-size-sm);
-  color: var(--color-text-secondary);
+  justify-content: space-between;
+  min-height: 22px;
+  margin-bottom: 8px;
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .stackSetupButton {
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-}
-
-.navigationControls {
-  display: flex;
-  justify-content: space-between;
-  gap: var(--spacing-sm);
-  padding: 0;
-  margin-bottom: 12px;
-}
-
-.navButton {
-  background-color: var(--color-background-secondary);
-  border: none;
-  border-radius: 6px;
-  height: 32px;
-  padding: 0 12px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  flex: 1;
-  transition: border-color 0.2s;
-  color: var(--color-text-secondary);
 }
 
 @media (width <= 768px) {

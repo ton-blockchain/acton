@@ -16,10 +16,10 @@ import {Address} from "@ton/core"
 import {
   AlertCircle,
   ArrowLeft,
+  Bug,
   CheckCircle2,
   CircleDotDashed,
   GitBranch,
-  RefreshCw,
   XCircle,
 } from "lucide-react"
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
@@ -440,8 +440,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         onClick={() => handleRetrace(txHash)}
         aria-expanded={isRetraceOpen}
       >
-        <RefreshCw size={14} />
-        Retrace
+        <Bug size={14} />
+        Debug
       </button>
     )
   }

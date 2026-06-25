@@ -14,20 +14,31 @@
 .toolbar {
   display: flex;
   flex: 0 0 auto;
-  align-items: flex-end;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
-  min-height: 0;
-  padding: 8px 12px 0;
+  min-height: var(--retrace-toolbar-height);
+  padding: 0 12px;
   border-bottom: 1px solid var(--tonscan-border);
 }
 
 .toolbarLeft {
   display: flex;
+  align-self: flex-end;
   align-items: flex-end;
   flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
+}
+
+.toolbarRight {
+  display: flex;
+  flex: 0 1 auto;
+  align-self: center;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .primaryTabs {
@@ -159,9 +170,13 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  border-bottom: 1px solid var(--tonscan-border);
   background: var(--tonscan-card-bg);
   scrollbar-width: thin;
+}
+
+.sourceBundleTabs,
+.sourceFileTabs {
+  border-bottom: 1px solid var(--tonscan-border);
 }
 
 .sourceBundleTabs {
@@ -242,11 +257,53 @@
   justify-content: flex-end;
   gap: 12px;
   min-width: 0;
-  min-height: 40px;
-  padding: 6px 12px;
+  max-width: 100%;
+  min-height: 36px;
+  padding: 0;
   overflow: hidden;
-  border-bottom: 1px solid var(--tonscan-border);
-  background: var(--color-background-secondary);
+  background: transparent;
+}
+
+.sourceDebugMeta,
+.sourceDebugControls {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.sourceDebugMeta {
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 10px;
+  overflow: hidden;
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.sourceDebugControls {
+  flex: 0 1 auto;
+  gap: 10px;
+}
+
+.sourceDebugStepPart {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sourceDebugSeparator {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 16px;
+  background: color-mix(in srgb, var(--tonscan-text-secondary) 30%, transparent);
+}
+
+.sourceDebugGroupSeparator {
+  height: 18px;
 }
 
 .sourceDebugNavigation {
@@ -284,26 +341,52 @@
   opacity: 0.45;
 }
 
-.sourceDebugStepInfo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.sourceDebugStepCounter {
+  flex: 0 0 auto;
+  color: var(--tonscan-text-primary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+}
+
+.sourceDebugInstruction {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-primary);
+  font-family: var(--font-family-mono);
+  font-size: 14.5px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceDebugInstructionGas {
+  flex: 0 0 auto;
+  color: var(--table-gas-value-color);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sourceDebugGas {
+  flex: 0 0 auto;
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.sourceDebugLocation {
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   color: var(--tonscan-text-secondary);
   font-size: 12px;
-  line-height: 1.2;
-}
-
-.sourceDebugStepCounter {
-  flex: 0 0 auto;
-  color: var(--tonscan-text-primary);
   font-weight: var(--font-weight-medium);
-}
-
-.sourceDebugLocation {
-  min-width: 0;
-  overflow: hidden;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -343,8 +426,8 @@
 
 .sourceDebugPanelResizeHandle::before {
   position: absolute;
-  top: 12px;
-  bottom: 12px;
+  top: 0;
+  bottom: 0;
   left: 2px;
   width: 1px;
   content: "";
@@ -382,8 +465,8 @@
 
 .sourceDebugSectionPanelCollapsed {
   flex: 0 0 auto;
-  min-height: 34px;
-  max-height: 34px;
+  min-height: 30px;
+  max-height: 30px;
 }
 
 .sourceDebugSectionPanel:last-child {
@@ -400,8 +483,8 @@
   align-items: center;
   width: 100%;
   min-width: 0;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 30px;
+  padding: 0 6px;
   border: 0;
   color: var(--tonscan-text-secondary);
   background: var(--tonscan-card-bg);
@@ -420,7 +503,7 @@
 .sourceDebugSectionHeaderContent {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -439,7 +522,7 @@
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
-  padding: 10px 12px 12px;
+  padding: 4px 6px 6px;
   overflow: auto;
 }
 
@@ -457,8 +540,8 @@
 .sourceDebugResizeHandle::before {
   position: absolute;
   top: 3px;
-  right: 12px;
-  left: 12px;
+  right: 0;
+  left: 0;
   height: 1px;
   content: "";
   background: transparent;
@@ -470,7 +553,7 @@
 }
 
 .sourceDebugException {
-  padding: 9px 10px;
+  padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--table-gas-value-color) 36%, transparent);
   border-radius: 8px;
   background: color-mix(in srgb, var(--table-gas-value-color) 9%, transparent);
@@ -495,13 +578,6 @@
 }
 
 .sourceVariableList {
-  --source-variable-name-color: #f0ac81;
-  --source-variable-icon-color: #d6ae58;
-  --source-variable-type-color: #9aa1ab;
-  --source-variable-equals-color: #d8dbe0;
-  --source-variable-value-color: #e1e4e8;
-  --source-variable-hover-bg: rgba(255, 255, 255, 0.045);
-
   gap: 0;
   font-family: inherit;
 }
@@ -518,7 +594,7 @@
   gap: 6px;
   min-width: 0;
   min-height: 22px;
-  padding: 2px 8px 2px calc(2px + var(--source-variable-depth, 0) * 18px);
+  padding: 2px 4px 2px calc(0px + var(--source-variable-depth, 0) * 18px);
   border-radius: 4px;
   font-family: inherit;
   font-size: 12.5px;
@@ -527,7 +603,7 @@
 }
 
 .sourceVariableRow:hover {
-  background: var(--source-variable-hover-bg);
+  background: var(--source-debug-variable-hover-bg);
 }
 
 .sourceVariableToggle {
@@ -553,7 +629,7 @@
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
-  color: var(--source-variable-icon-color);
+  color: var(--source-debug-variable-icon-color);
   overflow: visible;
 }
 
@@ -575,20 +651,20 @@
 }
 
 .sourceVariableName {
-  color: var(--source-variable-name-color);
+  color: var(--source-debug-variable-name-color);
   font-weight: var(--font-weight-medium);
 }
 
 .sourceVariableType {
-  color: var(--source-variable-type-color);
+  color: var(--source-debug-variable-type-color);
 }
 
 .sourceVariableEquals {
-  color: var(--source-variable-equals-color);
+  color: var(--source-debug-variable-equals-color);
 }
 
 .sourceVariableValue {
-  color: var(--source-variable-value-color);
+  color: var(--source-debug-variable-value-color);
 }
 
 .sourceCallStack {
@@ -601,7 +677,7 @@
   gap: 5px;
   width: 100%;
   min-height: 25px;
-  padding: 1px 8px 1px 10px;
+  padding: 1px 6px;
   border: 0;
   border-radius: 6px;
   color: var(--tonscan-text-primary);
@@ -614,23 +690,24 @@
 }
 
 .sourceCallFrame:hover {
-  background: rgba(255, 255, 255, 0.045);
+  background: var(--source-debug-variable-hover-bg);
 }
 
 .sourceCallFrameActive,
 .sourceCallFrameActive:hover {
-  background: #34373d;
+  background: var(--source-debug-variable-hover-bg);
 }
 
 .sourceCallStack:focus-within .sourceCallFrameActive,
 .sourceCallStack:focus-within .sourceCallFrameActive:hover {
-  background: #2a4371;
+  background: var(--source-debug-call-frame-active-bg);
 }
 
 .sourceCallFrameIcon {
   flex: 0 0 16px;
   width: 16px;
   height: 16px;
+  color: var(--source-debug-call-frame-icon-color);
 }
 
 .sourceCallFrameName,
@@ -643,13 +720,21 @@
 
 .sourceCallFrameName {
   flex: 0 1 auto;
-  color: #d9dce2;
+  color: var(--source-debug-call-frame-name-color);
   font-weight: var(--font-weight-medium);
 }
 
 .sourceCallFrameLocation {
   flex: 0 1 auto;
-  color: #8c9098;
+  color: var(--source-debug-call-frame-location-color);
+}
+
+.sourceCallStack:focus-within .sourceCallFrameActive .sourceCallFrameName {
+  color: var(--source-debug-call-frame-active-name-color);
+}
+
+.sourceCallStack:focus-within .sourceCallFrameActive .sourceCallFrameLocation {
+  color: var(--source-debug-call-frame-active-location-color);
 }
 
 .sourceDebugEmpty,
@@ -783,8 +868,13 @@
     gap: 8px;
   }
 
-  .sourceDebugStepInfo {
+  .sourceDebugMeta,
+  .sourceDebugControls {
     width: 100%;
+  }
+
+  .sourceDebugControls {
+    justify-content: flex-end;
   }
 
   .sourceVariableRow,
