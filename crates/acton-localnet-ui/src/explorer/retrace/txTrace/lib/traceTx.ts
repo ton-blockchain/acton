@@ -11,7 +11,11 @@ import {Cell} from "@ton/core"
 import type {AssemblyMapping} from "ton-source-map"
 
 import type {TonClient} from "../../../api/client"
-import type {SourceBundle, SourceTraceResponse, VerificationSourceResponse} from "../../../api/types"
+import type {
+  SourceBundle,
+  SourceTraceResponse,
+  VerificationSourceResponse,
+} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExitCode, RetraceResultAndCode} from "./types"
 
@@ -24,9 +28,7 @@ import {
 } from "./errors"
 
 function absoluteApiBaseUrl(baseUrl: string): string {
-  const fullBase = baseUrl.startsWith("http")
-    ? baseUrl
-    : `${globalThis.location.origin}${baseUrl}`
+  const fullBase = baseUrl.startsWith("http") ? baseUrl : `${globalThis.location.origin}${baseUrl}`
   return new URL(fullBase).toString().replace(/\/$/, "")
 }
 
@@ -56,11 +58,7 @@ function parseCompilerVersion(version: string): readonly [number, number, number
     return undefined
   }
 
-  return [
-    Number(match[1]),
-    Number(match[2] ?? 0),
-    Number(match[3] ?? 0),
-  ] as const
+  return [Number(match[1]), Number(match[2] ?? 0), Number(match[3] ?? 0)] as const
 }
 
 function isCompilerVersionAtLeast(
@@ -99,7 +97,7 @@ async function loadVerifiedTolkSource(
     return undefined
   }
 
-  const requests: Array<Parameters<TonClient["getVerifiedSource"]>[0]> = []
+  const requests: Parameters<TonClient["getVerifiedSource"]>[0][] = []
   if (result.codeCell) {
     requests.push({codeHash: result.codeCell.hash().toString("hex")})
   }

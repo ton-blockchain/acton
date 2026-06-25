@@ -107,7 +107,7 @@ interface CodeEditorProps {
   /** Use tighter Monaco gutters for embedded read-only trace views. */
   readonly compactGutter?: boolean
 
-  /** Source-debug locals used for VS Code-like inline values and hovers. */
+  /** Source-debug locals used for hover values. */
   readonly sourceDebugVariables?: readonly SourceDebugVariableValue[]
 }
 

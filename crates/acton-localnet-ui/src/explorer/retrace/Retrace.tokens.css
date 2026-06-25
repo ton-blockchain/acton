@@ -93,7 +93,6 @@
   --source-debug-call-frame-active-location-color: #bac4d8;
   --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
   --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
-  --source-debug-frame-line-ruler: #5b7ebe;
 
   --color-details-header: var(--color-background-primary);
 
@@ -360,7 +359,6 @@ html.dark-theme .retraceRoot {
   --source-debug-call-frame-active-location-color: #bac4d8;
   --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
   --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
-  --source-debug-frame-line-ruler: #5b7ebe;
 
   --color-details-header: var(--color-background-primary);
 

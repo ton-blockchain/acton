@@ -5,7 +5,7 @@ import type {LinesExecutionData} from "../../../txTrace/hooks"
 
 export interface HighlightGroup {
   readonly lines: number[]
-  readonly color: string
+  readonly color?: string
   readonly className?: string
 }
 
@@ -57,16 +57,20 @@ const createHighlightGroupDecorations = (
   for (const [index, group] of highlightGroups.entries()) {
     for (const lineNumber of group.lines) {
       if (lineNumber > 0 && lineNumber <= totalLines) {
+        const options: monacoTypes.editor.IModelDecorationOptions = {
+          isWholeLine: true,
+          className: group.className || `source-map-group-${index}`,
+        }
+        if (group.color) {
+          options.overviewRuler = {
+            color: group.color,
+            position: 1,
+          }
+        }
+
         decorations.push({
           range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-          options: {
-            isWholeLine: true,
-            className: group.className || `source-map-group-${index}`,
-            overviewRuler: {
-              color: group.color,
-              position: 1,
-            },
-          },
+          options,
         })
       }
     }

@@ -672,10 +672,7 @@ function SourceDebugPanel({
       const finishResize = () => {
         document.body.style.cursor = previousCursor
         document.body.style.userSelect = previousUserSelect
-        setStoredSourceDebugSectionHeights(
-          latestSectionHeights,
-          SOURCE_DEBUG_SECTION_MIN_HEIGHT,
-        )
+        setStoredSourceDebugSectionHeights(latestSectionHeights, SOURCE_DEBUG_SECTION_MIN_HEIGHT)
         globalThis.removeEventListener("pointermove", handlePointerMove)
         globalThis.removeEventListener("pointerup", finishResize)
         globalThis.removeEventListener("pointercancel", finishResize)
@@ -855,7 +852,6 @@ function SourceFilesEditor({
     ? [
         {
           lines: [selectedCallFrameLine],
-          color: "var(--source-debug-frame-line-ruler)",
           className: "source-debug-frame-line",
         },
       ]
