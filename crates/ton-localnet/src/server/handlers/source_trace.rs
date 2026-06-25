@@ -296,7 +296,7 @@ fn source_trace_temp_root(bundle_hash: &str) -> anyhow::Result<PathBuf> {
         .take(24)
         .collect();
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_nanos();
-    Ok(Path::new("/tmp").join(format!(
+    Ok(std::env::temp_dir().join(format!(
         "acton-localnet-source-trace-{}-{}-{now}",
         process::id(),
         if safe_hash.is_empty() {
