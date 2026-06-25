@@ -7,6 +7,7 @@ import type {
   AccountStatesResponse,
   ApiResponse,
   ApiCallLogResponse,
+  BuildSourceTraceRequest,
   JettonMaster,
   JettonMasterMetadata,
   JettonWallet,
@@ -15,6 +16,7 @@ import type {
   NftItem,
   StartupWallet,
   StreamingTransactionsEvent,
+  SourceTraceResponse,
   V3ActionsResponse,
   V3BlocksResponse,
   V3RunGetMethodResponse,
@@ -636,6 +638,21 @@ export class TonClient {
       url.searchParams.append("code_hash", options.codeHash)
     }
     return this.request<VerificationSourceResponse>(url, "Failed to fetch verified source")
+  }
+
+  async buildSourceTrace(
+    payload: BuildSourceTraceRequest,
+  ): Promise<SourceTraceResponse | undefined> {
+    if (!this.localnetControlEnabled) {
+      return undefined
+    }
+
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_buildSourceTrace")
+    return this.request<SourceTraceResponse>(url, "Failed to build source trace", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify(payload),
+    })
   }
 
   async getNodeInfo(): Promise<LocalnetNodeInfo> {

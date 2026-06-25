@@ -1332,6 +1332,70 @@ export interface SourceFile {
   readonly content_text: string | null
 }
 
+export interface BuildSourceTraceRequest {
+  readonly vm_logs: string
+  readonly code_hash: string
+  readonly source_bundle: SourceBundle
+}
+
+export interface SourceTraceResponse {
+  readonly source_bundle_hash: string
+  readonly code_hash: string
+  readonly entrypoint: string
+  readonly files: readonly SourceTraceFileInfo[]
+  readonly steps: readonly SourceTraceStep[]
+  readonly truncated: boolean
+}
+
+export interface SourceTraceFileInfo {
+  readonly path: string
+  readonly is_entrypoint: boolean
+}
+
+export interface SourceTraceStep {
+  readonly index: number
+  readonly location: SourceTraceLocation
+  readonly instruction: string | null
+  readonly vm_position: SourceTraceVmPosition | null
+  readonly locals: readonly SourceTraceVariable[]
+  readonly stack: readonly string[]
+  readonly call_stack: readonly SourceTraceFrame[]
+  readonly exception: SourceTraceException | null
+}
+
+export interface SourceTraceLocation {
+  readonly file: string
+  readonly line: number
+  readonly column: number
+  readonly end_line: number
+  readonly end_column: number
+}
+
+export interface SourceTraceVmPosition {
+  readonly cell_hash: string
+  readonly offset: number
+}
+
+export interface SourceTraceFrame {
+  readonly function_name: string
+  readonly location: SourceTraceLocation | null
+  readonly is_inlined: boolean
+  readonly is_builtin: boolean
+}
+
+export interface SourceTraceVariable {
+  readonly name: string
+  readonly value: string
+  readonly type: string | null
+  readonly children: readonly SourceTraceVariable[]
+}
+
+export interface SourceTraceException {
+  readonly errno: string
+  readonly symbolic_name: string | null
+  readonly is_uncaught: boolean
+}
+
 export interface NftCollection {
   readonly address: string
   readonly code_hash?: string

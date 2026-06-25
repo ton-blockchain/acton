@@ -827,3 +827,7 @@
     display: none;
   }
 }
+
+.container:has(:global(.retraceRoot)) {
+  padding-bottom: 0;
+}

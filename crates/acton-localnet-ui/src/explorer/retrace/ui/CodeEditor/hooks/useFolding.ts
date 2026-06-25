@@ -30,6 +30,7 @@ export const useFolding = ({
 }: UseFoldingOptions): UseFoldingReturn => {
   const collapseInactiveBlocks = useCallback(() => {
     if (!editorRef.current || !monaco) return
+    if (!lineExecutionData || Object.keys(lineExecutionData).length === 0) return
 
     try {
       editorRef.current.trigger("unfold", "editor.unfoldAll", {})
@@ -39,8 +40,6 @@ export const useFolding = ({
 
     const model = editorRef.current.getModel()
     if (!model) return
-
-    if (!lineExecutionData || Object.keys(lineExecutionData).length === 0) return
 
     const totalLines = model.getLineCount()
     const foldingRanges: FoldingRange[] = []

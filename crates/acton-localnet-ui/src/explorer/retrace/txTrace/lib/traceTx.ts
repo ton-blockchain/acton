@@ -10,6 +10,8 @@ import {Cell} from "@ton/core"
 
 import type {AssemblyMapping} from "ton-source-map"
 
+import type {TonClient} from "../../../api/client"
+import type {SourceBundle, SourceTraceResponse, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExitCode, RetraceResultAndCode} from "./types"
 
@@ -46,6 +48,99 @@ function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkCo
   }
 
   throw new TxTraceError(`Retrace is not configured for ${network.label}.`)
+}
+
+function parseCompilerVersion(version: string): readonly [number, number, number] | undefined {
+  const match = version.match(/(\d+)(?:\.(\d+))?(?:\.(\d+))?/)
+  if (!match) {
+    return undefined
+  }
+
+  return [
+    Number(match[1]),
+    Number(match[2] ?? 0),
+    Number(match[3] ?? 0),
+  ] as const
+}
+
+function isCompilerVersionAtLeast(
+  version: string,
+  minimum: readonly [number, number, number],
+): boolean {
+  const parsed = parseCompilerVersion(version)
+  if (!parsed) {
+    return false
+  }
+
+  for (let index = 0; index < minimum.length; index += 1) {
+    if (parsed[index] > minimum[index]) {
+      return true
+    }
+    if (parsed[index] < minimum[index]) {
+      return false
+    }
+  }
+
+  return true
+}
+
+function isSupportedTolkBundle(bundle: SourceBundle): boolean {
+  return (
+    bundle.language.trim().toLowerCase() === "tolk" &&
+    isCompilerVersionAtLeast(bundle.compiler_version, [1, 4, 0])
+  )
+}
+
+async function loadVerifiedTolkSource(
+  result: TraceResult,
+  client: TonClient | undefined,
+): Promise<VerificationSourceResponse | undefined> {
+  if (!client) {
+    return undefined
+  }
+
+  const requests: Array<Parameters<TonClient["getVerifiedSource"]>[0]> = []
+  if (result.codeCell) {
+    requests.push({codeHash: result.codeCell.hash().toString("hex")})
+  }
+  requests.push({address: result.inMsg.contract.toString()})
+
+  for (const request of requests) {
+    try {
+      const source = await client.getVerifiedSource(request)
+      const bundles = source.verified ? source.bundles.filter(isSupportedTolkBundle) : []
+
+      if (bundles.length > 0) {
+        return {...source, bundles}
+      }
+    } catch (error) {
+      console.debug("Failed to fetch verified source for retrace", error)
+    }
+  }
+
+  return undefined
+}
+
+async function loadSourceTrace(
+  result: TraceResult,
+  client: TonClient | undefined,
+  verifiedSource: VerificationSourceResponse | undefined,
+): Promise<SourceTraceResponse | undefined> {
+  const sourceBundle = verifiedSource?.bundles[0]
+  if (!client || !result.codeCell || !sourceBundle || !result.emulatedTx.vmLogs) {
+    return undefined
+  }
+
+  try {
+    return await client.buildSourceTrace({
+      vm_logs: result.emulatedTx.vmLogs,
+      code_hash: result.codeCell.hash().toString("hex"),
+      source_bundle: sourceBundle,
+    })
+  } catch (error) {
+    console.debug("Failed to build source trace for retrace", error)
+    return undefined
+  }
 }
 
 async function doTrace(
@@ -182,10 +277,14 @@ function extractCodeAndTrace(
 export async function traceTx(
   hash: string,
   network: ExplorerNetworkInfo,
+  client?: TonClient,
 ): Promise<RetraceResultAndCode> {
   const {result} = await doTrace(hash, network)
+  const verifiedSourcePromise = loadVerifiedTolkSource(result, client)
   const {code, traceInfo, exitCode} = extractCodeAndTrace(result.codeCell, result.emulatedTx.vmLogs)
-  return {result, code, trace: traceInfo, exitCode, network}
+  const verifiedSource = await verifiedSourcePromise
+  const sourceTrace = await loadSourceTrace(result, client, verifiedSource)
+  return {result, code, trace: traceInfo, exitCode, network, verifiedSource, sourceTrace}
 }
 
 export function normalizeGas(step: Step) {

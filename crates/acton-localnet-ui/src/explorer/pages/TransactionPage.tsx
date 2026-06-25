@@ -456,6 +456,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       <div className={styles.selectedRetraceSection}>
         <TransactionRetracePanel
           key={`${txHash}:${retraceAttempt}`}
+          client={client}
           txHash={txHash}
           onClose={handleCloseRetrace}
           onResult={handleRetraceResult}

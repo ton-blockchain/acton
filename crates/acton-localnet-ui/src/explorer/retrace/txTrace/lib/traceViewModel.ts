@@ -7,6 +7,7 @@ import type {InstructionDetail, RetraceResultAndCode} from "./types"
 export type TraceViewMode = "assembler" | "stepsChain"
 
 const TRACE_VIEW_MODE_STORAGE_KEY = "txtracer-trace-view-mode"
+const SOURCE_DEBUG_PANEL_WIDTH_STORAGE_KEY = "txtracer-source-debug-panel-width"
 
 function isTraceViewMode(value: string | null): value is TraceViewMode {
   return value === "assembler" || value === "stepsChain"
@@ -19,6 +20,15 @@ export function getStoredTraceViewMode(): TraceViewMode {
 
 export function setStoredTraceViewMode(mode: TraceViewMode): void {
   localStorage.setItem(TRACE_VIEW_MODE_STORAGE_KEY, mode)
+}
+
+export function getStoredSourceDebugPanelWidth(defaultWidth: number): number {
+  const stored = Number(localStorage.getItem(SOURCE_DEBUG_PANEL_WIDTH_STORAGE_KEY))
+  return Number.isFinite(stored) && stored > 0 ? stored : defaultWidth
+}
+
+export function setStoredSourceDebugPanelWidth(width: number): void {
+  localStorage.setItem(SOURCE_DEBUG_PANEL_WIDTH_STORAGE_KEY, Math.round(width).toString())
 }
 
 function extractFirstTransactionInstructions(vmLogs: string): readonly string[] {

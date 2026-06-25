@@ -1,13 +1,14 @@
-import {useEffect, useState} from "react"
+import {type CSSProperties, useEffect, useLayoutEffect, useRef, useState} from "react"
 import {X} from "lucide-react"
 
 import {useToast} from "@acton/shared-ui"
 
+import type {TonClient} from "../../../../api/client"
+import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {traceTx} from "../../lib/traceTx"
 import type {RetraceResultAndCode} from "../../lib/types"
 import InlineLoader from "../InlineLoader"
 import RetraceWorkspace from "../RetraceWorkspace"
-import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import "../../../Retrace.tokens.css"
 import styles from "./TransactionRetracePanel.module.css"
 
@@ -17,6 +18,7 @@ type RetracePanelState =
   | {readonly type: "error"; readonly message: string}
 
 interface TransactionRetracePanelProps {
+  readonly client: TonClient
   readonly txHash: string
   readonly onClose: () => void
   readonly onResult?: (txHash: string, result: RetraceResultAndCode) => void
@@ -27,13 +29,48 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function TransactionRetracePanel({
+  client,
   txHash,
   onClose,
   onResult,
 }: TransactionRetracePanelProps) {
   const {network} = useNetworkInfo()
   const {showToast} = useToast()
+  const rootRef = useRef<HTMLDivElement | null>(null)
+  const [flowMetrics, setFlowMetrics] = useState({offset: 0, width: 0})
   const [state, setState] = useState<RetracePanelState>({type: "loading"})
+
+  useLayoutEffect(() => {
+    const updateFlowMetrics = () => {
+      const root = rootRef.current
+      const anchor = root?.parentElement ?? root
+      if (!anchor) {
+        return
+      }
+
+      const offset = Math.max(0, Math.round(anchor.getBoundingClientRect().left))
+      const width = Math.round(document.documentElement.clientWidth || window.innerWidth)
+      setFlowMetrics(current =>
+        current.offset === offset && current.width === width ? current : {offset, width},
+      )
+    }
+
+    updateFlowMetrics()
+
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateFlowMetrics)
+    const observedElement = rootRef.current?.parentElement
+    if (resizeObserver && observedElement) {
+      resizeObserver.observe(observedElement)
+    }
+
+    window.addEventListener("resize", updateFlowMetrics)
+
+    return () => {
+      resizeObserver?.disconnect()
+      window.removeEventListener("resize", updateFlowMetrics)
+    }
+  }, [])
 
   useEffect(() => {
     let isActive = true
@@ -42,7 +79,7 @@ export default function TransactionRetracePanel({
       setState({type: "loading"})
 
       try {
-        const result = await traceTx(txHash, network)
+        const result = await traceTx(txHash, network, client)
         if (isActive) {
           setState({type: "ready", result})
           onResult?.(txHash, result)
@@ -67,10 +104,15 @@ export default function TransactionRetracePanel({
     return () => {
       isActive = false
     }
-  }, [network, onResult, showToast, txHash])
+  }, [client, network, onResult, showToast, txHash])
+
+  const rootStyle = {
+    "--retrace-flow-offset": `${flowMetrics.offset}px`,
+    "--retrace-flow-width": flowMetrics.width > 0 ? `${flowMetrics.width}px` : "100vw",
+  } as CSSProperties
 
   return (
-    <div className={`${styles.root} retraceRoot`}>
+    <div ref={rootRef} className={`${styles.root} retraceRoot`} style={rootStyle}>
       <div className={styles.header}>
         <div className={styles.title}>Retrace</div>
         <button

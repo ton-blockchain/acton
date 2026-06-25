@@ -12,6 +12,10 @@
   --transaction-tree-failed-badge-mark-stroke: var(--bg-color);
 }
 
+.container:has(:global(.retraceRoot)) {
+  overflow: visible;
+}
+
 .treeContainer {
   width: 100%;
   height: auto;
@@ -273,4 +277,8 @@
 .contractStateData {
   font-family: var(--font-mono), monospace;
   font-size: var(--font-size-xs);
+}
+
+.transactionDetails:has(:global(.retraceRoot)) {
+  margin-bottom: 0;
 }

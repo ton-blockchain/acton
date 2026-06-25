@@ -1,7 +1,10 @@
 .root {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100%;
   overflow: visible;
   border: 0;
   border-radius: 0;
@@ -10,6 +13,7 @@
 
 .toolbar {
   display: flex;
+  flex: 0 0 auto;
   align-items: flex-end;
   justify-content: flex-start;
   gap: 12px;
@@ -21,8 +25,71 @@
 .toolbarLeft {
   display: flex;
   align-items: flex-end;
+  flex-wrap: wrap;
   gap: 12px;
   min-width: 0;
+}
+
+.primaryTabs {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  min-height: 34px;
+  margin: 0 0 -1px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.primaryTabs::-webkit-scrollbar {
+  display: none;
+}
+
+.primaryTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 8px 18px;
+  border: 1px solid var(--tonscan-border);
+  border-left-width: 0;
+  border-radius: 0;
+  color: var(--tonscan-text-secondary);
+  background: var(--tonscan-row-hover);
+  font: inherit;
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.primaryTab:first-child {
+  border-left-width: 1px;
+  border-radius: 8px 0 0;
+}
+
+.primaryTab:last-child {
+  border-radius: 0 8px 0 0;
+}
+
+.primaryTab:only-child {
+  border-radius: 8px 8px 0 0;
+}
+
+.primaryTab:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.primaryTabActive {
+  position: relative;
+  z-index: 1;
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-bg);
+  border-bottom-color: var(--tonscan-border);
 }
 
 .statusContainer {
@@ -37,14 +104,19 @@
 
 .workspace {
   display: grid;
+  flex: 1 1 auto;
   grid-template-columns: minmax(0, 1fr) 400px;
   gap: 0;
-  height: var(--retrace-workspace-height);
+  height: auto;
   min-height: 0;
   padding: 0;
   border-radius: 0 0 16px 16px;
   overflow: hidden;
   background: var(--tonscan-card-bg);
+}
+
+.sourcesWorkspace {
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .codeArea {
@@ -58,11 +130,556 @@
   background: var(--color-background-primary);
 }
 
+.sourcesWorkspace .codeArea {
+  border-radius: 0 0 16px 16px;
+}
+
 .codeEditorWrapper {
   display: flex;
   flex: 1;
   min-height: 0;
   overflow: hidden;
+}
+
+.sourceShell {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--color-background-primary);
+}
+
+.sourceBundleTabs,
+.sourceFileTabs {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  border-bottom: 1px solid var(--tonscan-border);
+  background: var(--tonscan-card-bg);
+  scrollbar-width: thin;
+}
+
+.sourceBundleTabs {
+  min-height: 34px;
+}
+
+.sourceFileTabs {
+  min-height: 38px;
+}
+
+.sourceBundleTab,
+.sourceFileTab {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  border: 0;
+  border-right: 1px solid var(--tonscan-border);
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  font: inherit;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.sourceBundleTab {
+  padding: 7px 14px;
+  font-size: 12.5px;
+  font-family: var(--font-family-mono);
+}
+
+.sourceFileTab {
+  max-width: 220px;
+  padding: 9px 16px;
+  font-size: 13px;
+}
+
+.sourceBundleTab:hover,
+.sourceFileTab:hover {
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-row-hover);
+}
+
+.sourceBundleTabActive,
+.sourceFileTabActive {
+  color: var(--tonscan-text-primary);
+  background: var(--color-background-primary);
+}
+
+.sourceFileTabActive {
+  box-shadow: inset 0 -2px 0 var(--color-primary);
+}
+
+.sourceFileTabName {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceEditorPane {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sourceDebugToolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 6px 12px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--tonscan-border);
+  background: var(--color-background-secondary);
+}
+
+.sourceDebugNavigation {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+}
+
+.sourceDebugIconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 6px;
+  color: var(--tonscan-text-secondary);
+  background: var(--color-background-primary);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.sourceDebugIconButton:hover:not(:disabled) {
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-row-hover);
+}
+
+.sourceDebugIconButton:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.sourceDebugStepInfo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.sourceDebugStepCounter {
+  flex: 0 0 auto;
+  color: var(--tonscan-text-primary);
+  font-weight: var(--font-weight-medium);
+}
+
+.sourceDebugLocation,
+.sourceDebugInstruction {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--font-family-mono);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceDebugInstruction {
+  color: var(--color-primary);
+}
+
+.sourceDebugWarning {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 999px;
+  color: var(--table-gas-value-color);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.sourceDebugLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6px minmax(0, var(--source-debug-panel-width, 360px));
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sourceDebugLayoutSingle {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.sourceDebugPanelResizeHandle {
+  position: relative;
+  width: 6px;
+  min-width: 6px;
+  border-left: 1px solid var(--tonscan-border);
+  background: var(--tonscan-card-bg);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.sourceDebugPanelResizeHandle::before {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 2px;
+  width: 1px;
+  content: "";
+  background: transparent;
+  transition: background-color var(--transition-duration-fast);
+}
+
+.sourceDebugPanelResizeHandle:hover::before {
+  background: var(--color-primary);
+}
+
+.sourceDebugPanel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  overflow: hidden;
+  background: var(--tonscan-card-bg);
+}
+
+.sourceDebugSectionPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 1 var(--source-debug-section-height);
+  min-width: 0;
+  min-height: 72px;
+  max-height: 100%;
+  overflow: hidden;
+  border-bottom: 1px solid var(--tonscan-border);
+}
+
+.sourceDebugSectionPanelCollapsed {
+  flex: 0 0 auto;
+  min-height: 34px;
+  max-height: 34px;
+}
+
+.sourceDebugSectionPanel:last-child {
+  border-bottom: 0;
+}
+
+.sourceDebugSectionPanelGrow:not(.sourceDebugSectionPanelCollapsed) {
+  flex-grow: 1;
+}
+
+.sourceDebugSectionHeader {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  color: var(--tonscan-text-secondary);
+  background: var(--tonscan-card-bg);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.sourceDebugSectionHeader:hover {
+  color: var(--tonscan-text-primary);
+  background: var(--tonscan-row-hover);
+}
+
+.sourceDebugSectionHeaderContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.sourceDebugSectionTitle {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: uppercase;
+}
+
+.sourceDebugSectionBody {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 10px 12px 12px;
+  overflow: auto;
+}
+
+.sourceDebugResizeHandle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 2;
+  height: 7px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.sourceDebugResizeHandle::before {
+  position: absolute;
+  top: 3px;
+  right: 12px;
+  left: 12px;
+  height: 1px;
+  content: "";
+  background: transparent;
+  transition: background-color var(--transition-duration-fast);
+}
+
+.sourceDebugResizeHandle:hover::before {
+  background: var(--color-primary);
+}
+
+.sourceDebugException {
+  padding: 9px 10px;
+  border: 1px solid color-mix(in srgb, var(--table-gas-value-color) 36%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--table-gas-value-color) 9%, transparent);
+}
+
+.sourceDebugExceptionText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tonscan-text-primary);
+  font-family: var(--font-family-mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceVariableList,
+.sourceVariableGroup,
+.sourceCallStack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sourceVariableList {
+  --source-variable-name-color: #f0ac81;
+  --source-variable-icon-color: #d6ae58;
+  --source-variable-type-color: #9aa1ab;
+  --source-variable-equals-color: #d8dbe0;
+  --source-variable-value-color: #e1e4e8;
+  --source-variable-hover-bg: rgba(255, 255, 255, 0.045);
+
+  gap: 0;
+  font-family: inherit;
+}
+
+.sourceCallFrame {
+  min-width: 0;
+  border-radius: 6px;
+  background: var(--color-background-primary);
+}
+
+.sourceVariableRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 22px;
+  padding: 2px 8px 2px calc(2px + var(--source-variable-depth, 0) * 18px);
+  border-radius: 4px;
+  font-family: inherit;
+  font-size: 12.5px;
+  line-height: 1.25;
+  cursor: default;
+}
+
+.sourceVariableRow:hover {
+  background: var(--source-variable-hover-bg);
+}
+
+.sourceVariableToggle {
+  display: inline-flex;
+  flex: 0 0 16px;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sourceVariableToggle:disabled {
+  cursor: default;
+  opacity: 0;
+}
+
+.sourceVariableIcon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  color: var(--source-variable-icon-color);
+  overflow: visible;
+}
+
+.sourceVariableExpression {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tonscan-text-primary);
+  cursor: default;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceVariableName,
+.sourceVariableType,
+.sourceVariableEquals,
+.sourceVariableValue {
+  display: inline;
+}
+
+.sourceVariableName {
+  color: var(--source-variable-name-color);
+  font-weight: var(--font-weight-medium);
+}
+
+.sourceVariableType {
+  color: var(--source-variable-type-color);
+}
+
+.sourceVariableEquals {
+  color: var(--source-variable-equals-color);
+}
+
+.sourceVariableValue {
+  color: var(--source-variable-value-color);
+}
+
+.sourceCallStack {
+  gap: 0;
+}
+
+.sourceCallFrame {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: 100%;
+  min-height: 25px;
+  padding: 1px 8px 1px 10px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--tonscan-text-primary);
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.2;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sourceCallFrame:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.sourceCallFrameActive,
+.sourceCallFrameActive:hover {
+  background: #34373d;
+}
+
+.sourceCallStack:focus-within .sourceCallFrameActive,
+.sourceCallStack:focus-within .sourceCallFrameActive:hover {
+  background: #2a4371;
+}
+
+.sourceCallFrameIcon {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.sourceCallFrameName,
+.sourceCallFrameLocation {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourceCallFrameName {
+  flex: 0 1 auto;
+  color: #d9dce2;
+  font-weight: var(--font-weight-medium);
+}
+
+.sourceCallFrameLocation {
+  flex: 0 1 auto;
+  color: #8c9098;
+}
+
+.sourceDebugEmpty,
+.sourceDebugEmptyState {
+  color: var(--tonscan-text-secondary);
+  font-size: 12px;
+}
+
+.sourceDebugEmptyState {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.emptySourceState {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 0;
+  color: var(--tonscan-text-secondary);
+  font-size: 13px;
 }
 
 .codeEditorHidden {
@@ -108,13 +725,34 @@
 @media (width <= 980px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(420px, 1fr) minmax(340px, 0.8fr);
-    height: auto;
+    grid-template-rows: minmax(0, 1fr) minmax(260px, 0.65fr);
     min-height: 0;
   }
 
   .codeArea {
     border-radius: 0;
+  }
+
+  .sourcesWorkspace .codeArea {
+    border-radius: 0 0 16px 16px;
+  }
+
+  .sourceDebugLayout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(220px, 0.5fr);
+  }
+
+  .sourceDebugLayoutSingle {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  .sourceDebugPanelResizeHandle {
+    display: none;
+  }
+
+  .sourceDebugPanel {
+    border-top: 1px solid var(--tonscan-border);
+    border-left: 0;
   }
 
   .stackItemOverlay {
@@ -142,5 +780,20 @@
   .statusContainer {
     justify-content: flex-start;
     margin-bottom: 8px;
+  }
+
+  .sourceDebugToolbar {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .sourceDebugStepInfo {
+    width: 100%;
+  }
+
+  .sourceVariableRow,
+  .sourceCallFrame {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

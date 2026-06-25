@@ -6,9 +6,14 @@ export const tolkLanguageDefinition: languages.IMonarchLanguage = {
   keywords: [
     "tolk",
     "import",
+    "export",
+    "private",
+    "readonly",
     "global",
     "const",
     "type",
+    "enum",
+    "contract",
     "struct",
     "fun",
     "get",
@@ -44,11 +49,15 @@ export const tolkLanguageDefinition: languages.IMonarchLanguage = {
     "int",
     "bool",
     "cell",
+    "Cell",
     "slice",
     "builder",
     "continuation",
     "tuple",
-    "address",
+    "dict",
+    "array",
+    "any_address",
+    "string",
     "never",
     "coins",
     "map",
@@ -81,6 +90,8 @@ export const tolkLanguageDefinition: languages.IMonarchLanguage = {
     ">>",
     "~>>",
     "^>>",
+    "=>",
+    "??",
     "-",
     "+",
     "*",
@@ -120,15 +131,19 @@ export const tolkLanguageDefinition: languages.IMonarchLanguage = {
       [/((bits)|(bytes))\d{1,3}/, "type"],
 
       // Annotations
+      [/@[a-zA-Z_][a-zA-Z0-9_]*(\.[a-zA-Z_][a-zA-Z0-9_]*)+/, "annotation"],
       [/@[a-zA-Z_][a-zA-Z0-9_]*/, "annotation"],
 
-      // Numbers
-      [/0x[0-9a-fA-F]+/, "number.hex"],
-      [/0b[01]+/, "number.binary"],
-      [/\d+/, "number"],
+      // !is keyword operator
+      [/!is\b/, "keyword"],
 
       // Version numbers in tolk directives
-      [/(\d+)(\.\d+)?(\.\d+)?/, "number.version"],
+      [/\d+(?:\.\d+){1,2}/, "number.version"],
+
+      // Numbers
+      [/-?0x[0-9a-fA-F]+/, "number.hex"],
+      [/-?0b[01]+/, "number.binary"],
+      [/-?\d[\d_]*/, "number"],
 
       // Identifiers in backticks
       [/`[^`]+`/, "identifier.backtick"],
@@ -138,6 +153,13 @@ export const tolkLanguageDefinition: languages.IMonarchLanguage = {
 
       // Member access: dot as its own token, then color the name
       [/\.(?=[A-Za-z_][A-Za-z0-9_]*)/, {token: "delimiter.dot", next: "@member"}],
+
+      // address is also a common field name, so do not color `address:` as a type.
+      [/\baddress\b(?!\s*:)/, "type"],
+
+      // Uppercase constants and simple type parameters
+      [/\b[A-Z][A-Z0-9_]{2,}\b/, "constant"],
+      [/\b[TU]\b/, "type.parameter"],
 
       // Type identifiers (capitalized)
       [/[A-Z][a-zA-Z0-9_]*/, "type.identifier"],

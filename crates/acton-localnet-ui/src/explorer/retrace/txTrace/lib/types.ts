@@ -3,6 +3,7 @@ import type {TraceResult} from "@ton/retracer-core"
 
 import type {InstructionInfo} from "ton-source-map"
 
+import type {SourceTraceResponse, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 
 export type ExitCode = {
@@ -17,6 +18,8 @@ export interface RetraceResultAndCode {
   readonly trace: TraceInfo
   readonly exitCode: ExitCode | undefined
   readonly network: ExplorerNetworkInfo
+  readonly verifiedSource?: VerificationSourceResponse
+  readonly sourceTrace?: SourceTraceResponse
 }
 
 export interface InstructionDetail {

@@ -3,6 +3,7 @@ use serde::{
     de::{self, Error as _},
 };
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
 pub struct JsonRpcRequest {
@@ -63,6 +64,47 @@ pub struct GetLibrariesRequest {
 pub struct GetVerifiedSourceRequest {
     pub address: Option<String>,
     pub code_hash: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct BuildSourceTraceRequest {
+    pub vm_logs: String,
+    pub code_hash: String,
+    pub source_bundle: SourceTraceBundleRequest,
+}
+
+#[derive(Deserialize)]
+pub struct SourceTraceBundleRequest {
+    pub source_bundle_hash: String,
+    pub language: String,
+    pub compiler_version: String,
+    pub entrypoint: String,
+    pub compile_params: Value,
+    pub files: Vec<SourceTraceFileRequest>,
+}
+
+#[derive(Deserialize)]
+pub struct SourceTraceFileRequest {
+    pub path: String,
+    pub content_base64: String,
+    pub content_text: Option<String>,
+}
+
+impl SourceTraceBundleRequest {
+    #[must_use]
+    pub fn import_mappings(&self) -> Option<BTreeMap<String, String>> {
+        self.compile_params
+            .get("import_mappings")
+            .and_then(Value::as_object)
+            .map(|mappings| {
+                mappings
+                    .iter()
+                    .filter_map(|(key, value)| {
+                        value.as_str().map(|value| (key.clone(), value.to_owned()))
+                    })
+                    .collect()
+            })
+    }
 }
 
 #[derive(Deserialize)]

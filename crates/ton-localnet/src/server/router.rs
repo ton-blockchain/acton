@@ -14,8 +14,9 @@ use super::handlers::{
     pack_address, register_compiler_abis, revert_recovery_point, run_get_method,
     run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message,
     send_message_v3, set_address_name, set_mining_mode, set_network_conditions,
-    set_next_block_timestamp, set_shard_account, set_time, streaming_sse, streaming_ws,
-    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
+    set_next_block_timestamp, set_shard_account, set_time, source_trace::build_source_trace,
+    streaming_sse, streaming_ws, try_locate_result_tx, try_locate_source_tx, try_locate_tx,
+    unpack_address,
 };
 use crate::server::{
     ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
@@ -141,6 +142,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/acton_setAddressName", post(set_address_name))
         .route("/acton_getCompilerAbi", get(get_compiler_abi))
         .route("/acton_getVerifiedSource", get(get_verified_source))
+        .route("/acton_buildSourceTrace", post(build_source_trace))
         .route("/acton_registerCompilerAbis", post(register_compiler_abis))
         .route("/acton_dumpState", post(dump_state))
         .route("/acton_loadState", post(load_state))

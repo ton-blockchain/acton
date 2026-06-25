@@ -38,6 +38,11 @@
   box-shadow: inset 0 0 0 1px rgb(255 215 0 / 20%) !important;
 }
 
+:global(.monaco-editor .source-debug-frame-line) {
+  background-color: rgb(91 126 190 / 28%) !important;
+  box-shadow: inset 0 0 0 1px rgb(91 126 190 / 18%) !important;
+}
+
 :global(.monaco-editor .precise-highlight) {
   background-color: rgb(255 0 0 / 10%) !important;
   box-shadow: inset 0 0 0 2px rgb(255 0 0 / 20%) !important;
