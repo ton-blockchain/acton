@@ -1097,7 +1097,13 @@ export interface V3TransactionListItem {
   readonly mc_block_seqno: number
 }
 
-export interface LocalnetNodeInfo {
+export interface LocalnetTimeInfo {
+  readonly current_unix_time: number
+  readonly time_offset_seconds: number
+  readonly next_block_timestamp?: number | null
+}
+
+export interface LocalnetNodeInfo extends LocalnetTimeInfo {
   readonly uptime_seconds: number
   readonly last_block_seqno: number
   readonly state_source: string

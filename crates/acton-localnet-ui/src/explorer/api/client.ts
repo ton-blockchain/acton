@@ -13,6 +13,7 @@ import type {
   JettonWallet,
   JettonWalletData,
   LocalnetNodeInfo,
+  LocalnetTimeInfo,
   NftItem,
   StartupWallet,
   StreamingTransactionsEvent,
@@ -658,6 +659,15 @@ export class TonClient {
   async getNodeInfo(): Promise<LocalnetNodeInfo> {
     const url = this.buildUrl(this.addressNameBaseUrl, "/acton_nodeInfo")
     return this.request(url, "Failed to fetch node info")
+  }
+
+  async increaseTime(seconds: number): Promise<LocalnetTimeInfo> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_increaseTime")
+    return this.request(url, "Failed to advance node time", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({seconds}),
+    })
   }
 
   async getApiCalls(limit = 200): Promise<ApiCallLogResponse> {

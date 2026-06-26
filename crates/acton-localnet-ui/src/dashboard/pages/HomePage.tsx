@@ -1,8 +1,8 @@
-import {BookOpen, Check, Copy} from "lucide-react"
-import {Card, CardContent, CardHeader, CardTitle, useToast} from "@acton/shared-ui"
+import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
+import {Button, Card, CardContent, CardHeader, CardTitle, Input, useToast} from "@acton/shared-ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC} from "react"
+import type {FC, FormEvent} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import {addressKey} from "../../explorer/api/compilerAbi"
@@ -31,6 +31,34 @@ import styles from "../DashboardPage.module.css"
 const HOME_RECENT_TRANSACTIONS_REFRESH_MS = 2000
 const HOME_NODE_INFO_REFRESH_MS = 1000
 const MASTERCHAIN_BLOCK_SHARD = "8000000000000000"
+const DEFAULT_TIME_ADVANCE_SECONDS = "0"
+const MINUTE_SECONDS = 60
+const HOUR_SECONDS = 3600
+const DAY_SECONDS = 86_400
+const WEEK_SECONDS = 604_800
+const MONTH_SECONDS = 2_592_000
+const YEAR_SECONDS = 31_536_000
+const TIME_UNITS = [
+  {seconds: YEAR_SECONDS, compact: "y", name: "year"},
+  {seconds: MONTH_SECONDS, compact: "mo", name: "month"},
+  {seconds: WEEK_SECONDS, compact: "w", name: "week"},
+  {seconds: DAY_SECONDS, compact: "d", name: "day"},
+  {seconds: HOUR_SECONDS, compact: "h", name: "hour"},
+  {seconds: MINUTE_SECONDS, compact: "min", name: "minute"},
+  {seconds: 1, compact: "s", name: "second"},
+] as const
+const TIME_ADVANCE_PRESET_SECONDS = [
+  MINUTE_SECONDS,
+  HOUR_SECONDS,
+  DAY_SECONDS,
+  WEEK_SECONDS,
+  MONTH_SECONDS,
+  YEAR_SECONDS,
+] as const
+const TIME_ADVANCE_PRESETS = TIME_ADVANCE_PRESET_SECONDS.map(seconds => ({
+  label: formatReadableDuration(seconds),
+  seconds,
+}))
 
 interface HomePageProps {
   readonly client: TonClient
@@ -46,8 +74,11 @@ interface HomeState {
 interface NodeInfoRow {
   readonly label: string
   readonly value?: string
+  readonly secondaryValue?: string
   readonly to?: string
   readonly isLoading?: boolean
+  readonly title?: string
+  readonly variant?: "time"
 }
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
@@ -57,11 +88,22 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   const {prefetchNames} = useAddressBook()
   const [nodeInfo, setNodeInfo] = useState<LocalnetNodeInfo | undefined>()
   const [copiedEndpoint, setCopiedEndpoint] = useState<string>()
+  const [isTimeModalOpen, setIsTimeModalOpen] = useState(false)
+  const [timeAdvanceSeconds, setTimeAdvanceSeconds] = useState(DEFAULT_TIME_ADVANCE_SECONDS)
+  const [timeAdvanceError, setTimeAdvanceError] = useState<string>()
+  const [isAdvancingTime, setIsAdvancingTime] = useState(false)
   const [homeState, setHomeState] = useState<HomeState>({
     transactions: [],
     accountStatesByAddress: {},
     isLoading: true,
   })
+  const parsedTimeAdvanceSeconds = parseTimeAdvanceSeconds(timeAdvanceSeconds)
+  const timeAdvanceShiftValue = formatReadableDuration(parsedTimeAdvanceSeconds ?? 0)
+  const timeAdvanceCurrentValue = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : "—"
+  const timeAdvanceTargetValue =
+    nodeInfo
+      ? formatNodeDateTime(nodeInfo.current_unix_time + (parsedTimeAdvanceSeconds ?? 0))
+      : "—"
   const endpoints = useMemo(() => client.getEndpoints(), [client])
   const endpointRows = useMemo(
     () =>
@@ -86,6 +128,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
   )
   const nodeInfoRows = useMemo<readonly NodeInfoRow[]>(() => {
     const isLoading = nodeInfo === undefined
+    const nodeTime = nodeInfo ? formatNodeDateTime(nodeInfo.current_unix_time) : undefined
+    const nodeTimeOffset =
+      nodeInfo && nodeInfo.time_offset_seconds !== 0
+        ? formatTimeOffset(nodeInfo.time_offset_seconds)
+        : undefined
 
     return [
       {
@@ -105,25 +152,19 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         isLoading,
       },
       {
-        label: "Fork network",
-        value: nodeInfo ? formatOptionalNodeInfoValue(nodeInfo.fork_network) : undefined,
-        isLoading,
-      },
-      {
-        label: "Fork block",
+        label: "Fork",
         value: nodeInfo
-          ? formatOptionalNodeInfoValue(nodeInfo.fork_block_number?.toLocaleString())
+          ? formatForkInfo(nodeInfo.fork_network, nodeInfo.fork_block_number)
           : undefined,
         isLoading,
       },
       {
-        label: "Response delay",
-        value: nodeInfo
-          ? nodeInfo.network_conditions
-            ? `${nodeInfo.network_conditions.response_delay_ms} ms`
-            : "—"
-          : undefined,
+        label: "Node time",
+        value: nodeTime,
+        secondaryValue: nodeTimeOffset,
+        title: nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime,
         isLoading,
+        variant: "time",
       },
     ]
   }, [nodeInfo])
@@ -257,6 +298,35 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
     }
   }, [copiedEndpoint])
 
+  useEffect(() => {
+    if (!isTimeModalOpen) {
+      return
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !isAdvancingTime) {
+        setIsTimeModalOpen(false)
+      }
+    }
+
+    document.addEventListener("keydown", handleKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isAdvancingTime, isTimeModalOpen])
+
+  const openTimeAdvanceModal = useCallback(() => {
+    setTimeAdvanceSeconds(DEFAULT_TIME_ADVANCE_SECONDS)
+    setTimeAdvanceError(undefined)
+    setIsTimeModalOpen(true)
+  }, [])
+
+  const closeTimeAdvanceModal = useCallback(() => {
+    if (!isAdvancingTime) {
+      setIsTimeModalOpen(false)
+    }
+  }, [isAdvancingTime])
+
   const copyEndpoint = useCallback(
     async (endpoint: string) => {
       try {
@@ -272,6 +342,42 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
       }
     },
     [showToast],
+  )
+
+  const handleTimeAdvanceSubmit = useCallback(
+    async (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault()
+
+      const seconds = parseTimeAdvanceSeconds(timeAdvanceSeconds)
+      if (!seconds) {
+        setTimeAdvanceError("Enter a positive number of seconds.")
+        return
+      }
+
+      setIsAdvancingTime(true)
+      setTimeAdvanceError(undefined)
+      try {
+        const nextTimeInfo = await client.increaseTime(seconds)
+        setNodeInfo(current => (current ? {...current, ...nextTimeInfo} : current))
+        setIsTimeModalOpen(false)
+        showToast({
+          variant: "success",
+          title: "Time advanced",
+          description: `Node time moved by ${formatReadableDuration(seconds)}.`,
+        })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Failed to advance node time."
+        setTimeAdvanceError(message)
+        showToast({
+          variant: "error",
+          title: "Time not advanced",
+          description: message,
+        })
+      } finally {
+        setIsAdvancingTime(false)
+      }
+    },
+    [client, showToast, timeAdvanceSeconds],
   )
 
   return (
@@ -294,9 +400,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
             <CardContent className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
               {nodeInfoRows.map(row => {
                 const value = row.value ?? "—"
+                const title = row.title ?? value
+                const rowClassName = `${styles.nodeInfoRow} ${
+                  row.variant === "time" ? styles.nodeInfoTimeRow : ""
+                }`
 
                 return (
-                  <div key={row.label} className={styles.nodeInfoRow}>
+                  <div key={row.label} className={rowClassName}>
                     <span className={styles.nodeInfoLabel}>{row.label}</span>
                     {row.isLoading ? (
                       <span
@@ -304,12 +414,36 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         aria-label={`Loading ${row.label}`}
                       />
                     ) : row.to ? (
-                      <Link className={styles.nodeInfoValueLink} to={row.to} title={value}>
+                      <Link className={styles.nodeInfoValueLink} to={row.to} title={title}>
                         {value}
                       </Link>
+                    ) : row.variant === "time" ? (
+                      <div className={styles.nodeInfoTimeControl} title={title}>
+                        <span className={styles.nodeInfoTimeText}>
+                          <span className={styles.nodeInfoValueText}>{value}</span>
+                          {row.secondaryValue && (
+                            <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                          )}
+                        </span>
+                        <button
+                          type="button"
+                          className={styles.nodeInfoTimeButton}
+                          aria-label="Advance node time"
+                          aria-haspopup="dialog"
+                          aria-expanded={isTimeModalOpen}
+                          title="Advance time"
+                          onClick={openTimeAdvanceModal}
+                        >
+                          <FastForward size={14} />
+                          <span>Advance</span>
+                        </button>
+                      </div>
                     ) : (
-                      <span className={styles.nodeInfoValue} title={value}>
-                        {value}
+                      <span className={styles.nodeInfoValue} title={title}>
+                        <span className={styles.nodeInfoValueText}>{value}</span>
+                        {row.secondaryValue && (
+                          <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
+                        )}
                       </span>
                     )}
                   </div>
@@ -405,6 +539,117 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           )}
         </div>
       </section>
+
+      {isTimeModalOpen && (
+        <div
+          className={styles.timeModalBackdrop}
+          onMouseDown={event => {
+            if (event.target === event.currentTarget) {
+              closeTimeAdvanceModal()
+            }
+          }}
+        >
+          <section
+            className={styles.timeModal}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="node-time-modal-title"
+          >
+            <div className={styles.timeModalHeader}>
+              <h2 id="node-time-modal-title" className={styles.timeModalTitle}>
+                Advance time
+              </h2>
+              <button
+                type="button"
+                className={styles.timeModalCloseButton}
+                aria-label="Close time control"
+                disabled={isAdvancingTime}
+                onClick={closeTimeAdvanceModal}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className={styles.timeModalContent} onSubmit={handleTimeAdvanceSubmit}>
+              <div className={styles.fieldBlock}>
+                <label className={styles.label} htmlFor="node-time-advance-seconds">
+                  Seconds
+                </label>
+                <Input
+                  id="node-time-advance-seconds"
+                  className={styles.fieldInput}
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={timeAdvanceSeconds}
+                  disabled={isAdvancingTime}
+                  onChange={event => {
+                    setTimeAdvanceSeconds(event.target.value)
+                    setTimeAdvanceError(undefined)
+                  }}
+                />
+              </div>
+
+              <div className={styles.timeAdvancePresets}>
+                {TIME_ADVANCE_PRESETS.map(preset => (
+                  <button
+                    key={preset.seconds}
+                    type="button"
+                    className={styles.timeAdvancePresetButton}
+                    aria-label={`Add ${preset.label} to time shift`}
+                    disabled={isAdvancingTime}
+                    onClick={() => {
+                      setTimeAdvanceSeconds(currentSeconds =>
+                        addTimeAdvanceSeconds(currentSeconds, preset.seconds),
+                      )
+                      setTimeAdvanceError(undefined)
+                    }}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.timeAdvancePreview}>
+                <div className={styles.timeAdvancePreviewRow}>
+                  <span>Shift</span>
+                  <strong>{timeAdvanceShiftValue}</strong>
+                </div>
+                <div className={styles.timeAdvancePreviewRow}>
+                  <span>Current</span>
+                  <strong>{timeAdvanceCurrentValue}</strong>
+                </div>
+                <div className={styles.timeAdvancePreviewRow}>
+                  <span>After</span>
+                  <strong>{timeAdvanceTargetValue}</strong>
+                </div>
+              </div>
+
+              {timeAdvanceError && (
+                <div className={styles.timeAdvanceError} role="alert">
+                  {timeAdvanceError}
+                </div>
+              )}
+
+              <div className={styles.timeModalActions}>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isAdvancingTime}
+                  onClick={closeTimeAdvanceModal}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}>
+                  {isAdvancingTime ? "Advancing..." : "Advance"}
+                  <FastForward size={15} />
+                </Button>
+              </div>
+            </form>
+          </section>
+        </div>
+      )}
     </>
   )
 }
@@ -424,6 +669,81 @@ function formatOptionalNodeInfoValue(value: string | null | undefined): string {
   }
 
   return formatNodeInfoValue(value)
+}
+
+function formatForkInfo(network: string | null | undefined, block: number | null | undefined): string {
+  const networkValue = formatOptionalNodeInfoValue(network)
+  if (block === undefined || block === null) {
+    return networkValue
+  }
+
+  const blockValue = block.toLocaleString()
+  return networkValue === "—" ? blockValue : `${networkValue} · ${blockValue}`
+}
+
+function formatNodeDateTime(unixSeconds: number): string {
+  const date = new Date(unixSeconds * 1000)
+
+  return `${formatDateTimePart(date.getDate())}.${formatDateTimePart(
+    date.getMonth() + 1,
+  )}.${date.getFullYear()}, ${formatDateTimePart(date.getHours())}:${formatDateTimePart(
+    date.getMinutes(),
+  )}:${formatDateTimePart(date.getSeconds())}`
+}
+
+function formatDateTimePart(value: number): string {
+  return value.toString().padStart(2, "0")
+}
+
+function parseTimeAdvanceSeconds(value: string): number | undefined {
+  const seconds = Number(value)
+  if (!Number.isSafeInteger(seconds) || seconds <= 0) {
+    return undefined
+  }
+
+  return seconds
+}
+
+function addTimeAdvanceSeconds(currentValue: string, secondsToAdd: number): string {
+  const currentSeconds = parseTimeAdvanceSeconds(currentValue) ?? 0
+  return (currentSeconds + secondsToAdd).toString()
+}
+
+function formatReadableDuration(totalSeconds: number): string {
+  return formatDurationWithTimeUnits(totalSeconds, {style: "readable"})
+}
+
+function formatTimeOffset(offsetSeconds: number): string {
+  return formatDurationWithTimeUnits(offsetSeconds, {style: "compact", maxParts: 4})
+}
+
+function formatDurationWithTimeUnits(
+  totalSeconds: number,
+  options: {readonly style: "compact" | "readable"; readonly maxParts?: number},
+): string {
+  const sign = totalSeconds < 0 ? "-" : "+"
+  let remainingSeconds = Math.abs(totalSeconds)
+  const parts: string[] = []
+
+  for (const unit of TIME_UNITS) {
+    const value = Math.floor(remainingSeconds / unit.seconds)
+    if (value === 0) {
+      continue
+    }
+
+    parts.push(
+      options.style === "compact"
+        ? `${value}${unit.compact}`
+        : `${value} ${value === 1 ? unit.name : `${unit.name}s`}`,
+    )
+    remainingSeconds %= unit.seconds
+    if (options.maxParts !== undefined && parts.length === options.maxParts) {
+      break
+    }
+  }
+
+  const zeroValue = options.style === "compact" ? "0s" : "0 seconds"
+  return `${sign}${parts.length > 0 ? parts.join(" ") : zeroValue}`
 }
 
 function getMasterchainBlockPath(seqno: number): string {

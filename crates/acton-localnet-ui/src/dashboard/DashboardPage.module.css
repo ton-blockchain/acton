@@ -796,7 +796,7 @@
 .homeTopRow {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(560px, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(660px, 1.9fr) minmax(340px, 1fr);
   gap: 18px;
   align-items: start;
 }
@@ -1064,6 +1064,15 @@
   border-left: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
 }
 
+.nodeInfoTimeRow {
+  grid-column: 1 / -1;
+  min-height: 46px;
+}
+
+.homeCard .nodeInfoTimeRow.nodeInfoRow {
+  border-left: 0;
+}
+
 .nodeInfoLabel {
   min-width: 0;
   color: var(--litenode-text-muted);
@@ -1077,13 +1086,90 @@
 .nodeInfoValue {
   min-width: 0;
   color: var(--litenode-text);
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
   font-size: 0.82rem;
   font-weight: 500;
   line-height: 1.35;
   text-align: right;
+}
+
+.nodeInfoValueText {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.nodeInfoValueMeta {
+  flex: 0 0 auto;
+  color: var(--litenode-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.nodeInfoTimeControl {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 18px;
+}
+
+.nodeInfoTimeText {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 6px;
+  color: var(--litenode-text);
+  font-size: 0.82rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: right;
+}
+
+.nodeInfoTimeButton {
+  min-width: 0;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--tonscan-link, var(--litenode-accent));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1;
+  transition:
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.nodeInfoTimeButton:hover {
+  background: transparent;
+  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+}
+
+.nodeInfoTimeButton:focus-visible {
+  outline: none;
+  background: transparent;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.nodeInfoTimeButton svg {
+  color: currentColor;
 }
 
 .nodeInfoValueLink {
@@ -1130,14 +1216,16 @@
 
 .homeCard .endpointRow {
   display: grid;
-  grid-template-columns: minmax(112px, auto) minmax(0, 1fr);
+  grid-template-columns: 92px minmax(0, 1fr);
   align-items: center;
+  gap: 10px;
   min-height: 46px;
   padding: 0 18px;
   border: 0;
   border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
   border-radius: 0;
   background: transparent;
+  box-sizing: border-box;
 }
 
 .homeCard .endpointRow:first-child {
@@ -1176,6 +1264,15 @@
   align-items: center;
   justify-self: end;
   gap: 8px;
+}
+
+.homeCard .endpointValueRow {
+  display: flex;
+  justify-self: stretch;
+}
+
+.homeCard .endpointValue {
+  flex: 1 1 auto;
 }
 
 .endpointActions {
@@ -1921,7 +2018,8 @@
   border-radius: 999px;
 }
 
-.assetModalBackdrop {
+.assetModalBackdrop,
+.timeModalBackdrop {
   position: fixed;
   inset: 0;
   z-index: 95;
@@ -1933,8 +2031,8 @@
   backdrop-filter: blur(2px);
 }
 
-.assetModal {
-  width: min(560px, 100%);
+.assetModal,
+.timeModal {
   max-height: min(760px, calc(100vh - 36px));
   overflow: auto;
   border: 1px solid var(--litenode-border);
@@ -1943,22 +2041,34 @@
   box-shadow: var(--litenode-shadow-popover);
 }
 
-.assetModalHeader {
-  padding: 20px 20px 0;
+.assetModal {
+  width: min(560px, 100%);
+}
+
+.timeModal {
+  width: min(420px, 100%);
+}
+
+.assetModalHeader,
+.timeModalHeader {
+  padding: 14px 20px 0;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
 }
 
-.assetModalTitle {
+.assetModalTitle,
+.timeModalTitle {
   margin: 0;
   color: var(--litenode-text-strong);
   font-size: 1.05rem;
   font-weight: 650;
+  line-height: 1;
 }
 
-.assetModalCloseButton {
+.assetModalCloseButton,
+.timeModalCloseButton {
   width: 32px;
   height: 32px;
   padding: 0;
@@ -1977,21 +2087,138 @@
     box-shadow 120ms ease;
 }
 
-.assetModalCloseButton:hover {
+.assetModalCloseButton:hover,
+.timeModalCloseButton:hover:not(:disabled) {
   background: var(--litenode-surface-hover);
   color: var(--litenode-text);
 }
 
-.assetModalCloseButton:focus-visible {
+.assetModalCloseButton:focus-visible,
+.timeModalCloseButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--litenode-focus);
 }
 
-.assetModalContent {
+.timeModalCloseButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.assetModalContent,
+.timeModalContent {
   padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 14px;
+}
+
+.timeModalContent input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.timeModalContent input[type="number"]::-webkit-inner-spin-button,
+.timeModalContent input[type="number"]::-webkit-outer-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.timeModalContent .fieldBlock {
+  margin-bottom: 0;
+}
+
+.timeAdvancePresets {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.timeAdvancePresetButton {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 9px;
+  background: var(--litenode-surface);
+  color: var(--litenode-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
+}
+
+.timeAdvancePresetButton:hover:not(:disabled) {
+  border-color: var(--litenode-border-strong);
+  background: var(--litenode-surface-hover);
+}
+
+.timeAdvancePresetButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.timeAdvancePresetButton:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.timeAdvancePreview {
+  margin-bottom: 8px;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+  overflow: hidden;
+}
+
+.timeAdvancePreviewRow {
+  min-height: 40px;
+  padding: 0 12px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--litenode-border-subtle);
+}
+
+.timeAdvancePreviewRow:first-child {
+  border-top: 0;
+}
+
+.timeAdvancePreviewRow span {
+  color: var(--litenode-text-muted);
+  font-size: 0.74rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.timeAdvancePreviewRow strong {
+  min-width: 0;
+  color: var(--litenode-text);
+  font-size: 0.84rem;
+  font-weight: 600;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeAdvanceError {
+  color: var(--litenode-danger, #ff6b6b);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.timeModalActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .assetChoiceList {
@@ -2734,18 +2961,22 @@
     font-size: 0.82rem;
   }
 
-  .assetModalBackdrop {
+  .assetModalBackdrop,
+  .timeModalBackdrop {
     align-items: flex-end;
     padding: 10px;
   }
 
-  .assetModal {
+  .assetModal,
+  .timeModal {
     max-height: min(700px, calc(100vh - 20px));
     border-radius: 16px;
   }
 
   .assetModalHeader,
-  .assetModalContent {
+  .assetModalContent,
+  .timeModalHeader,
+  .timeModalContent {
     padding-right: 16px;
     padding-left: 16px;
   }
@@ -2797,5 +3028,38 @@
 
   .homeCard .nodeInfoRow:nth-child(2n) {
     border-left: 0;
+  }
+
+  .nodeInfoTimeRow {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .nodeInfoTimeRow.nodeInfoRow {
+    grid-template-columns: 1fr;
+    align-items: start;
+    gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .nodeInfoTimeControl {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .nodeInfoTimeText {
+    justify-content: flex-start;
+    text-align: left;
+  }
+
+  .timeAdvancePresets {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .timeModalActions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

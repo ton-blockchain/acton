@@ -651,7 +651,7 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
             <div className={styles.assetModalHeader}>
               <div>
                 <h2 id="faucet-asset-modal-title" className={styles.assetModalTitle}>
-                  Faucet asset
+                  Asset
                 </h2>
               </div>
               <button
