@@ -13,9 +13,11 @@ import type {BackendContractInfo, BackendTransaction, TransactionInfo} from "@/t
 import type {ContractData, ValueFlowItem} from "@/types/transaction"
 import {getMessageOpcode, getShardAccountBalance, resolveAbiOpcodeName} from "@/utils/messageBody"
 
-interface ValueFlowAccumulator extends ValueFlowItem {
-  readonly before: bigint
-  readonly after: bigint
+interface ValueFlowAccumulator {
+  readonly address: string
+  readonly before?: bigint
+  readonly after?: bigint
+  readonly fee: bigint
 }
 
 const bigintToAddress = (addr: bigint | undefined): Address | undefined => {
@@ -144,27 +146,42 @@ export function buildValueFlowItems(transactions: readonly TransactionInfo[]): V
       continue
     }
 
-    const before = tx.accountBalanceBefore ?? getShardAccountBalance(tx.shardAccountBefore)
-    const after = tx.accountBalanceAfter ?? getShardAccountBalance(tx.shardAccountAfter)
-    if (before === undefined || after === undefined) {
-      continue
-    }
-
     const previous = flowByAddress.get(address)
-    const initialBefore = previous?.before ?? before
+    const before = getTransactionBalanceBefore(tx)
+    const after = getTransactionBalanceAfter(tx)
 
     flowByAddress.set(address, {
       address,
-      before: initialBefore,
-      after,
-      change: after - initialBefore,
+      before: previous?.before ?? before,
+      after: after ?? previous?.after,
       fee: (previous?.fee ?? 0n) + tx.transaction.totalFees.coins,
     })
   }
 
   return [...flowByAddress.values()]
-    .map(({address, change, fee}) => ({address, change, fee}))
+    .filter(
+      (item): item is ValueFlowAccumulator & {readonly before: bigint; readonly after: bigint} => {
+        return item.before !== undefined && item.after !== undefined
+      },
+    )
+    .map(({address, before, after, fee}) => ({address, change: after - before, fee}))
     .sort((left, right) => left.address.localeCompare(right.address))
+}
+
+function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {
+  return (
+    tx.accountBalanceBefore ??
+    getShardAccountBalance(tx.shardAccountBefore) ??
+    (tx.transaction.oldStatus === "non-existing" ? 0n : undefined)
+  )
+}
+
+function getTransactionBalanceAfter(tx: TransactionInfo): bigint | undefined {
+  return (
+    tx.accountBalanceAfter ??
+    getShardAccountBalance(tx.shardAccountAfter) ??
+    (tx.transaction.endStatus === "non-existing" ? 0n : undefined)
+  )
 }
 
 function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInfo): number {

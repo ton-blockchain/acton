@@ -7,6 +7,7 @@ import {
   type TransactionInfo,
   TransactionTree,
   ValueFlowTable,
+  buildValueFlowItems,
   decodeStorageDataCell,
   decodeStorageShardAccount,
   getTransactionComputePhase,
@@ -28,7 +29,6 @@ import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
-import type {V3Transaction} from "../api/types"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {
   formatAddress as formatDisplayAddress,
@@ -56,11 +56,6 @@ const parseTabType = (tab: string | null): TabType => {
   return tab === "transactions" ? "transactions" : "value-flow"
 }
 
-interface ValueFlowAccumulator extends ValueFlowItem {
-  readonly before: bigint
-  readonly after: bigint
-}
-
 interface TraceTransactionNodeProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
@@ -68,19 +63,6 @@ interface TraceTransactionNodeProps {
   readonly isIntermediateSibling?: boolean
   readonly onContractClick: (address: string) => void
   readonly loadActions: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
-}
-
-const buildTransactionsHexIndex = (
-  transactionsMap: Record<string, V3Transaction>,
-): Record<string, V3Transaction> => {
-  const indexed: Record<string, V3Transaction> = {}
-
-  for (const [mapKey, tx] of Object.entries(transactionsMap)) {
-    const normalizedHash = hashToHex(mapKey) ?? hashToHex(tx.hash) ?? mapKey
-    indexed[normalizedHash.toLowerCase()] = tx
-  }
-
-  return indexed
 }
 
 const mapTraceTransactions = (
@@ -297,7 +279,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         if (data.traces && data.traces.length > 0) {
           const trace = data.traces[0]
           const transactionsMap = trace.transactions
-          const transactionsByHex = buildTransactionsHexIndex(transactionsMap)
           const transactionsByLt = new Map(
             Object.values(transactionsMap).map(tx => [tx.lt, tx] as const),
           )
@@ -377,7 +358,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             }),
           )
 
-          const nextValueFlow = buildValueFlowItems(transactionsByHex, processed)
+          const nextValueFlow = buildValueFlowItems(processed)
           if (isActive) {
             setTraces(processed)
             setContracts(contractsMap)
@@ -820,46 +801,6 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   )
 }
 
-function buildValueFlowItems(
-  transactionsByHex: Readonly<Record<string, V3Transaction>>,
-  processed: readonly TransactionInfo[],
-): ValueFlowItem[] {
-  const flowByAddress = new Map<string, ValueFlowAccumulator>()
-
-  for (const item of [...processed].sort(compareTransactionInfoByLt)) {
-    const address = item.address?.toString()
-    if (!address) {
-      continue
-    }
-
-    const txHash = item.transaction.hash().toString("hex")
-    const tx = transactionsByHex[txHash]
-    if (!tx) {
-      continue
-    }
-
-    const before = parseBalance(tx.account_state_before?.balance)
-    const after = parseBalance(tx.account_state_after?.balance)
-    if (before === undefined || after === undefined) {
-      continue
-    }
-
-    const initialBefore = flowByAddress.get(address)?.before ?? before
-
-    flowByAddress.set(address, {
-      address,
-      before: initialBefore,
-      after,
-      change: after - initialBefore,
-      fee: (flowByAddress.get(address)?.fee ?? 0n) + item.transaction.totalFees.coins,
-    })
-  }
-
-  return [...flowByAddress.values()]
-    .map(({address, change, fee}) => ({address, change, fee}))
-    .sort((a, b) => a.address.localeCompare(b.address))
-}
-
 function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInfo): number {
   const leftLt = parseBigInt(left.lt)
   const rightLt = parseBigInt(right.lt)
@@ -867,18 +808,6 @@ function compareTransactionInfoByLt(left: TransactionInfo, right: TransactionInf
     return 0
   }
   return leftLt < rightLt ? -1 : 1
-}
-
-function parseBalance(value: string | undefined): bigint | undefined {
-  if (!value) {
-    return undefined
-  }
-
-  try {
-    return BigInt(value)
-  } catch {
-    return undefined
-  }
 }
 
 function parseBigInt(value: string | undefined): bigint {

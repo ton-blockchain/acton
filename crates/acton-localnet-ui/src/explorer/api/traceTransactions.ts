@@ -160,8 +160,10 @@ const parseBigInt = (value: string | number | bigint | undefined, fallback = 0n)
   }
 }
 
-const parseOptionalBigInt = (value: string | number | bigint | undefined): bigint | undefined => {
-  if (value === undefined) return undefined
+const parseOptionalBigInt = (
+  value: string | number | bigint | null | undefined,
+): bigint | undefined => {
+  if (value === undefined || value === null) return undefined
   try {
     return BigInt(value)
   } catch {
