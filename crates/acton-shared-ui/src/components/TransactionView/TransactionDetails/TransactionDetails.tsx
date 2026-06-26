@@ -5,7 +5,13 @@ import type {Cell} from "@ton/core"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
-import {DataBlock, fmt} from "@/index"
+import {
+  ContractSourcePanel,
+  DataBlock,
+  InfoPopover,
+  fmt,
+  type ContractVerifiedSource,
+} from "@/index"
 import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
   computeSendMode,
@@ -19,7 +25,6 @@ import {
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
-import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
@@ -34,6 +39,7 @@ export interface TransactionDetailsProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
+  readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
@@ -45,14 +51,17 @@ export function TransactionDetails({
   tx,
   contracts,
   compilerAbisByCodeHash,
+  verifiedSourcesByCodeHash,
   allContracts,
   onContractClick,
   renderSourceLocation,
   loadActions,
   renderMessageRouteAction,
 }: TransactionDetailsProps): React.JSX.Element {
+  const stateInitAbiInfoId = React.useId()
   const [showActions, setShowActions] = useState(false)
   const [showStateInit, setShowStateInit] = useState(false)
+  const [showStateInitCode, setShowStateInitCode] = useState(false)
   const [expandedStorageLt, setExpandedStorageLt] = useState<string | undefined>()
   const [loadedActions, setLoadedActions] = useState<LoadedTransactionActions | undefined>()
   const [isLoadingActions, setIsLoadingActions] = useState(false)
@@ -64,6 +73,7 @@ export function TransactionDetails({
   useEffect(() => {
     currentTxIdRef.current = tx.id
     setShowActions(false)
+    setShowStateInitCode(false)
     setLoadedActions(undefined)
     setIsLoadingActions(false)
     setLoadActionsError(undefined)
@@ -136,10 +146,15 @@ export function TransactionDetails({
     })()
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
-  const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const stateInitCodeBocBase64 = stateInitCode?.toBoc().toString("base64")
   const stateInitCodeHash = stateInitCode?.hash().toString("hex")
-  const stateInitAbiName = stateInitCodeHash
-    ? compilerAbisByCodeHash?.get(stateInitCodeHash)?.contract_name?.trim()
+  const stateInitAbi = stateInitCodeHash
+    ? compilerAbisByCodeHash?.get(stateInitCodeHash)
+    : undefined
+  const stateInitAbiName = stateInitAbi?.contract_name?.trim()
+  const stateInitAbiDescription = stateInitAbi?.description?.trim()
+  const stateInitVerifiedSource = stateInitCodeHash
+    ? verifiedSourcesByCodeHash?.get(stateInitCodeHash)
     : undefined
   const parsedBody =
     tx.parsedBody ??
@@ -416,17 +431,24 @@ export function TransactionDetails({
                 </div>
                 {showStateInit && (
                   <div className={styles.stateInitSection}>
-                    {stateInitCode && (
-                      <div className={styles.stateInitField}>
-                        <div className={styles.multiColumnItemTitle}>Code</div>
-                        <DataBlock data={stateInitCodeBocHex!} />
-                        <DisasmSection bocHex={stateInitCodeBocHex!} title="Code Disassembly" />
-                      </div>
-                    )}
                     {stateInitAbiName && (
                       <div className={styles.stateInitField}>
                         <div className={styles.multiColumnItemTitle}>ABI</div>
-                        <div className={styles.multiColumnItemValue}>{stateInitAbiName}</div>
+                        <div
+                          className={`${styles.multiColumnItemValue} ${styles.stateInitAbiValue}`}
+                        >
+                          <span className={styles.stateInitAbiName}>{stateInitAbiName}</span>
+                          {stateInitAbiDescription && (
+                            <InfoPopover id={stateInitAbiInfoId} ariaLabel="Show ABI information">
+                              <span className={styles.stateInitAbiInfoTitle}>
+                                {stateInitAbiName}
+                              </span>
+                              <span className={styles.stateInitAbiInfoText}>
+                                {stateInitAbiDescription}
+                              </span>
+                            </InfoPopover>
+                          )}
+                        </div>
                       </div>
                     )}
                     {stateInitData && (
@@ -445,6 +467,39 @@ export function TransactionDetails({
                           </div>
                         ) : (
                           <DataBlock data={formatCellBocHex(stateInitData)} />
+                        )}
+                      </div>
+                    )}
+                    {stateInitCode && (
+                      <div className={styles.stateInitField}>
+                        <div className={styles.stateInitFieldTitle}>
+                          <span className={styles.multiColumnItemTitle}>Code</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowStateInitCode(!showStateInitCode)
+                            }}
+                            className={styles.actionsToggleButton}
+                            aria-label={
+                              showStateInitCode ? "Hide state init code" : "Show state init code"
+                            }
+                          >
+                            {showStateInitCode ? (
+                              <FiChevronUp size={14} />
+                            ) : (
+                              <FiChevronDown size={14} />
+                            )}
+                            <span className={styles.actionsToggleText}>
+                              {showStateInitCode ? "Hide" : "Show"}
+                            </span>
+                          </button>
+                        </div>
+                        {showStateInitCode && (
+                          <ContractSourcePanel
+                            codeBoc={stateInitCodeBocBase64!}
+                            verifiedSource={stateInitVerifiedSource}
+                            compact
+                          />
                         )}
                       </div>
                     )}

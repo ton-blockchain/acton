@@ -1,6 +1,7 @@
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, JSX} from "react"
 import {
+  type ContractVerifiedSource,
   type ContractData,
   type LoadedTransactionActions,
   TransactionDetails,
@@ -61,6 +62,7 @@ interface TraceTransactionNodeProps {
   readonly tx: TransactionInfo
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash: ReadonlyMap<string, ContractData["abi"]>
+  readonly verifiedSourcesByCodeHash: ReadonlyMap<string, ContractVerifiedSource>
   readonly isIntermediateSibling?: boolean
   readonly onContractClick: (address: string) => void
   readonly loadActions: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
@@ -147,6 +149,48 @@ const withRetracedStorage = (
   })
 }
 
+async function loadVerifiedSourcesByCodeHash({
+  client,
+  codeHashes,
+  shouldContinue,
+}: {
+  readonly client: TonClient
+  readonly codeHashes: readonly string[]
+  readonly shouldContinue: () => boolean
+}): Promise<Map<string, ContractVerifiedSource> | undefined> {
+  const uniqueCodeHashes = [...new Set(codeHashes.filter(codeHash => codeHash.trim().length > 0))]
+  if (uniqueCodeHashes.length === 0) {
+    return new Map()
+  }
+
+  const sources = await Promise.all(
+    uniqueCodeHashes.map(
+      async (codeHash): Promise<readonly [string, ContractVerifiedSource] | undefined> => {
+        try {
+          const source = await client.getVerifiedSource({codeHash})
+          if (!source.verified || source.bundles.length === 0) {
+            return undefined
+          }
+          return [codeHash, source] as const
+        } catch (error) {
+          console.debug(`Failed to fetch verified source for ${codeHash}`, error)
+          return undefined
+        }
+      },
+    ),
+  )
+
+  if (!shouldContinue()) {
+    return undefined
+  }
+
+  return new Map(
+    sources.filter(
+      (entry): entry is readonly [string, ContractVerifiedSource] => entry !== undefined,
+    ),
+  )
+}
+
 export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOnLoad = false}) => {
   const {hash: routeHash = ""} = useParams<{hash: string}>()
   const hash = hashToHex(routeHash) ?? routeHash
@@ -158,6 +202,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [contracts, setContracts] = useState<Map<string, ContractData>>(new Map())
   const [compilerAbisByCodeHash, setCompilerAbisByCodeHash] = useState<
     Map<string, ContractData["abi"]>
+  >(new Map())
+  const [verifiedSourcesByCodeHash, setVerifiedSourcesByCodeHash] = useState<
+    Map<string, ContractVerifiedSource>
   >(new Map())
   const [error, setError] = useState<string | undefined>()
   const [activeTab, setActiveTab] = useState<TabType>(() => parseTabType(searchParams.get("tab")))
@@ -273,6 +320,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     const fetchTrace = async () => {
       setLoading(true)
       setError(undefined)
+      setVerifiedSourcesByCodeHash(new Map())
       try {
         const data = await client.getTraces(hash)
         if (!isActive) return
@@ -298,10 +346,12 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
               additionalCodeHashes.add(tx.account_state_after.code_hash)
             }
           }
+          const stateInitCodeHashes = new Set<string>()
           for (const tx of processed) {
             const stateInitCodeHash = tx.transaction.inMessage?.init?.code?.hash().toString("hex")
             if (stateInitCodeHash) {
               additionalCodeHashes.add(stateInitCodeHash)
+              stateInitCodeHashes.add(stateInitCodeHash)
             }
           }
 
@@ -315,6 +365,14 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             return
           }
           const {addressToCodeHash, abiByCodeHash} = resolvedAbis
+          const stateInitVerifiedSources = await loadVerifiedSourcesByCodeHash({
+            client,
+            codeHashes: [...stateInitCodeHashes],
+            shouldContinue: () => isActive,
+          })
+          if (!stateInitVerifiedSources) {
+            return
+          }
 
           for (const tx of processed) {
             const sourceTx = transactionsByLt.get(tx.lt)
@@ -358,6 +416,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             setTraces(processed)
             setContracts(contractsMap)
             setCompilerAbisByCodeHash(new Map(abiByCodeHash))
+            setVerifiedSourcesByCodeHash(stateInitVerifiedSources)
             setValueFlow(nextValueFlow)
           }
         } else {
@@ -505,6 +564,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                           tx={tx}
                           contracts={contracts}
                           compilerAbisByCodeHash={compilerAbisByCodeHash}
+                          verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
                           onContractClick={handleContractClick}
                           loadActions={loadTransactionActions}
                         />
@@ -520,6 +580,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 transactions={traces}
                 contracts={contracts}
                 compilerAbisByCodeHash={compilerAbisByCodeHash}
+                verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
                 allContracts={[]}
                 selectedTransactionId={selectedTransactionId}
                 onContractClick={handleContractClick}
@@ -687,6 +748,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   tx,
   contracts,
   compilerAbisByCodeHash,
+  verifiedSourcesByCodeHash,
   isIntermediateSibling = false,
   onContractClick,
   loadActions,
@@ -760,6 +822,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             tx={tx}
             contracts={contracts}
             compilerAbisByCodeHash={compilerAbisByCodeHash}
+            verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
             allContracts={[]}
             onContractClick={onContractClick}
             loadActions={loadActions}
@@ -788,6 +851,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               tx={child}
               contracts={contracts}
               compilerAbisByCodeHash={compilerAbisByCodeHash}
+              verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
               isIntermediateSibling={index < children.length - 1}
               onContractClick={onContractClick}
               loadActions={loadActions}

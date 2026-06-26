@@ -1,0 +1,180 @@
+.infoPopover {
+  position: relative;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  min-height: 18px;
+}
+
+.infoPopoverButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--tonscan-text-primary, var(--text-primary));
+  background: var(--litenode-neutral-bg, var(--color-background-secondary, var(--bg-color)));
+  border: 1px solid transparent;
+  border-radius: 50%;
+  cursor: help;
+  transition:
+    background-color var(--transition-duration-fast),
+    border-color var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.infoPopoverButton:hover {
+  color: var(--tonscan-text-primary, var(--text-primary));
+  background: var(--litenode-control-hover, var(--color-background-tertiary, var(--border-color)));
+}
+
+.infoPopoverButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus, var(--color-primary, var(--link-color)));
+}
+
+.infoPopoverPanel {
+  --info-popover-bg: color-mix(in srgb, var(--tonscan-card-bg, var(--bg-color)) 92%, transparent);
+  --info-popover-border: color-mix(
+    in srgb,
+    var(--tonscan-border, var(--border-color)) 84%,
+    var(--info-popover-bg)
+  );
+
+  position: fixed;
+  z-index: 10000;
+  display: block;
+  box-sizing: border-box;
+  width: min(420px, calc(100vw - 24px));
+  padding: 0;
+  color: var(--tonscan-text-primary, var(--text-primary));
+  background: var(--info-popover-bg);
+  border: 1px solid var(--info-popover-border);
+  border-radius: 12px;
+  box-shadow: var(--litenode-shadow-popover, var(--shadow-tooltip));
+  overflow: visible;
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  transition:
+    opacity var(--transition-duration-fast),
+    transform var(--transition-duration-fast);
+  visibility: visible;
+  backdrop-filter: blur(18px);
+}
+
+.infoPopoverContent {
+  display: grid;
+  gap: 10px;
+  box-sizing: border-box;
+  max-height: calc(100vh - 24px);
+  padding: 12px 14px;
+  overflow-y: auto;
+}
+
+.infoPopoverPanel[data-positioned="false"] {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.98);
+  visibility: hidden;
+}
+
+.infoPopoverPanel::before,
+.infoPopoverPanel::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.infoPopoverPanel[data-placement="right"] {
+  transform-origin: 0 var(--info-popover-arrow-y);
+}
+
+.infoPopoverPanel[data-placement="right"]::after {
+  top: var(--info-popover-arrow-y);
+  left: -7px;
+  border-top: 7px solid transparent;
+  border-right: 7px solid var(--info-popover-bg);
+  border-bottom: 7px solid transparent;
+  transform: translateY(-50%);
+}
+
+.infoPopoverPanel[data-placement="right"]::before {
+  top: var(--info-popover-arrow-y);
+  left: -8px;
+  border-top: 8px solid transparent;
+  border-right: 8px solid var(--info-popover-border);
+  border-bottom: 8px solid transparent;
+  transform: translateY(-50%);
+}
+
+.infoPopoverPanel[data-placement="left"] {
+  transform-origin: 100% var(--info-popover-arrow-y);
+}
+
+.infoPopoverPanel[data-placement="left"]::after {
+  top: var(--info-popover-arrow-y);
+  right: -7px;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-left: 7px solid var(--info-popover-bg);
+  transform: translateY(-50%);
+}
+
+.infoPopoverPanel[data-placement="left"]::before {
+  top: var(--info-popover-arrow-y);
+  right: -8px;
+  border-top: 8px solid transparent;
+  border-bottom: 8px solid transparent;
+  border-left: 8px solid var(--info-popover-border);
+  transform: translateY(-50%);
+}
+
+.infoPopoverPanel[data-placement="bottom"] {
+  transform-origin: var(--info-popover-arrow-x) 0;
+}
+
+.infoPopoverPanel[data-placement="bottom"]::after {
+  top: -7px;
+  left: var(--info-popover-arrow-x);
+  border-right: 7px solid transparent;
+  border-bottom: 7px solid var(--info-popover-bg);
+  border-left: 7px solid transparent;
+  transform: translateX(-50%);
+}
+
+.infoPopoverPanel[data-placement="bottom"]::before {
+  top: -8px;
+  left: var(--info-popover-arrow-x);
+  border-right: 8px solid transparent;
+  border-bottom: 8px solid var(--info-popover-border);
+  border-left: 8px solid transparent;
+  transform: translateX(-50%);
+}
+
+.infoPopoverPanel[data-placement="top"] {
+  transform-origin: var(--info-popover-arrow-x) 100%;
+}
+
+.infoPopoverPanel[data-placement="top"]::after {
+  bottom: -7px;
+  left: var(--info-popover-arrow-x);
+  border-top: 7px solid var(--info-popover-bg);
+  border-right: 7px solid transparent;
+  border-left: 7px solid transparent;
+  transform: translateX(-50%);
+}
+
+.infoPopoverPanel[data-placement="top"]::before {
+  bottom: -8px;
+  left: var(--info-popover-arrow-x);
+  border-top: 8px solid var(--info-popover-border);
+  border-right: 8px solid transparent;
+  border-left: 8px solid transparent;
+  transform: translateX(-50%);
+}

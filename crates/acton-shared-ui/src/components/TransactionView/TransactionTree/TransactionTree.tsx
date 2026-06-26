@@ -12,7 +12,7 @@ import {
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
-import {fmt} from "@/index"
+import {fmt, type ContractVerifiedSource} from "@/index"
 import {
   getTransactionActionPhase,
   getTransactionComputePhase,
@@ -60,6 +60,7 @@ interface TransactionTreeProps {
   readonly transactions: TransactionInfo[]
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
+  readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
   readonly allContracts: readonly BackendContractInfo[]
   readonly selectedTransactionId?: string
   readonly onContractClick?: (address: string) => void
@@ -201,6 +202,7 @@ export function TransactionTree({
   transactions,
   contracts,
   compilerAbisByCodeHash,
+  verifiedSourcesByCodeHash,
   allContracts,
   selectedTransactionId,
   onContractClick,
@@ -903,6 +905,7 @@ export function TransactionTree({
             tx={selectedTransaction}
             contracts={contracts}
             compilerAbisByCodeHash={compilerAbisByCodeHash}
+            verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
             allContracts={allContracts}
             onContractClick={onContractClick}
             renderSourceLocation={renderSourceLocation}
