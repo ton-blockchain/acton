@@ -13,7 +13,7 @@ import {
   useState,
 } from "react"
 
-import type {StackElement} from "ton-assembly/dist/trace"
+import type {StackElement} from "@ton/tasm/dist/trace"
 import {
   Braces,
   ChevronDown,

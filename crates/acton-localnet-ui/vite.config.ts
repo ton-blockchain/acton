@@ -21,6 +21,7 @@ export default defineConfig({
       "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
       "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
       "@tasm-spec": path.resolve(import.meta.dirname, "../tasm-core/spec"),
+      "ton-assembly": "@ton/tasm",
     },
   },
   build: {

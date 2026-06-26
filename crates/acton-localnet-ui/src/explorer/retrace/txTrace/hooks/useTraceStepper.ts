@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
-import type {TraceInfo, StackElement, Step} from "ton-assembly/dist/trace"
+import type {TraceInfo, StackElement, Step} from "@ton/tasm/dist/trace"
 
 export interface UseTraceStepperReturn {
   readonly selectedStep: number

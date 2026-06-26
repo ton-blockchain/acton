@@ -9,7 +9,7 @@ export async function disassembleBocHex(bocHex: string): Promise<DisasmResult> {
     throw new Error("Empty code BOC")
   }
 
-  const {Cell, runtime, text} = await import("ton-assembly")
+  const {Cell, runtime, text} = await import("@ton/tasm")
   const cell = Cell.fromHex(normalizedHex)
   const isEmptyCell = cell.bits.length === 0 && cell.refs.length === 0
 
