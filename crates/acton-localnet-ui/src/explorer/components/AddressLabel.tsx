@@ -9,6 +9,7 @@ interface AddressLabelProps {
   readonly address: string
   readonly shorten?: boolean
   readonly fallback?: string
+  readonly nameFallback?: string
   readonly className?: string
 }
 
@@ -16,6 +17,7 @@ export const AddressLabel: FC<AddressLabelProps> = ({
   address,
   shorten = true,
   fallback = "Unknown",
+  nameFallback,
   className,
 }) => {
   const addressFormat = useAddressFormat()
@@ -25,6 +27,6 @@ export const AddressLabel: FC<AddressLabelProps> = ({
     return <span className={className}>{fallback}</span>
   }
 
-  const label = name || formatAddress(address, shorten, addressFormat)
+  const label = name || nameFallback || formatAddress(address, shorten, addressFormat)
   return <span className={className}>{label}</span>
 }

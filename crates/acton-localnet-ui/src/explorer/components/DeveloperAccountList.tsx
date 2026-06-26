@@ -3,7 +3,7 @@ import type {FC, ReactNode} from "react"
 import type {V3AccountState} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {AddressLabel} from "./AddressLabel"
+import {AddressChip} from "./AddressChip"
 import {formatNano} from "./utils"
 
 import styles from "./DeveloperAccountList.module.css"
@@ -66,7 +66,7 @@ export const DeveloperAccountList: FC<DeveloperAccountListProps> = ({
   accounts,
   className,
   title,
-  emptyState = "No accounts yet.",
+  emptyState = "No accounts yet",
   onAddressClick,
 }) => {
   if (accounts.length === 0) {
@@ -139,25 +139,10 @@ const AccountCell: FC<{
   readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({account, onAddressClick}) => {
   if (!onAddressClick) {
-    return (
-      <span className={styles.accountText}>
-        <AddressLabel address={account.address} />
-      </span>
-    )
+    return <AddressChip address={account.address} />
   }
 
-  return (
-    <button
-      type="button"
-      className={styles.addressButton}
-      onClick={event => {
-        event.stopPropagation()
-        onAddressClick(account.address, event)
-      }}
-    >
-      <AddressLabel address={account.address} />
-    </button>
-  )
+  return <AddressChip address={account.address} onAddressClick={onAddressClick} />
 }
 
 type AccountStatusClass = "statusActive" | "statusFrozen" | "statusUninit" | "statusNonexist"

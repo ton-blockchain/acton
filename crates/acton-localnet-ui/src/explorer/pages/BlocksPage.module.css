@@ -135,8 +135,7 @@
   min-width: 0;
 }
 
-.blocksLink,
-.blocksCellButton {
+.blocksLink {
   color: var(--litenode-text);
   font: inherit;
   font-weight: 500;
@@ -146,39 +145,16 @@
     color 120ms ease;
 }
 
-.blocksLink:hover,
-.blocksCellButton:hover {
+.blocksLink:hover {
   color: var(--tonscan-link);
   background: var(--litenode-link-chip-bg);
   text-decoration: none;
 }
 
 .blocksLink:focus-visible,
-.blocksCellButton:focus-visible,
 .blocksCopyButton:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.blocksCellButton {
-  max-width: 100%;
-  padding: 3px 4px;
-  margin-left: -4px;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  display: inline-block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.blocksCellButton > * {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .blocksHashCell {

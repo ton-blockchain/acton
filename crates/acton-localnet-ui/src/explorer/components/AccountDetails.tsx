@@ -17,14 +17,12 @@ import {
   Bell,
   Braces,
   CalendarDays,
-  Check,
   ChevronLeft,
   ChevronRight,
   CircleDot,
   CircleX,
   Code2,
   Coins,
-  Copy,
   Database,
   FileCode2,
   Filter,
@@ -76,20 +74,13 @@ import {
   useMessageNamesByAddress,
   type MessageNamesByAddress,
 } from "../hooks/useMessageNamesByAddress"
-import {useAddressFormat} from "../hooks/useNetworkInfo"
 
+import {AddressChip} from "./AddressChip"
 import {AddressLabel} from "./AddressLabel"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
-import {
-  formatNano,
-  formatTimeAgo,
-  hashToHex,
-  isSameAddress,
-  normalizeAddress,
-  parseAddress,
-} from "./utils"
+import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"
 
@@ -136,7 +127,6 @@ interface AccountDetailsProps {
 const ITEMS_PER_PAGE = 10
 const TRANSACTION_SKELETON_ROWS = 5
 const TRANSACTION_FILTERS_STORAGE_KEY = "acton.account.transactionFilters.v1"
-const HISTORY_ADDRESS_COPY_FEEDBACK_MS = 1400
 type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 type AccountHistoryMode = "actions" | "transactions"
 type AccountSortOrder = "desc" | "asc"
@@ -204,14 +194,6 @@ interface HistoryActionInfo {
 interface HistoryActionRow {
   readonly action: V3Action
   readonly info: HistoryActionInfo
-}
-
-interface HistoryAddressChipProps {
-  readonly address: string
-  readonly fallback: string
-  readonly highlighted: boolean
-  readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
-  readonly onHoverAddressChange: (address: string | undefined) => void
 }
 
 interface FilterPopoverPosition {
@@ -885,7 +867,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                             <span className={styles.addressRelation}>{info.relationLabel}</span>
                           )}
                           {info.address ? (
-                            <HistoryAddressChip
+                            <AddressChip
                               address={info.address}
                               fallback={info.displayAddressFallback}
                               highlighted={isAddressHovered}
@@ -975,7 +957,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       <TableCell>
                         <div className={styles.addressWrapper}>
                           {info.address ? (
-                            <HistoryAddressChip
+                            <AddressChip
                               address={info.address}
                               fallback={info.displayAddressFallback}
                               highlighted={isAddressHovered}
@@ -1312,67 +1294,6 @@ function readTransactionFilters(): AccountTransactionFilters {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function HistoryAddressChip({
-  address,
-  fallback,
-  highlighted,
-  onAddressClick,
-  onHoverAddressChange,
-}: HistoryAddressChipProps): JSX.Element {
-  const [isCopied, setIsCopied] = useState(false)
-  const addressFormat = useAddressFormat()
-  const copyAddress = normalizeAddress(address, addressFormat)
-
-  useEffect(() => {
-    if (!isCopied) {
-      return
-    }
-
-    const timeout = setTimeout(() => setIsCopied(false), HISTORY_ADDRESS_COPY_FEEDBACK_MS)
-    return () => clearTimeout(timeout)
-  }, [isCopied])
-
-  const handleAddressClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      onAddressClick?.(address, event)
-    },
-    [address, onAddressClick],
-  )
-
-  const handleCopyClick = useCallback(
-    (event: MouseEvent<HTMLButtonElement>) => {
-      event.stopPropagation()
-      void navigator.clipboard.writeText(copyAddress)
-      setIsCopied(true)
-    },
-    [copyAddress],
-  )
-
-  return (
-    <span
-      className={styles.addressChipGroup}
-      onMouseEnter={() => onHoverAddressChange(address)}
-      onMouseLeave={() => onHoverAddressChange(undefined)}
-    >
-      <span className={`${styles.addressChip} ${highlighted ? styles.addressChipHighlighted : ""}`}>
-        <button type="button" className={styles.address} onClick={handleAddressClick}>
-          <AddressLabel address={address} fallback={fallback} />
-        </button>
-      </span>
-      <button
-        type="button"
-        className={`${styles.addressCopyButton} ${isCopied ? styles.addressCopyButtonCopied : ""}`}
-        onClick={handleCopyClick}
-        aria-label={isCopied ? "Address copied" : "Copy address"}
-        title={isCopied ? "Copied" : "Copy address"}
-      >
-        {isCopied ? <Check size={13} /> : <Copy size={13} />}
-      </button>
-    </span>
-  )
 }
 
 function HistoryTechnicalCell({

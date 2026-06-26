@@ -4,7 +4,7 @@ import {addressKey} from "../api/compilerAbi"
 import type {V3Message, V3TransactionListItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
-import {AddressLabel} from "./AddressLabel"
+import {AddressChip} from "./AddressChip"
 import {formatNano, formatTimeAgo, hashToHex} from "./utils"
 import type {MessageNamesByAddress} from "../hooks/useMessageNamesByAddress"
 
@@ -104,7 +104,7 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
   transactions,
   className,
   title,
-  emptyState = "No transactions yet.",
+  emptyState = "No transactions yet",
   maxRows,
   messageNamesByAddress,
   onTransactionClick,
@@ -154,7 +154,11 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                   <span title={timeTitle}>{formatTimeAgo(row.time)}</span>
                 </td>
                 <td className={`${styles.addressCell} ${styles.fromCell}`}>
-                  <EndpointCell endpoint={row.from} onAddressClick={onAddressClick} />
+                  <EndpointCell
+                    endpoint={row.from}
+                    copyPlacement="left"
+                    onAddressClick={onAddressClick}
+                  />
                 </td>
                 <td className={styles.directionCell}>
                   <span
@@ -191,8 +195,9 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
 
 const EndpointCell: FC<{
   readonly endpoint: DeveloperEndpoint
+  readonly copyPlacement?: "left" | "right"
   readonly onAddressClick?: (address: string, event?: ExplorerNavigationClickEvent) => void
-}> = ({endpoint, onAddressClick}) => {
+}> = ({endpoint, copyPlacement = "right", onAddressClick}) => {
   if (endpoint.kind === "text") {
     return (
       <span className={styles.endpointText} title={endpoint.title}>
@@ -203,23 +208,21 @@ const EndpointCell: FC<{
 
   if (!onAddressClick) {
     return (
-      <span className={styles.endpointText}>
-        <AddressLabel address={endpoint.address} fallback={endpoint.fallback} />
-      </span>
+      <AddressChip
+        address={endpoint.address}
+        fallback={endpoint.fallback}
+        copyPlacement={copyPlacement}
+      />
     )
   }
 
   return (
-    <button
-      type="button"
-      className={styles.addressButton}
-      onClick={event => {
-        event.stopPropagation()
-        onAddressClick(endpoint.address, event)
-      }}
-    >
-      <AddressLabel address={endpoint.address} fallback={endpoint.fallback} />
-    </button>
+    <AddressChip
+      address={endpoint.address}
+      fallback={endpoint.fallback}
+      copyPlacement={copyPlacement}
+      onAddressClick={onAddressClick}
+    />
   )
 }
 

@@ -84,8 +84,7 @@
   padding-left: 18px !important;
 }
 
-.accountText,
-.addressButton {
+.accountText {
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
@@ -98,35 +97,6 @@
   color: var(--litenode-text);
   font-size: 0.78rem;
   font-weight: 500;
-}
-
-.addressButton {
-  width: auto;
-  padding: 3px 4px;
-  margin-left: -4px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--litenode-text);
-  background: transparent;
-  display: inline-block;
-  text-align: left;
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    color 120ms ease;
-}
-
-.addressButton:hover {
-  color: var(--tonscan-link);
-  background: var(--litenode-link-chip-bg);
-}
-
-.addressButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
 }
 
 .statusHeader,

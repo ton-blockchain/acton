@@ -372,7 +372,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
           />
         ) : homeState.transactions.length === 0 ? (
           <div className={`${styles.homeTransactionsCard} ${styles.emptyState}`}>
-            No transactions yet.
+            No transactions yet
           </div>
         ) : (
           <DeveloperTransactionList

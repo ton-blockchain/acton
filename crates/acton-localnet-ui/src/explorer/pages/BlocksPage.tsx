@@ -6,12 +6,12 @@ import type {FC, ReactNode} from "react"
 
 import type {TonClient} from "../api/client"
 import type {V3Block, V3TransactionListItem} from "../api/types"
-import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {
   DeveloperTransactionList,
   DeveloperTransactionListSkeleton,
 } from "../components/DeveloperTransactionList"
+import {AddressChip} from "../components/AddressChip"
 import {useAddressBook} from "../hooks/useAddressBook"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
@@ -168,14 +168,14 @@ export const BlocksPage: FC<BlocksPageProps> = ({client}) => {
             title="Last masterchain blocks"
             blocks={state.masterchainBlocks}
             isLoading={state.isLoading}
-            emptyLabel="No masterchain blocks yet."
+            emptyLabel="No masterchain blocks yet"
             onOpenBlock={(block, event) => openPath(blockPath(block), event)}
           />
           <BlockTableSection
             title="Last workchain blocks"
             blocks={state.workchainBlocks}
             isLoading={state.isLoading}
-            emptyLabel="No workchain blocks yet."
+            emptyLabel="No workchain blocks yet"
             onOpenBlock={(block, event) => openPath(blockPath(block), event)}
           />
         </div>
@@ -363,7 +363,7 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
                 title="Shardchain blocks"
                 blocks={state.shardchainBlocks}
                 isLoading={false}
-                emptyLabel="No shardchain blocks for this masterchain block."
+                emptyLabel="No shardchain blocks for this masterchain block"
                 onOpenBlock={(block, event) => openPath(blockPath(block), event)}
               />
             ) : null}
@@ -447,7 +447,7 @@ const BlockTransactionsTable: FC<{
   readonly onOpenTransaction: (hash: string, event?: ExplorerNavigationClickEvent) => void
 }> = ({transactions, onOpenAccount, onOpenTransaction}) => {
   if (transactions.length === 0) {
-    return <TableStateBlock title="Transactions">No transactions in this block.</TableStateBlock>
+    return <TableStateBlock title="Transactions">No transactions in this block</TableStateBlock>
   }
 
   return (
@@ -480,16 +480,11 @@ const BlockTransactionsTable: FC<{
               >
                 <td>{index + 1}</td>
                 <td>
-                  <button
-                    type="button"
-                    className={styles.blocksCellButton}
-                    onClick={event => {
-                      event.stopPropagation()
-                      onOpenAccount(transaction.account, event)
-                    }}
-                  >
-                    <AddressLabel address={transaction.account} fallback="Account" />
-                  </button>
+                  <AddressChip
+                    address={transaction.account}
+                    fallback="Account"
+                    onAddressClick={onOpenAccount}
+                  />
                 </td>
                 <td>{transaction.lt}</td>
                 <td>

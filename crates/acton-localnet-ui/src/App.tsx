@@ -239,7 +239,7 @@ const AppContent: FC<AppContentProps> = ({
               path="/wallets"
               element={
                 <DashboardPage {...dashboardProps}>
-                  <WalletsPage />
+                  <WalletsPage client={client} />
                 </DashboardPage>
               }
             />
