@@ -16,7 +16,7 @@ import {Check, CheckCircle2, Copy, ExternalLink, FileCode2, Folder, Menu} from "
 import {createHighlighterCore} from "shiki/core"
 import {createOnigurumaEngine} from "shiki/engine/oniguruma"
 import type {LanguageRegistration} from "shiki/types"
-import {Cell as Cell2, runtime, text} from "ton-assembly"
+import {Cell as Cell2, runtime, text} from "@ton/tasm"
 
 import type {TonClient} from "../api/client"
 import type {SourceBundle, SourceFile, VerificationSourceResponse} from "../api/types"

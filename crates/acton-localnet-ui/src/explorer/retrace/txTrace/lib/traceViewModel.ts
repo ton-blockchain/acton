@@ -1,5 +1,5 @@
-import {parse as parseVmLogs} from "ton-assembly/dist/logs"
-import type {TraceInfo} from "ton-assembly/dist/trace"
+import {parse as parseVmLogs} from "@ton/tasm/dist/logs"
+import type {TraceInfo} from "@ton/tasm/dist/trace"
 
 import {normalizeGas} from "./traceTx"
 import type {InstructionDetail, RetraceResultAndCode} from "./types"

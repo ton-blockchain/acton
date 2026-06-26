@@ -1,4 +1,4 @@
-import type {TraceInfo} from "ton-assembly/dist/trace"
+import type {TraceInfo} from "@ton/tasm/dist/trace"
 import type {TraceResult} from "@ton/retracer-core"
 
 import type {InstructionInfo} from "ton-source-map"

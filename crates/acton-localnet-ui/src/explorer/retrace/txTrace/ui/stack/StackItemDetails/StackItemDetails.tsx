@@ -1,6 +1,6 @@
 import React from "react"
 
-import {type StackElement} from "ton-assembly/dist/trace"
+import {type StackElement} from "@ton/tasm/dist/trace"
 import {Cell} from "@ton/core"
 
 import {DataBlock} from "@acton/shared-ui"

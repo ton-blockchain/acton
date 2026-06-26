@@ -1,6 +1,6 @@
 import React from "react"
 
-import type {StackElement} from "ton-assembly/dist/trace"
+import type {StackElement} from "@ton/tasm/dist/trace"
 
 import StackViewer from "../stack/StackViewer"
 import styles from "./TraceSidePanel.module.css"
