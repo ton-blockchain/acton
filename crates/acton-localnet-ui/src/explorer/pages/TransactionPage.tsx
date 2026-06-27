@@ -73,8 +73,10 @@ const normalizeTransactionReference = (reference: string): string => {
   return hashToHex(reference) ?? reference.trim().toLowerCase()
 }
 
+const transactionHashHex = (tx: TransactionInfo): string => tx.transaction.hash().toString("hex")
+
 const transactionReferenceKeys = (tx: TransactionInfo): readonly string[] => {
-  return [tx.id, tx.transaction.hash().toString("hex"), tx.lt, tx.transaction.lt.toString()].map(
+  return [tx.id, transactionHashHex(tx), tx.lt, tx.transaction.lt.toString()].map(
     normalizeTransactionReference,
   )
 }
@@ -231,6 +233,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const {fetchName} = useAddressBook()
   const {network} = useNetworkInfo()
   const addressFormat = useAddressFormat()
+  const [traceLookupHash, setTraceLookupHash] = useState(hash)
   const supportsTraceActions = client.usesToncenterApiEndpoint() && network.supportsActions
   const [activeTab, setActiveTab] = useState<TabType>(() =>
     parseTabType(searchParams.get("tab"), supportsTraceActions),
@@ -248,10 +251,11 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
-  const selectedTransactionId = useMemo(() => {
+  const selectedTraceTransaction = useMemo(() => {
     const requestedHash = hash.toLowerCase()
-    return traces.find(tx => tx.transaction.hash().toString("hex") === requestedHash)?.id
+    return traces.find(tx => transactionHashHex(tx).toLowerCase() === requestedHash)
   }, [hash, traces])
+  const selectedTransactionId = selectedTraceTransaction?.id
   const highlightedTransactionIds = useMemo(() => {
     if (!hoveredAction) {
       return undefined
@@ -326,6 +330,22 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     }
   }
 
+  const handleTransactionSelect = useCallback(
+    (tx: TransactionInfo) => {
+      const txHash = transactionHashHex(tx)
+      if (txHash.toLowerCase() === hash.toLowerCase()) {
+        return
+      }
+
+      const search = searchParams.toString()
+      const path = openRetraceOnLoad
+        ? routes.transactionTracePath(txHash)
+        : routes.transactionPath(txHash)
+      void navigate(search ? `${path}?${search}` : path)
+    },
+    [hash, navigate, openRetraceOnLoad, routes, searchParams],
+  )
+
   const loadTransactionActions = useCallback(
     async (tx: TransactionInfo): Promise<LoadedTransactionActions> => {
       const txHash = tx.transaction.hash().toString("hex").toLowerCase()
@@ -376,29 +396,31 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   }, [activeTab, traceActions.length])
 
   useEffect(() => {
+    if (!hash || traceLookupHash.toLowerCase() === hash.toLowerCase() || selectedTraceTransaction) {
+      return
+    }
+
+    setTraceLookupHash(hash)
+  }, [hash, selectedTraceTransaction, traceLookupHash])
+
+  useEffect(() => {
     setExpandedRetraceHash(undefined)
     setRetraceAttempt(0)
     setHoveredAction(undefined)
     loadedActionsByHashRef.current.clear()
-  }, [hash])
+  }, [traceLookupHash])
 
   useEffect(() => {
-    if (!openRetraceOnLoad || traces.length === 0) {
+    if (!openRetraceOnLoad || !selectedTraceTransaction) {
       return
     }
 
-    const requestedHash = hash.toLowerCase()
-    const selectedTrace = traces.find(
-      tx => tx.transaction.hash().toString("hex").toLowerCase() === requestedHash,
-    )
-    const selectedTraceHash = selectedTrace?.transaction.hash().toString("hex")
-    if (selectedTraceHash) {
-      setExpandedRetraceHash(selectedTraceHash)
-    }
-  }, [hash, openRetraceOnLoad, traces])
+    setExpandedRetraceHash(transactionHashHex(selectedTraceTransaction))
+  }, [openRetraceOnLoad, selectedTraceTransaction])
 
   useEffect(() => {
-    if (!hash) return
+    if (!traceLookupHash) return
+
     let isActive = true
 
     const fetchTrace = async () => {
@@ -409,7 +431,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setTraceActionMetadata({})
       setHoveredAction(undefined)
       try {
-        const data = await client.getTraces(hash, {includeActions: supportsTraceActions})
+        const data = await client.getTraces(traceLookupHash, {
+          includeActions: supportsTraceActions,
+        })
         if (!isActive) return
 
         if (data.traces && data.traces.length > 0) {
@@ -524,7 +548,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return () => {
       isActive = false
     }
-  }, [client, hash, supportsTraceActions])
+  }, [client, traceLookupHash, supportsTraceActions])
 
   if (loading) {
     return showLoadingSkeleton ? (
@@ -556,7 +580,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     .filter(tx => !tx.parent)
     .sort(compareTransactionInfoByLt)
   const renderSelectedTransactionMessageRouteAction = (tx: TransactionInfo): JSX.Element => {
-    const txHash = tx.transaction.hash().toString("hex")
+    const txHash = transactionHashHex(tx)
     const isRetraceOpen = expandedRetraceHash === txHash
 
     return (
@@ -573,7 +597,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   }
 
   const renderSelectedTransactionExtra = (tx: TransactionInfo): JSX.Element | null => {
-    const txHash = tx.transaction.hash().toString("hex")
+    const txHash = transactionHashHex(tx)
     if (expandedRetraceHash !== txHash) {
       return null
     }
@@ -699,6 +723,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 selectedTransactionId={selectedTransactionId}
                 highlightedTransactionIds={highlightedTransactionIds}
                 onContractClick={handleContractClick}
+                onTransactionSelect={handleTransactionSelect}
                 renderAddressChip={renderTraceAddressChip}
                 renderSelectedTransactionExtra={renderSelectedTransactionExtra}
                 renderSelectedTransactionMessageRouteAction={

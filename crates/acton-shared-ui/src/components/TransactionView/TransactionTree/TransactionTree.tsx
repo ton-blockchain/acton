@@ -66,6 +66,7 @@ interface TransactionTreeProps {
   readonly selectedTransactionId?: string
   readonly highlightedTransactionIds?: ReadonlySet<string>
   readonly onContractClick?: (address: string) => void
+  readonly onTransactionSelect?: (tx: TransactionInfo) => void
   readonly renderAddressChip?: (
     address: string,
     options: {readonly shorten: boolean},
@@ -235,6 +236,7 @@ export function TransactionTree({
   selectedTransactionId,
   highlightedTransactionIds,
   onContractClick,
+  onTransactionSelect,
   renderAddressChip,
   renderSourceLocation,
   renderSelectedTransactionExtra,
@@ -282,6 +284,7 @@ export function TransactionTree({
       setSelectedTransactionIdState(undefined)
     } else {
       setSelectedTransactionIdState(id)
+      onTransactionSelect?.(transaction)
     }
   }
 
