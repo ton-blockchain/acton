@@ -5,20 +5,15 @@
 }
 
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 20;
   min-height: 52px;
-  padding: 0 32px;
-  border-bottom: 1px solid color-mix(in srgb, var(--tonscan-border) 70%, transparent);
-  background: color-mix(in srgb, var(--tonscan-card-bg) 80%, transparent);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  padding: 0 28px;
+  background: color-mix(in srgb, var(--tonscan-bg) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.08);
+  -webkit-backdrop-filter: blur(16px) saturate(1.08);
   box-sizing: border-box;
 }
 
 .headerHome {
-  border-bottom: 0;
   background: var(--tonscan-bg);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -31,28 +26,29 @@
   margin-inline: auto;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   box-sizing: border-box;
 }
 
 .headerPrimary {
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 22px;
+  flex: 0 0 auto;
   min-width: 0;
 }
 
 .headerSearch {
-  flex: 0 1 430px;
-  max-width: 430px;
-  min-width: 180px;
+  flex: 1 1 430px;
+  max-width: 520px;
+  min-width: 220px;
   margin-left: auto;
 }
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 9px;
   min-width: 0;
   color: var(--tonscan-text-primary);
   font-size: var(--font-size-md);
@@ -66,27 +62,34 @@
 .brandIcon {
   display: block;
   flex: 0 0 auto;
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
 }
 
 .nav {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 4px;
   margin-left: 0;
-  padding-top: 2px;
+  padding: 2px;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 58%, transparent);
 }
 
 .navLink {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-sizing: border-box;
-  padding: 6px 0;
+  min-height: 32px;
+  padding: 0 12px;
   border: 0;
+  border-radius: 9px;
   background: transparent;
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   line-height: 1;
   text-decoration: none;
   cursor: pointer;
@@ -99,11 +102,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 34px;
+  box-sizing: border-box;
+  min-height: 38px;
   padding: 0 10px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
@@ -117,10 +121,11 @@
 .navLink:hover,
 .githubButton:hover {
   color: var(--tonscan-text-primary);
+  background: color-mix(in srgb, var(--litenode-surface-hover) 82%, transparent);
 }
 
 .headerActions {
-  margin-left: 0;
+  margin-left: auto;
   display: inline-flex;
   align-items: center;
   align-self: center;
@@ -138,18 +143,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  width: 120px;
-  min-height: 34px;
+  width: 128px;
+  min-height: 38px;
   padding: 0 10px 0 12px;
-  border: 1px solid color-mix(in srgb, var(--tonscan-border) 80%, transparent);
-  border-radius: 8px;
-  background: linear-gradient(
-    180deg,
-    color-mix(in srgb, var(--litenode-surface-raised) 92%, transparent),
-    color-mix(in srgb, var(--litenode-surface-subtle) 88%, transparent)
-  );
+  border: 1px solid var(--litenode-border-control);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
   color: var(--tonscan-text-primary);
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--litenode-surface-raised) 80%, transparent);
+  box-shadow: none;
   box-sizing: border-box;
   cursor: pointer;
   transition:
@@ -161,16 +162,16 @@
 
 .networkTrigger:hover,
 .networkTrigger[aria-expanded="true"] {
-  border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-hover);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--litenode-border-control) 55%, transparent);
+  border-color: var(--litenode-border-strong);
+  background: color-mix(in srgb, var(--litenode-surface-hover) 82%, transparent);
+  box-shadow: none;
 }
 
 .networkTriggerLabel {
   overflow: hidden;
   color: inherit;
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--font-weight-medium);
   line-height: 1;
   letter-spacing: 0;
   text-overflow: ellipsis;
@@ -570,10 +571,21 @@
 .headerActions [data-theme-toggle] {
   margin-left: 0;
   flex: 0 0 auto;
+  min-height: 38px;
+  padding: 5px;
+  border-color: var(--litenode-border-control);
+  background: color-mix(in srgb, var(--tonscan-card-bg) 64%, transparent);
+  box-sizing: border-box;
+}
+
+.headerActions [data-theme-toggle] svg {
+  width: 26px;
+  height: 26px;
+  padding: 6px;
 }
 
 .githubButton {
-  width: 34px;
+  width: 38px;
   padding: 0;
   flex: 0 0 auto;
 }
@@ -627,7 +639,8 @@
   }
 
   .navLink {
-    padding: 0;
+    min-height: 32px;
+    padding: 0 10px;
   }
 
   .headerActions {
