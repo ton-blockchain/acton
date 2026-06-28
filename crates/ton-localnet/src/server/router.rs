@@ -1,17 +1,19 @@
 use super::handlers::utils::get_extra;
 use super::handlers::{
-    change_account_state, create_recovery_point, detect_address, detect_hash, dump_state,
-    emulate_trace_v1, export_recovery_point, faucet, get_account_states_v3, get_address_balance,
-    get_address_information, get_address_information_v3, get_address_name, get_address_state,
-    get_api_calls, get_block_header, get_block_transactions, get_block_transactions_ext,
-    get_blocks_v3, get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
+    change_account_state, create_recovery_point, delete_compiler_abi, delete_verified_source,
+    detect_address, detect_hash, dump_state, emulate_trace_v1, export_recovery_point, faucet,
+    get_account_states_v3, get_address_balance, get_address_information,
+    get_address_information_v3, get_address_name, get_address_state, get_api_calls,
+    get_block_header, get_block_transactions, get_block_transactions_ext, get_blocks_v3,
+    get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
     get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
     get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
-    get_shard_account_cell, get_shards, get_startup_wallets, get_status, get_token_data,
-    get_traces, get_transactions, get_transactions_by_message_v3, get_transactions_std,
-    get_transactions_v3, get_verified_source, get_wallet_information, import_recovery_point,
-    increase_time, json_rpc, list_recovery_points, load_state, lookup_block, mine_blocks,
-    pack_address, register_compiler_abis, revert_recovery_point, run_get_method,
+    get_registered_verified_source, get_shard_account_cell, get_shards, get_startup_wallets,
+    get_status, get_token_data, get_traces, get_transactions, get_transactions_by_message_v3,
+    get_transactions_std, get_transactions_v3, get_verified_source, get_wallet_information,
+    import_recovery_point, increase_time, json_rpc, list_compiler_abis, list_recovery_points,
+    list_verified_sources, load_state, lookup_block, mine_blocks, pack_address,
+    register_compiler_abis, register_verified_sources, revert_recovery_point, run_get_method,
     run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message,
     send_message_v3, set_address_name, set_mining_mode, set_network_conditions,
     set_next_block_timestamp, set_shard_account, set_time, source_trace::build_source_trace,
@@ -141,9 +143,21 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/acton_getAddressName", get(get_address_name))
         .route("/acton_setAddressName", post(set_address_name))
         .route("/acton_getCompilerAbi", get(get_compiler_abi))
+        .route("/acton_listCompilerAbis", get(list_compiler_abis))
+        .route("/acton_deleteCompilerAbi", post(delete_compiler_abi))
         .route("/acton_getVerifiedSource", get(get_verified_source))
+        .route(
+            "/acton_getRegisteredVerifiedSource",
+            get(get_registered_verified_source),
+        )
+        .route("/acton_listVerifiedSources", get(list_verified_sources))
+        .route("/acton_deleteVerifiedSource", post(delete_verified_source))
         .route("/acton_buildSourceTrace", post(build_source_trace))
         .route("/acton_registerCompilerAbis", post(register_compiler_abis))
+        .route(
+            "/acton_registerVerifiedSources",
+            post(register_verified_sources),
+        )
         .route("/acton_dumpState", post(dump_state))
         .route("/acton_loadState", post(load_state))
         .route("/acton_snapshot", post(create_recovery_point))

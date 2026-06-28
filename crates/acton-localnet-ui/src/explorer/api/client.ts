@@ -36,25 +36,11 @@ interface TonClientOptions {
   readonly localnetApiToken?: string
   readonly onUnauthorized?: () => void
   readonly toncenterApiKey?: string
-  readonly compilerAbiLoader?: CompilerAbiLoader
 }
 
-type CompilerAbiLoader = (
+export type CompilerAbiLoader = (
   codeHashes: readonly string[],
 ) => Promise<Record<string, ExtendedContractABI | null>>
-
-interface VerifierAbiResponse {
-  readonly items?: readonly VerifierAbiItem[]
-}
-
-interface VerifierAbiItem {
-  readonly code_hash?: string
-  readonly abi?: unknown
-}
-
-const VERIFIER_SOURCE_URL = "https://verifier.acton.monster/api/v1/verification/source"
-const VERIFIER_ABI_URL = "https://verifier.acton.monster/api/v1/abi"
-const COMPILER_ABI_STORAGE_PREFIX = "acton:compiler-abi:v1:"
 
 interface FaucetResponse {
   readonly ok?: boolean
@@ -259,120 +245,6 @@ function isToncenterApiBaseUrl(baseUrl: string): boolean {
   }
 }
 
-function verifierCodeHashCacheKey(codeHash: string | undefined): string {
-  const trimmed = codeHash?.trim() ?? ""
-  const hex = trimmed.replace(/^0x/i, "")
-  if (/^[0-9a-fA-F]{64}$/.test(hex)) {
-    return hex.toLowerCase()
-  }
-  return base64CodeHashToHex(trimmed) ?? trimmed
-}
-
-function base64CodeHashToHex(codeHash: string): string | undefined {
-  if (!codeHash) {
-    return undefined
-  }
-  const base64 = codeHash.replace(/-/g, "+").replace(/_/g, "/")
-  const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), "=")
-
-  try {
-    const bytes = globalThis.atob(padded)
-    if (bytes.length !== 32) {
-      return undefined
-    }
-    return Array.from(bytes, byte => byte.charCodeAt(0).toString(16).padStart(2, "0")).join("")
-  } catch {
-    return undefined
-  }
-}
-
-function sameVerifierCodeHash(left: string | undefined, right: string): boolean {
-  return verifierCodeHashCacheKey(left) === verifierCodeHashCacheKey(right)
-}
-
-function verifiedSourceCacheKey(options: {
-  readonly address?: string
-  readonly codeHash?: string
-}): string {
-  const codeHash = verifierCodeHashCacheKey(options.codeHash)
-  if (codeHash) {
-    return `code_hash:${codeHash}`
-  }
-  return `address:${options.address?.trim() ?? ""}`
-}
-
-function unverifiedSourceResponse(options: {
-  readonly address?: string
-  readonly codeHash?: string
-}): VerificationSourceResponse {
-  return {
-    code_hash: verifierCodeHashCacheKey(options.codeHash),
-    verified: false,
-    bundles: [],
-  }
-}
-
-function compilerAbiStorageKey(cacheKey: string): string {
-  return `${COMPILER_ABI_STORAGE_PREFIX}${cacheKey}`
-}
-
-function browserLocalStorage(): Storage | undefined {
-  try {
-    return globalThis.localStorage
-  } catch {
-    return undefined
-  }
-}
-
-function readStoredCompilerAbi(cacheKey: string): ExtendedContractABI | undefined {
-  const storage = browserLocalStorage()
-  if (!storage) {
-    return undefined
-  }
-
-  try {
-    const raw = storage.getItem(compilerAbiStorageKey(cacheKey))
-    if (!raw) {
-      return undefined
-    }
-
-    const parsed = JSON.parse(raw) as Partial<ExtendedContractABI>
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      typeof parsed.compiler_abi !== "object" ||
-      parsed.compiler_abi === null
-    ) {
-      storage.removeItem(compilerAbiStorageKey(cacheKey))
-      return undefined
-    }
-
-    return {
-      compiler_abi: parsed.compiler_abi as ExtendedContractABI["compiler_abi"],
-      display_name: typeof parsed.display_name === "string" ? parsed.display_name : undefined,
-      code_hashes: Array.isArray(parsed.code_hashes)
-        ? parsed.code_hashes.filter(hash => typeof hash === "string")
-        : [cacheKey],
-      links: Array.isArray(parsed.links) ? (parsed.links as ExtendedContractABI["links"]) : [],
-    }
-  } catch {
-    return undefined
-  }
-}
-
-function storeCompilerAbi(cacheKey: string, abi: ExtendedContractABI): void {
-  const storage = browserLocalStorage()
-  if (!storage) {
-    return
-  }
-
-  try {
-    storage.setItem(compilerAbiStorageKey(cacheKey), JSON.stringify(abi))
-  } catch {
-    // Storage can be disabled or full. The in-memory cache remains valid for this session.
-  }
-}
-
 export class TonClient {
   private readonly v2BaseUrl: string
   private readonly v3BaseUrl: string
@@ -382,12 +254,7 @@ export class TonClient {
   private readonly localnetApiToken: string | undefined
   private readonly onUnauthorized: (() => void) | undefined
   private readonly toncenterApiKey: string | undefined
-  private readonly compilerAbiLoader: CompilerAbiLoader | undefined
   private readonly pendingGetRequests = new Map<string, Promise<unknown>>()
-  private readonly verifierAbiCache = new Map<string, ExtendedContractABI | null>()
-  private readonly verifierSourceCache = new Map<string, VerificationSourceResponse>()
-  private localnetCompilerAbiUnavailable = false
-  private localnetVerifiedSourceUnavailable = false
 
   constructor({
     v2BaseUrl,
@@ -398,7 +265,6 @@ export class TonClient {
     localnetApiToken,
     onUnauthorized,
     toncenterApiKey,
-    compilerAbiLoader,
   }: TonClientOptions) {
     this.v2BaseUrl = v2BaseUrl
     this.v3BaseUrl = v3BaseUrl
@@ -408,7 +274,6 @@ export class TonClient {
     this.localnetApiToken = localnetApiToken?.trim() || undefined
     this.onUnauthorized = onUnauthorized
     this.toncenterApiKey = toncenterApiKey?.trim() || undefined
-    this.compilerAbiLoader = compilerAbiLoader
   }
 
   async getAddressInformation(address: string): Promise<AddressInformation> {
@@ -730,7 +595,7 @@ export class TonClient {
     )
   }
 
-  async getCompilerAbis(
+  async getRegisteredCompilerAbis(
     codeHashes: readonly string[],
   ): Promise<Record<string, ExtendedContractABI | null>> {
     const uniqueCodeHashes = [...new Set(codeHashes.filter(Boolean))]
@@ -738,217 +603,113 @@ export class TonClient {
       return {}
     }
 
-    const result: Record<string, ExtendedContractABI | null> = {}
-    const missingCodeHashes: string[] = []
-
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getCompilerAbi")
     for (const codeHash of uniqueCodeHashes) {
-      const cacheKey = verifierCodeHashCacheKey(codeHash)
-      if (this.verifierAbiCache.has(cacheKey)) {
-        result[codeHash] = this.verifierAbiCache.get(cacheKey) ?? null
-      } else if (cacheKey) {
-        const storedAbi = readStoredCompilerAbi(cacheKey)
-        if (storedAbi) {
-          this.cacheCompilerAbi(cacheKey, storedAbi)
-          result[codeHash] = storedAbi
-        } else {
-          missingCodeHashes.push(codeHash)
-        }
-      } else {
-        missingCodeHashes.push(codeHash)
-      }
+      url.searchParams.append("code_hash", codeHash)
     }
-
-    let unresolvedCodeHashes = missingCodeHashes
-    if (
-      this.localnetControlEnabled &&
-      unresolvedCodeHashes.length > 0 &&
-      !this.localnetCompilerAbiUnavailable
-    ) {
-      const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getCompilerAbi")
-      for (const codeHash of unresolvedCodeHashes) {
-        url.searchParams.append("code_hash", codeHash)
-      }
-
-      try {
-        const localnetAbis = await this.request<Record<string, ExtendedContractABI | null>>(
-          url,
-          "Failed to fetch compiler ABI",
-        )
-        unresolvedCodeHashes = unresolvedCodeHashes.filter(codeHash => {
-          const abi = localnetAbis[codeHash] ?? null
-          if (abi) {
-            result[codeHash] = abi
-            this.cacheCompilerAbi(codeHash, abi)
-            return false
-          }
-          return true
-        })
-      } catch (error) {
-        this.localnetCompilerAbiUnavailable = true
-        console.debug("Localnet compiler ABI endpoint unavailable, falling back to verifier", error)
-      }
-    }
-
-    if (unresolvedCodeHashes.length > 0 && this.compilerAbiLoader) {
-      const bundledAbis: Record<string, ExtendedContractABI | null> = await this.compilerAbiLoader(
-        unresolvedCodeHashes,
-      ).catch(error => {
-        console.debug("Bundled compiler ABI loader failed", error)
-        return {}
-      })
-      unresolvedCodeHashes = unresolvedCodeHashes.filter(codeHash => {
-        const abi = bundledAbis[codeHash] ?? null
-        if (abi) {
-          result[codeHash] = abi
-          this.cacheCompilerAbi(codeHash, abi)
-          return false
-        }
-        return true
-      })
-    }
-
-    if (unresolvedCodeHashes.length > 0) {
-      const verifierAbis = await this.fetchVerifierCompilerAbis(unresolvedCodeHashes)
-      unresolvedCodeHashes = unresolvedCodeHashes.filter(codeHash => {
-        if (codeHash in verifierAbis) {
-          const abi = verifierAbis[codeHash]
-          result[codeHash] = abi
-          if (abi || !this.localnetControlEnabled || this.localnetCompilerAbiUnavailable) {
-            this.cacheCompilerAbi(codeHash, abi)
-          }
-          return false
-        }
-        return true
-      })
-    }
-
-    for (const codeHash of unresolvedCodeHashes) {
-      result[codeHash] = null
-      if (!this.localnetControlEnabled || this.localnetCompilerAbiUnavailable) {
-        this.cacheCompilerAbi(codeHash, null)
-      }
-    }
-
-    return result
-  }
-
-  async getVerifiedSource(options: {
-    readonly address?: string
-    readonly codeHash?: string
-  }): Promise<VerificationSourceResponse> {
-    const cacheKey = verifiedSourceCacheKey(options)
-    const cachedSource = this.verifierSourceCache.get(cacheKey)
-    if (cachedSource) {
-      return cachedSource
-    }
-
-    if (this.localnetControlEnabled && !this.localnetVerifiedSourceUnavailable) {
-      const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getVerifiedSource")
-      if (options.address) {
-        url.searchParams.append("address", options.address)
-      }
-      if (options.codeHash) {
-        url.searchParams.append("code_hash", options.codeHash)
-      }
-
-      try {
-        const source = await this.request<VerificationSourceResponse>(
-          url,
-          "Failed to fetch verified source",
-        )
-        return source
-      } catch (error) {
-        this.localnetVerifiedSourceUnavailable = true
-        console.debug(
-          "Localnet verified source endpoint unavailable, falling back to verifier",
-          error,
-        )
-      }
-    }
-
-    const source = await this.fetchVerifierSource(options).catch(error => {
-      console.debug("Verifier source lookup failed", error)
-      return unverifiedSourceResponse(options)
-    })
-    this.cacheVerifiedSource(cacheKey, source)
-    return source
-  }
-
-  private async fetchVerifierCompilerAbis(
-    codeHashes: readonly string[],
-  ): Promise<Record<string, ExtendedContractABI | null>> {
-    const result: Record<string, ExtendedContractABI | null> = {}
-    await Promise.all(
-      codeHashes.map(async codeHash => {
-        const queryCodeHash = verifierCodeHashCacheKey(codeHash)
-        const url = new URL(VERIFIER_ABI_URL)
-        url.searchParams.set("code_hash", queryCodeHash)
-        try {
-          const response = await this.request<VerifierAbiResponse>(
-            url,
-            "Failed to fetch verifier ABI",
-          )
-          const item = response.items?.find(entry =>
-            sameVerifierCodeHash(entry.code_hash, codeHash),
-          )
-          const abi = item?.abi && typeof item.abi === "object" ? item.abi : undefined
-          result[codeHash] = abi
-            ? {
-                compiler_abi: abi as ExtendedContractABI["compiler_abi"],
-                code_hashes: [queryCodeHash],
-                links: [],
-              }
-            : null
-        } catch (error) {
-          console.debug(`Failed to fetch verifier ABI for ${codeHash}`, error)
-          result[codeHash] = null
-        }
-      }),
+    return this.request<Record<string, ExtendedContractABI | null>>(
+      url,
+      "Failed to fetch registered compiler ABI",
     )
-    return result
   }
 
-  private async fetchVerifierSource(options: {
+  async registerCompilerAbis(
+    entries: readonly {
+      readonly abi: ExtendedContractABI
+    }[],
+  ): Promise<void> {
+    if (entries.length === 0) {
+      return
+    }
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_registerCompilerAbis")
+    await this.request<null>(url, "Failed to register compiler ABI", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        entries: entries.map(entry => ({
+          abi: entry.abi,
+        })),
+      }),
+    })
+  }
+
+  async listRegisteredCompilerAbis(): Promise<
+    readonly {
+      readonly codeHash: string
+      readonly abi: ExtendedContractABI
+      readonly savedAt: number
+    }[]
+  > {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listCompilerAbis")
+    return this.request(url, "Failed to list registered compiler ABI")
+  }
+
+  async deleteRegisteredCompilerAbi(codeHash: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteCompilerAbi")
+    await this.request<null>(url, "Failed to delete compiler ABI", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code_hash: codeHash}),
+    })
+  }
+
+  async getRegisteredVerifiedSource(options: {
     readonly address?: string
     readonly codeHash?: string
   }): Promise<VerificationSourceResponse> {
-    const url = new URL(VERIFIER_SOURCE_URL)
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_getRegisteredVerifiedSource")
     if (options.address) {
       url.searchParams.append("address", options.address)
     }
     if (options.codeHash) {
-      url.searchParams.append("code_hash", verifierCodeHashCacheKey(options.codeHash))
+      url.searchParams.append("code_hash", options.codeHash)
     }
-    return this.request<VerificationSourceResponse>(url, "Failed to fetch verifier source")
+    return this.request<VerificationSourceResponse>(
+      url,
+      "Failed to fetch registered verified source",
+    )
   }
 
-  private cacheVerifiedSource(cacheKey: string, source: VerificationSourceResponse): void {
-    this.verifierSourceCache.set(cacheKey, source)
-    if (source.code_hash) {
-      this.verifierSourceCache.set(verifiedSourceCacheKey({codeHash: source.code_hash}), source)
+  async registerVerifiedSources(
+    entries: readonly {
+      readonly codeHash: string
+      readonly source: VerificationSourceResponse
+    }[],
+  ): Promise<void> {
+    if (entries.length === 0) {
+      return
     }
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_registerVerifiedSources")
+    await this.request<null>(url, "Failed to register verified source", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        entries: entries.map(entry => ({
+          code_hash: entry.codeHash,
+          source: entry.source,
+        })),
+      }),
+    })
   }
 
-  private cacheCompilerAbi(codeHash: string, abi: ExtendedContractABI | null): void {
-    const cacheKey = verifierCodeHashCacheKey(codeHash)
-    if (!cacheKey) {
-      return
-    }
+  async listRegisteredVerifiedSources(): Promise<
+    readonly {
+      readonly codeHash: string
+      readonly source: VerificationSourceResponse
+      readonly savedAt: number
+    }[]
+  > {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_listVerifiedSources")
+    return this.request(url, "Failed to list registered verified sources")
+  }
 
-    this.verifierAbiCache.set(cacheKey, abi)
-    if (!abi) {
-      return
-    }
-
-    storeCompilerAbi(cacheKey, abi)
-    for (const aliasedCodeHash of abi.code_hashes) {
-      const aliasedCacheKey = verifierCodeHashCacheKey(aliasedCodeHash)
-      if (!aliasedCacheKey || aliasedCacheKey === cacheKey) {
-        continue
-      }
-      this.verifierAbiCache.set(aliasedCacheKey, abi)
-      storeCompilerAbi(aliasedCacheKey, abi)
-    }
+  async deleteRegisteredVerifiedSource(codeHash: string): Promise<void> {
+    const url = this.buildUrl(this.addressNameBaseUrl, "/acton_deleteVerifiedSource")
+    await this.request<null>(url, "Failed to delete verified source", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({code_hash: codeHash}),
+    })
   }
 
   async buildSourceTrace(

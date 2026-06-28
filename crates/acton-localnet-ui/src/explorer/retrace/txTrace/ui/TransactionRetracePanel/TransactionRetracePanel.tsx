@@ -4,9 +4,9 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import {useToast, type ContractData} from "@acton/shared-ui"
 
-import type {TonClient} from "../../../../api/client"
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"
+import type {ExplorerMetadataRegistry} from "../../../../metadata/types"
 import {traceTx} from "../../lib/traceTx"
 import type {RetraceResultAndCode} from "../../lib/types"
 import InlineLoader from "../InlineLoader"
@@ -22,7 +22,7 @@ type RetracePanelState =
 const MAX_RETRACE_FLOW_WIDTH = 1800
 
 interface TransactionRetracePanelProps {
-  readonly client: TonClient
+  readonly metadataRegistry: ExplorerMetadataRegistry
   readonly txHash: string
   readonly codeHash?: string
   readonly contractAbi?: ContractABI
@@ -38,7 +38,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function TransactionRetracePanel({
-  client,
+  metadataRegistry,
   txHash,
   codeHash,
   contractAbi,
@@ -60,7 +60,7 @@ export default function TransactionRetracePanel({
       setState({type: "loading"})
 
       try {
-        const result = await traceTx(txHash, network, client, {codeHash})
+        const result = await traceTx(txHash, network, metadataRegistry, {codeHash})
         if (isActive) {
           setState({type: "ready", result})
           onResult?.(txHash, result)
@@ -85,7 +85,7 @@ export default function TransactionRetracePanel({
     return () => {
       isActive = false
     }
-  }, [client, codeHash, network, onResult, showToast, txHash])
+  }, [codeHash, metadataRegistry, network, onResult, showToast, txHash])
 
   const rootStyle = {
     "--retrace-flow-offset": `${flowMetrics.offset}px`,

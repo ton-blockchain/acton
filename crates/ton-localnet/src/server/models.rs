@@ -349,13 +349,28 @@ pub struct GetApiCallsRequest {
 
 #[derive(Deserialize)]
 pub struct CompilerAbiRegistration {
-    pub code_hash: String,
-    pub compiler_abi: Value,
+    pub abi: Value,
 }
 
 #[derive(Deserialize)]
 pub struct RegisterCompilerAbisRequest {
     pub entries: Vec<CompilerAbiRegistration>,
+}
+
+#[derive(Deserialize)]
+pub struct CodeHashRequest {
+    pub code_hash: String,
+}
+
+#[derive(Deserialize)]
+pub struct VerifiedSourceRegistration {
+    pub code_hash: String,
+    pub source: Value,
+}
+
+#[derive(Deserialize)]
+pub struct RegisterVerifiedSourcesRequest {
+    pub entries: Vec<VerifiedSourceRegistration>,
 }
 
 #[derive(Deserialize)]

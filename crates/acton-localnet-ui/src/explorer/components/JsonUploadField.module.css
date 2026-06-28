@@ -1,0 +1,82 @@
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--litenode-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.textArea {
+  width: 100%;
+  min-height: 132px;
+  box-sizing: border-box;
+  resize: vertical;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  background: var(--litenode-surface-subtle);
+  color: var(--litenode-text);
+  padding: 10px;
+  font: inherit;
+  font-family: var(--font-family-mono, monospace);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.fileControl {
+  position: relative;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  box-sizing: border-box;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  background: var(--litenode-surface-subtle);
+  padding: 5px;
+  color: var(--litenode-text);
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+}
+
+.fileButton {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 6px;
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+  color: var(--litenode-text);
+  font-weight: 650;
+}
+
+.fileName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--tonscan-text-secondary);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fileInput {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.textArea:focus,
+.fileControl:focus-within {
+  outline: none;
+  border-color: var(--litenode-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--litenode-focus) 18%, transparent);
+}

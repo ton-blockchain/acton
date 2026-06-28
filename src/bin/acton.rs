@@ -725,6 +725,12 @@ enum Commands {
             help = "Directory to save compiled Fift files"
         )]
         output_fift: Option<String>,
+        #[arg(
+            long,
+            value_name = "DIR",
+            help = "Directory to save source registration artifacts"
+        )]
+        output_sources: Option<String>,
         #[arg(long, help = "Show compiled contract info")]
         info: bool,
     },
@@ -2287,6 +2293,7 @@ fn main() {
             gen_dir,
             output_abi,
             output_fift,
+            output_sources,
             info,
         } => build_cmd(BuildCommandOptions {
             contract_id,
@@ -2296,6 +2303,7 @@ fn main() {
             gen_dir,
             output_abi,
             output_fift,
+            output_sources,
             show_info: info,
             quiet_no_contracts: false,
         }),

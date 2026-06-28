@@ -39,6 +39,8 @@ pub(crate) struct NodeStateSnapshot {
     pub history_asset_detection_checked: Vec<Addr>,
     #[serde(default)]
     pub history_compiler_abis: Vec<(Hash256, Value)>,
+    #[serde(default)]
+    pub history_verified_sources: Vec<(Hash256, Value)>,
     pub cas_entries: Vec<(Hash256, BocBytes)>,
     pub pool_external: VecDeque<Hash256>,
     pub pool_internal: VecDeque<Hash256>,
@@ -146,6 +148,14 @@ impl Node {
             .collect::<Vec<_>>();
         history_compiler_abis.sort_by_key(|(hash, _)| *hash);
 
+        let mut history_verified_sources = self
+            .history
+            .verified_sources
+            .iter()
+            .map(|(hash, source)| (*hash, source.clone()))
+            .collect::<Vec<_>>();
+        history_verified_sources.sort_by_key(|(hash, _)| *hash);
+
         let cas_entries = self.export_cas_entries()?;
 
         Ok(NodeStateSnapshot {
@@ -173,6 +183,7 @@ impl Node {
             history_nft_items,
             history_asset_detection_checked,
             history_compiler_abis,
+            history_verified_sources,
             cas_entries,
             pool_external: self.pool.external.clone(),
             pool_internal: self.pool.internal.clone(),
@@ -252,6 +263,7 @@ impl Node {
             .into_iter()
             .collect();
         self.history.compiler_abis = snapshot.history_compiler_abis.into_iter().collect();
+        self.history.verified_sources = snapshot.history_verified_sources.into_iter().collect();
 
         self.pool.external = snapshot.pool_external;
         self.pool.internal = snapshot.pool_internal;
@@ -314,6 +326,7 @@ impl Node {
             tx.execute("DELETE FROM messages", [])?;
             tx.execute("DELETE FROM accounts", [])?;
             tx.execute("DELETE FROM compiler_abis", [])?;
+            tx.execute("DELETE FROM verified_sources", [])?;
 
             for (hash, boc) in &snapshot.cas_entries {
                 tx.execute(
@@ -372,6 +385,14 @@ impl Node {
                 let data = serde_json::to_vec(compiler_abi)?;
                 tx.execute(
                     "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
+                    rusqlite::params![code_hash.0.to_vec(), data],
+                )?;
+            }
+
+            for (code_hash, source) in &snapshot.history_verified_sources {
+                let data = serde_json::to_vec(source)?;
+                tx.execute(
+                    "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
                     rusqlite::params![code_hash.0.to_vec(), data],
                 )?;
             }

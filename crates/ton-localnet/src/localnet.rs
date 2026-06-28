@@ -499,11 +499,32 @@ pub(crate) enum Request {
         entries: Vec<(Hash256, Value)>,
         resp: oneshot::Sender<anyhow::Result<()>>,
     },
+    ListCompilerAbis {
+        resp: oneshot::Sender<anyhow::Result<Vec<(Hash256, Value)>>>,
+    },
+    DeleteCompilerAbi {
+        code_hash: Hash256,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
     GetCompilerAbis {
         code_hashes: Vec<Hash256>,
-        resp: oneshot::Sender<
-            anyhow::Result<Vec<Option<acton_abi_catalog::ExtendedContractAbi<Value>>>>,
-        >,
+        resp: oneshot::Sender<anyhow::Result<Vec<Option<Value>>>>,
+    },
+    RegisterVerifiedSources {
+        entries: Vec<(Hash256, Value)>,
+        resp: oneshot::Sender<anyhow::Result<()>>,
+    },
+    GetRegisteredVerifiedSource {
+        address: Option<Addr>,
+        code_hash: Option<Hash256>,
+        resp: oneshot::Sender<anyhow::Result<Option<Value>>>,
+    },
+    ListVerifiedSources {
+        resp: oneshot::Sender<anyhow::Result<Vec<(Hash256, Value)>>>,
+    },
+    DeleteVerifiedSource {
+        code_hash: Hash256,
+        resp: oneshot::Sender<anyhow::Result<()>>,
     },
     DumpState {
         path: String,
@@ -1421,15 +1442,31 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn list_compiler_abis(&self) -> anyhow::Result<Vec<(String, Value)>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ListCompilerAbis { resp }).await?;
+        let entries = rx.await??;
+
+        Ok(entries
+            .into_iter()
+            .map(|(code_hash, abi)| (code_hash.to_hex(), abi))
+            .collect())
+    }
+
+    pub async fn delete_compiler_abi(&self, code_hash_str: String) -> anyhow::Result<()> {
+        let code_hash =
+            Hash256::from_hex(&code_hash_str).or_else(|_| Hash256::from_base64(&code_hash_str))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::DeleteCompilerAbi { code_hash, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_compiler_abis(
         &self,
         code_hash_strs: Vec<String>,
-    ) -> anyhow::Result<
-        Vec<(
-            String,
-            Option<acton_abi_catalog::ExtendedContractAbi<Value>>,
-        )>,
-    > {
+    ) -> anyhow::Result<Vec<(String, Option<Value>)>> {
         let code_hashes = code_hash_strs
             .iter()
             .map(|code_hash| {
@@ -1443,6 +1480,65 @@ impl Localnet {
         let abis = rx.await??;
 
         Ok(code_hash_strs.into_iter().zip(abis).collect())
+    }
+
+    pub async fn register_verified_sources(
+        &self,
+        entries: Vec<(Hash256, Value)>,
+    ) -> anyhow::Result<()> {
+        if entries.is_empty() {
+            return Ok(());
+        }
+
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::RegisterVerifiedSources { entries, resp })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_registered_verified_source(
+        &self,
+        address_str: Option<String>,
+        code_hash_str: Option<String>,
+    ) -> anyhow::Result<Option<Value>> {
+        let address = address_str.as_deref().map(Self::parse_addr).transpose()?;
+        let code_hash = code_hash_str
+            .as_deref()
+            .map(|code_hash| {
+                Hash256::from_hex(code_hash).or_else(|_| Hash256::from_base64(code_hash))
+            })
+            .transpose()?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetRegisteredVerifiedSource {
+                address,
+                code_hash,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn list_verified_sources(&self) -> anyhow::Result<Vec<(String, Value)>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx.send(Request::ListVerifiedSources { resp }).await?;
+        let entries = rx.await??;
+
+        Ok(entries
+            .into_iter()
+            .map(|(code_hash, source)| (code_hash.to_hex(), source))
+            .collect())
+    }
+
+    pub async fn delete_verified_source(&self, code_hash_str: String) -> anyhow::Result<()> {
+        let code_hash =
+            Hash256::from_hex(&code_hash_str).or_else(|_| Hash256::from_base64(&code_hash_str))?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::DeleteVerifiedSource { code_hash, resp })
+            .await?;
+        rx.await?
     }
 
     pub async fn dump_state(&self, path: String) -> anyhow::Result<()> {
@@ -2014,19 +2110,58 @@ fn process_loop_request(
                 });
             let _ = resp.send(res);
         }
+        Request::ListCompilerAbis { resp } => {
+            let mut entries = node
+                .history
+                .compiler_abis
+                .iter()
+                .map(|(code_hash, compiler_abi)| (*code_hash, compiler_abi.clone()))
+                .collect::<Vec<_>>();
+            entries.sort_by_key(|(code_hash, _)| *code_hash);
+            let _ = resp.send(Ok(entries));
+        }
+        Request::DeleteCompilerAbi { code_hash, resp } => {
+            let res = node.history.delete_compiler_abi(&code_hash);
+            let _ = resp.send(res);
+        }
         Request::GetCompilerAbis { code_hashes, resp } => {
             let res = code_hashes
                 .iter()
                 .map(|code_hash| {
                     node.history
                         .get_compiler_abi(code_hash)
-                        .map(|compiler_abi| {
-                            registered_compiler_abi_payload(code_hash, compiler_abi)
-                        })
                         .or_else(|| catalog_compiler_abi_payload(code_hash))
                 })
                 .collect();
             let _ = resp.send(Ok(res));
+        }
+        Request::RegisterVerifiedSources { entries, resp } => {
+            let res = entries.into_iter().try_for_each(|(code_hash, source)| {
+                node.history.set_verified_source(code_hash, source)
+            });
+            let _ = resp.send(res);
+        }
+        Request::GetRegisteredVerifiedSource {
+            address,
+            code_hash,
+            resp,
+        } => {
+            let res = registered_verified_source_for_query(node, address, code_hash);
+            let _ = resp.send(res);
+        }
+        Request::ListVerifiedSources { resp } => {
+            let mut entries = node
+                .history
+                .verified_sources
+                .iter()
+                .map(|(code_hash, source)| (*code_hash, source.clone()))
+                .collect::<Vec<_>>();
+            entries.sort_by_key(|(code_hash, _)| *code_hash);
+            let _ = resp.send(Ok(entries));
+        }
+        Request::DeleteVerifiedSource { code_hash, resp } => {
+            let res = node.history.delete_verified_source(&code_hash);
+            let _ = resp.send(res);
         }
         Request::DumpState { path, resp } => {
             let res = node.dump_state_to_path(path);
@@ -2098,38 +2233,25 @@ fn process_loop_request(
     }
 }
 
-fn registered_compiler_abi_payload(
-    code_hash: &Hash256,
-    compiler_abi: Value,
-) -> acton_abi_catalog::ExtendedContractAbi<Value> {
-    let display_name = compiler_abi
-        .get("contract_name")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|name| !name.is_empty())
-        .map(ToOwned::to_owned);
-
-    acton_abi_catalog::ExtendedContractAbi {
-        compiler_abi,
-        display_name,
-        code_hashes: vec![code_hash.to_hex()],
-        links: Vec::new(),
+fn registered_verified_source_for_query(
+    node: &mut Node,
+    address: Option<Addr>,
+    code_hash: Option<Hash256>,
+) -> anyhow::Result<Option<Value>> {
+    if let Some(code_hash) = code_hash {
+        return Ok(node.history.get_verified_source(&code_hash));
     }
+
+    let Some(address) = address else {
+        return Ok(None);
+    };
+    let code_hash = handle_get_address_context(node, address)?.code_hash;
+    Ok(code_hash.and_then(|code_hash| node.history.get_verified_source(&code_hash)))
 }
 
-fn catalog_compiler_abi_payload(
-    code_hash: &Hash256,
-) -> Option<acton_abi_catalog::ExtendedContractAbi<Value>> {
+fn catalog_compiler_abi_payload(code_hash: &Hash256) -> Option<Value> {
     let contract = acton_abi_catalog::find_contract_by_code_hash(&code_hash.to_hex())?;
-    let extended_abi = contract.extended_abi();
-    let compiler_abi = serde_json::to_value(&extended_abi.compiler_abi).ok()?;
-
-    Some(acton_abi_catalog::ExtendedContractAbi {
-        compiler_abi,
-        display_name: extended_abi.display_name,
-        code_hashes: extended_abi.code_hashes,
-        links: extended_abi.links,
-    })
+    serde_json::to_value(contract.extended_abi()).ok()
 }
 
 fn handle_send_boc(

@@ -453,6 +453,8 @@ pub struct BuildSettings {
     pub output_abi: Option<String>,
     /// Directory where per-contract compiled Fift files are saved
     pub output_fift: Option<String>,
+    /// Directory where per-contract source registration artifacts are saved
+    pub output_sources: Option<String>,
 }
 
 /// Default settings for wrapper generation
@@ -2156,6 +2158,7 @@ out-dir = "artifacts/build"
 gen-dir = "artifacts/gen"
 output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 "#;
 
         let config: ActonConfig = toml::from_str(toml_content).unwrap();
@@ -2164,6 +2167,7 @@ output-fift = "build/fift"
         assert_eq!(build.gen_dir.as_deref(), Some("artifacts/gen"));
         assert_eq!(build.output_abi.as_deref(), Some("build/abi"));
         assert_eq!(build.output_fift.as_deref(), Some("build/fift"));
+        assert_eq!(build.output_sources.as_deref(), Some("build/sources"));
     }
 
     #[test]

@@ -4,6 +4,8 @@
   "compiler_name": "tolk",
   "contract_name": "getter",
   "has_add_ten_get_method": true,
+  "local_registration_alias_resolves": true,
+  "local_registration_is_single_row": true,
   "local_registration_overrides_catalog": true,
   "missing_code_hash_is_null": true
 }

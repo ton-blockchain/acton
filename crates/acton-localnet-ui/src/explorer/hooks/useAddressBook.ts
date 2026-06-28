@@ -11,7 +11,7 @@ import {
 } from "react"
 import type {FC, ReactNode} from "react"
 
-import type {TonClient} from "../api/client"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 type AddressName = string | undefined
 
@@ -60,9 +60,9 @@ interface PendingNameRequest {
 }
 
 export const AddressBookProvider: FC<{
-  client?: TonClient
   children: ReactNode
-}> = ({client, children}) => {
+}> = ({children}) => {
+  const metadataRegistry = useMetadataRegistry()
   const cacheRef = useRef(new Map<string, AddressName>())
   const tonAssetsRef = useRef(new Map<string, string>())
   const tonAssetsAccountsRef = useRef<readonly TonAssetsNameMatch[]>([])
@@ -153,16 +153,7 @@ export const AddressBookProvider: FC<{
       return
     }
 
-    if (!client) {
-      const entries = requests.map(request => [request.address, undefined] as const)
-      updateNames(entries)
-      for (const request of requests) {
-        request.resolve(tonAssetsRef.current.get(normalizeKey(request.address)))
-      }
-      return
-    }
-
-    void client
+    void metadataRegistry
       .getAddressNames(requests.map(request => request.address))
       .then(namesByAddress => {
         const entries = requests.map(request => {
@@ -185,16 +176,14 @@ export const AddressBookProvider: FC<{
           request.resolve(missingName ?? tonAssetsRef.current.get(normalizeKey(request.address)))
         }
       })
-  }, [client, updateNames])
+  }, [metadataRegistry, updateNames])
 
   const setAddressName = useCallback(
     async (address: string, name: string) => {
-      if (client) {
-        await client.setAddressName(address, name)
-      }
+      await metadataRegistry.setAddressName(address, name || undefined)
       updateName(address, name || undefined)
     },
-    [client, updateName],
+    [metadataRegistry, updateName],
   )
 
   const fetchName = useCallback(

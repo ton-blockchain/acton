@@ -33,12 +33,83 @@
 }
 
 .tableFrame {
+  order: 2;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
   border-radius: 12px;
   background: var(--tonscan-card-bg, var(--litenode-surface));
   box-sizing: border-box;
+}
+
+.fieldLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: var(--litenode-text-muted);
+  font-size: var(--font-size-xs);
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.textInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  background: var(--litenode-surface-subtle);
+  color: var(--litenode-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 400;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.textInput:focus {
+  outline: none;
+  border-color: var(--litenode-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--litenode-focus) 18%, transparent);
+}
+
+.primaryButton,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primaryButton {
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  background: var(--litenode-text-strong);
+  color: var(--litenode-surface);
+  font-size: var(--font-size-sm);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+  color: var(--litenode-text-muted);
+}
+
+.primaryButton:hover:not(:disabled),
+.iconButton:hover {
+  filter: brightness(0.97);
 }
 
 .tableTitle {
@@ -63,7 +134,7 @@
 
 .table {
   width: 100%;
-  min-width: 760px;
+  min-width: 820px;
   border-collapse: collapse;
   table-layout: fixed;
   background: var(--tonscan-card-bg, var(--litenode-surface));
@@ -103,7 +174,7 @@
 
 .table th:first-child,
 .table td:first-child {
-  width: 38%;
+  width: 42%;
 }
 
 .tableRow {
@@ -141,18 +212,35 @@
   border: 0;
 }
 
+.nameCell {
+  min-width: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .primaryCell {
   min-width: 0;
-  display: inline-flex;
+  display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
   gap: 3px;
-  max-width: 100%;
   color: var(--litenode-text);
   font: inherit;
   font-weight: 650;
 }
 
-.primaryCell span,
+.nameLine {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.nameText,
 .primaryCell small {
   min-width: 0;
   overflow: hidden;
@@ -160,10 +248,147 @@
   white-space: nowrap;
 }
 
+.nameText {
+  color: var(--litenode-text);
+}
+
+.localBadge {
+  flex: 0 0 auto;
+  position: relative;
+  top: -4px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 16px;
+  padding: 0 5px;
+  border: 1px solid color-mix(in srgb, #16a34a 34%, var(--tonscan-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 13%, var(--tonscan-card-bg));
+  color: color-mix(in srgb, #16a34a 78%, var(--litenode-text));
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .primaryCell small {
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
+}
+
+.rowActionButton {
+  position: relative;
+  z-index: 2;
+}
+
+.rowActionButton:hover,
+.rowActionButton:focus-visible {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--tonscan-border));
+  background: color-mix(in srgb, #dc2626 9%, var(--tonscan-card-bg));
+  color: #dc2626;
+  filter: none;
+}
+
+.rowActionButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #dc2626 24%, transparent);
+}
+
+.formButtonRow td {
+  height: auto;
+  padding: 0;
+  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--tonscan-card-bg));
+}
+
+.registerAbiButton {
+  min-width: 0;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--litenode-text);
+  font: inherit;
+  font-weight: 750;
+  letter-spacing: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.registerAbiButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registerAbiButton:hover {
+  background: var(--litenode-row-hover);
+}
+
+.registerAbiButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.expandedFormRow td {
+  height: auto;
+  padding: 16px;
+  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--tonscan-card-bg));
+}
+
+.abiInlineForm {
+  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formSubmitButton {
+  align-self: flex-start;
+  min-width: 160px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.jsonField {
+  grid-column: 1 / -1;
+}
+
+.localNote {
+  max-width: 640px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: -2px 0 0;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.localNote svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.codeHashList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codeHashRow {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .empty,
@@ -296,6 +521,10 @@
 @media (max-width: 768px) {
   .container {
     padding: 16px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
   }
 
   .title {

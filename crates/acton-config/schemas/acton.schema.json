@@ -133,6 +133,10 @@
         "output-fift": {
           "description": "Directory where per-contract compiled Fift files are saved",
           "type": "string"
+        },
+        "output-sources": {
+          "description": "Directory where per-contract source registration artifacts are saved",
+          "type": "string"
         }
       }
     },

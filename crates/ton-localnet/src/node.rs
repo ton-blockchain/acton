@@ -228,6 +228,10 @@ impl Node {
                 "CREATE TABLE IF NOT EXISTS compiler_abis (code_hash BLOB PRIMARY KEY, data BLOB)",
                 [],
             )?;
+            conn.execute(
+                "CREATE TABLE IF NOT EXISTS verified_sources (code_hash BLOB PRIMARY KEY, data BLOB)",
+                [],
+            )?;
             Some(conn)
         } else {
             None
@@ -363,6 +367,22 @@ impl Node {
             for abi in abi_iter {
                 let (hash, compiler_abi) = abi?;
                 history.compiler_abis.insert(hash, compiler_abi);
+            }
+
+            // Load verified source registry
+            let mut stmt = conn.prepare("SELECT code_hash, data FROM verified_sources")?;
+            let source_iter = stmt.query_map([], |row| {
+                let hash_bytes: Vec<u8> = row.get(0)?;
+                let data: Vec<u8> = row.get(1)?;
+                let mut hash = [0u8; 32];
+                hash.copy_from_slice(&hash_bytes);
+                let source = serde_json::from_slice::<Value>(&data)
+                    .map_err(|e| rusqlite::Error::ToSqlConversionFailure(Box::new(e)))?;
+                Ok((Hash256(hash), source))
+            })?;
+            for source in source_iter {
+                let (hash, value) = source?;
+                history.verified_sources.insert(hash, value);
             }
         }
 
@@ -3241,6 +3261,70 @@ mod tests {
             reopened.history.get_compiler_abi(&code_hash),
             Some(compiler_abi),
             "compiler ABI registry must survive node restart"
+        );
+
+        drop(reopened);
+        let _ = std::fs::remove_dir_all(temp_root);
+    }
+
+    #[test]
+    fn verified_source_registry_persists_across_db_reopen() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time must be after unix epoch")
+            .as_nanos();
+        let temp_root = std::path::PathBuf::from("/tmp").join(format!(
+            "ton-localnet-verified-source-test-{}-{unique}",
+            std::process::id()
+        ));
+        let db_path = temp_root.join("localnet.db");
+
+        let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
+        let mut node = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc.clone(),
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must create sqlite-backed test node");
+
+        let code_hash = Hash256([0x24; 32]);
+        let source = json!({
+            "code_hash": code_hash.to_hex(),
+            "verified": true,
+            "bundles": [
+                {
+                    "source_bundle_hash": "source-bundle",
+                    "verified_at": 0,
+                    "storage_revision": "local",
+                    "entrypoint": "contracts/main.tolk",
+                    "compiler": {
+                        "language": "tolk",
+                        "version": "1.4.0",
+                        "params": {}
+                    },
+                    "files": []
+                }
+            ]
+        });
+
+        node.history
+            .set_verified_source(code_hash, source.clone())
+            .expect("must persist verified source");
+        drop(node);
+
+        let reopened = Node::with_db_path(
+            Box::new(NoopExecutor),
+            config_boc,
+            StateSource::Local,
+            Some(&db_path),
+        )
+        .expect("must reopen sqlite-backed test node");
+
+        assert_eq!(
+            reopened.history.get_verified_source(&code_hash),
+            Some(source),
+            "verified source registry must survive node restart"
         );
 
         drop(reopened);

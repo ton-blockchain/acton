@@ -45,6 +45,8 @@ import {useAvailableFlowMetrics} from "../hooks/useAvailableFlowMetrics"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
+import type {ExplorerMetadataRegistry} from "../metadata/types"
 import {traceTx} from "../retrace/txTrace/lib/traceTx"
 import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
@@ -178,11 +180,11 @@ const withRetracedStorage = (
 }
 
 async function loadVerifiedSourcesByCodeHash({
-  client,
+  metadataRegistry,
   codeHashes,
   shouldContinue,
 }: {
-  readonly client: TonClient
+  readonly metadataRegistry: ExplorerMetadataRegistry
   readonly codeHashes: readonly string[]
   readonly shouldContinue: () => boolean
 }): Promise<Map<string, ContractVerifiedSource> | undefined> {
@@ -195,7 +197,7 @@ async function loadVerifiedSourcesByCodeHash({
     uniqueCodeHashes.map(
       async (codeHash): Promise<readonly [string, ContractVerifiedSource] | undefined> => {
         try {
-          const source = await client.getVerifiedSource({codeHash})
+          const source = await metadataRegistry.getSource({codeHash})
           if (!source.verified || source.bundles.length === 0) {
             return undefined
           }
@@ -237,6 +239,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [error, setError] = useState<string | undefined>()
   const {fetchName} = useAddressBook()
   const {network} = useNetworkInfo()
+  const metadataRegistry = useMetadataRegistry()
   const addressFormat = useAddressFormat()
   const [traceLookupHash, setTraceLookupHash] = useState(hash)
   const supportsTraceActions = client.usesToncenterApiEndpoint() && network.supportsActions
@@ -359,7 +362,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         return cachedActions
       }
 
-      const retraceResult = await traceTx(txHash, network, undefined, {
+      const retraceResult = await traceTx(txHash, network, metadataRegistry, {
         codeHash: transactionExecutionCodeHash(tx),
       })
       const loadedActions: LoadedTransactionActions = {
@@ -379,7 +382,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
       return loadedActions
     },
-    [network],
+    [metadataRegistry, network],
   )
 
   const handleRetraceResult = useCallback((txHash: string, result: RetraceResultAndCode) => {
@@ -475,6 +478,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
 
           const resolvedAbis = await resolveCompilerAbis({
             client,
+            metadataRegistry,
             addresses: requestedAddresses,
             additionalCodeHashes: [...additionalCodeHashes],
             shouldContinue: () => isActive,
@@ -484,7 +488,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           }
           const {addressToCodeHash, abiByCodeHash} = resolvedAbis
           const stateInitVerifiedSources = await loadVerifiedSourcesByCodeHash({
-            client,
+            metadataRegistry,
             codeHashes: [...stateInitCodeHashes],
             shouldContinue: () => isActive,
           })
@@ -555,7 +559,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return () => {
       isActive = false
     }
-  }, [client, traceLookupHash, supportsTraceActions])
+  }, [client, metadataRegistry, traceLookupHash, supportsTraceActions])
 
   if (loading) {
     return showLoadingSkeleton ? (
@@ -613,10 +617,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       <div className={styles.selectedRetraceSection}>
         <TransactionRetracePanel
           key={`${txHash}:${retraceAttempt}`}
-          client={client}
+          metadataRegistry={metadataRegistry}
           txHash={txHash}
           codeHash={transactionExecutionCodeHash(tx)}
-          className={styles.selectedRetracePanel}
           contractAbi={tx.contractAbi}
           contracts={contracts}
           onClose={handleCloseRetrace}

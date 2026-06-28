@@ -462,6 +462,7 @@ pub struct History {
     pub nft_items: IndexMap<Addr, NftItemMeta>,
     pub asset_detection_checked: HashSet<Addr>,
     pub compiler_abis: HashMap<Hash256, Value>,
+    pub verified_sources: HashMap<Hash256, Value>,
 }
 
 impl Default for History {
@@ -489,6 +490,7 @@ impl History {
             nft_items: IndexMap::new(),
             asset_detection_checked: HashSet::new(),
             compiler_abis: HashMap::new(),
+            verified_sources: HashMap::new(),
         }
     }
 
@@ -509,6 +511,7 @@ impl History {
             nft_items: IndexMap::new(),
             asset_detection_checked: HashSet::new(),
             compiler_abis: HashMap::new(),
+            verified_sources: HashMap::new(),
         }
     }
 
@@ -534,13 +537,35 @@ impl History {
         code_hash: Hash256,
         compiler_abi: Value,
     ) -> anyhow::Result<()> {
+        let aliases = compiler_abi_code_hashes(&compiler_abi, Some(code_hash));
+        let stale_keys = self
+            .compiler_abis
+            .iter()
+            .filter_map(|(existing_hash, existing_abi)| {
+                let existing_aliases = compiler_abi_code_hashes(existing_abi, Some(*existing_hash));
+                existing_aliases
+                    .iter()
+                    .any(|alias| aliases.contains(alias))
+                    .then_some(*existing_hash)
+            })
+            .collect::<Vec<_>>();
+
         if let Some(conn) = &self.conn {
             let data = serde_json::to_vec(&compiler_abi)?;
             let conn = conn.lock().expect("Failed to lock DB connection");
+            for stale_key in &stale_keys {
+                conn.execute(
+                    "DELETE FROM compiler_abis WHERE code_hash = ?1",
+                    params![stale_key.0.to_vec()],
+                )?;
+            }
             conn.execute(
                 "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
                 params![code_hash.0.to_vec(), data],
             )?;
+        }
+        for stale_key in stale_keys {
+            self.compiler_abis.remove(&stale_key);
         }
         self.compiler_abis.insert(code_hash, compiler_abi);
         Ok(())
@@ -548,7 +573,13 @@ impl History {
 
     #[must_use]
     pub fn get_compiler_abi(&self, code_hash: &Hash256) -> Option<Value> {
-        self.compiler_abis.get(code_hash).cloned()
+        self.compiler_abis.get(code_hash).cloned().or_else(|| {
+            self.compiler_abis.iter().find_map(|(entry_hash, abi)| {
+                compiler_abi_code_hashes(abi, Some(*entry_hash))
+                    .contains(code_hash)
+                    .then(|| abi.clone())
+            })
+        })
     }
 
     pub fn replace_compiler_abis(
@@ -570,6 +601,79 @@ impl History {
         self.compiler_abis = compiler_abis;
         Ok(())
     }
+
+    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
+        if let Some(conn) = &self.conn {
+            let data = serde_json::to_vec(&source)?;
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.execute(
+                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
+                params![code_hash.0.to_vec(), data],
+            )?;
+        }
+        self.verified_sources.insert(code_hash, source);
+        Ok(())
+    }
+
+    #[must_use]
+    pub fn get_verified_source(&self, code_hash: &Hash256) -> Option<Value> {
+        self.verified_sources.get(code_hash).cloned()
+    }
+
+    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        let delete_key = self
+            .compiler_abis
+            .iter()
+            .find_map(|(entry_hash, abi)| {
+                compiler_abi_code_hashes(abi, Some(*entry_hash))
+                    .contains(code_hash)
+                    .then_some(*entry_hash)
+            })
+            .unwrap_or(*code_hash);
+
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.execute(
+                "DELETE FROM compiler_abis WHERE code_hash = ?1",
+                params![delete_key.0.to_vec()],
+            )?;
+        }
+        self.compiler_abis.remove(&delete_key);
+        Ok(())
+    }
+
+    pub fn delete_verified_source(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        if let Some(conn) = &self.conn {
+            let conn = conn.lock().expect("Failed to lock DB connection");
+            conn.execute(
+                "DELETE FROM verified_sources WHERE code_hash = ?1",
+                params![code_hash.0.to_vec()],
+            )?;
+        }
+        self.verified_sources.remove(code_hash);
+        Ok(())
+    }
+}
+
+fn compiler_abi_code_hashes(compiler_abi: &Value, fallback: Option<Hash256>) -> Vec<Hash256> {
+    let mut code_hashes = fallback.into_iter().collect::<Vec<_>>();
+    if let Some(values) = compiler_abi.get("code_hashes").and_then(Value::as_array) {
+        code_hashes.extend(
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .filter_map(parse_compiler_abi_code_hash),
+        );
+    }
+    code_hashes.sort();
+    code_hashes.dedup();
+    code_hashes
+}
+
+fn parse_compiler_abi_code_hash(code_hash: &str) -> Option<Hash256> {
+    Hash256::from_hex(code_hash)
+        .or_else(|_| Hash256::from_base64(code_hash))
+        .ok()
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]

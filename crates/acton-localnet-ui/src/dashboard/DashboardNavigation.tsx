@@ -8,6 +8,7 @@ import {
   Brackets,
   Check,
   Coins,
+  FileCode2,
   FileJson,
   Github,
   HandCoins,
@@ -56,6 +57,7 @@ const mainItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
   {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
+  {label: "Sources", icon: FileCode2, path: "/explorer/sources"},
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
   {label: "Tokens", icon: Coins, path: "/tokens"},
@@ -102,7 +104,11 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
   const closeMobileMenu = useCallback(() => setMobileMenuOpen(false), [])
 
   useEffect(() => {
-    if (!location.pathname.startsWith("/explorer") || location.pathname === "/explorer/blocks") {
+    if (
+      !location.pathname.startsWith("/explorer") ||
+      location.pathname === "/explorer/blocks" ||
+      location.pathname === "/explorer/sources"
+    ) {
       return
     }
 
@@ -198,7 +204,8 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                     const isActive =
                       item.path === "/explorer"
                         ? location.pathname.startsWith("/explorer") &&
-                          location.pathname !== "/explorer/blocks"
+                          location.pathname !== "/explorer/blocks" &&
+                          location.pathname !== "/explorer/sources"
                         : item.path === "/explorer/blocks"
                           ? location.pathname === "/explorer/blocks" ||
                             location.pathname === "/blocks" ||

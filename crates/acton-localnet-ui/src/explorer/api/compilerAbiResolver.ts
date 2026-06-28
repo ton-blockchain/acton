@@ -1,10 +1,13 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import type {TonClient} from "./client"
+import type {ExtendedContractABI} from "./compilerAbi"
 import {addressKey} from "./compilerAbi"
+import type {ExplorerMetadataRegistry} from "../metadata/types"
+import type {TonClient} from "./client"
 
 export interface ResolveCompilerAbisOptions {
   readonly client: TonClient
+  readonly metadataRegistry: ExplorerMetadataRegistry
   readonly addresses: readonly string[]
   readonly additionalCodeHashes?: readonly string[]
   readonly shouldContinue?: () => boolean
@@ -20,6 +23,7 @@ export interface ResolvedCompilerAbis {
 
 export async function resolveCompilerAbis({
   client,
+  metadataRegistry,
   addresses,
   additionalCodeHashes = [],
   shouldContinue = () => true,
@@ -56,9 +60,9 @@ export async function resolveCompilerAbis({
   ]
   const fetchedAbis =
     codeHashes.length > 0
-      ? await client
+      ? await metadataRegistry
           .getCompilerAbis(codeHashes)
-          .catch((): Awaited<ReturnType<TonClient["getCompilerAbis"]>> => ({}))
+          .catch((): Record<string, ExtendedContractABI | null> => ({}))
       : {}
 
   if (!shouldContinue()) {

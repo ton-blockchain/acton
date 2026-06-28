@@ -1094,6 +1094,9 @@ fn compile_test_file(
                 code_boc64: cache_entry.code_boc64,
                 code_hash_hex: cache_entry.code_hash_hex,
                 source_map: cache_entry.source_map,
+                debug_marks_base64: cache_entry.debug_marks_base64,
+                symbol_types_json: cache_entry.symbol_types_json,
+                debug_marks_json: cache_entry.debug_marks_json,
                 abi: cache_entry.abi,
             },
         ));

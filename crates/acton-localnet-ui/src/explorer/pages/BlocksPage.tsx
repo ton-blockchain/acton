@@ -764,5 +764,5 @@ function compactMiddle(value: string, visibleChars: number): string {
   }
 
   const side = Math.max(4, Math.floor(visibleChars / 2))
-  return `${value.slice(0, side)}...${value.slice(-side)}`
+  return `${value.slice(0, side)}…${value.slice(-side)}`
 }

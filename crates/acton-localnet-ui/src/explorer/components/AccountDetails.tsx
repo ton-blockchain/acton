@@ -74,6 +74,7 @@ import {
   useMessageNamesByAddress,
   type MessageNamesByAddress,
 } from "../hooks/useMessageNamesByAddress"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import {AddressChip} from "./AddressChip"
 import {AddressLabel} from "./AddressLabel"
@@ -324,8 +325,10 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     () => [...transactionAddresses, ...actionAddresses],
     [transactionAddresses, actionAddresses],
   )
+  const metadataRegistry = useMetadataRegistry()
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
+    metadataRegistry,
     addresses: messageNameAddresses,
   })
   const transactionRows = useMemo<readonly HistoryTransactionRow[]>(
@@ -1387,8 +1390,10 @@ export function ActionHistoryTable({
   onTransactionClick,
 }: ActionHistoryTableProps): JSX.Element {
   const actionAddresses = useMemo(() => collectActionMessageNameAddresses(actions), [actions])
+  const metadataRegistry = useMetadataRegistry()
   const messageNamesByAddress = useMessageNamesByAddress({
     client,
+    metadataRegistry,
     addresses: actionAddresses,
   })
   const rows = useMemo(

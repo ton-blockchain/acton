@@ -23,6 +23,7 @@
         "@ton/tolk-abi-to-typescript": "^0.5.0",
         "buffer": "^6.0.3",
         "framer-motion": "^12.11.0",
+        "idb": "8.0.3",
         "lucide-react": "^0.474.0",
         "monaco-editor": "^0.52.2",
         "qrcode.react": "^4.2.0",
@@ -62,6 +63,7 @@
         "@types/react-router-dom": "^5.3.3",
         "buffer": "^6.0.3",
         "framer-motion": "^12.11.0",
+        "idb": "8.0.3",
         "lucide-react": "^0.474.0",
         "monaco-editor": "^0.52.2",
         "qrcode.react": "^4.2.0",
@@ -1003,6 +1005,8 @@
     "https-browserify": ["https-browserify@1.0.0", "", {}, "sha512-J+FkSdyD+0mA0N+81tMotaRMfSL9SGi+xpD3T6YApKsc3bGSXJlfXri3VyFOeYkfLRQisDk1W+jIFFKBeUBbBg=="],
 
     "https-proxy-agent": ["https-proxy-agent@5.0.1", "", { "dependencies": { "agent-base": "6", "debug": "4" } }, "sha512-dFcAjpTQFgoLMzC2VwU+C/CbS7uRL0lWmxDITmqm7C+7F0Odmj6s9l6alZc6AELXhrnggM2CeWSXHGOdX2YtwA=="],
+
+    "idb": ["idb@8.0.3", "", {}, "sha512-LtwtVyVYO5BqRvcsKuB2iUMnHwPVByPCXFXOpuU96IZPPoPN6xjOGxZQ74pgSVVLQWtUOYgyeL4GE98BY5D3wg=="],
 
     "identifier-regex": ["identifier-regex@1.0.1", "", { "dependencies": { "reserved-identifiers": "^1.0.0" } }, "sha512-ZrYyM0sozNPZlvBvE7Oq9Bn44n0qKGrYu5sQ0JzMUnjIhpgWYE2JB6aBoFwEYdPjqj7jPyxXTMJiHDOxDfd8yw=="],
 

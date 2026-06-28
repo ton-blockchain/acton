@@ -1,6 +1,7 @@
 use crate::commands::common::error_fmt;
+use crate::contract_interface::is_boc_path;
 use crate::contract_interface::{
-    compile_optional_contract_interface_with_cache, is_boc_path, read_precompiled_boc,
+    compile_optional_contract_interface_with_cache, read_precompiled_boc,
 };
 use crate::file_build_cache::FileBuildCache;
 use crate::stdlib;
@@ -12,14 +13,18 @@ use acton_config::config::{
 use anyhow::anyhow;
 use heck::ToLowerCamelCase;
 use log::debug;
+use serde_json::json;
+use source_artifact::{SourceArtifactDebugInfo, save_source_artifact};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
+use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use tycho_types::boc::Boc;
 
 mod dep_graph;
+mod source_artifact;
 
 #[derive(Debug, Default)]
 pub struct BuildCommandOptions {
@@ -30,6 +35,7 @@ pub struct BuildCommandOptions {
     pub gen_dir: Option<String>,
     pub output_abi: Option<String>,
     pub output_fift: Option<String>,
+    pub output_sources: Option<String>,
     pub show_info: bool,
     pub quiet_no_contracts: bool,
 }
@@ -50,6 +56,7 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
         gen_dir,
         output_abi,
         output_fift,
+        output_sources,
         show_info,
         quiet_no_contracts,
     } = options;
@@ -103,6 +110,14 @@ pub fn build_cmd(options: BuildCommandOptions) -> anyhow::Result<()> {
             .build
             .as_ref()
             .and_then(|build| non_empty_path(build.output_fift.clone())),
+        project_root,
+    );
+    let output_sources_dir = resolve_optional_build_output_dir(
+        output_sources,
+        config
+            .build
+            .as_ref()
+            .and_then(|build| non_empty_path(build.output_sources.clone())),
         project_root,
     );
 
@@ -177,6 +192,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
     let mut compile_errors = BTreeMap::new();
     let mut artifact_errors = BTreeMap::<String, Vec<String>>::new();
     let mut build_info = Vec::new();
+    let with_debug_info = output_sources_dir.is_some();
 
     for parent_contract in filtered_compilation_order {
         let Some(contract_config) = contracts.get(&parent_contract) else {
@@ -208,6 +224,7 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             &contract_path,
             &config,
             project_root,
+            with_debug_info,
             output_fift_dir.is_some(),
             force_recompile,
         ) {
@@ -223,6 +240,8 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             code_hash,
             fift_code,
             abi,
+            source_map,
+            debug_info,
             compiled_from_source,
         } = processed_contract;
 
@@ -288,6 +307,25 @@ See https://ton-blockchain.github.io/acton/docs/building/reference/#contracts-se
             && let Some(fift_code) = &fift_code
             && let Err(err) =
                 save_fift_file(project_root, output_fift_dir, &parent_contract, fift_code)
+        {
+            record_contract_error(&mut artifact_errors, &parent_contract, err);
+            error_count += 1;
+        }
+
+        if let Some(output_sources_dir) = &output_sources_dir
+            && !is_boc_path(&contract_path)
+            && let Err(err) = save_source_artifact(
+                project_root,
+                output_sources_dir,
+                &parent_contract,
+                contract_config,
+                &contract_path,
+                &code_hash,
+                source_map.as_ref(),
+                debug_info.as_ref(),
+                abi.as_ref(),
+                &config,
+            )
         {
             record_contract_error(&mut artifact_errors, &parent_contract, err);
             error_count += 1;
@@ -372,6 +410,8 @@ struct ProcessedContract {
     code_hash: String,
     fift_code: Option<String>,
     abi: Option<ContractABI>,
+    source_map: Option<SourceMap>,
+    debug_info: Option<SourceArtifactDebugInfo>,
     compiled_from_source: bool,
 }
 
@@ -385,6 +425,7 @@ fn process_contract(
     contract_path: &Path,
     acton_config: &ActonConfig,
     project_root: &Path,
+    with_debug_info: bool,
     with_fift: bool,
     force_recompile: bool,
 ) -> anyhow::Result<ProcessedContract> {
@@ -404,6 +445,8 @@ fn process_contract(
             code_hash: precompiled.code_hash.to_string(),
             fift_code: None,
             abi,
+            source_map: None,
+            debug_info: None,
             compiled_from_source: false,
         });
     }
@@ -412,16 +455,24 @@ fn process_contract(
         debug!("Cache bypass for '{contract_cache_key}' because dependency changed");
         None
     } else {
-        file_cache.get(contract_cache_key, false, with_fift, 2, "1.4")
+        file_cache.get(contract_cache_key, with_debug_info, with_fift, 2, "1.4")
     };
 
     if let Some(cached_result) = cached_result {
         debug!("Cache hit, use cached result for '{contract_cache_key}'");
+        let debug_info = SourceArtifactDebugInfo::from_compiler_result(
+            &cached_result.code_boc64,
+            cached_result.symbol_types_json,
+            cached_result.debug_marks_json,
+            cached_result.debug_marks_base64,
+        );
         return Ok(ProcessedContract {
             code_boc64: cached_result.code_boc64,
             code_hash: cached_result.code_hash_hex,
             fift_code: cached_result.fift_code,
             abi: cached_result.abi,
+            source_map: cached_result.source_map,
+            debug_info,
             compiled_from_source: false,
         });
     }
@@ -433,23 +484,38 @@ fn process_contract(
 
     let mappings = acton_config.mappings();
     let compiler = tolk_compiler::Compiler::new(2).with_mappings(&mappings);
-    let compilation_result = compiler.compile(contract_path, false);
+    let compilation_result = compiler.compile(contract_path, with_debug_info);
     let compile_time = compile_start.elapsed();
 
     match compilation_result {
         tolk_compiler::CompilerResult::Success(result) => {
-            if let Err(e) = file_cache.put(contract_cache_key, &result, false, with_fift, 2, "1.4")
-            {
+            if let Err(e) = file_cache.put(
+                contract_cache_key,
+                &result,
+                with_debug_info,
+                with_fift,
+                2,
+                "1.4",
+            ) {
                 eprintln!("Warning: Failed to cache compilation result for {display_name}: {e}");
             }
 
             println!("    {} in {:?}", "Finished".green(), compile_time);
+
+            let debug_info = SourceArtifactDebugInfo::from_compiler_result(
+                &result.code_boc64,
+                result.symbol_types_json,
+                result.debug_marks_json,
+                result.debug_marks_base64,
+            );
 
             Ok(ProcessedContract {
                 code_boc64: result.code_boc64,
                 code_hash: result.code_hash_hex,
                 fift_code: with_fift.then_some(result.fift_code),
                 abi: result.abi,
+                source_map: result.source_map,
+                debug_info,
                 compiled_from_source: true,
             })
         }
@@ -510,8 +576,6 @@ fn save_build_artifact(
     code_boc64: &str,
     code_hash: &str,
 ) -> anyhow::Result<()> {
-    use serde_json::json;
-
     let json_data = json!({
         "code_boc64": code_boc64,
         "hash": code_hash
@@ -600,7 +664,11 @@ fn save_fift_file(
     Ok(())
 }
 
-fn contract_artifact_path(output_dir: &Path, contract_key: &str, extension: &str) -> PathBuf {
+pub(super) fn contract_artifact_path(
+    output_dir: &Path,
+    contract_key: &str,
+    extension: &str,
+) -> PathBuf {
     let filename = format!("{contract_key}.{extension}");
     output_dir.join(filename)
 }

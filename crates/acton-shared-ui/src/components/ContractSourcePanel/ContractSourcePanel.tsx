@@ -76,6 +76,8 @@ interface ContractSourcePanelProps {
   readonly codeBoc: string
   readonly verifiedSource?: ContractVerifiedSource
   readonly verifiedSourceLoading?: boolean
+  readonly verificationUrl?: string
+  readonly verificationExternal?: boolean
   readonly compact?: boolean
 }
 
@@ -122,6 +124,8 @@ export function ContractSourcePanel({
   codeBoc,
   verifiedSource,
   verifiedSourceLoading = false,
+  verificationUrl,
+  verificationExternal = true,
   compact = false,
 }: ContractSourcePanelProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<ContractSourceTab>("verified")
@@ -142,6 +146,8 @@ export function ContractSourcePanel({
         onTabChange={setActiveTab}
         codeData={codeData}
         verifiedSource={resolvedVerifiedSource}
+        verificationUrl={verificationUrl}
+        verificationExternal={verificationExternal}
         compact={compact}
       />
       {verifiedSourceLoading && !resolvedVerifiedSource && (
@@ -186,12 +192,16 @@ function SourcePanel({
   onTabChange,
   codeData,
   verifiedSource,
+  verificationUrl,
+  verificationExternal,
   compact,
 }: {
   readonly activeTab: ContractSourceTab
   readonly onTabChange: (tab: ContractSourceTab) => void
   readonly codeData: ContractCodeData
   readonly verifiedSource?: ContractVerifiedSource
+  readonly verificationUrl?: string
+  readonly verificationExternal: boolean
   readonly compact: boolean
 }): JSX.Element {
   const activeSourceTab = activeTab === "verified" && !verifiedSource ? "decompiled" : activeTab
@@ -259,7 +269,11 @@ function SourcePanel({
         ))}
       </div>
       {activeSourceTab === "verified" && verifiedSource ? (
-        <VerifiedSourcePanel source={verifiedSource} />
+        <VerifiedSourcePanel
+          source={verifiedSource}
+          verificationUrl={verificationUrl}
+          verificationExternal={verificationExternal}
+        />
       ) : activeSource ? (
         <ContractTextPanel
           title={activeSource.title}
@@ -272,7 +286,15 @@ function SourcePanel({
   )
 }
 
-function VerifiedSourcePanel({source}: {readonly source: ContractVerifiedSource}): JSX.Element {
+function VerifiedSourcePanel({
+  source,
+  verificationUrl,
+  verificationExternal,
+}: {
+  readonly source: ContractVerifiedSource
+  readonly verificationUrl?: string
+  readonly verificationExternal: boolean
+}): JSX.Element {
   const bundles = useMemo(
     () => source.bundles.filter(bundle => bundle.files.length > 0),
     [source.bundles],
@@ -313,7 +335,10 @@ function VerifiedSourcePanel({source}: {readonly source: ContractVerifiedSource}
       )}
       <VerifiedCodeViewer
         bundle={activeBundle}
-        verificationUrl={`${VERIFIER_BASE_URL}/${encodeURIComponent(source.code_hash)}`}
+        verificationUrl={
+          verificationUrl ?? `${VERIFIER_BASE_URL}/${encodeURIComponent(source.code_hash)}`
+        }
+        verificationExternal={verificationUrl ? verificationExternal : true}
       />
     </section>
   )
@@ -322,9 +347,11 @@ function VerifiedSourcePanel({source}: {readonly source: ContractVerifiedSource}
 function VerifiedCodeViewer({
   bundle,
   verificationUrl,
+  verificationExternal,
 }: {
   readonly bundle: SourceBundle
   readonly verificationUrl: string
+  readonly verificationExternal: boolean
 }): JSX.Element {
   const entrypointPath = useMemo(
     () => findEntrypointFile(bundle.files, bundle.entrypoint)?.path,
@@ -391,8 +418,8 @@ function VerifiedCodeViewer({
           <a
             className={styles.verificationLink}
             href={verificationUrl}
-            target="_blank"
-            rel="noreferrer"
+            target={verificationExternal ? "_blank" : undefined}
+            rel={verificationExternal ? "noreferrer" : undefined}
           >
             <ExternalLink size={13} aria-hidden="true" />
             View verification
@@ -611,7 +638,7 @@ function shortenMiddle(value: string, prefix = 8, suffix = 6): string {
   if (value.length <= prefix + suffix + 1) {
     return value
   }
-  return `${value.slice(0, prefix)}...${value.slice(-suffix)}`
+  return `${value.slice(0, prefix)}…${value.slice(-suffix)}`
 }
 
 function ContractTextPanel({

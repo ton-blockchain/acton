@@ -165,6 +165,7 @@ Configures defaults for `acton build`.
 | `gen-dir`     | `string` | No       | Directory where generated dependency files are written (default: `gen`).                 |
 | `output-abi`  | `string` | No       | Directory where contract ABI JSON files are written (default: `build/abi`).              |
 | `output-fift` | `string` | No       | Directory where compiled Fift files are written (`<contract>.fif` per `.tolk` contract). |
+| `output-sources` | `string` | No    | Directory where source registration artifacts are written (`<contract>.source.json` per `.tolk` contract). |
 
 Example:
 
@@ -174,9 +175,10 @@ out-dir = "build"
 gen-dir = "gen"
 output-abi = "build/abi"
 output-fift = "build/fift"
+output-sources = "build/sources"
 ```
 
-`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, and `acton build --output-fift <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Precompiled `.boc` contracts emit ABI only when their contract config sets `types`; they never emit Fift output.
+`acton build --out-dir <DIR>`, `acton build --gen-dir <DIR>`, `acton build --output-abi <DIR>`, `acton build --output-fift <DIR>`, and `acton build --output-sources <DIR>` override these values for a single run. Config values here are project-root-relative. The CLI flags stay relative to the current working directory unless absolute paths are passed. Precompiled `.boc` contracts emit ABI only when their contract config sets `types`; they never emit Fift or source registration output.
 
 ## `[wrappers]`
 

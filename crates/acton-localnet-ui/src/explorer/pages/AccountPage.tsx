@@ -35,6 +35,7 @@ import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
 import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import styles from "./AccountPage.module.css"
 
@@ -63,6 +64,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const routes = useExplorerRoutePaths()
   const openPath = useOpenExplorerPath()
   const {addressFormat, network} = useNetworkInfo()
+  const metadataRegistry = useMetadataRegistry()
   const [accountState, setAccountState] = useState<AddressInformation | undefined>()
   const [accountStateV3, setAccountStateV3] = useState<V3AccountState | undefined>()
   const [transactions, setTransactions] = useState<V3TransactionListItem[]>([])
@@ -395,7 +397,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
       setCompilerAbiError(undefined)
 
       try {
-        const abis = await client.getCompilerAbis([accountCodeHash])
+        const abis = await metadataRegistry.getCompilerAbis([accountCodeHash])
         if (!isActive) return
         setExtendedContractAbi(abis[accountCodeHash] ?? undefined)
         setCompilerAbiLoading(false)
@@ -411,7 +413,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, client])
+  }, [accountCodeHash, metadataRegistry])
 
   useEffect(() => {
     let isActive = true
@@ -427,7 +429,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
       setVerifiedSourceLoading(true)
 
       try {
-        const source = await client.getVerifiedSource({
+        const source = await metadataRegistry.getSource({
           codeHash: accountCodeHash,
         })
         if (!isActive) return
@@ -445,7 +447,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     return () => {
       isActive = false
     }
-  }, [accountCodeHash, client])
+  }, [accountCodeHash, metadataRegistry])
 
   useEffect(() => {
     if (!formattedAddress) {

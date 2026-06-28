@@ -27,6 +27,7 @@
     "@types/react-router-dom": "^5.3.3",
     "buffer": "^6.0.3",
     "framer-motion": "^12.11.0",
+    "idb": "8.0.3",
     "lucide-react": "^0.474.0",
     "monaco-editor": "^0.52.2",
     "qrcode.react": "^4.2.0",

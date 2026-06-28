@@ -3321,8 +3321,6 @@ struct RegisterAbiPayload {
 
 #[derive(Serialize)]
 struct RegisterAbiEntry {
-    code_hash: String,
-    #[serde(rename = "compiler_abi")]
     abi: serde_json::Value,
 }
 
@@ -3343,9 +3341,16 @@ fn register_localnet_abis(
         if abi.contract_name.is_empty() {
             abi.contract_name.clone_from(&result.name);
         }
-        entries_by_hash
-            .entry(result.code_hash.to_string())
-            .or_insert(serde_json::to_value(&abi)?);
+        let display_name = abi.contract_name.clone();
+        let code_hash = result.code_hash.to_string();
+        entries_by_hash.entry(code_hash.clone()).or_insert_with(|| {
+            serde_json::json!({
+                "compiler_abi": abi,
+                "display_name": display_name,
+                "code_hashes": [code_hash],
+                "links": [],
+            })
+        });
     }
 
     if entries_by_hash.is_empty() {
@@ -3355,8 +3360,8 @@ fn register_localnet_abis(
     let url = localnet_acton_url(custom_networks, "acton_registerCompilerAbis")?;
     let payload = RegisterAbiPayload {
         entries: entries_by_hash
-            .into_iter()
-            .map(|(code_hash, abi)| RegisterAbiEntry { code_hash, abi })
+            .into_values()
+            .map(|abi| RegisterAbiEntry { abi })
             .collect(),
     };
 

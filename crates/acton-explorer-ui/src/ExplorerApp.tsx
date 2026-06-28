@@ -9,6 +9,11 @@ import {getBundledCompilerAbis} from "../../acton-localnet-ui/src/explorer/api/c
 import {AddressBookProvider} from "../../acton-localnet-ui/src/explorer/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "../../acton-localnet-ui/src/explorer/hooks/useExplorerRoutes"
 import {StaticNetworkInfoProvider} from "../../acton-localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
+import {BrowserMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/browserRegistry"
+import {BundledAbiRegistry} from "../../acton-localnet-ui/src/explorer/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/compositeRegistry"
+import {MetadataRegistryProvider} from "../../acton-localnet-ui/src/explorer/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/verifierRegistry"
 import type {
   CustomExplorerNetworkId,
   ExplorerApiConfig,
@@ -20,6 +25,7 @@ import {
   AbiCatalogPage,
   AbiDetailsPage,
 } from "../../acton-localnet-ui/src/explorer/pages/AbiCatalogPage"
+import {SourceCatalogPage} from "../../acton-localnet-ui/src/explorer/pages/SourceCatalogPage"
 import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
@@ -805,9 +811,17 @@ export const ExplorerApp: FC = () => {
         localnetControlEnabled: false,
         toncenterApiCompatible: true,
         toncenterApiKey: networkConfig.api.toncenterApiKey,
-        compilerAbiLoader: getBundledCompilerAbis,
       }),
     [networkConfig],
+  )
+  const metadataRegistry = useMemo(
+    () =>
+      new CompositeMetadataRegistry([
+        new BrowserMetadataRegistry(`actonscan:${networkConfig.id}`),
+        new BundledAbiRegistry(getBundledCompilerAbis),
+        new VerifierMetadataRegistry(),
+      ]),
+    [networkConfig.id],
   )
   const handleNetworkChange = useCallback((selectedNetworkId: SelectableExplorerNetworkId) => {
     setNetworkState(current => ({...current, selectedNetworkId}))
@@ -886,78 +900,84 @@ export const ExplorerApp: FC = () => {
       <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
-            <AddressBookProvider>
-              <div className={styles.appShell}>
-                <ExplorerHeaderFrame>
-                  <div className={styles.headerInner}>
-                    <div className={styles.headerPrimary}>
-                      <Link className={styles.brand} to="/">
-                        <img
-                          className={styles.brandIcon}
-                          src={actonScanLogo}
-                          alt=""
-                          aria-hidden="true"
+            <MetadataRegistryProvider registry={metadataRegistry}>
+              <AddressBookProvider>
+                <div className={styles.appShell}>
+                  <ExplorerHeaderFrame>
+                    <div className={styles.headerInner}>
+                      <div className={styles.headerPrimary}>
+                        <Link className={styles.brand} to="/">
+                          <img
+                            className={styles.brandIcon}
+                            src={actonScanLogo}
+                            alt=""
+                            aria-hidden="true"
+                          />
+                          <span className={styles.brandText}>actonscan</span>
+                        </Link>
+                        <nav className={styles.nav} aria-label="Explorer navigation">
+                          <Link className={styles.navLink} to="/blocks">
+                            Blocks
+                          </Link>
+                          <Link className={styles.navLink} to="/abi">
+                            ABI
+                          </Link>
+                          <Link className={styles.navLink} to="/sources">
+                            Sources
+                          </Link>
+                        </nav>
+                      </div>
+                      <ExplorerSearch className={styles.headerSearch} variant="header" />
+                      <div className={styles.headerActions}>
+                        <NetworkDropdown
+                          networks={selectableNetworks}
+                          value={networkId}
+                          onChange={handleNetworkChange}
+                          onAddNetwork={handleAddNetwork}
+                          onEditNetwork={handleEditNetwork}
+                          onDeleteNetwork={handleDeleteNetwork}
                         />
-                        <span className={styles.brandText}>actonscan</span>
-                      </Link>
-                      <nav className={styles.nav} aria-label="Explorer navigation">
-                        <Link className={styles.navLink} to="/blocks">
-                          Blocks
-                        </Link>
-                        <Link className={styles.navLink} to="/abi">
-                          ABI
-                        </Link>
-                      </nav>
+                        <ThemeSwitch
+                          theme={theme}
+                          onToggleTheme={toggleTheme}
+                          aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
+                        />
+                        <a
+                          className={styles.githubButton}
+                          href="https://github.com/ton-blockchain/acton"
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Open GitHub"
+                          aria-label="Open GitHub"
+                        >
+                          <Github size={18} />
+                        </a>
+                      </div>
                     </div>
-                    <ExplorerSearch className={styles.headerSearch} variant="header" />
-                    <div className={styles.headerActions}>
-                      <NetworkDropdown
-                        networks={selectableNetworks}
-                        value={networkId}
-                        onChange={handleNetworkChange}
-                        onAddNetwork={handleAddNetwork}
-                        onEditNetwork={handleEditNetwork}
-                        onDeleteNetwork={handleDeleteNetwork}
+                  </ExplorerHeaderFrame>
+                  <main className={styles.main}>
+                    <Routes>
+                      <Route path="/" element={<ExplorerIndexPage />} />
+                      <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route path="/abi" element={<AbiCatalogPage />} />
+                      <Route path="/abi/:slug" element={<AbiDetailsPage />} />
+                      <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route
+                        path="/block/:workchain/:shard/:seqno"
+                        element={<BlockDetailsPage client={client} />}
                       />
-                      <ThemeSwitch
-                        theme={theme}
-                        onToggleTheme={toggleTheme}
-                        aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
+                      <Route path="/address/:address" element={<AccountPage client={client} />} />
+                      <Route
+                        path="/tx/:hash/trace"
+                        element={<TransactionPage client={client} openRetraceOnLoad />}
                       />
-                      <a
-                        className={styles.githubButton}
-                        href="https://github.com/ton-blockchain/acton"
-                        target="_blank"
-                        rel="noreferrer"
-                        title="Open GitHub"
-                        aria-label="Open GitHub"
-                      >
-                        <Github size={18} />
-                      </a>
-                    </div>
-                  </div>
-                </ExplorerHeaderFrame>
-                <main className={styles.main}>
-                  <Routes>
-                    <Route path="/" element={<ExplorerIndexPage />} />
-                    <Route path="/blocks" element={<BlocksPage client={client} />} />
-                    <Route path="/abi" element={<AbiCatalogPage />} />
-                    <Route path="/abi/:slug" element={<AbiDetailsPage />} />
-                    <Route
-                      path="/block/:workchain/:shard/:seqno"
-                      element={<BlockDetailsPage client={client} />}
-                    />
-                    <Route path="/address/:address" element={<AccountPage client={client} />} />
-                    <Route
-                      path="/tx/:hash/trace"
-                      element={<TransactionPage client={client} openRetraceOnLoad />}
-                    />
-                    <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </main>
-              </div>
-            </AddressBookProvider>
+                      <Route path="/tx/:hash" element={<TransactionPage client={client} />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </main>
+                </div>
+              </AddressBookProvider>
+            </MetadataRegistryProvider>
           </ExplorerRoutesProvider>
         </StaticNetworkInfoProvider>
       </ToastProvider>

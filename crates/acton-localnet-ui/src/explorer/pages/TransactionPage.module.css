@@ -107,23 +107,6 @@
   margin-top: 12px;
 }
 
-.selectedRetraceSection > .selectedRetracePanel {
-  --retrace-page-header-height: calc(52px - 2px);
-  --retrace-panel-height: calc(
-    var(--retrace-panel-viewport-height) +
-    var(--retrace-panel-header-height) -
-    var(--retrace-page-header-height)
-  );
-  --retrace-workspace-height: calc(
-    var(--retrace-panel-viewport-height) -
-    var(--retrace-page-header-height)
-  );
-  --retrace-workspace-narrow-height: calc(
-    var(--retrace-panel-viewport-height) -
-    var(--retrace-page-header-height)
-  );
-}
-
 .retraceInlineButton {
   display: inline-flex;
   align-items: center;

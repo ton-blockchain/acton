@@ -8,6 +8,7 @@ import {
   type MessageNamesByAddress,
   useMessageNamesByAddress,
 } from "./useMessageNamesByAddress"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 export function useTransactionMessageNames(
   client: TonClient,
@@ -17,7 +18,8 @@ export function useTransactionMessageNames(
   readonly messageNamesByAddress: MessageNamesByAddress
 } {
   const addresses = useMemo(() => collectTransactionListAddresses(transactions), [transactions])
-  const messageNamesByAddress = useMessageNamesByAddress({client, addresses})
+  const metadataRegistry = useMetadataRegistry()
+  const messageNamesByAddress = useMessageNamesByAddress({client, metadataRegistry, addresses})
 
   return {addresses, messageNamesByAddress}
 }

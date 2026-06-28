@@ -5,6 +5,7 @@ import type {TonClient} from "../api/client"
 import {buildMessageNamesByOpcodeHex} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import type {V3TransactionListItem} from "../api/types"
+import type {ExplorerMetadataRegistry} from "../metadata/types"
 
 export type MessageNamesByAddress = ReadonlyMap<
   string,
@@ -23,6 +24,8 @@ export type MessageNamesByAddress = ReadonlyMap<
 interface UseMessageNamesByAddressOptions {
   /** Localnet client used to resolve account states and compiler ABIs. */
   readonly client: TonClient
+  /** Product-specific metadata registry used to resolve compiler ABIs. */
+  readonly metadataRegistry: ExplorerMetadataRegistry
   /** Raw or user-friendly addresses to resolve; duplicates are normalized away. */
   readonly addresses: readonly string[]
 }
@@ -36,6 +39,7 @@ interface UseMessageNamesByAddressOptions {
  */
 export function useMessageNamesByAddress({
   client,
+  metadataRegistry,
   addresses,
 }: UseMessageNamesByAddressOptions): MessageNamesByAddress {
   // Keep this hook transaction-shape agnostic: callers collect the addresses
@@ -59,6 +63,7 @@ export function useMessageNamesByAddress({
 
       const resolved = await resolveCompilerAbis({
         client,
+        metadataRegistry,
         addresses: requestedAddresses,
         shouldContinue: () => isActive,
         onAccountStatesError: error => {
@@ -77,7 +82,7 @@ export function useMessageNamesByAddress({
     return () => {
       isActive = false
     }
-  }, [client, requestedAddresses])
+  }, [client, metadataRegistry, requestedAddresses])
 
   return useMemo<MessageNamesByAddress>(() => {
     const next = new Map<

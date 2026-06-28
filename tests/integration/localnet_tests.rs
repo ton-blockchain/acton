@@ -5109,6 +5109,8 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         .to_hex();
 
     let missing_code_hash = "1111111111111111111111111111111111111111111111111111111111111111";
+    let local_override_alias_hash =
+        "2222222222222222222222222222222222222222222222222222222222222222";
     let abi_response = wait_for_ok_response(
         &node,
         &format!(
@@ -5126,10 +5128,14 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
         &json!({
             "entries": [
                 {
-                    "code_hash": CATALOG_WALLET_V4R2_CODE_HASH,
-                    "compiler_abi": {
-                        "compiler_name": "tolk",
-                        "contract_name": "LocalOverride"
+                    "abi": {
+                        "compiler_abi": {
+                            "compiler_name": "tolk",
+                            "contract_name": "LocalOverride"
+                        },
+                        "display_name": "LocalOverride",
+                        "code_hashes": [CATALOG_WALLET_V4R2_CODE_HASH, local_override_alias_hash],
+                        "links": []
                     }
                 }
             ]
@@ -5143,10 +5149,26 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
     );
     let override_response = wait_for_ok_response(
         &node,
-        &format!("/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}"),
+        &format!(
+            "/acton_getCompilerAbi?code_hash={CATALOG_WALLET_V4R2_CODE_HASH}&code_hash={local_override_alias_hash}"
+        ),
         Duration::from_secs(12),
     );
     let override_payload = response_payload(&override_response);
+    let registered_compiler_abis_response =
+        wait_for_ok_response(&node, "/acton_listCompilerAbis", Duration::from_secs(12));
+    let registered_compiler_abis = response_payload(&registered_compiler_abis_response);
+    let local_override_rows = registered_compiler_abis
+        .as_array()
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|entry| {
+                    entry["abi"]["compiler_abi"]["contract_name"].as_str() == Some("LocalOverride")
+                })
+                .count()
+        })
+        .unwrap_or_default();
 
     let abi_summary = json!({
         "compiler_name": abi["compiler_name"],
@@ -5167,6 +5189,12 @@ fn localnet_registers_and_serves_compiler_abi_for_localnet_deploys() {
             ["contract_name"]
             .as_str()
             == Some("LocalOverride"),
+        "local_registration_alias_resolves": override_payload[local_override_alias_hash]
+            ["compiler_abi"]
+            ["contract_name"]
+            .as_str()
+            == Some("LocalOverride"),
+        "local_registration_is_single_row": local_override_rows == 1,
         "missing_code_hash_is_null": abi_payload[missing_code_hash].is_null(),
     });
     let abi_summary_json = format!(

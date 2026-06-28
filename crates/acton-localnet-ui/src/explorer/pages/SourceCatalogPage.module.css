@@ -1,0 +1,407 @@
+.container {
+  width: 100%;
+  max-width: 1200px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-inline: auto;
+  padding: 24px 32px 40px;
+}
+
+.hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  padding: 4px 0 2px;
+}
+
+.title {
+  margin: 0;
+  color: var(--litenode-text-strong);
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 40px;
+}
+
+.tableFrame {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+  box-sizing: border-box;
+}
+
+.tableTitle {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+  color: var(--litenode-text);
+  font-size: 0.86rem;
+  font-weight: 750;
+  letter-spacing: 0;
+  line-height: 1;
+}
+
+.primaryButton,
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-radius: 8px;
+  font: inherit;
+  font-weight: 650;
+  letter-spacing: 0;
+  cursor: pointer;
+}
+
+.primaryButton {
+  align-self: flex-start;
+  gap: 8px;
+  min-height: 38px;
+  min-width: 160px;
+  padding: 0 12px;
+  background: var(--litenode-text-strong);
+  color: var(--litenode-surface);
+  font-size: var(--font-size-sm);
+}
+
+.primaryButton:hover:not(:disabled),
+.iconButton:hover {
+  filter: brightness(0.97);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.localNote {
+  max-width: 640px;
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: -2px 0 0;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.localNote svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.tableScroller {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+}
+
+.table th,
+.table td {
+  box-sizing: border-box;
+  padding: 0 14px;
+  color: var(--litenode-text);
+  line-height: 1.35;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table th {
+  height: 36px;
+  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
+  color: var(--litenode-text-muted);
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.table td {
+  height: 56px;
+  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  font-size: 0.82rem;
+}
+
+.table tbody tr:first-child td {
+  border-top: 0;
+}
+
+.table th:first-child,
+.table td:first-child {
+  width: 34%;
+}
+
+.table th:nth-child(2),
+.table td:nth-child(2) {
+  width: 19%;
+}
+
+.table th:nth-child(3),
+.table td:nth-child(3) {
+  width: 16%;
+}
+
+.table th:nth-child(4),
+.table td:nth-child(4) {
+  width: 9%;
+}
+
+.tableRow {
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+}
+
+.tableRow:hover td,
+.tableRow:focus-within td {
+  background: var(--litenode-row-hover);
+}
+
+.formButtonRow td {
+  height: auto;
+  padding: 0;
+  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--tonscan-card-bg));
+}
+
+.registerSourceButton {
+  min-width: 0;
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: var(--litenode-text);
+  font: inherit;
+  font-weight: 750;
+  letter-spacing: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.registerSourceButton span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.registerSourceButton:hover {
+  background: var(--litenode-row-hover);
+}
+
+.registerSourceButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.expandedFormRow td {
+  height: auto;
+  padding: 16px;
+  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--tonscan-card-bg));
+}
+
+.sourceInlineForm {
+  width: min(100%, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entrypointCell {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  gap: 3px;
+}
+
+.nameCell,
+.codeHashCell {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nameCell {
+  justify-content: space-between;
+}
+
+.codeHashCell {
+  width: fit-content;
+  max-width: 100%;
+  gap: 4px;
+}
+
+.entrypointCell span,
+.entrypointCell small,
+.codeHash {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.entrypointCell span {
+  color: var(--litenode-text);
+  font-weight: 650;
+}
+
+.entrypointCell small {
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.codeHash {
+  display: block;
+  color: var(--litenode-text);
+  font-family: var(--font-family-mono, monospace);
+  font-size: 0.78rem;
+}
+
+.iconButton {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  background: var(--tonscan-card-bg, var(--litenode-surface));
+  color: var(--litenode-text-muted);
+}
+
+.rowActionButton:hover,
+.rowActionButton:focus-visible {
+  border-color: color-mix(in srgb, #dc2626 42%, var(--tonscan-border));
+  background: color-mix(in srgb, #dc2626 9%, var(--tonscan-card-bg));
+  color: #dc2626;
+  filter: none;
+}
+
+.iconButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--litenode-focus) 24%, transparent);
+}
+
+.rowActionButton:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #dc2626 24%, transparent);
+}
+
+.hashCopyButton {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tonscan-text-secondary, var(--litenode-text-muted));
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    color 120ms ease,
+    opacity 120ms ease;
+}
+
+.codeHashCell:hover .hashCopyButton,
+.codeHashCell:focus-within .hashCopyButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.hashCopyButton:hover {
+  color: var(--litenode-text);
+}
+
+.hashCopyButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 156px;
+  padding: var(--spacing-xl);
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  text-align: center;
+}
+
+.skeletonList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+}
+
+.skeletonRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(120px, 0.45fr) minmax(160px, 0.6fr);
+  gap: 16px;
+  min-height: 34px;
+  align-items: center;
+}
+
+.skeletonRow span {
+  display: block;
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--tonscan-row-hover) 0%,
+    color-mix(in srgb, var(--tonscan-text-secondary) 14%, var(--tonscan-row-hover)) 45%,
+    var(--tonscan-row-hover) 90%
+  );
+  background-size: 220% 100%;
+  animation: skeletonPulse 1.2s ease-in-out infinite;
+}
+
+@keyframes skeletonPulse {
+  from {
+    background-position: 100% 0;
+  }
+
+  to {
+    background-position: -120% 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 16px;
+  }
+
+  .title {
+    font-size: var(--font-size-xl);
+    line-height: 1.2;
+  }
+
+  .primaryButton {
+    width: 100%;
+  }
+}

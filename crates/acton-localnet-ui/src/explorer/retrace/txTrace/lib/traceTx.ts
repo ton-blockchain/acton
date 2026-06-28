@@ -10,9 +10,9 @@ import {Cell} from "@ton/core"
 
 import type {AssemblyMapping} from "ton-source-map"
 
-import type {TonClient} from "../../../api/client"
 import type {SourceBundle, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
+import type {ExplorerMetadataRegistry} from "../../../metadata/types"
 import type {ExitCode, RetraceResultAndCode} from "./types"
 
 import {
@@ -95,15 +95,15 @@ function isSupportedTolkBundle(bundle: SourceBundle): boolean {
 }
 
 async function loadVerifiedTolkSource(
-  client: TonClient | undefined,
+  metadataRegistry: ExplorerMetadataRegistry | undefined,
   codeHash?: string,
 ): Promise<VerificationSourceResponse | undefined> {
-  if (!client || !codeHash) {
+  if (!metadataRegistry || !codeHash) {
     return undefined
   }
 
   try {
-    const source = await client.getVerifiedSource({
+    const source = await metadataRegistry.getSource({
       codeHash,
     })
     const bundles = source.verified ? source.bundles.filter(isSupportedTolkBundle) : []
@@ -278,10 +278,10 @@ function extractCodeAndTrace(
 export async function traceTx(
   hash: string,
   network: ExplorerNetworkInfo,
-  client?: TonClient,
+  metadataRegistry?: ExplorerMetadataRegistry,
   options: TraceTxOptions = {},
 ): Promise<RetraceResultAndCode> {
-  const verifiedSource = await loadVerifiedTolkSource(client, options.codeHash)
+  const verifiedSource = await loadVerifiedTolkSource(metadataRegistry, options.codeHash)
   const sourceTraceOptions = verifiedSourceTraceOptions(verifiedSource)
   const {result} = await doTrace(hash, network, sourceTraceOptions?.sourceMap)
   const {code, traceInfo, exitCode} = extractCodeAndTrace(result.codeCell, result.emulatedTx.vmLogs)

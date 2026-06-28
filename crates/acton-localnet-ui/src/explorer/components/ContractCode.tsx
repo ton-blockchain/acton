@@ -14,6 +14,7 @@ import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {TonClient} from "../api/client"
+import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {AbiPanel, type AbiTab} from "./abi-viewer"
 import type {AddressFormatOptions} from "./utils"
@@ -76,6 +77,7 @@ export const ContractCode: FC<ContractCodeProps> = ({
   const [activeStorageTab, setActiveStorageTab] = useState<StorageTab>("parsed")
   const [activeAbiTab, setActiveAbiTab] = useState<AbiTab>("view")
   const addressFormat = useAddressFormat()
+  const routes = useExplorerRoutePaths()
 
   const parsedStorage = useMemo(
     () => decodeStorageDataCell(dataBoc, compilerAbi),
@@ -110,6 +112,9 @@ export const ContractCode: FC<ContractCodeProps> = ({
       : "No storage data available for this account"
     : "No ABI registered for storage decoding"
   const hasVerifiedSource = Boolean(verifiedSource?.verified && verifiedSource.bundles.length > 0)
+  const hasLocalVerifiedSource = Boolean(
+    verifiedSource?.bundles.some(bundle => bundle.storage_revision === "local"),
+  )
 
   const handleContractTabChange = (tab: ContractCodeTab) => {
     setActiveTab(tab)
@@ -188,6 +193,8 @@ export const ContractCode: FC<ContractCodeProps> = ({
             codeBoc={codeBoc}
             verifiedSource={hasVerifiedSource ? verifiedSource : undefined}
             verifiedSourceLoading={verifiedSourceLoading && !hasVerifiedSource}
+            verificationUrl={hasLocalVerifiedSource ? routes.sourcesPath : undefined}
+            verificationExternal={!hasLocalVerifiedSource}
           />
         )}
       </div>

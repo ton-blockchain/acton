@@ -412,6 +412,9 @@ pub(crate) fn compile_project_contract_with_cache(
                 code_boc64: cached.code_boc64,
                 code_hash_hex: cached.code_hash_hex,
                 source_map: cached.source_map,
+                debug_marks_base64: cached.debug_marks_base64,
+                symbol_types_json: cached.symbol_types_json,
+                debug_marks_json: cached.debug_marks_json,
                 abi: cached.abi,
             }
         } else {

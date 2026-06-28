@@ -11,9 +11,15 @@ import {AccountPage} from "./explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
+import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
+import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
+import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
+import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "./explorer/metadata/verifierRegistry"
 import {DashboardPage} from "./dashboard/DashboardPage"
 import {FaucetPage} from "./dashboard/pages/FaucetPage"
 import {HomePage} from "./dashboard/pages/HomePage"
@@ -115,9 +121,17 @@ export const App: FC = () => {
         localnetApiToken,
         onUnauthorized: handleUnauthorized,
         toncenterApiKey: TONCENTER_API_KEY,
-        compilerAbiLoader: getBundledCompilerAbis,
       }),
     [handleUnauthorized, localnetApiToken],
+  )
+  const metadataRegistry = useMemo(
+    () =>
+      new CompositeMetadataRegistry([
+        new LocalnetMetadataRegistry(client),
+        new BundledAbiRegistry(getBundledCompilerAbis),
+        new VerifierMetadataRegistry(),
+      ]),
+    [client],
   )
   const explorerApi = useMemo(
     () => ({
@@ -138,23 +152,29 @@ export const App: FC = () => {
     <BrowserRouter>
       <ToastProvider>
         <NetworkInfoProvider client={client} api={explorerApi}>
-          <AddressBookProvider client={client}>
-            <WalletRuntimeProvider client={client} host={HOST} localnetApiToken={localnetApiToken}>
-              <AppContent
+          <MetadataRegistryProvider registry={metadataRegistry}>
+            <AddressBookProvider>
+              <WalletRuntimeProvider
                 client={client}
-                isAuthOverlayOpen={isAuthOverlayOpen}
-                isAuthOverlayRequired={isAuthOverlayRequired}
+                host={HOST}
                 localnetApiToken={localnetApiToken}
-                onClearAuthToken={clearAuthToken}
-                onCloseAuthOverlay={closeAuthOverlay}
-                onOpenAuthOverlay={openAuthOverlay}
-                onRequireAuthToken={handleUnauthorized}
-                onSaveAuthToken={saveAuthToken}
-                theme={theme}
-                setTheme={setTheme}
-              />
-            </WalletRuntimeProvider>
-          </AddressBookProvider>
+              >
+                <AppContent
+                  client={client}
+                  isAuthOverlayOpen={isAuthOverlayOpen}
+                  isAuthOverlayRequired={isAuthOverlayRequired}
+                  localnetApiToken={localnetApiToken}
+                  onClearAuthToken={clearAuthToken}
+                  onCloseAuthOverlay={closeAuthOverlay}
+                  onOpenAuthOverlay={openAuthOverlay}
+                  onRequireAuthToken={handleUnauthorized}
+                  onSaveAuthToken={saveAuthToken}
+                  theme={theme}
+                  setTheme={setTheme}
+                />
+              </WalletRuntimeProvider>
+            </AddressBookProvider>
+          </MetadataRegistryProvider>
         </NetworkInfoProvider>
       </ToastProvider>
     </BrowserRouter>
@@ -353,6 +373,14 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <AbiDetailsPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/sources"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <SourceCatalogPage />
                 </DashboardPage>
               }
             />

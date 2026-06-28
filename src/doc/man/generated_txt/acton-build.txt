@@ -19,7 +19,9 @@ DESCRIPTION
        contract ABI JSON file to the ABI output directory. When the contract
        config has an output path, Acton writes the compiled .boc file there.
        Dependency helper files are emitted into the generated-code directory,
-       and optional Fift output can be written separately.
+       and optional Fift output can be written separately. Source registration
+       artifacts for local explorer source upload can also be written when
+       explicitly configured.
 
        Contracts with .boc sources are treated as precompiled inputs: Acton
        loads their code, includes them in dependency resolution, and skips code
@@ -65,6 +67,14 @@ OPTIONS
 
            Defaults to [build].output-fift when configured. If neither the flag
            nor the config value is set, Acton does not write .fif files.
+
+       --output-sources dir
+           Directory for source registration artifacts generated from .tolk
+           contracts.
+
+           Defaults to [build].output-sources when configured. If neither the
+           flag nor the config value is set, Acton does not write source
+           registration artifacts.
 
        --info
            Print compiled code and hash information for each successfully built
@@ -116,6 +126,7 @@ CONFIGURATION
            gen-dir = "gen"
            output-abi = "build/abi"
            output-fift = "build/fift"
+           output-sources = "build/sources"
 
        CLI flags override config values for the current invocation. For
        dependency helpers, a per-dependency depends[].path still overrides the
@@ -137,6 +148,9 @@ OUTPUTS
           configured)
 
        o  <output-fift>/<contract-name>.fif for compiled .tolk contracts
+
+       o  <output-sources>/<contract-name>.source.json with a source
+          registration artifact for compiled .tolk contracts
 
        o  a DOT dependency graph file when --graph is passed
 
@@ -203,7 +217,8 @@ EXAMPLES
 
               acton build --out-dir artifacts --gen-dir artifacts/gen \
                                               --output-abi artifacts/abi \
-                                              --output-fift artifacts/fift
+                                              --output-fift artifacts/fift \
+                                              --output-sources artifacts/sources
 
        6. Print compiled code and hashes after the build:
 
