@@ -1743,7 +1743,7 @@ function getHistoryActionIcon(action: V3Action, info: HistoryActionInfo): Lucide
     return info.isIncoming ? MoveDownLeft : MoveUpRight
   }
 
-  return ACTION_TYPE_ICONS[action.type]
+  return ACTION_TYPE_ICONS[action.type] ?? CircleDot
 }
 
 function getActionRowKey(action: V3Action, fallbackIndex: number): string {

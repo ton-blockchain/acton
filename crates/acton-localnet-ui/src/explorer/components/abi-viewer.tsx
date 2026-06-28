@@ -1090,7 +1090,7 @@ function tupleItemToV3StackEntry(item: TupleItem): V3RunGetMethodStackEntry {
 function v3StackEntryToTupleItem(entry: V3RunGetMethodStackEntry): TupleItem {
   switch (entry.type) {
     case "num": {
-      return {type: "int", value: BigInt(String(entry.value))}
+      return {type: "int", value: parseStackBigInt(entry.value)}
     }
     case "null": {
       return {type: "null"}
@@ -1125,6 +1125,20 @@ function v3StackEntryToTupleItem(entry: V3RunGetMethodStackEntry): TupleItem {
       throw new Error(`Unsupported stack entry type: ${entry.type}.`)
     }
   }
+}
+
+function parseStackBigInt(value: unknown): bigint {
+  if (typeof value === "number") {
+    return BigInt(Math.trunc(value))
+  }
+
+  const text = String(value).trim()
+  if (/^[+-]0x/i.test(text)) {
+    const sign = text.startsWith("-") ? -1n : 1n
+    return sign * BigInt(text.slice(1))
+  }
+
+  return BigInt(text)
 }
 
 function v3StackListToTupleItem(entries: readonly unknown[]): TupleItem {

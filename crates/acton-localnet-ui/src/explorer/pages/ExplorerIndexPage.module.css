@@ -35,7 +35,68 @@
   font-weight: var(--font-weight-bold);
   color: var(--text-primary);
   margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.32em;
+  row-gap: var(--spacing-xs);
   line-height: 1.1;
+}
+
+.logoTitleAccent {
+  -webkit-text-fill-color: transparent;
+  background: linear-gradient(89deg, #2b82eb, #1cc8ff);
+  background-clip: text;
+  font-feature-settings:
+    "clig" off,
+    "liga" off;
+}
+
+.footer {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 18px 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  color: var(--tonscan-text-secondary);
+  font-size: var(--font-size-sm);
+  line-height: 1;
+}
+
+.footer a {
+  color: var(--tonscan-text-secondary);
+  text-decoration: none;
+  transition: color var(--transition-duration-fast);
+}
+
+.footerCredit {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.footerBrand {
+  color: var(--tonscan-text-primary);
+}
+
+.footerBy {
+  font-size: var(--font-size-xs);
+  color: var(--tonscan-text-secondary);
+}
+
+.footer .footerCreditLink {
+  color: var(--tonscan-link);
+}
+
+.footer a:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.footer .footerCreditLink:hover {
+  color: var(--tonscan-link);
 }
 
 @media (max-width: 768px) {
@@ -45,5 +106,11 @@
 
   .logoTitle {
     font-size: var(--font-size-xl);
+  }
+
+  .footer {
+    flex-wrap: wrap;
+    gap: 12px;
+    padding-bottom: 0;
   }
 }

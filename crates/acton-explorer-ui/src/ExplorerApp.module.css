@@ -47,6 +47,10 @@
   margin-left: auto;
 }
 
+.headerHome .headerSearch {
+  display: none;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;
