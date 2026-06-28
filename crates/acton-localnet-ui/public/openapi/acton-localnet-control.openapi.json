@@ -116,6 +116,45 @@
         }
       }
     },
+    "/acton_listCompilerAbis": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listCompilerAbis",
+        "summary": "List registered compiler ABI metadata",
+        "description": "Returns compiler ABI metadata registered directly in the localnet node.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredCompilerAbisResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteCompilerAbi": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteCompilerAbi",
+        "summary": "Delete registered compiler ABI metadata",
+        "description": "Deletes a locally registered compiler ABI entry by code hash or one of its code hash aliases.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
     "/acton_getVerifiedSource": {
       "get": {
         "tags": ["Localnet Control"],
@@ -147,12 +186,82 @@
         }
       }
     },
+    "/acton_getRegisteredVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getRegisteredVerifiedSource",
+        "summary": "Get registered contract source",
+        "description": "Returns source bundles registered directly in the localnet node by address or code hash.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
+    "/acton_listVerifiedSources": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listVerifiedSources",
+        "summary": "List registered contract sources",
+        "description": "Returns source bundles registered directly in the localnet node.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteVerifiedSource": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteVerifiedSource",
+        "summary": "Delete registered contract source",
+        "description": "Deletes a locally registered source bundle by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
     "/acton_registerCompilerAbis": {
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "registerCompilerAbis",
         "summary": "Register compiler ABI metadata",
-        "description": "Registers one or more compiler ABI payloads for later explorer and API lookups by code hash.",
+        "description": "Registers one or more extended compiler ABI payloads for later explorer and API lookups by code hash.",
         "requestBody": {
           "required": true,
           "content": {
@@ -163,10 +272,50 @@
               "example": {
                 "entries": [
                   {
+                    "abi": {
+                      "compiler_abi": {
+                        "contract_name": "Wallet",
+                        "get_methods": [],
+                        "incoming_messages": []
+                      },
+                      "display_name": "Wallet",
+                      "code_hashes": ["f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="],
+                      "links": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_registerVerifiedSources": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "registerVerifiedSources",
+        "summary": "Register contract sources",
+        "description": "Registers one or more source artifacts for later explorer source-code and retrace lookups by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterVerifiedSourcesRequest"
+              },
+              "example": {
+                "entries": [
+                  {
                     "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
-                    "compiler_abi": {
-                      "types": [],
-                      "getters": []
+                    "source": {
+                      "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
+                      "verified": true,
+                      "bundles": []
                     }
                   }
                 ]
@@ -760,6 +909,31 @@
           }
         }
       },
+      "RegisteredCompilerAbisResponse": {
+        "description": "Successful wrapped response with registered compiler ABI metadata.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredCompilerAbi"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
       "VerifiedSourceResponse": {
         "description": "Successful wrapped response with source bundles returned by the Acton verifier.",
         "content": {
@@ -774,6 +948,31 @@
                   "properties": {
                     "result": {
                       "$ref": "#/components/schemas/VerificationSource"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RegisteredVerifiedSourcesResponse": {
+        "description": "Successful wrapped response with registered source bundles.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredVerifiedSource"
+                      }
                     }
                   }
                 }
@@ -1109,12 +1308,20 @@
       },
       "CompilerAbiRegistration": {
         "type": "object",
-        "required": ["code_hash", "compiler_abi"],
+        "required": ["abi"],
+        "properties": {
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          }
+        }
+      },
+      "CodeHashRequest": {
+        "type": "object",
+        "required": ["code_hash"],
         "properties": {
           "code_hash": {
             "$ref": "#/components/schemas/Hash"
-          },
-          "compiler_abi": {}
+          }
         }
       },
       "ContractAbiLink": {
@@ -1158,6 +1365,22 @@
           }
         }
       },
+      "RegisteredCompilerAbi": {
+        "type": "object",
+        "required": ["codeHash", "abi", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
       "VerificationSource": {
         "type": "object",
         "required": ["code_hash", "verified", "bundles"],
@@ -1173,6 +1396,34 @@
             "items": {
               "$ref": "#/components/schemas/SourceBundle"
             }
+          }
+        }
+      },
+      "VerifiedSourceRegistration": {
+        "type": "object",
+        "required": ["code_hash", "source"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          }
+        }
+      },
+      "RegisteredVerifiedSource": {
+        "type": "object",
+        "required": ["codeHash", "source", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
           }
         }
       },
@@ -1278,6 +1529,18 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CompilerAbiRegistration"
+            }
+          }
+        }
+      },
+      "RegisterVerifiedSourcesRequest": {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedSourceRegistration"
             }
           }
         }

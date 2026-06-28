@@ -3,7 +3,7 @@
   "info": {
     "title": "Acton Localnet Control API",
     "version": "1.0.0",
-    "description": "Local development control endpoints exposed by the Acton localnet server. These routes are intended for local tooling and are not authenticated."
+    "description": "Local development control endpoints exposed by the Acton localnet server. These routes are intended for local tooling. When localnet is started with --require-auth, pass the printed token as Authorization: Bearer <token> or X-API-Key: <token>."
   },
   "servers": [
     {
@@ -14,7 +14,15 @@
   "tags": [
     {
       "name": "Localnet Control",
-      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling, are not authenticated, and should not be exposed publicly. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+      "description": "Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.\n\nThese routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled."
+    }
+  ],
+  "security": [
+    {
+      "BearerAuth": []
+    },
+    {
+      "APIKeyHeader": []
     }
   ],
   "paths": {
@@ -108,12 +116,152 @@
         }
       }
     },
+    "/acton_listCompilerAbis": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listCompilerAbis",
+        "summary": "List registered compiler ABI metadata",
+        "description": "Returns compiler ABI metadata registered directly in the localnet node.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredCompilerAbisResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteCompilerAbi": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteCompilerAbi",
+        "summary": "Delete registered compiler ABI metadata",
+        "description": "Deletes a locally registered compiler ABI entry by code hash or one of its code hash aliases.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_getVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getVerifiedSource",
+        "summary": "Get verified contract source",
+        "description": "Proxies Acton verifier source lookup by address or code hash and returns verified source bundles when the contract is confirmed.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
+    "/acton_getRegisteredVerifiedSource": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "getRegisteredVerifiedSource",
+        "summary": "Get registered contract source",
+        "description": "Returns source bundles registered directly in the localnet node by address or code hash.",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Address"
+            }
+          },
+          {
+            "name": "code_hash",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Hash"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/VerifiedSourceResponse"
+          }
+        }
+      }
+    },
+    "/acton_listVerifiedSources": {
+      "get": {
+        "tags": ["Localnet Control"],
+        "operationId": "listVerifiedSources",
+        "summary": "List registered contract sources",
+        "description": "Returns source bundles registered directly in the localnet node.",
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/RegisteredVerifiedSourcesResponse"
+          }
+        }
+      }
+    },
+    "/acton_deleteVerifiedSource": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "deleteVerifiedSource",
+        "summary": "Delete registered contract source",
+        "description": "Deletes a locally registered source bundle by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CodeHashRequest"
+              },
+              "example": {
+                "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
     "/acton_registerCompilerAbis": {
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "registerCompilerAbis",
         "summary": "Register compiler ABI metadata",
-        "description": "Registers one or more compiler ABI payloads for later explorer and API lookups by code hash.",
+        "description": "Registers one or more extended compiler ABI payloads for later explorer and API lookups by code hash.",
         "requestBody": {
           "required": true,
           "content": {
@@ -124,10 +272,50 @@
               "example": {
                 "entries": [
                   {
+                    "abi": {
+                      "compiler_abi": {
+                        "contract_name": "Wallet",
+                        "get_methods": [],
+                        "incoming_messages": []
+                      },
+                      "display_name": "Wallet",
+                      "code_hashes": ["f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8="],
+                      "links": []
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "$ref": "#/components/responses/NullResponse"
+          }
+        }
+      }
+    },
+    "/acton_registerVerifiedSources": {
+      "post": {
+        "tags": ["Localnet Control"],
+        "operationId": "registerVerifiedSources",
+        "summary": "Register contract sources",
+        "description": "Registers one or more source artifacts for later explorer source-code and retrace lookups by code hash.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterVerifiedSourcesRequest"
+              },
+              "example": {
+                "entries": [
+                  {
                     "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
-                    "compiler_abi": {
-                      "types": [],
-                      "getters": []
+                    "source": {
+                      "code_hash": "f4SmFiL+Y0Yxu0Uw1zIfTDQ/JT6Qje03EmHlaQQWDK8=",
+                      "verified": true,
+                      "bundles": []
                     }
                   }
                 ]
@@ -198,7 +386,7 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "createRecoveryPoint",
-        "summary": "Create a runtime recovery point",
+        "summary": "Create runtime recovery point",
         "description": "Creates an in-memory recovery point for the current localnet state. Recovery points are process-local and are not persisted across restart.",
         "requestBody": {
           "required": true,
@@ -238,7 +426,7 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "revertRecoveryPoint",
-        "summary": "Revert to a runtime recovery point",
+        "summary": "Revert runtime recovery point",
         "description": "Restores a previously created recovery point and invalidates that point plus every newer recovery point.",
         "requestBody": {
           "required": true,
@@ -264,7 +452,7 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "exportRecoveryPoint",
-        "summary": "Export a runtime recovery point",
+        "summary": "Export runtime recovery point",
         "description": "Writes a named in-memory recovery point to a JSON snapshot file on the localnet host.",
         "requestBody": {
           "required": true,
@@ -291,7 +479,7 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "importRecoveryPoint",
-        "summary": "Import a runtime recovery point",
+        "summary": "Import runtime recovery point",
         "description": "Reads a JSON snapshot file on the localnet host into the current process as a named recovery point.",
         "requestBody": {
           "required": true,
@@ -442,8 +630,8 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "increaseTime",
-        "summary": "Increase localnet virtual time",
-        "description": "Adds seconds to the localnet virtual unix clock used for future blocks, live emulation, get methods, and TonCenter-compatible time fields.",
+        "summary": "Increase virtual time",
+        "description": "Adds seconds to the localnet virtual clock. Future blocks use this adjusted time until it is changed again.",
         "requestBody": {
           "required": true,
           "content": {
@@ -468,8 +656,8 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "setTime",
-        "summary": "Set localnet virtual time",
-        "description": "Sets the localnet virtual unix clock. The timestamp cannot be lower than the latest mined block timestamp.",
+        "summary": "Set virtual time",
+        "description": "Sets the localnet virtual clock to a Unix timestamp. The timestamp must not be lower than the latest mined block time.",
         "requestBody": {
           "required": true,
           "content": {
@@ -478,7 +666,7 @@
                 "$ref": "#/components/schemas/SetTimeRequest"
               },
               "example": {
-                "timestamp": 1893456000
+                "timestamp": 1710000000
               }
             }
           }
@@ -494,8 +682,8 @@
       "post": {
         "tags": ["Localnet Control"],
         "operationId": "setNextBlockTimestamp",
-        "summary": "Set next localnet block timestamp",
-        "description": "Sets a one-shot unix timestamp for the next mined localnet block. The timestamp cannot be lower than the latest mined block timestamp.",
+        "summary": "Set next block timestamp",
+        "description": "Sets a one-shot Unix timestamp for the next mined block. The timestamp is consumed by the next automatic or manually mined block and must not be lower than the latest mined block time.",
         "requestBody": {
           "required": true,
           "content": {
@@ -504,7 +692,7 @@
                 "$ref": "#/components/schemas/SetNextBlockTimestampRequest"
               },
               "example": {
-                "timestamp": 1893456000
+                "timestamp": 1710000600
               }
             }
           }
@@ -554,6 +742,19 @@
     }
   },
   "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Localnet API token printed by `acton localnet start --require-auth`."
+      },
+      "APIKeyHeader": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "Alternative localnet API token header for TonCenter-compatible clients."
+      }
+    },
     "parameters": {
       "AddressQuery": {
         "name": "address",
@@ -699,6 +900,78 @@
                           }
                         ],
                         "nullable": true
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RegisteredCompilerAbisResponse": {
+        "description": "Successful wrapped response with registered compiler ABI metadata.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredCompilerAbi"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "VerifiedSourceResponse": {
+        "description": "Successful wrapped response with source bundles returned by the Acton verifier.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "$ref": "#/components/schemas/VerificationSource"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "RegisteredVerifiedSourcesResponse": {
+        "description": "Successful wrapped response with registered source bundles.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "result": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/RegisteredVerifiedSource"
                       }
                     }
                   }
@@ -869,7 +1142,7 @@
         }
       },
       "TimeControlResponse": {
-        "description": "Successful localnet virtual time update response.",
+        "description": "Successful virtual time update response.",
         "content": {
           "application/json": {
             "schema": {
@@ -1035,12 +1308,20 @@
       },
       "CompilerAbiRegistration": {
         "type": "object",
-        "required": ["code_hash", "compiler_abi"],
+        "required": ["abi"],
+        "properties": {
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          }
+        }
+      },
+      "CodeHashRequest": {
+        "type": "object",
+        "required": ["code_hash"],
         "properties": {
           "code_hash": {
             "$ref": "#/components/schemas/Hash"
-          },
-          "compiler_abi": {}
+          }
         }
       },
       "ContractAbiLink": {
@@ -1084,6 +1365,162 @@
           }
         }
       },
+      "RegisteredCompilerAbi": {
+        "type": "object",
+        "required": ["codeHash", "abi", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "abi": {
+            "$ref": "#/components/schemas/ExtendedContractABI"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "VerificationSource": {
+        "type": "object",
+        "required": ["code_hash", "verified", "bundles"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "bundles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceBundle"
+            }
+          }
+        }
+      },
+      "VerifiedSourceRegistration": {
+        "type": "object",
+        "required": ["code_hash", "source"],
+        "properties": {
+          "code_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          }
+        }
+      },
+      "RegisteredVerifiedSource": {
+        "type": "object",
+        "required": ["codeHash", "source", "savedAt"],
+        "properties": {
+          "codeHash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "source": {
+            "$ref": "#/components/schemas/VerificationSource"
+          },
+          "savedAt": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "OnchainVerification": {
+        "type": "object",
+        "required": ["master_address", "verification_record_address"],
+        "properties": {
+          "master_address": {
+            "type": "string"
+          },
+          "verification_record_address": {
+            "type": "string"
+          }
+        }
+      },
+      "SourceBundle": {
+        "type": "object",
+        "required": [
+          "source_bundle_hash",
+          "verified_at",
+          "storage_revision",
+          "entrypoint",
+          "compiler",
+          "files"
+        ],
+        "properties": {
+          "source_bundle_hash": {
+            "$ref": "#/components/schemas/Hash"
+          },
+          "verified_at": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "storage_revision": {
+            "type": "string"
+          },
+          "entrypoint": {
+            "type": "string"
+          },
+          "compiler": {
+            "$ref": "#/components/schemas/SourceCompiler"
+          },
+          "files": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceFile"
+            }
+          }
+        }
+      },
+      "SourceCompiler": {
+        "type": "object",
+        "required": ["language", "version", "params"],
+        "properties": {
+          "language": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "params": {}
+        }
+      },
+      "SourceFile": {
+        "type": "object",
+        "required": [
+          "path",
+          "content_hash",
+          "include_in_command",
+          "is_stdlib",
+          "has_include_directives",
+          "content"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "content_hash": {
+            "type": "string"
+          },
+          "include_in_command": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "is_stdlib": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "has_include_directives": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "content": {
+            "type": "string"
+          }
+        }
+      },
       "RegisterCompilerAbisRequest": {
         "type": "object",
         "required": ["entries"],
@@ -1092,6 +1529,18 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CompilerAbiRegistration"
+            }
+          }
+        }
+      },
+      "RegisterVerifiedSourcesRequest": {
+        "type": "object",
+        "required": ["entries"],
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VerifiedSourceRegistration"
             }
           }
         }
@@ -1342,7 +1791,7 @@
           "seconds": {
             "type": "integer",
             "minimum": 1,
-            "description": "Seconds to add to the localnet virtual clock."
+            "description": "Seconds to add to the virtual localnet clock."
           }
         }
       },
@@ -1353,7 +1802,7 @@
           "timestamp": {
             "type": "integer",
             "minimum": 0,
-            "description": "Unix timestamp in seconds for the localnet virtual clock."
+            "description": "Unix timestamp to use for the current virtual localnet time."
           }
         }
       },
@@ -1364,7 +1813,7 @@
           "timestamp": {
             "type": "integer",
             "minimum": 0,
-            "description": "Unix timestamp in seconds for the next mined localnet block."
+            "description": "Unix timestamp to use for the next mined block only."
           }
         }
       },
@@ -1374,11 +1823,11 @@
         "properties": {
           "current_unix_time": {
             "type": "integer",
-            "minimum": 0
+            "description": "Current virtual Unix timestamp used by localnet."
           },
           "time_offset_seconds": {
             "type": "integer",
-            "description": "Offset in seconds applied to wall-clock unix time."
+            "description": "Signed offset applied to wall-clock time in seconds."
           },
           "next_block_timestamp": {
             "type": "integer",
@@ -1468,12 +1917,12 @@
         "required": [
           "uptime_seconds",
           "last_block_seqno",
-          "current_unix_time",
-          "time_offset_seconds",
-          "next_block_timestamp",
           "state_source",
           "fork_network",
           "fork_block_number",
+          "current_unix_time",
+          "time_offset_seconds",
+          "next_block_timestamp",
           "network_conditions"
         ],
         "properties": {
@@ -1484,17 +1933,6 @@
           "last_block_seqno": {
             "type": "integer",
             "minimum": 0
-          },
-          "current_unix_time": {
-            "type": "integer",
-            "minimum": 0
-          },
-          "time_offset_seconds": {
-            "type": "integer"
-          },
-          "next_block_timestamp": {
-            "type": "integer",
-            "nullable": true
           },
           "state_source": {
             "type": "string",
@@ -1507,6 +1945,19 @@
           "fork_block_number": {
             "type": "integer",
             "nullable": true
+          },
+          "current_unix_time": {
+            "type": "integer",
+            "description": "Current virtual Unix timestamp used by localnet."
+          },
+          "time_offset_seconds": {
+            "type": "integer",
+            "description": "Signed offset applied to wall-clock time in seconds."
+          },
+          "next_block_timestamp": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Pending one-shot timestamp for the next mined block, if configured."
           },
           "network_conditions": {
             "$ref": "#/components/schemas/NetworkConditions"

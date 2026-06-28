@@ -28,8 +28,29 @@ _openapi:
       title: Get compiler ABI metadata
       url: '#get-compiler-abi-metadata'
     - depth: 2
+      title: List registered compiler ABI metadata
+      url: '#list-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Delete registered compiler ABI metadata
+      url: '#delete-registered-compiler-abi-metadata'
+    - depth: 2
+      title: Get verified contract source
+      url: '#get-verified-contract-source'
+    - depth: 2
+      title: Get registered contract source
+      url: '#get-registered-contract-source'
+    - depth: 2
+      title: List registered contract sources
+      url: '#list-registered-contract-sources'
+    - depth: 2
+      title: Delete registered contract source
+      url: '#delete-registered-contract-source'
+    - depth: 2
       title: Register compiler ABI metadata
       url: '#register-compiler-abi-metadata'
+    - depth: 2
+      title: Register contract sources
+      url: '#register-contract-sources'
     - depth: 2
       title: Dump local state
       url: '#dump-local-state'
@@ -37,11 +58,20 @@ _openapi:
       title: Load local state
       url: '#load-local-state'
     - depth: 2
-      title: Create a runtime recovery point
-      url: '#create-a-runtime-recovery-point'
+      title: Create runtime recovery point
+      url: '#create-runtime-recovery-point'
     - depth: 2
-      title: Revert to a runtime recovery point
-      url: '#revert-to-a-runtime-recovery-point'
+      title: List runtime recovery points
+      url: '#list-runtime-recovery-points'
+    - depth: 2
+      title: Revert runtime recovery point
+      url: '#revert-runtime-recovery-point'
+    - depth: 2
+      title: Export runtime recovery point
+      url: '#export-runtime-recovery-point'
+    - depth: 2
+      title: Import runtime recovery point
+      url: '#import-runtime-recovery-point'
     - depth: 2
       title: Set a ShardAccount
       url: '#set-a-shardaccount'
@@ -58,14 +88,14 @@ _openapi:
       title: Mine localnet blocks
       url: '#mine-localnet-blocks'
     - depth: 2
-      title: Increase localnet virtual time
-      url: '#increase-localnet-virtual-time'
+      title: Increase virtual time
+      url: '#increase-virtual-time'
     - depth: 2
-      title: Set localnet virtual time
-      url: '#set-localnet-virtual-time'
+      title: Set virtual time
+      url: '#set-virtual-time'
     - depth: 2
-      title: Set next localnet block timestamp
-      url: '#set-next-localnet-block-timestamp'
+      title: Set next block timestamp
+      url: '#set-next-block-timestamp'
     - depth: 2
       title: Set simulated network conditions
       url: '#set-simulated-network-conditions'
@@ -82,16 +112,36 @@ _openapi:
         id: set-an-address-name
       - content: Get compiler ABI metadata
         id: get-compiler-abi-metadata
+      - content: List registered compiler ABI metadata
+        id: list-registered-compiler-abi-metadata
+      - content: Delete registered compiler ABI metadata
+        id: delete-registered-compiler-abi-metadata
+      - content: Get verified contract source
+        id: get-verified-contract-source
+      - content: Get registered contract source
+        id: get-registered-contract-source
+      - content: List registered contract sources
+        id: list-registered-contract-sources
+      - content: Delete registered contract source
+        id: delete-registered-contract-source
       - content: Register compiler ABI metadata
         id: register-compiler-abi-metadata
+      - content: Register contract sources
+        id: register-contract-sources
       - content: Dump local state
         id: dump-local-state
       - content: Load local state
         id: load-local-state
-      - content: Create a runtime recovery point
-        id: create-a-runtime-recovery-point
-      - content: Revert to a runtime recovery point
-        id: revert-to-a-runtime-recovery-point
+      - content: Create runtime recovery point
+        id: create-runtime-recovery-point
+      - content: List runtime recovery points
+        id: list-runtime-recovery-points
+      - content: Revert runtime recovery point
+        id: revert-runtime-recovery-point
+      - content: Export runtime recovery point
+        id: export-runtime-recovery-point
+      - content: Import runtime recovery point
+        id: import-runtime-recovery-point
       - content: Set a ShardAccount
         id: set-a-shardaccount
       - content: Change account state
@@ -102,12 +152,12 @@ _openapi:
         id: list-startup-wallets
       - content: Mine localnet blocks
         id: mine-localnet-blocks
-      - content: Increase localnet virtual time
-        id: increase-localnet-virtual-time
-      - content: Set localnet virtual time
-        id: set-localnet-virtual-time
-      - content: Set next localnet block timestamp
-        id: set-next-localnet-block-timestamp
+      - content: Increase virtual time
+        id: increase-virtual-time
+      - content: Set virtual time
+        id: set-virtual-time
+      - content: Set next block timestamp
+        id: set-next-block-timestamp
       - content: Set simulated network conditions
         id: set-simulated-network-conditions
       - content: Get node status
@@ -128,9 +178,33 @@ _openapi:
           Missing ABI entries are returned as null.
         heading: get-compiler-abi-metadata
       - content: >-
-          Registers one or more compiler ABI payloads for later explorer and API
-          lookups by code hash.
+          Returns compiler ABI metadata registered directly in the localnet
+          node.
+        heading: list-registered-compiler-abi-metadata
+      - content: >-
+          Deletes a locally registered compiler ABI entry by code hash or one of
+          its code hash aliases.
+        heading: delete-registered-compiler-abi-metadata
+      - content: >-
+          Proxies Acton verifier source lookup by address or code hash and
+          returns verified source bundles when the contract is confirmed.
+        heading: get-verified-contract-source
+      - content: >-
+          Returns source bundles registered directly in the localnet node by
+          address or code hash.
+        heading: get-registered-contract-source
+      - content: Returns source bundles registered directly in the localnet node.
+        heading: list-registered-contract-sources
+      - content: Deletes a locally registered source bundle by code hash.
+        heading: delete-registered-contract-source
+      - content: >-
+          Registers one or more extended compiler ABI payloads for later
+          explorer and API lookups by code hash.
         heading: register-compiler-abi-metadata
+      - content: >-
+          Registers one or more source artifacts for later explorer source-code
+          and retrace lookups by code hash.
+        heading: register-contract-sources
       - content: Writes a JSON state snapshot without stopping the server.
         heading: dump-local-state
       - content: Replaces the current node state with a JSON state snapshot.
@@ -139,18 +213,32 @@ _openapi:
           Creates an in-memory recovery point for the current localnet state.
           Recovery points are process-local and are not persisted across
           restart.
-        heading: create-a-runtime-recovery-point
+        heading: create-runtime-recovery-point
+      - content: >-
+          Lists named in-memory recovery points available in the current
+          localnet process.
+        heading: list-runtime-recovery-points
       - content: >-
           Restores a previously created recovery point and invalidates that
           point plus every newer recovery point.
-        heading: revert-to-a-runtime-recovery-point
+        heading: revert-runtime-recovery-point
+      - content: >-
+          Writes a named in-memory recovery point to a JSON snapshot file on the
+          localnet host.
+        heading: export-runtime-recovery-point
+      - content: >-
+          Reads a JSON snapshot file on the localnet host into the current
+          process as a named recovery point.
+        heading: import-runtime-recovery-point
       - content: >-
           Replaces the selected account state with a base64-encoded ShardAccount
           BOC.
         heading: set-a-shardaccount
       - content: >-
           Changes the selected local account state to nonexist, uninit, or
-          frozen.
+          frozen. When state is frozen with source=current, set mine=false to
+          queue the synthetic freeze transaction for the next mined block
+          instead of committing a block immediately.
         heading: change-account-state
       - content: >-
           Injects a base64-encoded internal message BOC into the local internal
@@ -164,18 +252,18 @@ _openapi:
           body is omitted or blocks is not provided, one block is mined.
         heading: mine-localnet-blocks
       - content: >-
-          Adds seconds to the localnet virtual unix clock used for future
-          blocks, live emulation, get methods, and TonCenter-compatible time
-          fields.
-        heading: increase-localnet-virtual-time
+          Adds seconds to the localnet virtual clock. Future blocks use this
+          adjusted time until it is changed again.
+        heading: increase-virtual-time
       - content: >-
-          Sets the localnet virtual unix clock. The timestamp cannot be lower
-          than the latest mined block timestamp.
-        heading: set-localnet-virtual-time
+          Sets the localnet virtual clock to a Unix timestamp. The timestamp
+          must not be lower than the latest mined block time.
+        heading: set-virtual-time
       - content: >-
-          Sets a one-shot unix timestamp for the next mined localnet block. The
-          timestamp cannot be lower than the latest mined block timestamp.
-        heading: set-next-localnet-block-timestamp
+          Sets a one-shot Unix timestamp for the next mined block. The timestamp
+          is consumed by the next automatic or manually mined block and must not
+          be lower than the latest mined block time.
+        heading: set-next-block-timestamp
       - content: >-
           Updates simulated network conditions while the localnet server is
           running and returns the updated values. Set response_delay_ms to 0 to
@@ -194,4 +282,4 @@ Acton-only control routes for local state, wallets, address names, compiler ABI 
 
 These routes are intended for local development tooling and should not be exposed publicly. They are unauthenticated by default, and --require-auth protects them together with other localnet HTTP routes. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
 
-<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_snapshot","method":"post"},{"path":"/acton_listSnapshots","method":"post"},{"path":"/acton_revert","method":"post"},{"path":"/acton_exportSnapshot","method":"post"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
+<APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_snapshot","method":"post"},{"path":"/acton_listSnapshots","method":"post"},{"path":"/acton_revert","method":"post"},{"path":"/acton_exportSnapshot","method":"post"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />
