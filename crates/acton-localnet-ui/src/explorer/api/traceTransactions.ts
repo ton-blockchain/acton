@@ -45,6 +45,8 @@ export const buildTraceTransactionInfos = (
       contractAbi: undefined,
       shardAccountBefore: "",
       shardAccountAfter: "",
+      codeHashBefore: hashToHex(tx.account_state_before?.code_hash),
+      codeHashAfter: hashToHex(tx.account_state_after?.code_hash),
       accountBalanceBefore: parseOptionalBigInt(tx.account_state_before?.balance),
       accountBalanceAfter: parseOptionalBigInt(tx.account_state_after?.balance),
       parsedBody: undefined,

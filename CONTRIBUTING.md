@@ -108,6 +108,10 @@ Optional CLI tools:
   cargo install cargo-llvm-cov --locked
   rustup component add llvm-tools-preview
   ```
+- `wasm-pack` (optional, for rebuilding the source trace WASM package)
+  ```bash
+  cargo install wasm-pack --locked
+  ```
 
 System dependencies:
 
@@ -424,6 +428,26 @@ Build UI bundles used by Acton:
 ```bash
 just build-ui
 ```
+
+### Source Trace WASM
+
+When changing `crates/acton-source-trace` or `crates/acton-source-trace-wasm`,
+generate the wasm-bindgen package with:
+
+```bash
+just build-source-trace-wasm
+```
+
+The generated package is written to `/tmp/acton-source-trace-wasm` by default.
+Override it with:
+
+```bash
+ACTON_SOURCE_TRACE_WASM_OUT=/tmp/my-source-trace-wasm just build-source-trace-wasm
+```
+
+Copying the generated JS/WASM into the package that embeds it is a manual step.
+Use the files from that output directory as the source for the downstream
+retracer-core update.
 
 ## Documentation workflows
 

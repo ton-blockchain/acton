@@ -5,8 +5,8 @@
 
 #![allow(clippy::unwrap_used)]
 
+#[cfg(feature = "live-vm")]
 use super::debug_executor_handle::DebugExecutorHandle;
-use super::debug_executor_handle::RuntimeDebugSnapshot;
 use super::types_render::{
     RenderedValue, SlotValue, debug_format_lazy, debug_print_from_stack, render_address_text,
     render_runtime_in_message, render_runtime_out_actions, render_runtime_storage_with_abi,
@@ -15,10 +15,10 @@ use super::types_render::{
 use anyhow::anyhow;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{Arc, OnceLock};
-use tolk_compiler::abi::ContractABI;
-use tolk_compiler::debug_marks_dict::DebugMarksDict;
-use tolk_compiler::source_map::{DebugMark, SourceMap, SrcRange};
-use tolk_compiler::types_kernel::{Ty, TyIdx, render_ty};
+use tolk_source_map::abi::ContractABI;
+use tolk_source_map::debug_marks_dict::DebugMarksDict;
+use tolk_source_map::source_map::{DebugMark, SourceMap, SrcRange};
+use tolk_source_map::types_kernel::{Ty, TyIdx, render_ty};
 use tvm_logs::parser::{VmLine, VmStack, VmStackValue};
 
 // ---------------------------------------------------------------------------
@@ -134,6 +134,15 @@ pub trait RuntimeEventSource {
     fn runtime_debug_snapshot(&self) -> Option<RuntimeDebugSnapshot> {
         None
     }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct RuntimeDebugSnapshot {
+    /// Values exposed under the DAP "Registers" scope for live runtimes.
+    pub stack_values: Vec<VmStackValue>,
+    pub c4: Option<VmStackValue>,
+    pub c5: Option<VmStackValue>,
+    pub c7: Option<VmStackValue>,
 }
 
 #[derive(Debug, Clone)]
@@ -338,6 +347,7 @@ impl RuntimeEventSource for VmLogRuntimeEventSource {
     }
 }
 
+#[cfg(feature = "live-vm")]
 pub struct LiveVmRuntimeEventSource {
     executor: DebugExecutorHandle,
     terminated: bool,
@@ -345,11 +355,13 @@ pub struct LiveVmRuntimeEventSource {
     pending_events: VecDeque<RuntimeEvent>,
 }
 
+#[cfg(feature = "live-vm")]
 enum PendingLiveInstruction {
     Normal(String),
     ImplicitJmpRef,
 }
 
+#[cfg(feature = "live-vm")]
 impl LiveVmRuntimeEventSource {
     #[must_use]
     pub const fn new(executor: DebugExecutorHandle) -> Self {
@@ -385,6 +397,7 @@ impl LiveVmRuntimeEventSource {
     }
 }
 
+#[cfg(feature = "live-vm")]
 impl RuntimeEventSource for LiveVmRuntimeEventSource {
     fn next_event(&mut self) -> Option<RuntimeEvent> {
         if let Some(event) = self.pending_events.pop_front() {
@@ -613,6 +626,7 @@ impl TolkReplayer {
         Ok(replayer)
     }
 
+    #[cfg(feature = "live-vm")]
     pub fn new_live_vm(
         source_map: &SourceMap,
         executor: DebugExecutorHandle,

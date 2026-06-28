@@ -1,6 +1,5 @@
 [package]
-name = "tolk-compiler"
-description = "Tolk compiler crate"
+name = "acton-source-trace"
 version = { workspace = true }
 publish = false
 authors = { workspace = true }
@@ -12,16 +11,18 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ton-objs = { workspace = true, features = ["tolk"] }
-tolk-source-map = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-include_dir = { workspace = true }
-rustc-hash = { workspace = true }
-dunce = { workspace = true }
+acton-debug = { workspace = true }
 anyhow = { workspace = true }
-
-[dev-dependencies]
+base64 = { workspace = true }
+hex = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tolk-source-map = { workspace = true }
+tycho-types = { workspace = true }
 
 [lints]
 workspace = true
+
+[lib]
+test = false
+doctest = false

@@ -3,7 +3,7 @@ pub use ::ton_retrace::trace::{
 };
 use acton_debug::replayer::{CallFrameInfo, ExceptionBreakMode, StepMode, TolkReplayer};
 use tolk_compiler::SourceMap;
-use ton_source_map::SourceLocation;
+use tolk_source_map::SourceLocation;
 use tvm_logs::parser::VmLine;
 
 #[derive(Debug, Clone)]

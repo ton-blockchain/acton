@@ -2,25 +2,19 @@ use super::utils::handle_result;
 use crate::server::models::{
     BuildSourceTraceRequest, SourceTraceBundleRequest, SourceTraceFileRequest,
 };
-use crate::types::Hash256;
-use acton_debug::RenderedValue;
-use acton_debug::replayer::{ExceptionBreakMode, LocalVarRendered, StepMode, Tick, TolkReplayer};
+use acton_source_trace::{
+    SourceTracePathRoots, SourceTraceResponse,
+    build_source_trace_response as build_source_trace_from_source_map, validate_bundle,
+};
 use anyhow::Context;
 use axum::Json;
-use serde::Serialize;
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
-use tolk_compiler::{Compiler, CompilerResult, SourceMap, source_map::SrcRange};
-use tycho_types::boc::Boc;
-
-const MAX_SOURCE_TRACE_STEPS: usize = 10_000;
-const MAX_RENDERED_VALUE_DEPTH: usize = 2;
-const MAX_RENDERED_CHILDREN: usize = 64;
-const INTERNAL_MESSAGE_ENTRYPOINT: &str = "onInternalMessage";
+use tolk_compiler::{Compiler, CompilerResult};
 
 struct SourceTraceTempDir {
     root: PathBuf,
@@ -31,73 +25,6 @@ impl Drop for SourceTraceTempDir {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.root);
     }
-}
-
-#[derive(Serialize)]
-struct SourceTraceResponse {
-    source_bundle_hash: String,
-    code_hash: String,
-    entrypoint: String,
-    files: Vec<SourceTraceFileInfo>,
-    steps: Vec<SourceTraceStep>,
-    truncated: bool,
-}
-
-#[derive(Serialize)]
-struct SourceTraceFileInfo {
-    path: String,
-    is_entrypoint: bool,
-}
-
-#[derive(Serialize)]
-struct SourceTraceStep {
-    index: usize,
-    location: SourceTraceLocation,
-    instruction: Option<String>,
-    vm_position: Option<SourceTraceVmPosition>,
-    locals: Vec<SourceTraceVariable>,
-    stack: Vec<String>,
-    call_stack: Vec<SourceTraceFrame>,
-    exception: Option<SourceTraceException>,
-}
-
-#[derive(Clone, Serialize)]
-struct SourceTraceLocation {
-    file: String,
-    line: usize,
-    column: usize,
-    end_line: usize,
-    end_column: usize,
-}
-
-#[derive(Serialize)]
-struct SourceTraceVmPosition {
-    cell_hash: String,
-    offset: i32,
-}
-
-#[derive(Serialize)]
-struct SourceTraceFrame {
-    function_name: String,
-    location: Option<SourceTraceLocation>,
-    is_inlined: bool,
-    is_builtin: bool,
-}
-
-#[derive(Serialize)]
-struct SourceTraceVariable {
-    name: String,
-    value: String,
-    #[serde(rename = "type")]
-    type_field: Option<String>,
-    children: Vec<SourceTraceVariable>,
-}
-
-#[derive(Serialize)]
-struct SourceTraceException {
-    errno: String,
-    symbolic_name: Option<String>,
-    is_uncaught: bool,
 }
 
 pub async fn build_source_trace(Json(payload): Json<BuildSourceTraceRequest>) -> Json<Value> {
@@ -117,7 +44,6 @@ fn build_source_trace_response(
 ) -> anyhow::Result<SourceTraceResponse> {
     validate_bundle(&payload.source_bundle)?;
 
-    let expected_code_hash = parse_hash_any(&payload.code_hash)?;
     let temp_dir = write_source_bundle(&payload.source_bundle)?;
     let entrypoint_path = temp_dir
         .root
@@ -137,174 +63,21 @@ fn build_source_trace_response(
         }
     };
 
-    let code_cell =
-        Boc::decode_base64(compiled.code_boc64).context("Failed to decode compiled code BoC")?;
-    let compiled_hash = Hash256::from(code_cell.repr_hash());
-    if compiled_hash != expected_code_hash {
-        anyhow::bail!(
-            "Verified source bundle code hash mismatch: expected {}, compiled {}",
-            expected_code_hash.to_hex(),
-            compiled_hash.to_hex()
-        );
-    }
-
     let source_map = compiled
         .source_map
         .context("Compiler did not return source map")?;
-    if !source_map.has_debug_marks() {
-        anyhow::bail!("Compiler did not return debug marks");
-    }
-    let source_path_by_file_id =
-        source_path_by_file_id(&source_map, &temp_dir, &payload.source_bundle);
-
-    let mut replayer = TolkReplayer::new(&source_map, &payload.vm_logs)?;
-    replayer.set_exception_breakpoints(ExceptionBreakMode::Uncaught);
-
-    let mut steps = Vec::new();
-    let mut truncated = false;
-
-    while !replayer.is_finished() {
-        if steps.len() >= MAX_SOURCE_TRACE_STEPS {
-            truncated = true;
-            break;
-        }
-
-        let mut instruction = None;
-        replayer.step_with_callback(StepMode::StepInto, |tick, _replayer| {
-            if let Tick::TvmAfterExecute { instr_name } = tick {
-                instruction = Some(instr_name.clone());
-            }
-        });
-
-        let Some(location) = current_location(&replayer, &source_path_by_file_id) else {
-            continue;
-        };
-        let call_stack = source_trace_call_stack(&replayer, &location, &source_path_by_file_id);
-        let mut locals: Vec<_> = replayer
-            .locals_for_frame(0)
-            .into_iter()
-            .map(source_trace_variable)
-            .collect();
-        inject_context_variables(&payload, &call_stack, &mut locals);
-
-        steps.push(SourceTraceStep {
-            index: steps.len(),
-            location,
-            instruction,
-            vm_position: replayer.current_vm_position().map(|(cell_hash, offset)| {
-                SourceTraceVmPosition {
-                    cell_hash: cell_hash.to_owned(),
-                    offset,
-                }
-            }),
-            locals,
-            stack: replayer.tvm_stack_rendered(),
-            call_stack,
-            exception: replayer
-                .last_exception()
-                .map(|exception| SourceTraceException {
-                    errno: exception.errno.clone(),
-                    symbolic_name: exception.symbolic_name.clone(),
-                    is_uncaught: exception.is_uncaught,
-                }),
-        });
-    }
-
-    Ok(SourceTraceResponse {
-        source_bundle_hash: payload.source_bundle.source_bundle_hash.clone(),
-        code_hash: expected_code_hash.to_hex(),
-        entrypoint: normalize_source_path(&payload.source_bundle.entrypoint),
-        files: payload
-            .source_bundle
-            .files
-            .iter()
-            .filter(|file| should_show_source_file(&file.path))
-            .map(|file| SourceTraceFileInfo {
-                path: normalize_source_path(&file.path),
-                is_entrypoint: same_source_path(&file.path, &payload.source_bundle.entrypoint),
-            })
-            .collect(),
-        steps,
-        truncated,
-    })
-}
-
-fn inject_context_variables(
-    payload: &BuildSourceTraceRequest,
-    call_stack: &[SourceTraceFrame],
-    locals: &mut Vec<SourceTraceVariable>,
-) {
-    if call_stack
-        .first()
-        .is_none_or(|frame| frame.function_name != INTERNAL_MESSAGE_ENTRYPOINT)
-    {
-        return;
-    }
-
-    let Some(sender_address) = payload
-        .context
-        .as_ref()
-        .and_then(|context| context.in_msg.as_ref())
-        .and_then(|in_msg| in_msg.sender_address.as_deref())
-        .filter(|sender_address| !sender_address.is_empty())
-    else {
-        return;
+    let path_roots = SourceTracePathRoots {
+        root: temp_dir.root.clone(),
+        canonical_root: temp_dir.canonical_root.clone(),
     };
-
-    let sender_address = LocalVarRendered::in_sender_address(sender_address);
-    if locals
-        .iter()
-        .any(|local| local.name == sender_address.var_name)
-    {
-        return;
-    }
-
-    locals.insert(0, source_trace_variable(sender_address));
-}
-
-fn validate_bundle(bundle: &SourceTraceBundleRequest) -> anyhow::Result<()> {
-    if bundle.compiler.language.trim().to_lowercase() != "tolk" {
-        anyhow::bail!("Source-level retrace supports only Tolk bundles");
-    }
-    if !is_compiler_version_at_least(&bundle.compiler.version, [1, 4, 0]) {
-        anyhow::bail!(
-            "Source-level retrace requires Tolk compiler 1.4.0 or newer, got {}",
-            bundle.compiler.version
-        );
-    }
-    if bundle.files.is_empty() {
-        anyhow::bail!("Source bundle does not contain files");
-    }
-    if bundle.entrypoint.trim().is_empty() {
-        anyhow::bail!("Source bundle does not contain entrypoint");
-    }
-    Ok(())
-}
-
-fn is_compiler_version_at_least(version: &str, minimum: [u64; 3]) -> bool {
-    let parsed = parse_compiler_version(version);
-    for (current, minimum) in parsed.into_iter().zip(minimum) {
-        if current > minimum {
-            return true;
-        }
-        if current < minimum {
-            return false;
-        }
-    }
-    true
-}
-
-fn parse_compiler_version(version: &str) -> [u64; 3] {
-    let mut result = [0, 0, 0];
-    for (index, part) in version
-        .split(|ch: char| !ch.is_ascii_digit())
-        .filter(|part| !part.is_empty())
-        .take(3)
-        .enumerate()
-    {
-        result[index] = part.parse().unwrap_or(0);
-    }
-    result
+    build_source_trace_from_source_map(
+        &payload.vm_logs,
+        &payload.code_hash,
+        payload.context.as_ref(),
+        &compiled.code_boc64,
+        &source_map,
+        Some(&path_roots),
+    )
 }
 
 fn write_source_bundle(bundle: &SourceTraceBundleRequest) -> anyhow::Result<SourceTraceTempDir> {
@@ -349,12 +122,8 @@ fn write_source_file(root: &Path, file: &SourceTraceFileRequest) -> anyhow::Resu
             .with_context(|| format!("Failed to create source dir {}", parent.display()))?;
     }
 
-    let content = source_file_content(file);
-    fs::write(&path, content).with_context(|| format!("Failed to write {}", path.display()))
-}
-
-fn source_file_content(file: &SourceTraceFileRequest) -> Vec<u8> {
-    file.content.as_bytes().to_vec()
+    fs::write(&path, file.content.as_bytes())
+        .with_context(|| format!("Failed to write {}", path.display()))
 }
 
 fn temp_import_mappings(
@@ -392,191 +161,6 @@ fn safe_relative_path(path: &str) -> anyhow::Result<PathBuf> {
     Ok(result)
 }
 
-fn source_path_by_file_id(
-    source_map: &SourceMap,
-    temp_dir: &SourceTraceTempDir,
-    bundle: &SourceTraceBundleRequest,
-) -> BTreeMap<usize, String> {
-    let bundle_paths: BTreeMap<String, String> = bundle
-        .files
-        .iter()
-        .filter(|file| should_show_source_file(&file.path))
-        .map(|file| {
-            let path = normalize_source_path(&file.path);
-            (path.clone(), path)
-        })
-        .collect();
-
-    source_map
-        .files()
-        .iter()
-        .filter_map(|file| {
-            let path = source_map_file_path(temp_dir, &file.file_name);
-            bundle_paths
-                .get(&path)
-                .cloned()
-                .map(|path| (file.file_id, path))
-        })
-        .collect()
-}
-
-fn source_map_file_path(temp_dir: &SourceTraceTempDir, path: &str) -> String {
-    let path = Path::new(path);
-    for root in [&temp_dir.root, &temp_dir.canonical_root] {
-        if let Ok(relative_path) = path.strip_prefix(root) {
-            return normalize_source_path(&relative_path.to_string_lossy());
-        }
-    }
-    normalize_source_path(&path.to_string_lossy())
-}
-
-fn current_location(
-    replayer: &TolkReplayer,
-    source_path_by_file_id: &BTreeMap<usize, String>,
-) -> Option<SourceTraceLocation> {
-    let line = replayer.current_line();
-    let column = replayer.current_column();
-    if line == 0 {
-        return None;
-    }
-    let file = source_path_by_file_id
-        .get(&replayer.current_file_id())?
-        .to_owned();
-
-    Some(SourceTraceLocation {
-        file,
-        line,
-        column,
-        end_line: replayer.current_end_line(),
-        end_column: replayer.current_end_column(),
-    })
-}
-
-fn range_location(
-    range: &SrcRange,
-    source_path_by_file_id: &BTreeMap<usize, String>,
-) -> Option<SourceTraceLocation> {
-    let line = range.start_line();
-    let column = range.start_col();
-    if line == 0 && column == 0 {
-        return None;
-    }
-    let file = source_path_by_file_id.get(&range.file_id())?.to_owned();
-
-    Some(SourceTraceLocation {
-        file,
-        line,
-        column,
-        end_line: range.end_line(),
-        end_column: range.end_col(),
-    })
-}
-
-fn source_trace_call_stack(
-    replayer: &TolkReplayer,
-    current_location: &SourceTraceLocation,
-    source_path_by_file_id: &BTreeMap<usize, String>,
-) -> Vec<SourceTraceFrame> {
-    let frames = replayer.call_stack();
-    let frame_count = frames.len();
-
-    (0..frame_count)
-        .map(|depth| {
-            let frame_index = frame_count - 1 - depth;
-            let frame = &frames[frame_index];
-            let location = if depth == 0 {
-                Some(current_location.clone())
-            } else {
-                frames
-                    .get(frame_index + 1)
-                    .and_then(|child_frame| child_frame.call_site_loc.as_ref())
-                    .and_then(|range| range_location(range, source_path_by_file_id))
-            };
-
-            SourceTraceFrame {
-                function_name: frame.f_name.clone(),
-                location,
-                is_inlined: frame.is_inlined,
-                is_builtin: frame.is_builtin,
-            }
-        })
-        .collect()
-}
-
-fn source_trace_variable(local: LocalVarRendered) -> SourceTraceVariable {
-    rendered_value_variable(local.var_name, &local.value, 0)
-}
-
-fn rendered_value_variable(
-    name: String,
-    value: &RenderedValue,
-    depth: usize,
-) -> SourceTraceVariable {
-    let (display_value, type_field) = value.dap_parts();
-    let children = if depth >= MAX_RENDERED_VALUE_DEPTH {
-        Vec::new()
-    } else {
-        rendered_value_children(value)
-            .into_iter()
-            .take(MAX_RENDERED_CHILDREN)
-            .map(|(name, value)| rendered_value_variable(name, value, depth + 1))
-            .collect()
-    };
-
-    SourceTraceVariable {
-        name,
-        value: display_value,
-        type_field,
-        children,
-    }
-}
-
-fn rendered_value_children(value: &RenderedValue) -> Vec<(String, &RenderedValue)> {
-    match value {
-        RenderedValue::Struct { fields, .. }
-        | RenderedValue::MapKV { fields, .. }
-        | RenderedValue::Address { fields, .. }
-        | RenderedValue::CellLike { fields, .. }
-        | RenderedValue::CellOf { fields, .. }
-        | RenderedValue::EnumValue { fields, .. }
-        | RenderedValue::UnionCase { fields, .. } => fields
-            .iter()
-            .map(|(name, value)| (name.clone(), value))
-            .collect(),
-        RenderedValue::Tensor { items, .. } | RenderedValue::ArrayOf { items, .. } => items
-            .iter()
-            .enumerate()
-            .map(|(index, value)| (index.to_string(), value))
-            .collect(),
-        RenderedValue::LastSeen { inner } => rendered_value_children(inner),
-        RenderedValue::LazyNotYetLoaded { preview } => rendered_value_children(preview),
-        RenderedValue::Leaf { .. }
-        | RenderedValue::OptimizedOut
-        | RenderedValue::LazyCantParseSlice
-        | RenderedValue::LazyUnresolved { .. } => Vec::new(),
-    }
-}
-
-fn should_show_source_file(path: &str) -> bool {
-    !normalize_source_path(path)
-        .to_lowercase()
-        .ends_with(".abi.json")
-}
-
-fn same_source_path(left: &str, right: &str) -> bool {
-    normalize_source_path(left) == normalize_source_path(right)
-}
-
 fn normalize_source_path(path: &str) -> String {
     path.replace('\\', "/").trim_start_matches("./").to_owned()
-}
-
-fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-    anyhow::bail!("Invalid hash format")
 }

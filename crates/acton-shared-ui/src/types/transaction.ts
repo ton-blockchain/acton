@@ -74,6 +74,8 @@ export interface TransactionInfo {
   contractAbi: ContractABI | undefined
   readonly shardAccountBefore: string
   readonly shardAccountAfter: string
+  readonly codeHashBefore?: string
+  readonly codeHashAfter?: string
   readonly accountBalanceBefore?: bigint
   readonly accountBalanceAfter?: bigint
   parsedBody: ParsedTransactionBody | undefined

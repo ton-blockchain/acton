@@ -1313,6 +1313,7 @@ export interface SourceBundle {
   readonly entrypoint: string
   readonly compiler: SourceCompiler
   readonly files: readonly SourceFile[]
+  readonly source_map?: SourceMapData | null
 }
 
 export interface SourceCompiler {
@@ -1330,6 +1331,13 @@ export interface SourceFile {
   readonly content: string
 }
 
+export interface SourceMapData {
+  readonly code_boc64: string
+  readonly symbol_types_json: unknown
+  readonly debug_marks_json: readonly unknown[]
+  readonly debug_marks_base64: string
+}
+
 export interface BuildSourceTraceRequest {
   readonly vm_logs: string
   readonly code_hash: string
@@ -1338,17 +1346,15 @@ export interface BuildSourceTraceRequest {
 }
 
 export interface SourceTraceContext {
-  readonly in_msg?: SourceTraceInMessageContext
+  readonly inMsg?: SourceTraceInMessageContext
 }
 
 export interface SourceTraceInMessageContext {
-  readonly sender_address?: string
+  readonly senderAddress?: string
 }
 
 export interface SourceTraceResponse {
-  readonly source_bundle_hash: string
-  readonly code_hash: string
-  readonly entrypoint: string
+  readonly codeHash: string
   readonly files: readonly SourceTraceFileInfo[]
   readonly steps: readonly SourceTraceStep[]
   readonly truncated: boolean
@@ -1356,17 +1362,16 @@ export interface SourceTraceResponse {
 
 export interface SourceTraceFileInfo {
   readonly path: string
-  readonly is_entrypoint: boolean
 }
 
 export interface SourceTraceStep {
   readonly index: number
   readonly location: SourceTraceLocation
   readonly instruction: string | null
-  readonly vm_position: SourceTraceVmPosition | null
+  readonly vmPosition: SourceTraceVmPosition | null
   readonly locals: readonly SourceTraceVariable[]
   readonly stack: readonly string[]
-  readonly call_stack: readonly SourceTraceFrame[]
+  readonly callStack: readonly SourceTraceFrame[]
   readonly exception: SourceTraceException | null
 }
 
@@ -1374,20 +1379,20 @@ export interface SourceTraceLocation {
   readonly file: string
   readonly line: number
   readonly column: number
-  readonly end_line: number
-  readonly end_column: number
+  readonly endLine: number
+  readonly endColumn: number
 }
 
 export interface SourceTraceVmPosition {
-  readonly cell_hash: string
+  readonly cellHash: string
   readonly offset: number
 }
 
 export interface SourceTraceFrame {
-  readonly function_name: string
+  readonly functionName: string
   readonly location: SourceTraceLocation | null
-  readonly is_inlined: boolean
-  readonly is_builtin: boolean
+  readonly isInlined: boolean
+  readonly isBuiltin: boolean
 }
 
 export interface SourceTraceVariable {
@@ -1399,8 +1404,8 @@ export interface SourceTraceVariable {
 
 export interface SourceTraceException {
   readonly errno: string
-  readonly symbolic_name: string | null
-  readonly is_uncaught: boolean
+  readonly symbolicName: string | null
+  readonly isUncaught: boolean
 }
 
 export interface NftCollection {

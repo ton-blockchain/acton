@@ -4,12 +4,12 @@
 
 use crate::abi::ABICustomPackUnpack;
 use crate::debug_marks_dict::DebugMarksDict;
+use crate::source_location::SourceLocation;
 use crate::types_kernel::{AliasInstantiation, StructInstantiation, Ty, TyIdx, TyResolver};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::OnceLock;
-use ton_source_map::SourceLocation;
 // ---------------------------------------------------------------------------
 // Top-level structure
 // ---------------------------------------------------------------------------

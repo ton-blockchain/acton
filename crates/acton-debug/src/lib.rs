@@ -8,20 +8,27 @@
 
 mod core;
 pub mod exit_codes;
+#[cfg(feature = "dap-server")]
 pub mod multi;
+#[cfg(feature = "dap-server")]
 pub mod single;
+#[cfg(feature = "dap-server")]
 mod transport;
 
 pub mod replayer {
     pub use crate::core::replayer::*;
 }
 
+#[cfg(feature = "live-vm")]
 pub use core::DebugExecutorHandle;
+#[cfg(feature = "dap-server")]
 pub use multi::{ChildDebugContextSpec, ReplayerDebugSession};
+#[cfg(feature = "dap-server")]
 pub use multi::{
     DapMessage, DapTransport, reserve_dap_listener, start_dap_server,
     start_dap_server_with_listener,
 };
+#[cfg(feature = "dap-server")]
 pub use single::serve_single_replayer_dap;
 pub use types_render::{
     PrettyAddressFormat, PrettyRenderOptions, RenderedValue, render_tuple_as_tolk_type,

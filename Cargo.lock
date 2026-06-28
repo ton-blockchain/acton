@@ -86,6 +86,7 @@ dependencies = [
  "tolk-fmt",
  "tolk-linter",
  "tolk-resolver",
+ "tolk-source-map",
  "tolk-syntax",
  "tolk-ty",
  "toml",
@@ -98,7 +99,6 @@ dependencies = [
  "ton-localnet",
  "ton-ls",
  "ton-retrace",
- "ton-source-map",
  "toncenter-keys",
  "tower-http",
  "tower-lsp",
@@ -146,7 +146,7 @@ dependencies = [
  "num-bigint",
  "owo-colors",
  "serde_json",
- "tolk-compiler",
+ "tolk-source-map",
  "tolk-syntax",
  "ton-executor",
  "tvm-ffi",
@@ -163,6 +163,31 @@ dependencies = [
  "pulldown-cmark",
  "serde_json",
  "url",
+]
+
+[[package]]
+name = "acton-source-trace"
+version = "1.1.0"
+dependencies = [
+ "acton-debug",
+ "anyhow",
+ "base64",
+ "hex",
+ "serde",
+ "serde_json",
+ "tolk-source-map",
+ "tycho-types",
+]
+
+[[package]]
+name = "acton-source-trace-wasm"
+version = "1.1.0"
+dependencies = [
+ "acton-source-trace",
+ "console_error_panic_hook",
+ "getrandom 0.3.4",
+ "serde-wasm-bindgen",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -948,6 +973,16 @@ dependencies = [
  "once_cell",
  "unicode-width 0.2.0",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -4173,6 +4208,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-wasm-bindgen"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8302e169f0eddcc139c70f139d19d6467353af16f9fce27e8c30158036a1e16b"
+dependencies = [
+ "js-sys",
+ "serde",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "serde_core"
 version = "1.0.228"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4652,7 +4698,7 @@ dependencies = [
  "serde_json",
  "smallvec",
  "tolk-compiler",
- "ton-source-map",
+ "tolk-source-map",
  "tycho-types",
  "zstd",
 ]
@@ -4999,15 +5045,12 @@ version = "1.1.0"
 dependencies = [
  "anyhow",
  "dunce",
- "expect-test",
  "include_dir",
- "num-bigint",
  "rustc-hash 2.1.1",
  "serde",
  "serde_json",
+ "tolk-source-map",
  "ton-objs",
- "ton-source-map",
- "tycho-types",
 ]
 
 [[package]]
@@ -5077,6 +5120,19 @@ dependencies = [
  "tempfile",
  "tolk-syntax",
  "tree-sitter",
+]
+
+[[package]]
+name = "tolk-source-map"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "expect-test",
+ "num-bigint",
+ "pathdiff",
+ "serde",
+ "serde_json",
+ "tycho-types",
 ]
 
 [[package]]
@@ -5357,7 +5413,7 @@ version = "1.1.0"
 dependencies = [
  "acton-abi-catalog",
  "acton-config",
- "acton-debug",
+ "acton-source-trace",
  "anyhow",
  "axum",
  "base64",
@@ -5454,15 +5510,6 @@ dependencies = [
  "toncenter-keys",
  "tvm-logs",
  "tycho-types",
-]
-
-[[package]]
-name = "ton-source-map"
-version = "1.1.0"
-dependencies = [
- "anyhow",
- "pathdiff",
- "serde",
 ]
 
 [[package]]

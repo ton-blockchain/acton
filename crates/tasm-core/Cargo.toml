@@ -19,7 +19,7 @@ tycho-types = { workspace = true }
 smallvec = { workspace = true }
 anyhow = { workspace = true }
 tolk-compiler = { workspace = true }
-ton-source-map = { workspace = true }
+tolk-source-map = { workspace = true }
 zstd = { workspace = true }
 
 [build-dependencies]

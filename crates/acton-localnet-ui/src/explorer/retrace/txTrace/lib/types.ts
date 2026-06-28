@@ -24,6 +24,7 @@ export interface RetraceResultAndCode {
   readonly network: ExplorerNetworkInfo
   readonly verifiedSource?: VerificationSourceResponse
   readonly sourceTrace?: SourceTraceResponse
+  readonly sourceTraceBundleHash?: string
 }
 
 export interface InstructionDetail {

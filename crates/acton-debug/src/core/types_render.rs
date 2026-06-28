@@ -3,11 +3,11 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::{self, Write};
 use std::sync::OnceLock;
-use tolk_compiler::SourceMap;
-use tolk_compiler::abi::ContractABI;
-use tolk_compiler::dynamic_unpack::{self, UnpackSchema, UnpackedValue};
-use tolk_compiler::source_map::{AbiStruct, Declaration};
-use tolk_compiler::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
+use tolk_source_map::abi::ContractABI;
+use tolk_source_map::dynamic_unpack::{self, UnpackSchema, UnpackedValue};
+use tolk_source_map::source_map::{AbiStruct, Declaration};
+use tolk_source_map::types_kernel::{Ty, TyIdx, calc_width_on_stack, render_ty};
+use tolk_source_map::{SourceMap, types_kernel};
 use tvm_ffi::from_stack::FromStack;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tvm_logs::parser::{CellLike, CellSlice, VmStackValue};
@@ -2082,7 +2082,7 @@ fn resolve_alias_shape_ty(symbols: &dyn UnpackSchema, ty_idx: TyIdx) -> Option<T
 
 fn resolve_union_object_ty(
     symbols: &dyn UnpackSchema,
-    variants: &[tolk_compiler::types_kernel::UnionVariant],
+    variants: &[types_kernel::UnionVariant],
     object_name: &str,
 ) -> Option<TyIdx> {
     let labels = union_variant_labels(symbols, variants);
@@ -2099,7 +2099,7 @@ fn resolve_union_object_ty(
 
 fn union_variant_labels(
     symbols: &dyn UnpackSchema,
-    variants: &[tolk_compiler::types_kernel::UnionVariant],
+    variants: &[types_kernel::UnionVariant],
 ) -> Vec<Option<String>> {
     let simple_labels = variants
         .iter()
@@ -3840,14 +3840,14 @@ fn render_runtime_extra_currencies_field(value: &VmStackValue) -> RenderedValue 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tolk_compiler::abi::{
+    use tolk_source_map::abi::{
         ABICustomPackUnpack, ABIDeclaration, ABIOpcode, ABIOutgoingMessage, ABIStorage,
         ABIStructField,
     };
-    use tolk_compiler::source_map::{
+    use tolk_source_map::source_map::{
         AbiAlias, AbiEnum, AbiStruct, Declaration, EnumMemberInfo, FieldInfo, PrefixInfo, SrcRange,
     };
-    use tolk_compiler::types_kernel::UnionVariant;
+    use tolk_source_map::types_kernel::UnionVariant;
     use tycho_types::cell::{CellDataBuilder, CellFamily, HashBytes, Lazy, Store};
     use tycho_types::dict::{Dict, DictKey, StoreDictKey};
     use tycho_types::error::Error;

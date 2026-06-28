@@ -70,7 +70,7 @@ struct UiTestReport {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     details: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    location: Option<ton_source_map::SourceLocation>,
+    location: Option<tolk_source_map::SourceLocation>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     execution: Option<UiExecutionSummary>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

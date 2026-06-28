@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
+use tolk_source_map::SourceLocation;
 use ton_executor::get::GetMethodResult;
-use ton_source_map::SourceLocation;
 use tycho_types::cell::HashBytes;
 use tycho_types::models::{ShardAccount, StdAddr};
 

@@ -24,6 +24,7 @@ const MAX_RETRACE_FLOW_WIDTH = 1800
 interface TransactionRetracePanelProps {
   readonly client: TonClient
   readonly txHash: string
+  readonly codeHash?: string
   readonly contractAbi?: ContractABI
   readonly contracts?: Map<string, ContractData>
   readonly className?: string
@@ -39,6 +40,7 @@ function getErrorMessage(error: unknown): string {
 export default function TransactionRetracePanel({
   client,
   txHash,
+  codeHash,
   contractAbi,
   contracts,
   className,
@@ -58,7 +60,7 @@ export default function TransactionRetracePanel({
       setState({type: "loading"})
 
       try {
-        const result = await traceTx(txHash, network, client)
+        const result = await traceTx(txHash, network, client, {codeHash})
         if (isActive) {
           setState({type: "ready", result})
           onResult?.(txHash, result)
@@ -83,7 +85,7 @@ export default function TransactionRetracePanel({
     return () => {
       isActive = false
     }
-  }, [client, network, onResult, showToast, txHash])
+  }, [client, codeHash, network, onResult, showToast, txHash])
 
   const rootStyle = {
     "--retrace-flow-offset": `${flowMetrics.offset}px`,

@@ -37,10 +37,12 @@ license = "MIT OR Apache-2.0"
 # local crates
 acton-config = { path = "crates/acton-config" }
 acton-abi-catalog = { path = "crates/acton-abi-catalog" }
-acton-debug = { path = "crates/acton-debug" }
+acton-debug = { path = "crates/acton-debug", default-features = false }
+acton-source-trace = { path = "crates/acton-source-trace" }
 acton-mdman = { path = "crates/acton-mdman" }
 ton-objs = { path = "crates/ton-objs" }
 tolk-compiler = { path = "crates/tolk-compiler" }
+tolk-source-map = { path = "crates/tolk-source-map" }
 ton-emulator = { path = "crates/ton-emulator" }
 ton-executor = { path = "crates/ton-executor" }
 tolk-syntax = { path = "crates/tolk-syntax" }
@@ -64,7 +66,6 @@ dap-client = { path = "crates/dap-client" }
 ton-api = { path = "crates/ton-api" }
 ton-liteapi = { path = "crates/ton-liteapi" }
 ton-retrace = { path = "crates/ton-retrace" }
-ton-source-map = { path = "crates/ton-source-map" }
 tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
@@ -213,6 +214,7 @@ path-absolutize = "3.1.1"
 tracing = "0.1"
 function_name = "0.3.0"
 parking_lot = "0.12.5"
+wasm-bindgen = "0.2.105"
 
 cc = "1.2"
 
@@ -220,9 +222,10 @@ cc = "1.2"
 # local crates
 acton-config = { workspace = true }
 acton-abi-catalog = { workspace = true }
-acton-debug = { workspace = true }
+acton-debug = { workspace = true, features = ["dap-server"] }
 acton-mdman = { workspace = true }
 tolk-compiler = { workspace = true }
+tolk-source-map = { workspace = true }
 ton-emulator = { workspace = true }
 ton-executor = { workspace = true }
 tolk-syntax = { workspace = true }
@@ -237,7 +240,6 @@ tvm-logs = { workspace = true }
 tasm-core = { workspace = true }
 ton-api = { workspace = true }
 ton-retrace = { workspace = true }
-ton-source-map = { workspace = true }
 toncenter-keys = { workspace = true }
 tolk-fmt = { workspace = true }
 ton-localnet = { workspace = true }

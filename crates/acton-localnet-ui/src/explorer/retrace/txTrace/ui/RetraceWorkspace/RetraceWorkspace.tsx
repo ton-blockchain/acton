@@ -159,7 +159,7 @@ function sourceLocationWithColumnLabel(location: SourceTraceLocation): string {
 function sourceTraceExceptionStep(steps: readonly SourceTraceStep[]): SourceTraceStep | undefined {
   for (let index = steps.length - 1; index >= 0; index -= 1) {
     const step = steps[index]
-    if (step?.exception?.is_uncaught) {
+    if (step?.exception?.isUncaught) {
       return step
     }
   }
@@ -188,9 +188,9 @@ function sourceTraceExitStep(
     for (let index = steps.length - 1; index >= 0; index -= 1) {
       const step = steps[index]
       if (
-        step?.vm_position &&
-        step.vm_position.cell_hash.toLowerCase() === vmPosition.cellHash &&
-        step.vm_position.offset === vmPosition.offset
+        step?.vmPosition &&
+        step.vmPosition.cellHash.toLowerCase() === vmPosition.cellHash &&
+        step.vmPosition.offset === vmPosition.offset
       ) {
         return step
       }
@@ -220,7 +220,7 @@ function sourceExceptionCodeLensAnnotation(
 
   const formatted = formatExitCode(code, {
     compilerAbi,
-    vmDescription: step.exception?.symbolic_name ?? exitCode?.description,
+    vmDescription: step.exception?.symbolicName ?? exitCode?.description,
   })
 
   return {
@@ -237,7 +237,7 @@ function sourceExceptionLabel(
 ): string {
   return formatExitCode(exception.errno, {
     compilerAbi,
-    vmDescription: exception.symbolic_name,
+    vmDescription: exception.symbolicName,
   }).description
 }
 
@@ -579,14 +579,14 @@ function SourceVariableRow({
   )
 }
 
-function callFrameLabel(frame: SourceTraceStep["call_stack"][number]): string {
-  if (frame.is_builtin) {
-    return `${frame.function_name} (built-in)`
+function callFrameLabel(frame: SourceTraceStep["callStack"][number]): string {
+  if (frame.isBuiltin) {
+    return `${frame.functionName} (built-in)`
   }
-  if (frame.is_inlined) {
-    return `${frame.function_name} (inlined)`
+  if (frame.isInlined) {
+    return `${frame.functionName} (inlined)`
   }
-  return frame.function_name
+  return frame.functionName
 }
 
 function SourceCallFrameIcon() {
@@ -825,7 +825,7 @@ function SourceDebugPanel({
     "locals",
     "callStack",
   ]
-  const activeCallFrameIndex = selectedCallFrameIndex ?? (step.call_stack.length > 0 ? 0 : null)
+  const activeCallFrameIndex = selectedCallFrameIndex ?? (step.callStack.length > 0 ? 0 : null)
   const resizePartnerId = (id: SourceDebugSectionId): SourceDebugSectionId | undefined => {
     const startIndex = visibleSectionIds.indexOf(id)
     if (startIndex < 0 || collapsedSections[id]) {
@@ -885,11 +885,11 @@ function SourceDebugPanel({
         onResizeStart={startSectionResize}
         setSectionElement={setSectionElement}
       >
-        {step.call_stack.length > 0 ? (
+        {step.callStack.length > 0 ? (
           <div className={styles.sourceCallStack}>
-            {step.call_stack.map((frame, index) => (
+            {step.callStack.map((frame, index) => (
               <button
-                key={`${frame.function_name}-${index}`}
+                key={`${frame.functionName}-${index}`}
                 type="button"
                 className={`${styles.sourceCallFrame} ${
                   index === activeCallFrameIndex ? styles.sourceCallFrameActive : ""
@@ -918,6 +918,7 @@ function SourceFilesEditor({
   bundles,
   traceId,
   sourceTrace,
+  sourceTraceBundleHash,
   exitCode,
   contractAbi,
   contracts,
@@ -926,6 +927,7 @@ function SourceFilesEditor({
   readonly bundles: readonly SourceBundle[]
   readonly traceId: string
   readonly sourceTrace?: SourceTraceResponse
+  readonly sourceTraceBundleHash?: string
   readonly exitCode?: ExitCode
   readonly contractAbi?: ContractABI
   readonly contracts?: Map<string, ContractData>
@@ -940,7 +942,7 @@ function SourceFilesEditor({
     : undefined
   const code = activeFile ? decodeSourceFile(activeFile) : ""
   const activeSourceTrace =
-    activeBundle && sourceTrace?.source_bundle_hash === activeBundle.source_bundle_hash
+    activeBundle && sourceTraceBundleHash === activeBundle.source_bundle_hash
       ? sourceTrace
       : undefined
   const sourceSteps = activeSourceTrace?.steps ?? []
@@ -964,7 +966,7 @@ function SourceFilesEditor({
   const selectedCallFrameLocation =
     selectedCallFrameIndex === null
       ? null
-      : (currentSourceStep?.call_stack[selectedCallFrameIndex]?.location ?? null)
+      : (currentSourceStep?.callStack[selectedCallFrameIndex]?.location ?? null)
   const highlightedSourceLine =
     currentSourceStep &&
     activeFile &&
@@ -1005,11 +1007,11 @@ function SourceFilesEditor({
 
   useEffect(() => {
     setActiveSourceStepIndex(0)
-  }, [activeSourceTrace?.source_bundle_hash])
+  }, [sourceTraceBundleHash])
 
   useEffect(() => {
     setSelectedCallFrameIndex(null)
-  }, [activeSourceTrace?.source_bundle_hash, currentSourceStepIndex])
+  }, [sourceTraceBundleHash, currentSourceStepIndex])
 
   useEffect(() => {
     if (sourceSteps.length > 0 && activeSourceStepIndex >= sourceSteps.length) {
@@ -1081,7 +1083,7 @@ function SourceFilesEditor({
 
   const handleCallFrameSelect = useCallback(
     (index: number) => {
-      const frameLocation = currentSourceStep?.call_stack[index]?.location
+      const frameLocation = currentSourceStep?.callStack[index]?.location
       if (!activeBundle || !frameLocation) {
         return
       }
@@ -1475,6 +1477,7 @@ function RetraceWorkspaceFc({
                 bundles={sourceBundles}
                 traceId={result.result.emulatedTx.lt.toString()}
                 sourceTrace={result.sourceTrace}
+                sourceTraceBundleHash={result.sourceTraceBundleHash}
                 exitCode={result.exitCode}
                 contractAbi={contractAbi}
                 contracts={contracts}

@@ -12,7 +12,7 @@ license = { workspace = true }
 
 [dependencies]
 acton-abi-catalog = { workspace = true }
-acton-debug = { workspace = true }
+acton-source-trace = { workspace = true }
 ton-executor = { workspace = true }
 ton-networks = { workspace = true }
 ton-api = { workspace = true }

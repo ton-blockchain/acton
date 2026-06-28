@@ -1,5 +1,5 @@
-import {RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK, retrace} from "@ton/retracer-core"
-import type {RetraceNetworkConfig, TraceResult} from "@ton/retracer-core"
+import type {RetraceNetworkConfig, TolkSourceMapData, TraceResult} from "@ton/retracer-core"
+import {retrace, RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK} from "@ton/retracer-core"
 import {compileCellWithMapping, decompileCell} from "@ton/tasm/dist/runtime/instr"
 import {createMappingInfo} from "@ton/tasm/dist/trace/mapping"
 import {type Step, type TraceInfo} from "@ton/tasm/dist/trace"
@@ -11,11 +11,7 @@ import {Cell} from "@ton/core"
 import type {AssemblyMapping} from "ton-source-map"
 
 import type {TonClient} from "../../../api/client"
-import type {
-  SourceBundle,
-  SourceTraceResponse,
-  VerificationSourceResponse,
-} from "../../../api/types"
+import type {SourceBundle, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExitCode, RetraceResultAndCode} from "./types"
 
@@ -26,6 +22,15 @@ import {
   TxNotFoundError,
   TxTraceError,
 } from "./errors"
+
+interface TraceTxOptions {
+  readonly codeHash?: string
+}
+
+interface VerifiedSourceTraceOptions {
+  readonly sourceMap: TolkSourceMapData
+  readonly sourceTraceBundleHash: string
+}
 
 function absoluteApiBaseUrl(baseUrl: string): string {
   const fullBase = baseUrl.startsWith("http") ? baseUrl : `${globalThis.location.origin}${baseUrl}`
@@ -90,71 +95,59 @@ function isSupportedTolkBundle(bundle: SourceBundle): boolean {
 }
 
 async function loadVerifiedTolkSource(
-  result: TraceResult,
   client: TonClient | undefined,
+  codeHash?: string,
 ): Promise<VerificationSourceResponse | undefined> {
-  if (!client) {
+  if (!client || !codeHash) {
     return undefined
   }
 
-  const requests: Parameters<TonClient["getVerifiedSource"]>[0][] = []
-  if (result.codeCell) {
-    requests.push({codeHash: result.codeCell.hash().toString("hex")})
-  }
-  requests.push({address: result.inMsg.contract.toString()})
+  try {
+    const source = await client.getVerifiedSource({
+      codeHash,
+    })
+    const bundles = source.verified ? source.bundles.filter(isSupportedTolkBundle) : []
 
-  for (const request of requests) {
-    try {
-      const source = await client.getVerifiedSource(request)
-      const bundles = source.verified ? source.bundles.filter(isSupportedTolkBundle) : []
-
-      if (bundles.length > 0) {
-        return {...source, bundles}
-      }
-    } catch (error) {
-      console.debug("Failed to fetch verified source for retrace", error)
+    if (bundles.length > 0) {
+      return {...source, bundles}
     }
+  } catch (error) {
+    console.debug("Failed to fetch verified source for retrace", error)
   }
 
   return undefined
 }
 
-async function loadSourceTrace(
-  result: TraceResult,
-  client: TonClient | undefined,
+function verifiedSourceTraceOptions(
   verifiedSource: VerificationSourceResponse | undefined,
-): Promise<SourceTraceResponse | undefined> {
+): VerifiedSourceTraceOptions | undefined {
   const sourceBundle = verifiedSource?.bundles[0]
-  if (!client || !result.codeCell || !sourceBundle || !result.emulatedTx.vmLogs) {
+  if (!sourceBundle?.source_map) {
     return undefined
   }
 
-  try {
-    const senderAddress = result.inMsg.sender?.toString()
-    return await client.buildSourceTrace({
-      vm_logs: result.emulatedTx.vmLogs,
-      code_hash: result.codeCell.hash().toString("hex"),
-      source_bundle: sourceBundle,
-      context: senderAddress
-        ? {
-            in_msg: {
-              sender_address: senderAddress,
-            },
-          }
-        : undefined,
-    })
-  } catch (error) {
-    console.debug("Failed to build source trace for retrace", error)
-    return undefined
+  return {
+    sourceMap: {
+      codeBoc64: sourceBundle.source_map.code_boc64,
+      symbolTypesJson: sourceBundle.source_map.symbol_types_json,
+      debugMarksJson: sourceBundle.source_map.debug_marks_json,
+      debugMarksBase64: sourceBundle.source_map.debug_marks_base64,
+    },
+    sourceTraceBundleHash: sourceBundle.source_bundle_hash,
   }
 }
 
 async function doTrace(
   hash: string,
   network: ExplorerNetworkInfo,
+  sourceMap?: TolkSourceMapData,
 ): Promise<{readonly result: TraceResult; readonly network: ExplorerNetworkInfo}> {
   try {
-    const result = await retrace(getRetraceNetworkConfig(network), hash.toLowerCase())
+    const result = await retrace(
+      getRetraceNetworkConfig(network),
+      hash.toLowerCase(),
+      sourceMap ? {sourceMap} : undefined,
+    )
     return {result, network}
   } catch (e: unknown) {
     let message = "An unknown error occurred."
@@ -286,13 +279,22 @@ export async function traceTx(
   hash: string,
   network: ExplorerNetworkInfo,
   client?: TonClient,
+  options: TraceTxOptions = {},
 ): Promise<RetraceResultAndCode> {
-  const {result} = await doTrace(hash, network)
-  const verifiedSourcePromise = loadVerifiedTolkSource(result, client)
+  const verifiedSource = await loadVerifiedTolkSource(client, options.codeHash)
+  const sourceTraceOptions = verifiedSourceTraceOptions(verifiedSource)
+  const {result} = await doTrace(hash, network, sourceTraceOptions?.sourceMap)
   const {code, traceInfo, exitCode} = extractCodeAndTrace(result.codeCell, result.emulatedTx.vmLogs)
-  const verifiedSource = await verifiedSourcePromise
-  const sourceTrace = await loadSourceTrace(result, client, verifiedSource)
-  return {result, code, trace: traceInfo, exitCode, network, verifiedSource, sourceTrace}
+  return {
+    result,
+    code,
+    trace: traceInfo,
+    exitCode,
+    network,
+    verifiedSource,
+    sourceTrace: result.sourceTrace,
+    sourceTraceBundleHash: sourceTraceOptions?.sourceTraceBundleHash,
+  }
 }
 
 export function normalizeGas(step: Step) {

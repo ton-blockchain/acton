@@ -75,6 +75,11 @@ const normalizeTransactionReference = (reference: string): string => {
 
 const transactionHashHex = (tx: TransactionInfo): string => tx.transaction.hash().toString("hex")
 
+const transactionExecutionCodeHash = (tx: TransactionInfo): string | undefined =>
+  tx.codeHashBefore ??
+  tx.transaction.inMessage?.init?.code?.hash().toString("hex") ??
+  tx.codeHashAfter
+
 const transactionReferenceKeys = (tx: TransactionInfo): readonly string[] => {
   return [tx.id, transactionHashHex(tx), tx.lt, tx.transaction.lt.toString()].map(
     normalizeTransactionReference,
@@ -354,7 +359,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         return cachedActions
       }
 
-      const retraceResult = await traceTx(txHash, network)
+      const retraceResult = await traceTx(txHash, network, undefined, {
+        codeHash: transactionExecutionCodeHash(tx),
+      })
       const loadedActions: LoadedTransactionActions = {
         actions: retraceResult.result.emulatedTx.c5,
         outActions: retraceResult.result.emulatedTx.actions,
@@ -608,6 +615,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           key={`${txHash}:${retraceAttempt}`}
           client={client}
           txHash={txHash}
+          codeHash={transactionExecutionCodeHash(tx)}
           className={styles.selectedRetracePanel}
           contractAbi={tx.contractAbi}
           contracts={contracts}

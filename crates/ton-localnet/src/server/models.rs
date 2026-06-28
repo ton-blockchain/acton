@@ -1,9 +1,12 @@
+pub use acton_source_trace::{
+    BuildSourceTraceRequest, SourceTraceBundleRequest, SourceTraceCompilerRequest,
+    SourceTraceContextRequest, SourceTraceFileRequest, SourceTraceInMessageContextRequest,
+};
 use serde::{
     Deserialize, Deserializer, Serialize,
     de::{self, Error as _},
 };
 use serde_json::Value;
-use std::collections::BTreeMap;
 
 #[derive(Deserialize)]
 pub struct JsonRpcRequest {
@@ -64,63 +67,6 @@ pub struct GetLibrariesRequest {
 pub struct GetVerifiedSourceRequest {
     pub address: Option<String>,
     pub code_hash: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct BuildSourceTraceRequest {
-    pub vm_logs: String,
-    pub code_hash: String,
-    pub source_bundle: SourceTraceBundleRequest,
-    pub context: Option<SourceTraceContextRequest>,
-}
-
-#[derive(Deserialize)]
-pub struct SourceTraceContextRequest {
-    pub in_msg: Option<SourceTraceInMessageContextRequest>,
-}
-
-#[derive(Deserialize)]
-pub struct SourceTraceInMessageContextRequest {
-    pub sender_address: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct SourceTraceBundleRequest {
-    pub source_bundle_hash: String,
-    pub entrypoint: String,
-    pub compiler: SourceTraceCompilerRequest,
-    pub files: Vec<SourceTraceFileRequest>,
-}
-
-#[derive(Deserialize)]
-pub struct SourceTraceCompilerRequest {
-    pub language: String,
-    pub version: String,
-    pub params: Value,
-}
-
-#[derive(Deserialize)]
-pub struct SourceTraceFileRequest {
-    pub path: String,
-    pub content: String,
-}
-
-impl SourceTraceBundleRequest {
-    #[must_use]
-    pub fn import_mappings(&self) -> Option<BTreeMap<String, String>> {
-        self.compiler
-            .params
-            .get("import_mappings")
-            .and_then(Value::as_object)
-            .map(|mappings| {
-                mappings
-                    .iter()
-                    .filter_map(|(key, value)| {
-                        value.as_str().map(|value| (key.clone(), value.to_owned()))
-                    })
-                    .collect()
-            })
-    }
 }
 
 #[derive(Deserialize)]

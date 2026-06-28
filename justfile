@@ -1,5 +1,6 @@
 NEXTEST_PROFILE_ARGS := if env_var_or_default("CI", "") != "" { "-P ci" } else { "" }
 TEST_FEATURE_ARGS := if env_var_or_default("CI", "") != "" { "--features only_ci" } else { "" }
+SOURCE_TRACE_WASM_OUT := env_var_or_default("ACTON_SOURCE_TRACE_WASM_OUT", "/tmp/acton-source-trace-wasm")
 
 all: precommit
 
@@ -8,6 +9,9 @@ build:
 
 build-dev:
     cargo build
+
+build-source-trace-wasm:
+    wasm-pack build crates/acton-source-trace-wasm --target web --out-dir "{{ SOURCE_TRACE_WASM_OUT }}" --out-name acton_source_trace_wasm
 
 sync-artifacts:
     cargo xtask sync-artifacts
