@@ -2,7 +2,16 @@ import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
 import {ToastProvider} from "@acton/shared-ui"
 import type {ThemeMode} from "@acton/shared-ui"
-import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {
+  Suspense,
+  lazy,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 import type {FC, ReactNode} from "react"
 
 import {TonClient} from "./explorer/api/client"
@@ -141,7 +150,7 @@ export const App: FC = () => {
     }),
     [],
   )
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark")
     document.body.classList.toggle("dark-mode", theme === "dark")
     document.body.classList.toggle("light-mode", theme !== "dark")

@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react"
+import {useEffect, useLayoutEffect, useState} from "react"
 import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
 
@@ -18,30 +18,37 @@ interface UseMonacoSetupReturn {
   readonly monaco: typeof monacoTypes | null
   readonly isReady: boolean
   readonly isMac: boolean
+  readonly theme: MonacoTheme
 }
 
-type MonacoTheme = "light-theme" | "dark-theme"
+export type MonacoTheme = "light-theme" | "dark-theme"
 
-const getExplorerMonacoTheme = (): MonacoTheme => {
+export const getExplorerMonacoTheme = (): MonacoTheme => {
   if (typeof globalThis.document === "undefined") return "light-theme"
   return globalThis.document.documentElement.classList.contains("dark-theme")
     ? "dark-theme"
     : "light-theme"
 }
 
-const initializeMonaco = (monaco: typeof monacoTypes, language: SupportedLanguage) => {
+export const initializeMonaco = (monaco: typeof monacoTypes, language: SupportedLanguage) => {
   if (language === "tasm") {
-    monaco.languages.register({id: TASM_LANGUAGE_ID})
+    if (!monaco.languages.getLanguages().some(candidate => candidate.id === TASM_LANGUAGE_ID)) {
+      monaco.languages.register({id: TASM_LANGUAGE_ID})
+    }
     monaco.languages.setMonarchTokensProvider(TASM_LANGUAGE_ID, tasmLanguageDefinition)
   }
 
   if (language === "func") {
-    monaco.languages.register({id: FUNC_LANGUAGE_ID})
+    if (!monaco.languages.getLanguages().some(candidate => candidate.id === FUNC_LANGUAGE_ID)) {
+      monaco.languages.register({id: FUNC_LANGUAGE_ID})
+    }
     monaco.languages.setMonarchTokensProvider(FUNC_LANGUAGE_ID, funcLanguageDefinition)
   }
 
   if (language === "tolk") {
-    monaco.languages.register({id: TOLK_LANGUAGE_ID})
+    if (!monaco.languages.getLanguages().some(candidate => candidate.id === TOLK_LANGUAGE_ID)) {
+      monaco.languages.register({id: TOLK_LANGUAGE_ID})
+    }
     monaco.languages.setMonarchTokensProvider(TOLK_LANGUAGE_ID, tolkLanguageDefinition)
   }
 
@@ -66,13 +73,16 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
 
     try {
       initializeMonaco(monaco, language)
+      const currentTheme = getExplorerMonacoTheme()
+      monaco.editor.setTheme(currentTheme)
+      setTheme(currentTheme)
       setIsReady(true)
     } catch (error) {
       console.error("Failed to initialize Monaco:", error)
     }
   }, [monaco, language])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (typeof globalThis.document === "undefined") return
 
     const updateTheme = () => {
@@ -92,7 +102,7 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
     }
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!monaco || !isReady) return
 
     try {
@@ -106,5 +116,6 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
     monaco,
     isReady,
     isMac,
+    theme,
   }
 }

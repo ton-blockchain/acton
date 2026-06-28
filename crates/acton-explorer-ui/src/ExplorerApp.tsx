@@ -1,6 +1,6 @@
 import {ThemeSwitch, ToastProvider, useToast} from "@acton/shared-ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Trash2} from "lucide-react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {BrowserRouter, Link, Navigate, Route, Routes, useLocation} from "react-router-dom"
 
@@ -869,7 +869,7 @@ export const ExplorerApp: FC = () => {
     })
   }, [])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     document.documentElement.classList.toggle("dark-theme", theme === "dark")
     document.body.classList.toggle("dark-mode", theme === "dark")
     document.body.classList.toggle("light-mode", theme !== "dark")

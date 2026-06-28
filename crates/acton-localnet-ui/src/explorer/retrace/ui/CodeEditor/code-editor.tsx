@@ -14,6 +14,8 @@ import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
 
 import {
   useMonacoSetup,
+  getExplorerMonacoTheme,
+  initializeMonaco,
   useDecorations,
   useEditorEvents,
   useTasmHoverProvider,
@@ -170,7 +172,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   const modelKey =
     modelPath ?? (language === "func" ? "main.fc" : language === "tolk" ? "main.tolk" : "out.tasm")
 
-  const {monaco, isMac} = useMonacoSetup({language})
+  const {monaco, isMac, theme} = useMonacoSetup({language})
 
   const {isCtrlPressed, hoveredLine} = useEditorEvents({
     monaco,
@@ -423,6 +425,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           height="100%"
           width="100%"
           language={language}
+          theme={theme}
           path={modelKey}
           value={code}
           saveViewState
@@ -454,10 +457,15 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             },
           }}
           loading={<></>}
+          beforeMount={monacoInstance => {
+            initializeMonaco(monacoInstance, language)
+            monacoInstance.editor.setTheme(getExplorerMonacoTheme())
+          }}
           onMount={editor => {
             const model = editor.getModel()
             if (monaco && model) {
               model.setEOL(monaco.editor.EndOfLineSequence.LF)
+              monaco.editor.setTheme(theme)
             }
 
             editorRef.current = editor
