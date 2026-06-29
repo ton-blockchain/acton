@@ -2106,7 +2106,7 @@ fn process_loop_request(
             let res = entries
                 .into_iter()
                 .try_for_each(|(code_hash, compiler_abi)| {
-                    node.history.set_compiler_abi(code_hash, compiler_abi)
+                    node.set_compiler_abi(code_hash, compiler_abi)
                 });
             let _ = resp.send(res);
         }
@@ -2121,7 +2121,7 @@ fn process_loop_request(
             let _ = resp.send(Ok(entries));
         }
         Request::DeleteCompilerAbi { code_hash, resp } => {
-            let res = node.history.delete_compiler_abi(&code_hash);
+            let res = node.delete_compiler_abi(&code_hash);
             let _ = resp.send(res);
         }
         Request::GetCompilerAbis { code_hashes, resp } => {
@@ -2136,9 +2136,9 @@ fn process_loop_request(
             let _ = resp.send(Ok(res));
         }
         Request::RegisterVerifiedSources { entries, resp } => {
-            let res = entries.into_iter().try_for_each(|(code_hash, source)| {
-                node.history.set_verified_source(code_hash, source)
-            });
+            let res = entries
+                .into_iter()
+                .try_for_each(|(code_hash, source)| node.set_verified_source(code_hash, source));
             let _ = resp.send(res);
         }
         Request::GetRegisteredVerifiedSource {
@@ -2160,7 +2160,7 @@ fn process_loop_request(
             let _ = resp.send(Ok(entries));
         }
         Request::DeleteVerifiedSource { code_hash, resp } => {
-            let res = node.history.delete_verified_source(&code_hash);
+            let res = node.delete_verified_source(&code_hash);
             let _ = resp.send(res);
         }
         Request::DumpState { path, resp } => {

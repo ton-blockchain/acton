@@ -44,7 +44,7 @@ impl NodePersistence {
 
     #[allow(clippy::significant_drop_tightening)]
     pub(crate) fn load(&self) -> anyhow::Result<PersistedNodeState> {
-        let mut history = History::with_conn(self.connection());
+        let mut history = History::new();
         let mut latest = LatestState::new();
         let mut indexes = Indexes::new();
         let mut head_seqno = 0;
@@ -246,6 +246,68 @@ impl NodePersistence {
                 params![addr.addr.to_vec(), account_data],
             )?;
 
+        Ok(())
+    }
+
+    pub(crate) fn set_compiler_abi(
+        &self,
+        code_hash: Hash256,
+        compiler_abi: &Value,
+        stale_keys: &[Hash256],
+    ) -> anyhow::Result<()> {
+        let data = serde_json::to_vec(compiler_abi)?;
+        let mut conn = self.conn.lock().expect("Failed to lock DB connection");
+        let tx = conn.transaction()?;
+        for stale_key in stale_keys {
+            tx.execute(
+                "DELETE FROM compiler_abis WHERE code_hash = ?1",
+                params![stale_key.0.to_vec()],
+            )?;
+        }
+        tx.execute(
+            "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
+            params![code_hash.0.to_vec(), data],
+        )?;
+        tx.commit()?;
+        drop(conn);
+        Ok(())
+    }
+
+    pub(crate) fn delete_compiler_abi(&self, code_hash: Hash256) -> anyhow::Result<()> {
+        self.conn
+            .lock()
+            .expect("Failed to lock DB connection")
+            .execute(
+                "DELETE FROM compiler_abis WHERE code_hash = ?1",
+                params![code_hash.0.to_vec()],
+            )?;
+        Ok(())
+    }
+
+    pub(crate) fn set_verified_source(
+        &self,
+        code_hash: Hash256,
+        source: &Value,
+    ) -> anyhow::Result<()> {
+        let data = serde_json::to_vec(source)?;
+        self.conn
+            .lock()
+            .expect("Failed to lock DB connection")
+            .execute(
+                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
+                params![code_hash.0.to_vec(), data],
+            )?;
+        Ok(())
+    }
+
+    pub(crate) fn delete_verified_source(&self, code_hash: Hash256) -> anyhow::Result<()> {
+        self.conn
+            .lock()
+            .expect("Failed to lock DB connection")
+            .execute(
+                "DELETE FROM verified_sources WHERE code_hash = ?1",
+                params![code_hash.0.to_vec()],
+            )?;
         Ok(())
     }
 

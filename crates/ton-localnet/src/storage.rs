@@ -449,7 +449,6 @@ pub struct AccountDelta {
 }
 
 pub struct History {
-    pub conn: Option<Arc<Mutex<Connection>>>,
     pub blocks: Vec<BlockMeta>,
     pub masterchain_blocks: Vec<MasterchainBlockMeta>,
     pub deltas_by_seqno: Vec<Vec<AccountDelta>>,
@@ -477,28 +476,6 @@ impl History {
         let address_names = Self::build_address_names();
 
         Self {
-            conn: None,
-            blocks: Vec::new(),
-            masterchain_blocks: Vec::new(),
-            deltas_by_seqno: Vec::new(),
-            tx_by_hash: HashMap::new(),
-            msg_by_hash: HashMap::new(),
-            msg_to_tx: HashMap::new(),
-            address_names,
-            jetton_masters: IndexMap::new(),
-            jetton_wallets: IndexMap::new(),
-            nft_items: IndexMap::new(),
-            asset_detection_checked: HashSet::new(),
-            compiler_abis: HashMap::new(),
-            verified_sources: HashMap::new(),
-        }
-    }
-
-    pub fn with_conn(conn: Arc<Mutex<Connection>>) -> Self {
-        let address_names = Self::build_address_names();
-
-        Self {
-            conn: Some(conn),
             blocks: Vec::new(),
             masterchain_blocks: Vec::new(),
             deltas_by_seqno: Vec::new(),
@@ -532,14 +509,14 @@ impl History {
         address_names
     }
 
-    pub fn set_compiler_abi(
-        &mut self,
+    #[must_use]
+    pub fn compiler_abi_stale_keys(
+        &self,
         code_hash: Hash256,
-        compiler_abi: Value,
-    ) -> anyhow::Result<()> {
-        let aliases = compiler_abi_code_hashes(&compiler_abi, Some(code_hash));
-        let stale_keys = self
-            .compiler_abis
+        compiler_abi: &Value,
+    ) -> Vec<Hash256> {
+        let aliases = compiler_abi_code_hashes(compiler_abi, Some(code_hash));
+        self.compiler_abis
             .iter()
             .filter_map(|(existing_hash, existing_abi)| {
                 let existing_aliases = compiler_abi_code_hashes(existing_abi, Some(*existing_hash));
@@ -548,27 +525,24 @@ impl History {
                     .any(|alias| aliases.contains(alias))
                     .then_some(*existing_hash)
             })
-            .collect::<Vec<_>>();
+            .collect()
+    }
 
-        if let Some(conn) = &self.conn {
-            let data = serde_json::to_vec(&compiler_abi)?;
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            for stale_key in &stale_keys {
-                conn.execute(
-                    "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                    params![stale_key.0.to_vec()],
-                )?;
-            }
-            conn.execute(
-                "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.0.to_vec(), data],
-            )?;
-        }
+    pub fn set_compiler_abi(&mut self, code_hash: Hash256, compiler_abi: Value) {
+        let stale_keys = self.compiler_abi_stale_keys(code_hash, &compiler_abi);
+        self.set_compiler_abi_with_stale_keys(code_hash, compiler_abi, &stale_keys);
+    }
+
+    pub fn set_compiler_abi_with_stale_keys(
+        &mut self,
+        code_hash: Hash256,
+        compiler_abi: Value,
+        stale_keys: &[Hash256],
+    ) {
         for stale_key in stale_keys {
-            self.compiler_abis.remove(&stale_key);
+            self.compiler_abis.remove(stale_key);
         }
         self.compiler_abis.insert(code_hash, compiler_abi);
-        Ok(())
     }
 
     #[must_use]
@@ -582,37 +556,12 @@ impl History {
         })
     }
 
-    pub fn replace_compiler_abis(
-        &mut self,
-        compiler_abis: HashMap<Hash256, Value>,
-    ) -> anyhow::Result<()> {
-        if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            conn.execute("DELETE FROM compiler_abis", [])?;
-            for (code_hash, compiler_abi) in &compiler_abis {
-                let data = serde_json::to_vec(compiler_abi)?;
-                conn.execute(
-                    "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                    params![code_hash.0.to_vec(), data],
-                )?;
-            }
-        }
-
+    pub fn replace_compiler_abis(&mut self, compiler_abis: HashMap<Hash256, Value>) {
         self.compiler_abis = compiler_abis;
-        Ok(())
     }
 
-    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
-        if let Some(conn) = &self.conn {
-            let data = serde_json::to_vec(&source)?;
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            conn.execute(
-                "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                params![code_hash.0.to_vec(), data],
-            )?;
-        }
+    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) {
         self.verified_sources.insert(code_hash, source);
-        Ok(())
     }
 
     #[must_use]
@@ -620,38 +569,29 @@ impl History {
         self.verified_sources.get(code_hash).cloned()
     }
 
-    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
-        let delete_key = self
-            .compiler_abis
+    #[must_use]
+    pub fn compiler_abi_delete_key(&self, code_hash: &Hash256) -> Hash256 {
+        self.compiler_abis
             .iter()
             .find_map(|(entry_hash, abi)| {
                 compiler_abi_code_hashes(abi, Some(*entry_hash))
                     .contains(code_hash)
                     .then_some(*entry_hash)
             })
-            .unwrap_or(*code_hash);
-
-        if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            conn.execute(
-                "DELETE FROM compiler_abis WHERE code_hash = ?1",
-                params![delete_key.0.to_vec()],
-            )?;
-        }
-        self.compiler_abis.remove(&delete_key);
-        Ok(())
+            .unwrap_or(*code_hash)
     }
 
-    pub fn delete_verified_source(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
-        if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            conn.execute(
-                "DELETE FROM verified_sources WHERE code_hash = ?1",
-                params![code_hash.0.to_vec()],
-            )?;
-        }
+    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) {
+        let delete_key = self.compiler_abi_delete_key(code_hash);
+        self.delete_compiler_abi_by_key(&delete_key);
+    }
+
+    pub fn delete_compiler_abi_by_key(&mut self, delete_key: &Hash256) {
+        self.compiler_abis.remove(delete_key);
+    }
+
+    pub fn delete_verified_source(&mut self, code_hash: &Hash256) {
         self.verified_sources.remove(code_hash);
-        Ok(())
     }
 }
 

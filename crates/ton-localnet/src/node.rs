@@ -28,6 +28,7 @@ use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
 use tokio::sync::broadcast;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
@@ -2168,6 +2169,47 @@ impl Node {
         Ok(())
     }
 
+    pub fn set_compiler_abi(
+        &mut self,
+        code_hash: Hash256,
+        compiler_abi: Value,
+    ) -> anyhow::Result<()> {
+        let stale_keys = self
+            .history
+            .compiler_abi_stale_keys(code_hash, &compiler_abi);
+        if let Some(persistence) = &self.persistence {
+            persistence.set_compiler_abi(code_hash, &compiler_abi, &stale_keys)?;
+        }
+        self.history
+            .set_compiler_abi_with_stale_keys(code_hash, compiler_abi, &stale_keys);
+        Ok(())
+    }
+
+    pub fn delete_compiler_abi(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        let delete_key = self.history.compiler_abi_delete_key(code_hash);
+        if let Some(persistence) = &self.persistence {
+            persistence.delete_compiler_abi(delete_key)?;
+        }
+        self.history.delete_compiler_abi_by_key(&delete_key);
+        Ok(())
+    }
+
+    pub fn set_verified_source(&mut self, code_hash: Hash256, source: Value) -> anyhow::Result<()> {
+        if let Some(persistence) = &self.persistence {
+            persistence.set_verified_source(code_hash, &source)?;
+        }
+        self.history.set_verified_source(code_hash, source);
+        Ok(())
+    }
+
+    pub fn delete_verified_source(&mut self, code_hash: &Hash256) -> anyhow::Result<()> {
+        if let Some(persistence) = &self.persistence {
+            persistence.delete_verified_source(*code_hash)?;
+        }
+        self.history.delete_verified_source(code_hash);
+        Ok(())
+    }
+
     pub fn get_shard_account_at_block(
         &mut self,
         addr: &Addr,
@@ -2933,8 +2975,7 @@ mod tests {
             ]
         });
 
-        node.history
-            .set_compiler_abi(code_hash, compiler_abi.clone())
+        node.set_compiler_abi(code_hash, compiler_abi.clone())
             .expect("must persist compiler ABI");
         drop(node);
 
@@ -2997,8 +3038,7 @@ mod tests {
             ]
         });
 
-        node.history
-            .set_verified_source(code_hash, source.clone())
+        node.set_verified_source(code_hash, source.clone())
             .expect("must persist verified source");
         drop(node);
 
