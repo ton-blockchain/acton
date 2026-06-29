@@ -22,7 +22,7 @@ import {
 } from "@ton/tolk-abi-to-typescript"
 import {Link2, Play} from "lucide-react"
 import {createHighlighterCore} from "shiki/core"
-import {createOnigurumaEngine} from "shiki/engine/oniguruma"
+import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
 
 import type {TonClient} from "../api/client"
@@ -87,7 +87,7 @@ const getAbiHighlighter = () => {
   abiHighlighterPromise ??= createHighlighterCore({
     themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
     langs: [tolkGrammar, import("shiki/langs/json.mjs")],
-    engine: createOnigurumaEngine(() => import("shiki/wasm")),
+    engine: createJavaScriptRegexEngine(),
   })
 
   return abiHighlighterPromise

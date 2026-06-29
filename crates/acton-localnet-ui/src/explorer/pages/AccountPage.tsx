@@ -25,6 +25,7 @@ import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {AccountDetails} from "../components/AccountDetails"
 import {
+  NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
   TOKEN_IMAGE_SOURCE_KEYS,
   TOKEN_PLACEHOLDER_IMAGE,
@@ -814,13 +815,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     contentString(collectionSample?.content, "collection_description")
   const nftCollectionImageSources = [
     ...getImageSources(nftCollectionTokenInfo, NFT_IMAGE_SOURCE_KEYS),
-    ...getImageSources(collectionSample?.content, [
-      "collection_image",
-      "collection_image_small",
-      "collection_image_medium",
-      "collection_image_big",
-      ...NFT_IMAGE_SOURCE_KEYS,
-    ]),
+    ...getImageSources(collectionSample?.content, NFT_COLLECTION_IMAGE_SOURCE_KEYS),
   ]
   const nftCollectionImage = nftCollectionImageSources[0] ?? TOKEN_PLACEHOLDER_IMAGE
   const collectiblePreviews = nftItems.slice(0, 8).map(item => {

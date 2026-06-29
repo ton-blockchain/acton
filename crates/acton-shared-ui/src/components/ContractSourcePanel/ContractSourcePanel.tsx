@@ -5,7 +5,7 @@ import {Cell} from "@ton/core"
 import {Cell as TasmCell, runtime, text} from "@ton/tasm"
 import {Check, CheckCircle2, Copy, ExternalLink, FileCode2, Folder, Menu} from "lucide-react"
 import {createHighlighterCore} from "shiki/core"
-import {createOnigurumaEngine} from "shiki/engine/oniguruma"
+import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
 
 import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "../CodeSnippet/jetbrains-themes"
@@ -114,7 +114,7 @@ const getContractSourceHighlighter = () => {
   contractSourceHighlighterPromise ??= createHighlighterCore({
     themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
     langs: [tasmGrammar, tolkGrammar, funcGrammar, import("shiki/langs/json.mjs")],
-    engine: createOnigurumaEngine(() => import("shiki/wasm")),
+    engine: createJavaScriptRegexEngine(),
   })
 
   return contractSourceHighlighterPromise

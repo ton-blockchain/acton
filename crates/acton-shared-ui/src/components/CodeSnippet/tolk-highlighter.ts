@@ -1,5 +1,5 @@
 import {createHighlighterCore} from "shiki/core"
-import {createOnigurumaEngine} from "shiki/engine/oniguruma"
+import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {ThemedToken} from "shiki/types"
 
 import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "./jetbrains-themes"
@@ -20,7 +20,7 @@ const getTolkHighlighter = () => {
   tolkHighlighterPromise ??= createHighlighterCore({
     themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
     langs: [tolkGrammar],
-    engine: createOnigurumaEngine(() => import("shiki/wasm")),
+    engine: createJavaScriptRegexEngine(),
   })
 
   return tolkHighlighterPromise

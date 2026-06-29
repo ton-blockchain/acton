@@ -102,7 +102,7 @@ interface NftItemsResponse {
   readonly metadata?: JettonWalletMetadata
 }
 
-const IMAGE_CONTENT_KEYS = ["image", "_image_small", "_image_medium", "_image_big"] as const
+const IMAGE_CONTENT_KEYS = ["_image_small", "_image_medium", "_image_big", "image"] as const
 const JETTON_CONTENT_KEYS = [
   "uri",
   "name",

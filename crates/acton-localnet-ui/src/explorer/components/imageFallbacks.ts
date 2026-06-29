@@ -6,19 +6,27 @@ const TOKEN_PLACEHOLDER_SVG =
 export const TOKEN_PLACEHOLDER_IMAGE = `data:image/svg+xml,${encodeURIComponent(TOKEN_PLACEHOLDER_SVG)}`
 
 export const TOKEN_IMAGE_SOURCE_KEYS = [
-  "image",
   "_image_small",
   "_image_medium",
   "_image_big",
+  "image",
 ] as const
 
 export const NFT_IMAGE_SOURCE_KEYS = [
-  "image",
   "_image_small",
+  "preview",
   "_image_medium",
   "_image_big",
-  "preview",
   "image_url",
+  "image",
+] as const
+
+export const NFT_COLLECTION_IMAGE_SOURCE_KEYS = [
+  "collection_image_small",
+  "collection_image_medium",
+  "collection_image_big",
+  "collection_image",
+  ...NFT_IMAGE_SOURCE_KEYS,
 ] as const
 
 export function getImageSources(
@@ -51,10 +59,6 @@ export function replaceBrokenImageWithFallback(
   if (currentSource === TOKEN_PLACEHOLDER_IMAGE) {
     return
   }
-  if (isToncenterImageProxyUrl(currentSource)) {
-    image.src = TOKEN_PLACEHOLDER_IMAGE
-    return
-  }
 
   const candidates = [
     ...sources.filter(source => source !== TOKEN_PLACEHOLDER_IMAGE),
@@ -67,17 +71,5 @@ export function replaceBrokenImageWithFallback(
 
   if (nextSource) {
     image.src = nextSource
-  }
-}
-
-function isToncenterImageProxyUrl(source: string | null): boolean {
-  if (!source) {
-    return false
-  }
-
-  try {
-    return new URL(source, globalThis.location.href).hostname === "imgproxy.toncenter.com"
-  } catch {
-    return false
   }
 }

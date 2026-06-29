@@ -47,7 +47,6 @@ import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
-import {traceTx} from "../retrace/txTrace/lib/traceTx"
 import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
@@ -362,6 +361,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         return cachedActions
       }
 
+      const {traceTx} = await import("../retrace/txTrace/lib/traceTx")
       const retraceResult = await traceTx(txHash, network, metadataRegistry, {
         codeHash: transactionExecutionCodeHash(tx),
       })
