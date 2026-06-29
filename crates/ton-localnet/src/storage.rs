@@ -765,11 +765,7 @@ impl MessagePool {
         self.internal.push_back(msg_hash);
     }
 
-    pub fn pop_next(
-        &mut self,
-        policy: QueuePolicy,
-        _msg_meta: &HashMap<Hash256, MsgMeta>,
-    ) -> Option<Hash256> {
+    pub fn pop_next(&mut self, policy: QueuePolicy) -> Option<Hash256> {
         match policy {
             QueuePolicy::ExternalFirstFifo => self
                 .external

@@ -4,9 +4,9 @@ use crate::storage::{
     MasterchainBlockMeta, MsgMeta, NftItemMeta, ReverseLtKey, TxMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::VecDeque;
@@ -168,8 +168,8 @@ impl Node {
                 queue_policy: self.globals.queue_policy,
                 checkpoint_every: self.globals.checkpoint_every,
             },
-            time_offset_seconds: self.time_offset_seconds,
-            next_block_timestamp: self.next_block_timestamp,
+            time_offset_seconds: self.clock.offset_seconds(),
+            next_block_timestamp: self.clock.next_block_timestamp(),
             latest_accounts,
             history_blocks: self.history.blocks.clone(),
             history_masterchain_blocks: self.history.masterchain_blocks.clone(),
@@ -194,28 +194,8 @@ impl Node {
 
     #[allow(clippy::significant_drop_tightening)]
     fn export_cas_entries(&self) -> anyhow::Result<Vec<(Hash256, BocBytes)>> {
-        if let Some(conn) = &self.conn {
-            let conn = conn.lock().expect("Failed to lock DB connection");
-            let mut stmt = conn.prepare("SELECT hash, boc FROM cas")?;
-            let iter = stmt.query_map([], |row| {
-                let hash_bytes: Vec<u8> = row.get(0)?;
-                let boc: Vec<u8> = row.get(1)?;
-                Ok((hash_bytes, boc))
-            })?;
-
-            let mut entries = Vec::new();
-            for row in iter {
-                let (hash_bytes, boc) = row?;
-                if hash_bytes.len() != 32 {
-                    anyhow::bail!("Invalid hash length in cas table: {}", hash_bytes.len());
-                }
-
-                let mut hash = [0u8; 32];
-                hash.copy_from_slice(&hash_bytes);
-                entries.push((Hash256(hash), boc.into()));
-            }
-            entries.sort_by_key(|(hash, _)| *hash);
-            Ok(entries)
+        if let Some(persistence) = &self.persistence {
+            persistence.export_cas_entries()
         } else {
             let mut entries = self
                 .cas
@@ -233,14 +213,13 @@ impl Node {
             anyhow::bail!("Unsupported snapshot version: {}", snapshot.version);
         }
 
-        self.replace_persistent_state(&snapshot)?;
+        if let Some(persistence) = &self.persistence {
+            persistence.replace_state(&snapshot)?;
+        }
 
-        let cas_by_hash = snapshot
-            .cas_entries
-            .into_iter()
-            .collect::<FxHashMap<Hash256, BocBytes>>();
+        let cas_by_hash = snapshot.cas_entries.into_iter().collect();
 
-        if self.conn.is_some() {
+        if self.persistence.is_some() {
             self.cas.boc_by_hash.clear();
         } else {
             self.cas.boc_by_hash = cas_by_hash;
@@ -284,8 +263,8 @@ impl Node {
             .context("Config missing")?;
         self.latest_masterchain_state = None;
         self.latest_shard_state = None;
-        self.time_offset_seconds = snapshot.time_offset_seconds;
-        self.next_block_timestamp = snapshot.next_block_timestamp;
+        self.clock =
+            VirtualClock::from_parts(snapshot.time_offset_seconds, snapshot.next_block_timestamp);
         if let Some(latest_block) = self.history.blocks.last() {
             self.bump_offset_to_at_least(latest_block.gen_utime)?;
         }
@@ -306,99 +285,6 @@ impl Node {
 
         self.rebuild_indexes();
         self.rebuild_global_libraries_from_accounts()?;
-        Ok(())
-    }
-
-    #[allow(clippy::significant_drop_tightening)]
-    fn replace_persistent_state(&self, snapshot: &NodeStateSnapshot) -> anyhow::Result<()> {
-        let Some(conn) = &self.conn else {
-            return Ok(());
-        };
-
-        {
-            let mut conn = conn.lock().expect("Failed to lock DB connection");
-            let tx = conn.transaction()?;
-
-            tx.execute("DELETE FROM cas", [])?;
-            tx.execute("DELETE FROM blocks", [])?;
-            tx.execute("DELETE FROM masterchain_blocks", [])?;
-            tx.execute("DELETE FROM transactions", [])?;
-            tx.execute("DELETE FROM messages", [])?;
-            tx.execute("DELETE FROM accounts", [])?;
-            tx.execute("DELETE FROM compiler_abis", [])?;
-            tx.execute("DELETE FROM verified_sources", [])?;
-
-            for (hash, boc) in &snapshot.cas_entries {
-                tx.execute(
-                    "INSERT OR REPLACE INTO cas (hash, boc) VALUES (?1, ?2)",
-                    rusqlite::params![hash.0.to_vec(), boc],
-                )?;
-            }
-
-            for block in &snapshot.history_blocks {
-                let block_data = serde_json::to_vec(block)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO blocks (seqno, data) VALUES (?1, ?2)",
-                    rusqlite::params![block.seqno, block_data],
-                )?;
-            }
-
-            for block in &snapshot.history_masterchain_blocks {
-                let block_data = serde_json::to_vec(block)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO masterchain_blocks (seqno, data) VALUES (?1, ?2)",
-                    rusqlite::params![block.seqno, block_data],
-                )?;
-            }
-
-            for (hash, tx_meta) in &snapshot.history_tx_by_hash {
-                let tx_data = serde_json::to_vec(tx_meta)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO transactions (hash, data, account, lt, seqno) VALUES (?1, ?2, ?3, ?4, ?5)",
-                    rusqlite::params![
-                        hash.0.to_vec(),
-                        tx_data,
-                        tx_meta.account.addr.to_vec(),
-                        tx_meta.lt,
-                        tx_meta.block_seqno,
-                    ],
-                )?;
-            }
-
-            for (hash, msg_meta) in &snapshot.history_msg_by_hash {
-                let msg_data = serde_json::to_vec(msg_meta)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO messages (hash, data) VALUES (?1, ?2)",
-                    rusqlite::params![hash.0.to_vec(), msg_data],
-                )?;
-            }
-
-            for (address, account_meta) in &snapshot.latest_accounts {
-                let account_data = serde_json::to_vec(account_meta)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO accounts (address, data) VALUES (?1, ?2)",
-                    rusqlite::params![address.addr.to_vec(), account_data],
-                )?;
-            }
-
-            for (code_hash, compiler_abi) in &snapshot.history_compiler_abis {
-                let data = serde_json::to_vec(compiler_abi)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO compiler_abis (code_hash, data) VALUES (?1, ?2)",
-                    rusqlite::params![code_hash.0.to_vec(), data],
-                )?;
-            }
-
-            for (code_hash, source) in &snapshot.history_verified_sources {
-                let data = serde_json::to_vec(source)?;
-                tx.execute(
-                    "INSERT OR REPLACE INTO verified_sources (code_hash, data) VALUES (?1, ?2)",
-                    rusqlite::params![code_hash.0.to_vec(), data],
-                )?;
-            }
-
-            tx.commit()?;
-        }
         Ok(())
     }
 
