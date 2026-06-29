@@ -1,5 +1,5 @@
 import {ThemeSwitch, ToastProvider, useToast} from "@acton/shared-ui"
-import {Check, ChevronDown, Edit2, Github, Plus, Share2, Trash2} from "lucide-react"
+import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {BrowserRouter, Link, Navigate, Route, Routes, useLocation} from "react-router-dom"
@@ -28,6 +28,7 @@ import {
 import {SourceCatalogPage} from "../../acton-localnet-ui/src/explorer/pages/SourceCatalogPage"
 import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "../../acton-localnet-ui/src/explorer/pages/FavoriteAccountsPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
 import type {ThemeMode} from "@acton/shared-ui"
 import "@acton/shared-ui/styles/tokens.css"
@@ -937,13 +938,21 @@ export const ExplorerApp: FC = () => {
                           onEditNetwork={handleEditNetwork}
                           onDeleteNetwork={handleDeleteNetwork}
                         />
+                        <Link
+                          className={styles.headerIconButton}
+                          to="/favorites"
+                          title="Favorite accounts"
+                          aria-label="Favorite accounts"
+                        >
+                          <Star size={18} />
+                        </Link>
                         <ThemeSwitch
                           theme={theme}
                           onToggleTheme={toggleTheme}
                           aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
                         />
                         <a
-                          className={styles.githubButton}
+                          className={styles.headerIconButton}
                           href="https://github.com/ton-blockchain/acton"
                           target="_blank"
                           rel="noreferrer"
@@ -962,6 +971,7 @@ export const ExplorerApp: FC = () => {
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />
+                      <Route path="/favorites" element={<FavoriteAccountsPage client={client} />} />
                       <Route
                         path="/block/:workchain/:shard/:seqno"
                         element={<BlockDetailsPage client={client} />}

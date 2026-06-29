@@ -18,6 +18,7 @@ interface AddressChipProps {
   readonly fallback?: string
   readonly copiedAddress?: string
   readonly highlighted?: boolean
+  readonly copyable?: boolean
   readonly copyPlacement?: AddressChipCopyPlacement
   readonly displayFormat?: AddressChipDisplayFormat
   readonly shorten?: boolean
@@ -33,6 +34,7 @@ export const AddressChip: FC<AddressChipProps> = ({
   fallback,
   copiedAddress,
   highlighted = false,
+  copyable = true,
   copyPlacement = "right",
   displayFormat = "network",
   shorten = true,
@@ -135,9 +137,9 @@ export const AddressChip: FC<AddressChipProps> = ({
       onMouseEnter={() => onHoverAddressChange?.(address)}
       onMouseLeave={() => onHoverAddressChange?.(undefined)}
     >
-      {copyPlacement === "left" && copyButton}
+      {copyable && copyPlacement === "left" && copyButton}
       {addressNode}
-      {copyPlacement === "right" && copyButton}
+      {copyable && copyPlacement === "right" && copyButton}
     </span>
   )
 }

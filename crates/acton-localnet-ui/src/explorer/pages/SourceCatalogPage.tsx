@@ -10,6 +10,7 @@ import type {
   VerificationSourceResponse,
 } from "../api/types"
 import {Breadcrumbs} from "../components/Breadcrumbs"
+import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {normalizeCodeHash} from "../metadata/codeHash"
@@ -28,7 +29,6 @@ interface SourceTableEntry {
   readonly entrypoint: string
   readonly compiler: string
   readonly files: number
-  readonly bundles: number
   readonly savedAt: number
 }
 
@@ -191,26 +191,24 @@ export const SourceCatalogPage: FC = () => {
                   tableEntries.map(entry => (
                     <tr key={entry.codeHash} className={styles.tableRow}>
                       <td>
-                        <div className={styles.nameCell}>
+                        <InlineActionGroup className={styles.nameCell} spacing="loose">
                           <div className={styles.entrypointCell}>
                             <span>{entry.entrypoint}</span>
-                            <small>
-                              {entry.bundles === 1 ? "1 bundle" : `${entry.bundles} bundles`}
-                            </small>
                           </div>
                           {metadataRegistry.canWriteSources && (
-                            <button
+                            <InlineActionButton
                               type="button"
-                              className={`${styles.iconButton} ${styles.rowActionButton}`}
                               onClick={() => {
                                 void handleDeleteSource(entry.codeHash)
                               }}
+                              variant="danger"
                               aria-label="Delete source"
+                              title="Delete source"
                             >
-                              <Trash2 size={15} />
-                            </button>
+                              <Trash2 size={13} />
+                            </InlineActionButton>
                           )}
-                        </div>
+                        </InlineActionGroup>
                       </td>
                       <td>
                         <div className={styles.codeHashCell}>
@@ -320,7 +318,6 @@ function sourceToTableEntry(source: RegisteredSource): SourceTableEntry {
     entrypoint: firstBundle?.entrypoint ?? "unknown",
     compiler: firstBundle ? formatCompiler(firstBundle.compiler) : "unknown",
     files,
-    bundles: source.source.bundles.length,
     savedAt: source.savedAt,
   }
 }

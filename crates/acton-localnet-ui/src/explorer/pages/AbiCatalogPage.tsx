@@ -12,6 +12,7 @@ import {
 } from "../api/compilerAbiCatalog"
 import {AbiPanel, type AbiTab} from "../components/abi-viewer"
 import {Breadcrumbs} from "../components/Breadcrumbs"
+import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {normalizeCodeHash} from "../metadata/codeHash"
@@ -288,7 +289,7 @@ export const AbiCatalogPage: FC = () => {
                         >
                           <span className={styles.visuallyHidden}>Open {title} ABI</span>
                         </Link>
-                        <div className={styles.nameCell}>
+                        <InlineActionGroup className={styles.nameCell} spacing="loose">
                           <div className={styles.primaryCell}>
                             <div className={styles.nameLine}>
                               <span className={styles.nameText}>{title}</span>
@@ -299,20 +300,21 @@ export const AbiCatalogPage: FC = () => {
                             {title !== contractName && <small>{contractName}</small>}
                           </div>
                           {deleteCodeHash && (
-                            <button
+                            <InlineActionButton
                               type="button"
-                              className={`${styles.iconButton} ${styles.rowActionButton}`}
+                              variant="danger"
                               onClick={event => {
                                 event.preventDefault()
                                 event.stopPropagation()
                                 void handleDeleteAbi(deleteCodeHash)
                               }}
                               aria-label="Delete ABI"
+                              title="Delete ABI"
                             >
-                              <Trash2 size={15} />
-                            </button>
+                              <Trash2 size={13} />
+                            </InlineActionButton>
                           )}
-                        </div>
+                        </InlineActionGroup>
                       </td>
                       <td>{stats.methods}</td>
                       <td>{stats.messages}</td>

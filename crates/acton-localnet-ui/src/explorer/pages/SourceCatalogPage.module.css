@@ -49,8 +49,7 @@
   line-height: 1;
 }
 
-.primaryButton,
-.iconButton {
+.primaryButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -73,8 +72,7 @@
   font-size: var(--font-size-sm);
 }
 
-.primaryButton:hover:not(:disabled),
-.iconButton:hover {
+.primaryButton:hover:not(:disabled) {
   filter: brightness(0.97);
 }
 
@@ -148,22 +146,22 @@
 
 .table th:first-child,
 .table td:first-child {
-  width: 34%;
+  width: 32%;
 }
 
 .table th:nth-child(2),
 .table td:nth-child(2) {
-  width: 19%;
+  width: 24%;
 }
 
 .table th:nth-child(3),
 .table td:nth-child(3) {
-  width: 16%;
+  width: 14%;
 }
 
 .table th:nth-child(4),
 .table td:nth-child(4) {
-  width: 9%;
+  width: 8%;
 }
 
 .tableRow {
@@ -239,23 +237,23 @@
 .nameCell,
 .codeHashCell {
   min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
 }
 
 .nameCell {
-  justify-content: space-between;
+  width: fit-content;
+  align-items: flex-start;
 }
 
 .codeHashCell {
   width: fit-content;
   max-width: 100%;
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  white-space: nowrap;
 }
 
 .entrypointCell span,
-.entrypointCell small,
 .codeHash {
   min-width: 0;
   overflow: hidden;
@@ -265,44 +263,14 @@
 
 .entrypointCell span {
   color: var(--litenode-text);
-  font-weight: 650;
-}
-
-.entrypointCell small {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
+  font-weight: 400;
 }
 
 .codeHash {
-  display: block;
+  display: inline-block;
   color: var(--litenode-text);
   font-family: var(--font-family-mono, monospace);
   font-size: 0.78rem;
-}
-
-.iconButton {
-  width: 32px;
-  height: 32px;
-  flex: 0 0 32px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text-muted);
-}
-
-.rowActionButton:hover,
-.rowActionButton:focus-visible {
-  border-color: color-mix(in srgb, #dc2626 42%, var(--tonscan-border));
-  background: color-mix(in srgb, #dc2626 9%, var(--tonscan-card-bg));
-  color: #dc2626;
-  filter: none;
-}
-
-.iconButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--litenode-focus) 24%, transparent);
-}
-
-.rowActionButton:focus-visible {
-  box-shadow: 0 0 0 2px color-mix(in srgb, #dc2626 24%, transparent);
 }
 
 .hashCopyButton {

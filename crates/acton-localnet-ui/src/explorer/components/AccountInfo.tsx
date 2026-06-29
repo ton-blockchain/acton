@@ -1,5 +1,5 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {Check, Copy, Edit2, QrCode, X} from "lucide-react"
+import {Check, Copy, Edit2, QrCode, Star, X} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
 import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
@@ -9,6 +9,7 @@ import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../ap
 import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
 import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
+import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
 import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
@@ -73,6 +74,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const editInputRef = useRef<HTMLInputElement>(null)
   const contractDescriptionId = useId()
   const {setAddressName} = useAddressBook()
+  const {isFavorite, toggleFavorite} = useFavoriteAccounts()
   const resolvedName = useAddressName(address)
   const {addressFormat, forkNetwork, network} = useNetworkInfo()
   const displayAddress = normalizeAddress(address, addressFormat)
@@ -84,6 +86,7 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const [tokenMastersLoading, setTokenMastersLoading] = useState(false)
 
   const [copied, setCopied] = useState(false)
+  const favorite = isFavorite(address)
 
   useEffect(() => {
     let isActive = true
@@ -177,6 +180,10 @@ export const AccountInfo: FC<AccountInfoProps> = ({
   const copyToClipboard = () => {
     void navigator.clipboard.writeText(displayAddress)
     setCopied(true)
+  }
+
+  const handleToggleFavorite = () => {
+    toggleFavorite(address)
   }
 
   const compilerAbi = extendedContractAbi?.compiler_abi
@@ -309,6 +316,16 @@ export const AccountInfo: FC<AccountInfoProps> = ({
                   {addressRowText}
                 </span>
                 <span className={styles.addressActions}>
+                  <button
+                    type="button"
+                    className={`${styles.iconButton} ${favorite ? styles.favoriteButtonActive : ""}`}
+                    onClick={handleToggleFavorite}
+                    title={favorite ? "Remove from favorites" : "Add to favorites"}
+                    aria-label={favorite ? "Remove from favorites" : "Add to favorites"}
+                    aria-pressed={favorite}
+                  >
+                    <Star size={16} className={favorite ? styles.favoriteIconActive : undefined} />
+                  </button>
                   {!customName && !isEditing && (
                     <button
                       type="button"

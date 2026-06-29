@@ -2,17 +2,15 @@ import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
 import {Button} from "@acton/shared-ui"
-import {formatUnits} from "@ton/walletkit"
 
 import type {TonClient} from "../../explorer/api/client"
-import type {JettonMasterMetadata, JettonWallet} from "../../explorer/api/types"
-import {AddressChip} from "../../explorer/components/AddressChip"
 import {
-  TOKEN_IMAGE_SOURCE_KEYS,
-  getImageSources,
-  getPrimaryImageSource,
-  replaceBrokenImageWithFallback,
-} from "../../explorer/components/imageFallbacks"
+  loadJettonWalletsWithMasters,
+  sortJettonWalletsByAmount,
+} from "../../explorer/api/jettonWallets"
+import type {JettonWallet} from "../../explorer/api/types"
+import {AddressChip} from "../../explorer/components/AddressChip"
+import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
 import {
   normalizeAddress,
   toRawAddress,
@@ -24,7 +22,7 @@ import {
   type ExplorerNavigationClickEvent,
 } from "../../explorer/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
-import {useWalletRuntime, type WalletBalanceState} from "../../wallet/useWalletRuntime"
+import {useWalletRuntime} from "../../wallet/useWalletRuntime"
 import dashboardStyles from "../DashboardPage.module.css"
 
 import styles from "./WalletsPage.module.css"
@@ -34,8 +32,6 @@ interface WalletsPageProps {
 }
 
 type WalletTokensById = Readonly<Record<string, readonly JettonWallet[]>>
-
-const TOKEN_PREVIEW_LIMIT = 5
 
 export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
   const addressFormat = useAddressFormat()
@@ -90,20 +86,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
           ownerByRawAddress.set(toRawAddress(walletAddress), wallet.id)
           return walletAddress
         })
-        const tokenWallets = await client.getJettonWallets(ownerAddresses)
-        const missingJettonAddresses = new Set<string>()
-        for (const tokenWallet of tokenWallets) {
-          if (!tokenWallet.master) {
-            missingJettonAddresses.add(tokenWallet.jetton)
-          }
-        }
-        const missingMasters =
-          missingJettonAddresses.size > 0
-            ? await client.getJettonMasters([...missingJettonAddresses])
-            : []
-        const missingMastersByAddress = new Map(
-          missingMasters.map(master => [toRawAddress(master.address), master] as const),
-        )
+        const tokenWallets = await loadJettonWalletsWithMasters(client, ownerAddresses)
         const nextTokensById: Record<string, JettonWallet[]> = {}
         for (const wallet of wallets) {
           nextTokensById[wallet.id] = []
@@ -113,11 +96,7 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
           if (!walletId) {
             continue
           }
-          nextTokensById[walletId].push({
-            ...tokenWallet,
-            master:
-              tokenWallet.master ?? missingMastersByAddress.get(toRawAddress(tokenWallet.jetton)),
-          })
+          nextTokensById[walletId].push(tokenWallet)
         }
         for (const [walletId, tokenWalletsForWallet] of Object.entries(nextTokensById)) {
           nextTokensById[walletId] = sortJettonWalletsByAmount(tokenWalletsForWallet)
@@ -232,19 +211,15 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           </span>
                         </td>
                         <td className={styles.walletBalanceCell}>
-                          <div className={styles.walletBalanceGroup}>
-                            <WalletTokenPreview
-                              address={walletAddress}
-                              tokens={walletTokensById[wallet.id] ?? []}
-                              loading={walletTokensLoading}
-                              onOpenTokens={(address, event) =>
-                                openPath(`/explorer/address/${address}#tokens`, event)
-                              }
-                            />
-                            <span className={styles.walletBalance}>
-                              {formatWalletBalanceLabel(balanceState)}
-                            </span>
-                          </div>
+                          <WalletAccountSummary
+                            address={walletAddress}
+                            tokens={walletTokensById[wallet.id] ?? []}
+                            tokensLoading={walletTokensLoading}
+                            balanceState={balanceState}
+                            onOpenTokens={(address, event) =>
+                              openPath(`/explorer/address/${address}#tokens`, event)
+                            }
+                          />
                         </td>
                       </tr>
                     )
@@ -417,121 +392,6 @@ function WalletRowsSkeleton(): JSX.Element {
   )
 }
 
-function formatGramBalance(balance: string): string {
-  return formatUnits(balance, 9)
-}
-
-function formatCompactGramBalance(balance: string): string {
-  const numericBalance = Number(formatGramBalance(balance))
-
-  if (!Number.isFinite(numericBalance)) {
-    return formatGramBalance(balance)
-  }
-
-  if (numericBalance > 0 && numericBalance < 0.0001) {
-    return "<0.0001"
-  }
-
-  return numericBalance.toLocaleString(undefined, {
-    maximumFractionDigits: 4,
-  })
-}
-
-function formatWalletBalanceLabel(balanceState: WalletBalanceState | undefined): string {
-  if (!balanceState) {
-    return "Loading balance..."
-  }
-
-  if (balanceState.value) {
-    const balance = `${formatCompactGramBalance(balanceState.value)} GRAM`
-    return balanceState.isLoading ? `${balance} · updating` : balance
-  }
-
-  if (balanceState.isLoading) {
-    return "Loading balance..."
-  }
-
-  return balanceState.error ? "Balance unavailable" : "Balance not loaded"
-}
-
-interface WalletTokenPreviewProps {
-  readonly address: string
-  readonly tokens: readonly JettonWallet[]
-  readonly loading: boolean
-  readonly onOpenTokens: (address: string, event?: ExplorerNavigationClickEvent) => void
-}
-
-const WalletTokenPreview: FC<WalletTokenPreviewProps> = ({
-  address,
-  tokens,
-  loading,
-  onOpenTokens,
-}) => {
-  if (loading && tokens.length === 0) {
-    return <span className={styles.walletTokenPreviewSkeleton} aria-label="Loading tokens" />
-  }
-
-  if (tokens.length === 0) {
-    return null
-  }
-
-  const firstToken = tokens[0]
-  const firstMaster = firstToken?.master
-  const firstSymbol = firstMaster?.jetton_content.symbol || "tokens"
-  const firstDecimals = parseJettonDecimals(firstMaster)
-  const firstImageSources = getImageSources(firstMaster?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
-  const firstImage = getPrimaryImageSource(firstMaster?.jetton_content, TOKEN_IMAGE_SOURCE_KEYS)
-  const previewTokens = tokens.slice(1, TOKEN_PREVIEW_LIMIT)
-
-  return (
-    <button
-      type="button"
-      className={styles.walletTokenPreviewButton}
-      onClick={event => onOpenTokens(address, event)}
-      title="Open wallet tokens"
-      aria-label="Open wallet tokens"
-    >
-      <img
-        src={firstImage}
-        alt=""
-        className={styles.walletTokenPreviewIcon}
-        onError={event => replaceBrokenImageWithFallback(event, firstImageSources)}
-      />
-      <span className={styles.walletTokenPreviewAmount}>
-        {formatTokenAmount(firstToken.balance, firstDecimals)} {firstSymbol}
-      </span>
-      {previewTokens.length > 0 && (
-        <span className={styles.walletTokenPreviewStack} aria-hidden="true">
-          {previewTokens.map((token, index) => {
-            const imageSources = getImageSources(
-              token.master?.jetton_content,
-              TOKEN_IMAGE_SOURCE_KEYS,
-            )
-            const image = imageSources[0]
-            return image ? (
-              <img
-                key={token.address}
-                src={image}
-                alt=""
-                className={styles.walletTokenPreviewStackIcon}
-                style={{zIndex: previewTokens.length - index}}
-                onError={event => replaceBrokenImageWithFallback(event, imageSources)}
-              />
-            ) : (
-              <span
-                key={token.address}
-                className={styles.walletTokenPreviewStackPlaceholder}
-                style={{zIndex: previewTokens.length - index}}
-              />
-            )
-          })}
-        </span>
-      )}
-      <span className={styles.walletTokenPreviewAction}>View all</span>
-    </button>
-  )
-}
-
 function formatDateTime(value: string): string {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) {
@@ -584,35 +444,4 @@ function findRuntimeWallet(
   walletId: string,
 ): RuntimeWallet | undefined {
   return wallets.find(wallet => wallet.id === walletId)
-}
-
-function sortJettonWalletsByAmount(wallets: readonly JettonWallet[]): JettonWallet[] {
-  return [...wallets].sort(compareJettonWalletAmount)
-}
-
-function compareJettonWalletAmount(left: JettonWallet, right: JettonWallet): number {
-  const leftAmount = normalizeJettonAmount(left)
-  const rightAmount = normalizeJettonAmount(right)
-  if (leftAmount === rightAmount) {
-    return 0
-  }
-  return leftAmount > rightAmount ? -1 : 1
-}
-
-function normalizeJettonAmount(wallet: JettonWallet): number {
-  const decimals = parseJettonDecimals(wallet.master)
-  const amount = Number(wallet.balance) / 10 ** decimals
-  return Number.isFinite(amount) ? amount : 0
-}
-
-function parseJettonDecimals(master: JettonMasterMetadata | undefined): number {
-  const decimals = Number(master?.jetton_content.decimals)
-  return Number.isFinite(decimals) ? decimals : 9
-}
-
-function formatTokenAmount(value: string, decimals: number): string {
-  const decimalsNumber = Number.isFinite(decimals) ? decimals : 9
-  return (Number(value) / 10 ** decimalsNumber).toLocaleString(undefined, {
-    maximumFractionDigits: decimalsNumber,
-  })
 }

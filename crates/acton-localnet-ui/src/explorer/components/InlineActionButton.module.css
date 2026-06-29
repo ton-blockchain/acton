@@ -1,0 +1,51 @@
+.group {
+  max-width: 100%;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  vertical-align: middle;
+}
+
+.group.loose {
+  gap: 10px;
+}
+
+.button {
+  position: relative;
+  z-index: 2;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--tonscan-text-secondary, var(--litenode-text-muted));
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.button:hover {
+  background: var(--litenode-surface-hover);
+  color: var(--litenode-text);
+}
+
+.button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--litenode-focus);
+}
+
+.button.danger:hover {
+  background: color-mix(in srgb, #dc2626 9%, var(--tonscan-card-bg));
+  color: #dc2626;
+}
+
+.button.danger:focus-visible {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #dc2626 24%, transparent);
+}

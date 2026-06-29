@@ -20,6 +20,7 @@ import {AccountPage} from "./explorer/pages/AccountPage"
 import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
 import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
 import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
 import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
 import {TransactionPage} from "./explorer/pages/TransactionPage"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
@@ -390,6 +391,14 @@ const AppContent: FC<AppContentProps> = ({
               element={
                 <DashboardPage {...dashboardProps} embedded>
                   <SourceCatalogPage />
+                </DashboardPage>
+              }
+            />
+            <Route
+              path="/explorer/favorites"
+              element={
+                <DashboardPage {...dashboardProps} embedded>
+                  <FavoriteAccountsPage client={client} />
                 </DashboardPage>
               }
             />

@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   Search as SearchIcon,
   Settings2,
+  Star,
   Wallet,
   X,
 } from "lucide-react"
@@ -107,7 +108,8 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
     if (
       !location.pathname.startsWith("/explorer") ||
       location.pathname === "/explorer/blocks" ||
-      location.pathname === "/explorer/sources"
+      location.pathname === "/explorer/sources" ||
+      location.pathname === "/explorer/favorites"
     ) {
       return
     }
@@ -205,7 +207,8 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                       item.path === "/explorer"
                         ? location.pathname.startsWith("/explorer") &&
                           location.pathname !== "/explorer/blocks" &&
-                          location.pathname !== "/explorer/sources"
+                          location.pathname !== "/explorer/sources" &&
+                          location.pathname !== "/explorer/favorites"
                         : item.path === "/explorer/blocks"
                           ? location.pathname === "/explorer/blocks" ||
                             location.pathname === "/blocks" ||
@@ -296,6 +299,23 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                   {localnetApiToken ? (
                     <Check size={12} className={styles.utilityStatusIcon} />
                   ) : undefined}
+                </button>
+
+                <button
+                  type="button"
+                  className={`${styles.sidebarUtilityButton} ${
+                    location.pathname === "/explorer/favorites"
+                      ? styles.sidebarUtilityButtonActive
+                      : ""
+                  }`}
+                  onClick={() => {
+                    void navigate("/explorer/favorites")
+                    closeMobileMenu()
+                  }}
+                  title="Favorite accounts"
+                  aria-label="Favorite accounts"
+                >
+                  <Star size={18} />
                 </button>
 
                 <ThemeSwitch

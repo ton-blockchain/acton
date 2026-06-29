@@ -104,7 +104,7 @@
     color var(--transition-duration-fast);
 }
 
-.githubButton {
+.headerIconButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -125,7 +125,7 @@
 }
 
 .navLink:hover,
-.githubButton:hover {
+.headerIconButton:hover {
   color: var(--tonscan-text-primary);
   background: color-mix(in srgb, var(--litenode-surface-hover) 82%, transparent);
 }
@@ -590,13 +590,13 @@
   padding: 6px;
 }
 
-.githubButton {
+.headerIconButton {
   width: 38px;
   padding: 0;
   flex: 0 0 auto;
 }
 
-.githubButton:focus-visible,
+.headerIconButton:focus-visible,
 .navLink:focus-visible,
 .brand:focus-visible,
 .networkTrigger:focus-visible,

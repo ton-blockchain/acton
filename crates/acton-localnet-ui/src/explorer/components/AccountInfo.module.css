@@ -329,6 +329,14 @@
   color: var(--tonscan-text-primary);
 }
 
+.favoriteButtonActive {
+  color: #d3a416;
+}
+
+.favoriteIconActive {
+  fill: currentColor;
+}
+
 .iconButton:focus-visible,
 .qrToggle:focus-visible,
 .moreLink:focus-visible,

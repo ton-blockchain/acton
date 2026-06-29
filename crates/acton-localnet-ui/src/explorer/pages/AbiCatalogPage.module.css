@@ -215,10 +215,7 @@
 .nameCell {
   min-width: 0;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  width: fit-content;
 }
 
 .primaryCell {
@@ -273,24 +270,6 @@
   color: var(--tonscan-text-secondary);
   font-size: var(--font-size-xs);
   font-weight: var(--font-weight-medium);
-}
-
-.rowActionButton {
-  position: relative;
-  z-index: 2;
-}
-
-.rowActionButton:hover,
-.rowActionButton:focus-visible {
-  border-color: color-mix(in srgb, #dc2626 42%, var(--tonscan-border));
-  background: color-mix(in srgb, #dc2626 9%, var(--tonscan-card-bg));
-  color: #dc2626;
-  filter: none;
-}
-
-.rowActionButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px color-mix(in srgb, #dc2626 24%, transparent);
 }
 
 .formButtonRow td {
