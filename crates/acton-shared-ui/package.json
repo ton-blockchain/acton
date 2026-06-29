@@ -12,8 +12,8 @@
   "scripts": {
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
-    "lint": "biome lint .",
-    "lint:fix": "biome lint --write ."
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write ."
   },
   "dependencies": {
     "@ton/core": "0.63.1",
