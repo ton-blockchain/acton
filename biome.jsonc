@@ -31,7 +31,17 @@
   "assist": {
     "enabled": true,
     "actions": {
-      "preset": "all"
+      "preset": "all",
+      "source": {
+        "preset": "all",
+        "useSortedAttributes": "off",
+        "useSortedKeys": "off",
+        "organizeImports": "off",
+        "useSortedPackageJson": "off",
+        "useSortedInterfaceMembers": "off",
+        "useSortedProperties": "off",
+        "useSortedEnumMembers": "off"
+      }
     }
   },
   "linter": {
@@ -89,7 +99,6 @@
         "useTopLevelRegex": "off"
       },
       "style": {
-        "preset": "all",
         "noContinue": "off",
         "noDefaultExport": "off",
         "noDescendingSpecificity": "off",
@@ -106,8 +115,10 @@
         "noParameterProperties": "off",
         "noProcessEnv": "off",
         "noTernary": "off",
+        "preset": "all",
         "useBlockStatements": "off",
         "useCollapsedElseIf": "off",
+        "useComponentExportOnlyModules": "off",
         "useConsistentArrowReturn": "off",
         "useConsistentCurlyBraces": "off",
         "useConsistentMethodSignatures": "off",
