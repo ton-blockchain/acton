@@ -156,9 +156,15 @@ export function TransactionDetails({
   const stateInitVerifiedSource = stateInitCodeHash
     ? verifiedSourcesByCodeHash?.get(stateInitCodeHash)
     : undefined
+  const additionalMessageBodyAbis = [
+    ...allContracts.map(contract => contract.abi),
+    ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
+  ].filter((abi): abi is NonNullable<ContractData["abi"]> => abi !== undefined)
   const parsedBody =
     tx.parsedBody ??
-    (inMessage ? decodeMessageBody(inMessage, contracts, tx.address?.toString()) : undefined)
+    (inMessage
+      ? decodeMessageBody(inMessage, contracts, tx.address?.toString(), additionalMessageBodyAbis)
+      : undefined)
   const parsedStateInitData = decodeStateInitData(
     stateInitData,
     targetContractWithAbi,
@@ -743,6 +749,7 @@ export function TransactionDetails({
               executorActions={resolvedExecutorActions}
               contracts={contracts}
               contractAddress={tx.address?.toString() ?? ""}
+              additionalMessageBodyAbis={additionalMessageBodyAbis}
               renderSourceLocation={renderSourceLocation}
             />
           </div>

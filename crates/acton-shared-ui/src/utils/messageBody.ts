@@ -312,6 +312,28 @@ const toSerializedCellScalar = (
 interface ParsedValueTypeContext {
   readonly symbols: SymTable
   readonly tyIdx: number
+  readonly abi?: ContractABI
+  readonly abiCandidates?: readonly ContractABI[]
+  readonly nestedPayloadDepth?: number
+}
+
+interface NestedPayloadSliceCandidate {
+  readonly slice: Slice
+  readonly wrapper?: "inline" | "ref"
+}
+
+const MAX_NESTED_PAYLOAD_DEPTH = 4
+
+function withTypeIndex(context: ParsedValueTypeContext, tyIdx: number): ParsedValueTypeContext {
+  return {...context, tyIdx}
+}
+
+function withNestedPayloadDepth(
+  context: ParsedValueTypeContext,
+  tyIdx: number,
+  nestedPayloadDepth: number,
+): ParsedValueTypeContext {
+  return {...context, tyIdx, nestedPayloadDepth}
 }
 
 function renderTypeName(context: ParsedValueTypeContext | undefined): string | undefined {
@@ -332,6 +354,174 @@ function tryGetTy(symbols: SymTable, tyIdx: number): Ty | undefined {
   } catch {
     return undefined
   }
+}
+
+const getNestedPayloadCandidates = (
+  abi: ContractABI,
+  symbols: SymTable,
+  opcode: number,
+): readonly MessageCandidate[] => {
+  const deduped = new Map<string, MessageCandidate>()
+
+  for (const candidate of [
+    ...abi.incoming_messages,
+    ...abi.incoming_external,
+    ...abi.outgoing_messages,
+  ]) {
+    if (resolveOpcodeNameFromBodyType(abi, symbols, candidate.body_ty_idx, opcode)) {
+      deduped.set(getBodyTypeKey(candidate.body_ty_idx), candidate)
+    }
+  }
+
+  for (const declaration of abi.declarations) {
+    if (getDeclarationOpcode(declaration) === opcode) {
+      deduped.set(getBodyTypeKey(declaration.ty_idx), {body_ty_idx: declaration.ty_idx})
+    }
+  }
+
+  return [...deduped.values()]
+}
+
+function sliceFromRemainingValue(value: unknown): Slice | undefined {
+  if (value instanceof Slice) {
+    return value
+  }
+
+  if (value instanceof Cell) {
+    return value.beginParse()
+  }
+
+  return undefined
+}
+
+function getNestedPayloadSliceCandidates(slice: Slice): readonly NestedPayloadSliceCandidate[] {
+  const payloadSlices: NestedPayloadSliceCandidate[] = []
+  if (slice.remainingBits >= 1) {
+    const parser = slice.clone()
+    const storedInRef = parser.loadBoolean()
+    if (!storedInRef) {
+      payloadSlices.push({slice: parser, wrapper: "inline"})
+    } else if (parser.remainingRefs >= 1) {
+      const refPayload = parser.loadRef().beginParse()
+      if (parser.remainingBits === 0 && parser.remainingRefs === 0) {
+        payloadSlices.push({slice: refPayload, wrapper: "ref"})
+      }
+    }
+  }
+
+  payloadSlices.push({slice})
+  return payloadSlices
+}
+
+function nestedPayloadOpcodeValue(slice: Slice): ParsedValue | undefined {
+  if (slice.remainingBits < 32) {
+    return undefined
+  }
+
+  return {
+    kind: "scalar",
+    value: `0x${slice.clone().preloadUint(32).toString(16).padStart(8, "0")}`,
+  }
+}
+
+function toUndecodedNestedPayloadValue(
+  candidate: NestedPayloadSliceCandidate | undefined,
+): ParsedValue | undefined {
+  if (!candidate?.wrapper) {
+    return undefined
+  }
+
+  const opcode = nestedPayloadOpcodeValue(candidate.slice)
+  return {
+    kind: "object",
+    typeName: candidate.wrapper === "inline" ? "PayloadInline" : "PayloadInRef",
+    entries: [
+      ...(opcode ? [{key: "opcode", value: opcode}] : []),
+      {key: "payload", value: toSerializedCellScalar("Slice", candidate.slice.asCell())},
+    ],
+  }
+}
+
+function tryDecodeNestedTextCommentPayload(slice: Slice): ParsedValue | undefined {
+  const parser = slice.clone()
+  if (parser.remainingBits < 32 || parser.loadUint(32) !== 0) {
+    return undefined
+  }
+
+  return {
+    kind: "object",
+    typeName: "Text Comment",
+    entries: [{key: "text", value: textCommentTailValue(parser)}],
+  }
+}
+
+function tryDecodeNestedPayloadSlice(
+  slice: Slice,
+  context: ParsedValueTypeContext,
+): ParsedValue | undefined {
+  const nestedPayloadDepth = context.nestedPayloadDepth ?? 0
+  if (nestedPayloadDepth >= MAX_NESTED_PAYLOAD_DEPTH) {
+    return undefined
+  }
+
+  const payloadCandidates = getNestedPayloadSliceCandidates(slice)
+  for (const payloadCandidate of payloadCandidates) {
+    const decodedPayload = tryDecodeNestedPayloadContent(payloadCandidate.slice, context)
+    if (decodedPayload) {
+      return decodedPayload
+    }
+  }
+
+  return toUndecodedNestedPayloadValue(payloadCandidates.find(candidate => candidate.wrapper))
+}
+
+function tryDecodeNestedPayloadContent(
+  slice: Slice,
+  context: ParsedValueTypeContext,
+): ParsedValue | undefined {
+  const abiCandidates = [context.abi, ...(context.abiCandidates ?? [])].filter(
+    (abi): abi is ContractABI => abi !== undefined,
+  )
+  if (abiCandidates.length === 0 || slice.remainingBits < 32) {
+    return undefined
+  }
+
+  const nestedPayloadDepth = context.nestedPayloadDepth ?? 0
+  const opcode = Number(slice.clone().preloadUint(32))
+  const textCommentPayload = opcode === 0 ? tryDecodeNestedTextCommentPayload(slice) : undefined
+  if (textCommentPayload) {
+    return textCommentPayload
+  }
+
+  for (const abi of abiCandidates) {
+    const ctx = new DynamicCtx(abi)
+    for (const candidate of getNestedPayloadCandidates(abi, ctx.symbols, opcode)) {
+      const parser = slice.clone()
+      try {
+        const decoded: unknown = unpackFromSliceDynamic(
+          ctx,
+          candidate.body_ty_idx,
+          parser,
+        ) as unknown
+        if (parser.remainingBits !== 0 || parser.remainingRefs !== 0) {
+          continue
+        }
+
+        return toParsedValue(
+          decoded,
+          withNestedPayloadDepth(
+            {...context, abi, symbols: ctx.symbols},
+            candidate.body_ty_idx,
+            nestedPayloadDepth + 1,
+          ),
+        )
+      } catch {
+        continue
+      }
+    }
+  }
+
+  return undefined
 }
 
 function valueToBitString(value: unknown, length: number): BitString | undefined {
@@ -356,6 +546,14 @@ function toParsedValueWithType(
   }
 
   switch (ty.kind) {
+    case "remaining": {
+      const remainingSlice = sliceFromRemainingValue(value)
+      if (!remainingSlice) {
+        return undefined
+      }
+
+      return tryDecodeNestedPayloadSlice(remainingSlice, context)
+    }
     case "bitsN": {
       const bitString = valueToBitString(value, ty.n)
       if (!bitString) {
@@ -371,17 +569,17 @@ function toParsedValueWithType(
     case "nullable": {
       return value === null
         ? {kind: "null"}
-        : toParsedValue(value, {symbols: context.symbols, tyIdx: ty.inner_ty_idx})
+        : toParsedValue(value, withTypeIndex(context, ty.inner_ty_idx))
     }
     case "cellOf": {
       if (typeof value !== "object" || value === null || !("ref" in value)) {
         return undefined
       }
 
-      return toParsedValue((value as {readonly ref: unknown}).ref, {
-        symbols: context.symbols,
-        tyIdx: ty.inner_ty_idx,
-      })
+      return toParsedValue(
+        (value as {readonly ref: unknown}).ref,
+        withTypeIndex(context, ty.inner_ty_idx),
+      )
     }
     case "arrayOf":
     case "lispListOf": {
@@ -391,9 +589,7 @@ function toParsedValueWithType(
 
       return {
         kind: "array",
-        items: value.map(item =>
-          toParsedValue(item, {symbols: context.symbols, tyIdx: ty.inner_ty_idx}),
-        ),
+        items: value.map(item => toParsedValue(item, withTypeIndex(context, ty.inner_ty_idx))),
       }
     }
     case "tensor":
@@ -405,10 +601,7 @@ function toParsedValueWithType(
       return {
         kind: "array",
         items: value.map((item, index) =>
-          toParsedValue(item, {
-            symbols: context.symbols,
-            tyIdx: ty.items_ty_idx[index] ?? context.tyIdx,
-          }),
+          toParsedValue(item, withTypeIndex(context, ty.items_ty_idx[index] ?? context.tyIdx)),
         ),
       }
     }
@@ -421,8 +614,8 @@ function toParsedValueWithType(
         kind: "map",
         typeName: renderTy(context.symbols, context.tyIdx),
         entries: [...value].map(([key, itemValue]) => ({
-          key: toParsedValue(key, {symbols: context.symbols, tyIdx: ty.key_ty_idx}),
-          value: toParsedValue(itemValue, {symbols: context.symbols, tyIdx: ty.value_ty_idx}),
+          key: toParsedValue(key, withTypeIndex(context, ty.key_ty_idx)),
+          value: toParsedValue(itemValue, withTypeIndex(context, ty.value_ty_idx)),
         })),
       }
     }
@@ -442,10 +635,7 @@ function toParsedValueWithType(
         typeName: renderTy(context.symbols, context.tyIdx),
         entries: context.symbols.structFieldsOf(context.tyIdx, false).map(field => ({
           key: field.name,
-          value: toParsedValue(objectValue[field.name], {
-            symbols: context.symbols,
-            tyIdx: field.ty_idx,
-          }),
+          value: toParsedValue(objectValue[field.name], withTypeIndex(context, field.ty_idx)),
         })),
       }
     }
@@ -456,7 +646,7 @@ function toParsedValueWithType(
       }
 
       const target = context.symbols.aliasTargetOf(context.tyIdx)
-      return toParsedValue(value, {symbols: context.symbols, tyIdx: target.ty_idx})
+      return toParsedValue(value, withTypeIndex(context, target.ty_idx))
     }
     default: {
       return undefined
@@ -676,6 +866,7 @@ const tryDecodeMessageWithCandidates = (
   message: ParsableMessage,
   abi: ContractABI,
   candidates: readonly MessageCandidate[],
+  nestedPayloadAbis: readonly ContractABI[] = [],
 ): ParsedTransactionBody | undefined => {
   if (candidates.length === 0) {
     return undefined
@@ -709,7 +900,13 @@ const tryDecodeMessageWithCandidates = (
 
       const parsedBody = {
         name: getBodyTypeName(ctx.symbols, candidate.body_ty_idx),
-        value: toParsedValue(decoded, {symbols: ctx.symbols, tyIdx: candidate.body_ty_idx}),
+        value: toParsedValue(decoded, {
+          symbols: ctx.symbols,
+          tyIdx: candidate.body_ty_idx,
+          abi,
+          abiCandidates: nestedPayloadAbis,
+          nestedPayloadDepth: 0,
+        }),
       }
 
       if (skipGenericBouncedDecode && !candidateOpcodeName) {
@@ -732,19 +929,21 @@ const tryDecodeMessageWithCandidates = (
 const tryDecodeIncomingMessageWithAbi = (
   message: ParsableMessage,
   abi: ContractABI,
+  nestedPayloadAbis?: readonly ContractABI[],
 ): ParsedTransactionBody | undefined => {
   const opcode = getOpcodeAfterBouncePrefix(message)
   const candidates = getIncomingCandidates(abi, message.info.type === "internal", opcode)
-  return tryDecodeMessageWithCandidates(message, abi, candidates)
+  return tryDecodeMessageWithCandidates(message, abi, candidates, nestedPayloadAbis)
 }
 
 const tryDecodeOutgoingMessageWithAbi = (
   message: ParsableMessage,
   abi: ContractABI,
+  nestedPayloadAbis?: readonly ContractABI[],
 ): ParsedTransactionBody | undefined => {
   const opcode = getOpcodeAfterBouncePrefix(message)
   const candidates = getOutgoingCandidates(abi, opcode)
-  return tryDecodeMessageWithCandidates(message, abi, candidates)
+  return tryDecodeMessageWithCandidates(message, abi, candidates, nestedPayloadAbis)
 }
 
 const getStorageCandidates = (compilerAbi: ContractABI): readonly number[] => {
@@ -1133,6 +1332,7 @@ export const decodeMessageBody = (
   message: ParsableMessage,
   contracts: Map<string, ContractData>,
   sourceAddress?: string,
+  additionalAbis: readonly ContractABI[] = [],
 ): ParsedTransactionBody | undefined => {
   const textCommentBody = tryDecodeTextCommentBody(message)
   if (textCommentBody) {
@@ -1143,6 +1343,12 @@ export const decodeMessageBody = (
   const destinationContract =
     message.info.type === "internal" ? contracts.get(message.info.dest.toString()) : undefined
   const allContracts = [...contracts.values()]
+  const nestedPayloadAbis = [
+    destinationContract?.abi,
+    sourceContract?.abi,
+    ...allContracts.map(contract => contract.abi),
+    ...additionalAbis,
+  ].filter((abi): abi is ContractABI => abi !== undefined)
 
   if (message.info.type === "internal") {
     if (message.info.bounced) {
@@ -1152,7 +1358,7 @@ export const decodeMessageBody = (
           continue
         }
 
-        const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi)
+        const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
         if (parsedBody) {
           return parsedBody
         }
@@ -1164,7 +1370,7 @@ export const decodeMessageBody = (
           continue
         }
 
-        const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi)
+        const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
         if (parsedBody) {
           return parsedBody
         }
@@ -1179,7 +1385,7 @@ export const decodeMessageBody = (
         continue
       }
 
-      const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi)
+      const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
       if (parsedBody) {
         return parsedBody
       }
@@ -1191,7 +1397,7 @@ export const decodeMessageBody = (
         continue
       }
 
-      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi)
+      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
       if (parsedBody) {
         return parsedBody
       }
@@ -1207,7 +1413,7 @@ export const decodeMessageBody = (
         continue
       }
 
-      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi)
+      const parsedBody = tryDecodeOutgoingMessageWithAbi(message, abi, nestedPayloadAbis)
       if (parsedBody) {
         return parsedBody
       }
@@ -1222,7 +1428,7 @@ export const decodeMessageBody = (
       continue
     }
 
-    const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi)
+    const parsedBody = tryDecodeIncomingMessageWithAbi(message, abi, nestedPayloadAbis)
     if (parsedBody) {
       return parsedBody
     }
@@ -1234,6 +1440,7 @@ export const decodeMessageBody = (
 const tryDecodeTransactionBodyWithAbi = (
   tx: TransactionInfo,
   abi: ContractABI,
+  nestedPayloadAbis: readonly ContractABI[] = [],
 ): ParsedTransactionBody | undefined => {
   const inMessage = tx.transaction.inMessage
   if (!inMessage) {
@@ -1247,12 +1454,12 @@ const tryDecodeTransactionBodyWithAbi = (
 
   if (inMessage.info.type === "internal" && inMessage.info.bounced) {
     return (
-      tryDecodeOutgoingMessageWithAbi(inMessage, abi) ??
-      tryDecodeIncomingMessageWithAbi(inMessage, abi)
+      tryDecodeOutgoingMessageWithAbi(inMessage, abi, nestedPayloadAbis) ??
+      tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis)
     )
   }
 
-  return tryDecodeIncomingMessageWithAbi(inMessage, abi)
+  return tryDecodeIncomingMessageWithAbi(inMessage, abi, nestedPayloadAbis)
 }
 
 export const decodeStateInitData = (
@@ -1295,7 +1502,7 @@ export const applyParsedBodies = (
     const targetAbi = tx.contractName ? backendContracts[tx.contractName]?.abi : undefined
 
     if (targetAbi) {
-      tx.parsedBody = tryDecodeTransactionBodyWithAbi(tx, targetAbi)
+      tx.parsedBody = tryDecodeTransactionBodyWithAbi(tx, targetAbi, fallbackAbis)
       tx.parsedStorageBefore = tryDecodeStorageWithAbi(tx.shardAccountBefore, targetAbi)
       tx.parsedStorageAfter = tryDecodeStorageWithAbi(tx.shardAccountAfter, targetAbi)
       if (tx.parsedBody) {
@@ -1308,7 +1515,7 @@ export const applyParsedBodies = (
         continue
       }
 
-      tx.parsedBody = tryDecodeTransactionBodyWithAbi(tx, fallbackAbi)
+      tx.parsedBody = tryDecodeTransactionBodyWithAbi(tx, fallbackAbi, fallbackAbis)
       if (tx.parsedBody) {
         break
       }

@@ -28,6 +28,7 @@ interface ActionsSummaryProps {
   readonly executorActions?: readonly BackendExecutorAction[]
   readonly contracts: Map<string, ContractData>
   readonly contractAddress: string
+  readonly additionalMessageBodyAbis?: readonly NonNullable<ContractData["abi"]>[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
 }
@@ -218,6 +219,7 @@ const renderActionDetails = (
   executorAction: BackendExecutorAction | undefined,
   contractAddress: string,
   contracts: Map<string, ContractData>,
+  additionalMessageBodyAbis: readonly NonNullable<ContractData["abi"]>[],
   onContractClick?: (address: string) => void,
   renderSourceLocation?: (location: SourceLocation) => React.ReactNode,
 ): React.JSX.Element | undefined => {
@@ -230,7 +232,12 @@ const renderActionDetails = (
       const message = action.outMsg
       const info = message.info
       const messageBodyHash = message.body.hash().toString("hex")
-      const parsedBody = decodeMessageBody(message, contracts, contractAddress)
+      const parsedBody = decodeMessageBody(
+        message,
+        contracts,
+        contractAddress,
+        additionalMessageBodyAbis,
+      )
       const opcode = getMessageOpcode(message)
       const opcodeName = resolveMessageOpcodeName(message, contracts, contractAddress)
       const showMessageDataSection =
@@ -495,6 +502,7 @@ export function ActionsSummary({
   executorActions = [],
   contracts,
   contractAddress,
+  additionalMessageBodyAbis = [],
   onContractClick,
   renderSourceLocation,
 }: ActionsSummaryProps): React.JSX.Element {
@@ -638,6 +646,7 @@ export function ActionsSummary({
             mappedExecutorActions[selectedActionIndex],
             contractAddress,
             contracts,
+            additionalMessageBodyAbis,
             onContractClick,
             renderSourceLocation,
           )}

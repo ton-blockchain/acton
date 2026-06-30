@@ -17,6 +17,7 @@ export type StorageLeafValue =
       readonly kind: "scalar"
       readonly value: string
       readonly rawValue?: string
+      readonly typeName?: string
     }
   | {
       readonly kind: "boolean"
@@ -59,10 +60,11 @@ export type StorageDiffNode =
       readonly entries: readonly StorageDiffEntry[]
     }
 
-const scalar = (value: string, rawValue?: string): StorageLeafValue => ({
+const scalar = (value: string, rawValue?: string, typeName?: string): StorageLeafValue => ({
   kind: "scalar",
   value,
   rawValue,
+  typeName,
 })
 
 const nullValue = (): StorageLeafValue => ({
@@ -139,7 +141,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
       return booleanValue(value.value)
     }
     case "scalar": {
-      return scalar(value.value, value.rawValue)
+      return scalar(value.value, value.rawValue, value.typeName)
     }
     case "address": {
       return addressValue(value.value)

@@ -1,9 +1,11 @@
 import type React from "react"
 
+import {VisuallyGroupedNumber} from "@/components/VisuallyGroupedNumber/VisuallyGroupedNumber"
 import type {ContractData} from "@/types/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
+import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "../scalarDisplay"
 
 import styles from "./StorageDiffView.module.css"
 import type {StorageDiffNode, StorageDiffStatus, StorageLeafValue} from "./storageDiff"
@@ -12,9 +14,8 @@ interface StorageDiffViewProps {
   readonly diff: StorageDiffNode
   readonly contracts: Map<string, ContractData>
   readonly onContractClick?: (address: string) => void
+  readonly fieldName?: string
 }
-
-const DECIMAL_SCALAR_PATTERN = /^-?\d+(?:\.\d+)?$/
 
 function getEntryStatusClassName(status: StorageDiffStatus): string {
   switch (status) {
@@ -37,6 +38,7 @@ function renderLeafValue(
   value: StorageLeafValue | undefined,
   contracts: Map<string, ContractData>,
   onContractClick?: (address: string) => void,
+  fieldName?: string,
 ): React.JSX.Element {
   if (!value) {
     return <span className={styles.storageDiffPlaceholder}>—</span>
@@ -66,16 +68,20 @@ function renderLeafValue(
       )
     }
     case "scalar": {
+      const displayValue = formatScalarByFieldName({
+        value: value.value,
+        typeName: value.typeName,
+        fieldName,
+      })
       const valueElement = (
-        <span
+        <VisuallyGroupedNumber
           className={
-            DECIMAL_SCALAR_PATTERN.test(value.value)
+            isDecimalScalarValue(value.value) && !isHexDisplayValue(displayValue)
               ? styles.storagePlainValue
               : styles.storageLeafValue
           }
-        >
-          {value.value}
-        </span>
+          value={displayValue}
+        />
       )
 
       if (value.rawValue) {
@@ -139,7 +145,12 @@ function StorageDiffRow({
     <>
       <div className={`${styles.storageEntryKey} ${statusClassName}`}>{label}:</div>
       <div className={`${styles.storageEntryValue} ${statusClassName}`}>
-        <StorageDiffView diff={diff} contracts={contracts} onContractClick={onContractClick} />
+        <StorageDiffView
+          diff={diff}
+          contracts={contracts}
+          onContractClick={onContractClick}
+          fieldName={label}
+        />
       </div>
     </>
   )
@@ -178,20 +189,21 @@ export function StorageDiffView({
   diff,
   contracts,
   onContractClick,
+  fieldName,
 }: StorageDiffViewProps): React.JSX.Element {
   if (diff.kind === "leaf") {
     if (diff.status === "unchanged") {
-      return renderLeafValue(diff.after ?? diff.before, contracts, onContractClick)
+      return renderLeafValue(diff.after ?? diff.before, contracts, onContractClick, fieldName)
     }
 
     return (
       <div className={styles.storageLeafDiff}>
         <span className={`${styles.storageDiffPill} ${getBeforePillClassName(diff.status)}`}>
-          {renderLeafValue(diff.before, contracts, onContractClick)}
+          {renderLeafValue(diff.before, contracts, onContractClick, fieldName)}
         </span>
         <span className={styles.storageDiffArrow}>→</span>
         <span className={`${styles.storageDiffPill} ${getAfterPillClassName(diff.status)}`}>
-          {renderLeafValue(diff.after, contracts, onContractClick)}
+          {renderLeafValue(diff.after, contracts, onContractClick, fieldName)}
         </span>
       </div>
     )
