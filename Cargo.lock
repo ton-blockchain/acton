@@ -185,6 +185,7 @@ version = "1.1.0"
 dependencies = [
  "acton-source-trace",
  "console_error_panic_hook",
+ "getrandom 0.3.4",
  "serde-wasm-bindgen",
  "wasm-bindgen",
 ]

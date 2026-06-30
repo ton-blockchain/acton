@@ -1,0 +1,47 @@
+name: Build Source Trace WASM
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-source-trace-wasm.yml"
+      - "crates/acton-source-trace/**"
+      - "crates/acton-source-trace-wasm/**"
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/build-source-trace-wasm.yml"
+      - "crates/acton-source-trace/**"
+      - "crates/acton-source-trace-wasm/**"
+  workflow_dispatch:
+
+concurrency:
+  group: build-source-trace-wasm-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: { }
+
+jobs:
+  build:
+    name: Build Source Trace WASM
+    runs-on: ubicloud-standard-2-ubuntu-2204
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Fetch Sources
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Installing additional Rust components
+        uses: taiki-e/install-action@15449e3094499af05d8d964a1c884208e4b8b595 # v2.81.11
+        with:
+          tool: just@1.52.0,wasm-pack@0.15.0
+          fallback: none
+
+      - name: Run WASM
+        run: just build-source-trace-wasm
