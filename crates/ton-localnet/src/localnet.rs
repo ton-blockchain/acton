@@ -2092,13 +2092,13 @@ fn process_loop_request(
             name,
             resp,
         } => {
-            node.history.address_names.insert(address, name);
+            node.set_address_name(address, name);
             let _ = resp.send(Ok(()));
         }
         Request::GetAddressNames { addresses, resp } => {
             let res = addresses
                 .iter()
-                .map(|address| node.history.address_names.get(address).cloned())
+                .map(|address| node.get_address_name(address))
                 .collect();
             let _ = resp.send(Ok(res));
         }

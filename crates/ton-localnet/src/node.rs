@@ -56,7 +56,7 @@ pub enum StateSource {
 pub struct Node {
     pub cas: CellStore,
     pub latest: LatestState,
-    pub history: History,
+    pub(crate) history: History,
     pub indexes: Indexes,
     pub globals: Globals,
     pub pool: MessagePool,
@@ -2167,6 +2167,20 @@ impl Node {
             persistence.persist_account_meta(addr, meta)?;
         }
         Ok(())
+    }
+
+    #[must_use]
+    pub const fn history(&self) -> &History {
+        &self.history
+    }
+
+    pub fn set_address_name(&mut self, address: Addr, name: String) {
+        self.history.address_names.insert(address, name);
+    }
+
+    #[must_use]
+    pub fn get_address_name(&self, address: &Addr) -> Option<String> {
+        self.history.address_names.get(address).cloned()
     }
 
     pub fn set_compiler_abi(
