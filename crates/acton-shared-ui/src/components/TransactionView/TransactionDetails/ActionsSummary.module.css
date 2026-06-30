@@ -119,6 +119,71 @@
   flex: 1;
 }
 
+.detailsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-mds);
+}
+
+.detailsHeader h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.detailsCopyButton,
+.messageDataCopyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: auto;
+  height: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+
+.actionDetails:hover .detailsCopyButton,
+.actionDetails:focus-within .detailsCopyButton,
+.detailsCopyButton:focus-visible,
+.copyableMessageDataSection:hover .messageDataCopyButton,
+.copyableMessageDataSection:focus-within .messageDataCopyButton,
+.messageDataCopyButton:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.detailsCopyButton:hover,
+.detailsCopyButton:focus-visible,
+.messageDataCopyButton:hover,
+.messageDataCopyButton:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+.detailsCopyButton svg,
+.messageDataCopyButton svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.detailsCopyButton span,
+.messageDataCopyButton span {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .failureBadge {
   font-size: 0.6875rem;
   font-weight: var(--font-weight-semibold);
@@ -170,16 +235,6 @@
 
 .actionDetails {
   width: 100%;
-}
-
-.detailsHeader {
-  margin-bottom: var(--spacing-mds);
-}
-
-.detailsHeader h4 {
-  margin: 0;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
 }
 
 .detailsContent {
@@ -234,10 +289,56 @@
   padding-top: var(--spacing-xs);
 }
 
+.copyableMessageDataSection {
+  position: relative;
+  padding-right: 22rem;
+}
+
+.messageDataCopyActions {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  max-width: min(22rem, 100%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-duration-fast) ease;
+}
+
+.copyableMessageDataSection:hover .messageDataCopyActions,
+.copyableMessageDataSection:focus-within .messageDataCopyActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .messageDataTitle {
   font-size: 0.6875rem;
   color: var(--text-muted);
   letter-spacing: 0.4px;
+}
+
+@media (max-width: 768px) {
+  .copyableMessageDataSection {
+    padding-right: 0;
+  }
+
+  .messageDataCopyActions {
+    position: static;
+    justify-content: flex-start;
+    max-width: 100%;
+    margin-bottom: var(--spacing-xs);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .messageDataCopyButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
 }
 
 .detailFailure {

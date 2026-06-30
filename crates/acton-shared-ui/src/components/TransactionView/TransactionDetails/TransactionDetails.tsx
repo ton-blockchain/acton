@@ -1,7 +1,6 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
-import type {Cell} from "@ton/core"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
@@ -25,12 +24,20 @@ import {
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {CopyValueButton} from "../CopyValueButton"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 import {StorageDiffView} from "../TransactionTree/StorageDiffView"
 import {buildStorageDiff} from "../TransactionTree/storageDiff"
+import {
+  formatCellBocHex,
+  formatMessageBocHex,
+  formatOutListBocHex,
+  formatShardAccountDataBocHex,
+  formatStateInitBocHex,
+} from "../rawBoc"
 
 import {ActionsSummary} from "./ActionsSummary"
 import styles from "./TransactionDetails.module.css"
@@ -45,6 +52,37 @@ export interface TransactionDetailsProps {
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+}
+
+interface RawCopyAction {
+  readonly value: string | undefined
+  readonly label: string
+  readonly caption: string
+}
+
+function renderSectionCopyActions(
+  actions: readonly RawCopyAction[],
+): React.JSX.Element | undefined {
+  const availableActions = actions.filter(
+    (action): action is RawCopyAction & {readonly value: string} => action.value !== undefined,
+  )
+  if (availableActions.length === 0) {
+    return undefined
+  }
+
+  return (
+    <div className={styles.sectionCopyActions}>
+      {availableActions.map(action => (
+        <CopyValueButton
+          key={action.label}
+          className={styles.sectionCopyButton}
+          value={action.value}
+          label={action.label}
+          caption={action.caption}
+        />
+      ))}
+    </div>
+  )
 }
 
 export function TransactionDetails({
@@ -144,8 +182,13 @@ export function TransactionDetails({
       const body = inMessage.body.asSlice()
       return body.remainingBits > 0 || body.remainingRefs > 0
     })()
+  const messageBodyBocHex = inMessage ? formatCellBocHex(inMessage.body) : undefined
+  const messageBocHex = inMessage ? formatMessageBocHex(inMessage) : undefined
   const stateInitCode = inMessage?.init?.code ?? undefined
   const stateInitData = inMessage?.init?.data ?? undefined
+  const stateInitBocHex = inMessage?.init ? formatStateInitBocHex(inMessage.init) : undefined
+  const stateInitCodeBocHex = stateInitCode ? formatCellBocHex(stateInitCode) : undefined
+  const stateInitDataBocHex = stateInitData ? formatCellBocHex(stateInitData) : undefined
   const stateInitCodeBocBase64 = stateInitCode?.toBoc().toString("base64")
   const stateInitCodeHash = stateInitCode?.hash().toString("hex")
   const stateInitAbi = stateInitCodeHash
@@ -156,6 +199,11 @@ export function TransactionDetails({
   const stateInitVerifiedSource = stateInitCodeHash
     ? verifiedSourcesByCodeHash?.get(stateInitCodeHash)
     : undefined
+  const messageCopyActions = renderSectionCopyActions([
+    {value: messageBocHex, label: "raw message", caption: "Copy raw message"},
+    {value: messageBodyBocHex, label: "raw data", caption: "Copy raw body"},
+    {value: stateInitBocHex, label: "raw state init", caption: "Copy raw state init"},
+  ])
   const additionalMessageBodyAbis = [
     ...allContracts.map(contract => contract.abi),
     ...(compilerAbisByCodeHash ? [...compilerAbisByCodeHash.values()] : []),
@@ -189,6 +237,10 @@ export function TransactionDetails({
   const hasAccountStatusChange = tx.transaction.oldStatus !== tx.transaction.endStatus
   const storageDiff = buildStorageDiff(tx.parsedStorageBefore, tx.parsedStorageAfter)
   const showStorageDiff = expandedStorageLt === tx.lt
+  const storageBocHex = storageDiff ? formatShardAccountDataBocHex(tx.shardAccountAfter) : undefined
+  const storageCopyActions = renderSectionCopyActions([
+    {value: storageBocHex, label: "raw storage", caption: "Copy raw storage"},
+  ])
   const storageChangeLabel =
     storageDiff === undefined
       ? undefined
@@ -202,6 +254,15 @@ export function TransactionDetails({
   const canLoadStorage = storageDiff === undefined && loadActions !== undefined && hasStorageAbi
 
   const hasResolvedActions = resolvedOutActions.length > 0
+  const resolvedActionsCell = loadedActions?.actions ?? tx.actions
+  const actionsBocHex = hasResolvedActions
+    ? resolvedActionsCell
+      ? formatCellBocHex(resolvedActionsCell)
+      : formatOutListBocHex(resolvedOutActions)
+    : undefined
+  const actionPhaseCopyActions = renderSectionCopyActions([
+    {value: actionsBocHex, label: "raw actions", caption: "Copy raw actions"},
+  ])
   const canLoadActions =
     !hasResolvedActions &&
     actionPhase !== null &&
@@ -400,7 +461,12 @@ export function TransactionDetails({
       {!isTickTock && (
         <div className={styles.labeledSectionRow}>
           <div className={styles.labeledSectionTitle}>Message Data</div>
-          <div className={styles.labeledSectionContent}>
+          <div
+            className={`${styles.labeledSectionContent} ${
+              messageCopyActions ? styles.copyableSectionContent : ""
+            }`}
+          >
+            {messageCopyActions}
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Opcode</div>
@@ -459,7 +525,17 @@ export function TransactionDetails({
                     )}
                     {stateInitData && (
                       <div className={styles.stateInitField}>
-                        <div className={styles.multiColumnItemTitle}>Data</div>
+                        <div className={styles.stateInitFieldTitle}>
+                          <span className={styles.multiColumnItemTitle}>Data</span>
+                          {parsedStateInitData && stateInitDataBocHex && (
+                            <CopyValueButton
+                              className={styles.fieldCopyButton}
+                              value={stateInitDataBocHex}
+                              label="state data BoC"
+                              caption="Copy BoC"
+                            />
+                          )}
+                        </div>
                         {parsedStateInitData ? (
                           <div className={styles.parsedBodyTree}>
                             <div className={styles.parsedBodyContent}>
@@ -472,7 +548,7 @@ export function TransactionDetails({
                             </div>
                           </div>
                         ) : (
-                          <DataBlock data={formatCellBocHex(stateInitData)} />
+                          <DataBlock data={stateInitDataBocHex} copyLabel="state data BOC" />
                         )}
                       </div>
                     )}
@@ -499,6 +575,14 @@ export function TransactionDetails({
                               {showStateInitCode ? "Hide" : "Show"}
                             </span>
                           </button>
+                          {stateInitCodeBocHex && (
+                            <CopyValueButton
+                              className={styles.fieldCopyButton}
+                              value={stateInitCodeBocHex}
+                              label="state code BoC"
+                              caption="Copy BoC"
+                            />
+                          )}
                         </div>
                         {showStateInitCode && (
                           <ContractSourcePanel
@@ -519,7 +603,12 @@ export function TransactionDetails({
 
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Storage</div>
-        <div className={styles.labeledSectionContent}>
+        <div
+          className={`${styles.labeledSectionContent} ${
+            storageCopyActions ? styles.copyableSectionContent : ""
+          }`}
+        >
+          {storageCopyActions}
           <div className={styles.storageSummaryRow}>
             <div className={styles.storageSummaryMain}>
               {storageChangeLabel && (
@@ -695,7 +784,12 @@ export function TransactionDetails({
 
       <div className={styles.labeledSectionRow}>
         <div className={styles.labeledSectionTitle}>Action Phase</div>
-        <div className={styles.labeledSectionContent}>
+        <div
+          className={`${styles.labeledSectionContent} ${
+            actionPhaseCopyActions ? styles.copyableSectionContent : ""
+          }`}
+        >
+          {actionPhaseCopyActions}
           {actionPhase ? (
             <div className={styles.multiColumnRow}>
               <div className={styles.multiColumnItem}>
@@ -788,10 +882,6 @@ function formatAccountStatus(status: string): string {
       return status
     }
   }
-}
-
-function formatCellBocHex(cell: Cell): string {
-  return cell.toBoc({idx: false, crc32: false}).toString("hex")
 }
 
 function formatDetailedTimestamp(

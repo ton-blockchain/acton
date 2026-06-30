@@ -15,11 +15,18 @@ import {parseReserveMode} from "@/utils/transaction"
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ChangeLibraryModeViewer} from "../ChangeLibraryModeViewer/ChangeLibraryModeViewer"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
+import {
+  formatCellBocHex,
+  formatMessageRelaxedBocHex,
+  formatOutActionBocHex,
+  formatStateInitBocHex,
+} from "../rawBoc"
 
 import styles from "./ActionsSummary.module.css"
 
@@ -226,12 +233,24 @@ const renderActionDetails = (
   const execution = getActionExecutionMeta(executorAction)
   const contract = contracts.get(contractAddress)
   const contractAbi = contract?.abi
+  const rawActionBocHex = formatOutActionBocHex(action)
+  const copyRawActionButton = (
+    <CopyValueButton
+      className={styles.detailsCopyButton}
+      value={rawActionBocHex}
+      label="raw action"
+      caption="Copy raw action"
+    />
+  )
 
   switch (action.type) {
     case "sendMsg": {
       const message = action.outMsg
       const info = message.info
       const messageBodyHash = message.body.hash().toString("hex")
+      const messageBodyBocHex = formatCellBocHex(message.body)
+      const messageBocHex = formatMessageRelaxedBocHex(message)
+      const stateInitBocHex = message.init ? formatStateInitBocHex(message.init) : undefined
       const parsedBody = decodeMessageBody(
         message,
         contracts,
@@ -251,6 +270,7 @@ const renderActionDetails = (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
             <h4>Details</h4>
+            {copyRawActionButton}
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
@@ -319,12 +339,40 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Body:</span>
                 <div className={styles.detailValue}>
-                  <DataBlock data={message.body.toBoc().toString("hex")} />
+                  <DataBlock data={messageBodyBocHex} copyLabel="body BOC" />
                 </div>
               </div>
             )}
             {showMessageDataSection && (
-              <div className={styles.messageDataSection}>
+              <div
+                className={`${styles.messageDataSection} ${
+                  parsedBody ? styles.copyableMessageDataSection : ""
+                }`}
+              >
+                {parsedBody && (
+                  <div className={styles.messageDataCopyActions}>
+                    <CopyValueButton
+                      className={styles.messageDataCopyButton}
+                      value={messageBocHex}
+                      label="raw message"
+                      caption="Copy raw message"
+                    />
+                    <CopyValueButton
+                      className={styles.messageDataCopyButton}
+                      value={messageBodyBocHex}
+                      label="raw data"
+                      caption="Copy raw body"
+                    />
+                    {stateInitBocHex && (
+                      <CopyValueButton
+                        className={styles.messageDataCopyButton}
+                        value={stateInitBocHex}
+                        label="raw state init"
+                        caption="Copy raw state init"
+                      />
+                    )}
+                  </div>
+                )}
                 <div className={styles.messageDataTitle}>Message Data</div>
                 <div className={styles.detailRow}>
                   <span className={styles.detailLabel}>Opcode:</span>
@@ -365,12 +413,13 @@ const renderActionDetails = (
       )
     }
     case "setCode": {
-      const newCodeBocHex = action.newCode.toBoc().toString("hex")
+      const newCodeBocHex = formatCellBocHex(action.newCode)
 
       return (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
             <h4>Details</h4>
+            {copyRawActionButton}
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
@@ -382,7 +431,7 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Code BoC:</span>
               <span className={styles.detailValue}>
-                <DataBlock data={newCodeBocHex} />
+                <DataBlock data={newCodeBocHex} copyLabel="code BOC" />
               </span>
             </div>
             <DisasmSection bocHex={newCodeBocHex} />
@@ -404,6 +453,7 @@ const renderActionDetails = (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
             <h4>Details</h4>
+            {copyRawActionButton}
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
@@ -442,12 +492,13 @@ const renderActionDetails = (
     case "changeLibrary": {
       const isEmbeddedLibrary = action.libRef.type === "ref"
       const embeddedLibraryBocHex =
-        action.libRef.type === "ref" ? action.libRef.library.toBoc().toString("hex") : undefined
+        action.libRef.type === "ref" ? formatCellBocHex(action.libRef.library) : undefined
 
       return (
         <div className={styles.actionDetails}>
           <div className={styles.detailsHeader}>
             <h4>Details</h4>
+            {copyRawActionButton}
           </div>
           <div className={styles.detailsContent}>
             <div className={styles.detailRow}>
@@ -468,6 +519,7 @@ const renderActionDetails = (
               </span>
               <span className={styles.detailValue}>
                 <DataBlock
+                  copyLabel={action.libRef.type === "hash" ? "library hash" : "library BOC"}
                   data={
                     action.libRef.type === "hash"
                       ? action.libRef.libHash.toString("hex")

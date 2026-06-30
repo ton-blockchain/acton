@@ -68,14 +68,6 @@
   word-break: break-word;
 }
 
-.scalarWithActions {
-  position: relative;
-  display: inline-block;
-  min-width: 0;
-  max-width: 100%;
-  padding-right: 1.2rem;
-}
-
 .parsedPlainScalar,
 .parsedNull,
 .parsedVoid,
@@ -129,51 +121,6 @@
   font-weight: var(--font-weight-semibold);
   color: var(--color-failed);
   font-size: var(--font-size-sm);
-}
-
-.copyButton {
-  position: absolute;
-  top: 50%;
-  right: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 1rem;
-  height: 1rem;
-  padding: 0;
-  border: none;
-  border-radius: var(--border-radius-sm);
-  background-color: var(--tonscan-card-bg, var(--bg-color));
-  color: var(--tonscan-text-secondary, var(--text-secondary));
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity var(--transition-duration-fast) ease,
-    color 0.15s ease,
-    background-color 0.15s ease;
-  transform: translateY(-50%);
-}
-
-.scalarWithActions:hover .copyButton,
-.scalarWithActions:focus-within .copyButton {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.copyButton:hover {
-  background-color: var(--litenode-control-hover, var(--hover-bg));
-  color: var(--tonscan-text-primary, var(--text-primary));
-}
-
-.copyButton:active {
-  background-color: var(--tonscan-row-hover, var(--bg-tertiary-color));
-}
-
-.copyButton svg {
-  display: block;
-  width: 12px;
-  height: 12px;
 }
 
 @media (max-width: 768px) {

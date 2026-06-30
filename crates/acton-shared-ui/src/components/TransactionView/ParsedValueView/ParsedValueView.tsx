@@ -3,8 +3,8 @@ import type React from "react"
 import {VisuallyGroupedNumber} from "@/components/VisuallyGroupedNumber/VisuallyGroupedNumber"
 import type {ContractData, ParsedValue, ParsedValueMapEntry} from "@/types/transaction"
 
-import {CopyValueButton} from "../CopyValueButton"
 import {ContractChip} from "../ContractChip/ContractChip"
+import {CopyableValue} from "../CopyableValue/CopyableValue"
 import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "../scalarDisplay"
 
 import styles from "./ParsedValueView.module.css"
@@ -132,21 +132,25 @@ export function ParsedValueView({
         typeName: value.typeName,
         fieldName,
       })
+      const scalarValue = (
+        <VisuallyGroupedNumber
+          className={
+            isDecimalScalarValue(value.value) && !isHexDisplayValue(displayValue)
+              ? styles.parsedPlainScalar
+              : styles.parsedScalar
+          }
+          value={displayValue}
+        />
+      )
+
+      if (!value.rawValue) {
+        return scalarValue
+      }
 
       return (
-        <span className={styles.scalarWithActions}>
-          <VisuallyGroupedNumber
-            className={
-              isDecimalScalarValue(value.value) && !isHexDisplayValue(displayValue)
-                ? styles.parsedPlainScalar
-                : styles.parsedScalar
-            }
-            value={displayValue}
-          />
-          {value.rawValue && (
-            <CopyValueButton className={styles.copyButton} value={value.rawValue} />
-          )}
-        </span>
+        <CopyableValue value={value.rawValue} label="raw value">
+          {scalarValue}
+        </CopyableValue>
       )
     }
     case "array": {

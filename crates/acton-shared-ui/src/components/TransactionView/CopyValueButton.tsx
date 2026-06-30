@@ -5,12 +5,14 @@ interface CopyValueButtonProps {
   readonly className: string
   readonly value: string
   readonly label?: string
+  readonly caption?: string
 }
 
 export function CopyValueButton({
   className,
   value,
   label = "full BOC hex",
+  caption,
 }: CopyValueButtonProps): React.JSX.Element {
   const [isCopied, setIsCopied] = useState(false)
   const title = isCopied ? `Copied ${label}` : `Copy ${label}`
@@ -72,6 +74,7 @@ export function CopyValueButton({
           <path d="m5,15 L5,5 a2,2 0 0,1 2,-2 l10,0" />
         </svg>
       )}
+      {caption && <span>{isCopied ? "Copied" : caption}</span>}
     </button>
   )
 }

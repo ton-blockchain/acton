@@ -143,6 +143,86 @@
   width: 100%;
 }
 
+.copyableSectionContent {
+  position: relative;
+}
+
+.sectionCopyActions {
+  position: absolute;
+  top: var(--spacing-xs);
+  right: var(--spacing-mds);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  max-width: min(22rem, calc(100% - var(--spacing-mds) * 2));
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-duration-fast) ease;
+}
+
+.sectionCopyButton,
+.fieldCopyButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  width: auto;
+  height: 1rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition: color 0.15s ease;
+}
+
+.fieldCopyButton {
+  margin-left: auto;
+}
+
+.copyableSectionContent:hover .sectionCopyActions,
+.copyableSectionContent:focus-within .sectionCopyActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.copyableSectionContent:hover .sectionCopyButton,
+.copyableSectionContent:focus-within .sectionCopyButton,
+.stateInitField:hover .fieldCopyButton,
+.stateInitField:focus-within .fieldCopyButton,
+.sectionCopyButton:focus-visible,
+.fieldCopyButton:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.sectionCopyButton:hover,
+.sectionCopyButton:focus-visible,
+.fieldCopyButton:hover,
+.fieldCopyButton:focus-visible {
+  color: var(--text-primary);
+  outline: none;
+}
+
+.sectionCopyButton svg,
+.fieldCopyButton svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+
+.sectionCopyButton span,
+.fieldCopyButton span {
+  font-size: 0.6875rem;
+  font-weight: var(--font-weight-medium);
+  line-height: 1;
+  white-space: nowrap;
+}
+
 .multiColumnRow {
   display: flex;
   flex-wrap: nowrap;
@@ -454,6 +534,20 @@
 }
 
 @media (max-width: 768px) {
+  .sectionCopyActions {
+    position: static;
+    justify-content: flex-start;
+    max-width: 100%;
+    margin-bottom: var(--spacing-xs);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .sectionCopyButton {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .transactionDetailsContainer {
     line-height: 1.35;
   }
