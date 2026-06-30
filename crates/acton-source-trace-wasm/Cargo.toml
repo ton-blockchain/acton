@@ -17,6 +17,7 @@ test = false
 
 [dependencies]
 acton-source-trace = { workspace = true }
+getrandom = { version = "0.3.4", features = ["wasm_js"] }
 console_error_panic_hook = "0.1.7"
 serde-wasm-bindgen = "0.6.5"
 wasm-bindgen = { workspace = true }

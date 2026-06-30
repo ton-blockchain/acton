@@ -6,14 +6,14 @@ on:
       - master
     paths:
       - ".github/workflows/build-source-trace-wasm.yml"
-      - "acton-source-trace/**"
+      - "crates/acton-source-trace/**"
       - "crates/acton-source-trace-wasm/**"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/build-source-trace-wasm.yml"
-      - "acton-source-trace/**"
+      - "crates/acton-source-trace/**"
       - "crates/acton-source-trace-wasm/**"
   workflow_dispatch:
 
