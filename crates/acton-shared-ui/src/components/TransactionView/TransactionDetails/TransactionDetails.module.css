@@ -271,6 +271,55 @@
   font-size: 0.8125rem;
 }
 
+.timeInlineValue {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  column-gap: var(--spacing-md);
+  row-gap: 2px;
+  word-break: normal;
+}
+
+.timeInlineItem {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  min-width: 0;
+}
+
+.timeInlineLabel {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  white-space: nowrap;
+}
+
+.timeInlineText {
+  min-width: 0;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.blockLink {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.8125rem;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.blockLink:hover,
+.blockLink:focus-visible {
+  color: inherit;
+  text-decoration: underline;
+  outline: none;
+}
+
 .actionsToggleButton {
   background: none;
   border: none;

@@ -11,7 +11,12 @@ import {
 } from "react-d3-tree"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
-import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
+import type {
+  ContractData,
+  LoadedTransactionActions,
+  TransactionBlockRef,
+  TransactionInfo,
+} from "@/types/transaction"
 import {fmt, type ContractVerifiedSource} from "@/index"
 import {
   getTransactionActionPhase,
@@ -74,6 +79,11 @@ interface TransactionTreeProps {
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly renderSelectedTransactionExtra?: (tx: TransactionInfo) => React.ReactNode
   readonly renderSelectedTransactionMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
+  readonly onBlockClick?: (
+    blockRef: TransactionBlockRef,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
 }
 
@@ -241,6 +251,8 @@ export function TransactionTree({
   renderSourceLocation,
   renderSelectedTransactionExtra,
   renderSelectedTransactionMessageRouteAction,
+  getBlockPath,
+  onBlockClick,
   loadActions,
 }: TransactionTreeProps): React.JSX.Element {
   const {
@@ -1021,6 +1033,8 @@ export function TransactionTree({
               renderSourceLocation={renderSourceLocation}
               loadActions={loadActions}
               renderMessageRouteAction={renderSelectedTransactionMessageRouteAction}
+              getBlockPath={getBlockPath}
+              onBlockClick={onBlockClick}
             />
           </div>
           {renderSelectedTransactionExtra?.(selectedTransaction)}

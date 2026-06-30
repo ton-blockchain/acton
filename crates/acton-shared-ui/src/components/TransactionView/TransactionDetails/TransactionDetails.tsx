@@ -3,7 +3,12 @@ import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
-import type {ContractData, LoadedTransactionActions, TransactionInfo} from "@/types/transaction"
+import type {
+  ContractData,
+  LoadedTransactionActions,
+  TransactionBlockRef,
+  TransactionInfo,
+} from "@/types/transaction"
 import {
   ContractSourcePanel,
   DataBlock,
@@ -52,6 +57,11 @@ export interface TransactionDetailsProps {
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
   readonly loadActions?: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
   readonly renderMessageRouteAction?: (tx: TransactionInfo) => React.ReactNode
+  readonly getBlockPath?: (blockRef: TransactionBlockRef) => string | undefined
+  readonly onBlockClick?: (
+    blockRef: TransactionBlockRef,
+    event: React.MouseEvent<HTMLElement>,
+  ) => void
 }
 
 interface RawCopyAction {
@@ -95,6 +105,8 @@ export function TransactionDetails({
   renderSourceLocation,
   loadActions,
   renderMessageRouteAction,
+  getBlockPath,
+  onBlockClick,
 }: TransactionDetailsProps): React.JSX.Element {
   const stateInitAbiInfoId = React.useId()
   const [showActions, setShowActions] = useState(false)
@@ -138,6 +150,12 @@ export function TransactionDetails({
   const actionPhase = getTransactionActionPhase(tx.transaction)
   const triggerLabel = getTransactionTriggerLabel(tx.transaction)
   const messageRouteAction = renderMessageRouteAction?.(tx)
+  const blockRef = tx.blockRef
+  const blockSeqno = blockRef?.seqno
+  const blockPath = blockRef ? getBlockPath?.(blockRef) : undefined
+  const blockTitle = blockRef
+    ? `workchain: ${blockRef.workchain}, shard: ${blockRef.shard}, seqno: ${blockRef.seqno}`
+    : undefined
 
   if (!computePhase) {
     return (
@@ -852,12 +870,52 @@ export function TransactionDetails({
 
       <div className={styles.detailRow}>
         <div className={styles.detailLabel}>Time</div>
-        <div
-          className={`${styles.detailValue} ${styles.timestampValue}`}
-          data-visual-dynamic="timestamp"
-          data-visual-placeholder="<timestamp>"
-        >
-          {formatDetailedTimestamp(tx.transaction.now)}
+        <div className={`${styles.detailValue} ${styles.timeInlineValue}`}>
+          <span
+            className={styles.timestampValue}
+            data-visual-dynamic="timestamp"
+            data-visual-placeholder="<timestamp>"
+          >
+            {formatDetailedTimestamp(tx.transaction.now)}
+          </span>
+          <span className={styles.timeInlineItem}>
+            <span className={styles.timeInlineLabel}>LT:</span>
+            <span className={`${styles.timeInlineText} ${styles.numberValue}`}>{tx.lt}</span>
+          </span>
+          <span className={styles.timeInlineItem}>
+            <span className={styles.timeInlineLabel}>Block:</span>
+            <span className={`${styles.timeInlineText} ${styles.numberValue}`}>
+              {blockSeqno === undefined ? (
+                "—"
+              ) : blockRef && blockPath ? (
+                <a
+                  className={styles.blockLink}
+                  href={blockPath}
+                  title={blockTitle}
+                  onClick={event => {
+                    if (!onBlockClick) {
+                      return
+                    }
+                    event.preventDefault()
+                    onBlockClick(blockRef, event)
+                  }}
+                >
+                  {blockSeqno}
+                </a>
+              ) : blockRef && onBlockClick ? (
+                <button
+                  type="button"
+                  className={styles.blockLink}
+                  title={blockTitle}
+                  onClick={event => onBlockClick(blockRef, event)}
+                >
+                  {blockSeqno}
+                </button>
+              ) : (
+                <span title={blockTitle}>{blockSeqno}</span>
+              )}
+            </span>
+          </span>
         </div>
       </div>
     </div>

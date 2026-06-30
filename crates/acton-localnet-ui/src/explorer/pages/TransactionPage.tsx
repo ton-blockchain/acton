@@ -4,6 +4,7 @@ import {
   type ContractVerifiedSource,
   type ContractData,
   type LoadedTransactionActions,
+  type TransactionBlockRef,
   TransactionDetails,
   type TransactionInfo,
   TransactionTree,
@@ -76,6 +77,9 @@ const normalizeTransactionReference = (reference: string): string => {
 
 const transactionHashHex = (tx: TransactionInfo): string => tx.transaction.hash().toString("hex")
 
+const blockPath = (blockRef: TransactionBlockRef): string =>
+  `/block/${blockRef.workchain}/${encodeURIComponent(blockRef.shard)}/${blockRef.seqno}`
+
 const transactionExecutionCodeHash = (tx: TransactionInfo): string | undefined =>
   tx.codeHashBefore ??
   tx.transaction.inMessage?.init?.code?.hash().toString("hex") ??
@@ -94,6 +98,11 @@ interface TraceTransactionNodeProps {
   readonly verifiedSourcesByCodeHash: ReadonlyMap<string, ContractVerifiedSource>
   readonly isIntermediateSibling?: boolean
   readonly onContractClick: (address: string) => void
+  readonly getBlockPath: (blockRef: TransactionBlockRef) => string | undefined
+  readonly onBlockClick: (
+    blockRef: TransactionBlockRef,
+    event: ExplorerNavigationClickEvent,
+  ) => void
   readonly loadActions: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
 }
 
@@ -298,6 +307,12 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const handleContractClick = (address: string, event?: ExplorerNavigationClickEvent) => {
     const formattedAddr = normalizeAddress(address, addressFormat)
     openExplorerPath(navigate, routes.addressPath(formattedAddr), event)
+  }
+  const handleBlockClick = (
+    blockRef: TransactionBlockRef,
+    event?: ExplorerNavigationClickEvent,
+  ) => {
+    openExplorerPath(navigate, blockPath(blockRef), event)
   }
 
   const renderTraceAddressChip = (
@@ -711,6 +726,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                           compilerAbisByCodeHash={compilerAbisByCodeHash}
                           verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
                           onContractClick={handleContractClick}
+                          getBlockPath={blockPath}
+                          onBlockClick={handleBlockClick}
                           loadActions={loadTransactionActions}
                         />
                       ))}
@@ -740,6 +757,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 renderSelectedTransactionMessageRouteAction={
                   renderSelectedTransactionMessageRouteAction
                 }
+                getBlockPath={blockPath}
+                onBlockClick={handleBlockClick}
                 loadActions={loadTransactionActions}
               />
             </div>
@@ -961,6 +980,8 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   verifiedSourcesByCodeHash,
   isIntermediateSibling = false,
   onContractClick,
+  getBlockPath,
+  onBlockClick,
   loadActions,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null)
@@ -1035,6 +1056,8 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
             allContracts={[]}
             onContractClick={onContractClick}
+            getBlockPath={getBlockPath}
+            onBlockClick={onBlockClick}
             loadActions={loadActions}
           />
         </div>
@@ -1064,6 +1087,8 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
               isIntermediateSibling={index < children.length - 1}
               onContractClick={onContractClick}
+              getBlockPath={getBlockPath}
+              onBlockClick={onBlockClick}
               loadActions={loadActions}
             />
           ))}

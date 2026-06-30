@@ -13,6 +13,12 @@ export interface ParsedContractStorage {
   readonly value: ParsedValue
 }
 
+export interface TransactionBlockRef {
+  readonly workchain: number
+  readonly shard: string
+  readonly seqno: number
+}
+
 export interface ParsedValueObjectEntry {
   readonly key: string
   readonly value: ParsedValue
@@ -63,6 +69,7 @@ export type ParsedValue =
 export interface TransactionInfo {
   readonly id: string
   readonly lt: string
+  readonly blockRef?: TransactionBlockRef
   readonly address: Address | undefined
   readonly transaction: Transaction
   readonly vmLogDiff: string

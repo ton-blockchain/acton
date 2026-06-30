@@ -34,6 +34,7 @@ export const buildTraceTransactionInfos = (
     const info: TransactionInfo = {
       id,
       lt: tx.lt,
+      blockRef: tx.block_ref,
       address: parseTonAddress(tx.account),
       transaction: synthesizeTransaction(tx),
       vmLogDiff: "",
