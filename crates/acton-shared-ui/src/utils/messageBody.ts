@@ -296,6 +296,10 @@ const formatSerializedCellPreview = (
   typeName: "Cell" | "Slice" | "Builder",
   cell: Cell,
 ): string => {
+  if (cell.bits.length === 0 && cell.refs.length === 0) {
+    return `<empty ${typeName.toLowerCase()}>`
+  }
+
   const hex = cell.toBoc({idx: false, crc32: false}).toString("hex")
   return `${typeName}(${formatHexPreview(hex)})`
 }
