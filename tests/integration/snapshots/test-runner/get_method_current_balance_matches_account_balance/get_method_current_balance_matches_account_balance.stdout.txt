@@ -1,0 +1,15 @@
+  Installing standard library [ACTON_VERSION]
+   Compiling contracts
+   Compiling Counter
+    Finished in [TIME]
+    Finished in [TIME]
+     Running tests
+
+ TEST  [ROOT]
+
+ > tests/balance_getter.test.tolk (1 test)
+  ✓ balance getter [TIME]
+    └─ Test output:
+       Actual balance: 999976466
+
+ ✓ 1 passed in 1 file

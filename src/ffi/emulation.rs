@@ -2511,6 +2511,7 @@ fn run_get_method_impl(
     let addr_str = addr.to_string();
 
     let shard_account = ctx.chain.world_state.get_account(&addr);
+    let balance = get_address_balance(&shard_account);
     let state = shard_account
         .account
         .load()
@@ -2538,7 +2539,7 @@ fn run_get_method_impl(
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
         unixtime,
-        balance: "10".to_string(),
+        balance,
         rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id,
@@ -2755,6 +2756,15 @@ fn get_address_code(account: &ShardAccount) -> Option<Cell> {
     };
 
     state.code
+}
+
+fn get_address_balance(account: &ShardAccount) -> String {
+    account
+        .account
+        .load()
+        .ok()
+        .and_then(|account| account.0.map(|account| account.balance.tokens.to_string()))
+        .unwrap_or_else(|| "0".to_owned())
 }
 
 extension!(crc16 in (Context) with (data: String) using crc16_impl);
@@ -3595,6 +3605,7 @@ pub(super) fn run_tolk_continuation(
     let world_state = &mut ctx.chain.world_state;
     let addr_str = addr.to_string();
     let shard_account = world_state.get_account(&addr);
+    let balance = get_address_balance(&shard_account);
     let account_state = shard_account
         .account
         .load()
@@ -3632,7 +3643,7 @@ pub(super) fn run_tolk_continuation(
         libs: libs_root.map(Boc::encode_base64).unwrap_or_default(),
         address: addr_str,
         unixtime,
-        balance: "10".to_string(),
+        balance,
         rand_seed: resolve_get_method_random_seed(ctx.chain.world_state),
         gas_limit: "0".to_string(),
         method_id: 0,
