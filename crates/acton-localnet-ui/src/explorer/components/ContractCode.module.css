@@ -132,7 +132,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--tonscan-border);
-  border-radius: 12px;
+  border-radius: 0 8px 8px;
   background: var(--tonscan-bg);
 }
 
@@ -140,7 +140,7 @@
   border-radius: 0 8px 8px;
 }
 
-.sourceDataBlock > div {
+.sourceDataBlock.sourceDataBlock > div {
   border-radius: inherit;
 }
 

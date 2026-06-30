@@ -137,7 +137,7 @@
   border-radius: 0 8px 8px;
 }
 
-.sourceDataBlock > div {
+.sourceDataBlock.sourceDataBlock > div {
   border-radius: inherit;
 }
 
