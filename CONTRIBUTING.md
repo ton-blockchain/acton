@@ -110,7 +110,7 @@ Optional CLI tools:
   ```
 - `wasm-pack` (optional, for rebuilding the source trace WASM package)
   ```bash
-  cargo install wasm-pack --locked
+  cargo install wasm-pack --version 0.15.0 --locked
   ```
 
 System dependencies:
