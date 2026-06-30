@@ -1,4 +1,4 @@
-import {type CSSProperties, useEffect, useState} from "react"
+import {Suspense, lazy, type CSSProperties, useEffect, useState} from "react"
 import {X} from "lucide-react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
@@ -7,12 +7,12 @@ import {useToast, type ContractData} from "@acton/shared-ui"
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"
 import type {ExplorerMetadataRegistry} from "../../../../metadata/types"
-import {traceTx} from "../../lib/traceTx"
 import type {RetraceResultAndCode} from "../../lib/types"
 import InlineLoader from "../InlineLoader"
-import RetraceWorkspace from "../RetraceWorkspace"
 import "../../../Retrace.tokens.css"
 import styles from "./TransactionRetracePanel.module.css"
+
+const RetraceWorkspace = lazy(() => import("../RetraceWorkspace"))
 
 type RetracePanelState =
   | {readonly type: "loading"}
@@ -60,6 +60,7 @@ export default function TransactionRetracePanel({
       setState({type: "loading"})
 
       try {
+        const {traceTx} = await import("../../lib/traceTx")
         const result = await traceTx(txHash, network, metadataRegistry, {codeHash})
         if (isActive) {
           setState({type: "ready", result})
@@ -129,12 +130,24 @@ export default function TransactionRetracePanel({
         )}
 
         {state.type === "ready" && (
-          <RetraceWorkspace
-            result={state.result}
-            contractAbi={contractAbi}
-            contracts={contracts}
-            onContractClick={onContractClick}
-          />
+          <Suspense
+            fallback={
+              <div className={styles.loadingState}>
+                <InlineLoader
+                  message="Loading debug workspace"
+                  subtext="Preparing trace view"
+                  loading={true}
+                />
+              </div>
+            }
+          >
+            <RetraceWorkspace
+              result={state.result}
+              contractAbi={contractAbi}
+              contracts={contracts}
+              onContractClick={onContractClick}
+            />
+          </Suspense>
         )}
       </div>
     </div>

@@ -1,0 +1,66 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 16px;
+  background: var(--tonscan-card-bg);
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cardHeader {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.storageScroll {
+  overflow-x: auto;
+  padding: 2px 0 4px;
+}
+
+.loadingState,
+.emptyState,
+.statusNote {
+  color: var(--tonscan-text-secondary);
+  font-size: 14px;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 260px;
+  background: var(--tonscan-card-bg);
+}
+
+.statusNote {
+  padding: 10px 12px;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 96%, var(--tonscan-row-hover));
+}
+
+.emptyState {
+  padding: 28px 20px;
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .panel {
+    padding: 12px;
+  }
+
+  .card {
+    gap: 12px;
+  }
+
+  .cardHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,5 +1,5 @@
 import type {TraceInfo} from "@ton/tasm/dist/trace"
-import type {TraceResult} from "@ton/retracer-core"
+import type {TraceReplayResult, TraceResult} from "@ton/retracer-core"
 
 import type {InstructionInfo} from "ton-source-map"
 
@@ -25,6 +25,11 @@ export interface RetraceResultAndCode {
   readonly verifiedSource?: VerificationSourceResponse
   readonly sourceTrace?: SourceTraceResponse
   readonly sourceTraceBundleHash?: string
+}
+
+export interface RetraceTraceResult {
+  readonly result: TraceReplayResult
+  readonly network: ExplorerNetworkInfo
 }
 
 export interface InstructionDetail {

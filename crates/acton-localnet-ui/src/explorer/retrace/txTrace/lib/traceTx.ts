@@ -1,5 +1,10 @@
 import type {RetraceNetworkConfig, TolkSourceMapData, TraceResult} from "@ton/retracer-core"
-import {retrace, RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK} from "@ton/retracer-core"
+import {
+  retrace,
+  retraceTrace,
+  RETRACE_MAINNET_NETWORK,
+  RETRACE_TESTNET_NETWORK,
+} from "@ton/retracer-core"
 import {compileCellWithMapping, decompileCell} from "@ton/tasm/dist/runtime/instr"
 import {createMappingInfo} from "@ton/tasm/dist/trace/mapping"
 import {type Step, type TraceInfo} from "@ton/tasm/dist/trace"
@@ -13,7 +18,7 @@ import type {AssemblyMapping} from "ton-source-map"
 import type {SourceBundle, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExplorerMetadataRegistry} from "../../../metadata/types"
-import type {ExitCode, RetraceResultAndCode} from "./types"
+import type {ExitCode, RetraceResultAndCode, RetraceTraceResult} from "./types"
 
 import {
   NetworkError,
@@ -150,32 +155,48 @@ async function doTrace(
     )
     return {result, network}
   } catch (e: unknown) {
-    let message = "An unknown error occurred."
-    if (e instanceof Error) {
-      message = e.message
-    } else if (e !== null && e !== undefined) {
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      message = String(e)
-    }
-
-    if (/status code 429|HTTP 429|\(429\)/i.test(message)) {
-      throw new TooManyRequests(undefined, e)
-    }
-
-    if (/status code 422|HTTP 422|\(422\)/i.test(message)) {
-      throw new TxHashInvalidError(undefined, e)
-    }
-
-    if (/not found/i.test(message)) {
-      throw new TxNotFoundError(undefined, e)
-    }
-
-    if (/network|failed to fetch|fetch failed|timeout|ECONN|ENOTFOUND|ERR_NETWORK/i.test(message)) {
-      throw new NetworkError(undefined, e)
-    }
-
-    throw new TxTraceError(message, e)
+    throw mapRetraceError(e)
   }
+}
+
+async function doTraceTree(
+  hash: string,
+  network: ExplorerNetworkInfo,
+): Promise<RetraceTraceResult> {
+  try {
+    const result = await retraceTrace(getRetraceNetworkConfig(network), hash.toLowerCase())
+    return {result, network}
+  } catch (e: unknown) {
+    throw mapRetraceError(e)
+  }
+}
+
+function mapRetraceError(e: unknown): TxTraceError {
+  let message = "An unknown error occurred."
+  if (e instanceof Error) {
+    message = e.message
+  } else if (e !== null && e !== undefined) {
+    // eslint-disable-next-line @typescript-eslint/no-base-to-string
+    message = String(e)
+  }
+
+  if (/status code 429|HTTP 429|\(429\)/i.test(message)) {
+    return new TooManyRequests(undefined, e)
+  }
+
+  if (/status code 422|HTTP 422|\(422\)/i.test(message)) {
+    return new TxHashInvalidError(undefined, e)
+  }
+
+  if (/not found|cannot find trace|cannot find transaction/i.test(message)) {
+    return new TxNotFoundError(undefined, e)
+  }
+
+  if (/network|failed to fetch|fetch failed|timeout|ECONN|ENOTFOUND|ERR_NETWORK/i.test(message)) {
+    return new NetworkError(undefined, e)
+  }
+
+  return new TxTraceError(message, e)
 }
 
 export function findException(reversedEntries: l.VmLine[]) {
@@ -295,6 +316,13 @@ export async function traceTx(
     sourceTrace: result.sourceTrace,
     sourceTraceBundleHash: sourceTraceOptions?.sourceTraceBundleHash,
   }
+}
+
+export async function traceTransactionTree(
+  hash: string,
+  network: ExplorerNetworkInfo,
+): Promise<RetraceTraceResult> {
+  return doTraceTree(hash, network)
 }
 
 export function normalizeGas(step: Step) {

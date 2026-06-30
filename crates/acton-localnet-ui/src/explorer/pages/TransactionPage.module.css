@@ -761,8 +761,62 @@
 .skeletonEventDirection,
 .skeletonEventAddressText,
 .skeletonEventOpcode,
-.skeletonEventValueText {
+.skeletonEventValueText,
+.skeletonStateAddress,
+.skeletonStateBadge,
+.skeletonStateCell,
+.skeletonStateStorage {
   border-radius: 999px;
+}
+
+.skeletonStateChanges {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.skeletonStateCard {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--tonscan-card-bg) 96%, var(--tonscan-row-hover));
+}
+
+.skeletonStateHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.skeletonStateAddress {
+  width: min(360px, 58%);
+  height: 18px;
+}
+
+.skeletonStateBadge {
+  width: 82px;
+  height: 24px;
+  flex: 0 0 auto;
+}
+
+.skeletonStateGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.skeletonStateCell {
+  height: 42px;
+}
+
+.skeletonStateStorage {
+  width: min(620px, 88%);
+  height: 34px;
 }
 
 .skeletonDetailCard {
@@ -934,6 +988,10 @@
         120px,
         0.8fr
       );
+  }
+
+  .skeletonStateGrid {
+    grid-template-columns: 1fr;
   }
 
   .skeletonDetailRow {

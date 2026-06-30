@@ -21,6 +21,7 @@ import {
   Bug,
   CheckCircle2,
   CircleDotDashed,
+  Database,
   GitBranch,
   ListChecks,
   XCircle,
@@ -35,6 +36,7 @@ import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {AddressChip} from "../components/AddressChip"
 import {Breadcrumbs} from "../components/Breadcrumbs"
+import {TraceStateChangesPanel} from "../components/TraceStateChangesPanel"
 import {
   formatAddress as formatDisplayAddress,
   hashToHex,
@@ -47,7 +49,7 @@ import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
 import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
-import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
+import type {RetraceResultAndCode, RetraceTraceResult} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 
@@ -58,13 +60,16 @@ interface TransactionPageProps {
   readonly openRetraceOnLoad?: boolean
 }
 
-type TabType = "transactions" | "value-flow" | "event-overview"
+type TabType = "transactions" | "value-flow" | "event-overview" | "state-changes"
 
 const parseTabType = (tab: string | null, supportsActions: boolean): TabType => {
   if (supportsActions && (tab === null || tab === "" || tab === "event-overview")) {
     return "event-overview"
   }
-  return tab === "transactions" ? "transactions" : "value-flow"
+  if (tab === "transactions" || tab === "state-changes") {
+    return tab
+  }
+  return "value-flow"
 }
 
 const MAX_TRACE_TREE_FLOW_WIDTH = 1800
@@ -178,6 +183,39 @@ const withRetracedStorage = (
   })
 }
 
+const withRetracedTraceStorage = (
+  transactions: readonly TransactionInfo[],
+  retracedTransactions: RetraceTraceResult["result"]["transactions"],
+): TransactionInfo[] => {
+  return mapTraceTransactions(transactions, tx => {
+    const retracedTx = retracedTransactions[transactionHashHex(tx).toLowerCase()]
+    if (!retracedTx) {
+      return {...tx}
+    }
+
+    const abi = tx.contractAbi
+    const parsedStorageBefore = decodeStorageShardAccount(
+      retracedTx.account.shardAccountBefore,
+      abi,
+    )
+    const parsedStorageAfter = decodeStorageShardAccount(retracedTx.account.shardAccountAfter, abi)
+
+    return {
+      ...tx,
+      vmLogDiff: retracedTx.emulatedTx.vmLogs,
+      executorLogs: retracedTx.emulatedTx.executorLogs,
+      actions: retracedTx.emulatedTx.c5,
+      outActions: retracedTx.emulatedTx.actions,
+      shardAccountBefore: retracedTx.account.shardAccountBefore,
+      shardAccountAfter: retracedTx.account.shardAccountAfter,
+      accountBalanceBefore: retracedTx.money.balanceBefore,
+      accountBalanceAfter: retracedTx.money.balanceAfter,
+      parsedStorageBefore: parsedStorageBefore ?? tx.parsedStorageBefore,
+      parsedStorageAfter: parsedStorageAfter ?? tx.parsedStorageAfter,
+    }
+  })
+}
+
 async function loadVerifiedSourcesByCodeHash({
   metadataRegistry,
   codeHashes,
@@ -251,10 +289,13 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [traceActions, setTraceActions] = useState<readonly V3Action[]>([])
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
+  const [stateChangesLoading, setStateChangesLoading] = useState(false)
+  const [stateChangesError, setStateChangesError] = useState<string | undefined>()
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
   const loadedActionsByHashRef = useRef(new Map<string, LoadedTransactionActions>())
+  const stateChangesRequestedHashRef = useRef<string | undefined>(undefined)
   const showLoadingSkeleton = useDelayedLoadingVisibility(loading, 500)
   const {flowMetrics: treeFlowMetrics, rootRef: treeSectionRef} =
     useAvailableFlowMetrics<HTMLDivElement>(MAX_TRACE_TREE_FLOW_WIDTH)
@@ -417,6 +458,9 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setExpandedRetraceHash(undefined)
     setRetraceAttempt(0)
     setHoveredAction(undefined)
+    setStateChangesLoading(false)
+    setStateChangesError(undefined)
+    stateChangesRequestedHashRef.current = undefined
     loadedActionsByHashRef.current.clear()
   }, [traceLookupHash])
 
@@ -561,6 +605,52 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     }
   }, [client, metadataRegistry, traceLookupHash, supportsTraceActions])
 
+  useEffect(() => {
+    if (
+      activeTab !== "state-changes" ||
+      traces.length === 0 ||
+      stateChangesRequestedHashRef.current?.toLowerCase() === traceLookupHash.toLowerCase()
+    ) {
+      return
+    }
+
+    let isActive = true
+    stateChangesRequestedHashRef.current = traceLookupHash
+    setStateChangesLoading(true)
+    setStateChangesError(undefined)
+
+    const loadTraceStateChanges = async () => {
+      try {
+        const {traceTransactionTree} = await import("../retrace/txTrace/lib/traceTx")
+        const replayedTrace = await traceTransactionTree(traceLookupHash, network)
+        if (!isActive) {
+          return
+        }
+
+        setTraces(currentTraces =>
+          withRetracedTraceStorage(currentTraces, replayedTrace.result.transactions),
+        )
+      } catch (error) {
+        console.error("Failed to retrace transaction tree:", error)
+        if (!isActive) {
+          return
+        }
+        setStateChangesError(
+          error instanceof Error ? error.message : "Failed to load decoded state changes",
+        )
+      } finally {
+        if (isActive) {
+          setStateChangesLoading(false)
+        }
+      }
+    }
+
+    void loadTraceStateChanges()
+    return () => {
+      isActive = false
+    }
+  }, [activeTab, network, traceLookupHash, traces.length])
+
   if (loading) {
     return showLoadingSkeleton ? (
       <TransactionTraceSkeleton activeTab={activeTab} showEventOverview={supportsTraceActions} />
@@ -701,6 +791,16 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                     />
                   )}
 
+                  {activeTab === "state-changes" && (
+                    <TraceStateChangesPanel
+                      transactions={traces}
+                      contracts={contracts}
+                      isLoading={stateChangesLoading}
+                      error={stateChangesError}
+                      onContractClick={handleContractClick}
+                    />
+                  )}
+
                   {activeTab === "transactions" && (
                     <div className={styles.detailsList}>
                       {rootTraceTransactions.map(tx => (
@@ -794,6 +894,15 @@ function TraceTabs({
       >
         <GitBranch size={16} /> Transactions
       </button>
+      <button
+        type="button"
+        className={`${styles.tab} ${activeTab === "state-changes" ? styles.tabActive : ""}`}
+        onClick={() => onTabChange?.("state-changes")}
+        disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+      >
+        <Database size={16} /> State Changes
+      </button>
     </div>
   )
 }
@@ -834,6 +943,8 @@ function TransactionTraceSkeleton({
             <div className={styles.tabContent}>
               {activeTab === "transactions" ? (
                 <TraceDetailsSkeleton />
+              ) : activeTab === "state-changes" ? (
+                <StateChangesSkeleton />
               ) : activeTab === "event-overview" ? (
                 <ActionHistorySkeleton />
               ) : (
@@ -928,6 +1039,30 @@ function TraceDetailsSkeleton(): JSX.Element {
               <span className={`${styles.skeleton} ${styles.skeletonDetailValue}`} />
             </div>
           ))}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function StateChangesSkeleton(): JSX.Element {
+  return (
+    <div className={styles.skeletonStateChanges} aria-hidden="true">
+      {[0, 1].map(index => (
+        <div key={`state-changes-skeleton-${index}`} className={styles.skeletonStateCard}>
+          <div className={styles.skeletonStateHeader}>
+            <span className={`${styles.skeleton} ${styles.skeletonStateAddress}`} />
+            <span className={`${styles.skeleton} ${styles.skeletonStateBadge}`} />
+          </div>
+          <div className={styles.skeletonStateGrid}>
+            {[0, 1, 2, 3].map(cellIndex => (
+              <span
+                key={`state-changes-skeleton-${index}-${cellIndex}`}
+                className={`${styles.skeleton} ${styles.skeletonStateCell}`}
+              />
+            ))}
+          </div>
+          <span className={`${styles.skeleton} ${styles.skeletonStateStorage}`} />
         </div>
       ))}
     </div>

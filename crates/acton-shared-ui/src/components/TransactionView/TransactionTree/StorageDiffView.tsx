@@ -10,7 +10,7 @@ import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "
 import styles from "./StorageDiffView.module.css"
 import type {StorageDiffNode, StorageDiffStatus, StorageLeafValue} from "./storageDiff"
 
-interface StorageDiffViewProps {
+export interface StorageDiffViewProps {
   readonly diff: StorageDiffNode
   readonly contracts: Map<string, ContractData>
   readonly onContractClick?: (address: string) => void
