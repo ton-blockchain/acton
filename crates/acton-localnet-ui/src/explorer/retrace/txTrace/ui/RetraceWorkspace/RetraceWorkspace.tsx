@@ -24,7 +24,7 @@ import {
   SkipForward,
 } from "lucide-react"
 
-import {Tooltip, type ContractData} from "@acton/shared-ui"
+import {CopyValueButton, Tooltip, type ContractData} from "@acton/shared-ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -35,6 +35,8 @@ import type {
   SourceTraceStep,
   SourceTraceVariable,
 } from "../../../../api/types"
+import {normalizeAddress} from "../../../../components/utils"
+import {useAddressFormat} from "../../../../hooks/useNetworkInfo"
 import {useLineExecutionData, useTraceStepper} from "../../hooks"
 import {findAddressContract, isTonAddress} from "../../lib/addressContracts"
 import {formatExitCode} from "../../lib/exitCodeFormatting"
@@ -457,9 +459,9 @@ function SourceVariableIcon() {
   )
 }
 
-function sourceVariableTooltip(variable: SourceTraceVariable): string {
+function sourceVariableTooltip(variable: SourceTraceVariable, value: string): string {
   const typeLabel = variable.type ? ` {${variable.type}}` : ""
-  return `${variable.name}${typeLabel} = ${variable.value}`
+  return `${variable.name}${typeLabel} = ${value}`
 }
 
 function isAddressVariable(variable: SourceTraceVariable): boolean {
@@ -487,6 +489,15 @@ function sourceVariableAddress(variable: SourceTraceVariable): string | undefine
   return undefined
 }
 
+function SourceVariableValue({value, label}: {readonly value: string; readonly label: string}) {
+  return (
+    <span className={styles.sourceVariableValueWrap}>
+      <span className={styles.sourceVariableValue}>{value}</span>
+      <CopyValueButton className={styles.sourceVariableCopyButton} value={value} label={label} />
+    </span>
+  )
+}
+
 function SourceVariableRow({
   variable,
   contracts,
@@ -498,10 +509,12 @@ function SourceVariableRow({
   readonly depth: number
   readonly path: string
 }) {
-  const hasChildren = variable.children.length > 0
+  const addressFormat = useAddressFormat()
   const address = sourceVariableAddress(variable)
   const showAddressBadge = address !== undefined
   const addressContract = address ? findAddressContract(address, contracts) : undefined
+  const displayValue = address ? normalizeAddress(address, addressFormat) : variable.value
+  const hasChildren = variable.children.length > 0
   const [expanded, setExpanded] = useState(false)
   const rowStyle = {
     "--source-variable-depth": depth,
@@ -553,7 +566,10 @@ function SourceVariableRow({
           ) : null}
         </button>
         <SourceVariableIcon />
-        <span className={styles.sourceVariableExpression} title={sourceVariableTooltip(variable)}>
+        <span
+          className={styles.sourceVariableExpression}
+          title={sourceVariableTooltip(variable, displayValue)}
+        >
           <span className={styles.sourceVariableName}>{variable.name}</span>
           <span className={styles.sourceVariableEquals}>=</span>
           {variable.type && (
@@ -564,7 +580,7 @@ function SourceVariableRow({
               {addressContract?.letter ?? "?"}
             </span>
           )}
-          <span className={styles.sourceVariableValue}>{variable.value}</span>
+          <SourceVariableValue value={displayValue} label={`${variable.name} value`} />
         </span>
       </div>
       {hasChildren && expanded && (

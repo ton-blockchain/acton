@@ -648,7 +648,8 @@
 .sourceVariableName,
 .sourceVariableType,
 .sourceVariableEquals,
-.sourceVariableValue {
+.sourceVariableValue,
+.sourceVariableValueWrap {
   display: block;
 }
 
@@ -686,13 +687,55 @@
   color: var(--source-debug-variable-equals-color);
 }
 
-.sourceVariableValue {
+.sourceVariableValueWrap {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
+  overflow: hidden;
+}
+
+.sourceVariableValue {
+  min-width: 0;
+  padding-right: 28px;
   overflow: hidden;
   color: var(--source-debug-variable-value-color);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.sourceVariableCopyButton {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 18px;
+  margin: auto 0;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  color: var(--tonscan-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--transition-duration-fast),
+    color var(--transition-duration-fast);
+}
+
+.sourceVariableCopyButton:hover {
+  color: var(--tonscan-text-primary);
+}
+
+.sourceVariableRow:hover .sourceVariableCopyButton,
+.sourceVariableRow:focus-within .sourceVariableCopyButton {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sourceCallStack {
