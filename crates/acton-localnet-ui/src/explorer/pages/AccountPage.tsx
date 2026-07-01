@@ -1465,7 +1465,7 @@ function renderJson(json: string): ReactNode[] {
 }
 
 function getAccountTokenInfo(
-  stateV3: AccountStatesResponse | void,
+  stateV3: AccountStatesResponse | undefined,
 ): readonly AccountStateTokenInfo[] {
   if (!stateV3) return []
   const currentAccount = stateV3.accounts[0]

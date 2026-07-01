@@ -140,7 +140,6 @@
         "preset": "all",
         "noArrayIndexKey": "off",
         "noBitwiseOperators": "off",
-        "noConfusingVoidType": "off",
         "noConsole": "off",
         "noDoubleEquals": "off",
         "noDuplicateProperties": "off",
