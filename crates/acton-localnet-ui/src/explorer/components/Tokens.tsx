@@ -77,7 +77,7 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
           const decimals = Number(master?.jetton_content?.decimals || 9)
           const rawBalance = Number(w.balance)
           const rawSupply = Number(master?.total_supply || "0")
-          const balance = rawBalance / Math.pow(10, decimals)
+          const balance = rawBalance / 10 ** decimals
           const supplyShare = rawSupply > 0 ? rawBalance / rawSupply : undefined
           const supplyShareLabel =
             supplyShare === undefined

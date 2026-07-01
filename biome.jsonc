@@ -126,7 +126,6 @@
         "useDefaultSwitchClause": "off",
         "useDestructuring": "off",
         "useErrorCause": "off",
-        "useExponentiationOperator": "off",
         "useExportsLast": "off",
         "useImportType": "off",
         "useNamingConvention": "off",
