@@ -1,23 +1,22 @@
+import {InfoPopover} from "@acton/shared-ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Check, Copy, Edit2, QrCode, Star, X} from "lucide-react"
 import {QRCodeSVG} from "qrcode.react"
-import {useEffect, useId, useRef, useState} from "react"
 import type {FC} from "react"
-import {InfoPopover} from "@acton/shared-ui"
-
-import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
+import {useEffect, useId, useRef, useState} from "react"
 import type {TonClient} from "../api/client"
 import type {ContractAbiLink, ExtendedContractABI} from "../api/compilerAbi"
+import type {AddressInformation, JettonMasterMetadata, JettonWallet} from "../api/types"
 import {useAddressBook, useAddressName} from "../hooks/useAddressBook"
 import {useFavoriteAccounts} from "../hooks/useFavoriteAccounts"
-import {useNetworkInfo, type ExplorerNetworkId} from "../hooks/useNetworkInfo"
+import {type ExplorerNetworkId, useNetworkInfo} from "../hooks/useNetworkInfo"
 
 import styles from "./AccountInfo.module.css"
 import {
-  TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
+  TOKEN_IMAGE_SOURCE_KEYS,
 } from "./imageFallbacks"
 import {formatAddress, formatNano, normalizeAddress, toRawAddress} from "./utils"
 

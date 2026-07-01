@@ -1,7 +1,7 @@
-import {useCallback, useEffect, useRef, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
-import {Link2, RefreshCw, Unplug} from "lucide-react"
 import {Button} from "@acton/shared-ui"
+import {Link2, RefreshCw, Unplug} from "lucide-react"
+import type {FC, FormEvent, JSX} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import {
@@ -10,16 +10,16 @@ import {
 } from "../../explorer/api/jettonWallets"
 import type {JettonWallet} from "../../explorer/api/types"
 import {AddressChip} from "../../explorer/components/AddressChip"
-import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
 import {
+  type AddressFormatOptions,
   normalizeAddress,
   toRawAddress,
-  type AddressFormatOptions,
 } from "../../explorer/components/utils"
+import {WalletAccountSummary} from "../../explorer/components/WalletAccountSummary"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
 import {
-  useOpenExplorerPath,
   type ExplorerNavigationClickEvent,
+  useOpenExplorerPath,
 } from "../../explorer/hooks/useOpenExplorerPath"
 import type {RuntimeWallet} from "../../wallet/types"
 import {useWalletRuntime} from "../../wallet/useWalletRuntime"

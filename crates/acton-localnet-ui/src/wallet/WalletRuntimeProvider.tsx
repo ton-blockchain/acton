@@ -1,15 +1,15 @@
-import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
 import {Button, useToast} from "@acton/shared-ui"
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC, ReactNode} from "react"
 import {
-  formatUnits,
   type ConnectionRequestEvent,
+  formatUnits,
   type RequestErrorEvent,
   type SendTransactionRequestEvent,
   type SignDataRequestEvent,
   type TONConnectSession,
 } from "@ton/walletkit"
+import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
+import type {FC, ReactNode} from "react"
+import {useCallback, useEffect, useMemo, useState} from "react"
 
 import styles from "../dashboard/pages/WalletsPage.module.css"
 import type {TonClient} from "../explorer/api/client"
@@ -22,8 +22,8 @@ import type {RuntimeWallet, StartupWalletRecord} from "./types"
 import {isSupportedWalletVersion} from "./types"
 import {useTonConnectPasteHandler} from "./useTonConnectPasteHandler"
 import {
-  WalletRuntimeContext,
   type WalletBalanceState,
+  WalletRuntimeContext,
   type WalletRuntimeContextValue,
 } from "./useWalletRuntime"
 

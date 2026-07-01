@@ -1,5 +1,3 @@
-import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {CSSProperties, FC, JSX, MouseEvent} from "react"
 import {
   Card,
   CardContent,
@@ -10,6 +8,7 @@ import {
   TableHeader,
   TableRow,
 } from "@acton/shared-ui"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {
   BadgeDollarSign,
   BadgeMinus,
@@ -37,6 +36,7 @@ import {
   Landmark,
   Layers,
   LockKeyhole,
+  type LucideIcon,
   MoreHorizontal,
   MoveDownLeft,
   MoveUpRight,
@@ -51,36 +51,34 @@ import {
   Vault,
   WalletCards,
   Webhook,
-  type LucideIcon,
 } from "lucide-react"
-import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-
+import type {CSSProperties, FC, JSX, MouseEvent} from "react"
+import {lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState} from "react"
+import type {TonClient} from "../api/client"
+import {addressKey} from "../api/compilerAbi"
 import type {
-  AddressInformation,
   AccountStateTokenInfo,
+  AddressInformation,
   JettonMaster,
   JettonWallet,
   NftItem,
   V3Action,
-  V3Metadata,
   V3Message,
+  V3Metadata,
   V3TransactionListItem,
   VerificationSourceResponse,
 } from "../api/types"
-import type {TonClient} from "../api/client"
-import {addressKey} from "../api/compilerAbi"
 import {
   collectTransactionListAddresses,
-  useMessageNamesByAddress,
   type MessageNamesByAddress,
+  useMessageNamesByAddress,
 } from "../hooks/useMessageNamesByAddress"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
-
+import styles from "./AccountDetails.module.css"
 import {AddressChip} from "./AddressChip"
 import {AddressLabel} from "./AddressLabel"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
-import styles from "./AccountDetails.module.css"
 import {formatNano, formatTimeAgo, hashToHex, isSameAddress, parseAddress} from "./utils"
 
 type Tabs = "history" | "contract" | "tokens" | "nfts" | "holders"

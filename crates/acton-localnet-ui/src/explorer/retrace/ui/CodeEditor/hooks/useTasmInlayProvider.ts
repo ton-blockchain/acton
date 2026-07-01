@@ -1,7 +1,6 @@
-import {type RefObject, useEffect} from "react"
 import type * as monacoTypes from "monaco-editor"
-
 import {languages} from "monaco-editor"
+import {type RefObject, useEffect} from "react"
 
 import {TASM_LANGUAGE_ID} from "../languages"
 

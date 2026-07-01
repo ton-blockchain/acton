@@ -1,17 +1,16 @@
-import {useEffect, useState} from "react"
 import type {FC} from "react"
+import {useEffect, useState} from "react"
 
 import type {TonClient} from "../api/client"
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-
-import styles from "./Tokens.module.css"
 import {
-  TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
+  TOKEN_IMAGE_SOURCE_KEYS,
 } from "./imageFallbacks"
+import styles from "./Tokens.module.css"
 import {toRawAddress} from "./utils"
 
 interface TokensProps {

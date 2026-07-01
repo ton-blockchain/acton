@@ -1,10 +1,10 @@
-import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
-import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
-import {ToastProvider} from "@acton/shared-ui"
 import type {ThemeMode} from "@acton/shared-ui"
+import {ToastProvider} from "@acton/shared-ui"
+import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
+import type {FC, ReactNode} from "react"
 import {
-  Suspense,
   lazy,
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -12,17 +12,15 @@ import {
   useRef,
   useState,
 } from "react"
-import type {FC, ReactNode} from "react"
-
+import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
+import {DashboardPage} from "./dashboard/DashboardPage"
+import {FaucetPage} from "./dashboard/pages/FaucetPage"
+import {HomePage} from "./dashboard/pages/HomePage"
+import {NftsPage} from "./dashboard/pages/NftsPage"
+import {TokensPage} from "./dashboard/pages/TokensPage"
+import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {TonClient} from "./explorer/api/client"
 import {getBundledCompilerAbis} from "./explorer/api/compilerAbiCatalog"
-import {AccountPage} from "./explorer/pages/AccountPage"
-import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
-import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
-import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
-import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
-import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
-import {TransactionPage} from "./explorer/pages/TransactionPage"
 import {NetworkInfoProvider} from "./explorer/hooks/NetworkInfoProvider"
 import {AddressBookProvider} from "./explorer/hooks/useAddressBook"
 import {BundledAbiRegistry} from "./explorer/metadata/bundledAbiRegistry"
@@ -30,12 +28,13 @@ import {CompositeMetadataRegistry} from "./explorer/metadata/compositeRegistry"
 import {LocalnetMetadataRegistry} from "./explorer/metadata/localnetRegistry"
 import {MetadataRegistryProvider} from "./explorer/metadata/MetadataRegistryProvider"
 import {VerifierMetadataRegistry} from "./explorer/metadata/verifierRegistry"
-import {DashboardPage} from "./dashboard/DashboardPage"
-import {FaucetPage} from "./dashboard/pages/FaucetPage"
-import {HomePage} from "./dashboard/pages/HomePage"
-import {NftsPage} from "./dashboard/pages/NftsPage"
-import {TokensPage} from "./dashboard/pages/TokensPage"
-import {WalletsPage} from "./dashboard/pages/WalletsPage"
+import {AbiCatalogPage, AbiDetailsPage} from "./explorer/pages/AbiCatalogPage"
+import {AccountPage} from "./explorer/pages/AccountPage"
+import {BlockDetailsPage, BlocksPage} from "./explorer/pages/BlocksPage"
+import {ExplorerIndexPage} from "./explorer/pages/ExplorerIndexPage"
+import {FavoriteAccountsPage} from "./explorer/pages/FavoriteAccountsPage"
+import {SourceCatalogPage} from "./explorer/pages/SourceCatalogPage"
+import {TransactionPage} from "./explorer/pages/TransactionPage"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
 import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"

@@ -1,5 +1,5 @@
-import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {CompilerAbiLoader} from "../api/client"
+import type {ExtendedContractABI} from "../api/compilerAbi"
 import {NullMetadataRegistry} from "./nullRegistry"
 
 export class BundledAbiRegistry extends NullMetadataRegistry {

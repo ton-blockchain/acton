@@ -1,19 +1,17 @@
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
-import type {CSSProperties, FC, JSX} from "react"
 import {
-  type ContractVerifiedSource,
+  buildValueFlowItems,
   type ContractData,
+  type ContractVerifiedSource,
+  decodeStorageDataCell,
+  decodeStorageShardAccount,
+  getTransactionComputePhase,
   type LoadedTransactionActions,
   type TransactionBlockRef,
   TransactionDetails,
   type TransactionInfo,
   TransactionTree,
-  ValueFlowTable,
-  buildValueFlowItems,
-  decodeStorageDataCell,
-  decodeStorageShardAccount,
-  getTransactionComputePhase,
   type ValueFlowItem,
+  ValueFlowTable,
 } from "@acton/shared-ui"
 import {Address} from "@ton/core"
 import {
@@ -26,13 +24,15 @@ import {
   ListChecks,
   XCircle,
 } from "lucide-react"
+import type {CSSProperties, FC, JSX} from "react"
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import {useNavigate, useParams, useSearchParams} from "react-router-dom"
-
+import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import type {TonClient} from "../api/client"
-import type {V3Action, V3Metadata} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
+import type {V3Action, V3Metadata} from "../api/types"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {AddressChip} from "../components/AddressChip"
 import {Breadcrumbs} from "../components/Breadcrumbs"
@@ -45,12 +45,11 @@ import {useAddressBook} from "../hooks/useAddressBook"
 import {useAvailableFlowMetrics} from "../hooks/useAvailableFlowMetrics"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat, useNetworkInfo} from "../hooks/useNetworkInfo"
-import {openExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {type ExplorerNavigationClickEvent, openExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {RetraceResultAndCode} from "../retrace/txTrace/lib/types"
 import TransactionRetracePanel from "../retrace/txTrace/ui/TransactionRetracePanel"
-import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 
 import styles from "./TransactionPage.module.css"
 

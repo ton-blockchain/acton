@@ -1,5 +1,5 @@
-import {type AsmInstruction} from "./types"
 import type {GasConsumptionEntry} from "./specification"
+import {type AsmInstruction} from "./types"
 
 export function generateAsmDoc(instruction: AsmInstruction): string | null {
   const stackInfo = instruction.instruction.signature?.stack_string

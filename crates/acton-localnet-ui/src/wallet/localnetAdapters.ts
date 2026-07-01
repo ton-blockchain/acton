@@ -5,21 +5,21 @@ import {
   external,
   internal,
   loadStateInit,
+  type MessageRelaxed,
   SendMode,
   storeMessage,
   storeMessageRelaxed,
-  type MessageRelaxed,
 } from "@ton/core"
 import {
-  CallForSuccess,
-  HexToUint8Array,
-  WalletV4R2Adapter,
-  WalletV5R1Adapter,
   type ApiClient,
   type Base64String,
+  CallForSuccess,
+  HexToUint8Array,
   type Network,
   type TransactionRequest,
   type WalletSigner,
+  WalletV4R2Adapter,
+  WalletV5R1Adapter,
 } from "@ton/walletkit"
 
 export const LOCALNET_WALLET_VALID_UNTIL = 0xff_ff_ff_ff

@@ -1,6 +1,6 @@
-import {useState} from "react"
-import type {ChangeEvent, FC} from "react"
 import {Upload} from "lucide-react"
+import type {ChangeEvent, FC} from "react"
+import {useState} from "react"
 
 import styles from "./JsonUploadField.module.css"
 

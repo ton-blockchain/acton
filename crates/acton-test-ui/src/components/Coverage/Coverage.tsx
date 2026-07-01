@@ -1,11 +1,10 @@
+import type {HighlightedToken} from "@acton/shared-ui"
+import {highlightTolkToTokens} from "@acton/shared-ui"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {FiSearch} from "react-icons/fi"
 
-import type {HighlightedToken} from "@acton/shared-ui"
-import {highlightTolkToTokens} from "@acton/shared-ui"
-
-import {parseLcov, type CoverageFile} from "../../utils/lcov"
+import {type CoverageFile, parseLcov} from "../../utils/lcov"
 
 import styles from "./Coverage.module.css"
 

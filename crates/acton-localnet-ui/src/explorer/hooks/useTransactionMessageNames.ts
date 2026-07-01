@@ -2,13 +2,12 @@ import {useMemo} from "react"
 
 import type {TonClient} from "../api/client"
 import type {V3TransactionListItem} from "../api/types"
-
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {
   collectTransactionListAddresses,
   type MessageNamesByAddress,
   useMessageNamesByAddress,
 } from "./useMessageNamesByAddress"
-import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 export function useTransactionMessageNames(
   client: TonClient,

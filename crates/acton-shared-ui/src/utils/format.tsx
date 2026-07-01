@@ -1,5 +1,5 @@
-import type React from "react"
 import {Address} from "@ton/core"
+import type React from "react"
 
 const NANOGRAM_DECIMALS = 9
 

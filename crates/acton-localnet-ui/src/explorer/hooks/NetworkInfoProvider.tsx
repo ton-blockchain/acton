@@ -1,13 +1,13 @@
-import {useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
+import {useEffect, useMemo, useState} from "react"
 
 import type {TonClient} from "../api/client"
 import type {LocalnetNodeInfo} from "../api/types"
 
 import {
-  NetworkInfoContext,
   type ExplorerApiConfig,
   type ExplorerNetworkInfo,
+  NetworkInfoContext,
   type NetworkInfoContextValue,
 } from "./useNetworkInfo"
 

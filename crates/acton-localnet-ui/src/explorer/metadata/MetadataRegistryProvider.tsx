@@ -1,5 +1,5 @@
-import {createContext, useContext} from "react"
 import type {FC, ReactNode} from "react"
+import {createContext, useContext} from "react"
 
 import {NullMetadataRegistry} from "./nullRegistry"
 import type {ExplorerMetadataRegistry} from "./types"

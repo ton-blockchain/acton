@@ -1,19 +1,16 @@
-import {useEffect, useMemo, useState} from "react"
-import type {CSSProperties, JSX} from "react"
-
 import {Cell} from "@ton/core"
-import {Cell as TasmCell, runtime, text} from "@ton/tasm"
+import {runtime, Cell as TasmCell, text} from "@ton/tasm"
 import {Check, CheckCircle2, Copy, ExternalLink, FileCode2, Folder, Menu} from "lucide-react"
+import type {CSSProperties, JSX} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {createHighlighterCore} from "shiki/core"
 import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
-
-import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "../CodeSnippet/jetbrains-themes"
-import {DataBlock} from "../DataBlock/DataBlock"
-
 import funcGrammarRaw from "../../../../../docs/grammars/grammar-func.json"
 import tasmGrammarRaw from "../../../../../docs/grammars/grammar-tasm.json"
 import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
+import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "../CodeSnippet/jetbrains-themes"
+import {DataBlock} from "../DataBlock/DataBlock"
 
 import styles from "./ContractSourcePanel.module.css"
 

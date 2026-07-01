@@ -1,11 +1,9 @@
-import {type CSSProperties, useEffect, useState} from "react"
-import {X} from "lucide-react"
+import {type ContractData, useToast} from "@acton/shared-ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-
-import {useToast, type ContractData} from "@acton/shared-ui"
-
-import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
+import {X} from "lucide-react"
+import {type CSSProperties, useEffect, useState} from "react"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"
+import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import type {ExplorerMetadataRegistry} from "../../../../metadata/types"
 import {traceTx} from "../../lib/traceTx"
 import type {RetraceResultAndCode} from "../../lib/types"

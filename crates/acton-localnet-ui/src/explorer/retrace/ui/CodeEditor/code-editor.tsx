@@ -1,39 +1,34 @@
-import React, {memo, useCallback, useEffect, useRef, useState} from "react"
 import {Editor, loader} from "@monaco-editor/react"
-
-import * as monaco from "monaco-editor"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
+import * as monaco from "monaco-editor"
 import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker"
-
-import type {ExitCode} from "../../txTrace/lib/types"
-
+import React, {memo, useCallback, useEffect, useRef, useState} from "react"
 import type {LinesExecutionData} from "../../txTrace/hooks"
-
-import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
+import type {ExitCode} from "../../txTrace/lib/types"
+import styles from "./CodeEditor.module.css"
 
 import {
-  useMonacoSetup,
+  type CodeLensAnnotation,
   getExplorerMonacoTheme,
-  initializeMonaco,
-  useDecorations,
-  useEditorEvents,
-  useTasmHoverProvider,
-  useCodeLensProvider,
-  useTasmCompletionProvider,
-  useTasmInlayProvider,
-  useImplicitRetInlayProvider,
-  useSourceDebugValuesProvider,
-  useFuncLanguageProviders,
-  useFolding,
-  type SupportedLanguage,
   type HighlightGroup,
   type HighlightRange,
+  initializeMonaco,
   type SourceDebugVariableValue,
-  type CodeLensAnnotation,
+  type SupportedLanguage,
+  useCodeLensProvider,
+  useDecorations,
+  useEditorEvents,
+  useFolding,
+  useFuncLanguageProviders,
+  useImplicitRetInlayProvider,
+  useMonacoSetup,
+  useSourceDebugValuesProvider,
+  useTasmCompletionProvider,
+  useTasmHoverProvider,
+  useTasmInlayProvider,
 } from "./hooks"
-
-import styles from "./CodeEditor.module.css"
+import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
 
 interface CodeEditorProps {
   /* -------------------------------- Core Editor -------------------------------- */

@@ -1,11 +1,10 @@
-import React, {memo, useMemo} from "react"
-
 import {
   type BackendContractInfo,
   type ContractData,
   DataBlock,
   TransactionDetails,
 } from "@acton/shared-ui"
+import React, {memo, useMemo} from "react"
 
 import {toTransactionInfo} from "../../lib/toTransactionInfo"
 import type {RetraceResultAndCode} from "../../lib/types"

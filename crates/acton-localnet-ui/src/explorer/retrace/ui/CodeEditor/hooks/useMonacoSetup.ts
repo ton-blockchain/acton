@@ -1,12 +1,11 @@
-import {useEffect, useLayoutEffect, useState} from "react"
 import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
-
-import {DARK_THEME, LIGHT_THEME} from "../themes"
+import {useEffect, useLayoutEffect, useState} from "react"
+import {FUNC_LANGUAGE_ID, TASM_LANGUAGE_ID, TOLK_LANGUAGE_ID} from "../languages"
 import {funcLanguageDefinition} from "../languages/func-language-definition"
 import {tasmLanguageDefinition} from "../languages/tasm-language-definition"
 import {tolkLanguageDefinition} from "../languages/tolk-language-definition"
-import {FUNC_LANGUAGE_ID, TASM_LANGUAGE_ID, TOLK_LANGUAGE_ID} from "../languages"
+import {DARK_THEME, LIGHT_THEME} from "../themes"
 
 export type SupportedLanguage = "tasm" | "func" | "tolk"
 

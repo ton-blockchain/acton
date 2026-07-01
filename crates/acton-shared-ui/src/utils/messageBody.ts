@@ -2,9 +2,9 @@ import type {DictionaryKey, DictionaryValue, Message, MessageRelaxed} from "@ton
 import {Address, BitString, Builder, Cell, Dictionary, loadShardAccount, Slice} from "@ton/core"
 import type {ContractABI, SymTable, Ty} from "@ton/tolk-abi-to-typescript"
 import {
+  SymTable as CompilerSymTable,
   DynamicCtx,
   renderTy,
-  SymTable as CompilerSymTable,
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
 

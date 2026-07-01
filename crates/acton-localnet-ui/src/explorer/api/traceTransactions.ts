@@ -2,12 +2,12 @@ import {Buffer} from "node:buffer"
 
 import type {TransactionInfo} from "@acton/shared-ui"
 import {
+  type AccountStatus,
+  type AccountStatusChange,
   Address,
   Cell,
   Dictionary,
   loadStateInit,
-  type AccountStatus,
-  type AccountStatusChange,
   type Message,
   type StateInit,
   type Transaction,

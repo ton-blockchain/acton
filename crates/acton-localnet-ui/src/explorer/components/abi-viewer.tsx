@@ -1,37 +1,33 @@
 import {Buffer} from "node:buffer"
-import {useEffect, useMemo, useState} from "react"
-import type {JSX, MouseEvent, ReactNode} from "react"
-
 import {DataBlock, jetbrainsDarculaTheme, jetbrainsLightTheme} from "@acton/shared-ui"
 import {
   Address,
   Cell,
-  Dictionary,
-  TupleReader,
   type ContractProvider,
+  Dictionary,
   type TupleItem,
+  TupleReader,
 } from "@ton/core"
 import {
+  type ABIGetMethod,
+  type ContractABI,
   callGetMethodDynamic,
   DynamicCtx,
   renderTy,
-  type ABIGetMethod,
-  type ContractABI,
   type SymTable,
   type Ty,
 } from "@ton/tolk-abi-to-typescript"
 import {Link2, Play} from "lucide-react"
+import type {JSX, MouseEvent, ReactNode} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {createHighlighterCore} from "shiki/core"
 import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
-
+import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
 import type {TonClient} from "../api/client"
 import type {V3RunGetMethodResponse, V3RunGetMethodStackEntry} from "../api/types"
-
-import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
-
-import {abiSymbolAnchorId} from "./abiAnchors"
 import styles from "./abi-viewer.module.css"
+import {abiSymbolAnchorId} from "./abiAnchors"
 
 export type AbiTab = "view" | "raw"
 type HighlightLanguage = "json" | "tolk"

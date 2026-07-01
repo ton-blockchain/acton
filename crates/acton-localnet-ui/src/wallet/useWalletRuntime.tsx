@@ -1,6 +1,5 @@
-import {createContext, useContext} from "react"
-
 import type {TONConnectSession} from "@ton/walletkit"
+import {createContext, useContext} from "react"
 
 import type {StartupWallet} from "../explorer/api/types"
 

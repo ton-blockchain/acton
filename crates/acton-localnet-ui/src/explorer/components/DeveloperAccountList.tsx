@@ -4,9 +4,8 @@ import type {V3AccountState} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {AddressChip} from "./AddressChip"
-import {formatNano} from "./utils"
-
 import styles from "./DeveloperAccountList.module.css"
+import {formatNano} from "./utils"
 
 export interface DeveloperAccountListItem {
   readonly address: string

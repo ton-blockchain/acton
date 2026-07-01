@@ -1,8 +1,7 @@
-import React, {useMemo} from "react"
+import {ContractChip, type ContractData} from "@acton/shared-ui"
 
 import {Address} from "@ton/core"
-
-import {ContractChip, type ContractData} from "@acton/shared-ui"
+import React, {useMemo} from "react"
 
 import {AddressChip} from "../../../../../components/AddressChip"
 import type {ExplorerNavigationClickEvent} from "../../../../../hooks/useOpenExplorerPath"

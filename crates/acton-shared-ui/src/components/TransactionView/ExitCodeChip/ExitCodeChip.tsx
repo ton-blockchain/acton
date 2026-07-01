@@ -3,7 +3,7 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {Tooltip} from "@/index"
 
 import styles from "./ExitCodeViewer.module.css"
-import {EXIT_CODE_DESCRIPTIONS, getExitCodeDocsUrl, type ExitCodeDescription} from "./error-codes"
+import {EXIT_CODE_DESCRIPTIONS, type ExitCodeDescription, getExitCodeDocsUrl} from "./error-codes"
 
 interface ExitCodeViewerProps {
   readonly exitCode: number | undefined

@@ -1,6 +1,6 @@
-import {useEffect, type RefObject} from "react"
-import type * as monacoTypes from "monaco-editor"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import type * as monacoTypes from "monaco-editor"
+import {type RefObject, useEffect} from "react"
 
 import {formatExitCode} from "../../../txTrace/lib/exitCodeFormatting"
 import type {ExitCode} from "../../../txTrace/lib/types"

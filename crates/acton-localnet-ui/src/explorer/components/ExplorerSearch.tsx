@@ -1,26 +1,24 @@
 import {useToast} from "@acton/shared-ui"
 import {FileCode2, History, Search, X} from "lucide-react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from "react"
-import {useNavigate} from "react-router-dom"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {NavigateFunction} from "react-router-dom"
+import {useNavigate} from "react-router-dom"
 
 import {
-  getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
+  getBundledCompilerAbiCatalog,
 } from "../api/compilerAbiCatalog"
 import {EXPLORER_HISTORY_STORAGE_KEY} from "../explorerResume"
-import {useAddressBook} from "../hooks/useAddressBook"
-import type {TonAssetsNameMatch} from "../hooks/useAddressBook"
-import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import type {ExplorerRoutes} from "../hooks/explorerRoutesContext"
+import type {TonAssetsNameMatch} from "../hooks/useAddressBook"
+import {useAddressBook} from "../hooks/useAddressBook"
+import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
-
-import {formatAddress, hashToHex, parseAddress} from "./utils"
-import type {AddressFormatOptions} from "./utils"
-
 import {abiSymbolAnchorId} from "./abiAnchors"
 import styles from "./ExplorerSearch.module.css"
+import type {AddressFormatOptions} from "./utils"
+import {formatAddress, hashToHex, parseAddress} from "./utils"
 
 type ExplorerSearchVariant = "hero" | "header"
 

@@ -1,25 +1,23 @@
 import {Buffer} from "node:buffer"
-import {useMemo, useState} from "react"
-import type {FC, JSX} from "react"
-
 import {
-  ContractSourcePanel,
-  decodeStorageDataCell,
-  DataBlock,
-  ParsedValueView,
   type ContractData,
+  ContractSourcePanel,
   type ContractVerifiedSource,
+  DataBlock,
+  decodeStorageDataCell,
+  ParsedValueView,
 } from "@acton/shared-ui"
 import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import type {FC, JSX} from "react"
+import {useMemo, useState} from "react"
 
 import type {TonClient} from "../api/client"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {AbiPanel, type AbiTab} from "./abi-viewer"
-import type {AddressFormatOptions} from "./utils"
-
 import styles from "./ContractCode.module.css"
+import type {AddressFormatOptions} from "./utils"
 
 interface ContractCodeProps {
   readonly codeBoc: string

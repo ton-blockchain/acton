@@ -1,6 +1,6 @@
-import {useEffect} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor, type IMarkdownString, Position} from "monaco-editor"
+import {useEffect} from "react"
 
 import {findInstruction, generateAsmDoc} from "../../../tasm/lib"
 

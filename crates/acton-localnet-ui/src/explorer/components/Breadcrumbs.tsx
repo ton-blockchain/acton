@@ -1,7 +1,7 @@
 import {ChevronRight} from "lucide-react"
-import {Link} from "react-router-dom"
-import {Fragment} from "react"
 import type {FC} from "react"
+import {Fragment} from "react"
+import {Link} from "react-router-dom"
 
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {AddressLabel} from "./AddressLabel"

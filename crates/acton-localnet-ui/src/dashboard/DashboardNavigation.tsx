@@ -1,10 +1,11 @@
-import {Fragment, useCallback, useEffect, useMemo, useState} from "react"
-import type {FC} from "react"
+import type {ThemeMode} from "@acton/shared-ui"
+import {ThemeSwitch} from "@acton/shared-ui"
+import type {LucideIcon} from "lucide-react"
 import {
   Activity,
   ArrowUpRight,
-  Boxes,
   BookOpen,
+  Boxes,
   Brackets,
   Check,
   Coins,
@@ -24,17 +25,15 @@ import {
   Wallet,
   X,
 } from "lucide-react"
-import type {LucideIcon} from "lucide-react"
+import type {FC} from "react"
+import {Fragment, useCallback, useEffect, useMemo, useState} from "react"
 import {useLocation, useNavigate} from "react-router-dom"
-import {ThemeSwitch} from "@acton/shared-ui"
-import type {ThemeMode} from "@acton/shared-ui"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
 import {useNetworkInfo} from "../explorer/hooks/useNetworkInfo"
-
-import {DashboardSearch} from "./DashboardSearch"
 import styles from "./DashboardPage.module.css"
+import {DashboardSearch} from "./DashboardSearch"
 
 interface DashboardNavigationProps {
   readonly client: TonClient

@@ -2,13 +2,11 @@ import type {FC, ReactNode} from "react"
 
 import {addressKey} from "../api/compilerAbi"
 import type {V3Message, V3TransactionListItem} from "../api/types"
-import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-
-import {AddressChip} from "./AddressChip"
-import {formatNano, formatTimeAgo, hashToHex} from "./utils"
 import type {MessageNamesByAddress} from "../hooks/useMessageNamesByAddress"
-
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {AddressChip} from "./AddressChip"
 import styles from "./DeveloperTransactionList.module.css"
+import {formatNano, formatTimeAgo, hashToHex} from "./utils"
 
 export type TransactionListItem = V3TransactionListItem
 

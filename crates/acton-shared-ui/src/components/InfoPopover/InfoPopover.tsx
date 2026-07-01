@@ -1,5 +1,4 @@
 import {Info} from "lucide-react"
-import {createPortal} from "react-dom"
 import {
   type CSSProperties,
   type JSX,
@@ -10,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react"
+import {createPortal} from "react-dom"
 
 import styles from "./InfoPopover.module.css"
 

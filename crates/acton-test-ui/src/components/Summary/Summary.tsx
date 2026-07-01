@@ -1,5 +1,5 @@
-import type React from "react"
 import {type TestReport, TestStatus} from "@acton/shared-ui"
+import type React from "react"
 
 import styles from "./Summary.module.css"
 

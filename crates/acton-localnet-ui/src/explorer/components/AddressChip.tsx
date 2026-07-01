@@ -1,14 +1,11 @@
 import {Check, Copy} from "lucide-react"
-import {useEffect, useState} from "react"
 import type {FC} from "react"
-
-import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {useEffect, useState} from "react"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
-
+import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import styles from "./AddressChip.module.css"
 import {AddressLabel} from "./AddressLabel"
 import {formatAddress} from "./utils"
-
-import styles from "./AddressChip.module.css"
 
 type AddressChipCopyPlacement = "left" | "right"
 type AddressChipDisplayFormat = "network" | "raw"

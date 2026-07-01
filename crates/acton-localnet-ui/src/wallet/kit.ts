@@ -1,11 +1,11 @@
 import {
   ApiClientToncenter,
+  createDeviceInfo,
+  createWalletManifest,
   LocalStorageAdapter,
   Network,
   Signer,
   TonWalletKit,
-  createDeviceInfo,
-  createWalletManifest,
   type Wallet,
 } from "@ton/walletkit"
 

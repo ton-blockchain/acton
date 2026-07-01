@@ -1,19 +1,7 @@
-import {
-  type CSSProperties,
-  type PointerEvent as ReactPointerEvent,
-  type ReactNode,
-  Fragment,
-  lazy,
-  memo,
-  Suspense,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import {type ContractData, CopyValueButton, Tooltip} from "@acton/shared-ui"
 
 import type {StackElement} from "@ton/tasm/dist/trace"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {
   Braces,
   ChevronDown,
@@ -23,9 +11,20 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react"
-
-import {CopyValueButton, Tooltip, type ContractData} from "@acton/shared-ui"
-import type {ContractABI} from "@ton/tolk-abi-to-typescript"
+import {
+  type CSSProperties,
+  Fragment,
+  lazy,
+  memo,
+  type ReactNode,
+  type PointerEvent as ReactPointerEvent,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react"
 
 import type {
   SourceBundle,
@@ -40,7 +39,6 @@ import {useAddressFormat} from "../../../../hooks/useNetworkInfo"
 import {useLineExecutionData, useTraceStepper} from "../../hooks"
 import {findAddressContract, isTonAddress} from "../../lib/addressContracts"
 import {formatExitCode} from "../../lib/exitCodeFormatting"
-import type {ExitCode, RetraceResultAndCode} from "../../lib/types"
 import {
   buildInstructionDetails,
   calculateCumulativeGasSinceBegin,
@@ -55,12 +53,13 @@ import {
   setStoredTraceViewMode,
   type TraceViewMode,
 } from "../../lib/traceViewModel"
+import type {ExitCode, RetraceResultAndCode} from "../../lib/types"
 import InlineLoader from "../InlineLoader"
 import StatusBadge from "../StatusBadge"
+import StackItemDetails from "../stack/StackItemDetails"
 import TraceSidePanel from "../TraceSidePanel"
 import TraceStepsChainView from "../TraceStepsChainView"
 import TraceViewModeToggle from "../TraceViewModeToggle"
-import StackItemDetails from "../stack/StackItemDetails"
 
 import styles from "./RetraceWorkspace.module.css"
 

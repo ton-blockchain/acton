@@ -1,5 +1,4 @@
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent} from "react"
+import type {LucideIcon} from "lucide-react"
 import {
   Boxes,
   ChartNoAxesColumn,
@@ -9,7 +8,8 @@ import {
   Search,
   Wallet,
 } from "lucide-react"
-import type {LucideIcon} from "lucide-react"
+import type {CSSProperties, FC, KeyboardEvent as ReactKeyboardEvent} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../explorer/api/client"
@@ -17,10 +17,10 @@ import type {JettonMaster, NftItem} from "../explorer/api/types"
 import {formatAddress, hashToHex, parseAddress} from "../explorer/components/utils"
 import {useAddressFormat} from "../explorer/hooks/useNetworkInfo"
 
-import {loadApiSearchIndex, type ApiSearchIndexEntry} from "./apiSearchIndex"
+import {type ApiSearchIndexEntry, loadApiSearchIndex} from "./apiSearchIndex"
 import {NFT_PLACEHOLDER_IMAGE, TOKEN_PLACEHOLDER_IMAGE} from "./constants"
-import {contentString, matchesQuery, shortHash} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
+import {contentString, matchesQuery, shortHash} from "./dashboardUtils"
 
 interface DashboardSearchOverlayProps {
   readonly client: TonClient

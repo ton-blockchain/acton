@@ -1,8 +1,7 @@
-import React from "react"
+import type {ContractData} from "@acton/shared-ui"
 
 import type {StackElement} from "@ton/tasm/dist/trace"
-
-import type {ContractData} from "@acton/shared-ui"
+import React from "react"
 
 import StackViewer from "../stack/StackViewer"
 import styles from "./TraceSidePanel.module.css"

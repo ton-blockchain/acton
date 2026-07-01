@@ -1,11 +1,10 @@
-import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
 import {Button, Input, useToast} from "@acton/shared-ui"
 import type {Address} from "@ton/core"
-import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
+import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
 import type {FC, FormEvent, ReactNode} from "react"
-
-import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
+import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {TonClient} from "../../explorer/api/client"
+import type {JettonMaster, StartupWallet} from "../../explorer/api/types"
 import {
   formatAddress,
   hashToHex,
@@ -13,16 +12,15 @@ import {
   parseAddress,
 } from "../../explorer/components/utils"
 import {useAddressFormat} from "../../explorer/hooks/useNetworkInfo"
+import usdtLogo from "../assets/usdt-logo.png"
 import {QUICK_AMOUNTS, TOKEN_PLACEHOLDER_IMAGE} from "../constants"
+import styles from "../DashboardPage.module.css"
 import {parseGramAmount} from "../dashboardUtils"
 import {
   buildJettonMintInternalMessageBoc,
   normalizeJettonDecimals,
   parseJettonAmount,
 } from "../jettonFaucet"
-import usdtLogo from "../assets/usdt-logo.png"
-
-import styles from "../DashboardPage.module.css"
 
 interface FaucetPageProps {
   readonly client: TonClient

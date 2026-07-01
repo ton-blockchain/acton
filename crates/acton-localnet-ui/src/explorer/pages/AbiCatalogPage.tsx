@@ -1,14 +1,14 @@
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
-import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {useToast} from "@acton/shared-ui"
+import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
+import type {FC, FormEvent, JSX} from "react"
+import {useCallback, useEffect, useMemo, useState} from "react"
 import {Link, useParams} from "react-router-dom"
 
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import {
-  getBundledCompilerAbiCatalog,
   type BundledCompilerAbiCatalogEntry,
+  getBundledCompilerAbiCatalog,
 } from "../api/compilerAbiCatalog"
 import {AbiPanel, type AbiTab} from "../components/abi-viewer"
 import {Breadcrumbs} from "../components/Breadcrumbs"

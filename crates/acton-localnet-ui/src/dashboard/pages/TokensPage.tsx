@@ -1,15 +1,14 @@
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@acton/shared-ui"
-import {useNavigate} from "react-router-dom"
-import {useEffect, useState} from "react"
 import type {FC, JSX} from "react"
+import {useEffect, useState} from "react"
+import {useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {JettonMaster} from "../../explorer/api/types"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {TOKEN_PLACEHOLDER_IMAGE} from "../constants"
-import {formatTokenSupply} from "../dashboardUtils"
-
 import styles from "../DashboardPage.module.css"
+import {formatTokenSupply} from "../dashboardUtils"
 
 interface TokensPageProps {
   readonly client: TonClient
