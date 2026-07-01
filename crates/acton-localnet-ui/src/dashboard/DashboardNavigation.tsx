@@ -58,11 +58,15 @@ const mainItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
   {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
-  {label: "Sources", icon: FileCode2, path: "/explorer/sources"},
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},
   {label: "Tokens", icon: Coins, path: "/tokens"},
   {label: "NFTs", icon: Image, path: "/nfts"},
+]
+
+const sourceItems: SidebarItem[] = [
+  {label: "Sources", icon: FileCode2, path: "/explorer/sources"},
+  {label: "ABI", icon: FileJson, path: "/explorer/abi"},
 ]
 
 const apiItems: SidebarItem[] = [
@@ -74,6 +78,7 @@ const apiItems: SidebarItem[] = [
 
 const navigationSections: Array<{readonly id: string; readonly items: readonly SidebarItem[]}> = [
   {id: "main", items: mainItems},
+  {id: "sources", items: sourceItems},
   {id: "api", items: apiItems},
 ]
 
@@ -109,6 +114,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
       !location.pathname.startsWith("/explorer") ||
       location.pathname === "/explorer/blocks" ||
       location.pathname === "/explorer/sources" ||
+      location.pathname.startsWith("/explorer/abi") ||
       location.pathname === "/explorer/favorites"
     ) {
       return
@@ -208,12 +214,15 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                         ? location.pathname.startsWith("/explorer") &&
                           location.pathname !== "/explorer/blocks" &&
                           location.pathname !== "/explorer/sources" &&
+                          !location.pathname.startsWith("/explorer/abi") &&
                           location.pathname !== "/explorer/favorites"
                         : item.path === "/explorer/blocks"
                           ? location.pathname === "/explorer/blocks" ||
                             location.pathname === "/blocks" ||
                             location.pathname.startsWith("/block/")
-                          : item.path === location.pathname
+                          : item.path === "/explorer/abi"
+                            ? location.pathname.startsWith("/explorer/abi")
+                            : item.path === location.pathname
 
                     return (
                       <button
