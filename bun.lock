@@ -18,7 +18,7 @@
         "@monaco-editor/react": "^4.7.0",
         "@ton/core": "0.63.1",
         "@ton/crypto": "^3.3.0",
-        "@ton/retracer-core": "0.10.0",
+        "@ton/retracer-core": "0.11.0",
         "@ton/tasm": "^0.6.1",
         "@ton/tolk-abi-to-typescript": "^0.5.0",
         "buffer": "^6.0.3",
@@ -56,7 +56,7 @@
         "@scalar/api-reference-react": "^0.9.41",
         "@ton/core": "0.63.1",
         "@ton/crypto": "^3.3.0",
-        "@ton/retracer-core": "0.10.0",
+        "@ton/retracer-core": "0.11.0",
         "@ton/tasm": "^0.6.1",
         "@ton/tolk-abi-to-typescript": "^0.5.0",
         "@ton/walletkit": "0.0.9",
@@ -578,13 +578,11 @@
 
     "@ton/crypto-primitives": ["@ton/crypto-primitives@2.1.0", "", { "dependencies": { "jssha": "3.2.0" } }, "sha512-PQesoyPgqyI6vzYtCXw4/ZzevePc4VGcJtFwf08v10OevVJHVfW238KBdpj1kEDQkxWLeuNHEpTECNFKnP6tow=="],
 
-    "@ton/retracer-core": ["@ton/retracer-core@0.10.0", "", { "dependencies": { "@ton/core": "^0.63.1", "@ton/sandbox": "^0.43.0" } }, "sha512-u2LEoou+jpKI/Mz5qPWuK6gRp4Nejd4ceTpLZ41yoC4bUNVxJj+Vn5mA2DuRCNTV3hPtPCupXaQ30u4mhvG1sg=="],
+    "@ton/retracer-core": ["@ton/retracer-core@0.11.0", "", { "dependencies": { "@ton/core": "^0.63.1", "@ton/sandbox": "^0.44.0", "@ton/tasm": "^0.6.1" } }, "sha512-V9HQ4cq3bSd7ZP1Y7U9hUYEr1670J92MbeIJ0hwHljigHKOF0eWZq7FfUrTdz+YaxMrj5IA0tAFgfiKPGhn3Zw=="],
 
-    "@ton/sandbox": ["@ton/sandbox@0.43.0", "", { "dependencies": { "chalk": "^4.1.2", "table": "^6.9.0", "ton-assembly": "0.6.1" }, "peerDependencies": { "@ton-community/func-js": ">=0.10.0", "@ton/core": ">=0.61.0", "@ton/crypto": ">=3.3.0", "@ton/test-utils": ">=0.7.0", "jest": "^29.5.0 || ^30.0.5" }, "optionalPeers": ["@ton/test-utils", "jest"] }, "sha512-WiUc/k8VFLq8NNTltOeRJpxssvftCm1gVFT9qXBZUeUyhj+keSQWGk1+4J/hRXe7f8pVeEimAHvF6ECoI/osgQ=="],
+    "@ton/sandbox": ["@ton/sandbox@0.44.0", "", { "dependencies": { "@ton/tasm": "0.6.1", "chalk": "^4.1.2", "table": "^6.9.0" }, "peerDependencies": { "@ton-community/func-js": ">=0.10.0", "@ton/core": ">=0.61.0", "@ton/crypto": ">=3.3.0", "@ton/test-utils": ">=0.7.0", "jest": "^29.5.0 || ^30.0.5" }, "optionalPeers": ["@ton/test-utils", "jest"] }, "sha512-cQr4AaayTe+h7+adlUGZt0TmvGlAYgR5n20QXruo1RvdQqdE5R0fCWJKsG+eaDsNtc8EW69Qg0RmIM94jCp+JA=="],
 
     "@ton/tasm": ["@ton/tasm@0.6.2", "", { "dependencies": { "@tonstudio/parser-runtime": "^0.0.1", "cac": "^6.7.14", "ton-source-map": "^0.2.2" }, "peerDependencies": { "@ton/core": ">=0.61.0" }, "bin": { "tasm": "dist/cli/assembler.js", "tdisasm": "dist/cli/disassembler.js", "tfift": "dist/cli/fift-compiler.js" } }, "sha512-jx0SQN2P3WAj7bBUROJEghG96B3FYN1e9cELp5xVoB+PJh27UxLj948Wr/vxsKvNQLiPbl5KSD2R516/QZECgQ=="],
-
-    "@ton/test-utils": ["@ton/test-utils@0.10.0", "", { "dependencies": { "node-inspect-extracted": "^2.0.0" }, "peerDependencies": { "@jest/globals": "*", "@ton/core": ">=0.49.2", "@types/bun": ">=1.0.0", "chai": "*" }, "optionalPeers": ["@jest/globals", "@types/bun", "chai"] }, "sha512-iQytFCteB60z8YlmGeqbs8Gbnr+ZogbxzBtOFxxPiBTogwQ+d3Ey7ugGUIEcfO5kR4LFCN0i7Q4ljF9nMMvYKw=="],
 
     "@ton/tolk-abi-to-typescript": ["@ton/tolk-abi-to-typescript@0.5.0", "", { "bin": { "tolk-abi-to-typescript": "dist/cli.js" } }, "sha512-/eS8bwMoGBT+S3KJrB/5DXJatoixLKGxe9BQEqzb3TJXnAOPNWyuGvS/WEz6Y8D3cR8XFJjTCvaE5aNwzstoww=="],
 
@@ -745,8 +743,6 @@
     "call-bound": ["call-bound@1.0.4", "", { "dependencies": { "call-bind-apply-helpers": "^1.0.2", "get-intrinsic": "^1.3.0" } }, "sha512-+ys997U96po4Kx/ABpBCqhA9EuxJaQWDQg7295H4hBphv3IZg0boBKuwYpt4YXp6MZ5AmZQnU/tyMTlRpaSejg=="],
 
     "ccount": ["ccount@2.0.1", "", {}, "sha512-eyrF0jiFpY+3drT6383f1qhkbGsLSifNAjA61IUjZjmLCWjItY6LB9ft9YhoDgwfmclB2zhu51Lc7+95b8NRAg=="],
-
-    "chai": ["chai@6.2.2", "", {}, "sha512-NUPRluOfOiTKBKvWPtSD4PhFvWCqOi0BGStNWs57X9js7XGTprSmFoz5F0tWhR4WPjNeR9jXqdC7/UpSJTnlRg=="],
 
     "chain-function": ["chain-function@1.0.1", "", {}, "sha512-SxltgMwL9uCko5/ZCLiyG2B7R9fY4pDZUw7hJ4MhirdjBLosoDqkWABi3XMucddHdLiFJMb7PD2MZifZriuMTg=="],
 
@@ -1236,8 +1232,6 @@
 
     "node-fetch": ["node-fetch@2.7.0", "", { "dependencies": { "whatwg-url": "^5.0.0" }, "peerDependencies": { "encoding": "^0.1.0" }, "optionalPeers": ["encoding"] }, "sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A=="],
 
-    "node-inspect-extracted": ["node-inspect-extracted@2.0.2", "", {}, "sha512-8qm9+tu/GmbA/uWQRs6ad8KstyhH94a0pXpRVGHaJ9wHlJbetCYoCwXbKILaaMcE+wgbgpOpzcCnipkL8vTqxA=="],
-
     "node-stdlib-browser": ["node-stdlib-browser@1.3.1", "", { "dependencies": { "assert": "^2.0.0", "browser-resolve": "^2.0.0", "browserify-zlib": "^0.2.0", "buffer": "^5.7.1", "console-browserify": "^1.1.0", "constants-browserify": "^1.0.0", "create-require": "^1.1.1", "crypto-browserify": "^3.12.1", "domain-browser": "4.22.0", "events": "^3.0.0", "https-browserify": "^1.0.0", "isomorphic-timers-promises": "^1.0.1", "os-browserify": "^0.3.0", "path-browserify": "^1.0.1", "pkg-dir": "^5.0.0", "process": "^0.11.10", "punycode": "^1.4.1", "querystring-es3": "^0.2.1", "readable-stream": "^3.6.0", "stream-browserify": "^3.0.0", "stream-http": "^3.2.0", "string_decoder": "^1.0.0", "timers-browserify": "^2.0.4", "tty-browserify": "0.0.1", "url": "^0.11.4", "util": "^0.12.4", "vm-browserify": "^1.0.1" } }, "sha512-X75ZN8DCLftGM5iKwoYLA3rjnrAEs97MkzvSd4q2746Tgpg8b8XWiBGiBG4ZpgcAqBgtgPHTiAc8ZMCvZuikDw=="],
 
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
@@ -1474,8 +1468,6 @@
 
     "to-buffer": ["to-buffer@1.2.2", "", { "dependencies": { "isarray": "^2.0.5", "safe-buffer": "^5.2.1", "typed-array-buffer": "^1.0.3" } }, "sha512-db0E3UJjcFhpDhAF4tLo03oli3pwl3dbnzXOUIlRKrp+ldk/VUxzpWYZENsw2SZiuBjHAk7DfB0VU7NKdpb6sw=="],
 
-    "ton-assembly": ["@ton/tasm@0.6.2", "", { "dependencies": { "@tonstudio/parser-runtime": "^0.0.1", "cac": "^6.7.14", "ton-source-map": "^0.2.2" }, "peerDependencies": { "@ton/core": ">=0.61.0" }, "bin": { "tasm": "dist/cli/assembler.js", "tdisasm": "dist/cli/disassembler.js", "tfift": "dist/cli/fift-compiler.js" } }, "sha512-jx0SQN2P3WAj7bBUROJEghG96B3FYN1e9cELp5xVoB+PJh27UxLj948Wr/vxsKvNQLiPbl5KSD2R516/QZECgQ=="],
-
     "ton-source-map": ["ton-source-map@0.2.2", "", {}, "sha512-T9as2Cmv5aqFbELd0ZxIyY3NRPGxf3ltpVN8rm+uIXMMDlNaGW3Wf6jFcaJYwkRNB2eR52PhNbt5tI5lwgL1Cg=="],
 
     "tr46": ["tr46@0.0.3", "", {}, "sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw=="],
@@ -1609,6 +1601,8 @@
     "@scure/bip39/@noble/hashes": ["@noble/hashes@2.2.0", "", {}, "sha512-IYqDGiTXab6FniAgnSdZwgWbomxpy9FtYvLKs7wCUs2a8RkITG+DFGO1DM9cr+E3/RgADRpFjrKVaJ1z6sjtEg=="],
 
     "@ston-fi/omniston-sdk/type-fest": ["type-fest@5.0.1", "", { "dependencies": { "tagged-tag": "^1.0.0" } }, "sha512-9MpwAI52m8H6ssA542UxSLnSiSD2dsC3/L85g6hVubLSXd82wdI80eZwTWhdOfN67NlA+D+oipAs1MlcTcu3KA=="],
+
+    "@ton/sandbox/@ton/tasm": ["@ton/tasm@0.6.1", "", { "dependencies": { "@tonstudio/parser-runtime": "^0.0.1", "cac": "^6.7.14", "ton-source-map": "^0.2.2" }, "peerDependencies": { "@ton/core": ">=0.61.0" }, "bin": { "tasm": "dist/cli/assembler.js", "tfift": "dist/cli/fift-compiler.js", "tdisasm": "dist/cli/disassembler.js" } }, "sha512-0W+zs1uOsVOBKPOZzHPhpky3gTiD79GpRu+VIksIaY2ADIqQI7xuVJPTACT8Ej4R9kX1pA4jeLScR63vQ/in0g=="],
 
     "asn1.js/bn.js": ["bn.js@4.12.3", "", {}, "sha512-fGTi3gxV/23FTYdAoUtLYp6qySe2KE3teyZitipKNRuVYcBkoP/bB3guXN/XVKUe9mxCHXnc9C4ocyz8OmgN0g=="],
 
