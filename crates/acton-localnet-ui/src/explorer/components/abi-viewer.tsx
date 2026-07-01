@@ -969,6 +969,7 @@ function normalizeDynamicArg(ctx: DynamicCtx, tyIdx: number, value: unknown): un
       return value
     }
     case "nullable": {
+      // biome-ignore lint/suspicious/noDoubleEquals: json-check
       return value == undefined ? undefined : normalizeDynamicArg(ctx, ty.inner_ty_idx, value)
     }
     case "arrayOf":
@@ -1197,6 +1198,7 @@ function decodedDisplayValue(value: unknown): unknown {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return value
   }
+  // biome-ignore lint/suspicious/noDoubleEquals: json-check
   if (value == undefined) return undefined
   if (value instanceof Address) {
     return value.toString()
@@ -1244,6 +1246,7 @@ function isCellLike(value: unknown): value is CellLike {
 
 function isPlainDecodedValue(value: unknown): boolean {
   return (
+    // biome-ignore lint/suspicious/noDoubleEquals: json-check
     value == undefined ||
     typeof value === "string" ||
     typeof value === "number" ||
@@ -1308,6 +1311,7 @@ function formatDecodedTolkNode(
 }
 
 function formatDecodedTolkScalar(value: unknown): string {
+  // biome-ignore lint/suspicious/noDoubleEquals: json-check
   if (value == undefined) return "null"
   if (typeof value === "number" || typeof value === "boolean") return String(value)
   if (typeof value === "string") {

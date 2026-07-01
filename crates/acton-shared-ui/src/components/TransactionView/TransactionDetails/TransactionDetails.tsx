@@ -193,6 +193,7 @@ export function TransactionDetails({
       : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
+    // biome-ignore lint/suspicious/noDoubleEquals: json-check
     inMessage != undefined &&
     (() => {
       const body = inMessage.body.asSlice()
