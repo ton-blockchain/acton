@@ -99,6 +99,7 @@
         "useTopLevelRegex": "off"
       },
       "style": {
+        "preset": "all",
         "noContinue": "off",
         "noDefaultExport": "off",
         "noDescendingSpecificity": "off",
@@ -115,7 +116,6 @@
         "noParameterProperties": "off",
         "noProcessEnv": "off",
         "noTernary": "off",
-        "preset": "all",
         "useBlockStatements": "off",
         "useComponentExportOnlyModules": "off",
         "useConsistentArrowReturn": "off",
