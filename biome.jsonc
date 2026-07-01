@@ -117,7 +117,6 @@
         "noTernary": "off",
         "preset": "all",
         "useBlockStatements": "off",
-        "useCollapsedElseIf": "off",
         "useComponentExportOnlyModules": "off",
         "useConsistentArrowReturn": "off",
         "useConsistentCurlyBraces": "off",

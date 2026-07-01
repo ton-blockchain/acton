@@ -557,9 +557,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             setTraceActions(trace.actions ?? [])
             setTraceActionMetadata(data.metadata)
           }
-        } else {
-          if (isActive) setError("Transaction not found or has no trace yet.")
-        }
+        } else if (isActive) setError("Transaction not found or has no trace yet.")
       } catch (error) {
         console.error("Failed to fetch trace:", error)
         if (!isActive) return
