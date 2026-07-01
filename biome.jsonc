@@ -144,7 +144,6 @@
         "noConsole": "off",
         "noDoubleEquals": "off",
         "noDuplicateProperties": "off",
-        "noEmptyBlock": "off",
         "noEmptyBlockStatements": "off",
         "noImportCycles": "off",
         "noLeakedRender": "off",
