@@ -36,8 +36,6 @@
         "preset": "all",
         "useSortedAttributes": "off",
         "useSortedKeys": "off",
-        "organizeImports": "off",
-        "useSortedPackageJson": "off",
         "useSortedInterfaceMembers": "off",
         "useSortedProperties": "off",
         "useSortedEnumMembers": "off"

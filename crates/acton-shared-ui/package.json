@@ -17,14 +17,14 @@
   },
   "dependencies": {
     "@ton/core": "0.63.1",
+    "@ton/tasm": "^0.6.1",
+    "@ton/tolk-abi-to-typescript": "^0.5.0",
     "buffer": "^6.0.3",
     "clsx": "^2.1.1",
-    "@ton/tolk-abi-to-typescript": "^0.5.0",
     "lucide-react": "^0.474.0",
     "react-d3-tree": "^3.6.6",
     "react-icons": "^5.5.0",
-    "shiki": "^3.22.0",
-    "@ton/tasm": "^0.6.1"
+    "shiki": "^3.22.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",
