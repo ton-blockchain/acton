@@ -1,5 +1,5 @@
-import {useEffect, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
+import {type RefObject, useEffect} from "react"
 
 interface UseImplicitRetInlayProviderOptions {
   readonly monaco: typeof monacoTypes | null

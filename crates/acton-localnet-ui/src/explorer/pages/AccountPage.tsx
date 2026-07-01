@@ -1,14 +1,14 @@
 import {Check, Copy, X} from "lucide-react"
-import {useLocation, useNavigate, useParams} from "react-router-dom"
-import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
+import {useEffect, useMemo, useRef, useState} from "react"
+import {useLocation, useNavigate, useParams} from "react-router-dom"
 
 import type {TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {
-  AddressInformation,
   AccountStatesResponse,
   AccountStateTokenInfo,
+  AddressInformation,
   JettonMaster,
   JettonMasterMetadata,
   JettonWallet,
@@ -20,22 +20,22 @@ import type {
   V3TransactionListItem,
   VerificationSourceResponse,
 } from "../api/types"
+import {AccountDetails} from "../components/AccountDetails"
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {AccountDetails} from "../components/AccountDetails"
 import {
+  getImageSources,
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
+  replaceBrokenImageWithFallback,
   TOKEN_IMAGE_SOURCE_KEYS,
   TOKEN_PLACEHOLDER_IMAGE,
-  getImageSources,
-  replaceBrokenImageWithFallback,
 } from "../components/imageFallbacks"
 import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useNetworkInfo} from "../hooks/useNetworkInfo"
-import {useOpenExplorerPath, type ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
+import {type ExplorerNavigationClickEvent, useOpenExplorerPath} from "../hooks/useOpenExplorerPath"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import styles from "./AccountPage.module.css"
@@ -1465,7 +1465,7 @@ function renderJson(json: string): ReactNode[] {
 }
 
 function getAccountTokenInfo(
-  stateV3: AccountStatesResponse | void,
+  stateV3: AccountStatesResponse | undefined,
 ): readonly AccountStateTokenInfo[] {
   if (!stateV3) return []
   const currentAccount = stateV3.accounts[0]

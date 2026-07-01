@@ -1,9 +1,7 @@
-import React from "react"
-
-import {type StackElement} from "@ton/tasm/dist/trace"
+import {type ContractData, DataBlock} from "@acton/shared-ui"
 import {Address, Cell} from "@ton/core"
-
-import {DataBlock, type ContractData} from "@acton/shared-ui"
+import {type StackElement} from "@ton/tasm/dist/trace"
+import React from "react"
 
 import AddressDetails from "../AddressDetails"
 import CellTreeView from "../CellTreeView/CellTreeView"

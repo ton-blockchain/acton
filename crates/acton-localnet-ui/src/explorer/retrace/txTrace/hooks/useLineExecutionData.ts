@@ -1,5 +1,5 @@
-import {useMemo} from "react"
 import type {TraceInfo} from "@ton/tasm/dist/trace"
+import {useMemo} from "react"
 
 export type LinesExecutionData = Record<number, LineExecutionData>
 

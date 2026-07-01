@@ -1,7 +1,7 @@
-import {PanelLeftOpen} from "lucide-react"
 import type {ThemeMode} from "@acton/shared-ui"
-import {useCallback, useEffect, useRef, useState} from "react"
+import {PanelLeftOpen} from "lucide-react"
 import type {FC, ReactNode} from "react"
+import {useCallback, useEffect, useRef, useState} from "react"
 
 import type {TonClient} from "../explorer/api/client"
 

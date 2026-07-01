@@ -1,15 +1,15 @@
 import {Search} from "lucide-react"
-import {useMemo, useState} from "react"
 import type {FC} from "react"
+import {useMemo, useState} from "react"
 
 import type {NftItem} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {AddressLabel} from "./AddressLabel"
 import {
-  NFT_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
+  NFT_IMAGE_SOURCE_KEYS,
   replaceBrokenImageWithFallback,
 } from "./imageFallbacks"
 import styles from "./Nfts.module.css"

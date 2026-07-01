@@ -1,8 +1,8 @@
-import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
 import {Button, Card, CardContent, CardHeader, CardTitle, Input, useToast} from "@acton/shared-ui"
-import {Link, useNavigate} from "react-router-dom"
-import {useCallback, useEffect, useMemo, useState} from "react"
+import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
 import type {FC, FormEvent} from "react"
+import {useCallback, useEffect, useMemo, useState} from "react"
+import {Link, useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../../explorer/api/client"
 import {addressKey} from "../../explorer/api/compilerAbi"
@@ -13,8 +13,8 @@ import type {
 } from "../../explorer/api/types"
 import {
   DeveloperAccountList,
-  DeveloperAccountListSkeleton,
   type DeveloperAccountListItem,
+  DeveloperAccountListSkeleton,
 } from "../../explorer/components/DeveloperAccountList"
 import {
   DeveloperTransactionList,
@@ -24,9 +24,8 @@ import {formatDuration} from "../../explorer/components/utils"
 import {useAddressBook} from "../../explorer/hooks/useAddressBook"
 import {useOpenExplorerPath} from "../../explorer/hooks/useOpenExplorerPath"
 import {useTransactionMessageNames} from "../../explorer/hooks/useTransactionMessageNames"
-import {collectRecentAccounts} from "../dashboardUtils"
-
 import styles from "../DashboardPage.module.css"
+import {collectRecentAccounts} from "../dashboardUtils"
 
 const HOME_RECENT_TRANSACTIONS_REFRESH_MS = 2000
 const HOME_NODE_INFO_REFRESH_MS = 1000

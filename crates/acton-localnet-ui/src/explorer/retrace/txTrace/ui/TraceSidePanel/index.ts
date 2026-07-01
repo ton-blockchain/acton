@@ -1,2 +1,2 @@
-export {default} from "./TraceSidePanel"
 export type {TraceSidePanelProps} from "./TraceSidePanel"
+export {default} from "./TraceSidePanel"

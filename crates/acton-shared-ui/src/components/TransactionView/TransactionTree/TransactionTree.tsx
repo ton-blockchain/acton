@@ -9,7 +9,7 @@ import {
   Tree,
   type TreeLinkDatum,
 } from "react-d3-tree"
-
+import {type ContractVerifiedSource, fmt} from "@/index"
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
   ContractData,
@@ -17,7 +17,6 @@ import type {
   TransactionBlockRef,
   TransactionInfo,
 } from "@/types/transaction"
-import {fmt, type ContractVerifiedSource} from "@/index"
 import {
   getTransactionActionPhase,
   getTransactionComputePhase,
@@ -30,8 +29,8 @@ import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 
 import {SmartTooltip} from "./SmartTooltip"
 import {StorageDiffView} from "./StorageDiffView"
-import styles from "./TransactionTree.module.css"
 import {buildStorageDiff, type StorageDiffNode} from "./storageDiff"
+import styles from "./TransactionTree.module.css"
 import {useTooltip} from "./useTooltip"
 
 interface EdgeTransactionTooltipData {

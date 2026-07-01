@@ -1,5 +1,5 @@
-import {useCallback, useRef} from "react"
 import type * as monacoTypes from "monaco-editor"
+import {useCallback, useRef} from "react"
 
 import type {LinesExecutionData} from "../../../txTrace/hooks"
 

@@ -1,7 +1,7 @@
-import {useMemo} from "react"
 import type {FC, ReactNode} from "react"
+import {useMemo} from "react"
 
-import {ExplorerRoutesContext, createExplorerRoutes} from "./explorerRoutesContext"
+import {createExplorerRoutes, ExplorerRoutesContext} from "./explorerRoutesContext"
 
 interface ExplorerRoutesProviderProps {
   readonly basePath?: string

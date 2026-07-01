@@ -1,8 +1,7 @@
 import * as React from "react"
 import {createPortal} from "react-dom"
-
-import {ToastContext, type ToastContextValue, type ToastOptions} from "./useToast"
 import styles from "./ToastProvider.module.css"
+import {ToastContext, type ToastContextValue, type ToastOptions} from "./useToast"
 
 interface ToastRecord extends ToastOptions {
   readonly id: string

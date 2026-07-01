@@ -1,9 +1,8 @@
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-
-import type {ExtendedContractABI} from "./compilerAbi"
-import {addressKey} from "./compilerAbi"
 import type {ExplorerMetadataRegistry} from "../metadata/types"
 import type {TonClient} from "./client"
+import type {ExtendedContractABI} from "./compilerAbi"
+import {addressKey} from "./compilerAbi"
 
 export interface ResolveCompilerAbisOptions {
   readonly client: TonClient

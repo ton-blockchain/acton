@@ -1,5 +1,5 @@
-import path from "node:path"
 import {createRequire} from "node:module"
+import path from "node:path"
 
 import react from "@vitejs/plugin-react"
 import {defineConfig} from "vite"

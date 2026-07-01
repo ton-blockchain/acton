@@ -1,7 +1,7 @@
+import flamegraph, {type FlameGraphDatum, tooltip as flamegraphTooltip} from "d3-flame-graph"
+import {select} from "d3-selection"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
-import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
-import {select} from "d3-selection"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 
 import styles from "./GasProfile.module.css"

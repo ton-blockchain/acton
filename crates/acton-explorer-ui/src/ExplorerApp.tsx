@@ -1,36 +1,35 @@
+import type {ThemeMode} from "@acton/shared-ui"
 import {ThemeSwitch, ToastProvider, useToast} from "@acton/shared-ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
-import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
+import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import {BrowserRouter, Link, Navigate, Route, Routes, useLocation} from "react-router-dom"
-
 import {TonClient} from "../../acton-localnet-ui/src/explorer/api/client"
 import {getBundledCompilerAbis} from "../../acton-localnet-ui/src/explorer/api/compilerAbiCatalog"
+import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
+import {StaticNetworkInfoProvider} from "../../acton-localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
 import {AddressBookProvider} from "../../acton-localnet-ui/src/explorer/hooks/useAddressBook"
 import {ExplorerRoutesProvider} from "../../acton-localnet-ui/src/explorer/hooks/useExplorerRoutes"
-import {StaticNetworkInfoProvider} from "../../acton-localnet-ui/src/explorer/hooks/StaticNetworkInfoProvider"
-import {BrowserMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/browserRegistry"
-import {BundledAbiRegistry} from "../../acton-localnet-ui/src/explorer/metadata/bundledAbiRegistry"
-import {CompositeMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/compositeRegistry"
-import {MetadataRegistryProvider} from "../../acton-localnet-ui/src/explorer/metadata/MetadataRegistryProvider"
-import {VerifierMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/verifierRegistry"
 import type {
   CustomExplorerNetworkId,
   ExplorerApiConfig,
   ExplorerNetworkInfo,
 } from "../../acton-localnet-ui/src/explorer/hooks/useNetworkInfo"
-import {BlockDetailsPage, BlocksPage} from "../../acton-localnet-ui/src/explorer/pages/BlocksPage"
-import {AccountPage} from "../../acton-localnet-ui/src/explorer/pages/AccountPage"
+import {BrowserMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/browserRegistry"
+import {BundledAbiRegistry} from "../../acton-localnet-ui/src/explorer/metadata/bundledAbiRegistry"
+import {CompositeMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/compositeRegistry"
+import {MetadataRegistryProvider} from "../../acton-localnet-ui/src/explorer/metadata/MetadataRegistryProvider"
+import {VerifierMetadataRegistry} from "../../acton-localnet-ui/src/explorer/metadata/verifierRegistry"
 import {
   AbiCatalogPage,
   AbiDetailsPage,
 } from "../../acton-localnet-ui/src/explorer/pages/AbiCatalogPage"
-import {SourceCatalogPage} from "../../acton-localnet-ui/src/explorer/pages/SourceCatalogPage"
-import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
+import {AccountPage} from "../../acton-localnet-ui/src/explorer/pages/AccountPage"
+import {BlockDetailsPage, BlocksPage} from "../../acton-localnet-ui/src/explorer/pages/BlocksPage"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
 import {FavoriteAccountsPage} from "../../acton-localnet-ui/src/explorer/pages/FavoriteAccountsPage"
+import {SourceCatalogPage} from "../../acton-localnet-ui/src/explorer/pages/SourceCatalogPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
-import type {ThemeMode} from "@acton/shared-ui"
 import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"

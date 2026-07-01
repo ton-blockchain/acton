@@ -1,7 +1,7 @@
+import {clsx} from "clsx"
 import {Check, ChevronDown, ChevronRight, Copy} from "lucide-react"
 import type React from "react"
 import {useEffect, useState} from "react"
-import {clsx} from "clsx"
 
 import styles from "./DataBlock.module.css"
 

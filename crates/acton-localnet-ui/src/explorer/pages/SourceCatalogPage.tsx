@@ -1,7 +1,7 @@
-import {useCallback, useEffect, useMemo, useState} from "react"
-import type {FC, FormEvent, JSX} from "react"
 import {CopyValueButton, useToast} from "@acton/shared-ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
+import type {FC, FormEvent, JSX} from "react"
+import {useCallback, useEffect, useMemo, useState} from "react"
 
 import type {
   SourceBundle,
@@ -12,8 +12,8 @@ import type {
 import {Breadcrumbs} from "../components/Breadcrumbs"
 import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
-import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {normalizeCodeHash} from "../metadata/codeHash"
+import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {sourceRegistrationFromResponse} from "../metadata/sourceRegistration"
 import type {RegisteredSource} from "../metadata/types"
 

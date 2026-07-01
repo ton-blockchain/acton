@@ -1,12 +1,12 @@
-import {useMemo} from "react"
 import type {FC, ReactNode} from "react"
+import {useMemo} from "react"
 
 import {
+  type ExplorerNetworkInfo,
   MAINNET_EXPLORER_NETWORK,
   NetworkInfoContext,
-  TESTNET_EXPLORER_NETWORK,
-  type ExplorerNetworkInfo,
   type NetworkInfoContextValue,
+  TESTNET_EXPLORER_NETWORK,
 } from "./useNetworkInfo"
 
 interface StaticNetworkInfoProviderProps {

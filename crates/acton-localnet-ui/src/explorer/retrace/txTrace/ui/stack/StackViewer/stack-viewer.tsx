@@ -1,9 +1,8 @@
-import React, {type JSX, memo, useState} from "react"
-import {type StackElement} from "@ton/tasm/dist/trace"
+import {type ContractData, CopyValueButton} from "@acton/shared-ui"
 import {Cell} from "@ton/core"
-import {motion, AnimatePresence, type Variants} from "framer-motion"
-
-import {CopyValueButton, type ContractData} from "@acton/shared-ui"
+import {type StackElement} from "@ton/tasm/dist/trace"
+import {AnimatePresence, motion, type Variants} from "framer-motion"
+import React, {type JSX, memo, useState} from "react"
 
 import {formatAddress} from "../../../../../components/utils"
 import {useAddressFormat} from "../../../../../hooks/useNetworkInfo"

@@ -1,32 +1,30 @@
 import type {OutAction} from "@ton/core"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
-
+import {DataBlock, fmt} from "@/index"
 import type {
   BackendExecutorAction,
   BackendExecutorActionFailureReason,
   SourceLocation,
 } from "@/types"
 import type {ContractData} from "@/types/transaction"
-import {fmt, DataBlock} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
 import {parseReserveMode} from "@/utils/transaction"
-
-import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ChangeLibraryModeViewer} from "../ChangeLibraryModeViewer/ChangeLibraryModeViewer"
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
+import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
-import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 import {
   formatCellBocHex,
   formatMessageRelaxedBocHex,
   formatOutActionBocHex,
   formatStateInitBocHex,
 } from "../rawBoc"
+import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 
 import styles from "./ActionsSummary.module.css"
 

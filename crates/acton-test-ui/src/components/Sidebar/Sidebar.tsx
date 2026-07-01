@@ -1,3 +1,4 @@
+import {AppIcon, type TestReport, TestStatus, type ThemeMode, ThemeSwitch} from "@acton/shared-ui"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {
@@ -9,7 +10,6 @@ import {
   FiMinus,
   FiX,
 } from "react-icons/fi"
-import {AppIcon, type TestReport, TestStatus, ThemeSwitch, type ThemeMode} from "@acton/shared-ui"
 
 import {Summary} from "../Summary/Summary"
 

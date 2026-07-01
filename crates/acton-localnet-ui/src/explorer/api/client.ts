@@ -2,11 +2,11 @@ import {Cell} from "@ton/core"
 
 import type {ExtendedContractABI} from "./compilerAbi"
 import type {
-  AddressInformation,
-  AccountStateTokenInfo,
   AccountStatesResponse,
-  ApiResponse,
+  AccountStateTokenInfo,
+  AddressInformation,
   ApiCallLogResponse,
+  ApiResponse,
   BuildSourceTraceRequest,
   JettonMaster,
   JettonMasterMetadata,
@@ -15,9 +15,9 @@ import type {
   LocalnetNodeInfo,
   LocalnetTimeInfo,
   NftItem,
+  SourceTraceResponse,
   StartupWallet,
   StreamingTransactionsEvent,
-  SourceTraceResponse,
   V3ActionsResponse,
   V3BlocksResponse,
   V3RunGetMethodResponse,

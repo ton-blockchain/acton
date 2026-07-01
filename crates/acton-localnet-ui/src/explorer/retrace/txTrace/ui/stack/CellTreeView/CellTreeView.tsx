@@ -1,5 +1,5 @@
-import React, {useState, useMemo} from "react"
 import {Cell} from "@ton/core"
+import React, {useMemo, useState} from "react"
 
 import styles from "./CellTreeView.module.css"
 

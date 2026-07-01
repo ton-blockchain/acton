@@ -1,5 +1,31 @@
 import path from "node:path"
-
+import {
+  applyParsedBodies,
+  buildValueFlowItems,
+  CodeSnippet,
+  ContractChip,
+  ContractData,
+  DataBlock,
+  type FailedMessage,
+  fmt,
+  getTransactionOpcode,
+  processTransactions,
+  resolveAbiOpcodeName,
+  type SourceLocation,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  type TestExecutionLogs,
+  type TestReport,
+  TestStatus,
+  type Trace,
+  type TransactionInfo,
+  TransactionTree,
+  ValueFlowTable,
+} from "@acton/shared-ui"
 import {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
@@ -14,36 +40,6 @@ import {
 } from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
-
-import {
-  type TestReport,
-  type TestExecutionLogs,
-  type SourceLocation,
-  TestStatus,
-  type Trace,
-  ContractData,
-  type FailedMessage,
-  type TransactionInfo,
-} from "@acton/shared-ui"
-import {
-  applyParsedBodies,
-  buildValueFlowItems,
-  fmt,
-  getTransactionOpcode,
-  processTransactions,
-  CodeSnippet,
-  DataBlock,
-  TransactionTree,
-  ContractChip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-  resolveAbiOpcodeName,
-  ValueFlowTable,
-} from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
 import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"

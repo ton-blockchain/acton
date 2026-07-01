@@ -1,7 +1,13 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
-
+import {
+  ContractSourcePanel,
+  type ContractVerifiedSource,
+  DataBlock,
+  fmt,
+  InfoPopover,
+} from "@/index"
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
   ContractData,
@@ -9,13 +15,6 @@ import type {
   TransactionBlockRef,
   TransactionInfo,
 } from "@/types/transaction"
-import {
-  ContractSourcePanel,
-  DataBlock,
-  InfoPopover,
-  fmt,
-  type ContractVerifiedSource,
-} from "@/index"
 import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
   computeSendMode,
@@ -26,16 +25,12 @@ import {
   getTransactionTriggerLabel,
   resolveTransactionOpcodeName,
 } from "@/utils/transaction"
-
-import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
+import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
-import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
-import {StorageDiffView} from "../TransactionTree/StorageDiffView"
-import {buildStorageDiff} from "../TransactionTree/storageDiff"
 import {
   formatCellBocHex,
   formatMessageBocHex,
@@ -43,6 +38,9 @@ import {
   formatShardAccountDataBocHex,
   formatStateInitBocHex,
 } from "../rawBoc"
+import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
+import {StorageDiffView} from "../TransactionTree/StorageDiffView"
+import {buildStorageDiff} from "../TransactionTree/storageDiff"
 
 import {ActionsSummary} from "./ActionsSummary"
 import styles from "./TransactionDetails.module.css"
@@ -195,6 +193,7 @@ export function TransactionDetails({
       : targetContract
   const sourceLabel = getTransactionSourceLabel(tx.transaction)
   const hasMessageBody =
+    // biome-ignore lint/suspicious/noDoubleEquals: json-check
     inMessage != undefined &&
     (() => {
       const body = inMessage.body.asSlice()

@@ -1,7 +1,6 @@
+import {toRawAddress} from "../components/utils"
 import type {TonClient} from "./client"
 import type {JettonMasterMetadata, JettonWallet} from "./types"
-
-import {toRawAddress} from "../components/utils"
 
 export async function loadJettonWalletsWithMasters(
   client: TonClient,

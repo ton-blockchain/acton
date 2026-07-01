@@ -1,14 +1,14 @@
-import type {FC} from "react"
 import {formatUnits} from "@ton/walletkit"
+import type {FC} from "react"
 
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
 
 import {
-  TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
+  TOKEN_IMAGE_SOURCE_KEYS,
 } from "./imageFallbacks"
 import styles from "./WalletAccountSummary.module.css"
 

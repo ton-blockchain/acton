@@ -1,17 +1,16 @@
-import {useEffect, useState} from "react"
 import type {FC} from "react"
+import {useEffect, useState} from "react"
 
 import type {TonClient} from "../api/client"
 import type {JettonMasterMetadata, JettonWallet} from "../api/types"
 import type {ExplorerNavigationClickEvent} from "../hooks/useOpenExplorerPath"
-
-import styles from "./Tokens.module.css"
 import {
-  TOKEN_IMAGE_SOURCE_KEYS,
   getImageSources,
   getPrimaryImageSource,
   replaceBrokenImageWithFallback,
+  TOKEN_IMAGE_SOURCE_KEYS,
 } from "./imageFallbacks"
+import styles from "./Tokens.module.css"
 import {toRawAddress} from "./utils"
 
 interface TokensProps {
@@ -78,7 +77,7 @@ export const Tokens: FC<TokensProps> = ({wallets, client, onAddressClick}) => {
           const decimals = Number(master?.jetton_content?.decimals || 9)
           const rawBalance = Number(w.balance)
           const rawSupply = Number(master?.total_supply || "0")
-          const balance = rawBalance / Math.pow(10, decimals)
+          const balance = rawBalance / 10 ** decimals
           const supplyShare = rawSupply > 0 ? rawBalance / rawSupply : undefined
           const supplyShareLabel =
             supplyShare === undefined

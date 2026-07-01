@@ -1,15 +1,14 @@
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@acton/shared-ui"
-import {useNavigate} from "react-router-dom"
-import {useEffect, useState} from "react"
 import type {FC, JSX} from "react"
+import {useEffect, useState} from "react"
+import {useNavigate} from "react-router-dom"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {NftItem} from "../../explorer/api/types"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
 import {NFT_PLACEHOLDER_IMAGE} from "../constants"
-import {contentString} from "../dashboardUtils"
-
 import styles from "../DashboardPage.module.css"
+import {contentString} from "../dashboardUtils"
 
 interface NftsPageProps {
   readonly client: TonClient

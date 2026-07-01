@@ -1,5 +1,5 @@
-import {useMemo} from "react"
 import type {FC} from "react"
+import {useMemo} from "react"
 
 import {formatAddress, normalizeAddress, parseAddress} from "../explorer/components/utils"
 import {useAddressName} from "../explorer/hooks/useAddressBook"

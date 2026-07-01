@@ -1,12 +1,11 @@
 import {Search} from "lucide-react"
-import {createPortal} from "react-dom"
-import {Suspense, lazy, useCallback, useEffect, useRef, useState} from "react"
 import type {CSSProperties, FC} from "react"
+import {lazy, Suspense, useCallback, useEffect, useRef, useState} from "react"
+import {createPortal} from "react-dom"
 
 import type {TonClient} from "../explorer/api/client"
-
-import {isTextEntryTarget} from "./dashboardUtils"
 import styles from "./DashboardPage.module.css"
+import {isTextEntryTarget} from "./dashboardUtils"
 
 interface DashboardSearchProps {
   readonly client: TonClient

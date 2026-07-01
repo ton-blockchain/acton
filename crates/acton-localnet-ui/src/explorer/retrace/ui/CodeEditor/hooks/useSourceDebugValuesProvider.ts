@@ -1,6 +1,6 @@
-import {useEffect, useMemo, type MutableRefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor, type IMarkdownString, Position} from "monaco-editor"
+import {type MutableRefObject, useEffect, useMemo} from "react"
 
 export interface SourceDebugVariableValue {
   readonly name: string

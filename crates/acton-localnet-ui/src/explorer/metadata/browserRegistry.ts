@@ -1,7 +1,6 @@
-import {openDB, type DBSchema, type IDBPDatabase} from "idb"
-
-import {addressKey} from "../api/compilerAbi"
+import {type DBSchema, type IDBPDatabase, openDB} from "idb"
 import type {ExtendedContractABI} from "../api/compilerAbi"
+import {addressKey} from "../api/compilerAbi"
 import type {VerificationSourceResponse} from "../api/types"
 import {normalizeCodeHash} from "./codeHash"
 import {unverifiedSourceResponse} from "./nullRegistry"

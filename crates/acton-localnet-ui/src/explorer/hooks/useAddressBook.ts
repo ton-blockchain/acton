@@ -1,4 +1,5 @@
 import {Address} from "@ton/core"
+import type {FC, ReactNode} from "react"
 import {
   createContext,
   createElement,
@@ -9,7 +10,6 @@ import {
   useRef,
   useState,
 } from "react"
-import type {FC, ReactNode} from "react"
 
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 

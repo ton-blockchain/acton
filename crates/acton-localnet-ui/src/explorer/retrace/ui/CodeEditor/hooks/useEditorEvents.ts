@@ -1,6 +1,6 @@
-import {useCallback, useEffect, useState, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
 import {editor} from "monaco-editor"
+import {type RefObject, useCallback, useEffect, useState} from "react"
 
 import type {LinesExecutionData} from "../../../txTrace/hooks"
 
