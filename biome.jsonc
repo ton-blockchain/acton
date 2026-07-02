@@ -143,7 +143,6 @@
         "noEmptyBlockStatements": "off",
         "noImportCycles": "off",
         "noLeakedRender": "off",
-        "noPrototypeBuiltins": "off",
         "noReactForwardRef": "off",
         "noReactSpecificProps": "off",
         "noShadow": "off",

@@ -734,7 +734,7 @@ const toParsedValue = (value: unknown, typeContext?: ParsedValueTypeContext): Pa
     const typeName = typeof objectValue.$ === "string" ? objectValue.$ : undefined
     if (
       typeName === "void" &&
-      Object.prototype.hasOwnProperty.call(objectValue, "value") &&
+      Object.hasOwn(objectValue, "value") &&
       objectValue.value === undefined
     ) {
       return {kind: "void"}

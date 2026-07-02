@@ -1161,7 +1161,7 @@ function assertV3StackEntry(value: unknown): V3RunGetMethodStackEntry {
   }
   return {
     type: value.type,
-    value: Object.prototype.hasOwnProperty.call(value, "value") ? value.value : undefined,
+    value: Object.hasOwn(value, "value") ? value.value : undefined,
   }
 }
 
