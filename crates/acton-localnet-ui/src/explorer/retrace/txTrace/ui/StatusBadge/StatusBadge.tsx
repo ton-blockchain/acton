@@ -1,4 +1,4 @@
-import React from "react"
+import type React from "react"
 
 import {EXIT_CODE_DESCRIPTIONS, Tooltip} from "@acton/shared-ui"
 

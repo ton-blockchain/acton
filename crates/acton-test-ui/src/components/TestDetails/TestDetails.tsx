@@ -21,7 +21,7 @@ import {
   type SourceLocation,
   TestStatus,
   type Trace,
-  ContractData,
+  type ContractData,
   type FailedMessage,
   type TransactionInfo,
 } from "@acton/shared-ui"

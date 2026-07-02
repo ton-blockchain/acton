@@ -1,6 +1,6 @@
 import {useEffect, type RefObject} from "react"
 import type * as monacoTypes from "monaco-editor"
-import {editor, languages, Position} from "monaco-editor"
+import type {editor, languages, Position} from "monaco-editor"
 
 import {instructionSpecification} from "../../../tasm/lib"
 

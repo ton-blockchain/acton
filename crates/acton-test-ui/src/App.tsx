@@ -1,4 +1,4 @@
-import * as React from "react"
+import type * as React from "react"
 import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 

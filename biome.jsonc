@@ -126,7 +126,6 @@
         "useDestructuring": "off",
         "useErrorCause": "off",
         "useExportsLast": "off",
-        "useImportType": "off",
         "useNamingConvention": "off",
         "useSelfClosingElements": "off"
       },

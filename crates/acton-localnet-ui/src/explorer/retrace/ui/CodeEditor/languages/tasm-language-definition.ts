@@ -1,4 +1,4 @@
-import {languages} from "monaco-editor"
+import type {languages} from "monaco-editor"
 
 export const tasmLanguageDefinition: languages.IMonarchLanguage = {
   keywords: ["ref", "embed", "exotic", "library"],

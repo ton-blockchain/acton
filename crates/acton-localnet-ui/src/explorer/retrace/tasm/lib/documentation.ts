@@ -1,4 +1,4 @@
-import {type AsmInstruction} from "./types"
+import type {AsmInstruction} from "./types"
 import type {GasConsumptionEntry} from "./specification"
 
 export function generateAsmDoc(instruction: AsmInstruction): string | null {

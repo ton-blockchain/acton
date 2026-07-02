@@ -1,6 +1,7 @@
-import React, {useMemo} from "react"
+import type React from "react"
+import {useMemo} from "react"
 
-import {Address} from "@ton/core"
+import type {Address} from "@ton/core"
 
 import {ContractChip, type ContractData} from "@acton/shared-ui"
 

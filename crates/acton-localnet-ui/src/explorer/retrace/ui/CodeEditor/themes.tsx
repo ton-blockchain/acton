@@ -1,4 +1,4 @@
-import {editor} from "monaco-editor"
+import type {editor} from "monaco-editor"
 
 export const LIGHT_THEME: editor.IStandaloneThemeData = {
   base: "vs",

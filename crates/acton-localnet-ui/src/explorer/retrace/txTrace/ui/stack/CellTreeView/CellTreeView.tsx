@@ -1,5 +1,6 @@
-import React, {useState, useMemo} from "react"
-import {Cell} from "@ton/core"
+import type React from "react"
+import {useState, useMemo} from "react"
+import type {Cell} from "@ton/core"
 
 import styles from "./CellTreeView.module.css"
 

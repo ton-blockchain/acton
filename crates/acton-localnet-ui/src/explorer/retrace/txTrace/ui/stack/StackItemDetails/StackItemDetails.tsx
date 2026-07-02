@@ -1,6 +1,6 @@
-import React from "react"
+import type React from "react"
 
-import {type StackElement} from "@ton/tasm/dist/trace"
+import type {StackElement} from "@ton/tasm/dist/trace"
 import {Address, Cell} from "@ton/core"
 
 import {DataBlock, type ContractData} from "@acton/shared-ui"

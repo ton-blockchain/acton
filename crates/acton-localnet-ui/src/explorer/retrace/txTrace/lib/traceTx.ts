@@ -2,11 +2,11 @@ import type {RetraceNetworkConfig, TolkSourceMapData, TraceResult} from "@ton/re
 import {retrace, RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK} from "@ton/retracer-core"
 import {compileCellWithMapping, decompileCell} from "@ton/tasm/dist/runtime/instr"
 import {createMappingInfo} from "@ton/tasm/dist/trace/mapping"
-import {type Step, type TraceInfo} from "@ton/tasm/dist/trace"
+import type {Step, TraceInfo} from "@ton/tasm/dist/trace"
 import {createTraceInfoPerTransaction, findInstructionInfo} from "@ton/tasm/dist/trace/trace"
 import {parse, print} from "@ton/tasm/dist/text"
 import * as l from "@ton/tasm/dist/logs"
-import {Cell} from "@ton/core"
+import type {Cell} from "@ton/core"
 
 import type {AssemblyMapping} from "ton-source-map"
 
