@@ -18,10 +18,12 @@
   },
   "dependencies": {
     "@acton/shared-ui": "workspace:*",
-    "@scalar/api-reference-react": "^0.9.41",
     "@monaco-editor/react": "^4.7.0",
+    "@scalar/api-reference-react": "^0.9.41",
     "@ton/core": "0.63.1",
     "@ton/crypto": "^3.3.0",
+    "@ton/retracer-core": "0.11.0",
+    "@ton/tasm": "^0.6.1",
     "@ton/tolk-abi-to-typescript": "^0.5.0",
     "@ton/walletkit": "0.0.9",
     "@types/react-router-dom": "^5.3.3",
@@ -32,13 +34,11 @@
     "monaco-editor": "^0.52.2",
     "qrcode.react": "^4.2.0",
     "react-d3-tree": "^3.6.6",
-    "react-markdown": "^10.1.0",
     "react-icons": "^5.5.0",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.15.0",
     "shiki": "^3.22.0",
-    "@ton/tasm": "^0.6.1",
     "ton-source-map": "^0.2.2",
-    "@ton/retracer-core": "0.11.0",
     "vite-plugin-node-polyfills": "^0.28.0"
   },
   "devDependencies": {
