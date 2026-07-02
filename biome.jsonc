@@ -75,7 +75,6 @@
         "preset": "all",
         "noEmptyPattern": "off",
         "noNodejsModules": "off",
-        "noProcessGlobal": "off",
         "noSolidDestructuredProps": "off",
         "noUndeclaredDependencies": "off",
         "noUnresolvedImports": "off",

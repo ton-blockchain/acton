@@ -4,6 +4,7 @@ import {createRequire} from "node:module"
 import react from "@vitejs/plugin-react"
 import {defineConfig} from "vite"
 import {nodePolyfills} from "vite-plugin-node-polyfills"
+import process from "node:process"
 
 const localnetTarget = process.env.VITE_LOCALNET_PROXY_TARGET || "http://127.0.0.1:3010"
 const require = createRequire(import.meta.url)

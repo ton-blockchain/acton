@@ -7,6 +7,7 @@ import {
   unionStorageTestName,
   type VisualSnapshotOptions,
 } from "./support/acton-test-ui"
+import process from "node:process"
 
 const visualSnapshotsEnabled =
   process.platform === "darwin" && Boolean(process.env.CHECK_UI_SNAPSHOTS)

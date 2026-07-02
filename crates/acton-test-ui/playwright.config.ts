@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import {defineConfig} from "@playwright/test"
+import process from "node:process"
 
 const repositoryRoot = path.resolve(import.meta.dirname, "../..")
 
