@@ -3636,9 +3636,9 @@ dependencies = [
 
 [[package]]
 name = "quick-junit"
-version = "0.5.2"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6ee9342d671fae8d66b3ae9fd7a9714dfd089c04d2a8b1ec0436ef77aee15e5f"
+checksum = "8216516c957e00535b3c91770524c219dd7df90dec439a182547f750dfe41591"
 dependencies = [
  "chrono",
  "indexmap 2.12.0",
@@ -3651,9 +3651,9 @@ dependencies = [
 
 [[package]]
 name = "quick-xml"
-version = "0.38.4"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
+checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
 ]
