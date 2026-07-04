@@ -80,6 +80,13 @@ interface GetTracesOptions {
   readonly includeActions?: boolean
 }
 
+interface AccountHistoryOptions {
+  readonly limit?: number
+  readonly offset?: number
+  readonly startUtime?: number
+  readonly endUtime?: number
+}
+
 type JettonWalletMetadata = Record<
   string,
   {
@@ -294,15 +301,18 @@ export class TonClient {
 
   async getAccountTransactions(
     address: string,
-    limit = 20,
-    offset = 0,
+    options: AccountHistoryOptions = {},
   ): Promise<V3TransactionsResponse> {
+    const limit = options.limit ?? 20
+    const offset = options.offset ?? 0
     const url = this.buildUrl(this.v3BaseUrl, "/transactions")
     url.searchParams.append("account", address)
     url.searchParams.append("limit", limit.toString())
     if (offset > 0) {
       url.searchParams.append("offset", offset.toString())
     }
+    appendOptionalSearchParam(url, "start_utime", options.startUtime)
+    appendOptionalSearchParam(url, "end_utime", options.endUtime)
     url.searchParams.append("sort", "desc")
     return this.request(url, "Failed to fetch account transactions")
   }
@@ -444,13 +454,20 @@ export class TonClient {
     return this.request(url, "Failed to fetch traces")
   }
 
-  async getAccountActions(address: string, limit = 20, offset = 0): Promise<V3ActionsResponse> {
+  async getAccountActions(
+    address: string,
+    options: AccountHistoryOptions = {},
+  ): Promise<V3ActionsResponse> {
+    const limit = options.limit ?? 20
+    const offset = options.offset ?? 0
     const url = this.buildUrl(this.v3BaseUrl, "/actions")
     url.searchParams.append("account", address)
     url.searchParams.append("limit", limit.toString())
     if (offset > 0) {
       url.searchParams.append("offset", offset.toString())
     }
+    appendOptionalSearchParam(url, "start_utime", options.startUtime)
+    appendOptionalSearchParam(url, "end_utime", options.endUtime)
     url.searchParams.append("sort", "desc")
     return this.request(url, "Failed to fetch account actions")
   }

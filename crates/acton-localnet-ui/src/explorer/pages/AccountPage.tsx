@@ -1,6 +1,6 @@
 import {Check, Copy, X} from "lucide-react"
 import {useLocation, useNavigate, useParams} from "react-router-dom"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import type {TonClient} from "../api/client"
@@ -23,7 +23,7 @@ import type {
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
 import {Breadcrumbs} from "../components/Breadcrumbs"
-import {AccountDetails} from "../components/AccountDetails"
+import {AccountDetails, type AccountHistoryDateRange} from "../components/AccountDetails"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
   NFT_IMAGE_SOURCE_KEYS,
@@ -50,6 +50,16 @@ const LOCAL_TRANSACTION_PAGE_SIZE = 1000
 const ACTION_PAGE_SIZE = 20
 const NEW_TRANSACTION_APPEAR_MS = 1400
 type AccountTab = "history" | "contract" | "tokens" | "nfts" | "holders"
+
+interface HistoryDateRangeState {
+  readonly accountKey?: string
+  readonly range?: AccountHistoryDateRange
+}
+
+interface HistoryDateRangeQuery {
+  readonly startUtime?: number
+  readonly endUtime?: number
+}
 
 interface AccountLoadIssue {
   readonly title: string
@@ -103,6 +113,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const [verifiedSourceLoading, setVerifiedSourceLoading] = useState(false)
   const [jettonMetadataOpen, setJettonMetadataOpen] = useState(false)
   const [jettonMetadataCopied, setJettonMetadataCopied] = useState(false)
+  const [historyDateRangeState, setHistoryDateRangeState] = useState<HistoryDateRangeState>({})
   const activeAccountKeyRef = useRef<string | undefined>(undefined)
   const transactionHashesRef = useRef<Set<string>>(new Set())
 
@@ -114,6 +125,18 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
   const accountRequestKey = useMemo(
     () => `${network.id}:${accountAddressKey}`,
     [accountAddressKey, network.id],
+  )
+  const historyDateRange =
+    historyDateRangeState.accountKey === accountAddressKey ? historyDateRangeState.range : undefined
+  const historyDateRangeQuery = useMemo(
+    () => getHistoryDateRangeQuery(historyDateRange),
+    [historyDateRange],
+  )
+  const handleHistoryDateRangeChange = useCallback(
+    (range: AccountHistoryDateRange | undefined) => {
+      setHistoryDateRangeState({accountKey: accountAddressKey, range})
+    },
+    [accountAddressKey],
   )
   const activeTab = useMemo<AccountTab>(() => {
     const tab = location.hash.replace("#", "")
@@ -254,72 +277,111 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
         }
       }
 
-      const loadTransactions = async () => {
-        try {
-          const txs = await client.getAccountTransactions(formattedAddress, initialTransactionLimit)
-          if (!isActive) return
-          setTransactions([...txs.transactions])
-          transactionHashesRef.current = transactionHashSet(txs.transactions)
-          setTransactionsHasMore(txs.transactions.length === initialTransactionLimit)
-          setTransactionsError(undefined)
-        } catch (error) {
-          if (!isActive) return
-          console.error("Failed to fetch account transactions", error)
-          setTransactions([])
-          setHighlightedTransactionHashes([])
-          transactionHashesRef.current = new Set()
-          setTransactionsHasMore(false)
-          setTransactionsError(
-            error instanceof Error ? error.message : "Failed to load transactions",
-          )
-        } finally {
-          if (isActive) setTransactionsLoading(false)
-        }
-      }
-
-      const loadActions = async () => {
-        if (!supportsAccountActions) {
-          setActions([])
-          setActionMetadata({})
-          setActionsOffset(0)
-          setActionsHasMore(false)
-          setActionsLoadingMore(false)
-          setActionsLoading(false)
-          setActionsError(undefined)
-          return
-        }
-
-        try {
-          const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE)
-          if (!isActive) return
-          setActions([...response.actions])
-          setActionMetadata(response.metadata)
-          setActionsOffset(response.actions.length)
-          setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
-          setActionsError(undefined)
-        } catch (error) {
-          if (!isActive) return
-          console.error("Failed to fetch account actions", error)
-          setActions([])
-          setActionMetadata({})
-          setActionsOffset(0)
-          setActionsHasMore(false)
-          setActionsError(error instanceof Error ? error.message : "Failed to load actions")
-        } finally {
-          if (isActive) setActionsLoading(false)
-        }
-      }
-
       void loadAccountState()
-      void loadTransactions()
-      void loadActions()
     }
 
     load()
     return () => {
       isActive = false
     }
-  }, [accountRequestKey, client, initialTransactionLimit, supportsAccountActions])
+  }, [accountRequestKey, client, supportsAccountActions])
+
+  useEffect(() => {
+    if (!formattedAddress) {
+      return
+    }
+
+    let isActive = true
+    setTransactionsLoading(true)
+    setActionsLoading(supportsAccountActions)
+    setTransactions([])
+    setActions([])
+    setActionMetadata({})
+    setHighlightedTransactionHashes([])
+    transactionHashesRef.current = new Set()
+    setTransactionsHasMore(false)
+    setTransactionsLoadingMore(false)
+    setActionsOffset(0)
+    setActionsHasMore(false)
+    setActionsLoadingMore(false)
+    setTransactionsError(undefined)
+    setActionsError(undefined)
+
+    const loadTransactions = async () => {
+      try {
+        const txs = await client.getAccountTransactions(formattedAddress, {
+          limit: initialTransactionLimit,
+          startUtime: historyDateRangeQuery.startUtime,
+          endUtime: historyDateRangeQuery.endUtime,
+        })
+        if (!isActive) return
+        setTransactions([...txs.transactions])
+        transactionHashesRef.current = transactionHashSet(txs.transactions)
+        setTransactionsHasMore(txs.transactions.length === initialTransactionLimit)
+        setTransactionsError(undefined)
+      } catch (error) {
+        if (!isActive) return
+        console.error("Failed to fetch account transactions", error)
+        setTransactions([])
+        setHighlightedTransactionHashes([])
+        transactionHashesRef.current = new Set()
+        setTransactionsHasMore(false)
+        setTransactionsError(error instanceof Error ? error.message : "Failed to load transactions")
+      } finally {
+        if (isActive) setTransactionsLoading(false)
+      }
+    }
+
+    const loadActions = async () => {
+      if (!supportsAccountActions) {
+        setActions([])
+        setActionMetadata({})
+        setActionsOffset(0)
+        setActionsHasMore(false)
+        setActionsLoadingMore(false)
+        setActionsLoading(false)
+        setActionsError(undefined)
+        return
+      }
+
+      try {
+        const response = await client.getAccountActions(formattedAddress, {
+          limit: ACTION_PAGE_SIZE,
+          startUtime: historyDateRangeQuery.startUtime,
+          endUtime: historyDateRangeQuery.endUtime,
+        })
+        if (!isActive) return
+        setActions([...response.actions])
+        setActionMetadata(response.metadata)
+        setActionsOffset(response.actions.length)
+        setActionsHasMore(response.actions.length === ACTION_PAGE_SIZE)
+        setActionsError(undefined)
+      } catch (error) {
+        if (!isActive) return
+        console.error("Failed to fetch account actions", error)
+        setActions([])
+        setActionMetadata({})
+        setActionsOffset(0)
+        setActionsHasMore(false)
+        setActionsError(error instanceof Error ? error.message : "Failed to load actions")
+      } finally {
+        if (isActive) setActionsLoading(false)
+      }
+    }
+
+    void loadTransactions()
+    void loadActions()
+    return () => {
+      isActive = false
+    }
+  }, [
+    client,
+    formattedAddress,
+    historyDateRangeQuery.endUtime,
+    historyDateRangeQuery.startUtime,
+    initialTransactionLimit,
+    supportsAccountActions,
+  ])
 
   const loadMoreTransactions = async () => {
     if (
@@ -334,11 +396,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     setTransactionsLoadingMore(true)
     setTransactionsError(undefined)
     try {
-      const txs = await client.getAccountTransactions(
-        formattedAddress,
-        transactionPageSize,
-        transactions.length,
-      )
+      const txs = await client.getAccountTransactions(formattedAddress, {
+        limit: transactionPageSize,
+        offset: transactions.length,
+        startUtime: historyDateRangeQuery.startUtime,
+        endUtime: historyDateRangeQuery.endUtime,
+      })
       transactionHashesRef.current = transactionHashSet([...transactions, ...txs.transactions])
       setTransactions(current => appendUniqueTransactions(current, txs.transactions))
       setTransactionsHasMore(txs.transactions.length === transactionPageSize)
@@ -365,7 +428,12 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     setActionsLoadingMore(true)
     setActionsError(undefined)
     try {
-      const response = await client.getAccountActions(formattedAddress, ACTION_PAGE_SIZE, offset)
+      const response = await client.getAccountActions(formattedAddress, {
+        limit: ACTION_PAGE_SIZE,
+        offset,
+        startUtime: historyDateRangeQuery.startUtime,
+        endUtime: historyDateRangeQuery.endUtime,
+      })
       setActions(current => [...current, ...response.actions])
       setActionMetadata(current => ({...current, ...response.metadata}))
       setActionsOffset(current => current + response.actions.length)
@@ -462,8 +530,15 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
           return
         }
 
+        const visibleTransactions = event.transactions.filter(tx =>
+          isTransactionInHistoryDateRange(tx, historyDateRangeQuery),
+        )
+        if (visibleTransactions.length === 0) {
+          return
+        }
+
         const newHashes = collectNewTransactionHashes(
-          event.transactions,
+          visibleTransactions,
           transactionHashesRef.current,
         )
         if (newHashes.length > 0) {
@@ -476,7 +551,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
           }, NEW_TRANSACTION_APPEAR_MS)
         }
 
-        setTransactions(current => prependUniqueTransactions(event.transactions, current))
+        setTransactions(current => prependUniqueTransactions(visibleTransactions, current))
         transactionHashesRef.current = new Set([...newHashes, ...transactionHashesRef.current])
         setTransactionsLoading(false)
         setTransactionsError(undefined)
@@ -492,7 +567,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
       isActive = false
       unsubscribe()
     }
-  }, [accountAddressKey, client])
+  }, [client, formattedAddress, historyDateRangeQuery.endUtime, historyDateRangeQuery.startUtime])
 
   useEffect(() => {
     setJettonMetadataOpen(false)
@@ -1075,11 +1150,13 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
             actionsLoadingMore={actionsLoadingMore}
             accountLoading={accountLoading}
             showHoldersTab={isJettonMasterAccount}
+            historyDateRange={historyDateRange}
             client={client}
             onAddressClick={handleSearch}
             onTransactionClick={handleTransactionClick}
             onLoadMoreTransactions={loadMoreTransactions}
             onLoadMoreActions={loadMoreActions}
+            onHistoryDateRangeChange={handleHistoryDateRangeChange}
             activeTabHash={activeTab}
             onTabChange={handleTabChange}
           />
@@ -1539,6 +1616,50 @@ function isAccountTab(value: string): value is AccountTab {
 
 function hasAccountInterface(interfaces: readonly string[], expected: string): boolean {
   return interfaces.some(iface => iface.trim().toLowerCase() === expected)
+}
+
+function getHistoryDateRangeQuery(
+  range: AccountHistoryDateRange | undefined,
+): HistoryDateRangeQuery {
+  if (!range?.from || Number.isNaN(range.from.getTime())) {
+    return {}
+  }
+
+  const fromDay = startOfLocalDay(range.from)
+  const toDay = startOfLocalDay(
+    range.to && !Number.isNaN(range.to.getTime()) ? range.to : range.from,
+  )
+  const startDay = fromDay.getTime() <= toDay.getTime() ? fromDay : toDay
+  const endDay = fromDay.getTime() <= toDay.getTime() ? toDay : fromDay
+  const startUtime = Math.max(0, Math.floor(startDay.getTime() / 1000) - 1)
+  const endUtime = Math.floor(addLocalDays(endDay, 1).getTime() / 1000)
+
+  return {startUtime, endUtime}
+}
+
+function isTransactionInHistoryDateRange(
+  transaction: Pick<V3TransactionListItem, "now">,
+  query: HistoryDateRangeQuery,
+): boolean {
+  const utime = Number(transaction.now)
+  if (!Number.isFinite(utime)) {
+    return false
+  }
+  if (query.startUtime !== undefined && utime <= query.startUtime) {
+    return false
+  }
+  if (query.endUtime !== undefined && utime >= query.endUtime) {
+    return false
+  }
+  return true
+}
+
+function startOfLocalDay(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate())
+}
+
+function addLocalDays(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
 }
 
 function transactionHashSet(

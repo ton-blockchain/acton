@@ -1,5 +1,6 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, JSX, MouseEvent} from "react"
+import {DayPicker, type DateRange} from "react-day-picker"
 import {
   Card,
   CardContent,
@@ -53,6 +54,7 @@ import {
   Webhook,
   type LucideIcon,
 } from "lucide-react"
+import "react-day-picker/style.css"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -77,7 +79,6 @@ import {
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import {AddressChip} from "./AddressChip"
-import {AddressLabel} from "./AddressLabel"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -116,11 +117,13 @@ interface AccountDetailsProps {
   readonly actionsLoadingMore?: boolean
   readonly accountLoading?: boolean
   readonly showHoldersTab?: boolean
+  readonly historyDateRange?: AccountHistoryDateRange
   readonly client: TonClient
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
   readonly onLoadMoreTransactions?: () => void
   readonly onLoadMoreActions?: () => void
+  readonly onHistoryDateRangeChange?: (range: AccountHistoryDateRange | undefined) => void
   readonly activeTabHash?: string
   readonly onTabChange?: (tab: Tabs) => void
 }
@@ -132,6 +135,7 @@ type PaginationItem = number | "ellipsis-left" | "ellipsis-right"
 type AccountHistoryMode = "actions" | "transactions"
 type AccountSortOrder = "desc" | "asc"
 export type AccountTimeFormat = "relative" | "smart" | "absolute"
+export type AccountHistoryDateRange = DateRange
 type HistoryValueTone = "positive" | "negative" | "empty" | "neutral"
 
 interface HistoryTechnicalLabel {
@@ -251,21 +255,32 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   actionsLoadingMore = false,
   accountLoading = false,
   showHoldersTab = false,
+  historyDateRange,
   client,
   onAddressClick,
   onTransactionClick,
   onLoadMoreTransactions,
   onLoadMoreActions,
+  onHistoryDateRangeChange,
   activeTabHash,
   onTabChange,
 }) => {
   const [activeTab, setActiveTab] = useState<Tabs>("history")
+  const calendarPopoverRef = useRef<HTMLDivElement>(null)
+  const calendarButtonRef = useRef<HTMLButtonElement>(null)
   const filterPopoverRef = useRef<HTMLDivElement>(null)
   const filterButtonRef = useRef<HTMLButtonElement>(null)
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false)
   const [isFiltersOpen, setIsFiltersOpen] = useState(false)
+  const [calendarPopoverPosition, setCalendarPopoverPosition] = useState<
+    FilterPopoverPosition | undefined
+  >()
   const [filterPopoverPosition, setFilterPopoverPosition] = useState<
     FilterPopoverPosition | undefined
   >()
+  const [draftDateRange, setDraftDateRange] = useState<AccountHistoryDateRange | undefined>(
+    historyDateRange,
+  )
   const [transactionFilters, setTransactionFilters] =
     useState<AccountTransactionFilters>(readTransactionFilters)
   const showNftsTab = !nftsLoading && nftItems.length > 0
@@ -273,6 +288,14 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     actionsSupported && transactionFilters.historyMode === "actions" ? "actions" : "transactions"
   const activeHistorySourceCount =
     effectiveHistoryMode === "actions" ? actions.length : transactions.length
+  const historyDateRangeKey = getHistoryDateRangeKey(historyDateRange)
+  const historyDateRangeLabel = formatHistoryDateRangeLabel(historyDateRange)
+  const draftDateRangeLabel = formatHistoryDateRangeLabel(draftDateRange)
+  const hasDraftDateRange = Boolean(draftDateRange?.from)
+  const hasAppliedDateRange = Boolean(historyDateRange?.from)
+  const calendarButtonTitle = historyDateRangeLabel
+    ? `History date range: ${historyDateRangeLabel}`
+    : "Filter history by date range"
 
   useEffect(() => {
     if (
@@ -437,18 +460,23 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   }, [transactionFilters])
 
   useEffect(() => {
-    if (!isFiltersOpen) return
+    if (!isFiltersOpen && !isCalendarOpen) return
 
     const handlePointerDown = (event: PointerEvent) => {
       const target = event.target
-      if (target instanceof Node && filterPopoverRef.current?.contains(target)) {
+      if (
+        target instanceof Node &&
+        (filterPopoverRef.current?.contains(target) || calendarPopoverRef.current?.contains(target))
+      ) {
         return
       }
+      setIsCalendarOpen(false)
       setIsFiltersOpen(false)
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        setIsCalendarOpen(false)
         setIsFiltersOpen(false)
       }
     }
@@ -459,7 +487,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       document.removeEventListener("pointerdown", handlePointerDown, true)
       document.removeEventListener("keydown", handleKeyDown)
     }
-  }, [isFiltersOpen])
+  }, [isCalendarOpen, isFiltersOpen])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -469,6 +497,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     transactionFilters.hiddenActionKeys,
     transactionFilters.hiddenToncenterActionKeys,
     transactionFilters.sortOrder,
+    historyDateRangeKey,
   ])
 
   useEffect(() => {
@@ -485,6 +514,17 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
 
   const setHistoryMode = (historyMode: AccountHistoryMode) => {
     setTransactionFilters(filters => ({...filters, historyMode}))
+  }
+
+  const applyHistoryDateRange = () => {
+    onHistoryDateRangeChange?.(normalizeHistoryDateRange(draftDateRange))
+    setIsCalendarOpen(false)
+  }
+
+  const clearHistoryDateRange = () => {
+    setDraftDateRange(undefined)
+    onHistoryDateRangeChange?.(undefined)
+    setIsCalendarOpen(false)
   }
 
   const toggleActionFilter = (actionKey: string) => {
@@ -504,6 +544,27 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
         : {...filters, hiddenActionKeys: [...hidden]}
     })
   }
+
+  const updateCalendarPopoverPosition = useCallback(() => {
+    const button = calendarButtonRef.current
+    if (!button) {
+      return
+    }
+
+    const rect = button.getBoundingClientRect()
+    const viewportWidth = globalThis.innerWidth || document.documentElement.clientWidth
+    const sidePadding = viewportWidth <= 520 ? 12 : 16
+    const width = Math.max(288, Math.min(312, viewportWidth - sidePadding * 2))
+    const left = Math.min(
+      Math.max(sidePadding, rect.right - width),
+      Math.max(sidePadding, viewportWidth - width - sidePadding),
+    )
+
+    setCalendarPopoverPosition({
+      top: rect.bottom + 6,
+      left,
+    })
+  }, [])
 
   const updateFilterPopoverPosition = useCallback(() => {
     const button = filterButtonRef.current
@@ -527,6 +588,22 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
   }, [])
 
   useEffect(() => {
+    setDraftDateRange(historyDateRange)
+  }, [historyDateRange])
+
+  useEffect(() => {
+    if (!isCalendarOpen) return
+
+    updateCalendarPopoverPosition()
+    globalThis.addEventListener("resize", updateCalendarPopoverPosition)
+    document.addEventListener("scroll", updateCalendarPopoverPosition, true)
+    return () => {
+      globalThis.removeEventListener("resize", updateCalendarPopoverPosition)
+      document.removeEventListener("scroll", updateCalendarPopoverPosition, true)
+    }
+  }, [isCalendarOpen, updateCalendarPopoverPosition])
+
+  useEffect(() => {
     if (!isFiltersOpen) return
 
     updateFilterPopoverPosition()
@@ -537,6 +614,13 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       document.removeEventListener("scroll", updateFilterPopoverPosition, true)
     }
   }, [isFiltersOpen, updateFilterPopoverPosition])
+
+  const calendarPopoverStyle = calendarPopoverPosition
+    ? ({
+        top: `${calendarPopoverPosition.top}px`,
+        left: `${calendarPopoverPosition.left}px`,
+      } as CSSProperties)
+    : undefined
 
   const filtersPopoverStyle = filterPopoverPosition
     ? ({
@@ -605,10 +689,69 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
         <div className={styles.flexSpacer} />
         {activeTab === "history" && (
           <>
-            <div className={styles.tab}>
-              <span className={styles.tabIcon} aria-hidden="true">
-                <CalendarDays size={17} />
-              </span>
+            <div className={styles.filterPopoverRoot} ref={calendarPopoverRef}>
+              <button
+                ref={calendarButtonRef}
+                type="button"
+                className={`${styles.tab} ${hasAppliedDateRange ? styles.tabActive : ""}`}
+                onClick={() => {
+                  setDraftDateRange(historyDateRange)
+                  updateCalendarPopoverPosition()
+                  setIsFiltersOpen(false)
+                  setIsCalendarOpen(open => !open)
+                }}
+                aria-haspopup="dialog"
+                aria-expanded={isCalendarOpen}
+                title={calendarButtonTitle}
+              >
+                <span className={styles.tabIcon} aria-hidden="true">
+                  <CalendarDays size={17} />
+                </span>
+                {historyDateRangeLabel && (
+                  <span className={styles.calendarTabLabel}>{historyDateRangeLabel}</span>
+                )}
+              </button>
+              {isCalendarOpen && (
+                <div
+                  className={styles.calendarPopover}
+                  style={calendarPopoverStyle}
+                  role="dialog"
+                  aria-label="History date range"
+                >
+                  <div className={styles.calendarPopoverHeader}>
+                    <span>Date range</span>
+                    {draftDateRangeLabel && (
+                      <span className={styles.calendarPopoverRange}>{draftDateRangeLabel}</span>
+                    )}
+                  </div>
+                  <DayPicker
+                    mode="range"
+                    selected={draftDateRange}
+                    onSelect={range => setDraftDateRange(range)}
+                    defaultMonth={draftDateRange?.from ?? historyDateRange?.from ?? new Date()}
+                    fixedWeeks
+                    className={styles.calendarPicker}
+                  />
+                  <div className={styles.calendarPopoverActions}>
+                    <button
+                      type="button"
+                      className={styles.calendarSecondaryButton}
+                      onClick={clearHistoryDateRange}
+                      disabled={!hasDraftDateRange && !hasAppliedDateRange}
+                    >
+                      Clear
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.calendarPrimaryButton}
+                      onClick={applyHistoryDateRange}
+                      disabled={!hasDraftDateRange}
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className={styles.filterPopoverRoot} ref={filterPopoverRef}>
               <button
@@ -617,6 +760,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                 className={styles.tab}
                 onClick={() => {
                   updateFilterPopoverPosition()
+                  setIsCalendarOpen(false)
                   setIsFiltersOpen(open => !open)
                 }}
                 aria-haspopup="dialog"
@@ -1020,6 +1164,12 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                   const decimals = Number(jettonMaster?.jetton_content?.decimals || 9)
                   const balance = Number(holder.balance) / 10 ** decimals
                   const symbol = jettonMaster?.jetton_content?.symbol || ""
+                  const isOwnerHovered = hoveredAddress
+                    ? isSameAddress(holder.owner, hoveredAddress)
+                    : false
+                  const isWalletHovered = hoveredAddress
+                    ? isSameAddress(holder.address, hoveredAddress)
+                    : false
 
                   return (
                     <TableRow
@@ -1028,28 +1178,24 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       onClick={event => onAddressClick?.(holder.owner, event)}
                     >
                       <TableCell>
-                        <button
-                          type="button"
-                          className={styles.address}
-                          onClick={e => {
-                            e.stopPropagation()
-                            onAddressClick?.(holder.owner, e)
-                          }}
-                        >
-                          <AddressLabel address={holder.owner} />
-                        </button>
+                        <div className={styles.addressWrapper}>
+                          <AddressChip
+                            address={holder.owner}
+                            highlighted={isOwnerHovered}
+                            onAddressClick={onAddressClick}
+                            onHoverAddressChange={setHoveredAddress}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell>
-                        <button
-                          type="button"
-                          className={styles.address}
-                          onClick={e => {
-                            e.stopPropagation()
-                            onAddressClick?.(holder.address, e)
-                          }}
-                        >
-                          <AddressLabel address={holder.address} />
-                        </button>
+                        <div className={styles.addressWrapper}>
+                          <AddressChip
+                            address={holder.address}
+                            highlighted={isWalletHovered}
+                            onAddressClick={onAddressClick}
+                            onHoverAddressChange={setHoveredAddress}
+                          />
+                        </div>
                       </TableCell>
                       <TableCell className={styles.valueContainer}>
                         <div className={styles.valuePositive}>
@@ -2970,6 +3116,52 @@ function compareBigIntStrings(left: string, right: string): number {
   } catch {
     return left.localeCompare(right)
   }
+}
+
+function normalizeHistoryDateRange(
+  range: AccountHistoryDateRange | undefined,
+): AccountHistoryDateRange | undefined {
+  if (!range?.from || Number.isNaN(range.from.getTime())) {
+    return undefined
+  }
+
+  const to = range.to && !Number.isNaN(range.to.getTime()) ? range.to : undefined
+  if (to && to.getTime() < range.from.getTime()) {
+    return {from: to, to: range.from}
+  }
+
+  return {from: range.from, to}
+}
+
+function getHistoryDateRangeKey(range: AccountHistoryDateRange | undefined): string {
+  const normalized = normalizeHistoryDateRange(range)
+  if (!normalized?.from) {
+    return ""
+  }
+
+  return `${startOfLocalDayTime(normalized.from)}:${startOfLocalDayTime(normalized.to ?? normalized.from)}`
+}
+
+function formatHistoryDateRangeLabel(range: AccountHistoryDateRange | undefined): string {
+  const normalized = normalizeHistoryDateRange(range)
+  if (!normalized?.from) {
+    return ""
+  }
+
+  const from = formatHistoryDate(normalized.from)
+  const to = normalized.to ? formatHistoryDate(normalized.to) : from
+  return from === to ? from : `${from} - ${to}`
+}
+
+function formatHistoryDate(date: Date): string {
+  return date.toLocaleDateString("default", {
+    day: "numeric",
+    month: "short",
+  })
+}
+
+function startOfLocalDayTime(date: Date): number {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
 }
 
 function formatTransactionTime(
