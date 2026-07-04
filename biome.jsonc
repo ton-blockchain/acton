@@ -141,7 +141,6 @@
         "noBitwiseOperators": "off",
         "noConfusingVoidType": "off",
         "noConsole": "off",
-        "noDuplicateProperties": "off",
         "noEmptyBlockStatements": "off",
         "noImportCycles": "off",
         "noLeakedRender": "off",
