@@ -977,7 +977,7 @@ pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
-/// [TON docs message-lookup guide](https://docs.ton.org/ecosystem/ton-connect/message-lookup).
+/// [TON docs message-lookup guide](https://docs.ton.org/applications/ton-connect/how-to/message-lookup).
 ///
 /// Normalization rules applied to the cell:
 /// - `src` is replaced with `addr_none$00`;

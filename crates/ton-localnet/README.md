@@ -141,7 +141,7 @@ The response includes:
 The local node exposes a TonCenter Streaming API v2-compatible subset for
 real-time local tooling. Use the official TON Center Streaming API
 documentation for protocol details:
-https://docs.ton.org/applications/api/toncenter/streaming/overview
+https://docs.ton.org/api/streaming/overview
 
 - `POST /api/streaming/v2/sse` opens an SSE subscription and returns
   `text/event-stream`.

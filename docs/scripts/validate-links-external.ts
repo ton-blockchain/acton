@@ -71,11 +71,6 @@ async function checkExternalUrl(url: URL): Promise<ExternalLinkResult> {
     return checkLocalhostPort(url)
   }
 
-  if (url.hostname === "docs.ton.org") {
-    // TODO: remove after docs.ton.org fixes
-    return {success: true}
-  }
-
   const redirectMode = toRedirectMode(url)
   const response = await fetch(url, {
     method: "GET",

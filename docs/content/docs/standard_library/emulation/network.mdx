@@ -428,7 +428,7 @@ This method is useful when broadcasting transactions to the real network.
 It polls the network until the transaction is applied or the maximum number of attempts is reached.
 
 The lookup follows the TON docs message-lookup reference
-(https://docs.ton.org/ecosystem/ton-connect/message-lookup): the external-in message
+(https://docs.ton.org/applications/ton-connect/how-to/message-lookup): the external-in message
 actually delivered to the network is identified by its TEP-467 normalized hash
 (returned by `sendBocReturnHash` at send time), and the destination account's recent
 transactions are scanned until one with a matching `inMessage` shows up.
