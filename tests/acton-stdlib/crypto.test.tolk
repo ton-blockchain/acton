@@ -93,3 +93,53 @@ get fun `test raw sign matches sign`() {
     expect(rawSignature).toEqual(signature);
     expect(isSignatureValid(data.hash(), rawSignature, kp.publicKey)).toBeTrue();
 }
+
+get fun `test raw sign slice verifies under isSliceSignatureValid`() {
+    val kp = crypto.seedToKeyPair(0xC0FFEE);
+
+    // an arbitrary-length message (84 bytes — e.g. a validator block-signature
+    // preimage), signed as raw bytes: the CHKSIGNS counterpart
+    val message = beginCell()
+        .storeUint(0xf83de3a8, 32)
+        .storeUint(0xAAAA, 256)
+        .storeUint(0x2c, 8)
+        .storeUint(0x05e1a740, 32)
+        .storeUint(0x3fcd91b6, 32)
+        .storeUint(7, 32)
+        .storeUint(0xBBBB, 256)
+        .storeUint(0, 24)
+        .toSlice();
+
+    val signature = crypto.rawSignSlice(kp.privateKey, message);
+    expect(isSliceSignatureValid(message, signature, kp.publicKey)).toBeTrue();
+
+    // a different key must not verify
+    val other = crypto.seedToKeyPair(0xDEAD);
+    expect(isSliceSignatureValid(message, signature, other.publicKey)).toBeFalse();
+
+    // a different message must not verify either
+    val tampered = beginCell().storeUint(0xF00D, 32).toSlice();
+    expect(isSliceSignatureValid(tampered, signature, kp.publicKey)).toBeFalse();
+}
+
+get fun `test raw sign slice of a 32-byte slice matches raw sign`() {
+    val kp = crypto.generateKeyPair();
+    val hash = beginCell().storeUint(0x1234, 16).endCell().hash();
+
+    // Ed25519 is deterministic, and rawSign's message IS the 32 bytes of the hash —
+    // so signing the same 32 bytes as a slice must produce the identical signature,
+    // valid under both the CHKSIGNU and CHKSIGNS checks
+    val sliceSignature = crypto.rawSignSlice(
+        kp.privateKey,
+        beginCell().storeUint(hash, 256).toSlice(),
+    );
+    expect(sliceSignature).toEqual(crypto.rawSign(kp.privateKey, hash));
+    expect(isSignatureValid(hash, sliceSignature, kp.publicKey)).toBeTrue();
+    expect(
+        isSliceSignatureValid(
+            beginCell().storeUint(hash, 256).toSlice(),
+            sliceSignature,
+            kp.publicKey,
+        ),
+    ).toBeTrue();
+}
