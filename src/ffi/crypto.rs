@@ -124,7 +124,7 @@ fn raw_sign_slice_impl(
     let mut parser = data.as_slice_allow_exotic();
     let bits = parser.size_bits();
     anyhow::ensure!(
-        bits % 8 == 0,
+        bits.is_multiple_of(8),
         "rawSignSlice data bit length must be a multiple of 8, got {bits}"
     );
     let mut message = vec![0u8; (bits / 8) as usize];
