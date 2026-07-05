@@ -41,7 +41,7 @@ See how to [declare contract dependencies](/docs/projects#declare-contract-depen
 
 Acton resolves the full dependency graph and compiles contracts in topological order. A circular dependency aborts the build before any contract is compiled:
 
-```
+```text noCopy
 Error: Circular dependency detected in contracts: A → B → A → C
 ```
 

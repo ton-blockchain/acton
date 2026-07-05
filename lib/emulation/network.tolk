@@ -807,7 +807,7 @@ struct ExternalInMessage {
 /// Body is always packed into the Either Right (in the reference).
 /// If `StateInit` is present it is also packed in the Either Right (in the reference).
 /// Full TL-B scheme of the message is.
-/// ```
+/// ```tlb
 /// ext_in_msg_info$10 src:MsgAddressExt dest:MsgAddressInt
 ///   import_fee:Grams = CommonMsgInfo;
 /// message$_ {X:Type} info:CommonMsgInfo
