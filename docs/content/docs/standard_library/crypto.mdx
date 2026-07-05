@@ -153,7 +153,9 @@ Signs the data bytes of a slice with the given private key using Ed25519.
 Unlike [crypto.rawSign](#cryptorawsign) (which signs a fixed 32-byte hash, matching the
 on-chain `isSignatureValid` / CHKSIGNU check), this signs the raw bytes of
 `data` itself — the counterpart of `isSliceSignatureValid` / CHKSIGNS.
-The slice's bit length must be a multiple of 8.
+The semantics mirror CHKSIGNS exactly: only the slice's own data bits are
+signed (references are ignored, just as the verifier ignores them), and the
+bit length must be a multiple of 8.
 
 Returns a 512-bit (64-byte) Ed25519 signature as a slice.
 
@@ -165,7 +167,7 @@ val signature = crypto.rawSignSlice(kp.privateKey, message);
 // isSliceSignatureValid(message, signature, kp.publicKey) == true
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L115" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L117" />
 
 ## `crypto.getSecureRandomBytes`
 
@@ -185,7 +187,7 @@ Example:
 val randomBytes = crypto.getSecureRandomBytes(32);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L130" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L132" />
 
 ## `crypto.getFastRandomBytes`
 
@@ -219,7 +221,7 @@ val b = crypto.getFastRandomBytes(16);
 // `a == b` because both calls started from the same VM random seed
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L162" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L164" />
 
 ## `crypto.generateKeyPair`
 
@@ -237,7 +239,7 @@ Example:
 val kp = crypto.generateKeyPair();
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L187" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L189" />
 
 ## `crypto.seedToKeyPair`
 
@@ -254,5 +256,5 @@ Example:
 val kp = crypto.seedToKeyPair(mySeed);
 ```
 
-<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L200" />
+<SourceCodeLink href="https://github.com/ton-blockchain/acton/blob/master/lib/crypto.tolk#L202" />
 

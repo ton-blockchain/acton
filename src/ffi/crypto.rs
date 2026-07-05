@@ -7,7 +7,7 @@ use ton::ton_wallet::Mnemonic;
 use ton_emulator::{extension, register_ext_methods};
 use ton_executor::BaseExecutor;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::cell::CellBuilder;
+use tycho_types::cell::{Cell, CellBuilder};
 
 extension!(get_secure_random_bytes in (Context) with (bytes_num: BigInt) using get_secure_random_bytes_impl);
 fn get_secure_random_bytes_impl(
@@ -109,18 +109,32 @@ fn raw_sign_impl(
     Ok(())
 }
 
-extension!(raw_sign_slice in (Context) with (data: Vec<u8>, private_key: BigInt) using raw_sign_slice_impl);
+extension!(raw_sign_slice in (Context) with (data: Cell, private_key: BigInt) using raw_sign_slice_impl);
 fn raw_sign_slice_impl(
     _ctx: &mut Context,
     stack: &mut Tuple,
-    data: Vec<u8>,
+    data: Cell,
     private_key: BigInt,
 ) -> anyhow::Result<()> {
     let signing_key = seed_to_signing_key(private_key);
 
+    // Mirror CHKSIGNS exactly: it verifies only the root slice's data bits (references
+    // are ignored) and throws unless the bit length is a multiple of eight. Snake-style
+    // decoding would sign ref-chain bytes the on-chain verifier never sees.
+    let mut parser = data.as_slice_allow_exotic();
+    let bits = parser.size_bits();
+    anyhow::ensure!(
+        bits % 8 == 0,
+        "rawSignSlice data bit length must be a multiple of 8, got {bits}"
+    );
+    let mut message = vec![0u8; (bits / 8) as usize];
+    parser
+        .load_raw(&mut message, bits)
+        .map_err(|e| anyhow::anyhow!("failed to read rawSignSlice data bits: {e}"))?;
+
     // Sign the raw data bytes (Ed25519 over the message itself, the CHKSIGNS
     // counterpart — unlike raw_sign, which signs a fixed 32-byte hash)
-    let sig = signing_key.sign(&data);
+    let sig = signing_key.sign(&message);
 
     // Return signature as a 512-bit slice (64 bytes)
     let mut builder = CellBuilder::new();

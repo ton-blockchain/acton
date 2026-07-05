@@ -101,7 +101,9 @@ fun crypto.rawSign(privateKey: int, data: int): slice {
 /// Unlike [crypto.rawSign] (which signs a fixed 32-byte hash, matching the
 /// on-chain `isSignatureValid` / CHKSIGNU check), this signs the raw bytes of
 /// `data` itself — the counterpart of `isSliceSignatureValid` / CHKSIGNS.
-/// The slice's bit length must be a multiple of 8.
+/// The semantics mirror CHKSIGNS exactly: only the slice's own data bits are
+/// signed (references are ignored, just as the verifier ignores them), and the
+/// bit length must be a multiple of 8.
 ///
 /// Returns a 512-bit (64-byte) Ed25519 signature as a slice.
 ///

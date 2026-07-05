@@ -122,6 +122,24 @@ get fun `test raw sign slice verifies under isSliceSignatureValid`() {
     expect(isSliceSignatureValid(tampered, signature, kp.publicKey)).toBeFalse();
 }
 
+get fun `test raw sign slice ignores references like CHKSIGNS does`() {
+    val kp = crypto.seedToKeyPair(0xFACE);
+
+    // CHKSIGNS verifies only the root slice's data bits and ignores references —
+    // so must the signer, or signatures over ref-carrying slices would never verify
+    val withRef = beginCell()
+        .storeUint(0xDEADBEEF, 32)
+        .storeRef(beginCell().storeUint(0x0BAD, 16).endCell())
+        .toSlice();
+
+    val signature = crypto.rawSignSlice(kp.privateKey, withRef);
+    expect(isSliceSignatureValid(withRef, signature, kp.publicKey)).toBeTrue();
+
+    // identical to signing the bare root bits: the reference contributed nothing
+    val rootOnly = beginCell().storeUint(0xDEADBEEF, 32).toSlice();
+    expect(signature).toEqual(crypto.rawSignSlice(kp.privateKey, rootOnly));
+}
+
 get fun `test raw sign slice of a 32-byte slice matches raw sign`() {
     val kp = crypto.generateKeyPair();
     val hash = beginCell().storeUint(0x1234, 16).endCell().hash();
