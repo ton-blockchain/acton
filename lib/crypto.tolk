@@ -96,6 +96,26 @@ fun crypto.rawSign(privateKey: int, data: int): slice {
     return ffi.rawSign(privateKey, data);
 }
 
+/// Signs the data bytes of a slice with the given private key using Ed25519.
+///
+/// Unlike [crypto.rawSign] (which signs a fixed 32-byte hash, matching the
+/// on-chain `isSignatureValid` / CHKSIGNU check), this signs the raw bytes of
+/// `data` itself — the counterpart of `isSliceSignatureValid` / CHKSIGNS.
+/// The slice's bit length must be a multiple of 8.
+///
+/// Returns a 512-bit (64-byte) Ed25519 signature as a slice.
+///
+/// Example:
+/// ```tolk
+/// val kp = crypto.generateKeyPair();
+/// val message = beginCell().storeUint(0xdeadbeef, 32).toSlice();
+/// val signature = crypto.rawSignSlice(kp.privateKey, message);
+/// // isSliceSignatureValid(message, signature, kp.publicKey) == true
+/// ```
+fun crypto.rawSignSlice(privateKey: int, data: slice): slice {
+    return ffi.rawSignSlice(privateKey, data);
+}
+
 /// Generates cryptographically secure random bytes.
 ///
 /// Returns a slice containing `bytesNum` random bytes.
@@ -196,3 +216,6 @@ fun ffi.getSecureRandomBytes(bytesNum: uint16): slice
 
 fun ffi.rawSign(privateKey: int, data: int): slice
     asm "403 EXTCALL"
+
+fun ffi.rawSignSlice(privateKey: int, data: slice): slice
+    asm "405 EXTCALL"

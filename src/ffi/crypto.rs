@@ -109,6 +109,27 @@ fn raw_sign_impl(
     Ok(())
 }
 
+extension!(raw_sign_slice in (Context) with (data: Vec<u8>, private_key: BigInt) using raw_sign_slice_impl);
+fn raw_sign_slice_impl(
+    _ctx: &mut Context,
+    stack: &mut Tuple,
+    data: Vec<u8>,
+    private_key: BigInt,
+) -> anyhow::Result<()> {
+    let signing_key = seed_to_signing_key(private_key);
+
+    // Sign the raw data bytes (Ed25519 over the message itself, the CHKSIGNS
+    // counterpart — unlike raw_sign, which signs a fixed 32-byte hash)
+    let sig = signing_key.sign(&data);
+
+    // Return signature as a 512-bit slice (64 bytes)
+    let mut builder = CellBuilder::new();
+    builder.store_raw(&sig.to_bytes(), 512)?;
+    let cell = builder.build()?;
+    stack.push(TupleItem::Slice(cell));
+    Ok(())
+}
+
 extension!(seed_to_keypair in (Context) with (seed: BigInt) using seed_to_keypair_impl);
 fn seed_to_keypair_impl(_ctx: &mut Context, stack: &mut Tuple, seed: BigInt) -> anyhow::Result<()> {
     let signing_key = seed_to_signing_key(seed);
@@ -133,5 +154,6 @@ pub fn register_extensions<T: BaseExecutor>(executor: &mut T, ctx: &mut Context)
         402 => mnemonic_to_key_pair : 1,
         403 => raw_sign : 2,
         404 => seed_to_keypair : 1,
+        405 => raw_sign_slice : 2,
     });
 }
