@@ -723,7 +723,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   font-size: 0.78rem;
   font-weight: 700;
@@ -736,7 +736,8 @@
   display: none;
 }
 
-.signPreviewHeader::before {
+.signPreviewHeader::before,
+.signPreviewDetails summary::before {
   width: 7px;
   height: 7px;
   border-right: 1.5px solid var(--litenode-text-muted);
@@ -747,7 +748,8 @@
   transition: transform 120ms ease;
 }
 
-.signPreviewPanel[open] .signPreviewHeader::before {
+.signPreviewPanel[open] .signPreviewHeader::before,
+.signPreviewDetails[open] summary::before {
   transform: rotate(45deg);
 }
 
@@ -833,10 +835,16 @@
   cursor: pointer;
   display: flex;
   align-items: center;
+  gap: 12px;
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1;
+  list-style: none;
   text-transform: uppercase;
+}
+
+.signPreviewDetails summary::-webkit-details-marker {
+  display: none;
 }
 
 .signPreviewDetails pre {
