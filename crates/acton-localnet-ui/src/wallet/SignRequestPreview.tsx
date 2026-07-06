@@ -34,9 +34,6 @@ function describeSignPreview(preview: SignDataRequestEvent["preview"]["data"]): 
     case "binary": {
       return `${preview.value.content.length} base64 chars`
     }
-    case "cell": {
-      return preview.value.schema || "TON Cell payload"
-    }
     default: {
       return "Unknown sign payload"
     }
