@@ -1,11 +1,17 @@
+import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "@acton/shared-ui"
 import {KeyRound} from "lucide-react"
 import {parseTLB, type ParsedCell} from "@ton-community/tlb-runtime"
 import {Cell} from "@ton/core"
 import type {CSSProperties, FC} from "react"
-import {useMemo} from "react"
+import {useEffect, useMemo, useState} from "react"
+import {createHighlighterCore} from "shiki/core"
+import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
+import type {LanguageRegistration} from "shiki/types"
 import {formatUnits, type SignDataRequestEvent} from "@ton/walletkit"
 
 import styles from "../dashboard/pages/WalletsPage.module.css"
+
+import tlbGrammarRaw from "../../../../docs/grammars/grammar-tlb.json"
 
 type SignRequestCellData = Extract<SignDataRequestEvent["preview"]["data"], {type: "cell"}>
 
@@ -27,6 +33,30 @@ interface ParsedCellPreview {
   readonly refs: number
   readonly fields: ParsedCellField[]
   readonly error?: string
+}
+
+interface TlbSchemaCodeProps {
+  readonly schema: string
+}
+
+const grammarWithName = (grammar: unknown, name: string): LanguageRegistration =>
+  ({
+    ...(grammar as Record<string, unknown>),
+    name,
+  }) as LanguageRegistration
+
+const tlbGrammar = grammarWithName(tlbGrammarRaw, "tlb")
+
+let tlbHighlighterPromise: ReturnType<typeof createHighlighterCore> | undefined
+
+const getTlbHighlighter = () => {
+  tlbHighlighterPromise ??= createHighlighterCore({
+    themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
+    langs: [tlbGrammar],
+    engine: createJavaScriptRegexEngine(),
+  })
+
+  return tlbHighlighterPromise
 }
 
 export const SignRequestCellPreview: FC<SignRequestCellPreviewProps> = ({preview}) => {
@@ -79,9 +109,70 @@ export const SignRequestCellPreview: FC<SignRequestCellPreviewProps> = ({preview
 
       <details className={styles.signPreviewDetails}>
         <summary>Schema</summary>
-        <pre>{preview.value.schema || "No schema"}</pre>
+        <TlbSchemaCode schema={preview.value.schema} />
       </details>
     </>
+  )
+}
+
+const TlbSchemaCode: FC<TlbSchemaCodeProps> = ({schema}) => {
+  const value = schema || "No schema"
+  const [highlightedHtml, setHighlightedHtml] = useState<string | undefined>()
+
+  useEffect(() => {
+    let isActive = true
+
+    const highlight = async () => {
+      setHighlightedHtml(undefined)
+      try {
+        const highlighter = await getTlbHighlighter()
+        const isDark = document.documentElement.classList.contains("dark-theme")
+        const html = highlighter.codeToHtml(value, {
+          lang: "tlb",
+          theme: isDark ? "jetbrains-darcula" : "jetbrains-light",
+        })
+
+        if (isActive) {
+          setHighlightedHtml(html)
+        }
+      } catch (error) {
+        console.error("Failed to highlight TL-B schema:", error)
+        if (isActive) {
+          setHighlightedHtml(undefined)
+        }
+      }
+    }
+
+    void highlight()
+
+    const observer = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (mutation.type === "attributes" && mutation.attributeName === "class") {
+          void highlight()
+        }
+      }
+    })
+    observer.observe(document.documentElement, {attributes: true})
+
+    return () => {
+      isActive = false
+      observer.disconnect()
+    }
+  }, [value])
+
+  if (!highlightedHtml) {
+    return (
+      <pre className={styles.tlbSchemaCode}>
+        <code>{value}</code>
+      </pre>
+    )
+  }
+
+  return (
+    <div
+      className={styles.tlbHighlightedCode}
+      dangerouslySetInnerHTML={{__html: highlightedHtml}}
+    />
   )
 }
 
