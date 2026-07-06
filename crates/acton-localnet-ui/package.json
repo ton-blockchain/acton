@@ -21,6 +21,7 @@
     "@acton/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@scalar/api-reference-react": "^0.9.41",
+    "@ton-community/tlb-runtime": "1.0.0-alpha.3",
     "@ton/core": "0.63.1",
     "@ton/crypto": "^3.3.0",
     "@ton/retracer-core": "0.11.0",
