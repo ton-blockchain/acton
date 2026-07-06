@@ -50,11 +50,11 @@ export const SignRequestCellPreview: FC<SignRequestCellPreviewProps> = ({preview
       </div>
 
       {parsedCell && (
-        <section className={styles.signPreviewPanel} aria-label="Parsed sign request cell">
-          <div className={styles.signPreviewHeader}>
+        <details className={styles.signPreviewPanel} open>
+          <summary className={styles.signPreviewHeader}>
             <span>Parsed Cell</span>
             <span className={styles.signPreviewHash}>{shortenHash(parsedCell.hash)}</span>
-          </div>
+          </summary>
           {parsedCell.error && (
             <div className={`${styles.signPreviewNotice} ${styles.signPreviewNoticeError}`}>
               {parsedCell.error}
@@ -74,7 +74,7 @@ export const SignRequestCellPreview: FC<SignRequestCellPreviewProps> = ({preview
               </div>
             ))}
           </div>
-        </section>
+        </details>
       )}
 
       <details className={styles.signPreviewDetails}>

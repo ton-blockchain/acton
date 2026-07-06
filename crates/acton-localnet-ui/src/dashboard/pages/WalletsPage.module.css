@@ -647,7 +647,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 12px;
   padding: 12px;
   text-align: left;
@@ -720,6 +720,7 @@
   padding: 0 12px;
   border-bottom: 1px solid var(--litenode-border-subtle);
   color: var(--litenode-text);
+  cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -727,11 +728,32 @@
   font-size: 0.78rem;
   font-weight: 700;
   line-height: 1;
+  list-style: none;
   text-transform: uppercase;
+}
+
+.signPreviewHeader::-webkit-details-marker {
+  display: none;
+}
+
+.signPreviewHeader::before {
+  width: 7px;
+  height: 7px;
+  border-right: 1.5px solid var(--litenode-text-muted);
+  border-bottom: 1.5px solid var(--litenode-text-muted);
+  content: "";
+  flex: 0 0 auto;
+  transform: rotate(-45deg);
+  transition: transform 120ms ease;
+}
+
+.signPreviewPanel[open] .signPreviewHeader::before {
+  transform: rotate(45deg);
 }
 
 .signPreviewHash {
   min-width: 0;
+  margin-left: auto;
   color: var(--litenode-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
