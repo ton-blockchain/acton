@@ -703,6 +703,133 @@
   margin-top: 6px;
 }
 
+.signPreviewPanel,
+.signPreviewDetails {
+  min-width: 0;
+  border: 1px solid var(--litenode-border-subtle);
+  border-radius: 12px;
+  background: var(--litenode-surface-subtle);
+}
+
+.signPreviewPanel {
+  overflow: hidden;
+}
+
+.signPreviewHeader {
+  min-height: 38px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--litenode-border-subtle);
+  color: var(--litenode-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.signPreviewHash {
+  min-width: 0;
+  color: var(--litenode-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
+  text-transform: none;
+}
+
+.signPreviewNotice {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--litenode-border-subtle);
+  color: var(--litenode-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.signPreviewNoticeError {
+  color: var(--litenode-danger);
+}
+
+.signPreviewRows {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.signPreviewRow {
+  --sign-preview-depth: 0;
+
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 12px 7px calc(12px + var(--sign-preview-depth) * 14px);
+  border-top: 1px solid var(--litenode-border-subtle);
+  display: grid;
+  grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.signPreviewRows .signPreviewRow:first-child {
+  border-top: 0;
+}
+
+.signPreviewRowError .signPreviewValue {
+  color: var(--litenode-danger);
+}
+
+.signPreviewLabel {
+  min-width: 0;
+  color: var(--litenode-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.75rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.signPreviewValue {
+  min-width: 0;
+  color: var(--litenode-text);
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.signPreviewDetails {
+  padding: 0;
+}
+
+.signPreviewDetails summary {
+  min-height: 38px;
+  padding: 0 12px;
+  color: var(--litenode-text);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+.signPreviewDetails pre {
+  max-height: 240px;
+  margin: 0;
+  padding: 12px;
+  border-top: 1px solid var(--litenode-border-subtle);
+  color: var(--litenode-text-muted);
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .spinning {
   animation: spin 900ms linear infinite;
 }
