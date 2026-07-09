@@ -87,7 +87,7 @@ pub(crate) mod types;
 
 pub use flow_inference::InferenceResult;
 pub use global_usages::{GlobalUsage, GlobalUsages};
-pub use type_db::TypeDb;
+pub use type_db::{TypeDb, TypeDbCache};
 pub use type_inference::infer;
 pub use type_interner::{TyId, TypeInterner};
 pub use types::{AddressKind, IntTy, TyData};

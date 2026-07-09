@@ -258,6 +258,14 @@ impl FileDb {
         self.files.get(path).map(|entry| entry.clone())
     }
 
+    /// Removes a processed file from the cache.
+    pub fn remove_path(&self, path: &Path) {
+        let Some((_, info)) = self.files.remove(path) else {
+            return;
+        };
+        self.files_by_id.remove(&info.id);
+    }
+
     /// Resolves a `FileId` to its `FileInfo` if it has already been processed.
     pub fn get_by_id(&self, file_id: FileId) -> Option<Arc<FileInfo>> {
         self.files_by_id.get(&file_id).map(|entry| entry.clone())

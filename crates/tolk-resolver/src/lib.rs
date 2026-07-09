@@ -22,4 +22,6 @@ pub use project_index::{
     ProjectIndex, ProjectIndexBuilder, ProjectSource, ProjectSourceProvider, ResolvedImport,
 };
 pub use resolve_index::{FileResolveIndex, NameUse, NameUseKind, Resolved};
-pub use symbol_resolver::{SymbolResolver, resolve, resolve_file};
+pub use symbol_resolver::{
+    SymbolResolver, resolve, resolve_file, resolve_files, resolve_workspace_files,
+};

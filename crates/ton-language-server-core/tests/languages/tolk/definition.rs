@@ -169,6 +169,69 @@ fn resolves_stdlib_static_and_generic_methods() {
 }
 
 #[test]
+fn resolves_fields_in_counter_contract_body() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            tolk 1.0
+
+            struct Storage {
+                id: uint32
+                counter: uint32
+            }
+
+            fun Storage.load() {
+                return Storage.fromCell(contract.getData())
+            }
+
+            fun Storage.save(mutate self) {
+                contract.setData(self.toCell())
+            }
+
+            struct (0x7e8764ef) IncreaseCounter {
+                queryId: uint64 = 0
+                increaseBy: uint32
+            }
+
+            struct (0x3a752f06) ResetCounter {
+                queryId: uint64
+            }
+
+            type AllowedMessage = IncreaseCounter | ResetCounter
+
+            fun onInternalMessage(in: InMessage) {
+                val msg = lazy AllowedMessage.fromSlice(in.body);
+
+                match (msg) {
+                    IncreaseCounter => {
+                        var storage = lazy Storage.load();
+
+                        storage.<caret:counter>counter += msg.<caret:increase_by>increaseBy;
+                        storage.<caret:save>save();
+                    }
+
+                    ResetCounter => {
+                        var storage = lazy Storage.load();
+
+                        storage.counter = 0;
+                        storage.save();
+                    }
+
+                    else => {
+                        assert (in.body.isEmpty()) throw 0xFFFF
+                    }
+                }
+            }
+        ",
+        |_| {},
+        expect![[r"
+            33:20 -> file:///fixture/main.tolk 4:4 resolved
+            33:35 -> file:///fixture/main.tolk 17:4 resolved
+            34:20 -> file:///fixture/main.tolk 11:12 resolved"]],
+    );
+}
+
+#[test]
 fn unresolved_reference_is_rendered() {
     case_tolk_definition(
         "file:///fixture/main.tolk",

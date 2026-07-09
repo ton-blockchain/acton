@@ -12,7 +12,7 @@ use std::sync::{Arc, RwLock};
 use tolk_resolver::{
     FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Resolved, Span, SymbolId,
 };
-use tolk_ty::{InferenceResult, TypeDb, TypeInterner, infer};
+use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
 use tree_sitter::Tree;
 
 pub const LANGUAGE_ID: &str = "tolk";
@@ -206,6 +206,7 @@ impl TolkWorkspaceEngine {
         let file = state.files.entry(path).or_default();
         file.base_uri = Some(uri);
         file.base_text = Some(text);
+        file.dirty = true;
         let mut profiler = Profiler::disabled();
         state.rebuild_snapshot(&mut profiler)
     }
@@ -224,6 +225,7 @@ impl TolkWorkspaceEngine {
             uri: document.uri().clone(),
             source_file: parsed.source_file.clone(),
         });
+        file.dirty = true;
         state.rebuild_snapshot(profiler)
     }
 
@@ -236,10 +238,13 @@ impl TolkWorkspaceEngine {
             file.open = None;
             if file.base_text.is_none() {
                 remove_file = true;
+            } else {
+                file.dirty = true;
             }
         }
         if remove_file {
             state.files.remove(&path);
+            state.file_db.remove_path(&path);
         }
         let mut profiler = Profiler::disabled();
         if let Err(error) = state.rebuild_snapshot(&mut profiler) {
@@ -292,7 +297,7 @@ impl TolkWorkspaceEngine {
             return Vec::new();
         };
         snapshot
-            .inferred_resolved_at(file_id, symbol.id, offset)
+            .inferred_resolved_at(symbol.id, offset)
             .map_or_else(Vec::new, |resolved| {
                 snapshot.location_for_resolved(&resolved)
             })
@@ -300,21 +305,12 @@ impl TolkWorkspaceEngine {
 }
 
 impl TolkResolveSnapshot {
-    fn inferred_resolved_at(
-        &self,
-        file_id: FileId,
-        symbol_id: SymbolId,
-        offset: usize,
-    ) -> Option<Resolved> {
-        let inference = self.all_body_types.get(&file_id)?.get(&symbol_id)?;
-        if let Some(resolved) = inference.resolve(Span::from_offset(offset)) {
-            return Some(resolved.resolved.clone());
-        }
-        inference
-            .resolved_refs
-            .iter()
-            .find(|name_use| name_use.span.contains(offset))
-            .map(|resolved| resolved.resolved.clone())
+    fn inferred_resolved_at(&self, symbol_id: SymbolId, offset: usize) -> Option<Resolved> {
+        let inference = self
+            .all_body_types
+            .get(&symbol_id.file_id)?
+            .get(&symbol_id)?;
+        resolved_from_inference(inference, offset)
     }
 
     fn location_for_resolved(&self, resolved: &Resolved) -> Vec<Location> {
@@ -337,12 +333,31 @@ impl TolkResolveSnapshot {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct TolkWorkspaceState {
+    file_db: Arc<FileDb>,
+    type_interner: TypeInterner,
+    type_db_cache: TypeDbCache,
+    all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
     files: BTreeMap<PathBuf, TolkWorkspaceFile>,
     roots: BTreeSet<PathBuf>,
     generation: u64,
     latest_snapshot: Option<Arc<TolkResolveSnapshot>>,
+}
+
+impl Default for TolkWorkspaceState {
+    fn default() -> Self {
+        Self {
+            file_db: Arc::new(FileDb::new(PathBuf::from(TOLK_STDLIB_PATH), None)),
+            type_interner: TypeInterner::new(),
+            type_db_cache: TypeDbCache::default(),
+            all_body_types: HashMap::new(),
+            files: BTreeMap::new(),
+            roots: BTreeSet::new(),
+            generation: 0,
+            latest_snapshot: None,
+        }
+    }
 }
 
 impl TolkWorkspaceState {
@@ -363,7 +378,8 @@ impl TolkWorkspaceState {
             files: self.files.clone(),
         };
         let stdlib_path = PathBuf::from(TOLK_STDLIB_PATH);
-        let file_db = Arc::new(FileDb::new(stdlib_path.clone(), None));
+        let changed_file_ids = self.process_dirty_files(profiler)?;
+        let file_db = self.file_db.clone();
         let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
         roots.sort();
         let root = roots.remove(0);
@@ -379,9 +395,15 @@ impl TolkWorkspaceState {
         tolk_resolver::resolve(&file_db, &mut project_index);
         profiler.finish("tolk.resolve", resolve_started_at);
 
-        let type_inference_started_at = profiler.start();
-        let all_body_types = infer_body_types(&file_db, &project_index, &self.roots);
-        profiler.finish("tolk.type_inference", type_inference_started_at);
+        infer_incremental_workspace_body_types(
+            &file_db,
+            &project_index,
+            &mut self.type_interner,
+            &mut self.type_db_cache,
+            &mut self.all_body_types,
+            &changed_file_ids,
+            profiler,
+        );
 
         self.generation += 1;
         let materialize_started_at = profiler.start();
@@ -394,7 +416,7 @@ impl TolkWorkspaceState {
             generation: self.generation,
             file_db,
             project_index: Arc::new(project_index),
-            all_body_types,
+            all_body_types: self.all_body_types.clone(),
             path_to_uri,
         }));
         profiler.finish("tolk.snapshot.materialize", materialize_started_at);
@@ -408,6 +430,39 @@ impl TolkWorkspaceState {
         );
         Ok(())
     }
+
+    fn process_dirty_files(&mut self, profiler: &mut Profiler) -> anyhow::Result<BTreeSet<FileId>> {
+        let started_at = profiler.start();
+        let dirty_paths = self
+            .files
+            .iter()
+            .filter_map(|(path, file)| file.dirty.then_some(path.clone()))
+            .collect::<Vec<_>>();
+        let mut changed_file_ids = BTreeSet::new();
+        for path in dirty_paths {
+            let Some(file) = self.files.get_mut(&path) else {
+                continue;
+            };
+            let Some(source) = file.active_source() else {
+                if let Some(info) = self.file_db.get_by_path(&path) {
+                    changed_file_ids.insert(info.id());
+                }
+                self.file_db.remove_path(&path);
+                file.dirty = false;
+                continue;
+            };
+            let info = match source {
+                ProjectSource::Parsed(source_file) => {
+                    self.file_db.process_source_file(path, source_file)
+                }
+                ProjectSource::Text(text) => self.file_db.process_content(path, &text)?,
+            };
+            changed_file_ids.insert(info.id());
+            file.dirty = false;
+        }
+        profiler.finish("tolk.snapshot.update_files", started_at);
+        Ok(changed_file_ids)
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -415,6 +470,7 @@ struct TolkWorkspaceFile {
     base_uri: Option<DocumentUri>,
     base_text: Option<Arc<str>>,
     open: Option<TolkOpenFile>,
+    dirty: bool,
 }
 
 impl TolkWorkspaceFile {
@@ -492,24 +548,55 @@ impl ProjectSourceProvider for SnapshotSourceProvider {
     }
 }
 
-fn infer_body_types(
+fn resolved_from_inference(inference: &InferenceResult, offset: usize) -> Option<Resolved> {
+    if let Some(resolved) = inference.resolve(Span::from_offset(offset)) {
+        return Some(resolved.resolved.clone());
+    }
+    inference
+        .resolved_refs
+        .iter()
+        .find(|name_use| name_use.span.contains(offset))
+        .map(|resolved| resolved.resolved.clone())
+}
+
+fn infer_incremental_workspace_body_types(
     file_db: &FileDb,
     project_index: &ProjectIndex,
-    roots: &BTreeSet<PathBuf>,
-) -> HashMap<FileId, HashMap<SymbolId, InferenceResult>> {
-    let mut file_ids = BTreeSet::new();
-    for root in roots {
-        let Some(root_id) = project_index.get_file_by_path(root) else {
-            continue;
-        };
-        file_ids.extend(project_index.reachable_files(root_id));
+    type_interner: &mut TypeInterner,
+    type_db_cache: &mut TypeDbCache,
+    all_body_types: &mut HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    changed_file_ids: &BTreeSet<FileId>,
+    profiler: &mut Profiler,
+) {
+    let workspace_file_ids = project_index
+        .workspace_files()
+        .into_iter()
+        .map(|file| file.id)
+        .collect::<BTreeSet<_>>();
+    all_body_types.retain(|file_id, _| workspace_file_ids.contains(file_id));
+
+    let affected_file_ids = affected_workspace_file_ids(
+        project_index,
+        &workspace_file_ids,
+        all_body_types,
+        changed_file_ids,
+    );
+
+    let signature_started_at = profiler.start();
+    let mut type_db = TypeDb::new_with_cache(
+        type_interner,
+        file_db,
+        project_index,
+        std::mem::take(type_db_cache),
+        affected_file_ids.iter().copied(),
+    );
+    profiler.finish("tolk.type_signature", signature_started_at);
+    for _ in type_db.refreshed_files() {
+        profiler.increment("tolk.type_signature.file");
     }
 
-    let mut interner = TypeInterner::new();
-    let mut type_db = TypeDb::new(&mut interner, file_db, project_index);
-    let mut all_body_types = HashMap::new();
-
-    for file_id in file_ids {
+    let body_inference_started_at = profiler.start();
+    for file_id in affected_file_ids {
         let Some(file_info) = file_db.get_by_id(file_id) else {
             continue;
         };
@@ -518,13 +605,52 @@ fn infer_body_types(
             let Some(index_decl) = file_info.find_declaration(&decl) else {
                 continue;
             };
-            let result = infer(&mut type_db, file_id, index_decl.id, &decl);
-            body_types.insert(index_decl.id, result);
+            let inference = infer(&mut type_db, file_id, index_decl.id, &decl);
+            body_types.insert(index_decl.id, inference);
         }
+        profiler.increment("tolk.type_inference.file");
         all_body_types.insert(file_id, body_types);
     }
+    profiler.finish("tolk.type_inference", body_inference_started_at);
+    *type_db_cache = type_db.into_cache();
+}
 
-    all_body_types
+fn affected_workspace_file_ids(
+    project_index: &ProjectIndex,
+    workspace_file_ids: &BTreeSet<FileId>,
+    all_body_types: &HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    changed_file_ids: &BTreeSet<FileId>,
+) -> BTreeSet<FileId> {
+    if all_body_types.is_empty() {
+        return workspace_file_ids.clone();
+    }
+
+    let mut affected = workspace_file_ids
+        .iter()
+        .filter(|file_id| !all_body_types.contains_key(file_id))
+        .copied()
+        .collect::<BTreeSet<_>>();
+
+    let mut queue = Vec::new();
+    for file_id in changed_file_ids {
+        if project_index.get_file_index(*file_id).is_none() {
+            return workspace_file_ids.clone();
+        }
+        queue.push(*file_id);
+    }
+
+    while let Some(file_id) = queue.pop() {
+        for dependent in project_index.direct_dependents(file_id) {
+            if affected.insert(dependent) {
+                queue.push(dependent);
+            }
+        }
+    }
+
+    affected
+        .into_iter()
+        .filter(|file_id| workspace_file_ids.contains(file_id))
+        .collect()
 }
 
 fn embedded_stdlib_source(path: &Path) -> Option<ProjectSource> {

@@ -19,6 +19,34 @@ use tolk_syntax::{
 };
 use tolk_syntax::{HasTreeSitterKind, ast};
 
+/// Reusable type database state that can be carried across analysis snapshots.
+#[derive(Debug, Clone, Default)]
+pub struct TypeDbCache {
+    top_level_types: FxHashMap<SymbolId, TyId>,
+    receiver_types: FxHashMap<SymbolId, TyId>,
+    initialized_files: FxHashSet<FileId>,
+}
+
+impl TypeDbCache {
+    fn retain_current_except(
+        &mut self,
+        project_index: &ProjectIndex,
+        refresh_file_ids: &FxHashSet<FileId>,
+    ) {
+        self.top_level_types.retain(|symbol_id, _| {
+            project_index.get_file_index(symbol_id.file_id).is_some()
+                && !refresh_file_ids.contains(&symbol_id.file_id)
+        });
+        self.receiver_types.retain(|symbol_id, _| {
+            project_index.get_file_index(symbol_id.file_id).is_some()
+                && !refresh_file_ids.contains(&symbol_id.file_id)
+        });
+        self.initialized_files.retain(|file_id| {
+            project_index.get_file_index(*file_id).is_some() && !refresh_file_ids.contains(file_id)
+        });
+    }
+}
+
 /// Represents a field in a structure.
 #[derive(Debug, Clone)]
 pub struct StructField {
@@ -70,6 +98,8 @@ pub struct TypeDb<'a> {
     /// Keeps track of definitions that have already been processed or are currently
     /// being processed (to handle `A -> B -> A` dependencies).
     currently_lowering: FxHashSet<SymbolId>,
+    initialized_files: FxHashSet<FileId>,
+    refreshed_files: Vec<FileId>,
     method_receivers_loaded: bool,
     treat_unresolved_as_type_parameter: bool,
 }
@@ -83,6 +113,40 @@ impl<'a> TypeDb<'a> {
         file_db: &'a FileDb,
         project_index: &'a ProjectIndex,
     ) -> TypeDb<'a> {
+        let files_to_collect = project_index.files().keys().copied().collect::<Vec<_>>();
+        Self::new_with_cache(
+            type_interner,
+            file_db,
+            project_index,
+            TypeDbCache::default(),
+            files_to_collect,
+        )
+    }
+
+    /// Creates a `TypeDb` from reusable cache and refreshes selected files.
+    ///
+    /// The cache is valid only with the same [`TypeInterner`]. Callers should
+    /// refresh changed files and their semantic dependents so inferred auto
+    /// return types cannot leak from an older snapshot.
+    pub fn new_with_cache(
+        type_interner: &'a mut TypeInterner,
+        file_db: &'a FileDb,
+        project_index: &'a ProjectIndex,
+        mut cache: TypeDbCache,
+        refresh_file_ids: impl IntoIterator<Item = FileId>,
+    ) -> TypeDb<'a> {
+        let refresh_file_ids = refresh_file_ids.into_iter().collect::<FxHashSet<_>>();
+        cache.retain_current_except(project_index, &refresh_file_ids);
+        let mut files_to_collect = project_index
+            .files()
+            .keys()
+            .filter(|file_id| {
+                refresh_file_ids.contains(file_id) || !cache.initialized_files.contains(file_id)
+            })
+            .copied()
+            .collect::<Vec<_>>();
+        files_to_collect.sort_unstable();
+
         let mut db = TypeDb {
             intrn: type_interner,
             file_db,
@@ -90,14 +154,31 @@ impl<'a> TypeDb<'a> {
             inverted_call_graph: FxHashMap::default(),
             call_graph: FxHashMap::default(),
             type_lower_cache: FxHashMap::default(),
-            top_level_types: FxHashMap::default(),
-            receiver_types: FxHashMap::default(),
+            top_level_types: cache.top_level_types,
+            receiver_types: cache.receiver_types,
             currently_lowering: FxHashSet::default(),
+            initialized_files: cache.initialized_files,
+            refreshed_files: files_to_collect.clone(),
             method_receivers_loaded: false,
             treat_unresolved_as_type_parameter: false,
         };
-        db.collect_top_level_types();
+        db.collect_top_level_types_for(files_to_collect);
+        db.method_receivers_loaded = true;
         db
+    }
+
+    #[must_use]
+    pub fn refreshed_files(&self) -> &[FileId] {
+        &self.refreshed_files
+    }
+
+    #[must_use]
+    pub fn into_cache(self) -> TypeDbCache {
+        TypeDbCache {
+            top_level_types: self.top_level_types,
+            receiver_types: self.receiver_types,
+            initialized_files: self.initialized_files,
+        }
     }
 
     pub fn ensure_method_receivers_loaded(&mut self) {
@@ -105,16 +186,18 @@ impl<'a> TypeDb<'a> {
             return;
         }
 
-        let mut method_ids = Vec::new();
+        let mut missing_method_ids = Vec::new();
         for file_index in self.project_index.files().values() {
             for symbol in &file_index.decls {
-                if matches!(symbol.kind, SymbolKind::Method { .. }) {
-                    method_ids.push(symbol.id);
+                if matches!(symbol.kind, SymbolKind::Method { .. })
+                    && !self.receiver_types.contains_key(&symbol.id)
+                {
+                    missing_method_ids.push(symbol.id);
                 }
             }
         }
 
-        for method_id in method_ids {
+        for method_id in missing_method_ids {
             let _ = self.get_top_level_type(None, method_id);
         }
 
@@ -217,9 +300,15 @@ impl<'a> TypeDb<'a> {
         None
     }
 
-    fn collect_top_level_types(&mut self) {
+    fn collect_top_level_types_for(&mut self, file_ids: Vec<FileId>) {
         // Pass 1: Identity types (struct, enum) — globally available first
-        for file_index in self.project_index.files().values() {
+        let file_indexes = file_ids
+            .iter()
+            .filter_map(|file_id| self.project_index.get_file_index(*file_id))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        for file_index in &file_indexes {
             for symbol in &file_index.decls {
                 let Symbol { kind, name, id, .. } = symbol;
                 let ty = match kind {
@@ -255,10 +344,11 @@ impl<'a> TypeDb<'a> {
         }
 
         // Pass 2: Lower everything else (triggered by demand or by iterating)
-        for file_index in self.project_index.files().values() {
+        for file_index in &file_indexes {
             for symbol in &file_index.decls {
                 let _ = self.get_top_level_type(Some(&symbol.kind), symbol.id);
             }
+            self.initialized_files.insert(file_index.id);
         }
     }
 

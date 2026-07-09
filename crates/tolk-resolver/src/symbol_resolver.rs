@@ -836,6 +836,25 @@ fn parse_numeric_suffix(name: &str, prefix: &str) -> bool {
 /// Resolves all symbols in all files present in the `ProjectIndex`.
 pub fn resolve(db: &FileDb, index: &mut ProjectIndex) {
     let files = index.files().keys().copied().collect::<Vec<_>>();
+    resolve_files(db, index, files);
+}
+
+/// Resolves symbols only in workspace files present in the `ProjectIndex`.
+pub fn resolve_workspace_files(db: &FileDb, index: &mut ProjectIndex) {
+    let files = index
+        .workspace_files()
+        .into_iter()
+        .map(|file| file.id)
+        .collect::<Vec<_>>();
+    resolve_files(db, index, files);
+}
+
+/// Resolves symbols in selected files present in the `ProjectIndex`.
+pub fn resolve_files(
+    db: &FileDb,
+    index: &mut ProjectIndex,
+    files: impl IntoIterator<Item = FileId>,
+) {
     for file_id in files {
         let Some(file_index) = resolve_file(db, index, file_id) else {
             continue;

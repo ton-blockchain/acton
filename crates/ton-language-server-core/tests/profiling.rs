@@ -100,26 +100,108 @@ fn records_incremental_edit_and_hot_definition_spans() -> anyhow::Result<()> {
 fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
     let uri = DocumentUri::from("file:///fixture/profiling.tolk");
     let mut service = tolk_profiling_service();
+    let source = "struct Storage {\n    counter: int\n}\nfun Storage.save(self) {}\nfun main() {\n    var storage = Storage { counter: 1 };\n    storage.save();\n    storage.counter;\n}\n";
 
-    service.open_document(
-        uri.clone(),
-        TOLK_LANGUAGE_ID,
-        1,
-        "struct Storage {\n    counter: int\n}\nfun Storage.save(self) {}\nfun main() {\n    var storage = Storage { counter: 1 };\n    storage.save();\n    storage.counter;\n}\n",
-    )?;
+    service.open_document(uri.clone(), TOLK_LANGUAGE_ID, 1, source)?;
+    {
+        let summary = service.profiler().summary();
+        assert_eq!(counter(summary, "document.open"), 1);
+        assert_eq!(event_count(summary, "tolk.parse"), 1);
+        assert_eq!(event_count(summary, "tolk.snapshot.rebuild"), 1);
+        assert_eq!(event_count(summary, "tolk.snapshot.update_files"), 1);
+        assert_eq!(event_count(summary, "tolk.snapshot.index"), 1);
+        assert_eq!(event_count(summary, "tolk.resolve"), 1);
+        assert_eq!(event_count(summary, "tolk.snapshot.materialize"), 1);
+        assert_eq!(event_count(summary, "tolk.type_inference"), 1);
+    }
+
     let locations = service.definition(&uri, Position::new(6, 12))?;
+    assert_eq!(locations.len(), 1);
+    assert_eq!(
+        event_count(service.profiler().summary(), "tolk.type_inference"),
+        1
+    );
+
+    let locations = service.definition(&uri, Position::new(7, 12))?;
+    assert_eq!(locations.len(), 1);
+    assert_eq!(
+        event_count(service.profiler().summary(), "tolk.type_inference"),
+        1
+    );
+
+    service.change_document(&uri, 2, source.replace("counter: 1", "counter: 2"))?;
+    assert_eq!(
+        event_count(service.profiler().summary(), "tolk.type_inference"),
+        2
+    );
+
+    let locations = service.definition(&uri, Position::new(6, 12))?;
+    assert_eq!(locations.len(), 1);
 
     let summary = service.profiler().summary();
-    assert_eq!(locations.len(), 1);
     assert_eq!(counter(summary, "document.open"), 1);
-    assert_eq!(event_count(summary, "tolk.parse"), 1);
-    assert_eq!(event_count(summary, "tolk.snapshot.rebuild"), 1);
-    assert_eq!(event_count(summary, "tolk.snapshot.index"), 1);
-    assert_eq!(event_count(summary, "tolk.resolve"), 1);
-    assert_eq!(event_count(summary, "tolk.type_inference"), 1);
-    assert_eq!(event_count(summary, "tolk.snapshot.materialize"), 1);
-    assert_eq!(event_count(summary, "definition"), 1);
-    assert_eq!(event_count(summary, "tolk.definition.resolve"), 1);
+    assert_eq!(counter(summary, "document.change"), 1);
+    assert_eq!(event_count(summary, "tolk.parse"), 2);
+    assert_eq!(event_count(summary, "tolk.snapshot.rebuild"), 2);
+    assert_eq!(event_count(summary, "tolk.snapshot.update_files"), 2);
+    assert_eq!(event_count(summary, "tolk.snapshot.index"), 2);
+    assert_eq!(event_count(summary, "tolk.resolve"), 2);
+    assert_eq!(event_count(summary, "tolk.type_inference"), 2);
+    assert_eq!(event_count(summary, "tolk.snapshot.materialize"), 2);
+    assert_eq!(event_count(summary, "definition"), 3);
+    assert_eq!(event_count(summary, "tolk.definition.resolve"), 3);
+
+    Ok(())
+}
+
+#[test]
+fn records_incremental_tolk_type_inference_by_import_dependents() -> anyhow::Result<()> {
+    let lib_uri = DocumentUri::from("file:///fixture/lib.tolk");
+    let main_uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = tolk_profiling_service();
+
+    service.open_document(
+        lib_uri.clone(),
+        TOLK_LANGUAGE_ID,
+        1,
+        "fun helper(): int { return 1; }\n",
+    )?;
+    service.open_document(
+        main_uri,
+        TOLK_LANGUAGE_ID,
+        1,
+        "import \"lib\"\nfun main(): int { return helper(); }\n",
+    )?;
+    let signature_files_after_open =
+        counter(service.profiler().summary(), "tolk.type_signature.file");
+    assert_eq!(
+        counter(service.profiler().summary(), "tolk.type_inference.file"),
+        2
+    );
+
+    service.change_document(
+        &DocumentUri::from("file:///fixture/main.tolk"),
+        2,
+        "import \"lib\"\nfun main(): int { return helper() + 1; }\n",
+    )?;
+    assert_eq!(
+        counter(service.profiler().summary(), "tolk.type_signature.file"),
+        signature_files_after_open + 1
+    );
+    assert_eq!(
+        counter(service.profiler().summary(), "tolk.type_inference.file"),
+        3
+    );
+
+    service.change_document(&lib_uri, 2, "fun helper(): int { return 2; }\n")?;
+    assert_eq!(
+        counter(service.profiler().summary(), "tolk.type_signature.file"),
+        signature_files_after_open + 3
+    );
+    assert_eq!(
+        counter(service.profiler().summary(), "tolk.type_inference.file"),
+        5
+    );
 
     Ok(())
 }
