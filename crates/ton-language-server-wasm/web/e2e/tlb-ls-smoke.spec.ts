@@ -21,6 +21,7 @@ type SmokeGlobal = typeof globalThis & {
         }
       }[]
     >
+    foldingRanges: () => Promise<{start: number; end: number; kind: string | null}[]>
     logs: () => Promise<string>
     profile: () => Promise<string>
     sidePanelText: () => string
@@ -28,9 +29,9 @@ type SmokeGlobal = typeof globalThis & {
     profilePanelText: () => string
     editorText: () => string
     languageId: () => string | undefined
-    selectedLanguage: () => "tasm" | "tlb"
+    selectedLanguage: () => "tasm" | "tlb" | "fift"
     setEditorText: (text: string) => void
-    setLanguage: (languageId: "tasm" | "tlb") => Promise<void>
+    setLanguage: (languageId: "tasm" | "tlb" | "fift") => Promise<void>
     setProfileVisible: (visible: boolean) => void
   }
 }
@@ -76,6 +77,29 @@ test("Monaco runs the local WASM language server with persisted files and logs",
       start: {line: 0, character: 0},
     },
   })
+
+  await page.selectOption("#language-select", "fift")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.selectedLanguage()))
+    .toBe("fift")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
+    .toContain("PROGRAM{")
+  const foldingRanges = await page.evaluate(() =>
+    (globalThis as SmokeGlobal).__tonLsSmoke?.foldingRanges(),
+  )
+  expect(foldingRanges).toContainEqual({start: 0, end: 16, kind: null})
+  expect(foldingRanges).toContainEqual({start: 2, end: 15, kind: null})
+  expect(foldingRanges).toContainEqual({start: 3, end: 4, kind: null})
+  expect(foldingRanges).toContainEqual({start: 5, end: 6, kind: null})
+  expect(foldingRanges).toContainEqual({start: 8, end: 9, kind: null})
+  expect(foldingRanges).toContainEqual({start: 10, end: 11, kind: null})
+  expect(foldingRanges?.length).toBeGreaterThanOrEqual(5)
+
+  await page.selectOption("#language-select", "tasm")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.selectedLanguage()))
+    .toBe("tasm")
 
   await page.selectOption("#log-level-select", "debug")
   await page.check("#logs-toggle")

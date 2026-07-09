@@ -9,52 +9,57 @@
   operation: language.register
   replaced: false
 02 info ton_language_server_core::service
+  language_id: fift
+  message: registered language plugin
+  operation: language.register
+  replaced: false
+03 info ton_language_server_core::service
   language_id: tlb
   message: opening document
   operation: document.open
   text_len: 37
   uri: file://<redacted>/logging-snapshot.tlb
   version: 1
-03 debug ton_language_server_core::languages::tlb
+04 debug ton_language_server_core::languages::tlb
   incremental: false
   message: parsing TL-B document
   operation: tlb.parse
   text_len: 37
   uri: file://<redacted>/logging-snapshot.tlb
   version: 1
-04 debug ton_language_server_core::languages::tlb
+05 debug ton_language_server_core::languages::tlb
   has_error: false
   incremental: false
   message: parsed TL-B document
   operation: tlb.parse
   uri: file://<redacted>/logging-snapshot.tlb
   version: 1
-05 trace ton_language_server_core::languages::tlb
+06 trace ton_language_server_core::languages::tlb
   end_byte: 15
   message: indexed TL-B symbol
   name: Old
   operation: tlb.index.symbol
   start_byte: 12
-06 trace ton_language_server_core::languages::tlb
+07 trace ton_language_server_core::languages::tlb
   end_byte: 35
   message: indexed TL-B symbol
   name: Wrap
   operation: tlb.index.symbol
   start_byte: 31
-07 debug ton_language_server_core::languages::tlb
+08 debug ton_language_server_core::languages::tlb
   declaration_count: 2
   message: rebuilt TL-B symbol index
   operation: tlb.index.rebuilt
   uri: file://<redacted>/logging-snapshot.tlb
   version: 1
-08 info ton_language_server_core::service
+09 info ton_language_server_core::service
   incremental: false
   language_id: tlb
   message: document opened
   operation: document.open
   uri: file://<redacted>/logging-snapshot.tlb
   version: 1
-09 info ton_language_server_core::service
+10 info ton_language_server_core::service
   edit_count: 2
   incremental: true
   language_id: tlb
@@ -62,7 +67,7 @@
   operation: document.edit
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-10 trace ton_language_server_core::service
+11 trace ton_language_server_core::service
   edit_index: 0
   end_character: 15
   end_line: 0
@@ -73,7 +78,7 @@
   start_line: 0
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-11 trace ton_language_server_core::edit
+12 trace ton_language_server_core::edit
   end_character: 15
   end_line: 0
   message: built tree-sitter input edit
@@ -90,7 +95,7 @@
   start_column: 12
   start_line: 0
   start_row: 0
-12 trace ton_language_server_core::service
+13 trace ton_language_server_core::service
   edit_index: 1
   end_character: 11
   end_line: 1
@@ -101,7 +106,7 @@
   start_line: 1
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-13 trace ton_language_server_core::edit
+14 trace ton_language_server_core::edit
   end_character: 11
   end_line: 1
   message: built tree-sitter input edit
@@ -118,39 +123,39 @@
   start_column: 8
   start_line: 1
   start_row: 1
-14 debug ton_language_server_core::languages::tlb
+15 debug ton_language_server_core::languages::tlb
   incremental: true
   message: parsing TL-B document
   operation: tlb.parse
   text_len: 37
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-15 debug ton_language_server_core::languages::tlb
+16 debug ton_language_server_core::languages::tlb
   has_error: false
   incremental: true
   message: parsed TL-B document
   operation: tlb.parse
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-16 trace ton_language_server_core::languages::tlb
+17 trace ton_language_server_core::languages::tlb
   end_byte: 15
   message: indexed TL-B symbol
   name: New
   operation: tlb.index.symbol
   start_byte: 12
-17 trace ton_language_server_core::languages::tlb
+18 trace ton_language_server_core::languages::tlb
   end_byte: 35
   message: indexed TL-B symbol
   name: Wrap
   operation: tlb.index.symbol
   start_byte: 31
-18 debug ton_language_server_core::languages::tlb
+19 debug ton_language_server_core::languages::tlb
   declaration_count: 2
   message: rebuilt TL-B symbol index
   operation: tlb.index.rebuilt
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-19 info ton_language_server_core::service
+20 info ton_language_server_core::service
   edit_count: 2
   incremental: true
   language_id: tlb
@@ -159,7 +164,7 @@
   text_len: 37
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-20 info ton_language_server_core::service
+21 info ton_language_server_core::service
   character: 8
   language_id: tlb
   line: 1
@@ -167,14 +172,14 @@
   operation: definition
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-21 trace ton_language_server_core::languages::tlb
+22 trace ton_language_server_core::languages::tlb
   character: 8
   line: 1
   message: looking up TL-B reference
   operation: tlb.reference.lookup
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-22 trace ton_language_server_core::languages::tlb
+23 trace ton_language_server_core::languages::tlb
   character: 8
   found_node: true
   line: 1
@@ -183,19 +188,19 @@
   operation: tlb.reference.lookup
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-23 trace ton_language_server_core::languages::tlb
+24 trace ton_language_server_core::languages::tlb
   end_byte: 15
   kind: declaration
   message: found TL-B declaration candidate
   name: New
   operation: tlb.reference.candidate
   start_byte: 12
-24 trace ton_language_server_core::languages::tlb
+25 trace ton_language_server_core::languages::tlb
   message: resolved TL-B reference
   name: New
   operation: tlb.reference.resolve
   result_count: 1
-25 debug ton_language_server_core::languages::tlb
+26 debug ton_language_server_core::languages::tlb
   character: 8
   line: 1
   message: resolved TL-B definition
@@ -203,7 +208,7 @@
   result_count: 1
   uri: file://<redacted>/logging-snapshot.tlb
   version: 2
-26 info ton_language_server_core::service
+27 info ton_language_server_core::service
   character: 8
   language_id: tlb
   line: 1

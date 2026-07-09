@@ -223,3 +223,33 @@ impl CodeLens {
         Self { range, command }
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct FoldingRange {
+    pub start_line: u32,
+    pub start_character: Option<u32>,
+    pub end_line: u32,
+    pub end_character: Option<u32>,
+}
+
+impl FoldingRange {
+    #[must_use]
+    pub const fn new(
+        start_line: u32,
+        start_character: Option<u32>,
+        end_line: u32,
+        end_character: Option<u32>,
+    ) -> Self {
+        Self {
+            start_line,
+            start_character,
+            end_line,
+            end_character,
+        }
+    }
+
+    #[must_use]
+    pub const fn line_range(start_line: u32, end_line: u32) -> Self {
+        Self::new(start_line, None, end_line, None)
+    }
+}

@@ -14,6 +14,7 @@ license = { workspace = true }
 anyhow = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+fift-syntax = { workspace = true }
 tasm-syntax = { workspace = true }
 tlb-syntax = { workspace = true }
 ton-syntax = { workspace = true }
@@ -39,6 +40,10 @@ path = "tests/languages/tasm/hover.rs"
 [[test]]
 name = "tasm_code_lens"
 path = "tests/languages/tasm/code_lens.rs"
+
+[[test]]
+name = "fift_folding"
+path = "tests/languages/fift/folding.rs"
 
 [lints]
 workspace = true

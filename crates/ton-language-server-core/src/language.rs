@@ -1,5 +1,5 @@
 use crate::profiling::Profiler;
-use crate::types::{CodeLens, DocumentSnapshot, Hover, Location, Position};
+use crate::types::{CodeLens, DocumentSnapshot, FoldingRange, Hover, Location, Position};
 use std::any::Any;
 use tree_sitter::Tree;
 
@@ -11,6 +11,7 @@ pub struct FeatureSet {
     pub references: bool,
     pub hover: bool,
     pub code_lens: bool,
+    pub folding_ranges: bool,
     pub completion: bool,
     pub semantic_tokens: bool,
 }
@@ -47,6 +48,10 @@ pub struct CodeLensRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
+pub struct FoldingRangeRequest<'a> {
+    pub context: PluginContext<'a>,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -65,6 +70,13 @@ pub trait LanguagePlugin: Send + Sync {
     }
 
     fn code_lens(&self, _request: CodeLensRequest<'_>) -> anyhow::Result<Vec<CodeLens>> {
+        Ok(Vec::new())
+    }
+
+    fn folding_ranges(
+        &self,
+        _request: FoldingRangeRequest<'_>,
+    ) -> anyhow::Result<Vec<FoldingRange>> {
         Ok(Vec::new())
     }
 }

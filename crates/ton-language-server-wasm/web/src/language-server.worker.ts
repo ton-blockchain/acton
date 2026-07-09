@@ -48,6 +48,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       codeLensProvider: {
         resolveProvider: false,
       },
+      foldingRangeProvider: true,
       executeCommandProvider: {
         commands: [STACK_EFFECT_CODE_LENS_COMMAND],
       },
@@ -84,6 +85,11 @@ connection.onHover(async params => {
 connection.onCodeLens(async params => {
   const server = await getLanguageServer()
   return server.codeLens(params.textDocument.uri)
+})
+
+connection.onFoldingRanges(async params => {
+  const server = await getLanguageServer()
+  return server.foldingRanges(params.textDocument.uri)
 })
 
 connection.onExecuteCommand(async params => {

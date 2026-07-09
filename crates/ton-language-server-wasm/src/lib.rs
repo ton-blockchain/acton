@@ -1,10 +1,11 @@
 use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Write as _;
+use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::TasmLanguage;
 use ton_language_server_core::{
-    CORE_TARGET, CodeLens, DocumentUri, Hover, LanguageId, LanguageService, Location, LogLevel,
-    Position, ProfileSummary,
+    CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
+    LogLevel, Position, ProfileSummary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -135,6 +136,17 @@ impl TonLanguageServer {
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&code_lenses_to_lsp(lenses)).map_err(js_error)
     }
+
+    #[wasm_bindgen(js_name = foldingRanges)]
+    pub fn folding_ranges(&self, uri: String) -> Result<JsValue, JsValue> {
+        let ranges = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .folding_ranges(&DocumentUri::from(uri))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&folding_ranges_to_lsp(ranges)).map_err(js_error)
+    }
 }
 
 impl Default for TonLanguageServer {
@@ -149,6 +161,7 @@ fn wasm_language_service() -> LanguageService {
     });
     service.register_language(ton_language_server_core::languages::tlb::TlbLanguage::new());
     service.register_language(TasmLanguage::new());
+    service.register_language(FiftLanguage::new());
     service
 }
 
@@ -184,6 +197,17 @@ struct LspCommand {
     command: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     arguments: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspFoldingRange {
+    start_line: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    start_character: Option<u32>,
+    end_line: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    end_character: Option<u32>,
 }
 
 #[derive(Serialize)]
@@ -234,6 +258,18 @@ fn code_lens_to_lsp(lens: CodeLens) -> LspCodeLens {
             arguments: command.arguments,
         }),
     }
+}
+
+fn folding_ranges_to_lsp(ranges: Vec<FoldingRange>) -> Vec<LspFoldingRange> {
+    ranges
+        .into_iter()
+        .map(|range| LspFoldingRange {
+            start_line: range.start_line,
+            start_character: range.start_character,
+            end_line: range.end_line,
+            end_character: range.end_character,
+        })
+        .collect()
 }
 
 const fn range_to_lsp(range: ton_language_server_core::Range) -> LspRange {

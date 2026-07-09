@@ -1,11 +1,12 @@
 use crate::language::{
-    CodeLensRequest, DefinitionRequest, HoverRequest, LanguagePlugin, ParseRequest, ParsedDocument,
-    PluginContext,
+    CodeLensRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest, LanguagePlugin,
+    ParseRequest, ParsedDocument, PluginContext,
 };
 use crate::logging;
 use crate::profiling::Profiler;
 use crate::types::{
-    CodeLens, DocumentSnapshot, DocumentUri, Hover, LanguageId, Location, Position, TextEdit,
+    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location, Position,
+    TextEdit,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -607,6 +608,84 @@ impl LanguageService {
                     version = state.document.version(),
                     error = %error,
                     "code lens failed"
+                );
+            }
+        }
+        result
+    }
+
+    pub fn folding_ranges(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<FoldingRange>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "folding_ranges",
+                uri = uri.as_str(),
+                "folding range request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "folding_ranges",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            "folding ranges requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "folding_ranges",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().folding_ranges {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "folding_ranges",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "folding ranges unsupported by language"
+            );
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.folding_ranges(FoldingRangeRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+        });
+        self.profiler.finish("folding_ranges", started_at);
+        match &result {
+            Ok(ranges) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "folding_ranges",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    result_count = ranges.len(),
+                    "folding ranges completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "folding_ranges",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    error = %error,
+                    "folding ranges failed"
                 );
             }
         }
