@@ -9,7 +9,7 @@ use ton_language_server_core::languages::tasm::TasmLanguage;
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
-    LogLevel, Position, ProfileSummary,
+    LogLevel, Position, ProfileSummary, WorkspaceConfig,
 };
 use wasm_bindgen::prelude::*;
 
@@ -53,6 +53,29 @@ impl TonLanguageServer {
             .try_borrow_mut()
             .map_err(|_| language_server_busy())?
             .add_source_file(LanguageId::from(language_id), DocumentUri::from(uri), text)
+            .map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = setWorkspaceConfigForLanguage)]
+    pub fn set_workspace_config_for_language(
+        &self,
+        language_id: String,
+        root_uri: String,
+        manifest_uri: String,
+        manifest_text: String,
+    ) -> Result<(), JsValue> {
+        let manifest_uri = if manifest_uri.is_empty() {
+            None
+        } else {
+            Some(DocumentUri::from(manifest_uri))
+        };
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .set_workspace_config(
+                LanguageId::from(language_id),
+                WorkspaceConfig::new(DocumentUri::from(root_uri), manifest_uri, manifest_text),
+            )
             .map_err(js_error)
     }
 

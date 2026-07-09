@@ -5397,6 +5397,7 @@ dependencies = [
  "tolk-resolver",
  "tolk-syntax",
  "tolk-ty",
+ "toml",
  "ton-syntax",
  "tracing",
  "tree-sitter",

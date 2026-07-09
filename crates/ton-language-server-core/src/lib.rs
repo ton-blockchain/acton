@@ -20,7 +20,7 @@ pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{
     CodeLens, Command, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location,
-    Position, Range, TextEdit,
+    Position, Range, TextEdit, WorkspaceConfig,
 };
 
 #[must_use]

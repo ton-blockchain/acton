@@ -2,9 +2,13 @@ use crate::language::{
     DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument, WorkspaceLanguage,
 };
 use crate::logging;
-use crate::{DocumentSnapshot, DocumentUri, LanguageId, Location, Profiler, Range, TextIndex};
+use crate::{
+    DocumentSnapshot, DocumentUri, LanguageId, Location, Profiler, Range, TextIndex,
+    WorkspaceConfig,
+};
 use anyhow::Context;
 use include_dir::{Dir, include_dir};
+use serde::Deserialize;
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Component, Path, PathBuf};
@@ -146,6 +150,10 @@ impl WorkspaceLanguage for TolkLanguage {
         TolkLanguage::add_source_file(self, uri, text)
     }
 
+    fn set_workspace_config(&self, config: WorkspaceConfig) -> anyhow::Result<()> {
+        self.engine.set_workspace_config(config)
+    }
+
     fn did_open(
         &self,
         document: &DocumentSnapshot,
@@ -211,6 +219,18 @@ impl TolkWorkspaceEngine {
         file.base_uri = Some(uri);
         file.base_text = Some(text);
         file.dirty = true;
+        let mut profiler = Profiler::disabled();
+        state.rebuild_snapshot(&mut profiler)
+    }
+
+    fn set_workspace_config(&self, config: WorkspaceConfig) -> anyhow::Result<()> {
+        let project_config = TolkProjectConfig::from_workspace_config(&config)?;
+        let mut state = self.state.write().expect("Tolk workspace lock poisoned");
+        if state.project_config == project_config {
+            return Ok(());
+        }
+        state.project_config = project_config;
+        state.invalidate_project_config();
         let mut profiler = Profiler::disabled();
         state.rebuild_snapshot(&mut profiler)
     }
@@ -343,6 +363,7 @@ struct TolkWorkspaceState {
     type_interner: TypeInterner,
     type_db_cache: TypeDbCache,
     all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    project_config: TolkProjectConfig,
     files: BTreeMap<PathBuf, TolkWorkspaceFile>,
     roots: BTreeSet<PathBuf>,
     generation: u64,
@@ -356,6 +377,7 @@ impl Default for TolkWorkspaceState {
             type_interner: TypeInterner::new(),
             type_db_cache: TypeDbCache::default(),
             all_body_types: HashMap::new(),
+            project_config: TolkProjectConfig::default(),
             files: BTreeMap::new(),
             roots: BTreeSet::new(),
             generation: 0,
@@ -387,10 +409,12 @@ impl TolkWorkspaceState {
         let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
         roots.sort();
         let root = roots.remove(0);
+        let project_config = self.project_config.clone();
         let index_started_at = profiler.start();
         let project_index = ProjectIndex::builder(&file_db, root)
             .with_additional_roots(roots)
             .with_stdlib(stdlib_path)
+            .with_mappings(&project_config.import_mappings)
             .build_with_provider(&provider);
         profiler.finish("tolk.snapshot.index", index_started_at);
         let mut project_index = project_index?;
@@ -430,9 +454,22 @@ impl TolkWorkspaceState {
             generation = self.generation,
             root_count = self.roots.len(),
             file_count = self.files.len(),
+            project_root = project_config.project_root.to_string_lossy().as_ref(),
+            import_mapping_count = project_config
+                .import_mappings
+                .as_ref()
+                .map_or(0, BTreeMap::len),
             "rebuilt Tolk resolve snapshot"
         );
         Ok(())
+    }
+
+    fn invalidate_project_config(&mut self) {
+        for file in self.files.values_mut() {
+            file.dirty = true;
+        }
+        self.type_db_cache = TypeDbCache::default();
+        self.all_body_types.clear();
     }
 
     fn process_dirty_files(&mut self, profiler: &mut Profiler) -> anyhow::Result<BTreeSet<FileId>> {
@@ -467,6 +504,65 @@ impl TolkWorkspaceState {
         profiler.finish("tolk.snapshot.update_files", started_at);
         Ok(changed_file_ids)
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct TolkProjectConfig {
+    project_root: PathBuf,
+    import_mappings: Option<BTreeMap<String, String>>,
+}
+
+impl Default for TolkProjectConfig {
+    fn default() -> Self {
+        Self {
+            project_root: PathBuf::from("/"),
+            import_mappings: None,
+        }
+    }
+}
+
+impl TolkProjectConfig {
+    fn from_workspace_config(config: &WorkspaceConfig) -> anyhow::Result<Self> {
+        let manifest = toml::from_str::<ActonManifest>(config.manifest_text().as_ref())
+            .with_context(|| {
+                let uri = config
+                    .manifest_uri()
+                    .map_or("Acton.toml", DocumentUri::as_str);
+                format!("failed to parse {uri}")
+            })?;
+        let project_root = logical_path_for_uri(config.root_uri());
+        Ok(Self {
+            import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
+            project_root,
+        })
+    }
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct ActonManifest {
+    #[serde(default, rename = "import-mappings")]
+    import_mappings: Option<BTreeMap<String, String>>,
+}
+
+fn normalize_import_mappings(
+    mappings: Option<BTreeMap<String, String>>,
+    project_root: &Path,
+) -> Option<BTreeMap<String, String>> {
+    let mappings = mappings?;
+    Some(
+        mappings
+            .into_iter()
+            .map(|(key, value)| {
+                let value_path = Path::new(&value);
+                let normalized_value = if value_path.is_absolute() {
+                    normalize_path(value_path)
+                } else {
+                    normalize_path(&project_root.join(value_path))
+                };
+                (key, normalized_value.to_string_lossy().to_string())
+            })
+            .collect(),
+    )
 }
 
 #[derive(Clone, Debug, Default)]

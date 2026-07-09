@@ -108,8 +108,29 @@ input[type="checkbox"] {
   grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
 }
 
+#main-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+}
+
+#app-shell[data-show-acton-config="true"] #main-panel {
+  grid-template-rows: minmax(0, 1fr) minmax(160px, 30%);
+}
+
 #monaco-editor-root {
   min-height: 0;
+}
+
+#acton-config-editor-root {
+  border-top: 1px solid #2a2f3a;
+  display: none;
+  min-height: 0;
+}
+
+#app-shell[data-show-acton-config="true"] #acton-config-editor-root {
+  display: block;
 }
 
 #side-panel {

@@ -1,6 +1,7 @@
 use crate::profiling::Profiler;
 use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, Location, Position,
+    WorkspaceConfig,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -44,6 +45,10 @@ pub trait WorkspaceLanguage: Send + Sync {
 
     fn add_source_file(&self, _uri: DocumentUri, _text: Arc<str>) -> anyhow::Result<()> {
         anyhow::bail!("workspace source files are not supported by this language")
+    }
+
+    fn set_workspace_config(&self, _config: WorkspaceConfig) -> anyhow::Result<()> {
+        anyhow::bail!("workspace configuration is not supported by this language")
     }
 }
 

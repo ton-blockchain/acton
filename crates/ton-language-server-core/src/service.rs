@@ -6,7 +6,7 @@ use crate::logging;
 use crate::profiling::Profiler;
 use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location, Position,
-    TextEdit,
+    TextEdit, WorkspaceConfig,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -118,6 +118,69 @@ impl LanguageService {
                     language_id = language_id.as_str(),
                     error = %error,
                     "failed to add provider-backed source file"
+                );
+            }
+        }
+        result
+    }
+
+    pub fn set_workspace_config(
+        &mut self,
+        language_id: impl Into<LanguageId>,
+        config: WorkspaceConfig,
+    ) -> anyhow::Result<()> {
+        let language_id = language_id.into();
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "workspace.config.set",
+            root_uri = config.root_uri().as_str(),
+            manifest_uri = config.manifest_uri().map(DocumentUri::as_str),
+            language_id = language_id.as_str(),
+            text_len = config.manifest_text().len(),
+            "setting workspace configuration"
+        );
+
+        let Some(plugin) = self.plugins.get(&language_id) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "workspace.config.set",
+                root_uri = config.root_uri().as_str(),
+                manifest_uri = config.manifest_uri().map(DocumentUri::as_str),
+                language_id = language_id.as_str(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        let Some(workspace) = plugin.workspace() else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "workspace.config.set",
+                root_uri = config.root_uri().as_str(),
+                manifest_uri = config.manifest_uri().map(DocumentUri::as_str),
+                language_id = language_id.as_str(),
+                "language has no workspace provider"
+            );
+            anyhow::bail!("language '{language_id}' does not support workspace configuration");
+        };
+
+        let result = workspace.set_workspace_config(config);
+        match &result {
+            Ok(()) => {
+                self.profiler.increment("workspace.config.set");
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "workspace.config.set",
+                    language_id = language_id.as_str(),
+                    "workspace configuration updated"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "workspace.config.set",
+                    language_id = language_id.as_str(),
+                    error = %error,
+                    "failed to set workspace configuration"
                 );
             }
         }

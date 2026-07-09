@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use support::MarkedSource;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position,
+    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position, WorkspaceConfig,
 };
 
 fn case_tolk_definition(
@@ -107,6 +107,45 @@ fn resolves_imported_function() {
         },
         expect![[r"
             1:25 -> acton://fixture/lib.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_imported_function_through_acton_toml_mapping() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@lib/helper"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new(
+                        "file:///workspace",
+                        Some(DocumentUri::from("file:///workspace/Acton.toml")),
+                        r#"
+                            [package]
+                            name = "fixture"
+                            version = "0.1.0"
+
+                            [import-mappings]
+                            lib = "./src/lib"
+                        "#,
+                    ),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/src/lib/helper.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r"
+            1:25 -> file:///workspace/src/lib/helper.tolk 0:4 resolved"]],
     );
 }
 

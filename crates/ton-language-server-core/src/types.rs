@@ -35,6 +35,43 @@ impl fmt::Display for DocumentUri {
     }
 }
 
+#[derive(Clone, Debug)]
+pub struct WorkspaceConfig {
+    root_uri: DocumentUri,
+    manifest_uri: Option<DocumentUri>,
+    manifest_text: Arc<str>,
+}
+
+impl WorkspaceConfig {
+    #[must_use]
+    pub fn new(
+        root_uri: impl Into<DocumentUri>,
+        manifest_uri: Option<DocumentUri>,
+        manifest_text: impl Into<Arc<str>>,
+    ) -> Self {
+        Self {
+            root_uri: root_uri.into(),
+            manifest_uri,
+            manifest_text: manifest_text.into(),
+        }
+    }
+
+    #[must_use]
+    pub const fn root_uri(&self) -> &DocumentUri {
+        &self.root_uri
+    }
+
+    #[must_use]
+    pub const fn manifest_uri(&self) -> Option<&DocumentUri> {
+        self.manifest_uri.as_ref()
+    }
+
+    #[must_use]
+    pub const fn manifest_text(&self) -> &Arc<str> {
+        &self.manifest_text
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct LanguageId(Arc<str>);
 

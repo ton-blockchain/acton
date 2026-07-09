@@ -16,7 +16,13 @@ all-languages = ["tlb", "tasm", "fift", "tolk"]
 tlb = ["dep:tlb-syntax", "dep:ton-syntax"]
 tasm = ["dep:tasm-syntax"]
 fift = ["dep:fift-syntax"]
-tolk = ["dep:include_dir", "dep:tolk-resolver", "dep:tolk-syntax", "dep:tolk-ty"]
+tolk = [
+    "dep:include_dir",
+    "dep:tolk-resolver",
+    "dep:tolk-syntax",
+    "dep:tolk-ty",
+    "dep:toml",
+]
 
 [dependencies]
 anyhow = { workspace = true }
@@ -29,6 +35,7 @@ tlb-syntax = { workspace = true, optional = true }
 tolk-resolver = { workspace = true, optional = true }
 tolk-syntax = { workspace = true, optional = true }
 tolk-ty = { workspace = true, optional = true }
+toml = { workspace = true, optional = true }
 ton-syntax = { workspace = true, optional = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }

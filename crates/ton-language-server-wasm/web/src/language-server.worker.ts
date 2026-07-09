@@ -23,6 +23,7 @@ const LOGS_REQUEST = "ton/logs"
 const CLEAR_LOGS_REQUEST = "ton/clearLogs"
 const PROFILE_REQUEST = "ton/profile"
 const ADD_SOURCE_FILE_REQUEST = "ton/addSourceFile"
+const SET_WORKSPACE_CONFIG_REQUEST = "ton/setWorkspaceConfig"
 const STACK_EFFECT_CODE_LENS_COMMAND = "tonls.tasm.stackEffect"
 
 let languageServerPromise: Promise<TonLanguageServer> | undefined
@@ -137,6 +138,20 @@ connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>
   }),
 )
 
+connection.onRequest(SET_WORKSPACE_CONFIG_REQUEST, async params =>
+  withLanguageServer(SET_WORKSPACE_CONFIG_REQUEST, server => {
+    if (!isRecord(params)) {
+      throw new Error("expected { languageId, rootUri, manifestUri?, text } params")
+    }
+    const languageId = requiredString(params.languageId, "languageId")
+    const rootUri = requiredString(params.rootUri, "rootUri")
+    const manifestUri = typeof params.manifestUri === "string" ? params.manifestUri : ""
+    const text = requiredString(params.text, "text")
+    server.setWorkspaceConfigForLanguage(languageId, rootUri, manifestUri, text)
+    return null
+  }),
+)
+
 documents.listen(connection)
 connection.listen()
 
@@ -176,4 +191,11 @@ function errorText(error: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
+}
+
+function requiredString(value: unknown, name: string): string {
+  if (typeof value !== "string") {
+    throw new Error(`${name} must be a string`)
+  }
+  return value
 }

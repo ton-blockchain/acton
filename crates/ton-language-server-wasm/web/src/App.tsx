@@ -21,7 +21,9 @@ import {
   languageSupports,
   normalizeLanguage,
   type SupportedLanguage,
+  TOLK_LANGUAGE_ID,
 } from "./languages"
+import {actonTomlLanguageSupport, defaultActonTomlSource} from "./languages/acton-toml"
 
 type LogLevelName = "off" | "error" | "warn" | "info" | "debug" | "trace"
 
@@ -61,6 +63,8 @@ type PersistedState = {
   logLevel: LogLevelName
   logsVisible: boolean
   profileVisible: boolean
+  actonTomlVisible: boolean
+  actonToml: string
   files: Record<SupportedLanguage, string>
 }
 
@@ -81,16 +85,21 @@ type SmokeApi = {
   setLogLevel: (level: LogLevelName) => Promise<void>
   setLogsVisible: (visible: boolean) => void
   setProfileVisible: (visible: boolean) => void
+  setActonTomlVisible: (visible: boolean) => void
+  setActonTomlText: (text: string) => void
   editorText: () => string
+  actonTomlText: () => string
   languageId: () => string | undefined
 }
 
 const workspaceUri = vscode.Uri.file("/workspace")
+const actonTomlUri = vscode.Uri.file("/workspace/Acton.toml")
 const storageKey = "ton-language-server-web-state:v1"
 const logLevelRequest = "ton/setLogLevel"
 const logsRequest = "ton/logs"
 const clearLogsRequest = "ton/clearLogs"
 const profileRequest = "ton/profile"
+const setWorkspaceConfigRequest = "ton/setWorkspaceConfig"
 
 const logLevels: readonly LogLevelName[] = ["off", "error", "warn", "info", "debug", "trace"]
 
@@ -108,11 +117,14 @@ export function App() {
   const persistedRef = useRef(persisted)
   const currentLanguageRef = useRef(persisted.selectedLanguage)
   const editorRootRef = useRef<HTMLDivElement | null>(null)
+  const actonConfigRootRef = useRef<HTMLDivElement | null>(null)
   const profileRootRef = useRef<HTMLDivElement | null>(null)
   const logsRootRef = useRef<HTMLDivElement | null>(null)
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
+  const actonConfigEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const profileEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
   const logsEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | undefined>(undefined)
+  const actonConfigModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const profileModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const logsModelRef = useRef<monaco.editor.ITextModel | undefined>(undefined)
   const profileRefreshTimerRef = useRef<ReturnType<typeof globalThis.setInterval> | undefined>(
@@ -126,6 +138,7 @@ export function App() {
   const setLogLevelRef = useRef<(level: LogLevelName) => Promise<void>>(async () => {})
   const setLogsVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const setProfileVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
+  const setActonTomlVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const clearLogsRef = useRef<() => Promise<void>>(async () => {})
 
   const persist = useCallback((next: PersistedState, updateReact = true) => {
@@ -179,6 +192,11 @@ export function App() {
         monaco.languages.register(language.extensionPoint)
         monaco.languages.setMonarchTokensProvider(language.id, language.monarchLanguage)
       }
+      monaco.languages.register(actonTomlLanguageSupport.extensionPoint)
+      monaco.languages.setMonarchTokensProvider(
+        actonTomlLanguageSupport.id,
+        actonTomlLanguageSupport.monarchLanguage,
+      )
       languagesRegistered = true
     }
 
@@ -209,9 +227,10 @@ export function App() {
 
     const start = async () => {
       const editorRoot = editorRootRef.current
+      const actonConfigRoot = actonConfigRootRef.current
       const profileRoot = profileRootRef.current
       const logsRoot = logsRootRef.current
-      if (!editorRoot || !profileRoot || !logsRoot) {
+      if (!editorRoot || !actonConfigRoot || !profileRoot || !logsRoot) {
         throw new Error("TON LS editor roots are missing")
       }
 
@@ -274,6 +293,25 @@ export function App() {
         return client.sendRequest(method, params)
       }
 
+      const applyWorkspaceConfig = async (text = persistedRef.current.actonToml) => {
+        await sendRequest<null>(setWorkspaceConfigRequest, {
+          languageId: TOLK_LANGUAGE_ID,
+          rootUri: workspaceUri.toString(),
+          manifestUri: actonTomlUri.toString(),
+          text,
+        })
+      }
+
+      const applyWorkspaceConfigIfAvailable = async (text = persistedRef.current.actonToml) => {
+        try {
+          await applyWorkspaceConfig(text)
+        } catch (error) {
+          if (!errorText(error).includes("unsupported language 'tolk'")) {
+            throw error
+          }
+        }
+      }
+
       const refreshLogs = async () => {
         if (!persistedRef.current.logsVisible) {
           return
@@ -323,12 +361,19 @@ export function App() {
         }
       }
 
+      const applyActonTomlVisibility = async () => {
+        editorRef.current?.layout()
+        actonConfigEditorRef.current?.layout()
+      }
+
       const clearLogs = async () => {
         const logs = await sendRequest<string>(clearLogsRequest)
         if (persistedRef.current.logsVisible) {
           updateLogsEditor(logs)
         }
       }
+
+      await applyWorkspaceConfigIfAvailable()
 
       const editorConfig: EditorAppConfig = {
         codeResources: {
@@ -353,6 +398,24 @@ export function App() {
       const editorApp = new EditorApp(editorConfig)
       await editorApp.start(editorRoot)
       editorRef.current = editorApp.getEditor()
+
+      actonConfigModelRef.current = monaco.editor.createModel(
+        persistedRef.current.actonToml,
+        actonTomlLanguageSupport.id,
+        actonTomlUri,
+      )
+      actonConfigEditorRef.current = monaco.editor.create(actonConfigRoot, {
+        automaticLayout: true,
+        fixedOverflowWidgets: true,
+        glyphMargin: false,
+        lineDecorationsWidth: 8,
+        lineNumbersMinChars: 3,
+        minimap: {enabled: false},
+        model: actonConfigModelRef.current,
+        padding: {top: 8, bottom: 8},
+        renderLineHighlight: "line",
+        scrollBeyondLastLine: false,
+      })
 
       profileModelRef.current = monaco.editor.createModel("No profiling data", "plaintext")
       profileEditorRef.current = monaco.editor.create(profileRoot, {
@@ -405,6 +468,31 @@ export function App() {
           }),
         )
       }
+      const actonConfigModel = actonConfigModelRef.current
+      if (actonConfigModel) {
+        disposables.push(
+          actonConfigModel.onDidChangeContent(() => {
+            const actonToml = actonConfigModel.getValue()
+            persist(
+              {
+                ...persistedRef.current,
+                actonToml,
+              },
+              false,
+            )
+            void applyWorkspaceConfigIfAvailable(actonToml)
+              .then(async () => {
+                setStatus({state: "ready", text: "Acton.toml saved locally"})
+                await refreshLogs()
+                await refreshProfile()
+              })
+              .catch((error: unknown) => {
+                console.error(error)
+                setStatus({state: "error", text: errorText(error)})
+              })
+          }),
+        )
+      }
 
       const switchLanguage = async (languageId: SupportedLanguage) => {
         if (languageId === currentLanguageRef.current) {
@@ -416,6 +504,9 @@ export function App() {
           ...persistedRef.current,
           selectedLanguage: languageId,
         })
+        if (languageId === TOLK_LANGUAGE_ID) {
+          await applyWorkspaceConfigIfAvailable()
+        }
         switchingLanguageRef.current = true
         try {
           await editorApp.updateCodeResources({
@@ -438,6 +529,7 @@ export function App() {
       setLogLevelRef.current = applyLogLevel
       setLogsVisibleRef.current = applyLogsVisibility
       setProfileVisibleRef.current = applyProfileVisibility
+      setActonTomlVisibleRef.current = applyActonTomlVisibility
       clearLogsRef.current = clearLogs
 
       const flushCurrentFile = () => saveCurrentFile(currentLanguageRef.current)
@@ -453,6 +545,7 @@ export function App() {
       window.addEventListener("resize", layoutEditors)
       cleanupCallbacks.push(() => window.removeEventListener("resize", layoutEditors))
       await applyLogLevel(persistedRef.current.logLevel)
+      await applyActonTomlVisibility()
       await applyLogsVisibility(persistedRef.current.logsVisible)
       await applyProfileVisibility(persistedRef.current.profileVisible)
 
@@ -531,8 +624,18 @@ export function App() {
           persist({...persistedRef.current, profileVisible: visible})
           void applyProfileVisibility(visible)
         },
+        setActonTomlVisible(visible: boolean) {
+          persist({...persistedRef.current, actonTomlVisible: visible})
+          void applyActonTomlVisibility()
+        },
+        setActonTomlText(text: string) {
+          actonConfigModelRef.current?.setValue(text)
+        },
         editorText() {
           return editorRef.current?.getModel()?.getValue() ?? ""
+        },
+        actonTomlText() {
+          return actonConfigModelRef.current?.getValue() ?? ""
         },
         languageId() {
           return editorRef.current?.getModel()?.getLanguageId()
@@ -549,6 +652,7 @@ export function App() {
 
       function layoutEditors() {
         editorRef.current?.layout()
+        actonConfigEditorRef.current?.layout()
         profileEditorRef.current?.layout()
         logsEditorRef.current?.layout()
       }
@@ -575,6 +679,8 @@ export function App() {
       for (const cleanup of cleanupCallbacks) {
         cleanup()
       }
+      actonConfigEditorRef.current?.dispose()
+      actonConfigModelRef.current?.dispose()
       profileEditorRef.current?.dispose()
       profileModelRef.current?.dispose()
       logsEditorRef.current?.dispose()
@@ -619,6 +725,15 @@ export function App() {
     })
   }
 
+  const handleActonTomlVisibleChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const actonTomlVisible = event.currentTarget.checked
+    persist({...persistedRef.current, actonTomlVisible})
+    void setActonTomlVisibleRef.current(actonTomlVisible).catch((error: unknown) => {
+      console.error(error)
+      setStatus({state: "error", text: errorText(error)})
+    })
+  }
+
   const handleClearLogs = () => {
     void clearLogsRef.current().catch((error: unknown) => {
       console.error(error)
@@ -631,6 +746,7 @@ export function App() {
       id="app-shell"
       data-show-logs={String(persisted.logsVisible)}
       data-show-profile={String(persisted.profileVisible)}
+      data-show-acton-config={String(persisted.actonTomlVisible)}
       data-show-panel={String(persisted.logsVisible || persisted.profileVisible)}
     >
       <div id="toolbar">
@@ -672,6 +788,15 @@ export function App() {
         </button>
         <label className="check-field">
           <input
+            id="acton-config-toggle"
+            type="checkbox"
+            checked={persisted.actonTomlVisible}
+            onChange={handleActonTomlVisibleChange}
+          />
+          <span>Acton.toml</span>
+        </label>
+        <label className="check-field">
+          <input
             id="profile-toggle"
             type="checkbox"
             checked={persisted.profileVisible}
@@ -684,7 +809,10 @@ export function App() {
         </div>
       </div>
       <div id="editor-shell">
-        <div id="monaco-editor-root" ref={editorRootRef} />
+        <div id="main-panel">
+          <div id="monaco-editor-root" ref={editorRootRef} />
+          <div id="acton-config-editor-root" ref={actonConfigRootRef} />
+        </div>
         <div id="side-panel">
           <div id="profile-editor-root" ref={profileRootRef} />
           <div id="logs-editor-root" ref={logsRootRef} />
@@ -753,6 +881,8 @@ function loadState(): PersistedState {
     logLevel: "info",
     logsVisible: false,
     profileVisible: false,
+    actonTomlVisible: false,
+    actonToml: defaultActonTomlSource,
     files: defaultFiles(),
   }
   const raw = localStorage.getItem(storageKey)
@@ -766,6 +896,8 @@ function loadState(): PersistedState {
       logLevel: normalizeLogLevel(parsed.logLevel),
       logsVisible: parsed.logsVisible === true,
       profileVisible: parsed.profileVisible === true,
+      actonTomlVisible: parsed.actonTomlVisible === true,
+      actonToml: typeof parsed.actonToml === "string" ? parsed.actonToml : defaultActonTomlSource,
       files: readPersistedFiles(parsed.files),
     }
   } catch {
