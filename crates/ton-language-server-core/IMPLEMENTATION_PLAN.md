@@ -301,6 +301,10 @@ Performance principles:
 - Avoid cloning full document text or large indexes in feature handlers.
 - Keep WASM/browser costs in mind: serialization, copying strings across the
   JS/WASM boundary, and worker message size are part of latency.
+- Keep tree-sitter WASM builds on the upstream path: `tree-sitter` 0.26+
+  consumes the `tree-sitter-language` WASM headers/sources, and grammar crates
+  should expose that crate to their build scripts instead of vendoring local
+  libc shims or generated workaround files.
 
 Profiling should be optional and cheap when disabled.
 

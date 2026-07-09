@@ -251,7 +251,10 @@ fn collect_mutations<'a>(
                     }
 
                     for idx in 0..node.child_count() {
-                        if let Some(child) = node.child(idx) {
+                        let Ok(child_index) = u32::try_from(idx) else {
+                            continue;
+                        };
+                        if let Some(child) = node.child(child_index) {
                             stack.push(child);
                         }
                     }

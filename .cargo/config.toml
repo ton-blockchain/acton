@@ -1,6 +1,9 @@
 [alias]
 xtask = "run --package xtask --"
 
+[env]
+CC_wasm32_unknown_unknown = { value = "tools/wasm32-unknown-unknown-clang", relative = true }
+
 # uncomment for flamegraph collection
 #[build]
 #rustflags = ["-C", "force-frame-pointers=yes"]

@@ -61,7 +61,10 @@ fn push_generic_folding(node: Node<'_>, result: &mut Vec<FoldingRange>) {
     let Some(open_brace) = node.child(0) else {
         return;
     };
-    let Some(close_brace) = node.child(child_count - 1) else {
+    let Ok(close_brace_index) = u32::try_from(child_count - 1) else {
+        return;
+    };
+    let Some(close_brace) = node.child(close_brace_index) else {
         return;
     };
 

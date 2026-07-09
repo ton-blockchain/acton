@@ -118,7 +118,7 @@ impl FileInfo {
     #[must_use]
     pub fn find_syntax_declaration(&self, decl_id: SymbolId) -> Option<ast::TopLevel<'_>> {
         let idx = self.index.symbol_id_to_decl_index.get(&decl_id.local_id)?;
-        let child = self.source.root_node().child(*idx)?;
+        let child = self.source.root_node().child(u32::try_from(*idx).ok()?)?;
         Some(child.into())
     }
 }

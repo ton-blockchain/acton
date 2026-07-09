@@ -46,7 +46,7 @@ impl TlbSymbolIndex {
         Self { declarations }
     }
 
-    pub(super) fn declaration_count(&self) -> usize {
+    pub(super) const fn declaration_count(&self) -> usize {
         self.declarations.len()
     }
 

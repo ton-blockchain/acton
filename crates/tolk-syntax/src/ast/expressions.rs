@@ -371,7 +371,8 @@ impl<'tree> Bin<'tree> {
     }
 
     pub fn right(&self) -> Option<Expr<'tree>> {
-        self.0.child(self.0.child_count() - 1).map(Into::into)
+        let child_index = u32::try_from(self.0.child_count().checked_sub(1)?).ok()?;
+        self.0.child(child_index).map(Into::into)
     }
 }
 

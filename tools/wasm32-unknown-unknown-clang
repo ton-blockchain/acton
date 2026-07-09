@@ -1,0 +1,34 @@
+#!/bin/sh
+set -eu
+
+try_sdk() {
+  sdk="$1"
+  shift
+  if [ -z "$sdk" ]; then
+    return 1
+  fi
+
+  for compiler in \
+    "$sdk/bin/clang" \
+    "$sdk/bin/wasm32-wasip1-clang" \
+    "$sdk/bin/wasm32-wasi-clang"
+  do
+    if [ -x "$compiler" ]; then
+      exec "$compiler" "$@"
+    fi
+  done
+
+  return 1
+}
+
+try_sdk "${TREE_SITTER_WASI_SDK_PATH:-}" "$@" || true
+try_sdk "${WASI_SDK_PATH:-}" "$@" || true
+try_sdk "${HOME:-}/.cache/tree-sitter/wasi-sdk" "$@" || true
+
+cat >&2 <<'EOF'
+error: no WebAssembly-capable clang found for wasm32-unknown-unknown C dependencies
+
+Set TREE_SITTER_WASI_SDK_PATH or WASI_SDK_PATH to a wasi-sdk directory, or let
+tree-sitter CLI populate ~/.cache/tree-sitter/wasi-sdk.
+EOF
+exit 127

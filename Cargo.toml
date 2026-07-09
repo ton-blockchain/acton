@@ -72,6 +72,7 @@ tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
+ton-language-server-core = { path = "crates/ton-language-server-core" }
 ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
@@ -96,7 +97,7 @@ hex = "0.4.3"
 crc = "3.3.0"
 owo-colors = "4.2.3" # overall coloring
 comfy-table = "7.1" # coverage table
-tree-sitter = "0.25.10" # tolk parser
+tree-sitter = "0.26.10" # tolk parser
 clap = { version = "4.5", features = ["derive"] } # CLI
 anyhow = "1.0.100"
 
@@ -193,7 +194,7 @@ codespan-reporting = "0.11.1"
 # acton ls
 tower-lsp = "0.20"
 lsp-types = "0.94.1"
-tree-sitter-language = "0.1"
+tree-sitter-language = "0.1.7"
 
 # other
 rustc-hash = "2.1.1"
