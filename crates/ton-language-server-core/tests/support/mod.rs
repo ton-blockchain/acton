@@ -1,7 +1,7 @@
 use std::fmt::Write as _;
 use ton_language_server_core::{
-    Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken,
-    TextIndex,
+    InlayHint, InlayHintKind, Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES,
+    SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, TextIndex,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -138,6 +138,36 @@ pub(crate) fn render_semantic_tokens(source: &str, tokens: &[SemanticToken]) -> 
     output
 }
 
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn render_inlay_hints(hints: &[InlayHint]) -> String {
+    if hints.is_empty() {
+        return "<none>".to_owned();
+    }
+
+    let mut output = String::new();
+    for hint in hints {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        let kind = match hint.kind {
+            Some(InlayHintKind::Type) => "type",
+            Some(InlayHintKind::Parameter) => "parameter",
+            None => "none",
+        };
+        let _ = write!(
+            output,
+            "{}:{} kind={kind:<9} label={}",
+            hint.position.line, hint.position.character, hint.label
+        );
+        if let Some(tooltip) = &hint.tooltip {
+            let _ = write!(output, " tooltip={tooltip}");
+        }
+    }
+    output
+}
+
+#[allow(dead_code)]
 fn is_marker_name(name: &str) -> bool {
     name == "caret" || name == "target" || name.starts_with("caret:") || name.starts_with("target:")
 }

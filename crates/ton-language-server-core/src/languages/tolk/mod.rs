@@ -1,6 +1,6 @@
 use crate::language::{
-    DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument, ReferenceRequest,
-    SemanticTokensRequest, WorkspaceLanguage,
+    DefinitionRequest, FeatureSet, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument,
+    ReferenceRequest, SemanticTokensRequest, WorkspaceLanguage,
 };
 use crate::logging;
 use crate::{
@@ -21,6 +21,7 @@ use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
 use tree_sitter::Tree;
 
 mod definition;
+mod inlay_hints;
 mod references;
 mod semantic_tokens;
 
@@ -74,6 +75,7 @@ impl LanguagePlugin for TolkLanguage {
             definition: true,
             references: true,
             semantic_tokens: true,
+            inlay_hints: true,
             ..FeatureSet::default()
         }
     }
@@ -207,6 +209,32 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk semantic tokens"
         );
         Ok(tokens)
+    }
+
+    fn inlay_hints(&self, request: InlayHintRequest<'_>) -> anyhow::Result<Vec<crate::InlayHint>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let hints = self
+            .engine
+            .inlay_hints(request.context.document, request.range);
+        request
+            .context
+            .profiler
+            .finish("tolk.inlay_hints", started_at);
+        tracing::debug!(
+            target: logging::TOLK_TARGET,
+            operation = "tolk.inlay_hints",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            result_count = hints.len(),
+            "resolved Tolk inlay hints"
+        );
+        Ok(hints)
     }
 }
 
@@ -461,6 +489,7 @@ impl TolkWorkspaceState {
             file_db,
             project_index: Arc::new(project_index),
             all_body_types: self.all_body_types.clone(),
+            type_interner: self.type_interner.clone(),
             path_to_uri,
         }));
         profiler.finish("tolk.snapshot.materialize", materialize_started_at);
@@ -634,6 +663,7 @@ struct TolkResolveSnapshot {
     file_db: Arc<FileDb>,
     project_index: Arc<ProjectIndex>,
     all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    type_interner: TypeInterner,
     path_to_uri: BTreeMap<PathBuf, DocumentUri>,
 }
 

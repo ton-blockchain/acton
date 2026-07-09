@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 use std::fmt::Write as _;
-use std::fs;
-use std::path::Path;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+#[path = "support/snapshots.rs"]
+mod snapshots;
+use snapshots::assert_file_snapshot;
 use ton_language_server_core::languages::tlb::LANGUAGE_ID;
 use ton_language_server_core::{
     CORE_TARGET, DocumentUri, EDIT_TARGET, LogLevel, LoggingConfig, Position, Range, TextEdit,
@@ -290,24 +291,6 @@ fn redact_path_like_value(value: &str) -> String {
     } else {
         value.to_owned()
     }
-}
-
-fn assert_file_snapshot(name: &str, actual: &str) -> anyhow::Result<()> {
-    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("snapshots")
-        .join(name);
-    let update_snapshots = std::env::var("UPDATE_SNAPSHOTS").is_ok_and(|value| !value.is_empty());
-    if update_snapshots {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(path, actual)?;
-    } else {
-        let expected = fs::read_to_string(&path)?;
-        assert_eq!(actual, expected, "snapshot mismatch for {}", path.display());
-    }
-    Ok(())
 }
 
 const fn range(start_line: u32, start_character: u32, end_line: u32, end_character: u32) -> Range {

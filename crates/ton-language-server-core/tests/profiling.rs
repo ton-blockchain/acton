@@ -129,6 +129,13 @@ fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
         1
     );
 
+    let hints = service.inlay_hints(&uri, range(0, 0, u32::MAX, u32::MAX))?;
+    assert!(!hints.is_empty());
+    assert_eq!(
+        event_count(service.profiler().summary(), "tolk.type_inference"),
+        1
+    );
+
     service.change_document(&uri, 2, source.replace("counter: 1", "counter: 2"))?;
     assert_eq!(
         event_count(service.profiler().summary(), "tolk.type_inference"),
@@ -150,6 +157,8 @@ fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
     assert_eq!(event_count(summary, "tolk.snapshot.materialize"), 2);
     assert_eq!(event_count(summary, "definition"), 3);
     assert_eq!(event_count(summary, "tolk.definition.resolve"), 3);
+    assert_eq!(event_count(summary, "inlay_hints"), 1);
+    assert_eq!(event_count(summary, "tolk.inlay_hints"), 1);
 
     Ok(())
 }

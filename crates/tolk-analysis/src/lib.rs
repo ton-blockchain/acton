@@ -7,6 +7,14 @@ use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, Span, SymbolId, SymbolKind
 use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
 use tolk_ty::{InferenceResult, TypeDb};
 
+mod constant_evaluator;
+mod hashes;
+
+pub use constant_evaluator::{
+    ConstantEvaluationContext, ConstantEvaluator, ConstantValue, is_simple_literal,
+};
+pub use hashes::compute_get_method_id;
+
 bitflags::bitflags! {
     pub struct UseFlags: u8 {
         const READ    = 1 << 1;

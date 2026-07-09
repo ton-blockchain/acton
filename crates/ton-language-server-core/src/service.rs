@@ -1,13 +1,14 @@
 use crate::language::{
-    CodeLensRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest, LanguagePlugin,
-    ParseRequest, ParsedDocument, PluginContext, ReferenceRequest, SemanticTokensRequest,
+    CodeLensRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest, InlayHintRequest,
+    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, ReferenceRequest,
+    SemanticTokensRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
-    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location, Position,
-    TextEdit, WorkspaceConfig,
+    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint, LanguageId, Location,
+    Position, Range, TextEdit, WorkspaceConfig,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -921,6 +922,93 @@ impl LanguageService {
             }
         }
         result.map(SemanticTokens::new)
+    }
+
+    pub fn inlay_hints(
+        &mut self,
+        uri: &DocumentUri,
+        range: Range,
+    ) -> anyhow::Result<Vec<InlayHint>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "inlay_hints",
+                uri = uri.as_str(),
+                "inlay hints request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "inlay_hints",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            start_line = range.start.line,
+            start_character = range.start.character,
+            end_line = range.end.line,
+            end_character = range.end.character,
+            "inlay hints requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "inlay_hints",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().inlay_hints {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "inlay_hints",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "inlay hints unsupported by language"
+            );
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.inlay_hints(InlayHintRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            range,
+        });
+        self.profiler.finish("inlay_hints", started_at);
+        match &result {
+            Ok(hints) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "inlay_hints",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    result_count = hints.len(),
+                    "inlay hints completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "inlay_hints",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    error = %error,
+                    "inlay hints failed"
+                );
+            }
+        }
+        result
     }
 
     pub fn code_lens(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<CodeLens>> {

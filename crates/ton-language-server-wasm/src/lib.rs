@@ -8,9 +8,10 @@ use ton_language_server_core::languages::tasm::TasmLanguage;
 #[cfg(feature = "tolk")]
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
-    CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
-    LogLevel, Position, ProfileSummary, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
-    SemanticToken, SemanticTokens, WorkspaceConfig,
+    CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId,
+    LanguageService, Location, LogLevel, Position, ProfileSummary, Range,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    WorkspaceConfig,
 };
 use wasm_bindgen::prelude::*;
 
@@ -209,6 +210,30 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&semantic_tokens_to_lsp(tokens)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = inlayHints)]
+    pub fn inlay_hints(
+        &self,
+        uri: String,
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let hints = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .inlay_hints(
+                &DocumentUri::from(uri),
+                Range::new(
+                    Position::new(start_line, start_character),
+                    Position::new(end_line, end_character),
+                ),
+            )
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&inlay_hints_to_lsp(hints)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = codeLens)]
     pub fn code_lens(&self, uri: String) -> Result<JsValue, JsValue> {
         let lenses = self
@@ -301,6 +326,19 @@ struct LspSemanticTokens {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspInlayHint {
+    position: LspPosition,
+    label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tooltip: Option<String>,
+    padding_left: bool,
+    padding_right: bool,
+}
+
+#[derive(Serialize)]
 struct LspCommand {
     title: String,
     command: String,
@@ -365,6 +403,23 @@ fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> LspSemanticTokens {
     }
 }
 
+fn inlay_hints_to_lsp(hints: Vec<InlayHint>) -> Vec<LspInlayHint> {
+    hints
+        .into_iter()
+        .map(|hint| LspInlayHint {
+            position: position_to_lsp(hint.position),
+            label: hint.label,
+            kind: hint.kind.map(|kind| match kind {
+                InlayHintKind::Type => 1,
+                InlayHintKind::Parameter => 2,
+            }),
+            tooltip: hint.tooltip,
+            padding_left: hint.padding_left,
+            padding_right: hint.padding_right,
+        })
+        .collect()
+}
+
 fn flatten_semantic_tokens(tokens: Vec<SemanticToken>) -> Vec<u32> {
     let mut data = Vec::with_capacity(tokens.len() * 5);
     for token in tokens {
@@ -400,7 +455,7 @@ fn folding_ranges_to_lsp(ranges: Vec<FoldingRange>) -> Vec<LspFoldingRange> {
         .collect()
 }
 
-const fn range_to_lsp(range: ton_language_server_core::Range) -> LspRange {
+const fn range_to_lsp(range: Range) -> LspRange {
     LspRange {
         start: position_to_lsp(range.start),
         end: position_to_lsp(range.end),

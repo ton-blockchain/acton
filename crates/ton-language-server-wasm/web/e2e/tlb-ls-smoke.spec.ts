@@ -34,6 +34,14 @@ type SmokeGlobal = typeof globalThis & {
       }[]
     >
     foldingRanges: () => Promise<{start: number; end: number; kind: string | null}[]>
+    inlayHints: () => Promise<
+      {
+        position: {line: number; character: number}
+        label: string
+        kind?: number
+        tooltip?: string
+      }[]
+    >
     logs: () => Promise<string>
     profile: () => Promise<string>
     sidePanelText: () => string
@@ -112,6 +120,41 @@ fun main() {
       }),
     }),
   )
+
+  const inlaySource = `const COMPUTED = 1 + 2
+fun deliver(destination: int): void {}
+get fun counter(): int { return 0 }
+fun main(): void {
+    deliver(1);
+}
+`
+  await page.evaluate(source => {
+    ;(globalThis as SmokeGlobal).__tonLsSmoke?.setEditorText(source)
+  }, inlaySource)
+  await expect
+    .poll(async () => {
+      const hints = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.inlayHints(),
+      )
+      return hints?.map(hint => hint.label)
+    })
+    .toEqual(
+      expect.arrayContaining([
+        ": int",
+        " /* = 3 (0x3) */",
+        "destination:",
+        expect.stringMatching(/^\(0x[0-9a-f]+\)$/),
+      ]),
+    )
+
+  const valueHint = await page.evaluate(async () => {
+    const hints = await (globalThis as SmokeGlobal).__tonLsSmoke?.inlayHints()
+    return hints?.find(hint => hint.label.includes("/* ="))
+  })
+  expect(valueHint).toMatchObject({
+    tooltip: "Evaluated value: 3 (0x3)",
+  })
+  expect(valueHint).not.toHaveProperty("kind")
 
   await page.selectOption("#language-select", "tasm")
   await expect

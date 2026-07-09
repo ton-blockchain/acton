@@ -868,6 +868,25 @@ pub struct GetMethod<'tree>(pub Node<'tree>);
 impl_ast_node!(GetMethod, "get_method_declaration");
 
 impl<'tree> GetMethod<'tree> {
+    #[must_use]
+    pub fn get_keyword(&self) -> Option<Node<'tree>> {
+        let mut cursor = self.0.walk();
+        self.0
+            .children(&mut cursor)
+            .find(|child| child.kind_bytes() == b"get")
+    }
+
+    #[must_use]
+    pub fn has_method_id_annotation(&self, source: &'tree str) -> bool {
+        self.annotations().is_some_and(|annotations| {
+            annotations.annotations().any(|annotation| {
+                annotation
+                    .name()
+                    .is_some_and(|name| name.text_matches(source, "method_id"))
+            })
+        })
+    }
+
     pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
         self.0
             .child_by_field_name("parameters")

@@ -10,8 +10,8 @@ pub mod languages;
 
 pub use language::{
     CodeLensRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest, HoverRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, SemanticTokensRequest,
-    WorkspaceLanguage,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    SemanticTokensRequest, WorkspaceLanguage,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
@@ -25,8 +25,8 @@ pub use semantic_tokens::{
 pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{
-    CodeLens, Command, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location,
-    Position, Range, TextEdit, WorkspaceConfig,
+    CodeLens, Command, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint,
+    InlayHintKind, LanguageId, Location, Position, Range, TextEdit, WorkspaceConfig,
 };
 
 #[must_use]

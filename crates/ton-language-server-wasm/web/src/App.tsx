@@ -63,6 +63,15 @@ type PlainSemanticTokens = {
   readonly data: readonly number[]
 }
 
+type PlainInlayHint = {
+  readonly position: {readonly line: number; readonly character: number}
+  readonly label: string
+  readonly kind?: number
+  readonly tooltip?: string
+  readonly paddingLeft?: boolean
+  readonly paddingRight?: boolean
+}
+
 type PersistedState = {
   selectedLanguage: SupportedLanguage
   logLevel: LogLevelName
@@ -79,6 +88,7 @@ type SmokeApi = {
   codeLenses: () => Promise<PlainCodeLens[]>
   foldingRanges: () => Promise<PlainFoldingRange[]>
   semanticTokens: () => Promise<PlainSemanticTokens>
+  inlayHints: () => Promise<PlainInlayHint[]>
   logs: () => Promise<string>
   profile: () => Promise<string>
   sidePanelText: () => string
@@ -251,6 +261,7 @@ export function App() {
             "editor.fontSize": 13,
             "editor.lineHeight": 20,
             "editor.codeLens": true,
+            "editor.inlayHints.enabled": "on",
             "editor.semanticHighlighting.enabled": true,
             "editor.minimap.enabled": false,
             "editor.wordBasedSuggestions": "off",
@@ -395,6 +406,7 @@ export function App() {
           automaticLayout: true,
           fixedOverflowWidgets: true,
           glyphMargin: false,
+          inlayHints: {enabled: "on"},
           lineDecorationsWidth: 8,
           lineNumbersMinChars: 3,
           padding: {top: 8, bottom: 8},
@@ -591,6 +603,25 @@ export function App() {
           return sendRequest<PlainSemanticTokens>("textDocument/semanticTokens/full", {
             textDocument: {
               uri: documentUriFor(currentLanguageRef.current).toString(),
+            },
+          })
+        },
+        async inlayHints() {
+          const model = editorRef.current?.getModel()
+          if (!model) {
+            return []
+          }
+          const fullRange = model.getFullModelRange()
+          return sendRequest<PlainInlayHint[]>("textDocument/inlayHint", {
+            textDocument: {
+              uri: documentUriFor(currentLanguageRef.current).toString(),
+            },
+            range: {
+              start: {line: 0, character: 0},
+              end: {
+                line: fullRange.endLineNumber - 1,
+                character: fullRange.endColumn - 1,
+              },
             },
           })
         },

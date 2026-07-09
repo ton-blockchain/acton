@@ -180,6 +180,7 @@ pub struct Symbol {
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct Parameter {
+    pub name: Arc<str>,
     pub is_mutate: bool,
 }
 
@@ -512,12 +513,7 @@ impl FileIndex {
                         fqn,
                         kind: SymbolKind::Function {
                             has_return_type,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
@@ -559,12 +555,7 @@ impl FileIndex {
                             has_return_type,
                             is_mutable,
                             is_instance,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
@@ -582,12 +573,7 @@ impl FileIndex {
                         fqn,
                         kind: SymbolKind::GetMethod {
                             has_return_type,
-                            parameters: func
-                                .parameters()
-                                .map(|p| Parameter {
-                                    is_mutate: p.mutate(),
-                                })
-                                .collect(),
+                            parameters: Self::extract_parameters(file, func),
                             type_parameters: Self::extract_type_parameters(file, decl),
                         },
                         name_span,
@@ -651,6 +637,21 @@ impl FileIndex {
             })
             .unwrap_or_default()
             .into_iter()
+            .collect()
+    }
+
+    fn extract_parameters<'a, Node: FunctionLike<'a>>(
+        file: &ast::SourceFile,
+        decl: Node,
+    ) -> Vec<Parameter> {
+        decl.parameters()
+            .filter_map(|parameter| {
+                let name = parameter.name()?;
+                Some(Parameter {
+                    name: Arc::from(name.text(&file.source)),
+                    is_mutate: parameter.mutate(),
+                })
+            })
             .collect()
     }
 

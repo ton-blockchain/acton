@@ -18,6 +18,7 @@ tasm = ["dep:tasm-syntax"]
 fift = ["dep:fift-syntax"]
 tolk = [
     "dep:include_dir",
+    "dep:tolk-analysis",
     "dep:tolk-resolver",
     "dep:tolk-syntax",
     "dep:tolk-ty",
@@ -33,6 +34,7 @@ fift-syntax = { workspace = true, optional = true }
 tasm-syntax = { workspace = true, optional = true }
 tlb-syntax = { workspace = true, optional = true }
 tolk-resolver = { workspace = true, optional = true }
+tolk-analysis = { workspace = true, optional = true }
 tolk-syntax = { workspace = true, optional = true }
 tolk-ty = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
@@ -102,6 +104,11 @@ required-features = ["tolk"]
 [[test]]
 name = "tolk_semantic_tokens"
 path = "tests/languages/tolk/semantic_tokens.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_inlay_hints"
+path = "tests/languages/tolk/inlay_hints.rs"
 required-features = ["tolk"]
 
 [lints]

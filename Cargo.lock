@@ -5030,7 +5030,11 @@ name = "tolk-analysis"
 version = "1.1.0"
 dependencies = [
  "bitflags 2.9.4",
+ "crc",
+ "num-bigint",
+ "num-traits",
  "rustc-hash 2.1.1",
+ "sha2",
  "tolk-dataflow",
  "tolk-resolver",
  "tolk-syntax",
@@ -5392,6 +5396,7 @@ dependencies = [
  "serde_json",
  "tasm-syntax",
  "tlb-syntax",
+ "tolk-analysis",
  "tolk-resolver",
  "tolk-syntax",
  "tolk-ty",

@@ -12,9 +12,10 @@ use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, 
 use ton_language_server_core::languages::tlb::TlbLanguage;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, LanguageServiceConfig,
-    Location, Position, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
-    SemanticToken, SemanticTokens, TextEdit, TextIndex, WorkspaceConfig,
+    CodeLens, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId,
+    LanguageService, LanguageServiceConfig, Location, Position, Range,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    TextEdit, TextIndex, WorkspaceConfig,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -263,6 +264,7 @@ impl LanguageServer for NativeLanguageServer {
                 hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 references_provider: Some(lsp::OneOf::Left(true)),
+                inlay_hint_provider: Some(lsp::OneOf::Left(true)),
                 semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::from(
                     lsp::SemanticTokensOptions {
                         work_done_progress_options: lsp::WorkDoneProgressOptions {
@@ -500,6 +502,18 @@ impl LanguageServer for NativeLanguageServer {
         Ok(Some(lsp::SemanticTokensResult::Tokens(
             semantic_tokens_to_lsp(tokens),
         )))
+    }
+
+    async fn inlay_hint(
+        &self,
+        params: lsp::InlayHintParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::InlayHint>>> {
+        let uri = params.text_document.uri;
+        let range = range_from_lsp(params.range);
+        let hints = self
+            .with_service(|service| service.inlay_hints(&DocumentUri::from(uri.to_string()), range))
+            .map_err(rpc_error)?;
+        Ok(Some(hints.into_iter().map(inlay_hint_to_lsp).collect()))
     }
 
     async fn code_lens(
@@ -809,6 +823,22 @@ fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> lsp::SemanticTokens {
     lsp::SemanticTokens {
         result_id: tokens.result_id,
         data: tokens.data.into_iter().map(semantic_token_to_lsp).collect(),
+    }
+}
+
+fn inlay_hint_to_lsp(hint: InlayHint) -> lsp::InlayHint {
+    lsp::InlayHint {
+        position: position_to_lsp(hint.position),
+        label: lsp::InlayHintLabel::String(hint.label),
+        kind: hint.kind.map(|kind| match kind {
+            InlayHintKind::Type => lsp::InlayHintKind::TYPE,
+            InlayHintKind::Parameter => lsp::InlayHintKind::PARAMETER,
+        }),
+        text_edits: None,
+        tooltip: hint.tooltip.map(lsp::InlayHintTooltip::String),
+        padding_left: Some(hint.padding_left),
+        padding_right: Some(hint.padding_right),
+        data: None,
     }
 }
 

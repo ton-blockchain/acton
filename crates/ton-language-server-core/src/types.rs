@@ -275,6 +275,48 @@ impl CodeLens {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum InlayHintKind {
+    Type,
+    Parameter,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InlayHint {
+    pub position: Position,
+    pub label: String,
+    pub kind: Option<InlayHintKind>,
+    pub tooltip: Option<String>,
+    pub padding_left: bool,
+    pub padding_right: bool,
+}
+
+impl InlayHint {
+    #[must_use]
+    pub fn new(position: Position, label: impl Into<String>, kind: InlayHintKind) -> Self {
+        Self {
+            position,
+            label: label.into(),
+            kind: Some(kind),
+            tooltip: None,
+            padding_left: false,
+            padding_right: false,
+        }
+    }
+
+    #[must_use]
+    pub fn plain(position: Position, label: impl Into<String>) -> Self {
+        Self {
+            position,
+            label: label.into(),
+            kind: None,
+            tooltip: None,
+            padding_left: false,
+            padding_right: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FoldingRange {
     pub start_line: u32,
     pub start_character: Option<u32>,

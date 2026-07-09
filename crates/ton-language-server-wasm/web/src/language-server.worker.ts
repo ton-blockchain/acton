@@ -48,6 +48,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       definitionProvider: true,
       referencesProvider: true,
       hoverProvider: true,
+      inlayHintProvider: true,
       semanticTokensProvider: {
         legend: {
           tokenTypes: server.semanticTokenTypes() as string[],
@@ -111,6 +112,18 @@ connection.onHover(async params =>
 connection.languages.semanticTokens.on(async params =>
   withLanguageServer("textDocument/semanticTokens/full", server =>
     server.semanticTokens(params.textDocument.uri),
+  ),
+)
+
+connection.languages.inlayHint.on(async params =>
+  withLanguageServer("textDocument/inlayHint", server =>
+    server.inlayHints(
+      params.textDocument.uri,
+      params.range.start.line,
+      params.range.start.character,
+      params.range.end.line,
+      params.range.end.character,
+    ),
   ),
 )
 

@@ -1,8 +1,8 @@
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
-    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, Location, Position,
-    WorkspaceConfig,
+    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint, Location, Position,
+    Range, WorkspaceConfig,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -19,6 +19,7 @@ pub struct FeatureSet {
     pub folding_ranges: bool,
     pub completion: bool,
     pub semantic_tokens: bool,
+    pub inlay_hints: bool,
 }
 
 pub trait ParsedDocument: Any + Send + Sync {
@@ -97,6 +98,11 @@ pub struct SemanticTokensRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
+pub struct InlayHintRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub range: Range,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -137,6 +143,10 @@ pub trait LanguagePlugin: Send + Sync {
         &self,
         _request: SemanticTokensRequest<'_>,
     ) -> anyhow::Result<Vec<SemanticToken>> {
+        Ok(Vec::new())
+    }
+
+    fn inlay_hints(&self, _request: InlayHintRequest<'_>) -> anyhow::Result<Vec<InlayHint>> {
         Ok(Vec::new())
     }
 }
