@@ -12,10 +12,14 @@ license = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tasm-syntax = { workspace = true }
 tlb-syntax = { workspace = true }
 ton-syntax = { workspace = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
+web-time = { workspace = true }
 
 [dev-dependencies]
 expect-test = { workspace = true }
@@ -27,6 +31,14 @@ path = "tests/languages/tlb/definition.rs"
 [[test]]
 name = "tlb_incremental_edit"
 path = "tests/languages/tlb/incremental_edit.rs"
+
+[[test]]
+name = "tasm_hover"
+path = "tests/languages/tasm/hover.rs"
+
+[[test]]
+name = "tasm_code_lens"
+path = "tests/languages/tasm/code_lens.rs"
 
 [lints]
 workspace = true

@@ -1,9 +1,12 @@
 use crate::language::{
-    DefinitionRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    CodeLensRequest, DefinitionRequest, HoverRequest, LanguagePlugin, ParseRequest, ParsedDocument,
+    PluginContext,
 };
 use crate::logging;
 use crate::profiling::Profiler;
-use crate::types::{DocumentSnapshot, DocumentUri, LanguageId, Location, Position, TextEdit};
+use crate::types::{
+    CodeLens, DocumentSnapshot, DocumentUri, Hover, LanguageId, Location, Position, TextEdit,
+};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -435,6 +438,175 @@ impl LanguageService {
                     character = position.character,
                     error = %error,
                     "definition failed"
+                );
+            }
+        }
+        result
+    }
+
+    pub fn hover(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<Hover>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "hover",
+                uri = uri.as_str(),
+                line = position.line,
+                character = position.character,
+                "hover request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "hover",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            "hover requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "hover",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().hover {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "hover",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "hover unsupported by language"
+            );
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.hover(HoverRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("hover", started_at);
+        match &result {
+            Ok(hover) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "hover",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    has_result = hover.is_some(),
+                    "hover completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "hover",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    error = %error,
+                    "hover failed"
+                );
+            }
+        }
+        result
+    }
+
+    pub fn code_lens(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<CodeLens>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "code_lens",
+                uri = uri.as_str(),
+                "code lens request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "code_lens",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            "code lens requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "code_lens",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().code_lens {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "code_lens",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "code lens unsupported by language"
+            );
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.code_lens(CodeLensRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+        });
+        self.profiler.finish("code_lens", started_at);
+        match &result {
+            Ok(lenses) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "code_lens",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    result_count = lenses.len(),
+                    "code lens completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "code_lens",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    error = %error,
+                    "code lens failed"
                 );
             }
         }

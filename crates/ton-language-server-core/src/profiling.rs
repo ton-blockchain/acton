@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::time::{Duration, Instant};
+use web_time::{Duration, Instant};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProfileEvent {

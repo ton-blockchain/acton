@@ -218,6 +218,7 @@ tracing = "0.1"
 function_name = "0.3.0"
 parking_lot = "0.12.5"
 wasm-bindgen = "0.2.105"
+web-time = "1.1.0"
 
 cc = "1.2"
 

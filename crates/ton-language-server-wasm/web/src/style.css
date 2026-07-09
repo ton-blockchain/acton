@@ -11,18 +11,83 @@ body {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
 }
 
-#app {
+#app,
+#app-shell {
+  height: 100%;
+}
+
+#app-shell {
   display: grid;
-  grid-template-rows: 28px 1fr;
+  grid-template-rows: 34px 1fr;
+}
+
+#toolbar {
+  align-items: center;
+  border-bottom: 1px solid #2a2f3a;
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+  padding: 0 10px;
+}
+
+.field,
+.check-field {
+  align-items: center;
+  color: #8f98aa;
+  display: inline-flex;
+  font-size: 12px;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+select {
+  appearance: none;
+  background: #171a21;
+  border: 1px solid #343a47;
+  border-radius: 4px;
+  color: #d6d9df;
+  font: inherit;
+  height: 24px;
+  padding: 0 24px 0 8px;
+}
+
+.toolbar-button {
+  background: #171a21;
+  border: 1px solid #343a47;
+  border-radius: 4px;
+  color: #d6d9df;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 12px;
+  height: 24px;
+  line-height: 1;
+  padding: 0 8px;
+}
+
+.toolbar-button:active {
+  background: #20242d;
+}
+
+select:focus-visible,
+input[type="checkbox"]:focus-visible,
+.toolbar-button:focus-visible {
+  outline: 1px solid #7dd3a8;
+  outline-offset: 2px;
+}
+
+input[type="checkbox"] {
+  accent-color: #7dd3a8;
+  margin: 0;
 }
 
 #status {
-  align-items: center;
-  border-bottom: 1px solid #2a2f3a;
   color: #8f98aa;
-  display: flex;
   font-size: 12px;
-  padding: 0 10px;
+  margin-left: auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #status[data-state="ready"] {
@@ -33,6 +98,75 @@ body {
   color: #ff8a8a;
 }
 
+#editor-shell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 0;
+}
+
+#app-shell[data-show-panel="true"] #editor-shell {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 42%);
+}
+
 #monaco-editor-root {
   min-height: 0;
+}
+
+#side-panel {
+  border-left: 1px solid #2a2f3a;
+  display: none;
+  min-height: 0;
+  min-width: 0;
+}
+
+#app-shell[data-show-panel="true"] #side-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#app-shell[data-show-profile="true"][data-show-logs="true"] #side-panel {
+  grid-template-rows: minmax(140px, 36%) minmax(0, 1fr);
+}
+
+#profile-editor-root,
+#logs-editor-root {
+  display: none;
+  min-height: 0;
+}
+
+#app-shell[data-show-profile="true"] #profile-editor-root,
+#app-shell[data-show-logs="true"] #logs-editor-root {
+  display: block;
+}
+
+#app-shell[data-show-profile="true"][data-show-logs="true"] #profile-editor-root {
+  border-bottom: 1px solid #2a2f3a;
+}
+
+@media (max-width: 760px) {
+  #app-shell {
+    grid-template-rows: auto 1fr;
+  }
+
+  #toolbar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    padding-bottom: 6px;
+    padding-top: 6px;
+  }
+
+  #status {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  #app-shell[data-show-panel="true"] #editor-shell {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) minmax(180px, 34%);
+  }
+
+  #side-panel {
+    border-left: 0;
+    border-top: 1px solid #2a2f3a;
+  }
 }

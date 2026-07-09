@@ -176,3 +176,50 @@ impl Location {
         Self { uri, range }
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Hover {
+    pub contents: String,
+    pub range: Option<Range>,
+}
+
+impl Hover {
+    #[must_use]
+    pub fn new(contents: impl Into<String>, range: Option<Range>) -> Self {
+        Self {
+            contents: contents.into(),
+            range,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Command {
+    pub title: String,
+    pub command: String,
+    pub arguments: Vec<String>,
+}
+
+impl Command {
+    #[must_use]
+    pub fn new(title: impl Into<String>, command: impl Into<String>) -> Self {
+        Self {
+            title: title.into(),
+            command: command.into(),
+            arguments: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeLens {
+    pub range: Range,
+    pub command: Option<Command>,
+}
+
+impl CodeLens {
+    #[must_use]
+    pub const fn new(range: Range, command: Option<Command>) -> Self {
+        Self { range, command }
+    }
+}

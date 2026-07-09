@@ -1,5 +1,5 @@
 use crate::profiling::Profiler;
-use crate::types::{DocumentSnapshot, Location, Position};
+use crate::types::{CodeLens, DocumentSnapshot, Hover, Location, Position};
 use std::any::Any;
 use tree_sitter::Tree;
 
@@ -10,6 +10,7 @@ pub struct FeatureSet {
     pub diagnostics: bool,
     pub references: bool,
     pub hover: bool,
+    pub code_lens: bool,
     pub completion: bool,
     pub semantic_tokens: bool,
 }
@@ -37,6 +38,15 @@ pub struct DefinitionRequest<'a> {
     pub position: Position,
 }
 
+pub struct HoverRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct CodeLensRequest<'a> {
+    pub context: PluginContext<'a>,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -47,6 +57,14 @@ pub trait LanguagePlugin: Send + Sync {
     fn parse(&self, request: ParseRequest<'_>) -> anyhow::Result<Box<dyn ParsedDocument>>;
 
     fn definition(&self, _request: DefinitionRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        Ok(Vec::new())
+    }
+
+    fn hover(&self, _request: HoverRequest<'_>) -> anyhow::Result<Option<Hover>> {
+        Ok(None)
+    }
+
+    fn code_lens(&self, _request: CodeLensRequest<'_>) -> anyhow::Result<Vec<CodeLens>> {
         Ok(Vec::new())
     }
 }

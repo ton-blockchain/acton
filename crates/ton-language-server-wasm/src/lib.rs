@@ -1,76 +1,189 @@
 use serde::Serialize;
-use ton_language_server_core::languages::tlb::LANGUAGE_ID;
+use std::cell::RefCell;
+use std::fmt::Write as _;
+use ton_language_server_core::languages::tasm::TasmLanguage;
 use ton_language_server_core::{
-    DocumentUri, LanguageService, Location, Position, default_language_service,
+    CORE_TARGET, CodeLens, DocumentUri, Hover, LanguageId, LanguageService, Location, LogLevel,
+    Position, ProfileSummary,
 };
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
-pub struct TlbLanguageServer {
-    service: LanguageService,
+pub struct TonLanguageServer {
+    service: RefCell<LanguageService>,
 }
 
 #[wasm_bindgen]
-impl TlbLanguageServer {
+impl TonLanguageServer {
     #[wasm_bindgen(constructor)]
     #[must_use]
     pub fn new() -> Self {
         install_tree_sitter_allocator();
+        install_logging();
         console_error_panic_hook::set_once();
         Self {
-            service: default_language_service(),
+            service: RefCell::new(wasm_language_service()),
         }
+    }
+
+    #[wasm_bindgen(js_name = withTasmSpec)]
+    pub fn with_tasm_spec(spec_json: String) -> Result<Self, JsValue> {
+        install_tree_sitter_allocator();
+        install_logging();
+        console_error_panic_hook::set_once();
+        let mut service = wasm_language_service();
+        service.register_language(TasmLanguage::with_spec_json(&spec_json).map_err(js_error)?);
+        Ok(Self {
+            service: RefCell::new(service),
+        })
+    }
+
+    #[wasm_bindgen(js_name = setLogLevel)]
+    pub fn set_log_level(&self, level: String) -> Result<(), JsValue> {
+        let level = level.parse::<LogLevel>().map_err(js_error)?;
+        wasm_logs().set_level(level);
+        tracing::info!(
+            target: CORE_TARGET,
+            operation = "logging.set_level",
+            level = level.as_str(),
+            "log level updated"
+        );
+        Ok(())
+    }
+
+    #[wasm_bindgen(js_name = logs)]
+    #[must_use]
+    pub fn logs(&self) -> String {
+        wasm_logs().render()
+    }
+
+    #[wasm_bindgen(js_name = clearLogs)]
+    pub fn clear_logs(&self) {
+        wasm_logs().clear();
+    }
+
+    #[wasm_bindgen(js_name = profileSummary)]
+    pub fn profile_summary(&self) -> Result<String, JsValue> {
+        let summary = self
+            .service
+            .try_borrow()
+            .map_err(|_| language_server_busy())?
+            .profiler()
+            .summary()
+            .clone();
+        Ok(render_profile_summary(&summary))
     }
 
     #[wasm_bindgen(js_name = openDocument)]
     pub fn open_document(
-        &mut self,
+        &self,
         uri: String,
+        language_id: String,
         version: i32,
         text: String,
     ) -> Result<(), JsValue> {
         self.service
-            .open_document(DocumentUri::from(uri), LANGUAGE_ID, version, text)
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .open_document(
+                DocumentUri::from(uri),
+                LanguageId::from(language_id),
+                version,
+                text,
+            )
             .map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = changeDocument)]
-    pub fn change_document(
-        &mut self,
-        uri: String,
-        version: i32,
-        text: String,
-    ) -> Result<(), JsValue> {
+    pub fn change_document(&self, uri: String, version: i32, text: String) -> Result<(), JsValue> {
         self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
             .change_document(&DocumentUri::from(uri), version, text)
             .map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = definition)]
-    pub fn definition(
-        &mut self,
-        uri: String,
-        line: u32,
-        character: u32,
-    ) -> Result<JsValue, JsValue> {
+    pub fn definition(&self, uri: String, line: u32, character: u32) -> Result<JsValue, JsValue> {
         let locations = self
             .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
             .definition(&DocumentUri::from(uri), Position::new(line, character))
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
     }
+
+    #[wasm_bindgen(js_name = hover)]
+    pub fn hover(&self, uri: String, line: u32, character: u32) -> Result<JsValue, JsValue> {
+        let hover = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .hover(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&hover.map(hover_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = codeLens)]
+    pub fn code_lens(&self, uri: String) -> Result<JsValue, JsValue> {
+        let lenses = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .code_lens(&DocumentUri::from(uri))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&code_lenses_to_lsp(lenses)).map_err(js_error)
+    }
 }
 
-impl Default for TlbLanguageServer {
+impl Default for TonLanguageServer {
     fn default() -> Self {
         Self::new()
     }
+}
+
+fn wasm_language_service() -> LanguageService {
+    let mut service = LanguageService::new(ton_language_server_core::LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(ton_language_server_core::languages::tlb::TlbLanguage::new());
+    service.register_language(TasmLanguage::new());
+    service
+}
+
+#[derive(Serialize)]
+struct LspHover {
+    contents: LspMarkupContent,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    range: Option<LspRange>,
+}
+
+#[derive(Serialize)]
+struct LspMarkupContent {
+    kind: &'static str,
+    value: String,
 }
 
 #[derive(Serialize)]
 struct LspLocation {
     uri: String,
     range: LspRange,
+}
+
+#[derive(Serialize)]
+struct LspCodeLens {
+    range: LspRange,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<LspCommand>,
+}
+
+#[derive(Serialize)]
+struct LspCommand {
+    title: String,
+    command: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    arguments: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -98,6 +211,38 @@ fn locations_to_lsp(locations: Vec<Location>) -> Vec<LspLocation> {
         .collect()
 }
 
+fn hover_to_lsp(hover: Hover) -> LspHover {
+    LspHover {
+        contents: LspMarkupContent {
+            kind: "markdown",
+            value: hover.contents,
+        },
+        range: hover.range.map(range_to_lsp),
+    }
+}
+
+fn code_lenses_to_lsp(lenses: Vec<CodeLens>) -> Vec<LspCodeLens> {
+    lenses.into_iter().map(code_lens_to_lsp).collect()
+}
+
+fn code_lens_to_lsp(lens: CodeLens) -> LspCodeLens {
+    LspCodeLens {
+        range: range_to_lsp(lens.range),
+        command: lens.command.map(|command| LspCommand {
+            title: command.title,
+            command: command.command,
+            arguments: command.arguments,
+        }),
+    }
+}
+
+const fn range_to_lsp(range: ton_language_server_core::Range) -> LspRange {
+    LspRange {
+        start: position_to_lsp(range.start),
+        end: position_to_lsp(range.end),
+    }
+}
+
 const fn position_to_lsp(position: Position) -> LspPosition {
     LspPosition {
         line: position.line,
@@ -107,6 +252,306 @@ const fn position_to_lsp(position: Position) -> LspPosition {
 
 fn js_error(error: impl ToString) -> JsValue {
     JsValue::from_str(&error.to_string())
+}
+
+fn language_server_busy() -> JsValue {
+    JsValue::from_str("language server is busy")
+}
+
+fn render_profile_summary(summary: &ProfileSummary) -> String {
+    if summary.events.is_empty() && summary.counters.is_empty() {
+        return "No profiling data".to_owned();
+    }
+
+    let mut output = String::new();
+    if !summary.counters.is_empty() {
+        output.push_str("Counters\n");
+        for (name, count) in &summary.counters {
+            output.push_str("  ");
+            output.push_str(name);
+            output.push_str(": ");
+            output.push_str(&count.to_string());
+            output.push('\n');
+        }
+    }
+
+    if !summary.events.is_empty() {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        output.push_str("Spans\n");
+        let mut spans = std::collections::BTreeMap::<&'static str, (usize, f64)>::new();
+        for event in &summary.events {
+            let entry = spans.entry(event.name).or_default();
+            entry.0 += 1;
+            entry.1 += event.elapsed.as_secs_f64() * 1000.0;
+        }
+        for (name, (count, total_ms)) in spans {
+            let average_ms = total_ms / count as f64;
+            output.push_str("  ");
+            output.push_str(name);
+            output.push_str(": count=");
+            output.push_str(&count.to_string());
+            output.push_str(" total=");
+            push_ms(&mut output, total_ms);
+            output.push_str(" avg=");
+            push_ms(&mut output, average_ms);
+            output.push('\n');
+        }
+    }
+
+    output
+}
+
+fn push_ms(output: &mut String, milliseconds: f64) {
+    let _ = write!(output, "{milliseconds:.3}ms");
+}
+
+fn install_logging() {
+    let _ = tracing::subscriber::set_global_default(WasmLogSubscriber::new(wasm_logs().clone()));
+}
+
+fn wasm_logs() -> &'static std::sync::Arc<WasmLogState> {
+    static LOGS: std::sync::OnceLock<std::sync::Arc<WasmLogState>> = std::sync::OnceLock::new();
+    LOGS.get_or_init(|| std::sync::Arc::new(WasmLogState::default()))
+}
+
+#[derive(Debug)]
+struct WasmLogState {
+    level: std::sync::atomic::AtomicUsize,
+    next_event_id: std::sync::atomic::AtomicU64,
+    lines: std::sync::Mutex<Vec<String>>,
+}
+
+impl Default for WasmLogState {
+    fn default() -> Self {
+        Self {
+            level: std::sync::atomic::AtomicUsize::new(encode_log_level(LogLevel::Info)),
+            next_event_id: std::sync::atomic::AtomicU64::new(0),
+            lines: std::sync::Mutex::new(Vec::new()),
+        }
+    }
+}
+
+impl WasmLogState {
+    fn set_level(&self, level: LogLevel) {
+        self.level.store(
+            encode_log_level(level),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+
+    fn enabled(&self, level: tracing::Level) -> bool {
+        let configured = self.level.load(std::sync::atomic::Ordering::Relaxed);
+        configured != 0 && encode_tracing_level(level) <= configured
+    }
+
+    fn push(&self, line: String) {
+        const MAX_LOG_LINES: usize = 2_000;
+
+        let mut lines = self
+            .lines
+            .lock()
+            .expect("WASM log buffer should not be poisoned");
+        lines.push(line);
+        let overflow = lines.len().saturating_sub(MAX_LOG_LINES);
+        if overflow > 0 {
+            lines.drain(..overflow);
+        }
+    }
+
+    fn next_event_id(&self) -> u64 {
+        self.next_event_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn render(&self) -> String {
+        self.lines
+            .lock()
+            .expect("WASM log buffer should not be poisoned")
+            .join("\n")
+    }
+
+    fn clear(&self) {
+        self.lines
+            .lock()
+            .expect("WASM log buffer should not be poisoned")
+            .clear();
+    }
+}
+
+struct WasmLogSubscriber {
+    logs: std::sync::Arc<WasmLogState>,
+    next_span_id: std::sync::atomic::AtomicU64,
+}
+
+impl WasmLogSubscriber {
+    const fn new(logs: std::sync::Arc<WasmLogState>) -> Self {
+        Self {
+            logs,
+            next_span_id: std::sync::atomic::AtomicU64::new(1),
+        }
+    }
+}
+
+impl tracing::Subscriber for WasmLogSubscriber {
+    fn enabled(&self, metadata: &tracing::Metadata<'_>) -> bool {
+        metadata.target().starts_with(CORE_TARGET) && self.logs.enabled(*metadata.level())
+    }
+
+    fn new_span(&self, _span: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+        tracing::span::Id::from_u64(
+            self.next_span_id
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed),
+        )
+    }
+
+    fn record(&self, _span: &tracing::span::Id, _values: &tracing::span::Record<'_>) {}
+
+    fn record_follows_from(&self, _span: &tracing::span::Id, _follows: &tracing::span::Id) {}
+
+    fn event(&self, event: &tracing::Event<'_>) {
+        if !self.enabled(event.metadata()) {
+            return;
+        }
+
+        let mut visitor = FieldVisitor::default();
+        event.record(&mut visitor);
+        self.logs.push(render_log_event(
+            self.logs.next_event_id(),
+            event.metadata(),
+            &visitor.fields,
+        ));
+    }
+
+    fn enter(&self, _span: &tracing::span::Id) {}
+
+    fn exit(&self, _span: &tracing::span::Id) {}
+
+    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+        Some(tracing::level_filters::LevelFilter::TRACE)
+    }
+}
+
+#[derive(Default)]
+struct FieldVisitor {
+    fields: std::collections::BTreeMap<String, String>,
+}
+
+impl tracing::field::Visit for FieldVisitor {
+    fn record_bool(&mut self, field: &tracing::field::Field, value: bool) {
+        self.fields
+            .insert(field.name().to_owned(), value.to_string());
+    }
+
+    fn record_i64(&mut self, field: &tracing::field::Field, value: i64) {
+        self.fields
+            .insert(field.name().to_owned(), value.to_string());
+    }
+
+    fn record_u64(&mut self, field: &tracing::field::Field, value: u64) {
+        self.fields
+            .insert(field.name().to_owned(), value.to_string());
+    }
+
+    fn record_str(&mut self, field: &tracing::field::Field, value: &str) {
+        self.fields
+            .insert(field.name().to_owned(), value.to_owned());
+    }
+
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        self.fields
+            .insert(field.name().to_owned(), format!("{value:?}"));
+    }
+}
+
+fn render_log_event(
+    event_id: u64,
+    metadata: &tracing::Metadata<'_>,
+    fields: &std::collections::BTreeMap<String, String>,
+) -> String {
+    let mut output = format!(
+        "{event_id:04} {} {}",
+        render_tracing_level(*metadata.level()),
+        metadata.target()
+    );
+    if let Some(operation) = fields.get("operation") {
+        output.push(' ');
+        output.push_str(operation);
+    }
+    if let Some(message) = fields.get("message") {
+        output.push(' ');
+        output.push_str(message.trim_matches('"'));
+    }
+    for (name, value) in fields {
+        if name == "message" || name == "operation" {
+            continue;
+        }
+        output.push('\n');
+        output.push_str("  ");
+        output.push_str(name);
+        output.push_str(": ");
+        output.push_str(&redact_field(name, value));
+    }
+    output
+}
+
+fn redact_field(name: &str, value: &str) -> String {
+    if is_path_like_field(name) {
+        redact_path_like_value(value)
+    } else {
+        value.to_owned()
+    }
+}
+
+fn is_path_like_field(name: &str) -> bool {
+    matches!(name, "uri" | "path" | "root" | "workspace_root")
+        || name.ends_with("_uri")
+        || name.ends_with("_path")
+        || name.ends_with("_root")
+}
+
+fn redact_path_like_value(value: &str) -> String {
+    if let Some(path) = value.strip_prefix("file://") {
+        let file_name = path.rsplit('/').next().unwrap_or("<unknown>");
+        format!("file://<redacted>/{file_name}")
+    } else if value.starts_with('/') {
+        let file_name = value.rsplit('/').next().unwrap_or("<unknown>");
+        format!("<redacted>/{file_name}")
+    } else {
+        value.to_owned()
+    }
+}
+
+const fn encode_log_level(level: LogLevel) -> usize {
+    match level {
+        LogLevel::Off => 0,
+        LogLevel::Error => 1,
+        LogLevel::Warn => 2,
+        LogLevel::Info => 3,
+        LogLevel::Debug => 4,
+        LogLevel::Trace => 5,
+    }
+}
+
+const fn encode_tracing_level(level: tracing::Level) -> usize {
+    match level {
+        tracing::Level::ERROR => 1,
+        tracing::Level::WARN => 2,
+        tracing::Level::INFO => 3,
+        tracing::Level::DEBUG => 4,
+        tracing::Level::TRACE => 5,
+    }
+}
+
+const fn render_tracing_level(level: tracing::Level) -> &'static str {
+    match level {
+        tracing::Level::ERROR => "error",
+        tracing::Level::WARN => "warn",
+        tracing::Level::INFO => "info",
+        tracing::Level::DEBUG => "debug",
+        tracing::Level::TRACE => "trace",
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
