@@ -1,5 +1,5 @@
-import type {RetraceNetworkConfig, TolkSourceMapData, TraceResult} from "@ton/retracer-core"
-import {retrace, RETRACE_MAINNET_NETWORK, RETRACE_TESTNET_NETWORK} from "@ton/retracer-core"
+import type {TolkSourceMapData, TraceResult} from "@ton/retracer-core"
+import {retrace} from "@ton/retracer-core"
 import {compileCellWithMapping, decompileCell} from "@ton/tasm/dist/runtime/instr"
 import {createMappingInfo} from "@ton/tasm/dist/trace/mapping"
 import type {Step, TraceInfo} from "@ton/tasm/dist/trace"
@@ -14,6 +14,7 @@ import type {SourceBundle, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExplorerMetadataRegistry} from "../../../metadata/types"
 import type {ExitCode, RetraceResultAndCode} from "./types"
+import {getRetraceNetworkConfig} from "./retraceNetwork"
 
 import {
   NetworkError,
@@ -30,31 +31,6 @@ interface TraceTxOptions {
 interface VerifiedSourceTraceOptions {
   readonly sourceMap: TolkSourceMapData
   readonly sourceTraceBundleHash: string
-}
-
-function absoluteApiBaseUrl(baseUrl: string): string {
-  const fullBase = baseUrl.startsWith("http") ? baseUrl : `${globalThis.location.origin}${baseUrl}`
-  return new URL(fullBase).toString().replace(/\/$/, "")
-}
-
-function getRetraceNetworkConfig(network: ExplorerNetworkInfo): RetraceNetworkConfig {
-  if (network.api) {
-    return {
-      testnet: network.testOnly,
-      v2BaseUrl: absoluteApiBaseUrl(network.api.v2BaseUrl),
-      v3BaseUrl: absoluteApiBaseUrl(network.api.v3BaseUrl),
-      toncenterApiKey: network.api.toncenterApiKey,
-    }
-  }
-
-  if (network.id === "mainnet") {
-    return RETRACE_MAINNET_NETWORK
-  }
-  if (network.id === "testnet") {
-    return RETRACE_TESTNET_NETWORK
-  }
-
-  throw new TxTraceError(`Retrace is not configured for ${network.label}.`)
 }
 
 function parseCompilerVersion(version: string): readonly [number, number, number] | undefined {
@@ -243,7 +219,7 @@ export function findExitCode(vmLogs: string, mappingInfo: AssemblyMapping) {
   return exitCode
 }
 
-function extractCodeAndTrace(
+export function extractCodeAndTrace(
   codeCell: Cell | undefined,
   vmLogs: string,
 ): {

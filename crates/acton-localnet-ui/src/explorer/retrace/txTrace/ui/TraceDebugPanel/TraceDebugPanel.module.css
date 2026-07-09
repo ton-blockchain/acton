@@ -8,6 +8,7 @@
   max-width: min(var(--retrace-flow-width, 100vw), var(--retrace-panel-max-width));
   height: var(--retrace-panel-height);
   min-height: 560px;
+  margin-top: 12px;
   margin-left: calc(-1 * var(--retrace-flow-offset, 0px));
   margin-right: 0;
   box-sizing: border-box;

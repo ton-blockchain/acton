@@ -18,6 +18,7 @@ import {
   Menu,
   PanelLeftClose,
   PanelLeftOpen,
+  Play,
   Search as SearchIcon,
   Settings2,
   Star,
@@ -57,6 +58,7 @@ interface SidebarItem {
 const mainItems: SidebarItem[] = [
   {label: "Home", icon: LayoutGrid, path: "/dashboard"},
   {label: "Explorer", icon: SearchIcon, path: "/explorer"},
+  {label: "Emulate", icon: Play, path: "/emulate"},
   {label: "Blocks", icon: Boxes, path: "/explorer/blocks"},
   {label: "Wallets", icon: Wallet, path: "/wallets"},
   {label: "Faucet", icon: HandCoins, path: "/faucet"},

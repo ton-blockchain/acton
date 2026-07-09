@@ -23,7 +23,7 @@
     "@scalar/api-reference-react": "^0.9.41",
     "@ton/core": "0.63.1",
     "@ton/crypto": "^3.3.0",
-    "@ton/retracer-core": "0.11.0",
+    "@ton/retracer-core": "file:../../../retracer-core-new",
     "@ton/tasm": "^0.6.1",
     "@ton/tolk-abi-to-typescript": "^0.5.0",
     "@ton/walletkit": "0.0.9",
@@ -46,10 +46,10 @@
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.2",
+    "@vitejs/plugin-react": "^6.0.3",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.16"
+    "typescript": "^7.0.2",
+    "vite": "^8.1.4"
   }
 }

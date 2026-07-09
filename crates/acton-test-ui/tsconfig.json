@@ -5,7 +5,6 @@
     "lib": ["DOM", "DOM.Iterable", "ESNext"],
     "allowJs": false,
     "skipLibCheck": true,
-    "esModuleInterop": false,
     "allowSyntheticDefaultImports": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
@@ -15,8 +14,8 @@
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",
-    "baseUrl": ".",
     "paths": {
+      "*": ["./*"],
       "@acton/shared-ui": ["../acton-shared-ui/src/index.ts"],
       "@acton/shared-ui/*": ["../acton-shared-ui/*"],
       "@/*": ["../acton-shared-ui/src/*"]

@@ -46,10 +46,6 @@ export default defineConfig({
         target: localnetTarget,
         changeOrigin: true,
       },
-      "/emulate": {
-        target: localnetTarget,
-        changeOrigin: true,
-      },
     },
   },
 })

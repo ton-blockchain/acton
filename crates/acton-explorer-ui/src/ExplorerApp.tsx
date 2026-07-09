@@ -26,6 +26,7 @@ import {
   AbiCatalogPage,
   AbiDetailsPage,
 } from "../../acton-localnet-ui/src/explorer/pages/AbiCatalogPage"
+import {EmulatePage} from "../../acton-localnet-ui/src/explorer/pages/EmulatePage"
 import {SourceCatalogPage} from "../../acton-localnet-ui/src/explorer/pages/SourceCatalogPage"
 import {ExplorerSearch} from "../../acton-localnet-ui/src/explorer/components/ExplorerSearch"
 import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/ExplorerIndexPage"
@@ -922,6 +923,9 @@ export const ExplorerApp: FC = () => {
                           <Link className={styles.navLink} to="/blocks">
                             Blocks
                           </Link>
+                          <Link className={styles.navLink} to="/emulate">
+                            Emulate
+                          </Link>
                           <Link className={styles.navLink} to="/abi">
                             ABI
                           </Link>
@@ -970,6 +974,7 @@ export const ExplorerApp: FC = () => {
                     <Routes>
                       <Route path="/" element={<ExplorerIndexPage />} />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
+                      <Route path="/emulate" element={<EmulatePage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />
                       <Route path="/sources" element={<SourceCatalogPage />} />

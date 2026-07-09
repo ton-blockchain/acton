@@ -1,4 +1,3 @@
-import {Buffer} from "node:buffer"
 import {useEffect, useMemo, useState} from "react"
 import type {JSX, MouseEvent, ReactNode} from "react"
 
@@ -31,6 +30,11 @@ import type {V3RunGetMethodResponse, V3RunGetMethodStackEntry} from "../api/type
 import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
 
 import {abiSymbolAnchorId} from "./abiAnchors"
+import {
+  normalizeAbiDynamicArg,
+  normalizeSimpleAbiDynamicArg,
+  sampleAbiValueForTy,
+} from "../api/abiDynamic"
 import styles from "./abi-viewer.module.css"
 
 export type AbiTab = "view" | "raw"
@@ -863,7 +867,7 @@ function parseSimpleGetMethodArgs(
   }
 
   return method.parameters.map((parameter, index) =>
-    normalizeSimpleDynamicArg(ctx, parameter.ty_idx, values[index] ?? ""),
+    normalizeSimpleAbiDynamicArg(ctx, parameter.ty_idx, values[index] ?? ""),
   )
 }
 
@@ -877,190 +881,8 @@ function parseGetMethodArgs(ctx: DynamicCtx, method: ABIGetMethod, value: string
   }
 
   return method.parameters.map((parameter, index) =>
-    normalizeDynamicArg(ctx, parameter.ty_idx, parsed[index]),
+    normalizeAbiDynamicArg(ctx, parameter.ty_idx, parsed[index]),
   )
-}
-
-function normalizeSimpleDynamicArg(ctx: DynamicCtx, tyIdx: number, value: string): unknown {
-  const ty = ctx.symbols.tyByIdx(tyIdx)
-  switch (ty.kind) {
-    case "int":
-    case "intN":
-    case "uintN":
-    case "varintN":
-    case "varuintN":
-    case "coins":
-    case "EnumRef": {
-      return BigInt(requireArgValue(value, "Number argument"))
-    }
-    case "bool": {
-      if (value === "true") return true
-      if (value === "false") return false
-      throw new Error("Boolean argument must be true or false.")
-    }
-    case "string": {
-      return value
-    }
-    case "address":
-    case "addressExt": {
-      return Address.parse(requireArgValue(value, "Address argument"))
-    }
-    case "addressOpt":
-    case "addressAny": {
-      return value.trim() ? Address.parse(value.trim()) : undefined
-    }
-    case "cell": {
-      return parseCellArg(value)
-    }
-    case "builder": {
-      return parseCellArg(value).asBuilder()
-    }
-    case "slice":
-    case "remaining":
-    case "bitsN": {
-      return parseCellArg(value).beginParse()
-    }
-    case "nullable": {
-      return value.trim() ? normalizeSimpleDynamicArg(ctx, ty.inner_ty_idx, value) : undefined
-    }
-    case "AliasRef": {
-      const target = ctx.symbols.aliasTargetOf(tyIdx)
-      return normalizeSimpleDynamicArg(ctx, target.ty_idx, value)
-    }
-    default: {
-      return normalizeDynamicArg(ctx, tyIdx, value)
-    }
-  }
-}
-
-function normalizeDynamicArg(ctx: DynamicCtx, tyIdx: number, value: unknown): unknown {
-  const ty = ctx.symbols.tyByIdx(tyIdx)
-  switch (ty.kind) {
-    case "int":
-    case "intN":
-    case "uintN":
-    case "varintN":
-    case "varuintN":
-    case "coins":
-    case "EnumRef": {
-      return typeof value === "string" ? BigInt(value) : value
-    }
-    case "address":
-    case "addressExt": {
-      return typeof value === "string" ? Address.parse(value) : value
-    }
-    case "addressOpt": {
-      return typeof value === "string" ? Address.parse(value) : value
-    }
-    case "addressAny": {
-      return typeof value === "string" && value !== "none" ? Address.parse(value) : value
-    }
-    case "cell": {
-      return typeof value === "string" ? Cell.fromBase64(value) : value
-    }
-    case "builder": {
-      return typeof value === "string" ? Cell.fromBase64(value).asBuilder() : value
-    }
-    case "slice":
-    case "remaining":
-    case "bitsN": {
-      return typeof value === "string" ? Cell.fromBase64(value).beginParse() : value
-    }
-    case "cellOf": {
-      if (isRecord(value) && "ref" in value) {
-        return {ref: normalizeDynamicArg(ctx, ty.inner_ty_idx, value.ref)}
-      }
-      return value
-    }
-    case "nullable": {
-      // biome-ignore lint/suspicious/noDoubleEquals: ok
-      return value == undefined ? undefined : normalizeDynamicArg(ctx, ty.inner_ty_idx, value)
-    }
-    case "arrayOf":
-    case "lispListOf": {
-      return Array.isArray(value)
-        ? value.map(item => normalizeDynamicArg(ctx, ty.inner_ty_idx, item))
-        : value
-    }
-    case "tensor":
-    case "shapedTuple": {
-      return Array.isArray(value)
-        ? value.map((item, index) => normalizeDynamicArg(ctx, ty.items_ty_idx[index], item))
-        : value
-    }
-    case "mapKV": {
-      if (isRecord(value)) {
-        return new Map(
-          Object.entries(value).map(([key, item]) => [
-            normalizeDynamicMapKey(ctx, ty.key_ty_idx, key),
-            normalizeDynamicArg(ctx, ty.value_ty_idx, item),
-          ]),
-        )
-      }
-      return value
-    }
-    case "StructRef": {
-      if (isRecord(value)) {
-        return Object.fromEntries(
-          ctx.symbols
-            .structFieldsOf(tyIdx, true)
-            .map(field => [field.name, normalizeDynamicArg(ctx, field.ty_idx, value[field.name])]),
-        )
-      }
-      return value
-    }
-    case "AliasRef": {
-      const target = ctx.symbols.aliasTargetOf(tyIdx)
-      return normalizeDynamicArg(ctx, target.ty_idx, value)
-    }
-    default: {
-      return value
-    }
-  }
-}
-
-function requireArgValue(value: string, label: string): string {
-  const trimmed = value.trim()
-  if (!trimmed) {
-    throw new Error(`${label} is required.`)
-  }
-  return trimmed
-}
-
-function parseCellArg(value: string): Cell {
-  const trimmed = requireArgValue(value, "Cell argument")
-  const hex = trimmed.startsWith("0x") ? trimmed.slice(2) : trimmed
-  if (/^(?:[0-9a-fA-F]{2})+$/.test(hex)) {
-    return Cell.fromBoc(Buffer.from(hex, "hex"))[0]
-  }
-  return Cell.fromBase64(trimmed)
-}
-
-function normalizeDynamicMapKey(ctx: DynamicCtx, tyIdx: number, value: string): unknown {
-  const ty = ctx.symbols.tyByIdx(tyIdx)
-  switch (ty.kind) {
-    case "int":
-    case "intN":
-    case "uintN":
-    case "varintN":
-    case "varuintN":
-    case "coins":
-    case "EnumRef": {
-      return BigInt(value)
-    }
-    case "address":
-    case "addressOpt":
-    case "addressAny": {
-      return Address.parse(value)
-    }
-    case "AliasRef": {
-      const target = ctx.symbols.aliasTargetOf(tyIdx)
-      return normalizeDynamicMapKey(ctx, target.ty_idx, value)
-    }
-    default: {
-      return value
-    }
-  }
 }
 
 function tupleItemToV3StackEntry(item: TupleItem): V3RunGetMethodStackEntry {
@@ -1434,7 +1256,7 @@ function formatGetMethodSignature(method: ABIGetMethod, symbols: SymTable): stri
 
 function formatArgsPlaceholder(method: ABIGetMethod, symbols: SymTable): string {
   return JSON.stringify(
-    method.parameters.map(parameter => sampleValueForTy(symbols, parameter.ty_idx)),
+    method.parameters.map(parameter => sampleAbiValueForTy(symbols, parameter.ty_idx)),
     undefined,
     2,
   )
@@ -1524,80 +1346,6 @@ function placeholderForSimpleArg(input: AbiSimpleArgInput): string {
     }
     case "bool": {
       return ""
-    }
-  }
-}
-
-function sampleValueForTy(symbols: SymTable, tyIdx: number, visited = new Set<number>()): unknown {
-  const ty = tryTyByIdx(symbols, tyIdx)
-  if (!ty) return undefined
-  switch (ty.kind) {
-    case "int":
-    case "intN":
-    case "uintN":
-    case "varintN":
-    case "varuintN":
-    case "coins":
-    case "EnumRef": {
-      return "0"
-    }
-    case "bool": {
-      return false
-    }
-    case "string": {
-      return ""
-    }
-    case "address":
-    case "addressOpt":
-    case "addressExt":
-    case "addressAny": {
-      return "EQ..."
-    }
-    case "cell":
-    case "slice":
-    case "builder":
-    case "bitsN":
-    case "remaining": {
-      return "te6ccgEBAQEAAgAAAA=="
-    }
-    case "nullable": {
-      return undefined
-    }
-    case "cellOf": {
-      return {ref: sampleValueForTy(symbols, ty.inner_ty_idx, visited)}
-    }
-    case "arrayOf":
-    case "lispListOf": {
-      return []
-    }
-    case "tensor":
-    case "shapedTuple": {
-      return ty.items_ty_idx.map(itemTyIdx => sampleValueForTy(symbols, itemTyIdx, visited))
-    }
-    case "mapKV": {
-      return {}
-    }
-    case "StructRef": {
-      if (visited.has(tyIdx)) return {}
-      visited.add(tyIdx)
-      return Object.fromEntries(
-        symbols
-          .structFieldsOf(tyIdx, true)
-          .map(field => [field.name, sampleValueForTy(symbols, field.ty_idx, visited)]),
-      )
-    }
-    case "AliasRef": {
-      const targetTyIdx = tryAliasTargetTyIdx(symbols, tyIdx)
-      return targetTyIdx === undefined ? undefined : sampleValueForTy(symbols, targetTyIdx, visited)
-    }
-    case "union": {
-      return {$: "Variant", value: undefined}
-    }
-    case "nullLiteral": {
-      return undefined
-    }
-    default: {
-      return undefined
     }
   }
 }
