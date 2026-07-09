@@ -47,6 +47,10 @@ pub trait WorkspaceLanguage: Send + Sync {
         anyhow::bail!("workspace source files are not supported by this language")
     }
 
+    fn remove_source_file(&self, _uri: &DocumentUri) -> anyhow::Result<()> {
+        anyhow::bail!("workspace source files are not supported by this language")
+    }
+
     fn set_workspace_config(&self, _config: WorkspaceConfig) -> anyhow::Result<()> {
         anyhow::bail!("workspace configuration is not supported by this language")
     }

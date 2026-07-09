@@ -1,131 +1,221 @@
 use crate::paths;
-use acton_config::config::{ActonConfig, project_root as configured_project_root};
-use dashmap::DashMap;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::net::TcpListener;
-use tolk_resolver::file_db::FileDb;
-use ton_ls::{Backend, SelfContainedLanguageRegistry};
-use tower_lsp::{LspService, Server};
+use acton_config::config::project_root as configured_project_root;
+use std::env;
+use std::path::{Path, PathBuf};
+use ton_language_server_native::{LogLevel, NativeLoggingConfig, ServerConfig};
 
 pub async fn ls_cmd(
     port: Option<u16>,
     stdio: bool,
     log_file: Option<String>,
     no_log: bool,
+    log_level: String,
+    stdlib_path: Option<PathBuf>,
 ) -> anyhow::Result<()> {
-    if !no_log {
-        setup_ls_logging(log_file)?;
-    }
-
-    let stdlib_path =
-        dunce::canonicalize(PathBuf::from(".acton/tolk-stdlib")).expect("Failed to canonicalize");
-    let acton_stdlib_path =
-        dunce::canonicalize(PathBuf::from(".acton/")).unwrap_or_else(|_| PathBuf::from(".acton/"));
-    let common_tolk = stdlib_path.join("common.tolk");
-
-    let file_db = FileDb::new(stdlib_path, Some(acton_stdlib_path));
-    if common_tolk.exists() {
-        let _ = file_db.process(&common_tolk);
-    }
-    let project_root = dunce::canonicalize(configured_project_root())
-        .unwrap_or_else(|_| configured_project_root().to_path_buf());
-    let (mappings, acton_config) = match ActonConfig::load() {
-        Ok(config) => (config.mappings(), Some(Arc::new(config))),
-        Err(e) => {
-            eprintln!("  ⚠ Failed to load Acton.toml: {e:#}");
-            (None, None)
-        }
+    let log_level = log_level.parse::<LogLevel>()?;
+    let project_root = configured_project_root().to_path_buf();
+    let tolk_stdlib_root = resolve_tolk_stdlib_root(&project_root, stdlib_path)?;
+    let logging = if no_log {
+        None
+    } else {
+        Some(NativeLoggingConfig::new(
+            log_file.map_or_else(
+                || paths::language_server_log_path(configured_project_root()),
+                PathBuf::from,
+            ),
+            log_level,
+        ))
+    };
+    let config = ServerConfig {
+        project_root,
+        tolk_stdlib_root,
+        logging,
+        enable_profiling: cfg!(feature = "profiling"),
     };
 
-    if port.is_none() && !stdio {
-        // default to stdio if no port is provided and stdio is not explicitly set
-        return ls_cmd_internal(port, true, file_db, project_root, mappings, acton_config).await;
+    match (port, stdio) {
+        (Some(port), _) => ton_language_server_native::serve_tcp(config, port).await,
+        (None, true) | (None, false) => ton_language_server_native::serve_stdio(config).await,
     }
-
-    ls_cmd_internal(port, stdio, file_db, project_root, mappings, acton_config).await
 }
 
-async fn ls_cmd_internal(
-    port: Option<u16>,
-    stdio: bool,
-    file_db: FileDb,
-    project_root: PathBuf,
-    mappings: Option<BTreeMap<String, String>>,
-    acton_config: Option<Arc<ActonConfig>>,
-) -> anyhow::Result<()> {
-    let (service, socket) = LspService::new(|client| {
-        #[cfg(feature = "profiling")]
-        let profiling = Arc::new(ton_ls::ProfilingContext::new());
+fn resolve_tolk_stdlib_root(
+    project_root: &Path,
+    stdlib_path: Option<PathBuf>,
+) -> anyhow::Result<Option<PathBuf>> {
+    resolve_tolk_stdlib_root_from_candidates(
+        stdlib_path,
+        default_tolk_stdlib_candidates(project_root),
+    )
+}
 
-        #[cfg(feature = "profiling")]
-        {
-            let profiling = profiling.clone();
-            tokio::spawn(async move {
-                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
-                loop {
-                    interval.tick().await;
-                    profiling.log_stats();
-                }
-            });
+fn resolve_tolk_stdlib_root_from_candidates(
+    stdlib_path: Option<PathBuf>,
+    candidates: Vec<PathBuf>,
+) -> anyhow::Result<Option<PathBuf>> {
+    if let Some(path) = stdlib_path {
+        if !path.is_dir() {
+            anyhow::bail!("Tolk stdlib path is not a directory: {}", path.display());
         }
+        return Ok(Some(dunce::canonicalize(path)?));
+    }
 
-        Backend {
-            client,
-            file_db: Arc::new(file_db),
-            project_root: project_root.clone(),
-            mappings: mappings.clone(),
-            acton_config: acton_config.clone(),
-            documents: DashMap::new(),
-            analysis: DashMap::new(),
-            file_urls: DashMap::new(),
-            registry: SelfContainedLanguageRegistry::new(),
-            #[cfg(feature = "profiling")]
-            profiling,
-        }
-    });
+    if let Some(path) = find_existing_tolk_stdlib_candidate(&candidates)? {
+        return Ok(Some(path));
+    }
 
-    if let Some(port) = port {
-        let listener = TcpListener::bind(format!("127.0.0.1:{port}")).await?;
-        println!("LSP server listening on port {port}");
-        let (stream, _) = listener.accept().await?;
-        let (reader, writer) = tokio::io::split(stream);
-        Server::new(reader, writer, socket).serve(service).await;
-    } else if stdio {
-        let stdin = tokio::io::stdin();
-        let stdout = tokio::io::stdout();
-        Server::new(stdin, stdout, socket).serve(service).await;
+    Ok(candidates.into_iter().next())
+}
+
+fn default_tolk_stdlib_candidates(project_root: &Path) -> Vec<PathBuf> {
+    default_tolk_stdlib_candidates_with_env(
+        project_root,
+        path_from_env("TEST_TOLK_STDLIB_PATH"),
+        path_from_env("TOLK_STDLIB"),
+        platform_tolk_stdlib_candidates(),
+    )
+}
+
+fn default_tolk_stdlib_candidates_with_env(
+    project_root: &Path,
+    test_stdlib_path: Option<PathBuf>,
+    tolk_stdlib_path: Option<PathBuf>,
+    platform_candidates: Vec<PathBuf>,
+) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = test_stdlib_path {
+        candidates.push(path);
+    }
+    candidates.extend([
+        project_root.join(".acton").join("tolk-stdlib"),
+        project_root
+            .join("node_modules")
+            .join("@ton")
+            .join("tolk-js")
+            .join("dist")
+            .join("tolk-stdlib"),
+        project_root.join("stdlib"),
+        project_root.join("tolk-stdlib"),
+    ]);
+    if let Some(path) = tolk_stdlib_path {
+        candidates.push(path);
+    }
+    candidates.extend(platform_candidates);
+    candidates
+}
+
+fn find_existing_tolk_stdlib_candidate(candidates: &[PathBuf]) -> anyhow::Result<Option<PathBuf>> {
+    candidates
+        .iter()
+        .find(|path| path.is_dir())
+        .map(dunce::canonicalize)
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn path_from_env(name: &str) -> Option<PathBuf> {
+    let value = env::var_os(name)?;
+    (!value.is_empty()).then_some(PathBuf::from(value))
+}
+
+fn platform_tolk_stdlib_candidates() -> Vec<PathBuf> {
+    if cfg!(target_os = "linux") {
+        vec![PathBuf::from("/usr/share/ton/smartcont/tolk-stdlib")]
+    } else if cfg!(target_os = "macos") {
+        vec![
+            PathBuf::from("/opt/homebrew/share/ton/ton/smartcont/tolk-stdlib"),
+            PathBuf::from("/usr/local/share/ton/ton/smartcont/tolk-stdlib"),
+        ]
+    } else if cfg!(target_os = "windows") {
+        vec![PathBuf::from(
+            "C:\\ProgramData\\chocolatey\\lib\\ton\\smartcont\\tolk-stdlib",
+        )]
     } else {
-        anyhow::bail!("Either --port or --stdio must be specified");
+        Vec::new()
     }
-
-    Ok(())
 }
 
-fn setup_ls_logging(log_file: Option<String>) -> anyhow::Result<()> {
-    let log_path = log_file.unwrap_or_else(|| {
-        paths::language_server_log_path(configured_project_root())
-            .to_string_lossy()
-            .to_string()
-    });
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
 
-    if let Some(parent) = std::path::Path::new(&log_path).parent() {
-        std::fs::create_dir_all(parent)?;
+    #[test]
+    fn explicit_tolk_stdlib_path_wins_over_defaults() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let default_path = dir.path().join(".acton").join("tolk-stdlib");
+        let explicit_path = dir.path().join("custom-stdlib");
+        fs::create_dir_all(&default_path)?;
+        fs::create_dir_all(&explicit_path)?;
+
+        let resolved = resolve_tolk_stdlib_root(dir.path(), Some(explicit_path.clone()))?;
+
+        assert_eq!(resolved, Some(dunce::canonicalize(explicit_path)?));
+        Ok(())
     }
 
-    fern::Dispatch::new()
-        .format(|out, message, record| {
-            out.finish(format_args!(
-                "{}[{}][{}] {}",
-                chrono::Local::now().format("[%Y-%m-%d][%H:%M:%S]"),
-                record.target(),
-                record.level(),
-                message
-            ));
-        })
-        .level(log::LevelFilter::Debug)
-        .chain(fern::log_file(log_path)?)
-        .apply()?;
-    Ok(())
+    #[test]
+    fn default_tolk_stdlib_candidates_match_ton_vscode_order() {
+        let root = Path::new("/workspace");
+
+        let candidates = default_tolk_stdlib_candidates_with_env(
+            root,
+            Some(PathBuf::from("/test-stdlib")),
+            Some(PathBuf::from("/env-stdlib")),
+            vec![PathBuf::from("/platform-stdlib")],
+        );
+
+        assert_eq!(
+            candidates,
+            vec![
+                PathBuf::from("/test-stdlib"),
+                PathBuf::from("/workspace/.acton/tolk-stdlib"),
+                PathBuf::from("/workspace/node_modules/@ton/tolk-js/dist/tolk-stdlib"),
+                PathBuf::from("/workspace/stdlib"),
+                PathBuf::from("/workspace/tolk-stdlib"),
+                PathBuf::from("/env-stdlib"),
+                PathBuf::from("/platform-stdlib"),
+            ]
+        );
+    }
+
+    #[test]
+    fn finds_first_existing_tolk_stdlib_candidate() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let node_stdlib = dir
+            .path()
+            .join("node_modules")
+            .join("@ton")
+            .join("tolk-js")
+            .join("dist")
+            .join("tolk-stdlib");
+        let lower_priority_stdlib = dir.path().join("stdlib");
+        fs::create_dir_all(&node_stdlib)?;
+        fs::create_dir_all(&lower_priority_stdlib)?;
+
+        let candidates = vec![
+            dir.path().join(".acton").join("tolk-stdlib"),
+            node_stdlib.clone(),
+            lower_priority_stdlib,
+        ];
+        let resolved = find_existing_tolk_stdlib_candidate(&candidates)?;
+
+        assert_eq!(resolved, Some(dunce::canonicalize(node_stdlib)?));
+        Ok(())
+    }
+
+    #[test]
+    fn returns_first_default_candidate_when_stdlib_is_missing() -> anyhow::Result<()> {
+        let first_candidate = PathBuf::from("/missing/.acton/tolk-stdlib");
+        let resolved = resolve_tolk_stdlib_root_from_candidates(
+            None,
+            vec![
+                first_candidate.clone(),
+                PathBuf::from("/missing/node_modules/@ton/tolk-js/dist/tolk-stdlib"),
+            ],
+        )?;
+
+        assert_eq!(resolved, Some(first_candidate));
+        Ok(())
+    }
 }

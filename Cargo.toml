@@ -73,6 +73,7 @@ ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
 ton-ls = { path = "crates/ton-ls" }
 ton-language-server-core = { path = "crates/ton-language-server-core" }
+ton-language-server-native = { path = "crates/ton-language-server-native" }
 ton-indexer = { path = "crates/ton-indexer" }
 tree-sitter-tolk = { path = "crates/tree-sitter-tolk" }
 tree-sitter-tasm = { path = "crates/tree-sitter-tasm" }
@@ -236,9 +237,7 @@ tolk-syntax = { workspace = true }
 tolk-resolver = { workspace = true }
 tolk-ty = { workspace = true }
 tolk-linter = { workspace = true }
-ton-ls = { workspace = true }
-tower-lsp = { workspace = true }
-dashmap = { workspace = true }
+ton-language-server-native = { workspace = true }
 tvm-ffi = { workspace = true }
 tvm-logs = { workspace = true }
 tasm-core = { workspace = true }
@@ -417,7 +416,7 @@ workspace = true
 
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
-profiling = ["ton-ls/profiling"]
+profiling = ["ton-language-server-native/profiling"]
 only_ci = []
 
 [lib]

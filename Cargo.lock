@@ -35,7 +35,6 @@ dependencies = [
  "ctrlc",
  "dap",
  "dap-client",
- "dashmap 7.0.0-rc2",
  "dotenvy",
  "dunce",
  "ed25519-dalek",
@@ -96,12 +95,11 @@ dependencies = [
  "ton-emulator",
  "ton-executor",
  "ton-indexer",
+ "ton-language-server-native",
  "ton-localnet",
- "ton-ls",
  "ton-retrace",
  "toncenter-keys",
  "tower-http",
- "tower-lsp",
  "tree-sitter",
  "tvm-ffi",
  "tvm-logs",
@@ -5402,6 +5400,20 @@ dependencies = [
  "tracing",
  "tree-sitter",
  "web-time",
+]
+
+[[package]]
+name = "ton-language-server-native"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "dunce",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "ton-language-server-core",
+ "tower-lsp",
+ "tracing",
 ]
 
 [[package]]

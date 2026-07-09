@@ -1,0 +1,117 @@
+{
+  "name": "acton-vscode",
+  "displayName": "Acton Language Server",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Local language server support for Tolk, TASM, Fift, TL-B and Acton.toml",
+  "categories": [
+    "Programming Languages"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "publisher": "ton-core",
+  "main": "./out/extension",
+  "scripts": {
+    "build": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "Acton Language Server",
+      "properties": {
+        "acton.languageServer.path": {
+          "type": "string",
+          "default": "acton",
+          "description": "Path to the acton executable"
+        },
+        "acton.languageServer.args": {
+          "type": "array",
+          "default": [
+            "ls",
+            "--stdio"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "description": "Arguments used to start the Acton language server"
+        },
+        "acton.languageServer.port": {
+          "type": "number",
+          "default": 0,
+          "description": "TCP port for connecting to a manually started language server. Use 0 to launch acton ls."
+        }
+      }
+    },
+    "languages": [
+      {
+        "id": "tolk",
+        "aliases": [
+          "Tolk"
+        ],
+        "extensions": [
+          ".tolk"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "tasm",
+        "aliases": [
+          "TASM"
+        ],
+        "extensions": [
+          ".tasm"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "fift",
+        "aliases": [
+          "Fift"
+        ],
+        "extensions": [
+          ".fif",
+          ".fift"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "tlb",
+        "aliases": [
+          "TL-B"
+        ],
+        "extensions": [
+          ".tlb"
+        ],
+        "configuration": "./language-configuration.json"
+      },
+      {
+        "id": "toml",
+        "aliases": [
+          "TOML"
+        ],
+        "filenames": [
+          "Acton.toml"
+        ]
+      }
+    ]
+  },
+  "activationEvents": [
+    "onLanguage:tolk",
+    "onLanguage:tasm",
+    "onLanguage:fift",
+    "onLanguage:tlb",
+    "onLanguage:toml",
+    "workspaceContains:Acton.toml"
+  ],
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.6",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^4.9.5"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  }
+}

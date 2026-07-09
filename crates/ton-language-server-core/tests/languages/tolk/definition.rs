@@ -111,6 +111,42 @@ fn resolves_imported_function() {
 }
 
 #[test]
+fn removes_provider_file_from_workspace() {
+    let main_uri = DocumentUri::from("acton://fixture/main.tolk");
+    let lib_uri = DocumentUri::from("acton://fixture/lib.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    service
+        .add_source_file(
+            LANGUAGE_ID,
+            lib_uri.clone(),
+            "fun helper(): int { return 1; }\n",
+        )
+        .expect("provider file should be added");
+    service
+        .open_document(
+            main_uri.clone(),
+            LANGUAGE_ID,
+            1,
+            "import \"lib\"\nfun main(): int { return helper(); }\n",
+        )
+        .expect("main file should open");
+
+    let locations = service
+        .definition(&main_uri, Position::new(1, 25))
+        .expect("definition should resolve before removal");
+    assert_eq!(locations.len(), 1);
+
+    service
+        .remove_source_file(LANGUAGE_ID, &lib_uri)
+        .expect("provider file should be removed");
+    let locations = service
+        .definition(&main_uri, Position::new(1, 25))
+        .expect("definition should not fail after removal");
+    assert!(locations.is_empty());
+}
+
+#[test]
 fn resolves_imported_function_through_acton_toml_mapping() {
     case_tolk_definition(
         "file:///workspace/main.tolk",
@@ -146,6 +182,35 @@ fn resolves_imported_function_through_acton_toml_mapping() {
         },
         expect![[r"
             1:25 -> file:///workspace/src/lib/helper.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_stdlib_import_to_external_root() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@stdlib/common"
+            fun main(): int { return <caret>stdlibHelper(); }
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new("file:///workspace", None, "")
+                        .with_tolk_stdlib_root_uri("file:///workspace/.acton/tolk-stdlib"),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/.acton/tolk-stdlib/common.tolk",
+                    "fun stdlibHelper(): int { return 1; }\n",
+                )
+                .expect("provider stdlib file should be added");
+        },
+        expect![[r"
+            1:25 -> file:///workspace/.acton/tolk-stdlib/common.tolk 0:4 resolved"]],
     );
 }
 

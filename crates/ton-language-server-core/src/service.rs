@@ -124,6 +124,67 @@ impl LanguageService {
         result
     }
 
+    pub fn remove_source_file(
+        &mut self,
+        language_id: impl Into<LanguageId>,
+        uri: &DocumentUri,
+    ) -> anyhow::Result<()> {
+        let language_id = language_id.into();
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "source_file.remove",
+            uri = uri.as_str(),
+            language_id = language_id.as_str(),
+            "removing provider-backed source file"
+        );
+
+        let Some(plugin) = self.plugins.get(&language_id) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "source_file.remove",
+                uri = uri.as_str(),
+                language_id = language_id.as_str(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        let Some(workspace) = plugin.workspace() else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "source_file.remove",
+                uri = uri.as_str(),
+                language_id = language_id.as_str(),
+                "language has no workspace provider"
+            );
+            anyhow::bail!("language '{language_id}' does not support workspace source files");
+        };
+
+        let result = workspace.remove_source_file(uri);
+        match &result {
+            Ok(()) => {
+                self.profiler.increment("source_file.remove");
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "source_file.remove",
+                    uri = uri.as_str(),
+                    language_id = language_id.as_str(),
+                    "removed provider-backed source file"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "source_file.remove",
+                    uri = uri.as_str(),
+                    language_id = language_id.as_str(),
+                    error = %error,
+                    "failed to remove provider-backed source file"
+                );
+            }
+        }
+        result
+    }
+
     pub fn set_workspace_config(
         &mut self,
         language_id: impl Into<LanguageId>,

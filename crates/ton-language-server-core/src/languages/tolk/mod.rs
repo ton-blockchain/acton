@@ -150,6 +150,10 @@ impl WorkspaceLanguage for TolkLanguage {
         TolkLanguage::add_source_file(self, uri, text)
     }
 
+    fn remove_source_file(&self, uri: &DocumentUri) -> anyhow::Result<()> {
+        self.engine.remove_source_file(uri)
+    }
+
     fn set_workspace_config(&self, config: WorkspaceConfig) -> anyhow::Result<()> {
         self.engine.set_workspace_config(config)
     }
@@ -219,6 +223,27 @@ impl TolkWorkspaceEngine {
         file.base_uri = Some(uri);
         file.base_text = Some(text);
         file.dirty = true;
+        let mut profiler = Profiler::disabled();
+        state.rebuild_snapshot(&mut profiler)
+    }
+
+    fn remove_source_file(&self, uri: &DocumentUri) -> anyhow::Result<()> {
+        let path = logical_path_for_uri(uri);
+        let mut state = self.state.write().expect("Tolk workspace lock poisoned");
+        let mut remove_file = false;
+        if let Some(file) = state.files.get_mut(&path) {
+            file.base_uri = None;
+            file.base_text = None;
+            if file.open.is_some() {
+                file.dirty = true;
+            } else {
+                remove_file = true;
+            }
+        }
+        if remove_file {
+            state.files.remove(&path);
+            state.file_db.remove_path(&path);
+        }
         let mut profiler = Profiler::disabled();
         state.rebuild_snapshot(&mut profiler)
     }
@@ -402,8 +427,8 @@ impl TolkWorkspaceState {
 
         let provider = SnapshotSourceProvider {
             files: self.files.clone(),
+            use_embedded_stdlib: self.project_config.use_embedded_stdlib,
         };
-        let stdlib_path = PathBuf::from(TOLK_STDLIB_PATH);
         let changed_file_ids = self.process_dirty_files(profiler)?;
         let file_db = self.file_db.clone();
         let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
@@ -413,7 +438,7 @@ impl TolkWorkspaceState {
         let index_started_at = profiler.start();
         let project_index = ProjectIndex::builder(&file_db, root)
             .with_additional_roots(roots)
-            .with_stdlib(stdlib_path)
+            .with_stdlib(project_config.stdlib_path.clone())
             .with_mappings(&project_config.import_mappings)
             .build_with_provider(&provider);
         profiler.finish("tolk.snapshot.index", index_started_at);
@@ -455,6 +480,8 @@ impl TolkWorkspaceState {
             root_count = self.roots.len(),
             file_count = self.files.len(),
             project_root = project_config.project_root.to_string_lossy().as_ref(),
+            stdlib_root = project_config.stdlib_path.to_string_lossy().as_ref(),
+            embedded_stdlib = project_config.use_embedded_stdlib,
             import_mapping_count = project_config
                 .import_mappings
                 .as_ref()
@@ -465,6 +492,7 @@ impl TolkWorkspaceState {
     }
 
     fn invalidate_project_config(&mut self) {
+        self.file_db = Arc::new(FileDb::new(self.project_config.stdlib_path.clone(), None));
         for file in self.files.values_mut() {
             file.dirty = true;
         }
@@ -509,6 +537,8 @@ impl TolkWorkspaceState {
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct TolkProjectConfig {
     project_root: PathBuf,
+    stdlib_path: PathBuf,
+    use_embedded_stdlib: bool,
     import_mappings: Option<BTreeMap<String, String>>,
 }
 
@@ -516,6 +546,8 @@ impl Default for TolkProjectConfig {
     fn default() -> Self {
         Self {
             project_root: PathBuf::from("/"),
+            stdlib_path: PathBuf::from(TOLK_STDLIB_PATH),
+            use_embedded_stdlib: true,
             import_mappings: None,
         }
     }
@@ -531,9 +563,14 @@ impl TolkProjectConfig {
                 format!("failed to parse {uri}")
             })?;
         let project_root = logical_path_for_uri(config.root_uri());
+        let stdlib_path = config
+            .tolk_stdlib_root_uri()
+            .map_or_else(|| PathBuf::from(TOLK_STDLIB_PATH), logical_path_for_uri);
         Ok(Self {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
             project_root,
+            stdlib_path,
+            use_embedded_stdlib: config.tolk_stdlib_root_uri().is_none(),
         })
     }
 }
@@ -628,6 +665,7 @@ impl TolkResolveSnapshot {
 #[derive(Clone, Debug)]
 struct SnapshotSourceProvider {
     files: BTreeMap<PathBuf, TolkWorkspaceFile>,
+    use_embedded_stdlib: bool,
 }
 
 impl ProjectSourceProvider for SnapshotSourceProvider {
@@ -643,6 +681,9 @@ impl ProjectSourceProvider for SnapshotSourceProvider {
             .and_then(TolkWorkspaceFile::active_source)
         {
             return Ok(Some(source));
+        }
+        if !self.use_embedded_stdlib {
+            return Ok(None);
         }
         Ok(embedded_stdlib_source(&path))
     }

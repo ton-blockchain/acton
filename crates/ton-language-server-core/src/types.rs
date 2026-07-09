@@ -40,6 +40,7 @@ pub struct WorkspaceConfig {
     root_uri: DocumentUri,
     manifest_uri: Option<DocumentUri>,
     manifest_text: Arc<str>,
+    tolk_stdlib_root_uri: Option<DocumentUri>,
 }
 
 impl WorkspaceConfig {
@@ -53,7 +54,14 @@ impl WorkspaceConfig {
             root_uri: root_uri.into(),
             manifest_uri,
             manifest_text: manifest_text.into(),
+            tolk_stdlib_root_uri: None,
         }
+    }
+
+    #[must_use]
+    pub fn with_tolk_stdlib_root_uri(mut self, uri: impl Into<DocumentUri>) -> Self {
+        self.tolk_stdlib_root_uri = Some(uri.into());
+        self
     }
 
     #[must_use]
@@ -69,6 +77,11 @@ impl WorkspaceConfig {
     #[must_use]
     pub const fn manifest_text(&self) -> &Arc<str> {
         &self.manifest_text
+    }
+
+    #[must_use]
+    pub const fn tolk_stdlib_root_uri(&self) -> Option<&DocumentUri> {
+        self.tolk_stdlib_root_uri.as_ref()
     }
 }
 
