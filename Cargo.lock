@@ -5395,6 +5395,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ton-language-server-wasm"
+version = "1.1.0"
+dependencies = [
+ "console_error_panic_hook",
+ "serde",
+ "serde-wasm-bindgen",
+ "ton-language-server-core",
+ "tree-sitter",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "ton-liteapi"
 version = "1.1.0"
 dependencies = [

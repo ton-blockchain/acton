@@ -1,0 +1,32 @@
+{
+  "name": "ton-language-server-web-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT OR Apache-2.0",
+  "author": "TON Core",
+  "type": "module",
+  "scripts": {
+    "build": "bun run build:wasm && tsc --noEmit && vite build",
+    "build:wasm": "wasm-pack build .. --target web --out-dir web/src/wasm --dev",
+    "dev": "vite --host 127.0.0.1 --port 3021",
+    "e2e": "playwright test --config playwright.config.ts",
+    "fmt": "biome format --write .",
+    "fmt:check": "biome format .",
+    "lint": "biome check --formatter-enabled=false .",
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "preview": "vite preview --host 127.0.0.1 --port 3022"
+  },
+  "dependencies": {
+    "@codingame/monaco-vscode-editor-api": "^25.1.2",
+    "monaco-languageclient": "10.7.0",
+    "vscode": "npm:@codingame/monaco-vscode-extension-api@^25.1.2",
+    "vscode-languageserver": "9.0.1",
+    "vscode-languageserver-textdocument": "1.0.12"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.16",
+    "wasm-pack": "0.15.0"
+  }
+}

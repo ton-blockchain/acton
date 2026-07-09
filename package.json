@@ -11,7 +11,8 @@
     "crates/acton-ui",
     "crates/acton-ui-gallery",
     "crates/acton-shared-ui",
-    "crates/acton-test-ui"
+    "crates/acton-test-ui",
+    "crates/ton-language-server-wasm/web"
   ],
   "scripts": {
     "build": "bun --filter '*' build",

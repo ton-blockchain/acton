@@ -1,0 +1,38 @@
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #111318;
+  color: #d6d9df;
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
+}
+
+#app {
+  display: grid;
+  grid-template-rows: 28px 1fr;
+}
+
+#status {
+  align-items: center;
+  border-bottom: 1px solid #2a2f3a;
+  color: #8f98aa;
+  display: flex;
+  font-size: 12px;
+  padding: 0 10px;
+}
+
+#status[data-state="ready"] {
+  color: #7dd3a8;
+}
+
+#status[data-state="error"] {
+  color: #ff8a8a;
+}
+
+#monaco-editor-root {
+  min-height: 0;
+}
