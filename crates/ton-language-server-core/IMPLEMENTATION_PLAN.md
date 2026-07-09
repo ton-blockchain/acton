@@ -31,8 +31,8 @@ access, or `file://`-only assumptions.
   - Owns `wasm-bindgen` exports, worker message handling, browser workspace
     snapshots, and serialization for Monaco clients.
 
-The initial change creates only this planning directory/file. No workspace
-manifest entries or Rust code are added yet.
+The first implementation slice starts with only `ton-language-server-core`.
+Native and WASM adapters remain planned sibling crates.
 
 ## Design Principles
 
@@ -139,6 +139,8 @@ Initial operations:
 - request diagnostics;
 - request definition;
 - request document symbols.
+- apply range-based document edits using LSP/Monaco UTF-16 positions and
+  tree-sitter `InputEdit`;
 
 Later operations:
 
@@ -289,6 +291,8 @@ Performance principles:
   request.
 - Keep request handlers mostly as cache lookups plus small local computation.
 - Reuse parse trees through tree-sitter incremental parsing.
+- Use incremental parsing only for range-based edits where the core can build a
+  correct `InputEdit`; full-text replacement is a safe fallback parse path.
 - Keep per-document indexes compact and cheap to rebuild for single-file
   languages.
 - Make cross-file/project indexing explicit and incremental when it is added
@@ -324,6 +328,97 @@ Initial performance expectations:
   current.
 - Rendering/test formatting should stay outside measured core feature timings.
 
+## Logging Strategy
+
+Logging and profiling should be related but separate:
+
+- logging explains what the language service is doing;
+- profiling measures how long specific operations take.
+
+The core should use structured logging through `tracing` spans and events. It
+should not initialize a global logger, write to stdout/stderr, write files, or
+call browser console APIs. Native and WASM adapters own the logging sink and the
+active filter level.
+
+Initial core support includes public `LogLevel` and `LoggingConfig` helpers for
+adapter-owned filters, stable target constants, and structured events around
+document lifecycle, range edits, TL-B parsing/indexing, and TL-B definition
+resolution.
+
+Recommended level semantics:
+
+- `error`
+  - unexpected internal failures and adapter setup failures;
+  - should be rare in core because most recoverable problems are returned as
+    typed errors or diagnostics.
+- `warn`
+  - recoverable service-level problems, such as unsupported language ids,
+    failed workspace provider reads, stale document versions, or failed
+    incremental reparse fallback;
+  - parser syntax errors should usually become diagnostics, not warning logs.
+- `info`
+  - lifecycle summaries: initialize, open/change/close document, request start
+    and finish, language registration, workspace provider changes;
+  - keep this useful for normal debugging without being noisy.
+- `debug`
+  - cache hits/misses, parse mode, index rebuild summaries, resolve path,
+    candidate counts, selected target counts, diagnostics counts.
+- `trace`
+  - detailed edit conversion, tree-sitter byte/point ranges, PSI node kinds,
+    scope walk details, resolve candidate lists.
+
+Every operation log should include enough structured fields to correlate events:
+
+- operation name;
+- request id if the adapter has one;
+- URI/logical document id;
+- language id;
+- document version;
+- edit count or change kind;
+- result count;
+- whether an incremental tree was reused;
+- broad cache hit/miss/fallback flags.
+
+The core should avoid logging full source text, token contents, or large
+serialized AST/debug dumps by default. Trace-level logs may include short symbol
+names and node kinds, but not whole files. Adapters can optionally redact or
+normalize URI paths when logs may leave the local machine.
+
+Configuring the active log level should be adapter-owned:
+
+- native adapter:
+  - read an initial level from CLI flags, environment, or LSP
+    `initializationOptions`;
+  - support dynamic updates through `workspace/didChangeConfiguration` using a
+    reloadable `tracing_subscriber` filter;
+  - optionally write to stderr, rotating files, or editor LSP log messages.
+- WASM adapter:
+  - expose a worker command such as `setLogLevel(level, target_filter)`;
+  - route logs to browser console or an in-page debug panel;
+  - keep filtering inside the worker so trace-level logging does not flood the
+    main thread unless explicitly enabled.
+
+Suggested target hierarchy:
+
+- `ton_language_server_core::service` for document lifecycle and feature
+  dispatch;
+- `ton_language_server_core::edit` for range edit and `InputEdit` conversion;
+- `ton_language_server_core::languages::<language>` for language-specific parse,
+  index, PSI, and resolve events;
+- `ton_language_server_native::*` and `ton_language_server_wasm::*` for adapter
+  transport and host integration.
+
+For testing, use a test subscriber in integration tests rather than asserting on
+stdout. Tests should verify that:
+
+- level filtering can hide or expose debug/trace events;
+- common operations emit stable structured event names;
+- trace-level edit logs are available when debugging invalid incremental trees;
+- logging remains disabled or filtered cheaply on hot paths.
+- file-based log snapshots are rendered through an explicit redaction layer
+  before comparison, so local filesystem paths, workspace roots, and user-owned
+  URIs do not become stable test fixtures.
+
 ## Testing Strategy
 
 The old `ton-ls` self-contained tests have the right user-facing shape and
@@ -335,6 +430,22 @@ should heavily influence the new test harness:
 - rendered, human-readable outputs;
 - `expect-test` snapshots for resolved targets, references, completions, hover,
   semantic tokens, and similar behavior.
+
+Snapshot tests should use two formats:
+
+- inline `expect-test` snapshots for small, highly local cases where the source
+  snippet and expected output fit comfortably in one test;
+- file-based snapshots/fixtures for larger language-server scenarios, following
+  the Acton-style approach used by existing repository tests: test files contain
+  named cases, source snippets, properties such as `only`, and expected output
+  blocks that can be refreshed with an explicit snapshot update mode such as
+  `UPDATE_SNAPSHOTS`.
+
+File snapshots should be preferred for LS outputs that naturally grow over time:
+diagnostics, semantic tokens, document symbols, completion lists, hover text,
+references, multi-file workspace cases, logging/profiling summaries, and adapter
+request/response rendering. This keeps test reviews readable and avoids large
+inline blobs in Rust files.
 
 The new architecture should keep those strengths but improve the layering.
 Most core tests should not spin up an LSP server and should not depend on
@@ -357,6 +468,10 @@ Recommended layers:
   - Use marked source snippets and snapshots for PSI/reference/resolve output.
   - For TL-B, start with single-file definition cases.
   - Include non-`file://` URIs in every feature group from the start.
+  - Keep language-specific integration tests under `tests/languages/<language>/`
+    and register them as explicit Cargo test targets. Top-level `tests/` should
+    stay reserved for core-wide service, logging, profiling, and adapter harness
+    tests.
 
 - **PSI and index tests**
   - Snapshot the language-owned semantic view: declarations, references, symbol
@@ -393,6 +508,8 @@ Improvements over the old harness:
   `case_tlb_references`, etc.
 - Use snapshots for scenario-style behavior and larger feature outputs. Reserve
   plain assertions for small invariants.
+- Store large LS scenario expectations in fixture files rather than inline Rust
+  snapshots, and make snapshot update explicit so CI never rewrites fixtures.
 
 Initial TL-B test matrix:
 
@@ -420,6 +537,8 @@ Initial TL-B test matrix:
 - Add minimal domain types for URI, positions, ranges, diagnostics, and edits.
 - Add `LanguageId`, language registry, feature-set/capability model, and the
   minimal plugin contract.
+- Add full-document replacement and range-based edit operations. Range edits
+  should apply `InputEdit` to the previous tree before reparsing.
 - Define the IntelliJ-inspired vocabulary in code: workspace/document,
   parsed-document cache, PSI facade boundary, reference/resolve boundary, and
   symbol index boundary.
@@ -445,6 +564,8 @@ Initial TL-B test matrix:
   (`tolk-syntax`, `fift-syntax`, `tasm-syntax`, `toml-syntax`, and
   `ton-syntax`) so later language features can reuse the same core shape.
 - Cache parse results by document id and version.
+- Reuse edited tree-sitter trees for incremental range edits, and verify them
+  against clean parses in tests.
 - Build a single-document TL-B symbol index.
 - Add a TL-B PSI-like facade and TL-B reference objects instead of implementing
   definition directly from raw LSP positions.
