@@ -142,6 +142,10 @@ impl LanguagePlugin for TolkLanguage {
 }
 
 impl WorkspaceLanguage for TolkLanguage {
+    fn add_source_file(&self, uri: DocumentUri, text: Arc<str>) -> anyhow::Result<()> {
+        TolkLanguage::add_source_file(self, uri, text)
+    }
+
     fn did_open(
         &self,
         document: &DocumentSnapshot,

@@ -129,9 +129,10 @@ connection.onRequest(PROFILE_REQUEST, async () =>
 connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>
   withLanguageServer(ADD_SOURCE_FILE_REQUEST, server => {
     if (!isRecord(params)) {
-      throw new Error("expected { uri, text } params")
+      throw new Error("expected { uri, text, languageId? } params")
     }
-    server.addSourceFile(String(params.uri), String(params.text))
+    const languageId = typeof params.languageId === "string" ? params.languageId : "tolk"
+    server.addSourceFileForLanguage(languageId, String(params.uri), String(params.text))
     return null
   }),
 )

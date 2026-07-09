@@ -1,8 +1,11 @@
 use serde::Serialize;
 use std::cell::RefCell;
 use std::fmt::Write as _;
+#[cfg(feature = "fift")]
 use ton_language_server_core::languages::fift::FiftLanguage;
+#[cfg(feature = "tasm")]
 use ton_language_server_core::languages::tasm::TasmLanguage;
+#[cfg(feature = "tolk")]
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
@@ -13,7 +16,6 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct TonLanguageServer {
     service: RefCell<LanguageService>,
-    tolk_language: TolkLanguage,
 }
 
 #[wasm_bindgen]
@@ -24,11 +26,7 @@ impl TonLanguageServer {
         install_tree_sitter_allocator();
         install_logging();
         console_error_panic_hook::set_once();
-        let (service, tolk_language) = wasm_language_service();
-        Self {
-            service: RefCell::new(service),
-            tolk_language,
-        }
+        wasm_language_server(None).expect("default language server construction should not fail")
     }
 
     #[wasm_bindgen(js_name = withTasmSpec)]
@@ -36,18 +34,25 @@ impl TonLanguageServer {
         install_tree_sitter_allocator();
         install_logging();
         console_error_panic_hook::set_once();
-        let (mut service, tolk_language) = wasm_language_service();
-        service.register_language(TasmLanguage::with_spec_json(&spec_json).map_err(js_error)?);
-        Ok(Self {
-            service: RefCell::new(service),
-            tolk_language,
-        })
+        wasm_language_server(Some(&spec_json))
     }
 
     #[wasm_bindgen(js_name = addSourceFile)]
     pub fn add_source_file(&self, uri: String, text: String) -> Result<(), JsValue> {
-        self.tolk_language
-            .add_source_file(DocumentUri::from(uri), text)
+        self.add_source_file_for_language("tolk".to_owned(), uri, text)
+    }
+
+    #[wasm_bindgen(js_name = addSourceFileForLanguage)]
+    pub fn add_source_file_for_language(
+        &self,
+        language_id: String,
+        uri: String,
+        text: String,
+    ) -> Result<(), JsValue> {
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .add_source_file(LanguageId::from(language_id), DocumentUri::from(uri), text)
             .map_err(js_error)
     }
 
@@ -167,16 +172,32 @@ impl Default for TonLanguageServer {
     }
 }
 
-fn wasm_language_service() -> (LanguageService, TolkLanguage) {
+fn wasm_language_server(tasm_spec_json: Option<&str>) -> Result<TonLanguageServer, JsValue> {
     let mut service = LanguageService::new(ton_language_server_core::LanguageServiceConfig {
         enable_profiling: true,
     });
+
+    #[cfg(feature = "tlb")]
     service.register_language(ton_language_server_core::languages::tlb::TlbLanguage::new());
-    service.register_language(TasmLanguage::new());
+
+    #[cfg(feature = "tasm")]
+    service.register_language(if let Some(spec_json) = tasm_spec_json {
+        TasmLanguage::with_spec_json(spec_json).map_err(js_error)?
+    } else {
+        TasmLanguage::new()
+    });
+    #[cfg(not(feature = "tasm"))]
+    let _ = tasm_spec_json;
+
+    #[cfg(feature = "fift")]
     service.register_language(FiftLanguage::new());
-    let tolk_language = TolkLanguage::new();
-    service.register_language(tolk_language.clone());
-    (service, tolk_language)
+
+    #[cfg(feature = "tolk")]
+    service.register_language(TolkLanguage::new());
+
+    Ok(TonLanguageServer {
+        service: RefCell::new(service),
+    })
 }
 
 #[derive(Serialize)]
@@ -754,7 +775,7 @@ mod tree_sitter_allocator {
         user_ptr.cast()
     }
 
-    unsafe fn read_header(ptr: *mut c_void) -> AllocationHeader {
+    const unsafe fn read_header(ptr: *mut c_void) -> AllocationHeader {
         let header_ptr = ptr
             .cast::<u8>()
             .wrapping_sub(HEADER_SIZE)
@@ -764,13 +785,13 @@ mod tree_sitter_allocator {
         unsafe { header_ptr.read() }
     }
 
-    unsafe fn layout_from_size_unchecked(size: usize) -> Layout {
+    const unsafe fn layout_from_size_unchecked(size: usize) -> Layout {
         // SAFETY: callers only pass sizes that were returned by `Layout::from_size_align`.
         unsafe { Layout::from_size_align_unchecked(size, ALLOCATION_ALIGN) }
     }
 
     impl AllocationHeader {
-        fn requested_size(self) -> usize {
+        const fn requested_size(self) -> usize {
             self.layout_size - HEADER_SIZE - (ALLOCATION_ALIGN - 1)
         }
     }

@@ -3,6 +3,7 @@ use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, Location, Position,
 };
 use std::any::Any;
+use std::sync::Arc;
 use tree_sitter::Tree;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -40,6 +41,10 @@ pub trait WorkspaceLanguage: Send + Sync {
     ) -> anyhow::Result<()>;
 
     fn did_close(&self, uri: &DocumentUri);
+
+    fn add_source_file(&self, _uri: DocumentUri, _text: Arc<str>) -> anyhow::Result<()> {
+        anyhow::bail!("workspace source files are not supported by this language")
+    }
 }
 
 pub struct PluginContext<'a> {

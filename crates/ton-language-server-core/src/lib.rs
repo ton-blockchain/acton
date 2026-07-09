@@ -26,9 +26,13 @@ pub use types::{
 #[must_use]
 pub fn default_language_service() -> LanguageService {
     let mut service = LanguageService::new(LanguageServiceConfig::default());
+    #[cfg(feature = "tlb")]
     service.register_language(languages::tlb::TlbLanguage::new());
+    #[cfg(feature = "tasm")]
     service.register_language(languages::tasm::TasmLanguage::new());
+    #[cfg(feature = "fift")]
     service.register_language(languages::fift::FiftLanguage::new());
+    #[cfg(feature = "tolk")]
     service.register_language(languages::tolk::TolkLanguage::new());
     service
 }

@@ -57,6 +57,73 @@ impl LanguageService {
         );
     }
 
+    pub fn add_source_file(
+        &mut self,
+        language_id: impl Into<LanguageId>,
+        uri: impl Into<DocumentUri>,
+        text: impl Into<Arc<str>>,
+    ) -> anyhow::Result<()> {
+        let language_id = language_id.into();
+        let uri = uri.into();
+        let text = text.into();
+        let text_len = text.len();
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "source_file.add",
+            uri = uri.as_str(),
+            language_id = language_id.as_str(),
+            text_len,
+            "adding provider-backed source file"
+        );
+
+        let Some(plugin) = self.plugins.get(&language_id) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "source_file.add",
+                uri = uri.as_str(),
+                language_id = language_id.as_str(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{language_id}'");
+        };
+        let Some(workspace) = plugin.workspace() else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "source_file.add",
+                uri = uri.as_str(),
+                language_id = language_id.as_str(),
+                "language has no workspace provider"
+            );
+            anyhow::bail!("language '{language_id}' does not support workspace source files");
+        };
+
+        let result = workspace.add_source_file(uri.clone(), text);
+        match &result {
+            Ok(()) => {
+                self.profiler.increment("source_file.add");
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "source_file.add",
+                    uri = uri.as_str(),
+                    language_id = language_id.as_str(),
+                    text_len,
+                    "added provider-backed source file"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "source_file.add",
+                    uri = uri.as_str(),
+                    language_id = language_id.as_str(),
+                    error = %error,
+                    "failed to add provider-backed source file"
+                );
+            }
+        }
+        result
+    }
+
     pub fn open_document(
         &mut self,
         uri: impl Into<DocumentUri>,

@@ -12,7 +12,7 @@ use ton_language_server_core::{
 fn case_tolk_definition(
     uri: &str,
     source: &str,
-    configure: impl FnOnce(&TolkLanguage),
+    configure: impl FnOnce(&mut LanguageService),
     expect: Expect,
 ) {
     let marked = MarkedSource::parse(source);
@@ -26,10 +26,9 @@ fn case_tolk_definition(
         "Tolk definition test must contain a caret marker"
     );
     let uri = DocumentUri::from(uri);
-    let language = TolkLanguage::new();
-    configure(&language);
     let mut service = LanguageService::new(LanguageServiceConfig::default());
-    service.register_language(language);
+    service.register_language(TolkLanguage::new());
+    configure(&mut service);
     service
         .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
         .expect("Tolk document should open");
@@ -97,9 +96,10 @@ fn resolves_imported_function() {
             import "lib"
             fun main(): int { return <caret>helper(); }
         "#,
-        |language| {
-            language
+        |service| {
+            service
                 .add_source_file(
+                    LANGUAGE_ID,
                     "acton://fixture/lib.tolk",
                     "fun helper(): int { return 1; }\n",
                 )
@@ -254,13 +254,16 @@ fn open_document_overrides_provider_file() {
     );
     let main_uri = DocumentUri::from("acton://fixture/main.tolk");
     let lib_uri = DocumentUri::from("acton://fixture/lib.tolk");
-    let language = TolkLanguage::new();
-    language
-        .add_source_file(lib_uri.clone(), "fun helper(): int { return 1; }\n")
-        .expect("provider file should be added");
 
     let mut service = LanguageService::new(LanguageServiceConfig::default());
-    service.register_language(language);
+    service.register_language(TolkLanguage::new());
+    service
+        .add_source_file(
+            LANGUAGE_ID,
+            lib_uri.clone(),
+            "fun helper(): int { return 1; }\n",
+        )
+        .expect("provider file should be added");
     service
         .open_document(main_uri.clone(), LANGUAGE_ID, 1, main.source().to_owned())
         .expect("main document should open");

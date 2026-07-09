@@ -10,18 +10,26 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[features]
+default = ["all-languages"]
+all-languages = ["tlb", "tasm", "fift", "tolk"]
+tlb = ["dep:tlb-syntax", "dep:ton-syntax"]
+tasm = ["dep:tasm-syntax"]
+fift = ["dep:fift-syntax"]
+tolk = ["dep:include_dir", "dep:tolk-resolver", "dep:tolk-syntax", "dep:tolk-ty"]
+
 [dependencies]
 anyhow = { workspace = true }
-include_dir = { workspace = true }
+include_dir = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
-fift-syntax = { workspace = true }
-tasm-syntax = { workspace = true }
-tlb-syntax = { workspace = true }
-tolk-resolver = { workspace = true }
-tolk-syntax = { workspace = true }
-tolk-ty = { workspace = true }
-ton-syntax = { workspace = true }
+fift-syntax = { workspace = true, optional = true }
+tasm-syntax = { workspace = true, optional = true }
+tlb-syntax = { workspace = true, optional = true }
+tolk-resolver = { workspace = true, optional = true }
+tolk-syntax = { workspace = true, optional = true }
+tolk-ty = { workspace = true, optional = true }
+ton-syntax = { workspace = true, optional = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
 web-time = { workspace = true }
@@ -30,28 +38,44 @@ web-time = { workspace = true }
 expect-test = { workspace = true }
 
 [[test]]
+name = "logging"
+path = "tests/logging.rs"
+required-features = ["tlb"]
+
+[[test]]
+name = "profiling"
+path = "tests/profiling.rs"
+required-features = ["tlb", "tolk"]
+
+[[test]]
 name = "tlb_definition"
 path = "tests/languages/tlb/definition.rs"
+required-features = ["tlb"]
 
 [[test]]
 name = "tlb_incremental_edit"
 path = "tests/languages/tlb/incremental_edit.rs"
+required-features = ["tlb"]
 
 [[test]]
 name = "tasm_hover"
 path = "tests/languages/tasm/hover.rs"
+required-features = ["tasm"]
 
 [[test]]
 name = "tasm_code_lens"
 path = "tests/languages/tasm/code_lens.rs"
+required-features = ["tasm"]
 
 [[test]]
 name = "fift_folding"
 path = "tests/languages/fift/folding.rs"
+required-features = ["fift"]
 
 [[test]]
 name = "tolk_definition"
 path = "tests/languages/tolk/definition.rs"
+required-features = ["tolk"]
 
 [lints]
 workspace = true

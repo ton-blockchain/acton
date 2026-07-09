@@ -15,11 +15,19 @@ crate-type = ["cdylib", "rlib"]
 doctest = false
 test = false
 
+[features]
+default = ["all-languages"]
+all-languages = ["tlb", "tasm", "fift", "tolk"]
+tlb = ["ton-language-server-core/tlb"]
+tasm = ["ton-language-server-core/tasm"]
+fift = ["ton-language-server-core/fift"]
+tolk = ["ton-language-server-core/tolk"]
+
 [dependencies]
 console_error_panic_hook = "0.1.7"
 serde = { workspace = true, features = ["derive"] }
 serde-wasm-bindgen = "0.6.5"
-ton-language-server-core = { workspace = true }
+ton-language-server-core = { path = "../ton-language-server-core", default-features = false }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
 wasm-bindgen = { workspace = true }
