@@ -9,7 +9,8 @@ use ton_language_server_core::languages::tasm::TasmLanguage;
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
-    LogLevel, Position, ProfileSummary, WorkspaceConfig,
+    LogLevel, Position, ProfileSummary, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
+    SemanticToken, SemanticTokens, WorkspaceConfig,
 };
 use wasm_bindgen::prelude::*;
 
@@ -115,6 +116,16 @@ impl TonLanguageServer {
         Ok(render_profile_summary(&summary))
     }
 
+    #[wasm_bindgen(js_name = semanticTokenTypes)]
+    pub fn semantic_token_types(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(SEMANTIC_TOKEN_TYPE_NAMES).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = semanticTokenModifiers)]
+    pub fn semantic_token_modifiers(&self) -> Result<JsValue, JsValue> {
+        serde_wasm_bindgen::to_value(SEMANTIC_TOKEN_MODIFIER_NAMES).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = openDocument)]
     pub fn open_document(
         &self,
@@ -155,6 +166,27 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = references)]
+    pub fn references(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+        include_declaration: bool,
+    ) -> Result<JsValue, JsValue> {
+        let locations = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .references(
+                &DocumentUri::from(uri),
+                Position::new(line, character),
+                include_declaration,
+            )
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = hover)]
     pub fn hover(&self, uri: String, line: u32, character: u32) -> Result<JsValue, JsValue> {
         let hover = self
@@ -164,6 +196,17 @@ impl TonLanguageServer {
             .hover(&DocumentUri::from(uri), Position::new(line, character))
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&hover.map(hover_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = semanticTokens)]
+    pub fn semantic_tokens(&self, uri: String) -> Result<JsValue, JsValue> {
+        let tokens = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .semantic_tokens(&DocumentUri::from(uri))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&semantic_tokens_to_lsp(tokens)).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = codeLens)]
@@ -250,6 +293,14 @@ struct LspCodeLens {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspSemanticTokens {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    result_id: Option<String>,
+    data: Vec<u32>,
+}
+
+#[derive(Serialize)]
 struct LspCommand {
     title: String,
     command: String,
@@ -305,6 +356,25 @@ fn hover_to_lsp(hover: Hover) -> LspHover {
 
 fn code_lenses_to_lsp(lenses: Vec<CodeLens>) -> Vec<LspCodeLens> {
     lenses.into_iter().map(code_lens_to_lsp).collect()
+}
+
+fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> LspSemanticTokens {
+    LspSemanticTokens {
+        result_id: tokens.result_id,
+        data: flatten_semantic_tokens(tokens.data),
+    }
+}
+
+fn flatten_semantic_tokens(tokens: Vec<SemanticToken>) -> Vec<u32> {
+    let mut data = Vec::with_capacity(tokens.len() * 5);
+    for token in tokens {
+        data.push(token.delta_line);
+        data.push(token.delta_start);
+        data.push(token.length);
+        data.push(token.token_type);
+        data.push(token.token_modifiers_bitset);
+    }
+    data
 }
 
 fn code_lens_to_lsp(lens: CodeLens) -> LspCodeLens {

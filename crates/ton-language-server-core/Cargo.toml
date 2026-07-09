@@ -65,6 +65,11 @@ path = "tests/languages/tlb/incremental_edit.rs"
 required-features = ["tlb"]
 
 [[test]]
+name = "tlb_semantic_tokens"
+path = "tests/languages/tlb/semantic_tokens.rs"
+required-features = ["tlb"]
+
+[[test]]
 name = "tasm_hover"
 path = "tests/languages/tasm/hover.rs"
 required-features = ["tasm"]
@@ -80,8 +85,23 @@ path = "tests/languages/fift/folding.rs"
 required-features = ["fift"]
 
 [[test]]
+name = "fift_semantic_tokens"
+path = "tests/languages/fift/semantic_tokens.rs"
+required-features = ["fift"]
+
+[[test]]
 name = "tolk_definition"
 path = "tests/languages/tolk/definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_references"
+path = "tests/languages/tolk/references.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_semantic_tokens"
+path = "tests/languages/tolk/semantic_tokens.rs"
 required-features = ["tolk"]
 
 [lints]

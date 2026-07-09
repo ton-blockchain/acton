@@ -58,6 +58,11 @@ type PlainLocation = {
   }
 }
 
+type PlainSemanticTokens = {
+  readonly resultId?: string
+  readonly data: readonly number[]
+}
+
 type PersistedState = {
   selectedLanguage: SupportedLanguage
   logLevel: LogLevelName
@@ -73,6 +78,7 @@ type SmokeApi = {
   definitionAt: (line: number, character: number) => Promise<PlainLocation[]>
   codeLenses: () => Promise<PlainCodeLens[]>
   foldingRanges: () => Promise<PlainFoldingRange[]>
+  semanticTokens: () => Promise<PlainSemanticTokens>
   logs: () => Promise<string>
   profile: () => Promise<string>
   sidePanelText: () => string
@@ -245,6 +251,7 @@ export function App() {
             "editor.fontSize": 13,
             "editor.lineHeight": 20,
             "editor.codeLens": true,
+            "editor.semanticHighlighting.enabled": true,
             "editor.minimap.enabled": false,
             "editor.wordBasedSuggestions": "off",
             "workbench.colorTheme": "Default Dark Modern",
@@ -384,7 +391,7 @@ export function App() {
           },
         },
         editorOptions: {
-          "semanticHighlighting.enabled": false,
+          "semanticHighlighting.enabled": true,
           automaticLayout: true,
           fixedOverflowWidgets: true,
           glyphMargin: false,
@@ -579,6 +586,13 @@ export function App() {
             documentUriFor(currentLanguageRef.current),
           )
           return (result ?? []).map(toPlainFoldingRange)
+        },
+        async semanticTokens() {
+          return sendRequest<PlainSemanticTokens>("textDocument/semanticTokens/full", {
+            textDocument: {
+              uri: documentUriFor(currentLanguageRef.current).toString(),
+            },
+          })
         },
         async logs() {
           return sendRequest<string>(logsRequest)

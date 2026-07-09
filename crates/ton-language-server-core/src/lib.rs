@@ -1,6 +1,7 @@
 mod language;
 mod logging;
 mod profiling;
+mod semantic_tokens;
 mod service;
 mod text;
 mod types;
@@ -9,13 +10,18 @@ pub mod languages;
 
 pub use language::{
     CodeLensRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest, HoverRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, WorkspaceLanguage,
+    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, SemanticTokensRequest,
+    WorkspaceLanguage,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
     SERVICE_TARGET, TASM_TARGET, TLB_TARGET, TOLK_TARGET,
 };
 pub use profiling::{ProfileEvent, ProfileSummary, Profiler};
+pub use semantic_tokens::{
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokenModifier,
+    SemanticTokenType, SemanticTokens, SemanticTokensBuilder,
+};
 pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{

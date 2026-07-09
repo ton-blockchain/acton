@@ -1,0 +1,190 @@
+#[path = "../../support/mod.rs"]
+mod support;
+
+use expect_test::{Expect, expect};
+use std::fmt::Write as _;
+use support::MarkedSource;
+use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::{
+    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position,
+};
+
+fn case_tolk_references(
+    uri: &str,
+    source: &str,
+    include_declaration: bool,
+    configure: impl FnOnce(&mut LanguageService),
+    expect: Expect,
+) {
+    let marked = MarkedSource::parse(source);
+    let caret = marked.marker("caret");
+    let uri = DocumentUri::from(uri);
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(TolkLanguage::new());
+    configure(&mut service);
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let locations = service
+        .references(&uri, caret.position, include_declaration)
+        .expect("references request should succeed");
+    expect.assert_eq(&render_references(caret.position, &locations));
+}
+
+#[test]
+fn finds_global_references_across_files() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r#"
+            import "lib"
+            import "other"
+            fun main(): int { return <caret>helper(); }
+        "#,
+        false,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/lib.tolk",
+                    "fun helper(): int { return 1; }\nfun other(): int { return helper(); }\n",
+                )
+                .expect("provider file should be added");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/other.tolk",
+                    "import \"lib\"\nfun use(): int { return helper(); }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r"
+            2:25 -> file:///workspace/lib.tolk 1:26 reference
+            2:25 -> file:///workspace/main.tolk 2:25 reference
+            2:25 -> file:///workspace/other.tolk 1:24 reference"]],
+    );
+}
+
+#[test]
+fn include_declaration_adds_global_definition() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun helper(): int { return 1; }
+            fun main(): int { return <caret>helper(); }
+        ",
+        true,
+        |_| {},
+        expect![[r"
+            1:25 -> file:///workspace/main.tolk 0:4 reference
+            1:25 -> file:///workspace/main.tolk 1:25 reference"]],
+    );
+}
+
+#[test]
+fn finds_local_references_from_declaration() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main(): int {
+                var <caret>value = 1;
+                return value + value;
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:8 -> file:///workspace/main.tolk 2:11 reference
+            1:8 -> file:///workspace/main.tolk 2:19 reference"]],
+    );
+}
+
+#[test]
+fn include_declaration_adds_local_definition() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main(): int {
+                var value = 1;
+                return <caret>value;
+            }
+        ",
+        true,
+        |_| {},
+        expect![[r"
+            2:11 -> file:///workspace/main.tolk 1:8 reference
+            2:11 -> file:///workspace/main.tolk 2:11 reference"]],
+    );
+}
+
+#[test]
+fn finds_field_references_with_type_inference() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            struct Storage {
+                counter: int
+            }
+            fun main() {
+                var storage = Storage { counter: 1 };
+                storage.<caret>counter;
+                storage.counter = 2;
+            }
+        ",
+        true,
+        |_| {},
+        expect![[r"
+            5:12 -> file:///workspace/main.tolk 1:4 reference
+            5:12 -> file:///workspace/main.tolk 4:28 reference
+            5:12 -> file:///workspace/main.tolk 5:12 reference
+            5:12 -> file:///workspace/main.tolk 6:12 reference"]],
+    );
+}
+
+#[test]
+fn unresolved_symbol_has_no_references() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main(): int { return <caret>missing(); }
+        ",
+        true,
+        |_| {},
+        expect![[r"
+            0:25 unresolved"]],
+    );
+}
+
+fn render_references(caret_position: Position, locations: &[Location]) -> String {
+    if locations.is_empty() {
+        return format!("{} unresolved", format_position(caret_position));
+    }
+
+    let mut locations = locations.to_vec();
+    locations.sort_by(|left, right| {
+        left.uri
+            .as_str()
+            .cmp(right.uri.as_str())
+            .then_with(|| left.range.start.cmp(&right.range.start))
+            .then_with(|| left.range.end.cmp(&right.range.end))
+    });
+
+    let mut output = String::new();
+    for location in locations {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        let _ = write!(
+            output,
+            "{} -> {} {} reference",
+            format_position(caret_position),
+            location.uri,
+            format_position(location.range.start)
+        );
+    }
+    output
+}
+
+fn format_position(position: Position) -> String {
+    format!("{}:{}", position.line, position.character)
+}

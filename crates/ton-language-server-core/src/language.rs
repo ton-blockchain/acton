@@ -1,4 +1,5 @@
 use crate::profiling::Profiler;
+use crate::semantic_tokens::SemanticToken;
 use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, Location, Position,
     WorkspaceConfig,
@@ -73,6 +74,12 @@ pub struct DefinitionRequest<'a> {
     pub position: Position,
 }
 
+pub struct ReferenceRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+    pub include_declaration: bool,
+}
+
 pub struct HoverRequest<'a> {
     pub context: PluginContext<'a>,
     pub position: Position,
@@ -83,6 +90,10 @@ pub struct CodeLensRequest<'a> {
 }
 
 pub struct FoldingRangeRequest<'a> {
+    pub context: PluginContext<'a>,
+}
+
+pub struct SemanticTokensRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
@@ -103,6 +114,10 @@ pub trait LanguagePlugin: Send + Sync {
         Ok(Vec::new())
     }
 
+    fn references(&self, _request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        Ok(Vec::new())
+    }
+
     fn hover(&self, _request: HoverRequest<'_>) -> anyhow::Result<Option<Hover>> {
         Ok(None)
     }
@@ -115,6 +130,13 @@ pub trait LanguagePlugin: Send + Sync {
         &self,
         _request: FoldingRangeRequest<'_>,
     ) -> anyhow::Result<Vec<FoldingRange>> {
+        Ok(Vec::new())
+    }
+
+    fn semantic_tokens(
+        &self,
+        _request: SemanticTokensRequest<'_>,
+    ) -> anyhow::Result<Vec<SemanticToken>> {
         Ok(Vec::new())
     }
 }

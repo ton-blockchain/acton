@@ -1,9 +1,11 @@
 mod index;
 mod psi;
 mod reference;
+mod semantic_tokens;
 
 use crate::language::{
     DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument,
+    SemanticTokensRequest,
 };
 use crate::logging;
 use crate::{LanguageId, Location};
@@ -36,6 +38,7 @@ impl LanguagePlugin for TlbLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             definition: true,
+            semantic_tokens: true,
             ..FeatureSet::default()
         }
     }
@@ -122,6 +125,33 @@ impl LanguagePlugin for TlbLanguage {
             .into_iter()
             .map(|range| Location::new(request.context.document.uri().clone(), range))
             .collect())
+    }
+
+    fn semantic_tokens(
+        &self,
+        request: SemanticTokensRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::SemanticToken>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let tokens = semantic_tokens::semantic_tokens(request.context.document, parsed);
+        request
+            .context
+            .profiler
+            .finish("tlb.semantic_tokens", started_at);
+        tracing::debug!(
+            target: logging::TLB_TARGET,
+            operation = "tlb.semantic_tokens",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            result_count = tokens.len(),
+            "resolved TL-B semantic tokens"
+        );
+        Ok(tokens)
     }
 }
 

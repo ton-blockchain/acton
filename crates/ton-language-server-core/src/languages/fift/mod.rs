@@ -1,11 +1,14 @@
 use crate::language::{
     FeatureSet, FoldingRangeRequest, LanguagePlugin, ParseRequest, ParsedDocument,
+    SemanticTokensRequest,
 };
 use crate::logging;
 use crate::{FoldingRange, LanguageId};
 use anyhow::Context;
 use std::any::Any;
 use tree_sitter::{Node, Tree};
+
+mod semantic_tokens;
 
 pub const LANGUAGE_ID: &str = "fift";
 
@@ -31,6 +34,7 @@ impl LanguagePlugin for FiftLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             folding_ranges: true,
+            semantic_tokens: true,
             ..FeatureSet::default()
         }
     }
@@ -112,6 +116,34 @@ impl LanguagePlugin for FiftLanguage {
         );
 
         Ok(ranges)
+    }
+
+    fn semantic_tokens(
+        &self,
+        request: SemanticTokensRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::SemanticToken>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let tokens = semantic_tokens::semantic_tokens(request.context.document, parsed);
+        request
+            .context
+            .profiler
+            .finish("fift.semantic_tokens", started_at);
+        tracing::debug!(
+            target: logging::FIFT_TARGET,
+            operation = "fift.semantic_tokens",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            result_count = tokens.len(),
+            "resolved Fift semantic tokens"
+        );
+
+        Ok(tokens)
     }
 }
 

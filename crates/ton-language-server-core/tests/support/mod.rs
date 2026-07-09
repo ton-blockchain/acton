@@ -1,5 +1,8 @@
 use std::fmt::Write as _;
-use ton_language_server_core::{Location, Position};
+use ton_language_server_core::{
+    Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken,
+    TextIndex,
+};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Marker {
@@ -55,6 +58,7 @@ impl MarkedSource {
     }
 
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn marker(&self, name: &str) -> &Marker {
         self.markers
             .iter()
@@ -81,7 +85,6 @@ pub(crate) fn render_definition(caret_position: Position, locations: &[Location]
         .map(|location| location.range.start)
         .collect::<Vec<_>>();
     targets.sort();
-    targets.dedup();
 
     let mut output = String::new();
     for target in targets {
@@ -93,6 +96,43 @@ pub(crate) fn render_definition(caret_position: Position, locations: &[Location]
             "{} -> {} resolved",
             format_position(caret_position),
             format_position(target)
+        );
+    }
+    output
+}
+
+#[allow(dead_code)]
+#[must_use]
+pub(crate) fn render_semantic_tokens(source: &str, tokens: &[SemanticToken]) -> String {
+    if tokens.is_empty() {
+        return "<none>".to_owned();
+    }
+
+    let text_index = TextIndex::new(source);
+    let mut line = 0;
+    let mut start = 0;
+    let mut output = String::new();
+    for token in tokens {
+        line += token.delta_line;
+        if token.delta_line == 0 {
+            start += token.delta_start;
+        } else {
+            start = token.delta_start;
+        }
+        let end = start + token.length;
+        let token_text = text_for_range(source, &text_index, line, start, end);
+        let token_type = SEMANTIC_TOKEN_TYPE_NAMES
+            .get(token.token_type as usize)
+            .copied()
+            .unwrap_or("<unknown>");
+        let modifiers = render_token_modifiers(token.token_modifiers_bitset);
+
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        let _ = write!(
+            output,
+            "{line}:{start} {end} kind={token_type:<13} modifiers={modifiers:<12} text={token_text}"
         );
     }
     output
@@ -124,6 +164,31 @@ fn offset_to_position_utf16(source: &str, offset: usize) -> Position {
         .map(char::len_utf16)
         .sum::<usize>();
     Position::new(line, character as u32)
+}
+
+fn text_for_range<'a>(
+    source: &'a str,
+    text_index: &TextIndex,
+    line: u32,
+    start: u32,
+    end: u32,
+) -> &'a str {
+    let start = text_index.position_to_offset(source, Position::new(line, start));
+    let end = text_index.position_to_offset(source, Position::new(line, end));
+    source.get(start..end).unwrap_or("")
+}
+
+fn render_token_modifiers(bitset: u32) -> String {
+    let modifiers = SEMANTIC_TOKEN_MODIFIER_NAMES
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, name)| (bitset & (1 << idx) != 0).then_some(*name))
+        .collect::<Vec<_>>();
+    if modifiers.is_empty() {
+        "-".to_owned()
+    } else {
+        modifiers.join("|")
+    }
 }
 
 fn dedent_block(source: &str) -> String {

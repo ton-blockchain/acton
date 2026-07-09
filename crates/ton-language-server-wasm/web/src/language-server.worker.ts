@@ -42,11 +42,20 @@ const getLanguageServer = async () => {
 }
 
 connection.onInitialize(async (): Promise<InitializeResult> => {
-  await getLanguageServer()
+  const server = await getLanguageServer()
   return {
     capabilities: {
       definitionProvider: true,
+      referencesProvider: true,
       hoverProvider: true,
+      semanticTokensProvider: {
+        legend: {
+          tokenTypes: server.semanticTokenTypes() as string[],
+          tokenModifiers: server.semanticTokenModifiers() as string[],
+        },
+        full: true,
+        range: false,
+      },
       codeLensProvider: {
         resolveProvider: false,
       },
@@ -82,9 +91,26 @@ connection.onDefinition(async params =>
   ),
 )
 
+connection.onReferences(async params =>
+  withLanguageServer("textDocument/references", server =>
+    server.references(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+      false,
+    ),
+  ),
+)
+
 connection.onHover(async params =>
   withLanguageServer("textDocument/hover", server =>
     server.hover(params.textDocument.uri, params.position.line, params.position.character),
+  ),
+)
+
+connection.languages.semanticTokens.on(async params =>
+  withLanguageServer("textDocument/semanticTokens/full", server =>
+    server.semanticTokens(params.textDocument.uri),
   ),
 )
 

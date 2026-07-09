@@ -13,7 +13,8 @@ use ton_language_server_core::languages::tlb::TlbLanguage;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
     CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, LanguageServiceConfig,
-    Location, Position, Range, TextEdit, TextIndex, WorkspaceConfig,
+    Location, Position, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
+    SemanticToken, SemanticTokens, TextEdit, TextIndex, WorkspaceConfig,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -261,6 +262,17 @@ impl LanguageServer for NativeLanguageServer {
                 )),
                 hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
                 definition_provider: Some(lsp::OneOf::Left(true)),
+                references_provider: Some(lsp::OneOf::Left(true)),
+                semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::from(
+                    lsp::SemanticTokensOptions {
+                        work_done_progress_options: lsp::WorkDoneProgressOptions {
+                            work_done_progress: None,
+                        },
+                        legend: semantic_tokens_legend_to_lsp(),
+                        range: Some(false),
+                        full: Some(lsp::SemanticTokensFullOptions::Bool(true)),
+                    },
+                )),
                 code_lens_provider: Some(lsp::CodeLensOptions {
                     resolve_provider: Some(false),
                 }),
@@ -454,6 +466,20 @@ impl LanguageServer for NativeLanguageServer {
         Ok(locations_to_definition_response(locations))
     }
 
+    async fn references(
+        &self,
+        params: lsp::ReferenceParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::Location>>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = position_from_lsp(params.text_document_position.position);
+        let locations = self
+            .with_service(|service| {
+                service.references(&DocumentUri::from(uri.to_string()), position, false)
+            })
+            .map_err(rpc_error)?;
+        Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
+    }
+
     async fn hover(&self, params: lsp::HoverParams) -> jsonrpc::Result<Option<lsp::Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
         let position = position_from_lsp(params.text_document_position_params.position);
@@ -461,6 +487,19 @@ impl LanguageServer for NativeLanguageServer {
             .with_service(|service| service.hover(&DocumentUri::from(uri.to_string()), position))
             .map_err(rpc_error)?;
         Ok(hover.map(hover_to_lsp))
+    }
+
+    async fn semantic_tokens_full(
+        &self,
+        params: lsp::SemanticTokensParams,
+    ) -> jsonrpc::Result<Option<lsp::SemanticTokensResult>> {
+        let uri = params.text_document.uri;
+        let tokens = self
+            .with_service(|service| service.semantic_tokens(&DocumentUri::from(uri.to_string())))
+            .map_err(rpc_error)?;
+        Ok(Some(lsp::SemanticTokensResult::Tokens(
+            semantic_tokens_to_lsp(tokens),
+        )))
     }
 
     async fn code_lens(
@@ -748,6 +787,38 @@ fn hover_to_lsp(hover: Hover) -> lsp::Hover {
             value: hover.contents,
         }),
         range: hover.range.map(range_to_lsp),
+    }
+}
+
+fn semantic_tokens_legend_to_lsp() -> lsp::SemanticTokensLegend {
+    lsp::SemanticTokensLegend {
+        token_types: SEMANTIC_TOKEN_TYPE_NAMES
+            .iter()
+            .copied()
+            .map(lsp::SemanticTokenType::from)
+            .collect(),
+        token_modifiers: SEMANTIC_TOKEN_MODIFIER_NAMES
+            .iter()
+            .copied()
+            .map(lsp::SemanticTokenModifier::from)
+            .collect(),
+    }
+}
+
+fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> lsp::SemanticTokens {
+    lsp::SemanticTokens {
+        result_id: tokens.result_id,
+        data: tokens.data.into_iter().map(semantic_token_to_lsp).collect(),
+    }
+}
+
+const fn semantic_token_to_lsp(token: SemanticToken) -> lsp::SemanticToken {
+    lsp::SemanticToken {
+        delta_line: token.delta_line,
+        delta_start: token.delta_start,
+        length: token.length,
+        token_type: token.token_type,
+        token_modifiers_bitset: token.token_modifiers_bitset,
     }
 }
 

@@ -407,7 +407,6 @@ fn render_definition(caret_position: Position, locations: &[Location]) -> String
                 right.range.start.character,
             ))
     });
-    locations.dedup_by(|left, right| left.uri == right.uri && left.range == right.range);
 
     let mut output = String::new();
     for location in locations {

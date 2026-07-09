@@ -1,5 +1,6 @@
 use crate::language::{
-    DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument, WorkspaceLanguage,
+    DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument, ReferenceRequest,
+    SemanticTokensRequest, WorkspaceLanguage,
 };
 use crate::logging;
 use crate::{
@@ -18,6 +19,10 @@ use tolk_resolver::{
 };
 use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
 use tree_sitter::Tree;
+
+mod definition;
+mod references;
+mod semantic_tokens;
 
 pub const LANGUAGE_ID: &str = "tolk";
 const TOLK_STDLIB_PATH: &str = "/__tolk_stdlib__";
@@ -67,6 +72,8 @@ impl LanguagePlugin for TolkLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             definition: true,
+            references: true,
+            semantic_tokens: true,
             ..FeatureSet::default()
         }
     }
@@ -142,6 +149,64 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk definition"
         );
         Ok(locations)
+    }
+
+    fn references(&self, request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let locations = self.engine.references(
+            request.context.document,
+            request.position,
+            request.include_declaration,
+        );
+        request
+            .context
+            .profiler
+            .finish("tolk.references.resolve", started_at);
+        tracing::debug!(
+            target: logging::TOLK_TARGET,
+            operation = "tolk.references.resolve",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            line = request.position.line,
+            character = request.position.character,
+            include_declaration = request.include_declaration,
+            result_count = locations.len(),
+            "resolved Tolk references"
+        );
+        Ok(locations)
+    }
+
+    fn semantic_tokens(
+        &self,
+        request: SemanticTokensRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::SemanticToken>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let tokens = self.engine.semantic_tokens(request.context.document);
+        request
+            .context
+            .profiler
+            .finish("tolk.semantic_tokens", started_at);
+        tracing::debug!(
+            target: logging::TOLK_TARGET,
+            operation = "tolk.semantic_tokens",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            result_count = tokens.len(),
+            "resolved Tolk semantic tokens"
+        );
+        Ok(tokens)
     }
 }
 
@@ -304,80 +369,6 @@ impl TolkWorkspaceEngine {
                 error = %error,
                 "failed to rebuild Tolk snapshot after close"
             );
-        }
-    }
-
-    fn definition(&self, document: &DocumentSnapshot, position: crate::Position) -> Vec<Location> {
-        let snapshot = {
-            let state = self.state.read().expect("Tolk workspace lock poisoned");
-            state.latest_snapshot.clone()
-        };
-        let Some(snapshot) = snapshot else {
-            return Vec::new();
-        };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
-            return Vec::new();
-        };
-        let offset = document
-            .text_index()
-            .position_to_offset(document.text(), position);
-
-        if let Some(name_use) = snapshot.project_index.find_use(file_id, offset)
-            && !matches!(name_use.resolved, Resolved::Unresolved)
-        {
-            return snapshot.location_for_resolved(&name_use.resolved);
-        }
-
-        if let Some(symbol) = snapshot.project_index.find_symbol_at(file_id, offset) {
-            return snapshot.location_for_span(symbol.id.file_id, symbol.name_span);
-        }
-
-        if let Some(resolve_index) = snapshot.project_index.get_resolved_uses(file_id)
-            && let Some(local) = resolve_index.find_local_at(offset)
-        {
-            return snapshot.location_for_span(local.id.file_id, local.def_span);
-        }
-
-        let Some(file_info) = snapshot.file_db.get_by_id(file_id) else {
-            return Vec::new();
-        };
-        let Some(symbol) = file_info.find_symbol_at(offset) else {
-            return Vec::new();
-        };
-        snapshot
-            .inferred_resolved_at(symbol.id, offset)
-            .map_or_else(Vec::new, |resolved| {
-                snapshot.location_for_resolved(&resolved)
-            })
-    }
-}
-
-impl TolkResolveSnapshot {
-    fn inferred_resolved_at(&self, symbol_id: SymbolId, offset: usize) -> Option<Resolved> {
-        let inference = self
-            .all_body_types
-            .get(&symbol_id.file_id)?
-            .get(&symbol_id)?;
-        resolved_from_inference(inference, offset)
-    }
-
-    fn location_for_resolved(&self, resolved: &Resolved) -> Vec<Location> {
-        match resolved {
-            Resolved::Global(symbol_id) => self
-                .project_index
-                .resolve_symbol(*symbol_id)
-                .map_or_else(Vec::new, |symbol| {
-                    self.location_for_span(symbol.id.file_id, symbol.name_span)
-                }),
-            Resolved::Local(local_id) => self
-                .project_index
-                .get_resolved_uses(local_id.file_id)
-                .and_then(|resolve_index| resolve_index.find_local(*local_id))
-                .map_or_else(Vec::new, |local| {
-                    self.location_for_span(local.id.file_id, local.def_span)
-                }),
-            Resolved::Unresolved => Vec::new(),
         }
     }
 }

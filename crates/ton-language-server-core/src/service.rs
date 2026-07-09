@@ -1,9 +1,10 @@
 use crate::language::{
     CodeLensRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest, LanguagePlugin,
-    ParseRequest, ParsedDocument, PluginContext,
+    ParseRequest, ParsedDocument, PluginContext, ReferenceRequest, SemanticTokensRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
+use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, LanguageId, Location, Position,
     TextEdit, WorkspaceConfig,
@@ -745,6 +746,181 @@ impl LanguageService {
             }
         }
         result
+    }
+
+    pub fn references(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+        include_declaration: bool,
+    ) -> anyhow::Result<Vec<Location>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "references",
+                uri = uri.as_str(),
+                line = position.line,
+                character = position.character,
+                include_declaration,
+                "references request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "references",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            include_declaration,
+            "references requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "references",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().references {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "references",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "references unsupported by language"
+            );
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.references(ReferenceRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+            include_declaration,
+        });
+        self.profiler.finish("references", started_at);
+        match &result {
+            Ok(locations) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "references",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    include_declaration,
+                    result_count = locations.len(),
+                    "references completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "references",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    include_declaration,
+                    error = %error,
+                    "references failed"
+                );
+            }
+        }
+        result
+    }
+
+    pub fn semantic_tokens(&mut self, uri: &DocumentUri) -> anyhow::Result<SemanticTokens> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "semantic_tokens",
+                uri = uri.as_str(),
+                "semantic tokens request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "semantic_tokens",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            "semantic tokens requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "semantic_tokens",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "unsupported language"
+            );
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().semantic_tokens {
+            tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "semantic_tokens",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                "semantic tokens unsupported by language"
+            );
+            return Ok(SemanticTokens::new(Vec::new()));
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.semantic_tokens(SemanticTokensRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+        });
+        self.profiler.finish("semantic_tokens", started_at);
+        match &result {
+            Ok(tokens) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "semantic_tokens",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    result_count = tokens.len(),
+                    "semantic tokens completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "semantic_tokens",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    error = %error,
+                    "semantic tokens failed"
+                );
+            }
+        }
+        result.map(SemanticTokens::new)
     }
 
     pub fn code_lens(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<CodeLens>> {
