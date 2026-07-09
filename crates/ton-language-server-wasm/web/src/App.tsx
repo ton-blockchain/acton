@@ -48,6 +48,14 @@ type PlainFoldingRange = {
   readonly kind: string | null
 }
 
+type PlainLocation = {
+  readonly uri: string
+  readonly range: {
+    readonly start: {readonly line: number; readonly character: number}
+    readonly end: {readonly line: number; readonly character: number}
+  }
+}
+
 type PersistedState = {
   selectedLanguage: SupportedLanguage
   logLevel: LogLevelName
@@ -58,6 +66,7 @@ type PersistedState = {
 
 type SmokeApi = {
   hoverAtInstruction: () => Promise<PlainHover[]>
+  definitionAt: (line: number, character: number) => Promise<PlainLocation[]>
   codeLenses: () => Promise<PlainCodeLens[]>
   foldingRanges: () => Promise<PlainFoldingRange[]>
   logs: () => Promise<string>
@@ -456,6 +465,14 @@ export function App() {
           )
           return (result ?? []).map(toPlainHover)
         },
+        async definitionAt(line: number, character: number) {
+          const result = await vscode.commands.executeCommand<vscode.Location[]>(
+            "vscode.executeDefinitionProvider",
+            documentUriFor(currentLanguageRef.current),
+            new vscode.Position(line, character),
+          )
+          return (result ?? []).map(toPlainLocation)
+        },
         async codeLenses() {
           const result = await vscode.commands.executeCommand<vscode.CodeLens[]>(
             "vscode.executeCodeLensProvider",
@@ -817,6 +834,22 @@ function toPlainCodeLens(lens: vscode.CodeLens): PlainCodeLens {
       end: {
         line: lens.range.end.line,
         character: lens.range.end.character,
+      },
+    },
+  }
+}
+
+function toPlainLocation(location: vscode.Location): PlainLocation {
+  return {
+    uri: location.uri.toString(),
+    range: {
+      start: {
+        line: location.range.start.line,
+        character: location.range.start.character,
+      },
+      end: {
+        line: location.range.end.line,
+        character: location.range.end.character,
       },
     },
   }

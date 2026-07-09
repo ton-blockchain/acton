@@ -105,6 +105,10 @@ impl LanguageService {
                 return Err(error);
             }
         };
+        let parsed: Arc<dyn ParsedDocument> = Arc::from(parsed);
+        if let Some(workspace) = plugin.workspace() {
+            workspace.did_open(&document, parsed.as_ref(), &mut self.profiler)?;
+        }
         self.profiler.increment("document.open");
         tracing::info!(
             target: logging::SERVICE_TARGET,
@@ -115,13 +119,8 @@ impl LanguageService {
             incremental = false,
             "document opened"
         );
-        self.documents.insert(
-            document.uri().clone(),
-            DocumentState {
-                document,
-                parsed: Arc::from(parsed),
-            },
-        );
+        self.documents
+            .insert(document.uri().clone(), DocumentState { document, parsed });
         Ok(())
     }
 
@@ -189,6 +188,10 @@ impl LanguageService {
                 return Err(error);
             }
         };
+        let parsed: Arc<dyn ParsedDocument> = Arc::from(parsed);
+        if let Some(workspace) = plugin.workspace() {
+            workspace.did_change(&document, parsed.as_ref(), &mut self.profiler)?;
+        }
         self.profiler.increment("document.change");
         tracing::info!(
             target: logging::SERVICE_TARGET,
@@ -199,13 +202,8 @@ impl LanguageService {
             incremental = false,
             "document changed"
         );
-        self.documents.insert(
-            uri.clone(),
-            DocumentState {
-                document,
-                parsed: Arc::from(parsed),
-            },
-        );
+        self.documents
+            .insert(uri.clone(), DocumentState { document, parsed });
         Ok(())
     }
 
@@ -249,10 +247,26 @@ impl LanguageService {
         );
 
         if edits.is_empty() {
+            let document = DocumentSnapshot::new(uri.clone(), language_id, version, text);
+            let Some(plugin) = self.plugins.get(document.language_id()) else {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "document.edit",
+                    uri = document.uri().as_str(),
+                    language_id = document.language_id().as_str(),
+                    version = document.version(),
+                    edit_count = 0,
+                    "unsupported language"
+                );
+                anyhow::bail!("unsupported language '{}'", document.language_id());
+            };
+            if let Some(workspace) = plugin.workspace() {
+                workspace.did_change(&document, old_parsed.as_ref(), &mut self.profiler)?;
+            }
             self.documents.insert(
                 uri.clone(),
                 DocumentState {
-                    document: DocumentSnapshot::new(uri.clone(), language_id, version, text),
+                    document,
                     parsed: old_parsed,
                 },
             );
@@ -321,6 +335,10 @@ impl LanguageService {
                 return Err(error);
             }
         };
+        let parsed: Arc<dyn ParsedDocument> = Arc::from(parsed);
+        if let Some(workspace) = plugin.workspace() {
+            workspace.did_change(&document, parsed.as_ref(), &mut self.profiler)?;
+        }
         self.profiler.increment("document.edit");
         tracing::info!(
             target: logging::SERVICE_TARGET,
@@ -333,18 +351,20 @@ impl LanguageService {
             incremental = true,
             "document edited"
         );
-        self.documents.insert(
-            uri.clone(),
-            DocumentState {
-                document,
-                parsed: Arc::from(parsed),
-            },
-        );
+        self.documents
+            .insert(uri.clone(), DocumentState { document, parsed });
         Ok(())
     }
 
     pub fn close_document(&mut self, uri: &DocumentUri) {
-        let removed = self.documents.remove(uri).is_some();
+        let removed = self.documents.remove(uri);
+        if let Some(state) = &removed
+            && let Some(plugin) = self.plugins.get(state.document.language_id())
+            && let Some(workspace) = plugin.workspace()
+        {
+            workspace.did_close(uri);
+        }
+        let removed = removed.is_some();
         tracing::info!(
             target: logging::SERVICE_TARGET,
             operation = "document.close",

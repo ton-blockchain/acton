@@ -61,8 +61,15 @@ impl MarkedSource {
             .find(|marker| marker.name == name)
             .unwrap_or_else(|| panic!("missing marker '{name}'"))
     }
+
+    #[allow(dead_code)]
+    #[must_use]
+    pub(crate) fn markers(&self) -> &[Marker] {
+        &self.markers
+    }
 }
 
+#[allow(dead_code)]
 #[must_use]
 pub(crate) fn render_definition(caret_position: Position, locations: &[Location]) -> String {
     if locations.is_empty() {
@@ -92,9 +99,10 @@ pub(crate) fn render_definition(caret_position: Position, locations: &[Location]
 }
 
 fn is_marker_name(name: &str) -> bool {
-    name == "caret" || name == "target" || name.starts_with("target:")
+    name == "caret" || name == "target" || name.starts_with("caret:") || name.starts_with("target:")
 }
 
+#[allow(dead_code)]
 fn format_position(position: Position) -> String {
     format!("{}:{}", position.line, position.character)
 }

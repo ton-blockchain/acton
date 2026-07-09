@@ -1,4 +1,5 @@
-use ton_language_server_core::languages::tlb::{LANGUAGE_ID, TlbLanguage};
+use ton_language_server_core::languages::tlb::{LANGUAGE_ID as TLB_LANGUAGE_ID, TlbLanguage};
+use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
     DocumentUri, LanguageService, LanguageServiceConfig, Position, ProfileSummary, Profiler, Range,
     TextEdit, default_language_service,
@@ -24,7 +25,7 @@ fn profiling_is_disabled_by_default_for_language_service() -> anyhow::Result<()>
 
     service.open_document(
         uri.clone(),
-        LANGUAGE_ID,
+        TLB_LANGUAGE_ID,
         1,
         "foo$0 a:# = CommonMsgInfo;\nbar$1 x:CommonMsgInfo = Wrap;\n",
     )?;
@@ -45,7 +46,7 @@ fn records_document_lifecycle_counters() -> anyhow::Result<()> {
 
     service.open_document(
         uri.clone(),
-        LANGUAGE_ID,
+        TLB_LANGUAGE_ID,
         1,
         "foo$0 a:# = Old;\nbar$1 x:Old = Wrap;\n",
     )?;
@@ -69,7 +70,7 @@ fn records_incremental_edit_and_hot_definition_spans() -> anyhow::Result<()> {
 
     service.open_document(
         uri.clone(),
-        LANGUAGE_ID,
+        TLB_LANGUAGE_ID,
         1,
         "foo$0 a:# = Old;\nbar$1 x:Old = Wrap;\n",
     )?;
@@ -95,11 +96,47 @@ fn records_incremental_edit_and_hot_definition_spans() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
+    let uri = DocumentUri::from("file:///fixture/profiling.tolk");
+    let mut service = tolk_profiling_service();
+
+    service.open_document(
+        uri.clone(),
+        TOLK_LANGUAGE_ID,
+        1,
+        "struct Storage {\n    counter: int\n}\nfun Storage.save(self) {}\nfun main() {\n    var storage = Storage { counter: 1 };\n    storage.save();\n    storage.counter;\n}\n",
+    )?;
+    let locations = service.definition(&uri, Position::new(6, 12))?;
+
+    let summary = service.profiler().summary();
+    assert_eq!(locations.len(), 1);
+    assert_eq!(counter(summary, "document.open"), 1);
+    assert_eq!(event_count(summary, "tolk.parse"), 1);
+    assert_eq!(event_count(summary, "tolk.snapshot.rebuild"), 1);
+    assert_eq!(event_count(summary, "tolk.snapshot.index"), 1);
+    assert_eq!(event_count(summary, "tolk.resolve"), 1);
+    assert_eq!(event_count(summary, "tolk.type_inference"), 1);
+    assert_eq!(event_count(summary, "tolk.snapshot.materialize"), 1);
+    assert_eq!(event_count(summary, "definition"), 1);
+    assert_eq!(event_count(summary, "tolk.definition.resolve"), 1);
+
+    Ok(())
+}
+
 fn profiling_service() -> LanguageService {
     let mut service = LanguageService::new(LanguageServiceConfig {
         enable_profiling: true,
     });
     service.register_language(TlbLanguage::new());
+    service
+}
+
+fn tolk_profiling_service() -> LanguageService {
+    let mut service = LanguageService::new(LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(TolkLanguage::new());
     service
 }
 

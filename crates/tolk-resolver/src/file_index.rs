@@ -8,7 +8,7 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tolk_syntax::{AstNode, FunctionLike, HasAnnotations, HasGenericParams, HasName, ast};
 use tree_sitter::Node;
@@ -342,7 +342,7 @@ impl FileIndex {
     ///
     /// # Panics
     ///
-    /// Panics in debug builds if the path is not absolute.
+    /// Panics in debug builds if the path is not a stable absolute path.
     #[must_use]
     pub fn build(
         content: &str,
@@ -351,7 +351,11 @@ impl FileIndex {
         file: &ast::SourceFile,
         source_kind: FileSource,
     ) -> FileIndex {
-        debug_assert!(path.is_absolute()); // for stable ID
+        debug_assert!(
+            is_stable_absolute_path(&path),
+            "FileIndex path must be absolute or slash-rooted: {}",
+            path.display()
+        );
 
         let mut decls = vec![];
         let mut imports = vec![];
@@ -667,4 +671,8 @@ impl FileIndex {
             })
         })
     }
+}
+
+fn is_stable_absolute_path(path: &Path) -> bool {
+    path.is_absolute() || path.to_string_lossy().starts_with('/')
 }

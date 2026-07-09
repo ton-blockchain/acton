@@ -12,11 +12,15 @@ license = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
+include_dir = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 fift-syntax = { workspace = true }
 tasm-syntax = { workspace = true }
 tlb-syntax = { workspace = true }
+tolk-resolver = { workspace = true }
+tolk-syntax = { workspace = true }
+tolk-ty = { workspace = true }
 ton-syntax = { workspace = true }
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
@@ -44,6 +48,10 @@ path = "tests/languages/tasm/code_lens.rs"
 [[test]]
 name = "fift_folding"
 path = "tests/languages/fift/folding.rs"
+
+[[test]]
+name = "tolk_definition"
+path = "tests/languages/tolk/definition.rs"
 
 [lints]
 workspace = true

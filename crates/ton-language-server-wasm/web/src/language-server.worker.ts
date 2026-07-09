@@ -22,6 +22,7 @@ const LOG_LEVEL_REQUEST = "ton/setLogLevel"
 const LOGS_REQUEST = "ton/logs"
 const CLEAR_LOGS_REQUEST = "ton/clearLogs"
 const PROFILE_REQUEST = "ton/profile"
+const ADD_SOURCE_FILE_REQUEST = "ton/addSourceFile"
 const STACK_EFFECT_CODE_LENS_COMMAND = "tonls.tasm.stackEffect"
 
 let languageServerPromise: Promise<TonLanguageServer> | undefined
@@ -58,39 +59,43 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
 })
 
 documents.onDidOpen(async event => {
-  const server = await getLanguageServer()
-  server.openDocument(
-    event.document.uri,
-    event.document.languageId,
-    event.document.version,
-    event.document.getText(),
+  await withLanguageServer("textDocument/didOpen", server =>
+    server.openDocument(
+      event.document.uri,
+      event.document.languageId,
+      event.document.version,
+      event.document.getText(),
+    ),
   )
 })
 
 documents.onDidChangeContent(async event => {
-  const server = await getLanguageServer()
-  server.changeDocument(event.document.uri, event.document.version, event.document.getText())
+  await withLanguageServer("textDocument/didChange", server =>
+    server.changeDocument(event.document.uri, event.document.version, event.document.getText()),
+  )
 })
 
-connection.onDefinition(async params => {
-  const server = await getLanguageServer()
-  return server.definition(params.textDocument.uri, params.position.line, params.position.character)
-})
+connection.onDefinition(async params =>
+  withLanguageServer("textDocument/definition", server =>
+    server.definition(params.textDocument.uri, params.position.line, params.position.character),
+  ),
+)
 
-connection.onHover(async params => {
-  const server = await getLanguageServer()
-  return server.hover(params.textDocument.uri, params.position.line, params.position.character)
-})
+connection.onHover(async params =>
+  withLanguageServer("textDocument/hover", server =>
+    server.hover(params.textDocument.uri, params.position.line, params.position.character),
+  ),
+)
 
-connection.onCodeLens(async params => {
-  const server = await getLanguageServer()
-  return server.codeLens(params.textDocument.uri)
-})
+connection.onCodeLens(async params =>
+  withLanguageServer("textDocument/codeLens", server => server.codeLens(params.textDocument.uri)),
+)
 
-connection.onFoldingRanges(async params => {
-  const server = await getLanguageServer()
-  return server.foldingRanges(params.textDocument.uri)
-})
+connection.onFoldingRanges(async params =>
+  withLanguageServer("textDocument/foldingRange", server =>
+    server.foldingRanges(params.textDocument.uri),
+  ),
+)
 
 connection.onExecuteCommand(async params => {
   if (params.command === STACK_EFFECT_CODE_LENS_COMMAND) {
@@ -99,27 +104,75 @@ connection.onExecuteCommand(async params => {
   throw new Error(`Unsupported command: ${params.command}`)
 })
 
-connection.onRequest(LOG_LEVEL_REQUEST, async level => {
-  const server = await getLanguageServer()
-  server.setLogLevel(String(level))
-  return server.logs()
-})
+connection.onRequest(LOG_LEVEL_REQUEST, async level =>
+  withLanguageServer(LOG_LEVEL_REQUEST, server => {
+    server.setLogLevel(String(level))
+    return server.logs()
+  }),
+)
 
-connection.onRequest(LOGS_REQUEST, async () => {
-  const server = await getLanguageServer()
-  return server.logs()
-})
+connection.onRequest(LOGS_REQUEST, async () =>
+  withLanguageServer(LOGS_REQUEST, server => server.logs()),
+)
 
-connection.onRequest(CLEAR_LOGS_REQUEST, async () => {
-  const server = await getLanguageServer()
-  server.clearLogs()
-  return server.logs()
-})
+connection.onRequest(CLEAR_LOGS_REQUEST, async () =>
+  withLanguageServer(CLEAR_LOGS_REQUEST, server => {
+    server.clearLogs()
+    return server.logs()
+  }),
+)
 
-connection.onRequest(PROFILE_REQUEST, async () => {
-  const server = await getLanguageServer()
-  return server.profileSummary()
-})
+connection.onRequest(PROFILE_REQUEST, async () =>
+  withLanguageServer(PROFILE_REQUEST, server => server.profileSummary()),
+)
+
+connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>
+  withLanguageServer(ADD_SOURCE_FILE_REQUEST, server => {
+    if (!isRecord(params)) {
+      throw new Error("expected { uri, text } params")
+    }
+    server.addSourceFile(String(params.uri), String(params.text))
+    return null
+  }),
+)
 
 documents.listen(connection)
 connection.listen()
+
+async function withLanguageServer<T>(
+  operation: string,
+  action: (server: TonLanguageServer) => T | Promise<T>,
+): Promise<T> {
+  try {
+    return await action(await getLanguageServer())
+  } catch (error) {
+    throw new Error(`${operation} failed: ${errorText(error)}`)
+  }
+}
+
+function errorText(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message
+  }
+  if (typeof error === "string") {
+    return error
+  }
+  if (isRecord(error)) {
+    for (const key of ["message", "error", "reason"]) {
+      const value = error[key]
+      if (typeof value === "string" && value.length > 0) {
+        return value
+      }
+    }
+    try {
+      return JSON.stringify(error)
+    } catch {
+      return "unknown error"
+    }
+  }
+  return String(error)
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}

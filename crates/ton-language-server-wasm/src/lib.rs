@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::fmt::Write as _;
 use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::TasmLanguage;
+use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, LanguageId, LanguageService, Location,
     LogLevel, Position, ProfileSummary,
@@ -12,6 +13,7 @@ use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 pub struct TonLanguageServer {
     service: RefCell<LanguageService>,
+    tolk_language: TolkLanguage,
 }
 
 #[wasm_bindgen]
@@ -22,8 +24,10 @@ impl TonLanguageServer {
         install_tree_sitter_allocator();
         install_logging();
         console_error_panic_hook::set_once();
+        let (service, tolk_language) = wasm_language_service();
         Self {
-            service: RefCell::new(wasm_language_service()),
+            service: RefCell::new(service),
+            tolk_language,
         }
     }
 
@@ -32,11 +36,19 @@ impl TonLanguageServer {
         install_tree_sitter_allocator();
         install_logging();
         console_error_panic_hook::set_once();
-        let mut service = wasm_language_service();
+        let (mut service, tolk_language) = wasm_language_service();
         service.register_language(TasmLanguage::with_spec_json(&spec_json).map_err(js_error)?);
         Ok(Self {
             service: RefCell::new(service),
+            tolk_language,
         })
+    }
+
+    #[wasm_bindgen(js_name = addSourceFile)]
+    pub fn add_source_file(&self, uri: String, text: String) -> Result<(), JsValue> {
+        self.tolk_language
+            .add_source_file(DocumentUri::from(uri), text)
+            .map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = setLogLevel)]
@@ -155,14 +167,16 @@ impl Default for TonLanguageServer {
     }
 }
 
-fn wasm_language_service() -> LanguageService {
+fn wasm_language_service() -> (LanguageService, TolkLanguage) {
     let mut service = LanguageService::new(ton_language_server_core::LanguageServiceConfig {
         enable_profiling: true,
     });
     service.register_language(ton_language_server_core::languages::tlb::TlbLanguage::new());
     service.register_language(TasmLanguage::new());
     service.register_language(FiftLanguage::new());
-    service
+    let tolk_language = TolkLanguage::new();
+    service.register_language(tolk_language.clone());
+    (service, tolk_language)
 }
 
 #[derive(Serialize)]

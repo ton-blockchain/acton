@@ -9,11 +9,11 @@ pub mod languages;
 
 pub use language::{
     CodeLensRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest, HoverRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, WorkspaceLanguage,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
-    SERVICE_TARGET, TASM_TARGET, TLB_TARGET,
+    SERVICE_TARGET, TASM_TARGET, TLB_TARGET, TOLK_TARGET,
 };
 pub use profiling::{ProfileEvent, ProfileSummary, Profiler};
 pub use service::{LanguageService, LanguageServiceConfig};
@@ -29,5 +29,6 @@ pub fn default_language_service() -> LanguageService {
     service.register_language(languages::tlb::TlbLanguage::new());
     service.register_language(languages::tasm::TasmLanguage::new());
     service.register_language(languages::fift::FiftLanguage::new());
+    service.register_language(languages::tolk::TolkLanguage::new());
     service
 }

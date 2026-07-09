@@ -1,5 +1,7 @@
 use crate::profiling::Profiler;
-use crate::types::{CodeLens, DocumentSnapshot, FoldingRange, Hover, Location, Position};
+use crate::types::{
+    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, Location, Position,
+};
 use std::any::Any;
 use tree_sitter::Tree;
 
@@ -20,6 +22,24 @@ pub trait ParsedDocument: Any + Send + Sync {
     fn as_any(&self) -> &dyn Any;
 
     fn tree(&self) -> &Tree;
+}
+
+pub trait WorkspaceLanguage: Send + Sync {
+    fn did_open(
+        &self,
+        document: &DocumentSnapshot,
+        parsed: &dyn ParsedDocument,
+        profiler: &mut Profiler,
+    ) -> anyhow::Result<()>;
+
+    fn did_change(
+        &self,
+        document: &DocumentSnapshot,
+        parsed: &dyn ParsedDocument,
+        profiler: &mut Profiler,
+    ) -> anyhow::Result<()>;
+
+    fn did_close(&self, uri: &DocumentUri);
 }
 
 pub struct PluginContext<'a> {
@@ -58,6 +78,10 @@ pub trait LanguagePlugin: Send + Sync {
     fn file_extensions(&self) -> &'static [&'static str];
 
     fn capabilities(&self) -> FeatureSet;
+
+    fn workspace(&self) -> Option<&dyn WorkspaceLanguage> {
+        None
+    }
 
     fn parse(&self, request: ParseRequest<'_>) -> anyhow::Result<Box<dyn ParsedDocument>>;
 

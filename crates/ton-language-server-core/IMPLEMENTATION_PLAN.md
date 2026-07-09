@@ -628,7 +628,11 @@ Initial TL-B test matrix:
 - Compare feature parity with old `ton-ls`.
 - Move missing language features into the new core incrementally.
 - Add Tolk only after the core has a deliberate project indexing model for
-  languages with imports and multiple files.
+  languages with imports and multiple files. See
+  [`TOLK_DESIGN.md`](TOLK_DESIGN.md) for the proposed Tolk workspace analysis
+  model. The first Tolk slice should stop at resolver-backed features such as
+  go to definition and references; type inference, lints, completion, and
+  type-aware hover come later.
 - Keep old `ton-ls` available until native and web users can move.
 - Delete or deprecate old architecture only after replacement coverage is clear.
 

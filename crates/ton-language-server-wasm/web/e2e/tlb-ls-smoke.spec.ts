@@ -11,6 +11,18 @@ type SmokeGlobal = typeof globalThis & {
         } | null
       }[]
     >
+    definitionAt: (
+      line: number,
+      character: number,
+    ) => Promise<
+      {
+        uri: string
+        range: {
+          start: {line: number; character: number}
+          end: {line: number; character: number}
+        }
+      }[]
+    >
     codeLenses: () => Promise<
       {
         title: string | null
@@ -29,9 +41,9 @@ type SmokeGlobal = typeof globalThis & {
     profilePanelText: () => string
     editorText: () => string
     languageId: () => string | undefined
-    selectedLanguage: () => "tasm" | "tlb" | "fift"
+    selectedLanguage: () => "tolk" | "tasm" | "tlb" | "fift"
     setEditorText: (text: string) => void
-    setLanguage: (languageId: "tasm" | "tlb" | "fift") => Promise<void>
+    setLanguage: (languageId: "tolk" | "tasm" | "tlb" | "fift") => Promise<void>
     setProfileVisible: (visible: boolean) => void
   }
 }
@@ -48,17 +60,66 @@ test("Monaco runs the local WASM language server with persisted files and logs",
     }
   })
   await page.goto("/")
-  await expect(page.locator("#status")).toHaveText(/TASM saved locally, 1 hovers/)
+  await expect(page.locator("#status")).toHaveText(/Tolk saved locally, 0 hovers/)
 
   const languageId = await page.evaluate(() =>
     (globalThis as SmokeGlobal).__tonLsSmoke?.languageId(),
   )
-  expect(languageId).toBe("tasm")
+  expect(languageId).toBe("tolk")
 
   const editorText = await page.evaluate(() =>
     (globalThis as SmokeGlobal).__tonLsSmoke?.editorText(),
   )
-  expect(editorText).toContain("DICTPUSHCONST 19")
+  expect(editorText).toContain("struct Storage")
+
+  const tolkSource = `struct Storage {
+    counter: int
+}
+fun Storage.save(self) {}
+fun main() {
+    var storage = Storage { counter: 1 };
+    storage.save();
+    storage.counter;
+}
+`
+  await page.evaluate(source => {
+    ;(globalThis as SmokeGlobal).__tonLsSmoke?.setEditorText(source)
+  }, tolkSource)
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
+    .toBe(tolkSource)
+
+  const saveDefinitions = await page.evaluate(() =>
+    (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(6, 12),
+  )
+  expect(saveDefinitions).toContainEqual(
+    expect.objectContaining({
+      uri: "file:///workspace/main.tolk",
+      range: expect.objectContaining({
+        start: {line: 3, character: 12},
+      }),
+    }),
+  )
+
+  const fieldDefinitions = await page.evaluate(() =>
+    (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(7, 12),
+  )
+  expect(fieldDefinitions).toContainEqual(
+    expect.objectContaining({
+      uri: "file:///workspace/main.tolk",
+      range: expect.objectContaining({
+        start: {line: 1, character: 4},
+      }),
+    }),
+  )
+
+  await page.selectOption("#language-select", "tasm")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.selectedLanguage()))
+    .toBe("tasm")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
+    .toContain("DICTPUSHCONST 19")
 
   const hovers = await page.evaluate(() =>
     (globalThis as SmokeGlobal).__tonLsSmoke?.hoverAtInstruction(),

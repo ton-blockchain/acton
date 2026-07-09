@@ -11,6 +11,44 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Source loaded by a project index builder.
+#[derive(Debug, Clone)]
+pub enum ProjectSource {
+    /// Raw file text. The builder parses it before indexing.
+    Text(Arc<str>),
+    /// Already parsed source file. This avoids reparsing open editor buffers.
+    Parsed(tolk_syntax::SourceFile),
+}
+
+/// Platform-neutral source provider for project indexing.
+///
+/// Native adapters can implement this over the filesystem. Browser adapters and
+/// tests can implement it over in-memory files and open-document overlays.
+pub trait ProjectSourceProvider {
+    /// Returns a canonical logical path. This must not require a native
+    /// filesystem; virtual workspaces can normalize path components instead.
+    fn canonicalize(&self, path: &Path) -> anyhow::Result<PathBuf>;
+
+    /// Loads source for the canonical path, or returns `None` when the file is
+    /// not available.
+    fn source(&self, path: &Path) -> anyhow::Result<Option<ProjectSource>>;
+}
+
+struct DiskProjectSourceProvider<'a> {
+    file_db: &'a FileDb,
+}
+
+impl ProjectSourceProvider for DiskProjectSourceProvider<'_> {
+    fn canonicalize(&self, path: &Path) -> anyhow::Result<PathBuf> {
+        Ok(self.file_db.canonicalize(path)?)
+    }
+
+    fn source(&self, path: &Path) -> anyhow::Result<Option<ProjectSource>> {
+        let content = std::fs::read_to_string(path)?;
+        Ok(Some(ProjectSource::Text(Arc::from(content))))
+    }
+}
+
 /// Represents an import where the target file has been resolved to a `FileId`.
 #[derive(Debug, Clone)]
 pub struct ResolvedImport {
@@ -232,25 +270,29 @@ impl ProjectIndex {
         self.path_to_file_id.get(path).copied()
     }
 
-    fn resolve_imports(
+    fn resolve_imports_with_provider(
         index: &FileIndex,
         path_to_id: &HashMap<PathBuf, FileId>,
-        file_db: &FileDb,
+        provider: &dyn ProjectSourceProvider,
         stdlib_path: Option<&Path>,
         mappings: &FxHashMap<String, String>,
     ) -> (Vec<ResolvedImport>, Vec<String>) {
         let mut errors = vec![];
         let mut file_imports = Vec::with_capacity(index.imports.len());
         for import in &index.imports {
-            let resolved =
-                match Self::resolve_path(&import.path, &index.path, file_db, stdlib_path, mappings)
-                {
-                    Ok(resolved) => resolved,
-                    Err(err) => {
-                        errors.push(format!("{err:#?}"));
-                        continue;
-                    }
-                };
+            let resolved = match Self::resolve_path_with_provider(
+                &import.path,
+                &index.path,
+                provider,
+                stdlib_path,
+                mappings,
+            ) {
+                Ok(resolved) => resolved,
+                Err(err) => {
+                    errors.push(format!("{err:#?}"));
+                    continue;
+                }
+            };
             let file_id = path_to_id.get(&resolved);
             file_imports.push(ResolvedImport {
                 import: import.clone(),
@@ -260,10 +302,10 @@ impl ProjectIndex {
         (file_imports, errors)
     }
 
-    fn resolve_path(
+    fn resolve_path_with_provider(
         import: &Arc<str>,
         file: &Path,
-        file_db: &FileDb,
+        provider: &dyn ProjectSourceProvider,
         stdlib_path: Option<&Path>,
         mappings: &FxHashMap<String, String>,
     ) -> anyhow::Result<PathBuf> {
@@ -273,7 +315,7 @@ impl ProjectIndex {
             };
             let abs_path = stdlib.join(relative_path);
             let abs_path = Self::append_tolk_extension_if_needed(abs_path);
-            return Ok(file_db.canonicalize(&abs_path)?);
+            return provider.canonicalize(&abs_path);
         }
 
         if import.starts_with('@') {
@@ -288,7 +330,7 @@ impl ProjectIndex {
 
             let abs_path = Path::new(target).join(suffix);
             let abs_path = Self::append_tolk_extension_if_needed(abs_path);
-            return Ok(file_db.canonicalize(&abs_path)?);
+            return provider.canonicalize(&abs_path);
         }
 
         let Some(dir) = file.parent() else {
@@ -296,7 +338,7 @@ impl ProjectIndex {
         };
         let abs_path = dir.join(import.as_ref());
         let abs_path = Self::append_tolk_extension_if_needed(abs_path);
-        Ok(file_db.canonicalize(&abs_path)?)
+        provider.canonicalize(&abs_path)
     }
 
     fn append_tolk_extension_if_needed(abs_path: PathBuf) -> PathBuf {
@@ -313,7 +355,7 @@ impl ProjectIndex {
 /// A builder for creating a `ProjectIndex`.
 pub struct ProjectIndexBuilder<'a> {
     file_db: &'a FileDb,
-    root_path: PathBuf,
+    root_paths: Vec<PathBuf>,
     stdlib_path: Option<PathBuf>,
     mappings: FxHashMap<String, String>,
 }
@@ -322,7 +364,7 @@ impl<'a> ProjectIndexBuilder<'a> {
     pub fn new(file_db: &'a FileDb, root_path: PathBuf) -> Self {
         Self {
             file_db,
-            root_path,
+            root_paths: vec![root_path],
             stdlib_path: None,
             mappings: FxHashMap::default(),
         }
@@ -331,6 +373,12 @@ impl<'a> ProjectIndexBuilder<'a> {
     #[must_use]
     pub fn with_stdlib(mut self, path: PathBuf) -> Self {
         self.stdlib_path = Some(path);
+        self
+    }
+
+    #[must_use]
+    pub fn with_additional_roots(mut self, paths: impl IntoIterator<Item = PathBuf>) -> Self {
+        self.root_paths.extend(paths);
         self
     }
 
@@ -357,10 +405,28 @@ impl<'a> ProjectIndexBuilder<'a> {
 
     /// Builds the `ProjectIndex` by recursively following imports from the root file.
     pub fn build(self) -> anyhow::Result<ProjectIndex> {
-        let mut errors = vec![];
-        let root_path = self.file_db.canonicalize(self.root_path)?;
+        let provider = DiskProjectSourceProvider {
+            file_db: self.file_db,
+        };
+        self.build_with_provider(&provider)
+    }
 
-        let root = match self.file_db.process(&root_path) {
+    /// Builds the `ProjectIndex` from a platform-neutral source provider.
+    pub fn build_with_provider(
+        self,
+        provider: &dyn ProjectSourceProvider,
+    ) -> anyhow::Result<ProjectIndex> {
+        let mut errors = vec![];
+        let root_paths = self
+            .root_paths
+            .iter()
+            .map(|path| provider.canonicalize(path))
+            .collect::<anyhow::Result<Vec<_>>>()?;
+        let Some(first_root_path) = root_paths.first().cloned() else {
+            anyhow::bail!("Cannot build project index without root files");
+        };
+
+        let first_root = match self.process_provider_path(provider, &first_root_path) {
             Ok(info) => info.index().clone(),
             Err(err) => {
                 anyhow::bail!("Cannot process root file: {err}")
@@ -369,24 +435,45 @@ impl<'a> ProjectIndexBuilder<'a> {
 
         let mut files = FxHashMap::default();
         let mut queue = VecDeque::new();
-        queue.extend(
-            root.imports
-                .iter()
-                .map(|import| (root.id, import.path.clone())),
-        );
 
         let mut path_to_file_id = HashMap::new();
-        path_to_file_id.insert(root.path.clone(), root.id);
-        files.insert(root.id, root);
+        queue.extend(
+            first_root
+                .imports
+                .iter()
+                .map(|import| (first_root.id, import.path.clone())),
+        );
+        path_to_file_id.insert(first_root.path.clone(), first_root.id);
+        files.insert(first_root.id, first_root);
+
+        for root_path in root_paths.into_iter().skip(1) {
+            let index = match self.process_provider_path(provider, &root_path) {
+                Ok(info) => info.index().clone(),
+                Err(err) => {
+                    errors.push(format!(
+                        "Cannot process root file {}: {err}",
+                        root_path.display()
+                    ));
+                    continue;
+                }
+            };
+            if path_to_file_id.contains_key(&index.path) {
+                continue;
+            }
+            let file_id = index.id;
+            queue.extend(index.imports.iter().map(|el| (file_id, el.path.clone())));
+            path_to_file_id.insert(index.path.clone(), file_id);
+            files.insert(file_id, index);
+        }
 
         // process common.tolk file if stdlib_path is provided
         if let Some(ref stdlib) = self.stdlib_path {
-            let common_tolk = stdlib.join("common.tolk");
-            match self.file_db.process(&common_tolk) {
+            let common_tolk = provider.canonicalize(&stdlib.join("common.tolk"))?;
+            match self.process_provider_path(provider, &common_tolk) {
                 Ok(info) => {
                     let index = info.index().clone();
                     let file_id = index.id;
-                    path_to_file_id.insert(common_tolk, file_id);
+                    path_to_file_id.insert(index.path.clone(), file_id);
                     files.insert(file_id, index);
                 }
                 Err(err) => {
@@ -399,10 +486,10 @@ impl<'a> ProjectIndexBuilder<'a> {
             let Some(root_file) = files.get(&root_file_id).map(|file| &file.path) else {
                 continue;
             };
-            let resolved = match ProjectIndex::resolve_path(
+            let resolved = match ProjectIndex::resolve_path_with_provider(
                 &import,
                 root_file,
-                self.file_db,
+                provider,
                 self.stdlib_path.as_deref(),
                 &self.mappings,
             ) {
@@ -417,7 +504,7 @@ impl<'a> ProjectIndexBuilder<'a> {
                 continue;
             }
 
-            let index = match self.file_db.process(&resolved) {
+            let index = match self.process_provider_path(provider, &resolved) {
                 Ok(info) => info.index().clone(),
                 Err(err) => {
                     errors.push(format!("{err:#?}"));
@@ -433,10 +520,10 @@ impl<'a> ProjectIndexBuilder<'a> {
 
         let mut imports = FxHashMap::with_capacity_and_hasher(files.len(), Default::default());
         for (id, index) in &files {
-            let (file_imports, file_errors) = ProjectIndex::resolve_imports(
+            let (file_imports, file_errors) = ProjectIndex::resolve_imports_with_provider(
                 index,
                 &path_to_file_id,
-                self.file_db,
+                provider,
                 self.stdlib_path.as_deref(),
                 &self.mappings,
             );
@@ -472,6 +559,25 @@ impl<'a> ProjectIndexBuilder<'a> {
             errors,
             global_symbols,
         })
+    }
+
+    fn process_provider_path(
+        &self,
+        provider: &dyn ProjectSourceProvider,
+        path: &Path,
+    ) -> anyhow::Result<Arc<crate::file_db::FileInfo>> {
+        if let Some(info) = self.file_db.get_by_path(path) {
+            return Ok(info);
+        }
+        let Some(source) = provider.source(path)? else {
+            anyhow::bail!("source file is not available: {}", path.display());
+        };
+        match source {
+            ProjectSource::Text(text) => self.file_db.process_content(path.to_owned(), &text),
+            ProjectSource::Parsed(source_file) => Ok(self
+                .file_db
+                .process_source_file(path.to_owned(), source_file)),
+        }
     }
 
     fn add_symbol_to_global_index(

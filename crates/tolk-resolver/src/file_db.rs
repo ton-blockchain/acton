@@ -186,7 +186,16 @@ impl FileDb {
         old_tree: Option<&Tree>,
     ) -> anyhow::Result<Arc<FileInfo>> {
         let file = tolk_syntax::parse_with_old_tree(content, old_tree)?;
+        Ok(self.process_source_file(path, file))
+    }
 
+    /// Processes an already parsed source file with the specified path.
+    ///
+    /// This is useful for language-server integrations where the document has
+    /// already been parsed by the editor document cache and should not be parsed
+    /// again just to update resolver indexes.
+    pub fn process_source_file(&self, path: PathBuf, file: ast::SourceFile) -> Arc<FileInfo> {
+        let content = file.source.clone();
         let mut line_offsets = vec![0];
         let mut last_offset = 0;
         for line in content.lines() {
@@ -205,7 +214,7 @@ impl FileDb {
         let info = Arc::new(FileInfo {
             id: file_id,
             index: Arc::new(FileIndex::build(
-                content,
+                content.as_ref(),
                 file_id,
                 path.clone(),
                 &file,
@@ -218,7 +227,7 @@ impl FileDb {
         // TODO: possible double work on concurrent run
         self.files.insert(path, info.clone());
         self.files_by_id.insert(file_id, info.clone());
-        Ok(info)
+        info
     }
 
     /// Checks if passed file resides in Tolk standard library.
