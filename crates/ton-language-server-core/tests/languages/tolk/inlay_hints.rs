@@ -1,5 +1,8 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 #[path = "../../support/snapshots.rs"]
 mod snapshots;
+
 #[path = "../../support/mod.rs"]
 mod support;
 #[path = "inlay_hints/upstream.rs"]

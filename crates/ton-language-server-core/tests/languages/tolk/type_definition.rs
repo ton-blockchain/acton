@@ -1,3 +1,5 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 #[path = "../../support/mod.rs"]
 mod support;
 #[path = "type_definition/upstream.rs"]

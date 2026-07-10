@@ -1,3 +1,5 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 use expect_test::{Expect, expect};
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
@@ -216,7 +218,7 @@ fn moves_open_only_and_provider_only_files() {
         )
         .expect("provider-only source should be added");
     provider_service
-        .did_rename_files(&[FileRename::new(old_provider_uri, new_provider_uri.clone())])
+        .did_rename_files(&[FileRename::new(old_provider_uri, new_provider_uri)])
         .expect("provider-only source should move");
     let provider_symbol = provider_service
         .workspace_symbols("ProviderOnly")

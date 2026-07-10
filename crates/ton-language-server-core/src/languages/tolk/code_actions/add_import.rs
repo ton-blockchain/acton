@@ -88,7 +88,7 @@ impl CodeActionProvider for AddImportProvider {
     }
 }
 
-fn importable(symbol: &Symbol) -> bool {
+const fn importable(symbol: &Symbol) -> bool {
     matches!(
         symbol.kind,
         SymbolKind::GlobalVariable

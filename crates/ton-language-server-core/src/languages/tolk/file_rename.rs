@@ -8,8 +8,10 @@ use tolk_syntax::{AstNode, TopLevel};
 
 impl TolkWorkspaceEngine {
     pub(super) fn will_rename_files(&self, files: &[FileRename]) -> Option<WorkspaceEdit> {
-        let state = self.state.read().expect("Tolk workspace lock poisoned");
-        let snapshot = state.latest_snapshot.as_ref()?;
+        let (snapshot, config) = {
+            let state = self.state.read().expect("Tolk workspace lock poisoned");
+            (state.latest_snapshot.clone()?, state.project_config.clone())
+        };
         let renames = files
             .iter()
             .filter_map(|rename| {
@@ -47,8 +49,8 @@ impl TolkWorkspaceEngine {
                 let Some(import_path) = import_edits::import_path_from(
                     importer_path,
                     target_path,
-                    &state.project_config.stdlib_path,
-                    state.project_config.import_mappings.as_ref(),
+                    &config.stdlib_path,
+                    config.import_mappings.as_ref(),
                 ) else {
                     continue;
                 };

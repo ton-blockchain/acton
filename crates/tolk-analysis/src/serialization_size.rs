@@ -176,11 +176,14 @@ impl Estimator<'_> {
                 .fold(SerializationSize::exact(0), |size, element| {
                     size.sum(self.estimate(element, true, substitutions))
                 }),
-            TyData::Array(_) | TyData::UntypedTuple => SerializationSize::unpredictable(),
+            TyData::Array(_)
+            | TyData::UntypedTuple
+            | TyData::Func { .. }
+            | TyData::TypeParameter { .. }
+            | TyData::Slice
+            | TyData::Builder
+            | TyData::Continuation => SerializationSize::unpredictable(),
             TyData::Union(elements) => self.union_size(&elements, substitutions),
-            TyData::Func { .. } | TyData::TypeParameter { .. } => {
-                SerializationSize::unpredictable()
-            }
             TyData::GenericTypeWithTs { inner_ty, types } => {
                 let def = type_definition(self.context.type_interner(), inner_ty);
                 let substitutions = def.map_or_else(
@@ -196,19 +199,17 @@ impl Estimator<'_> {
                 _ => SerializationSize::invalid(),
             },
             TyData::Int(IntTy::Int) => SerializationSize::exact(257),
-            TyData::Int(IntTy::IntN { size, .. }) => SerializationSize::exact(size as u32),
+            TyData::Int(IntTy::IntN { size, .. }) | TyData::Bits { size } => {
+                SerializationSize::exact(size as u32)
+            }
             TyData::Int(IntTy::VarIntN { size: 32, .. }) => SerializationSize::range(5, 253, 0, 0),
             TyData::Int(IntTy::VarIntN { .. } | IntTy::Coins) => {
                 SerializationSize::range(4, 124, 0, 0)
             }
             TyData::Bool { .. } => SerializationSize::exact(1),
             TyData::Cell => SerializationSize::range(0, 0, 1, 1),
-            TyData::Slice | TyData::Builder | TyData::Continuation => {
-                SerializationSize::unpredictable()
-            }
             TyData::Address(_) => SerializationSize::range(2, 267, 0, 0),
             TyData::MapKV { .. } => SerializationSize::range(0, 1, 0, 1),
-            TyData::Bits { size } => SerializationSize::exact(size as u32),
             TyData::Bytes { size } => SerializationSize::exact((size * 8) as u32),
             TyData::Null | TyData::Never => SerializationSize::exact(0),
             TyData::Void | TyData::Auto | TyData::Undefined | TyData::Unknown => {
@@ -337,14 +338,16 @@ impl Estimator<'_> {
         let Some(symbol) = self.context.project_index().resolve_symbol(def) else {
             return result;
         };
-        let parameters = match &symbol.kind {
-            SymbolKind::Struct {
-                type_parameters, ..
-            }
-            | SymbolKind::TypeAlias {
-                type_parameters, ..
-            } => type_parameters,
-            _ => return result,
+        let (SymbolKind::Struct {
+            type_parameters: parameters,
+            ..
+        }
+        | SymbolKind::TypeAlias {
+            type_parameters: parameters,
+            ..
+        }) = &symbol.kind
+        else {
+            return result;
         };
 
         for (parameter, ty) in parameters.iter().zip(args) {

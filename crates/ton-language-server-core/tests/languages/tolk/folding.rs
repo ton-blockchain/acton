@@ -1,3 +1,5 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 use expect_test::{Expect, expect};
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{

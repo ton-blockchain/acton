@@ -34,7 +34,7 @@ impl TolkResolveSnapshot {
             && self
                 .project_index
                 .resolve_symbol(symbol_id)
-                .is_some_and(|symbol| symbol.is_type())
+                .is_some_and(tolk_resolver::Symbol::is_type)
         {
             return self.location_for_resolved(&Resolved::Global(symbol_id));
         }

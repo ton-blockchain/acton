@@ -17,6 +17,6 @@ pub fn compute_get_method_id(name: &str) -> u32 {
 }
 
 #[must_use]
-pub fn compute_struct_opcode(name: &str) -> u32 {
+pub const fn compute_struct_opcode(name: &str) -> u32 {
     crc32(name.as_bytes())
 }

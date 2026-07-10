@@ -148,7 +148,6 @@ fn field_default(
 
 fn type_default(context: &TolkCodeActionContext<'_>, ty: TyId) -> String {
     match context.snapshot.type_interner.data(ty) {
-        TyData::Null => "null".to_owned(),
         TyData::Union(elements) => elements
             .iter()
             .find(|element| matches!(context.snapshot.type_interner.data(**element), TyData::Null))
@@ -199,8 +198,6 @@ fn type_default(context: &TolkCodeActionContext<'_>, ty: TyId) -> String {
                 type_default(context, *inner_ty)
             }
         }
-        // `string` is currently the only builtin represented by this variant.
-        TyData::Builtin { .. } => "null".to_owned(),
         _ => "null".to_owned(),
     }
 }

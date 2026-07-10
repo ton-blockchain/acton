@@ -186,9 +186,11 @@ impl TolkResolveSnapshot {
                     String::new()
                 } else {
                     let evaluated = ConstantEvaluator::new(self).evaluate_constant(symbol.id);
-                    (!evaluated.is_unknown())
-                        .then(|| format!(" // {}", evaluated.format()))
-                        .unwrap_or_default()
+                    if evaluated.is_unknown() {
+                        String::new()
+                    } else {
+                        format!(" // {}", evaluated.format())
+                    }
                 };
                 format!("const {name}: {typ} = {}{evaluation}", value.text(source))
             }
@@ -298,8 +300,7 @@ impl TolkResolveSnapshot {
             .descendant_for_byte_range(local.def_span.start(), local.def_span.end())?;
         let ty = self
             .local_type(local)
-            .map(|ty| self.type_interner.format(ty))
-            .unwrap_or_else(|| "unknown".to_owned());
+            .map_or_else(|| "unknown".to_owned(), |ty| self.type_interner.format(ty));
 
         let signature = match local.kind {
             LocalDefKind::Param { .. } => {
@@ -345,13 +346,13 @@ impl TolkResolveSnapshot {
     }
 
     fn symbol_value_type(&self, symbol: &Symbol) -> String {
-        self.type_db_cache
-            .top_level_type(symbol.id)
-            .map(|ty| match self.type_interner.data(ty) {
+        self.type_db_cache.top_level_type(symbol.id).map_or_else(
+            || "unknown".to_owned(),
+            |ty| match self.type_interner.data(ty) {
                 TyData::Func { return_ty, .. } => self.type_interner.format(*return_ty),
                 _ => self.type_interner.format(ty),
-            })
-            .unwrap_or_else(|| "unknown".to_owned())
+            },
+        )
     }
 
     fn function_signature<'tree, F>(
@@ -367,7 +368,7 @@ impl TolkResolveSnapshot {
         let syntax = function.syntax();
         let end = function
             .body()
-            .map_or(syntax.end_byte(), |body| body.syntax().start_byte());
+            .map_or_else(|| syntax.end_byte(), |body| body.syntax().start_byte());
         let mut signature = source[syntax.start_byte()..end].trim().to_owned();
 
         if infer_return_type
@@ -432,7 +433,7 @@ fn exit_code_hover(number: NumberLit<'_>, source: &str) -> Option<String> {
     ))
 }
 
-fn exit_code_info(code: i32) -> Option<(&'static str, &'static str)> {
+const fn exit_code_info(code: i32) -> Option<(&'static str, &'static str)> {
     Some(match code {
         0 => (
             "Compute and action phases",
@@ -672,7 +673,7 @@ fn contract_field_hover(field: ContractField<'_>, source: &str) -> Option<String
 }
 
 fn parameter_signature(parameter: Parameter<'_>, source: &str, inferred: &str) -> Option<String> {
-    let mutable = parameter.mutate().then_some("mutate ").unwrap_or_default();
+    let mutable = if parameter.mutate() { "mutate " } else { "" };
     let name = parameter.name()?.text(source);
     let typ = parameter.typ().map_or(inferred, |typ| typ.text(source));
     let default = parameter

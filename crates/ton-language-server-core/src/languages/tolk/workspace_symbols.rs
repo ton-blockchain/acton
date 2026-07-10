@@ -4,15 +4,18 @@ use tolk_resolver::{Symbol, SymbolKind};
 
 impl TolkWorkspaceEngine {
     pub(super) fn workspace_symbols(&self, query: &str) -> Vec<WorkspaceSymbol> {
-        let state = self.state.read().expect("Tolk workspace lock poisoned");
+        let (files, file_db) = {
+            let state = self.state.read().expect("Tolk workspace lock poisoned");
+            (state.files.clone(), state.file_db.clone())
+        };
         let query = query.to_ascii_lowercase();
         let mut symbols = Vec::new();
 
-        for (path, workspace_file) in &state.files {
+        for (path, workspace_file) in &files {
             let Some(uri) = workspace_file.active_uri() else {
                 continue;
             };
-            let Some(file) = state.file_db.get_by_path(path) else {
+            let Some(file) = file_db.get_by_path(path) else {
                 continue;
             };
             let source = file.source().source.as_ref();
