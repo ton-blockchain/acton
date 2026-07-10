@@ -204,6 +204,71 @@ pub struct TextEdit {
     pub new_text: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocumentEdits {
+    pub uri: DocumentUri,
+    pub edits: Vec<TextEdit>,
+}
+
+impl DocumentEdits {
+    #[must_use]
+    pub const fn new(uri: DocumentUri, edits: Vec<TextEdit>) -> Self {
+        Self { uri, edits }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct WorkspaceEdit {
+    pub documents: Vec<DocumentEdits>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CodeActionKind {
+    QuickFix,
+    Refactor,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CodeAction {
+    pub title: String,
+    pub kind: CodeActionKind,
+    pub edit: WorkspaceEdit,
+}
+
+impl CodeAction {
+    #[must_use]
+    pub fn new(title: impl Into<String>, kind: CodeActionKind, edit: WorkspaceEdit) -> Self {
+        Self {
+            title: title.into(),
+            kind,
+            edit,
+        }
+    }
+}
+
+impl WorkspaceEdit {
+    #[must_use]
+    pub const fn new(documents: Vec<DocumentEdits>) -> Self {
+        Self { documents }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PrepareRename {
+    pub range: Range,
+    pub placeholder: String,
+}
+
+impl PrepareRename {
+    #[must_use]
+    pub fn new(range: Range, placeholder: impl Into<String>) -> Self {
+        Self {
+            range,
+            placeholder: placeholder.into(),
+        }
+    }
+}
+
 impl TextEdit {
     #[must_use]
     pub fn new(range: Range, new_text: impl Into<String>) -> Self {
@@ -231,6 +296,29 @@ impl Location {
 pub struct Hover {
     pub contents: String,
     pub range: Option<Range>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DocumentHighlightKind {
+    Text,
+    Read,
+    Write,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocumentHighlight {
+    pub range: Range,
+    pub kind: Option<DocumentHighlightKind>,
+}
+
+impl DocumentHighlight {
+    #[must_use]
+    pub const fn new(range: Range, kind: DocumentHighlightKind) -> Self {
+        Self {
+            range,
+            kind: Some(kind),
+        }
+    }
 }
 
 impl Hover {
@@ -343,5 +431,168 @@ impl FoldingRange {
     #[must_use]
     pub const fn line_range(start_line: u32, end_line: u32) -> Self {
         Self::new(start_line, None, end_line, None)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum DocumentSymbolKind {
+    File,
+    Module,
+    Namespace,
+    Class,
+    Method,
+    Property,
+    Field,
+    Constructor,
+    Enum,
+    Interface,
+    Function,
+    Variable,
+    Constant,
+    String,
+    Number,
+    Boolean,
+    Array,
+    Object,
+    Key,
+    Null,
+    EnumMember,
+    Struct,
+    Event,
+    Operator,
+    TypeParameter,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DocumentSymbol {
+    pub name: String,
+    pub detail: Option<String>,
+    pub kind: DocumentSymbolKind,
+    pub range: Range,
+    pub selection_range: Range,
+    pub children: Vec<DocumentSymbol>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WorkspaceSymbol {
+    pub name: String,
+    pub kind: DocumentSymbolKind,
+    pub location: Location,
+    pub container_name: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FileRename {
+    pub old_uri: DocumentUri,
+    pub new_uri: DocumentUri,
+}
+
+impl FileRename {
+    #[must_use]
+    pub const fn new(old_uri: DocumentUri, new_uri: DocumentUri) -> Self {
+        Self { old_uri, new_uri }
+    }
+}
+
+impl WorkspaceSymbol {
+    #[must_use]
+    pub fn new(name: impl Into<String>, kind: DocumentSymbolKind, location: Location) -> Self {
+        Self {
+            name: name.into(),
+            kind,
+            location,
+            container_name: None,
+        }
+    }
+}
+
+impl DocumentSymbol {
+    #[must_use]
+    pub fn new(
+        name: impl Into<String>,
+        kind: DocumentSymbolKind,
+        range: Range,
+        selection_range: Range,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            detail: None,
+            kind,
+            range,
+            selection_range,
+            children: Vec::new(),
+        }
+    }
+
+    #[must_use]
+    pub fn with_children(mut self, children: Vec<DocumentSymbol>) -> Self {
+        self.children = children;
+        self
+    }
+
+    #[must_use]
+    pub fn with_detail(mut self, detail: impl Into<String>) -> Self {
+        self.detail = Some(detail.into());
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParameterInformation {
+    pub label: String,
+    pub documentation: Option<String>,
+}
+
+impl ParameterInformation {
+    #[must_use]
+    pub fn new(label: impl Into<String>) -> Self {
+        Self {
+            label: label.into(),
+            documentation: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SignatureInformation {
+    pub label: String,
+    pub documentation: Option<String>,
+    pub parameters: Vec<ParameterInformation>,
+    pub active_parameter: Option<u32>,
+}
+
+impl SignatureInformation {
+    #[must_use]
+    pub fn new(label: impl Into<String>, parameters: Vec<ParameterInformation>) -> Self {
+        Self {
+            label: label.into(),
+            documentation: None,
+            parameters,
+            active_parameter: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_active_parameter(mut self, active_parameter: u32) -> Self {
+        self.active_parameter = Some(active_parameter);
+        self
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SignatureHelp {
+    pub signatures: Vec<SignatureInformation>,
+    pub active_signature: Option<u32>,
+    pub active_parameter: Option<u32>,
+}
+
+impl SignatureHelp {
+    #[must_use]
+    pub fn new(signature: SignatureInformation) -> Self {
+        Self {
+            signatures: vec![signature],
+            active_signature: Some(0),
+            active_parameter: None,
+        }
     }
 }

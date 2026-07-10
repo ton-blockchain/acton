@@ -1076,7 +1076,7 @@ mod tests {
                 }
             ",
             expect![[r"
-                int -> Global(int at common.tolk:352-355)
+                int -> Global(int at test.tolk:22-25)
                 Status -> Global(Status at test.tolk:59-65)
                 Status -> Global(Status at test.tolk:59-65)
             "]],

@@ -12,11 +12,13 @@ use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, 
 use ton_language_server_core::languages::tlb::TlbLanguage;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    CodeLens, CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger,
-    CompletionTriggerKind, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind,
-    InsertTextFormat, LanguageId, LanguageService, LanguageServiceConfig, Location, Position,
-    Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    TextEdit, TextIndex, WorkspaceConfig,
+    CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
+    CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
+    DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename, FoldingRange, Hover, InlayHint,
+    InlayHintKind, InsertTextFormat, LanguageId, LanguageService, LanguageServiceConfig, Location,
+    Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
+    SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -264,7 +266,9 @@ impl LanguageServer for NativeLanguageServer {
                 )),
                 hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
                 definition_provider: Some(lsp::OneOf::Left(true)),
+                type_definition_provider: Some(lsp::TypeDefinitionProviderCapability::Simple(true)),
                 references_provider: Some(lsp::OneOf::Left(true)),
+                document_highlight_provider: Some(lsp::OneOf::Left(true)),
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(
@@ -290,11 +294,37 @@ impl LanguageServer for NativeLanguageServer {
                     resolve_provider: Some(false),
                 }),
                 folding_range_provider: Some(lsp::FoldingRangeProviderCapability::Simple(true)),
+                document_symbol_provider: Some(lsp::OneOf::Left(true)),
+                workspace_symbol_provider: Some(lsp::OneOf::Left(true)),
+                code_action_provider: Some(lsp::CodeActionProviderCapability::Options(
+                    lsp::CodeActionOptions {
+                        code_action_kinds: Some(vec![lsp::CodeActionKind::QUICKFIX]),
+                        resolve_provider: Some(false),
+                        work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+                    },
+                )),
+                signature_help_provider: Some(lsp::SignatureHelpOptions {
+                    trigger_characters: Some(vec!["(".to_owned(), ",".to_owned()]),
+                    retrigger_characters: Some(vec![",".to_owned()]),
+                    ..lsp::SignatureHelpOptions::default()
+                }),
+                rename_provider: Some(lsp::OneOf::Right(lsp::RenameOptions {
+                    prepare_provider: Some(true),
+                    work_done_progress_options: lsp::WorkDoneProgressOptions::default(),
+                })),
                 execute_command_provider: Some(lsp::ExecuteCommandOptions {
                     commands: execute_commands(),
                     work_done_progress_options: lsp::WorkDoneProgressOptions {
                         work_done_progress: None,
                     },
+                }),
+                workspace: Some(lsp::WorkspaceServerCapabilities {
+                    workspace_folders: None,
+                    file_operations: Some(lsp::WorkspaceFileOperationsServerCapabilities {
+                        will_rename: Some(tolk_file_operation_options()),
+                        did_rename: Some(tolk_file_operation_options()),
+                        ..lsp::WorkspaceFileOperationsServerCapabilities::default()
+                    }),
                 }),
                 ..lsp::ServerCapabilities::default()
             },
@@ -493,6 +523,25 @@ impl LanguageServer for NativeLanguageServer {
         Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
     }
 
+    async fn document_highlight(
+        &self,
+        params: lsp::DocumentHighlightParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::DocumentHighlight>>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = position_from_lsp(params.text_document_position_params.position);
+        let highlights = self
+            .with_service(|service| {
+                service.document_highlights(&DocumentUri::from(uri.to_string()), position)
+            })
+            .map_err(rpc_error)?;
+        Ok(Some(
+            highlights
+                .into_iter()
+                .map(document_highlight_to_lsp)
+                .collect(),
+        ))
+    }
+
     async fn hover(&self, params: lsp::HoverParams) -> jsonrpc::Result<Option<lsp::Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
         let position = position_from_lsp(params.text_document_position_params.position);
@@ -566,6 +615,115 @@ impl LanguageServer for NativeLanguageServer {
         Ok(Some(ranges.into_iter().map(folding_range_to_lsp).collect()))
     }
 
+    async fn document_symbol(
+        &self,
+        params: lsp::DocumentSymbolParams,
+    ) -> jsonrpc::Result<Option<lsp::DocumentSymbolResponse>> {
+        let uri = params.text_document.uri;
+        let symbols = self
+            .with_service(|service| service.document_symbols(&DocumentUri::from(uri.to_string())))
+            .map_err(rpc_error)?;
+        Ok(Some(lsp::DocumentSymbolResponse::Nested(
+            symbols.into_iter().map(document_symbol_to_lsp).collect(),
+        )))
+    }
+
+    async fn code_action(
+        &self,
+        params: lsp::CodeActionParams,
+    ) -> jsonrpc::Result<Option<lsp::CodeActionResponse>> {
+        let uri = params.text_document.uri;
+        let range = range_from_lsp(params.range);
+        let actions = self
+            .with_service(|service| {
+                service.code_actions(&DocumentUri::from(uri.to_string()), range)
+            })
+            .map_err(rpc_error)?;
+        let actions = actions
+            .into_iter()
+            .map(code_action_to_lsp)
+            .collect::<anyhow::Result<Vec<_>>>()
+            .map_err(rpc_error)?;
+        Ok(Some(actions))
+    }
+
+    async fn symbol(
+        &self,
+        params: lsp::WorkspaceSymbolParams,
+    ) -> jsonrpc::Result<Option<Vec<lsp::SymbolInformation>>> {
+        let symbols = self
+            .with_service(|service| service.workspace_symbols(&params.query))
+            .map_err(rpc_error)?;
+        Ok(Some(
+            symbols
+                .into_iter()
+                .filter_map(workspace_symbol_to_lsp)
+                .collect(),
+        ))
+    }
+
+    async fn goto_type_definition(
+        &self,
+        params: lsp::request::GotoTypeDefinitionParams,
+    ) -> jsonrpc::Result<Option<lsp::request::GotoTypeDefinitionResponse>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = position_from_lsp(params.text_document_position_params.position);
+        let locations = self
+            .with_service(|service| {
+                service.type_definition(&DocumentUri::from(uri.to_string()), position)
+            })
+            .map_err(rpc_error)?;
+        Ok(locations_to_definition_response(locations))
+    }
+
+    async fn signature_help(
+        &self,
+        params: lsp::SignatureHelpParams,
+    ) -> jsonrpc::Result<Option<lsp::SignatureHelp>> {
+        let uri = params.text_document_position_params.text_document.uri;
+        let position = position_from_lsp(params.text_document_position_params.position);
+        let signature_help = self
+            .with_service(|service| {
+                service.signature_help(&DocumentUri::from(uri.to_string()), position)
+            })
+            .map_err(rpc_error)?;
+        Ok(signature_help.map(signature_help_to_lsp))
+    }
+
+    async fn prepare_rename(
+        &self,
+        params: lsp::TextDocumentPositionParams,
+    ) -> jsonrpc::Result<Option<lsp::PrepareRenameResponse>> {
+        let uri = params.text_document.uri;
+        let position = position_from_lsp(params.position);
+        let prepare = self
+            .with_service(|service| {
+                service.prepare_rename(&DocumentUri::from(uri.to_string()), position)
+            })
+            .map_err(rpc_error)?;
+        Ok(prepare.map(prepare_rename_to_lsp))
+    }
+
+    async fn rename(
+        &self,
+        params: lsp::RenameParams,
+    ) -> jsonrpc::Result<Option<lsp::WorkspaceEdit>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = position_from_lsp(params.text_document_position.position);
+        let edit = self
+            .with_service(|service| {
+                service.rename(
+                    &DocumentUri::from(uri.to_string()),
+                    position,
+                    &params.new_name,
+                )
+            })
+            .map_err(rpc_error)?;
+        edit.map(workspace_edit_to_lsp)
+            .transpose()
+            .map_err(rpc_error)
+    }
+
     async fn did_change_watched_files(&self, params: lsp::DidChangeWatchedFilesParams) {
         for change in params.changes {
             let result = if is_acton_manifest_uri(&change.uri) {
@@ -589,6 +747,26 @@ impl LanguageServer for NativeLanguageServer {
             if let Err(error) = result {
                 self.report_error("workspace.files.change", error).await;
             }
+        }
+    }
+
+    async fn will_rename_files(
+        &self,
+        params: lsp::RenameFilesParams,
+    ) -> jsonrpc::Result<Option<lsp::WorkspaceEdit>> {
+        let files = file_renames_from_lsp(params.files);
+        let edit = self
+            .with_service(|service| service.will_rename_files(&files))
+            .map_err(rpc_error)?;
+        edit.map(workspace_edit_to_lsp)
+            .transpose()
+            .map_err(rpc_error)
+    }
+
+    async fn did_rename_files(&self, params: lsp::RenameFilesParams) {
+        let files = file_renames_from_lsp(params.files);
+        if let Err(error) = self.with_service(|service| service.did_rename_files(&files)) {
+            self.report_error("workspace.files.rename", error).await;
         }
     }
 
@@ -646,6 +824,31 @@ fn native_language_service(enable_profiling: bool) -> LanguageService {
 
 fn execute_commands() -> Vec<String> {
     vec![STACK_EFFECT_CODE_LENS_COMMAND.to_owned()]
+}
+
+fn tolk_file_operation_options() -> lsp::FileOperationRegistrationOptions {
+    lsp::FileOperationRegistrationOptions {
+        filters: vec![lsp::FileOperationFilter {
+            scheme: Some("file".to_owned()),
+            pattern: lsp::FileOperationPattern {
+                glob: "**/*.tolk".to_owned(),
+                matches: Some(lsp::FileOperationPatternKind::File),
+                options: None,
+            },
+        }],
+    }
+}
+
+fn file_renames_from_lsp(files: Vec<lsp::FileRename>) -> Vec<FileRename> {
+    files
+        .into_iter()
+        .map(|file| {
+            FileRename::new(
+                DocumentUri::from(file.old_uri),
+                DocumentUri::from(file.new_uri),
+            )
+        })
+        .collect()
 }
 
 fn apply_initial_workspace_config(
@@ -832,6 +1035,17 @@ fn hover_to_lsp(hover: Hover) -> lsp::Hover {
     }
 }
 
+fn document_highlight_to_lsp(highlight: DocumentHighlight) -> lsp::DocumentHighlight {
+    lsp::DocumentHighlight {
+        range: range_to_lsp(highlight.range),
+        kind: highlight.kind.map(|kind| match kind {
+            DocumentHighlightKind::Text => lsp::DocumentHighlightKind::TEXT,
+            DocumentHighlightKind::Read => lsp::DocumentHighlightKind::READ,
+            DocumentHighlightKind::Write => lsp::DocumentHighlightKind::WRITE,
+        }),
+    }
+}
+
 fn completion_trigger_from_lsp(context: Option<lsp::CompletionContext>) -> CompletionTrigger {
     let Some(context) = context else {
         return CompletionTrigger::invoked();
@@ -994,6 +1208,22 @@ fn code_lens_to_lsp(lens: CodeLens) -> lsp::CodeLens {
     }
 }
 
+fn code_action_to_lsp(action: CodeAction) -> anyhow::Result<lsp::CodeActionOrCommand> {
+    Ok(lsp::CodeActionOrCommand::CodeAction(lsp::CodeAction {
+        title: action.title,
+        kind: Some(match action.kind {
+            CodeActionKind::QuickFix => lsp::CodeActionKind::QUICKFIX,
+            CodeActionKind::Refactor => lsp::CodeActionKind::REFACTOR,
+        }),
+        diagnostics: None,
+        edit: Some(workspace_edit_to_lsp(action.edit)?),
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    }))
+}
+
 const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
     lsp::FoldingRange {
         start_line: range.start_line,
@@ -1002,6 +1232,133 @@ const fn folding_range_to_lsp(range: FoldingRange) -> lsp::FoldingRange {
         end_character: range.end_character,
         kind: None,
         collapsed_text: None,
+    }
+}
+
+fn document_symbol_to_lsp(symbol: DocumentSymbol) -> lsp::DocumentSymbol {
+    lsp::DocumentSymbol {
+        name: symbol.name,
+        detail: symbol.detail,
+        kind: document_symbol_kind_to_lsp(symbol.kind),
+        tags: None,
+        #[allow(deprecated)]
+        deprecated: None,
+        range: range_to_lsp(symbol.range),
+        selection_range: range_to_lsp(symbol.selection_range),
+        children: (!symbol.children.is_empty()).then(|| {
+            symbol
+                .children
+                .into_iter()
+                .map(document_symbol_to_lsp)
+                .collect()
+        }),
+    }
+}
+
+fn workspace_symbol_to_lsp(symbol: WorkspaceSymbol) -> Option<lsp::SymbolInformation> {
+    Some(lsp::SymbolInformation {
+        name: symbol.name,
+        kind: document_symbol_kind_to_lsp(symbol.kind),
+        tags: None,
+        #[allow(deprecated)]
+        deprecated: None,
+        location: lsp::Location {
+            uri: lsp::Url::parse(symbol.location.uri.as_str()).ok()?,
+            range: range_to_lsp(symbol.location.range),
+        },
+        container_name: symbol.container_name,
+    })
+}
+
+fn signature_help_to_lsp(help: SignatureHelp) -> lsp::SignatureHelp {
+    lsp::SignatureHelp {
+        signatures: help
+            .signatures
+            .into_iter()
+            .map(signature_information_to_lsp)
+            .collect(),
+        active_signature: help.active_signature,
+        active_parameter: help.active_parameter,
+    }
+}
+
+fn signature_information_to_lsp(signature: SignatureInformation) -> lsp::SignatureInformation {
+    lsp::SignatureInformation {
+        label: signature.label,
+        documentation: signature.documentation.map(lsp::Documentation::String),
+        parameters: Some(
+            signature
+                .parameters
+                .into_iter()
+                .map(|parameter| lsp::ParameterInformation {
+                    label: lsp::ParameterLabel::Simple(parameter.label),
+                    documentation: parameter.documentation.map(lsp::Documentation::String),
+                })
+                .collect(),
+        ),
+        active_parameter: signature.active_parameter,
+    }
+}
+
+fn prepare_rename_to_lsp(prepare: PrepareRename) -> lsp::PrepareRenameResponse {
+    lsp::PrepareRenameResponse::RangeWithPlaceholder {
+        range: range_to_lsp(prepare.range),
+        placeholder: prepare.placeholder,
+    }
+}
+
+fn workspace_edit_to_lsp(edit: WorkspaceEdit) -> anyhow::Result<lsp::WorkspaceEdit> {
+    let changes = edit
+        .documents
+        .into_iter()
+        .map(|document| {
+            let uri = lsp::Url::parse(document.uri.as_str())?;
+            let edits = document.edits.into_iter().map(text_edit_to_lsp).collect();
+            Ok((uri, edits))
+        })
+        .collect::<anyhow::Result<_>>()?;
+
+    Ok(lsp::WorkspaceEdit {
+        changes: Some(changes),
+        document_changes: None,
+        change_annotations: None,
+    })
+}
+
+fn text_edit_to_lsp(edit: TextEdit) -> lsp::TextEdit {
+    lsp::TextEdit {
+        range: range_to_lsp(edit.range),
+        new_text: edit.new_text,
+    }
+}
+
+const fn document_symbol_kind_to_lsp(kind: DocumentSymbolKind) -> lsp::SymbolKind {
+    match kind {
+        DocumentSymbolKind::File => lsp::SymbolKind::FILE,
+        DocumentSymbolKind::Module => lsp::SymbolKind::MODULE,
+        DocumentSymbolKind::Namespace => lsp::SymbolKind::NAMESPACE,
+        DocumentSymbolKind::Class => lsp::SymbolKind::CLASS,
+        DocumentSymbolKind::Method => lsp::SymbolKind::METHOD,
+        DocumentSymbolKind::Property => lsp::SymbolKind::PROPERTY,
+        DocumentSymbolKind::Field => lsp::SymbolKind::FIELD,
+        DocumentSymbolKind::Constructor => lsp::SymbolKind::CONSTRUCTOR,
+        DocumentSymbolKind::Enum => lsp::SymbolKind::ENUM,
+        DocumentSymbolKind::Interface => lsp::SymbolKind::INTERFACE,
+        DocumentSymbolKind::Function => lsp::SymbolKind::FUNCTION,
+        DocumentSymbolKind::Variable => lsp::SymbolKind::VARIABLE,
+        DocumentSymbolKind::Constant => lsp::SymbolKind::CONSTANT,
+        DocumentSymbolKind::String => lsp::SymbolKind::STRING,
+        DocumentSymbolKind::Number => lsp::SymbolKind::NUMBER,
+        DocumentSymbolKind::Boolean => lsp::SymbolKind::BOOLEAN,
+        DocumentSymbolKind::Array => lsp::SymbolKind::ARRAY,
+        DocumentSymbolKind::Object => lsp::SymbolKind::OBJECT,
+        DocumentSymbolKind::Key => lsp::SymbolKind::KEY,
+        DocumentSymbolKind::Null => lsp::SymbolKind::NULL,
+        DocumentSymbolKind::EnumMember => lsp::SymbolKind::ENUM_MEMBER,
+        DocumentSymbolKind::Struct => lsp::SymbolKind::STRUCT,
+        DocumentSymbolKind::Event => lsp::SymbolKind::EVENT,
+        DocumentSymbolKind::Operator => lsp::SymbolKind::OPERATOR,
+        DocumentSymbolKind::TypeParameter => lsp::SymbolKind::TYPE_PARAMETER,
     }
 }
 

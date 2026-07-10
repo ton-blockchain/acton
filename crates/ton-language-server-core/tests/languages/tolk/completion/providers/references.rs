@@ -876,6 +876,23 @@ fn hides_private_cell_storage_fields_from_member_completion() {
 }
 
 #[test]
+fn completes_methods_on_string_literals() {
+    // String literals have the built-in string type and expose common stdlib methods.
+    CompletionTest::new(
+        r#"
+            fun main() {
+                val valid = "abc-123".beginP<caret>;
+            }
+        "#,
+    )
+    .labels(&["beginParse"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label       kind    detail             edit       text
+        beginParse  Method  string.beginParse  1:26-1:32  beginParse()$0"#]]);
+}
+
+#[test]
 fn excludes_declaration_names_and_internal_symbols() {
     // A local declaration name is not treated as a reference-completion position.
     CompletionTest::new("fun main() { val from<caret> = 10; }")

@@ -112,6 +112,56 @@ path = "tests/languages/tolk/definition.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_folding"
+path = "tests/languages/tolk/folding.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_hover"
+path = "tests/languages/tolk/hover.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_document_symbols"
+path = "tests/languages/tolk/document_symbols.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_signature_help"
+path = "tests/languages/tolk/signature_help.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_rename"
+path = "tests/languages/tolk/rename.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_type_definition"
+path = "tests/languages/tolk/type_definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_document_highlights"
+path = "tests/languages/tolk/document_highlights.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_workspace_symbols"
+path = "tests/languages/tolk/workspace_symbols.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_code_actions"
+path = "tests/languages/tolk/code_actions/mod.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_file_rename"
+path = "tests/languages/tolk/file_rename.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_completion_providers"
 path = "tests/languages/tolk/completion/providers.rs"
 required-features = ["tolk"]

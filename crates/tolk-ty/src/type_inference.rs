@@ -428,8 +428,14 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         let interner = self.intrn();
         let ty_void = interner.ty_void;
         let ty_never = interner.ty_never;
+        let ty_auto = interner.ty_auto;
+        let mut has_inferable_return = false;
 
         for &return_ty in &return_types {
+            if return_ty == ty_auto {
+                continue;
+            }
+            has_inferable_return = true;
             return_unifier.unify_with(return_ty, None, interner);
         }
 
@@ -441,7 +447,11 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
                 ty_void
             }
         } else {
-            return_unifier.get_result(interner)
+            if has_inferable_return {
+                return_unifier.get_result(interner)
+            } else {
+                ty_auto
+            }
         };
 
         self.ctx.inferred_return_type = Some(inferred_return_type);

@@ -54,6 +54,8 @@ impl ProjectSourceProvider for DiskProjectSourceProvider<'_> {
 pub struct ResolvedImport {
     /// Original import information.
     import: Import,
+    /// Canonical path computed for the import, even if the target does not exist yet.
+    path: PathBuf,
     /// ID of the target file, if it could be resolved.
     target: Option<FileId>,
 }
@@ -63,6 +65,12 @@ impl ResolvedImport {
     #[must_use]
     pub const fn import(&self) -> &Import {
         &self.import
+    }
+
+    /// Returns the canonical path computed for this import.
+    #[must_use]
+    pub fn path(&self) -> &Path {
+        &self.path
     }
 
     /// Return `FileId` which is imported.
@@ -296,6 +304,7 @@ impl ProjectIndex {
             let file_id = path_to_id.get(&resolved);
             file_imports.push(ResolvedImport {
                 import: import.clone(),
+                path: resolved,
                 target: file_id.copied(),
             });
         }

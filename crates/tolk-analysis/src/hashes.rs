@@ -15,3 +15,8 @@ pub(crate) const fn crc32(value: &[u8]) -> u32 {
 pub fn compute_get_method_id(name: &str) -> u32 {
     u32::from(crc16(name.as_bytes())) | 0x1_0000
 }
+
+#[must_use]
+pub fn compute_struct_opcode(name: &str) -> u32 {
+    crc32(name.as_bytes())
+}

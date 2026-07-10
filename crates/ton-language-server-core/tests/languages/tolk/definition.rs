@@ -6,7 +6,8 @@ use std::fmt::Write as _;
 use support::MarkedSource;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position, WorkspaceConfig,
+    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position, ProfileSummary,
+    WorkspaceConfig,
 };
 
 fn case_tolk_definition(
@@ -57,6 +58,21 @@ fn resolves_function_in_same_file() {
         |_| {},
         expect![[r"
             1:25 -> file:///fixture/main.tolk 0:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_stdlib_method_on_string_literal() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            fun main() {
+                val valid = "abc-123".begin<caret>Parse();
+            }
+        "#,
+        |_| {},
+        expect![[r"
+            1:31 -> file:///__tolk_stdlib__/common.tolk 1079:11 resolved"]],
     );
 }
 
@@ -132,18 +148,25 @@ fn removes_provider_file_from_workspace() {
         )
         .expect("main file should open");
 
-    let locations = service
+    let before = service
         .definition(&main_uri, Position::new(1, 25))
         .expect("definition should resolve before removal");
-    assert_eq!(locations.len(), 1);
 
     service
         .remove_source_file(LANGUAGE_ID, &lib_uri)
         .expect("provider file should be removed");
-    let locations = service
+    let after = service
         .definition(&main_uri, Position::new(1, 25))
         .expect("definition should not fail after removal");
-    assert!(locations.is_empty());
+    let actual = format!(
+        "before: {}\nafter: {}",
+        render_definition(Position::new(1, 25), &before),
+        render_definition(Position::new(1, 25), &after),
+    );
+    expect![[r"
+        before: 1:25 -> acton://fixture/lib.tolk 0:4 resolved
+        after: 1:25 unresolved"]]
+    .assert_eq(&actual);
 }
 
 #[test]
@@ -227,6 +250,24 @@ fn resolves_local_variable() {
         |_| {},
         expect![[r"
             2:11 -> file:///fixture/main.tolk 1:8 resolved"]],
+    );
+}
+
+#[test]
+fn declarations_resolve_to_themselves() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun <caret:function>helper(): int { return 1; }
+            fun main(): int {
+                var <caret:local>value = helper();
+                return value;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            0:4 -> file:///fixture/main.tolk 0:4 resolved
+            2:8 -> file:///fixture/main.tolk 2:8 resolved"]],
     );
 }
 
@@ -387,6 +428,44 @@ fn open_document_overrides_provider_file() {
     expect![[r"
         1:25 -> acton://fixture/lib.tolk 1:4 resolved"]]
     .assert_eq(&render_definition(caret.position, &locations));
+}
+
+#[test]
+fn records_definition_profile_spans() {
+    let marked = MarkedSource::parse(
+        r"
+            fun helper() {}
+            fun main() { <caret>helper(); }
+        ",
+    );
+    let uri = DocumentUri::from("file:///fixture/profiled.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(TolkLanguage::new());
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let locations = service
+        .definition(&uri, marked.marker("caret").position)
+        .expect("definition request should succeed");
+    let summary = service.profiler().summary();
+    let actual = format!(
+        "locations={} definition={} tolk.definition={}",
+        locations.len(),
+        event_count(summary, "definition"),
+        event_count(summary, "tolk.definition.resolve"),
+    );
+    expect!["locations=1 definition=1 tolk.definition=1"].assert_eq(&actual);
+}
+
+fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
+    summary
+        .events
+        .iter()
+        .filter(|event| event.name == name)
+        .count()
 }
 
 fn render_definition(caret_position: Position, locations: &[Location]) -> String {

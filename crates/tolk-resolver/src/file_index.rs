@@ -440,6 +440,7 @@ impl FileIndex {
                             let name_ident = f.name()?;
                             let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
+                            let body_span = f.span();
                             let fqn = Arc::from(format!("{struct_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };
@@ -483,6 +484,7 @@ impl FileIndex {
                             let name_ident = f.name()?;
                             let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
+                            let body_span = f.span();
                             let fqn = Arc::from(format!("{enum_name}.{name}"));
                             local_id += 1;
                             let id = SymbolId { file_id, local_id };

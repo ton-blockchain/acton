@@ -4,6 +4,7 @@ import {
   createConnection,
   TextDocuments,
   TextDocumentSyncKind,
+  TypeDefinitionRequest,
   type InitializeResult,
 } from "vscode-languageserver/browser"
 import {TextDocument} from "vscode-languageserver-textdocument"
@@ -46,7 +47,9 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
   return {
     capabilities: {
       definitionProvider: true,
+      typeDefinitionProvider: true,
       referencesProvider: true,
+      documentHighlightProvider: true,
       hoverProvider: true,
       completionProvider: {
         resolveProvider: false,
@@ -64,9 +67,32 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       codeLensProvider: {
         resolveProvider: false,
       },
+      codeActionProvider: {
+        codeActionKinds: ["quickfix"],
+        resolveProvider: false,
+      },
       foldingRangeProvider: true,
+      documentSymbolProvider: true,
+      workspaceSymbolProvider: true,
+      signatureHelpProvider: {
+        triggerCharacters: ["(", ","],
+        retriggerCharacters: [","],
+      },
+      renameProvider: {
+        prepareProvider: true,
+      },
       executeCommandProvider: {
         commands: [STACK_EFFECT_CODE_LENS_COMMAND],
+      },
+      workspace: {
+        fileOperations: {
+          willRename: {
+            filters: [{scheme: "file", pattern: {glob: "**/*.tolk", matches: "file"}}],
+          },
+          didRename: {
+            filters: [{scheme: "file", pattern: {glob: "**/*.tolk", matches: "file"}}],
+          },
+        },
       },
       textDocumentSync: TextDocumentSyncKind.Full,
     },
@@ -96,6 +122,16 @@ connection.onDefinition(async params =>
   ),
 )
 
+connection.onRequest(TypeDefinitionRequest.type, async params =>
+  withLanguageServer("textDocument/typeDefinition", server =>
+    server.typeDefinition(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+    ),
+  ),
+)
+
 connection.onReferences(async params =>
   withLanguageServer("textDocument/references", server =>
     server.references(
@@ -103,6 +139,16 @@ connection.onReferences(async params =>
       params.position.line,
       params.position.character,
       false,
+    ),
+  ),
+)
+
+connection.onDocumentHighlight(async params =>
+  withLanguageServer("textDocument/documentHighlight", server =>
+    server.documentHighlights(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
     ),
   ),
 )
@@ -147,9 +193,62 @@ connection.onCodeLens(async params =>
   withLanguageServer("textDocument/codeLens", server => server.codeLens(params.textDocument.uri)),
 )
 
+connection.onCodeAction(async params =>
+  withLanguageServer("textDocument/codeAction", server =>
+    server.codeActions(
+      params.textDocument.uri,
+      params.range.start.line,
+      params.range.start.character,
+      params.range.end.line,
+      params.range.end.character,
+    ),
+  ),
+)
+
 connection.onFoldingRanges(async params =>
   withLanguageServer("textDocument/foldingRange", server =>
     server.foldingRanges(params.textDocument.uri),
+  ),
+)
+
+connection.onDocumentSymbol(async params =>
+  withLanguageServer("textDocument/documentSymbol", server =>
+    server.documentSymbols(params.textDocument.uri),
+  ),
+)
+
+connection.onWorkspaceSymbol(async params =>
+  withLanguageServer("workspace/symbol", server => server.workspaceSymbols(params.query)),
+)
+
+connection.onSignatureHelp(async params =>
+  withLanguageServer("textDocument/signatureHelp", server =>
+    server.signatureHelp(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+    ),
+  ),
+)
+
+connection.onPrepareRename(async params =>
+  withLanguageServer("textDocument/prepareRename", server =>
+    server.prepareRename(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+    ),
+  ),
+)
+
+connection.onRenameRequest(async params =>
+  withLanguageServer("textDocument/rename", server =>
+    server.rename(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+      params.newName,
+    ),
   ),
 )
 
@@ -158,6 +257,18 @@ connection.onExecuteCommand(async params => {
     return null
   }
   throw new Error(`Unsupported command: ${params.command}`)
+})
+
+connection.workspace.onWillRenameFiles(async params =>
+  withLanguageServer("workspace/willRenameFiles", server =>
+    server.willRenameFiles(JSON.stringify(params.files)),
+  ),
+)
+
+connection.workspace.onDidRenameFiles(async params => {
+  await withLanguageServer("workspace/didRenameFiles", server =>
+    server.didRenameFiles(JSON.stringify(params.files)),
+  )
 })
 
 connection.onRequest(LOG_LEVEL_REQUEST, async level =>

@@ -14,9 +14,11 @@ pub use completion::{
     InsertTextFormat,
 };
 pub use language::{
-    CodeLensRequest, CompletionRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest,
-    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
-    SemanticTokensRequest, WorkspaceLanguage,
+    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
+    DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet, FileRenameRequest,
+    FoldingRangeRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
+    ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
@@ -30,8 +32,11 @@ pub use semantic_tokens::{
 pub use service::{LanguageService, LanguageServiceConfig};
 pub use text::TextIndex;
 pub use types::{
-    CodeLens, Command, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint,
-    InlayHintKind, LanguageId, Location, Position, Range, TextEdit, WorkspaceConfig,
+    CodeAction, CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight,
+    DocumentHighlightKind, DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri,
+    FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId, Location,
+    ParameterInformation, Position, PrepareRename, Range, SignatureHelp, SignatureInformation,
+    TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

@@ -1,20 +1,45 @@
-2:12 kind=type      label=: int
-3:14 kind=type      label=: int
-3:22 kind=none      label= /* = 3 (0x3) */ tooltip=Evaluated value: 3 (0x3)
-4:16 kind=type      label=: int
-4:31 kind=none      label= /* = 12 (0xC) */ tooltip=Evaluated value: 12 (0xC)
-5:13 kind=type      label=: bool
-5:32 kind=none      label= /* = true */ tooltip=Evaluated value: true
-8:8 kind=parameter label= = 0 tooltip=Enum value: 0
-9:9 kind=parameter label= = 1 tooltip=Enum value: 1
-11:8 kind=parameter label= = 8 tooltip=Enum value: 8
-12:14 kind=parameter label= = 16 tooltip=Enum value: 16
-13:17 kind=parameter label= = -1 tooltip=Enum value: -1
-14:15 kind=parameter label= = 0 tooltip=Enum value: 0
-21:42 kind=type      label=: void
-27:3 kind=type      label=(0x1cad0)
-40:10 kind=type      label=: void
-41:15 kind=type      label=: Payload
-42:12 kind=parameter label=destination:
-42:17 kind=parameter label=amount:
-43:16 kind=parameter label=amount:
+tolk 1.0
+
+const SIMPLE/* : int */ = 1
+const COMPUTED/* : int */ = 1 + 2/* = 3 (0x3) */
+const REFERENCED/* : int */ = COMPUTED * 4/* = 12 (0xC) */
+const BOOLEAN/* : bool */ = REFERENCED == 12/* = true */
+
+enum Status {
+    None/* = 0 */,
+    Ready/* = 1 */,
+    Explicit = 7,
+    Next/* = 8 */,
+    Hex = 0x10/* = 16 */,
+    Truthy = true/* = -1 */,
+    AfterTruthy/* = 0 */,
+}
+
+struct Payload {
+    value: int
+}
+
+fun deliver(destination: int, amount: int)/* : void */ {}
+
+fun Payload.add(self, amount: int): int {
+    return self.value + amount;
+}
+
+get/* (0x1cad0) */ fun currentCounter(): int {
+    return 0;
+}
+
+@method_id(123)
+get fun explicitId(): int {
+    return 0;
+}
+
+get fun `test skipped`(): int {
+    return 0;
+}
+
+fun main()/* : void */ {
+    val payload/* : Payload */ = Payload { value: 1 };
+    deliver(/* destination: */100, /* amount: */25);
+    payload.add(/* amount: */2);
+}

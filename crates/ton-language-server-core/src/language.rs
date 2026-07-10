@@ -2,8 +2,9 @@ use crate::completion::{CompletionList, CompletionTrigger};
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
-    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint, Location, Position,
-    Range, WorkspaceConfig,
+    CodeAction, CodeLens, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
+    FileRename, FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range,
+    SignatureHelp, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -21,6 +22,13 @@ pub struct FeatureSet {
     pub completion: bool,
     pub semantic_tokens: bool,
     pub inlay_hints: bool,
+    pub signature_help: bool,
+    pub rename: bool,
+    pub type_definition: bool,
+    pub document_highlight: bool,
+    pub workspace_symbols: bool,
+    pub code_actions: bool,
+    pub file_rename: bool,
 }
 
 pub trait ParsedDocument: Any + Send + Sync {
@@ -95,6 +103,51 @@ pub struct FoldingRangeRequest<'a> {
     pub context: PluginContext<'a>,
 }
 
+pub struct DocumentSymbolRequest<'a> {
+    pub context: PluginContext<'a>,
+}
+
+pub struct SignatureHelpRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct PrepareRenameRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct RenameRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+    pub new_name: &'a str,
+}
+
+pub struct TypeDefinitionRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct DocumentHighlightRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
+pub struct WorkspaceSymbolRequest<'a> {
+    pub query: &'a str,
+    pub profiler: &'a mut Profiler,
+}
+
+pub struct CodeActionRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub range: Range,
+}
+
+pub struct FileRenameRequest<'a> {
+    pub files: &'a [FileRename],
+    pub profiler: &'a mut Profiler,
+}
+
 pub struct SemanticTokensRequest<'a> {
     pub context: PluginContext<'a>,
 }
@@ -144,6 +197,67 @@ pub trait LanguagePlugin: Send + Sync {
         _request: FoldingRangeRequest<'_>,
     ) -> anyhow::Result<Vec<FoldingRange>> {
         Ok(Vec::new())
+    }
+
+    fn document_symbols(
+        &self,
+        _request: DocumentSymbolRequest<'_>,
+    ) -> anyhow::Result<Vec<DocumentSymbol>> {
+        Ok(Vec::new())
+    }
+
+    fn signature_help(
+        &self,
+        _request: SignatureHelpRequest<'_>,
+    ) -> anyhow::Result<Option<SignatureHelp>> {
+        Ok(None)
+    }
+
+    fn prepare_rename(
+        &self,
+        _request: PrepareRenameRequest<'_>,
+    ) -> anyhow::Result<Option<PrepareRename>> {
+        Ok(None)
+    }
+
+    fn rename(&self, _request: RenameRequest<'_>) -> anyhow::Result<Option<WorkspaceEdit>> {
+        Ok(None)
+    }
+
+    fn type_definition(
+        &self,
+        _request: TypeDefinitionRequest<'_>,
+    ) -> anyhow::Result<Vec<Location>> {
+        Ok(Vec::new())
+    }
+
+    fn document_highlights(
+        &self,
+        _request: DocumentHighlightRequest<'_>,
+    ) -> anyhow::Result<Vec<DocumentHighlight>> {
+        Ok(Vec::new())
+    }
+
+    fn workspace_symbols(
+        &self,
+        _request: WorkspaceSymbolRequest<'_>,
+    ) -> anyhow::Result<Vec<WorkspaceSymbol>> {
+        Ok(Vec::new())
+    }
+
+    fn code_actions(&self, _request: CodeActionRequest<'_>) -> anyhow::Result<Vec<CodeAction>> {
+        Ok(Vec::new())
+    }
+
+    fn will_rename_files(
+        &self,
+        _request: FileRenameRequest<'_>,
+    ) -> anyhow::Result<Option<WorkspaceEdit>> {
+        Ok(None)
+    }
+
+    fn did_rename_files(&self, _files: &[FileRename]) -> anyhow::Result<()> {
+        Ok(())
     }
 
     fn semantic_tokens(

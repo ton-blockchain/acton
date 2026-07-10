@@ -2,13 +2,16 @@
 mod snapshots;
 #[path = "../../support/mod.rs"]
 mod support;
+#[path = "inlay_hints/upstream.rs"]
+mod upstream;
 
 use expect_test::{Expect, expect};
 use snapshots::assert_file_snapshot;
-use support::{MarkedSource, render_inlay_hints};
+use support::MarkedSource;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    DocumentUri, LanguageService, LanguageServiceConfig, Position, Range,
+    DocumentUri, InlayHint, LanguageService, LanguageServiceConfig, Position, ProfileSummary,
+    Range, TextIndex,
 };
 
 fn case_tolk_inlay_hints(source: &str, range: Range, expect: Expect) {
@@ -27,7 +30,33 @@ fn tolk_inlay_hints(source: &str, range: Range) -> String {
     let hints = service
         .inlay_hints(&uri, range)
         .expect("inlay hints request should succeed");
-    render_inlay_hints(&hints)
+    source_with_inline_hints(marked.source(), &hints)
+}
+
+fn source_with_inline_hints(source: &str, hints: &[InlayHint]) -> String {
+    let index = TextIndex::new(source);
+    let mut insertions = hints
+        .iter()
+        .enumerate()
+        .map(|(order, hint)| {
+            let offset = index.position_to_offset(source, hint.position);
+            let label = hint.label.trim();
+            let text = if label.starts_with("/*") && label.ends_with("*/") {
+                label.to_owned()
+            } else {
+                format!("/* {label} */")
+            };
+
+            (offset, order, text)
+        })
+        .collect::<Vec<_>>();
+    insertions.sort_by_key(|(offset, order, _)| std::cmp::Reverse((*offset, *order)));
+
+    let mut annotated = source.to_owned();
+    for (offset, _, text) in insertions {
+        annotated.insert_str(offset, &text);
+    }
+    annotated
 }
 
 const fn full_document_range() -> Range {
@@ -46,11 +75,31 @@ fn shows_inferred_types() {
             }
         ",
         full_document_range(),
-        expect![[r"
-            0:14 kind=type      label=: int
-            0:22 kind=none      label= /* = 3 (0x3) */ tooltip=Evaluated value: 3 (0x3)
-            2:12 kind=type      label=: int
-            3:14 kind=type      label=: int"]],
+        expect![[r#"
+            const COMPUTED/* : int */ = 1 + 2/* = 3 (0x3) */
+
+            fun answer()/* : int */ {
+                val result/* : int */ = 40 + 2;
+                return result;
+            }"#]],
+    );
+}
+
+#[test]
+fn shows_types_for_stdlib_methods_on_string_literals() {
+    case_tolk_inlay_hints(
+        r#"
+            fun main() {
+                val valid = "abc-123".beginParse();
+                val cell = beginCell().storeSlice("ce".beginParse()).endCell();
+            }
+        "#,
+        full_document_range(),
+        expect![[r#"
+            fun main()/* : void */ {
+                val valid/* : slice */ = "abc-123".beginParse();
+                val cell/* : cell */ = beginCell().storeSlice("ce".beginParse()).endCell();
+            }"#]],
     );
 }
 
@@ -70,7 +119,17 @@ fn shows_inferred_parameter_type_and_skips_underscored_locals() {
             }
         ",
         full_document_range(),
-        expect!["5:26 kind=type      label=: int"],
+        expect![[r#"
+            fun apply(f: (int) -> int): int {
+                return f(1);
+            }
+
+            fun main(): int {
+                return apply(fun(value/* : int */) {
+                    val _ignored = value;
+                    return value + 1;
+                });
+            }"#]],
     );
 }
 
@@ -91,7 +150,18 @@ fn skips_explicit_and_obvious_constant_types() {
             }
         ",
         full_document_range(),
-        expect!["<none>"],
+        expect![[r#"
+            struct Payload {
+                value: int
+            }
+
+            const EXPLICIT: int = 1
+            const OBJECT = Payload { value: 1 }
+
+            fun typed(value: int): int {
+                val local: int = value;
+                return local;
+            }"#]],
     );
 }
 
@@ -105,7 +175,11 @@ fn respects_requested_range() {
             }
         ",
         Range::new(Position::new(1, 0), Position::new(1, u32::MAX)),
-        expect!["1:14 kind=type      label=: int"],
+        expect![[r#"
+            fun answer() {
+                val result/* : int */ = 40 + 2;
+                return result;
+            }"#]],
     );
 }
 
@@ -136,9 +210,21 @@ fn handles_method_id_annotations_and_test_names() {
             get fun `test_foo`(): int { return 0 }
         ",
         full_document_range(),
-        expect![[r"
-            0:3 kind=type      label=(0x18762)
-            9:3 kind=type      label=(0x17cf5)"]],
+        expect![[r#"
+            get/* (0x18762) */ fun data(): int { return 0 }
+
+            @method_id(0x100)
+            get fun explicitId(): int { return 0 }
+
+            @method_id()
+            get fun emptyId(): int { return 0 }
+
+            @foo()
+            get/* (0x17cf5) */ fun annotated(): int { return 0 }
+
+            get fun `test foo`(): int { return 0 }
+            get fun `test-foo`(): int { return 0 }
+            get fun `test_foo`(): int { return 0 }"#]],
     );
 }
 
@@ -173,7 +259,32 @@ fn suppresses_redundant_parameter_hints() {
             }
         ",
         full_document_range(),
-        expect!["<none>"],
+        expect![[r#"
+            struct Payload {
+                sender: int
+                value: int
+            }
+
+            fun sender(): int { return 1 }
+            fun sameName(value: int): void {}
+            fun sameField(sender: int): void {}
+            fun sameCall(sender: int): void {}
+            fun shortName(x: int): void {}
+            fun stringArg(constString: int): void {}
+            fun objectArg(payload: Payload): void {}
+            fun println(message: int): void {}
+
+            fun main(): void {
+                val value: int = 1;
+                val payload: Payload = Payload { sender: 1, value: 2 };
+                sameName(value);
+                sameField(payload.sender);
+                sameCall(sender());
+                shortName(1);
+                stringArg(1);
+                objectArg(Payload { sender: 1, value: 2 });
+                println(1);
+            }"#]],
     );
 }
 
@@ -189,17 +300,13 @@ fn evaluates_compile_time_functions_and_skips_cycles() {
             const CYCLE_B = CYCLE_A + 1
         "#,
         full_document_range(),
-        expect![[r"
-            0:11 kind=type      label=: int
-            0:34 kind=none      label= /* = 50018 (0xC362) */ tooltip=Evaluated value: 50018 (0xC362)
-            1:11 kind=type      label=: int
-            1:34 kind=none      label= /* = 907060870 (0x3610A686) */ tooltip=Evaluated value: 907060870 (0x3610A686)
-            2:11 kind=type      label=: int
-            2:38 kind=none      label= /* = 754077114 (0x2CF24DBA) */ tooltip=Evaluated value: 754077114 (0x2CF24DBA)
-            3:13 kind=type      label=: int
-            3:38 kind=none      label= /* = 5525326 (0x544F4E) */ tooltip=Evaluated value: 5525326 (0x544F4E)
-            4:13 kind=type      label=: int
-            5:13 kind=type      label=: int"]],
+        expect![[r#"
+            const CRC16/* : int */ = stringCrc16("hello")/* = 50018 (0xC362) */
+            const CRC32/* : int */ = stringCrc32("hello")/* = 907060870 (0x3610A686) */
+            const SHA32/* : int */ = stringSha256_32("hello")/* = 754077114 (0x2CF24DBA) */
+            const BASE256/* : int */ = stringToBase256("TON")/* = 5525326 (0x544F4E) */
+            const CYCLE_A/* : int */ = CYCLE_B + 1
+            const CYCLE_B/* : int */ = CYCLE_A + 1"#]],
     );
 }
 
@@ -213,15 +320,11 @@ fn evaluates_operators_and_casts() {
             const CASTED = (0x10 as int) + 1
         ",
         full_document_range(),
-        expect![[r"
-            0:16 kind=type      label=: int
-            0:41 kind=none      label= /* = 37 (0x25) */ tooltip=Evaluated value: 37 (0x25)
-            1:14 kind=type      label=: int
-            1:34 kind=none      label= /* = 0x-26 */ tooltip=Evaluated value: 0x-26
-            2:11 kind=type      label=: bool
-            2:40 kind=none      label= /* = true */ tooltip=Evaluated value: true
-            3:12 kind=type      label=: int
-            3:32 kind=none      label= /* = 17 (0x11) */ tooltip=Evaluated value: 17 (0x11)"]],
+        expect![[r#"
+            const ARITHMETIC/* : int */ = ((1 + 2) * 3 << 2) | 1/* = 37 (0x25) */
+            const NEGATIVE/* : int */ = -(ARITHMETIC + 1)/* = 0x-26 */
+            const LOGIC/* : bool */ = !false && ARITHMETIC >= 37/* = true */
+            const CASTED/* : int */ = (0x10 as int) + 1/* = 17 (0x11) */"#]],
     );
 }
 
@@ -268,19 +371,44 @@ fn evaluates_enum_values_like_tolk() {
             }
         ",
         full_document_range(),
-        expect![[r"
-            0:10 kind=type      label=: int
-            7:7 kind=parameter label= = 0 tooltip=Enum value: 0
-            9:8 kind=parameter label= = 6 tooltip=Enum value: 6
-            11:8 kind=parameter label= = 0 tooltip=Enum value: 0
-            12:14 kind=parameter label= = 16 tooltip=Enum value: 16
-            13:19 kind=parameter label= = -1 tooltip=Enum value: -1
-            14:18 kind=parameter label= = 0 tooltip=Enum value: 0
-            15:14 kind=parameter label= = 1 tooltip=Enum value: 1
-            16:24 kind=parameter label= = 11 tooltip=Enum value: 11
-            17:30 kind=parameter label= = 5 tooltip=Enum value: 5
-            27:8 kind=parameter label= = 5 tooltip=Enum value: 5
-            35:8 kind=parameter label= = 8 tooltip=Enum value: 8"]],
+        expect![[r#"
+            const BASE/* : int */ = 10;
+
+            enum Other {
+                Item = 3,
+            }
+
+            enum Color {
+                Red/* = 0 */,
+                Green = 5,
+                Blue/* = 6 */,
+                Negative = -1,
+                Next/* = 0 */,
+                Hex = 0x10/* = 16 */,
+                Truthy = 10 > 0/* = -1 */,
+                Falsy = 10 < 0/* = 0 */,
+                AfterFalsy/* = 1 */,
+                FromConst = BASE + 1/* = 11 */,
+                FromOther = Other.Item + 2/* = 5 */,
+            }
+
+            fun notConst(): int { return 10 }
+
+            enum Broken {
+                A = 1,
+                B = notConst(),
+                C,
+                Reset = 4,
+                Last/* = 5 */,
+            }
+
+            enum SameEnumReference {
+                Base = 100,
+                Next = SameEnumReference.Base + 1,
+                After,
+                Reset = 7,
+                Last/* = 8 */,
+            }"#]],
     );
 }
 
@@ -294,13 +422,11 @@ fn shows_destructured_variable_types() {
             }
         "#,
         full_document_range(),
-        expect![[r"
-            1:14 kind=type      label=: int
-            1:22 kind=type      label=: bool
-            1:29 kind=type      label=: string
-            2:15 kind=type      label=: int
-            2:22 kind=type      label=: bool
-            2:29 kind=type      label=: string"]],
+        expect![[r#"
+            fun main(): void {
+                val (first/* : int */, second/* : bool */, third/* : string */) = (100, true, "");
+                val [fourth/* : int */, fifth/* : bool */, sixth/* : string */] = [200, false, "ok"];
+            }"#]],
     );
 }
 
@@ -309,7 +435,7 @@ fn range_filters_value_hints_independently() {
     case_tolk_inlay_hints(
         "const COMPUTED = 1 + 2",
         Range::new(Position::new(0, 0), Position::new(0, 14)),
-        expect!["0:14 kind=type      label=: int"],
+        expect!["const COMPUTED/* : int */ = 1 + 2"],
     );
 }
 
@@ -326,9 +452,50 @@ fn shows_catch_variable_types() {
             }
         ",
         full_document_range(),
-        expect![[r"
-            0:13 kind=type      label=: void
-            3:21 kind=type      label=: int
-            3:31 kind=type      label=: unknown"]],
+        expect![[r#"
+            fun recover()/* : void */ {
+                try {
+                    throw 1;
+                } catch (exitCode/* : int */, argument/* : unknown */) {
+                    return;
+                }
+            }"#]],
     );
+}
+
+#[test]
+fn records_inlay_hint_profile_spans() {
+    let uri = DocumentUri::from("file:///workspace/profiled.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(TolkLanguage::new());
+    service
+        .open_document(
+            uri.clone(),
+            LANGUAGE_ID,
+            1,
+            "fun main() { val value = 1 + 2; }",
+        )
+        .expect("Tolk document should open");
+
+    let hints = service
+        .inlay_hints(&uri, full_document_range())
+        .expect("inlay hints request should succeed");
+    let summary = service.profiler().summary();
+    let actual = format!(
+        "hints={} inlay={} tolk.inlay={}",
+        hints.len(),
+        event_count(summary, "inlay_hints"),
+        event_count(summary, "tolk.inlay_hints"),
+    );
+    expect!["hints=2 inlay=1 tolk.inlay=1"].assert_eq(&actual);
+}
+
+fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
+    summary
+        .events
+        .iter()
+        .filter(|event| event.name == name)
+        .count()
 }

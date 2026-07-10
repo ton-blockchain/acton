@@ -46,12 +46,7 @@ impl GlobalEnv {
 
         let mut visible: HashMap<Arc<str>, Vec<SymbolId>> = HashMap::with_capacity(capacity);
 
-        // common.tolk is available in any file
-        if let Some(common_tolk) = common_tolk {
-            Self::add_file_declaration(&mut visible, &common_tolk);
-        }
-
-        // add symbols from current file
+        // Declarations in the current file shadow common.tolk and imported declarations.
         if let Some(file) = file {
             Self::add_file_declaration(&mut visible, file);
         }
@@ -68,6 +63,11 @@ impl GlobalEnv {
 
                 Self::add_file_declaration(&mut visible, index);
             }
+        }
+
+        // common.tolk is the lowest-priority implicit import.
+        if let Some(common_tolk) = common_tolk {
+            Self::add_file_declaration(&mut visible, &common_tolk);
         }
 
         GlobalEnv { visible }

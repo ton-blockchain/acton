@@ -1,17 +1,20 @@
 use crate::language::{
-    CodeLensRequest, CompletionRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest,
-    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
-    ReferenceRequest, SemanticTokensRequest,
+    CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
+    DocumentHighlightRequest, DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    PrepareRenameRequest, ReferenceRequest, RenameRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticTokens;
 use crate::types::{
-    CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint, LanguageId, Location,
-    Position, Range, TextEdit, WorkspaceConfig,
+    CodeAction, CodeLens, DocumentEdits, DocumentHighlight, DocumentSnapshot, DocumentSymbol,
+    DocumentUri, FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position,
+    PrepareRename, Range, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use crate::{CompletionList, CompletionTrigger};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
@@ -659,6 +662,46 @@ impl LanguageService {
         result
     }
 
+    pub fn type_definition(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<Location>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().type_definition {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.type_definition(TypeDefinitionRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("type_definition", started_at);
+
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "type_definition",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            result_count = result.as_ref().map_or(0, Vec::len),
+            "type definition completed"
+        );
+        result
+    }
+
     pub fn hover(
         &mut self,
         uri: &DocumentUri,
@@ -844,6 +887,46 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn document_highlights(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Vec<DocumentHighlight>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().document_highlight {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.document_highlights(DocumentHighlightRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("document_highlights", started_at);
+
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "document_highlights",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            result_count = result.as_ref().map_or(0, Vec::len),
+            "document highlights completed"
+        );
         result
     }
 
@@ -1241,6 +1324,295 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn document_symbols(&mut self, uri: &DocumentUri) -> anyhow::Result<Vec<DocumentSymbol>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().document_symbols {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.document_symbols(DocumentSymbolRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+        });
+        self.profiler.finish("document_symbols", started_at);
+        result
+    }
+
+    pub fn workspace_symbols(&mut self, query: &str) -> anyhow::Result<Vec<WorkspaceSymbol>> {
+        let started_at = self.profiler.start();
+        let mut symbols = Vec::new();
+
+        for plugin in self.plugins.values() {
+            if !plugin.capabilities().workspace_symbols {
+                continue;
+            }
+            symbols.extend(plugin.workspace_symbols(WorkspaceSymbolRequest {
+                query,
+                profiler: &mut self.profiler,
+            })?);
+        }
+
+        symbols.sort_by(|left, right| {
+            left.name
+                .cmp(&right.name)
+                .then(left.location.uri.as_str().cmp(right.location.uri.as_str()))
+                .then(left.location.range.start.cmp(&right.location.range.start))
+        });
+        self.profiler.finish("workspace_symbols", started_at);
+        Ok(symbols)
+    }
+
+    pub fn code_actions(
+        &mut self,
+        uri: &DocumentUri,
+        range: Range,
+    ) -> anyhow::Result<Vec<CodeAction>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().code_actions {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.code_actions(CodeActionRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            range,
+        });
+        self.profiler.finish("code_actions", started_at);
+        result
+    }
+
+    pub fn will_rename_files(
+        &mut self,
+        files: &[FileRename],
+    ) -> anyhow::Result<Option<WorkspaceEdit>> {
+        let started_at = self.profiler.start();
+        let mut documents = BTreeMap::<String, DocumentEdits>::new();
+
+        for plugin in self.plugins.values() {
+            if !plugin.capabilities().file_rename {
+                continue;
+            }
+            let Some(edit) = plugin.will_rename_files(FileRenameRequest {
+                files,
+                profiler: &mut self.profiler,
+            })?
+            else {
+                continue;
+            };
+            for document in edit.documents {
+                documents
+                    .entry(document.uri.as_str().to_owned())
+                    .or_insert_with(|| DocumentEdits::new(document.uri, Vec::new()))
+                    .edits
+                    .extend(document.edits);
+            }
+        }
+
+        self.profiler.finish("files.rename.prepare", started_at);
+        let documents = documents.into_values().collect::<Vec<_>>();
+        Ok((!documents.is_empty()).then(|| WorkspaceEdit::new(documents)))
+    }
+
+    pub fn did_rename_files(&mut self, files: &[FileRename]) -> anyhow::Result<()> {
+        for plugin in self.plugins.values() {
+            if plugin.capabilities().file_rename {
+                plugin.did_rename_files(files)?;
+            }
+        }
+        for rename in files {
+            let Some(state) = self.documents.remove(&rename.old_uri) else {
+                continue;
+            };
+            let document = DocumentSnapshot::new(
+                rename.new_uri.clone(),
+                state.document.language_id().clone(),
+                state.document.version(),
+                Arc::<str>::from(state.document.text()),
+            );
+            self.documents.insert(
+                rename.new_uri.clone(),
+                DocumentState {
+                    document,
+                    parsed: state.parsed,
+                },
+            );
+        }
+        self.profiler.increment("files.rename");
+        Ok(())
+    }
+
+    pub fn signature_help(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<SignatureHelp>> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "signature_help",
+                uri = uri.as_str(),
+                line = position.line,
+                character = position.character,
+                "signature help request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().signature_help {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.signature_help(SignatureHelpRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("signature_help", started_at);
+
+        match &result {
+            Ok(signature_help) => {
+                tracing::info!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "signature_help",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    has_result = signature_help.is_some(),
+                    "signature help completed"
+                );
+            }
+            Err(error) => {
+                tracing::warn!(
+                    target: logging::SERVICE_TARGET,
+                    operation = "signature_help",
+                    uri = state.document.uri().as_str(),
+                    language_id = state.document.language_id().as_str(),
+                    version = state.document.version(),
+                    line = position.line,
+                    character = position.character,
+                    error = %error,
+                    "signature help failed"
+                );
+            }
+        }
+
+        result
+    }
+
+    pub fn prepare_rename(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<PrepareRename>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().rename {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.prepare_rename(PrepareRenameRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("rename.prepare", started_at);
+
+        tracing::debug!(
+            target: logging::SERVICE_TARGET,
+            operation = "rename.prepare",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            has_result = result.as_ref().is_ok_and(Option::is_some),
+            "prepare rename completed"
+        );
+        result
+    }
+
+    pub fn rename(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+        new_name: &str,
+    ) -> anyhow::Result<Option<WorkspaceEdit>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().rename {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.rename(RenameRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+            new_name,
+        });
+        self.profiler.finish("rename", started_at);
+
+        tracing::info!(
+            target: logging::SERVICE_TARGET,
+            operation = "rename",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            new_name,
+            document_count = result
+                .as_ref()
+                .ok()
+                .and_then(Option::as_ref)
+                .map_or(0, |edit| edit.documents.len()),
+            "rename completed"
+        );
         result
     }
 

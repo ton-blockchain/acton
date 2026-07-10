@@ -6,7 +6,7 @@ use std::fmt::Write as _;
 use support::MarkedSource;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position,
+    DocumentUri, LanguageService, LanguageServiceConfig, Location, Position, ProfileSummary,
 };
 
 fn case_tolk_references(
@@ -153,6 +153,259 @@ fn unresolved_symbol_has_no_references() {
         expect![[r"
             0:25 unresolved"]],
     );
+}
+
+#[test]
+fn finds_destructured_backticked_redefined_and_shorthand_locals() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                val <caret>`hello world` = 1;
+                `hello world` + `hello world`;
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:8 -> file:///workspace/main.tolk 2:4 reference
+            1:8 -> file:///workspace/main.tolk 2:20 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                val [<caret>first, second] = [1, 2];
+                first + second;
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:9 -> file:///workspace/main.tolk 2:4 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                val <caret>value = 1;
+                val value redef = 2;
+                value;
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:8 -> file:///workspace/main.tolk 2:8 reference
+            1:8 -> file:///workspace/main.tolk 3:4 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            struct Foo { value: int }
+            fun main(<caret>value: int) {
+                Foo { value };
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:9 -> file:///workspace/main.tolk 2:10 reference"]],
+    );
+}
+
+#[test]
+fn keeps_shadowed_local_and_lambda_scopes_separate() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                {
+                    val <caret>value = 1;
+                    value;
+                }
+                {
+                    val value = 2;
+                    value;
+                }
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            2:12 -> file:///workspace/main.tolk 3:8 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                fun (<caret>value: int) {
+                    value;
+                    fun (value: int) {
+                        value;
+                    };
+                };
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:9 -> file:///workspace/main.tolk 2:8 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun main() {
+                try {} catch (<caret>error, data) {
+                    error + data;
+                }
+            }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:18 -> file:///workspace/main.tolk 2:8 reference"]],
+    );
+}
+
+#[test]
+fn finds_references_for_every_global_symbol_kind() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            type <caret>Alias = int;
+            struct Box { value: Alias }
+            fun use(value: Alias): Alias { return value; }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:5 -> file:///workspace/main.tolk 1:20 reference
+            0:5 -> file:///workspace/main.tolk 2:15 reference
+            0:5 -> file:///workspace/main.tolk 2:23 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            struct <caret>Box { value: int }
+            fun Box.load(): Box { return Box { value: 1 }; }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:7 -> file:///workspace/main.tolk 1:4 reference
+            0:7 -> file:///workspace/main.tolk 1:16 reference
+            0:7 -> file:///workspace/main.tolk 1:29 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            enum Color { <caret>Red, Blue }
+            fun main() { Color.Red; match (Color.Blue) { Color.Red => {} } }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:13 -> file:///workspace/main.tolk 1:19 reference
+            0:13 -> file:///workspace/main.tolk 1:51 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            const <caret>ANSWER = 42;
+            global counter: int;
+            fun helper() { return ANSWER + counter; }
+            get fun getter() { return helper(); }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:6 -> file:///workspace/main.tolk 2:22 reference"]],
+    );
+}
+
+#[test]
+fn finds_function_method_and_type_parameter_references() {
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            fun <caret>helper() {}
+            fun main() { helper(); helper(); }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:4 -> file:///workspace/main.tolk 1:13 reference
+            0:4 -> file:///workspace/main.tolk 1:23 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            struct Box {}
+            fun Box.<caret>touch(self) {}
+            fun main(box: Box) { box.touch(); }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            1:8 -> file:///workspace/main.tolk 2:25 reference"]],
+    );
+
+    case_tolk_references(
+        "file:///workspace/main.tolk",
+        r"
+            struct Box<<caret>T> {
+                value: T
+            }
+            fun unwrap(value: Box<T>): T { return value.value; }
+        ",
+        false,
+        |_| {},
+        expect![[r"
+            0:11 -> file:///workspace/main.tolk 1:11 reference"]],
+    );
+}
+
+#[test]
+fn records_reference_profile_spans() {
+    let marked = MarkedSource::parse("fun <caret>main() {}\n");
+    let uri = DocumentUri::from("file:///workspace/profiled.tolk");
+    let mut service = LanguageService::new(LanguageServiceConfig {
+        enable_profiling: true,
+    });
+    service.register_language(TolkLanguage::new());
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
+        .expect("Tolk document should open");
+
+    let references = service
+        .references(&uri, marked.marker("caret").position, false)
+        .expect("references request should succeed");
+    let summary = service.profiler().summary();
+    let actual = format!(
+        "references={} references.span={} tolk.references={}",
+        references.len(),
+        event_count(summary, "references"),
+        event_count(summary, "tolk.references.resolve"),
+    );
+    expect!["references=0 references.span=1 tolk.references=1"].assert_eq(&actual);
+}
+
+fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
+    summary
+        .events
+        .iter()
+        .filter(|event| event.name == name)
+        .count()
 }
 
 fn render_references(caret_position: Position, locations: &[Location]) -> String {

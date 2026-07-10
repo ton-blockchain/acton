@@ -3,9 +3,9 @@ use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::languages::tolk::completion::{items, semantics};
-use crate::{CompletionItem, CompletionItemKind, Range, TextEdit};
+use crate::languages::tolk::import_edits;
+use crate::{CompletionItem, CompletionItemKind};
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Component, Path, PathBuf};
 use tolk_resolver::resolve_index::Resolved;
 use tolk_resolver::symbol_resolver::GlobalEnv;
 use tolk_resolver::{Symbol, SymbolKind};
@@ -110,11 +110,22 @@ impl ReferenceCompletionProvider {
                     .project_index
                     .files()
                     .get(&symbol.id.file_id)
-                && let Some(import_path) = import_path_for(context, &target.path)
+                && let Some(import_path) = import_edits::import_path_for(
+                    context.snapshot,
+                    context.file_id,
+                    &target.path,
+                    context.workspace.stdlib_path,
+                    context.workspace.mappings,
+                )
             {
-                candidate.item = candidate
-                    .item
-                    .with_additional_text_edit(import_edit(context, &import_path));
+                candidate.item =
+                    candidate
+                        .item
+                        .with_additional_text_edit(import_edits::import_edit(
+                            context.document,
+                            context.syntax.root(),
+                            &import_path,
+                        ));
             }
             collector.add(candidate.item, candidate.rank);
         }
@@ -319,89 +330,6 @@ impl ReferenceCompletionProvider {
                     .filter(|symbol| matches!(symbol.kind, SymbolKind::Struct { .. }))
             })
     }
-}
-
-fn import_path_for(context: &TolkCompletionProviderContext<'_>, target: &Path) -> Option<String> {
-    if let Ok(relative) = target.strip_prefix(context.workspace.stdlib_path) {
-        return Some(format!("@stdlib/{}", path_without_tolk(relative)));
-    }
-    if let Some(mappings) = context.workspace.mappings {
-        for (mapping, root) in mappings {
-            if let Ok(relative) = target.strip_prefix(root) {
-                let relative = path_without_tolk(relative);
-                return Some(if relative.is_empty() {
-                    mapping.clone()
-                } else {
-                    format!("{mapping}/{relative}")
-                });
-            }
-        }
-    }
-
-    let current = context
-        .snapshot
-        .project_index
-        .files()
-        .get(&context.file_id)?;
-    Some(path_without_tolk(&relative_path(
-        current.path.parent()?,
-        target,
-    )?))
-}
-
-fn path_without_tolk(path: &Path) -> String {
-    let mut path = path.to_path_buf();
-    if path
-        .extension()
-        .is_some_and(|extension| extension == "tolk")
-    {
-        path.set_extension("");
-    }
-    path.to_string_lossy().replace('\\', "/")
-}
-
-fn relative_path(from: &Path, to: &Path) -> Option<PathBuf> {
-    let from = from.components().collect::<Vec<_>>();
-    let to = to.components().collect::<Vec<_>>();
-    let common = from
-        .iter()
-        .zip(&to)
-        .take_while(|(left, right)| left == right)
-        .count();
-    if common == 0 {
-        return None;
-    }
-    let mut result = PathBuf::new();
-    for component in &from[common..] {
-        if !matches!(component, Component::CurDir) {
-            result.push("..");
-        }
-    }
-    for component in &to[common..] {
-        result.push(component.as_os_str());
-    }
-    Some(result)
-}
-
-fn import_edit(context: &TolkCompletionProviderContext<'_>, import_path: &str) -> TextEdit {
-    let root = context.syntax.root();
-    let mut cursor = root.walk();
-    let leading = root
-        .named_children(&mut cursor)
-        .take_while(|node| matches!(node.kind(), "tolk_required_version" | "import_directive"))
-        .last();
-    let (offset, text) = match leading {
-        Some(node) if node.kind() == "import_directive" => {
-            (node.end_byte(), format!("\nimport \"{import_path}\"\n"))
-        }
-        Some(node) => (node.end_byte(), format!("\n\nimport \"{import_path}\"\n")),
-        None => (0, format!("import \"{import_path}\"\n\n")),
-    };
-    let position = context
-        .document
-        .text_index()
-        .offset_to_position(context.document.text(), offset);
-    TextEdit::new(Range::new(position, position), text)
 }
 
 fn allowed_global(symbol: &Symbol, is_type: bool) -> bool {

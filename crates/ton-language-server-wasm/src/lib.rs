@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::fmt::Write as _;
 #[cfg(feature = "fift")]
@@ -8,11 +8,13 @@ use ton_language_server_core::languages::tasm::TasmLanguage;
 #[cfg(feature = "tolk")]
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
-    CORE_TARGET, CodeLens, CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger,
-    CompletionTriggerKind, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind,
-    InsertTextFormat, LanguageId, LanguageService, Location, LogLevel, Position, ProfileSummary,
-    Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    WorkspaceConfig,
+    CORE_TARGET, CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind,
+    CompletionList, CompletionTrigger, CompletionTriggerKind, DocumentHighlight,
+    DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename,
+    FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
+    Location, LogLevel, Position, PrepareRename, ProfileSummary, Range,
+    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    SignatureHelp, SignatureInformation, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use wasm_bindgen::prelude::*;
 
@@ -168,6 +170,22 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = typeDefinition)]
+    pub fn type_definition(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let locations = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .type_definition(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = references)]
     pub fn references(
         &self,
@@ -187,6 +205,22 @@ impl TonLanguageServer {
             )
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&locations_to_lsp(locations)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = documentHighlights)]
+    pub fn document_highlights(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let highlights = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .document_highlights(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&document_highlights_to_lsp(highlights)).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = hover)]
@@ -276,6 +310,30 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&code_lenses_to_lsp(lenses)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = codeActions)]
+    pub fn code_actions(
+        &self,
+        uri: String,
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let actions = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .code_actions(
+                &DocumentUri::from(uri),
+                Range::new(
+                    Position::new(start_line, start_character),
+                    Position::new(end_line, end_character),
+                ),
+            )
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&code_actions_to_lsp(actions)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = foldingRanges)]
     pub fn folding_ranges(&self, uri: String) -> Result<JsValue, JsValue> {
         let ranges = self
@@ -285,6 +343,103 @@ impl TonLanguageServer {
             .folding_ranges(&DocumentUri::from(uri))
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&folding_ranges_to_lsp(ranges)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = documentSymbols)]
+    pub fn document_symbols(&self, uri: String) -> Result<JsValue, JsValue> {
+        let symbols = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .document_symbols(&DocumentUri::from(uri))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&document_symbols_to_lsp(symbols)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = workspaceSymbols)]
+    pub fn workspace_symbols(&self, query: String) -> Result<JsValue, JsValue> {
+        let symbols = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .workspace_symbols(&query)
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&workspace_symbols_to_lsp(symbols)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = signatureHelp)]
+    pub fn signature_help(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let signature_help = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .signature_help(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&signature_help.map(signature_help_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = prepareRename)]
+    pub fn prepare_rename(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let prepare = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .prepare_rename(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&prepare.map(prepare_rename_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = rename)]
+    pub fn rename(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+        new_name: String,
+    ) -> Result<JsValue, JsValue> {
+        let edit = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .rename(
+                &DocumentUri::from(uri),
+                Position::new(line, character),
+                &new_name,
+            )
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&edit.map(workspace_edit_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = willRenameFiles)]
+    pub fn will_rename_files(&self, files_json: String) -> Result<JsValue, JsValue> {
+        let files = file_renames_from_json(&files_json)?;
+        let edit = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .will_rename_files(&files)
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&edit.map(workspace_edit_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = didRenameFiles)]
+    pub fn did_rename_files(&self, files_json: String) -> Result<(), JsValue> {
+        let files = file_renames_from_json(&files_json)?;
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .did_rename_files(&files)
+            .map_err(js_error)
     }
 }
 
@@ -381,10 +536,24 @@ struct LspLocation {
 }
 
 #[derive(Serialize)]
+struct LspDocumentHighlight {
+    range: LspRange,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<u8>,
+}
+
+#[derive(Serialize)]
 struct LspCodeLens {
     range: LspRange,
     #[serde(skip_serializing_if = "Option::is_none")]
     command: Option<LspCommand>,
+}
+
+#[derive(Serialize)]
+struct LspCodeAction {
+    title: String,
+    kind: &'static str,
+    edit: LspWorkspaceEdit,
 }
 
 #[derive(Serialize)]
@@ -428,6 +597,76 @@ struct LspFoldingRange {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspDocumentSymbol {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    kind: u8,
+    range: LspRange,
+    selection_range: LspRange,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    children: Vec<LspDocumentSymbol>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspWorkspaceSymbol {
+    name: String,
+    kind: u8,
+    location: LspLocation,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    container_name: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspSignatureHelp {
+    signatures: Vec<LspSignatureInformation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    active_signature: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    active_parameter: Option<u32>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspSignatureInformation {
+    label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    documentation: Option<String>,
+    parameters: Vec<LspParameterInformation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    active_parameter: Option<u32>,
+}
+
+#[derive(Serialize)]
+struct LspParameterInformation {
+    label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    documentation: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspPrepareRename {
+    range: LspRange,
+    placeholder: String,
+}
+
+#[derive(Serialize)]
+struct LspWorkspaceEdit {
+    changes: std::collections::BTreeMap<String, Vec<LspTextEdit>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonFileRename {
+    old_uri: String,
+    new_uri: String,
+}
+
+#[derive(Serialize)]
 struct LspRange {
     start: LspPosition,
     end: LspPosition,
@@ -448,6 +687,20 @@ fn locations_to_lsp(locations: Vec<Location>) -> Vec<LspLocation> {
                 start: position_to_lsp(location.range.start),
                 end: position_to_lsp(location.range.end),
             },
+        })
+        .collect()
+}
+
+fn document_highlights_to_lsp(highlights: Vec<DocumentHighlight>) -> Vec<LspDocumentHighlight> {
+    highlights
+        .into_iter()
+        .map(|highlight| LspDocumentHighlight {
+            range: range_to_lsp(highlight.range),
+            kind: highlight.kind.map(|kind| match kind {
+                DocumentHighlightKind::Text => 1,
+                DocumentHighlightKind::Read => 2,
+                DocumentHighlightKind::Write => 3,
+            }),
         })
         .collect()
 }
@@ -539,6 +792,20 @@ fn code_lenses_to_lsp(lenses: Vec<CodeLens>) -> Vec<LspCodeLens> {
     lenses.into_iter().map(code_lens_to_lsp).collect()
 }
 
+fn code_actions_to_lsp(actions: Vec<CodeAction>) -> Vec<LspCodeAction> {
+    actions
+        .into_iter()
+        .map(|action| LspCodeAction {
+            title: action.title,
+            kind: match action.kind {
+                CodeActionKind::QuickFix => "quickfix",
+                CodeActionKind::Refactor => "refactor",
+            },
+            edit: workspace_edit_to_lsp(action.edit),
+        })
+        .collect()
+}
+
 fn semantic_tokens_to_lsp(tokens: SemanticTokens) -> LspSemanticTokens {
     LspSemanticTokens {
         result_id: tokens.result_id,
@@ -596,6 +863,143 @@ fn folding_ranges_to_lsp(ranges: Vec<FoldingRange>) -> Vec<LspFoldingRange> {
             end_character: range.end_character,
         })
         .collect()
+}
+
+fn document_symbols_to_lsp(symbols: Vec<DocumentSymbol>) -> Vec<LspDocumentSymbol> {
+    symbols.into_iter().map(document_symbol_to_lsp).collect()
+}
+
+fn workspace_symbols_to_lsp(symbols: Vec<WorkspaceSymbol>) -> Vec<LspWorkspaceSymbol> {
+    symbols
+        .into_iter()
+        .map(|symbol| LspWorkspaceSymbol {
+            name: symbol.name,
+            kind: document_symbol_kind_to_lsp(symbol.kind),
+            location: LspLocation {
+                uri: symbol.location.uri.as_str().to_owned(),
+                range: range_to_lsp(symbol.location.range),
+            },
+            container_name: symbol.container_name,
+        })
+        .collect()
+}
+
+fn signature_help_to_lsp(help: SignatureHelp) -> LspSignatureHelp {
+    LspSignatureHelp {
+        signatures: help
+            .signatures
+            .into_iter()
+            .map(signature_information_to_lsp)
+            .collect(),
+        active_signature: help.active_signature,
+        active_parameter: help.active_parameter,
+    }
+}
+
+fn signature_information_to_lsp(signature: SignatureInformation) -> LspSignatureInformation {
+    LspSignatureInformation {
+        label: signature.label,
+        documentation: signature.documentation,
+        parameters: signature
+            .parameters
+            .into_iter()
+            .map(|parameter| LspParameterInformation {
+                label: parameter.label,
+                documentation: parameter.documentation,
+            })
+            .collect(),
+        active_parameter: signature.active_parameter,
+    }
+}
+
+fn prepare_rename_to_lsp(prepare: PrepareRename) -> LspPrepareRename {
+    LspPrepareRename {
+        range: range_to_lsp(prepare.range),
+        placeholder: prepare.placeholder,
+    }
+}
+
+fn workspace_edit_to_lsp(edit: WorkspaceEdit) -> LspWorkspaceEdit {
+    let changes = edit
+        .documents
+        .into_iter()
+        .map(|document| {
+            (
+                document.uri.as_str().to_owned(),
+                document.edits.into_iter().map(text_edit_to_lsp).collect(),
+            )
+        })
+        .collect();
+
+    LspWorkspaceEdit { changes }
+}
+
+fn file_renames_from_json(files_json: &str) -> Result<Vec<FileRename>, JsValue> {
+    serde_json::from_str::<Vec<JsonFileRename>>(files_json)
+        .map_err(js_error)
+        .map(|files| {
+            files
+                .into_iter()
+                .map(|file| {
+                    FileRename::new(
+                        DocumentUri::from(file.old_uri),
+                        DocumentUri::from(file.new_uri),
+                    )
+                })
+                .collect()
+        })
+}
+
+fn text_edit_to_lsp(edit: ton_language_server_core::TextEdit) -> LspTextEdit {
+    LspTextEdit {
+        range: range_to_lsp(edit.range),
+        new_text: edit.new_text,
+    }
+}
+
+fn document_symbol_to_lsp(symbol: DocumentSymbol) -> LspDocumentSymbol {
+    LspDocumentSymbol {
+        name: symbol.name,
+        detail: symbol.detail,
+        kind: document_symbol_kind_to_lsp(symbol.kind),
+        range: range_to_lsp(symbol.range),
+        selection_range: range_to_lsp(symbol.selection_range),
+        children: symbol
+            .children
+            .into_iter()
+            .map(document_symbol_to_lsp)
+            .collect(),
+    }
+}
+
+const fn document_symbol_kind_to_lsp(kind: DocumentSymbolKind) -> u8 {
+    match kind {
+        DocumentSymbolKind::File => 1,
+        DocumentSymbolKind::Module => 2,
+        DocumentSymbolKind::Namespace => 3,
+        DocumentSymbolKind::Class => 5,
+        DocumentSymbolKind::Method => 6,
+        DocumentSymbolKind::Property => 7,
+        DocumentSymbolKind::Field => 8,
+        DocumentSymbolKind::Constructor => 9,
+        DocumentSymbolKind::Enum => 10,
+        DocumentSymbolKind::Interface => 11,
+        DocumentSymbolKind::Function => 12,
+        DocumentSymbolKind::Variable => 13,
+        DocumentSymbolKind::Constant => 14,
+        DocumentSymbolKind::String => 15,
+        DocumentSymbolKind::Number => 16,
+        DocumentSymbolKind::Boolean => 17,
+        DocumentSymbolKind::Array => 18,
+        DocumentSymbolKind::Object => 19,
+        DocumentSymbolKind::Key => 20,
+        DocumentSymbolKind::Null => 21,
+        DocumentSymbolKind::EnumMember => 22,
+        DocumentSymbolKind::Struct => 23,
+        DocumentSymbolKind::Event => 24,
+        DocumentSymbolKind::Operator => 25,
+        DocumentSymbolKind::TypeParameter => 26,
+    }
 }
 
 const fn range_to_lsp(range: Range) -> LspRange {

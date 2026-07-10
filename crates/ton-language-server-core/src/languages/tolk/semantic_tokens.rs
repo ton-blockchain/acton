@@ -49,6 +49,13 @@ impl TolkResolveSnapshot {
         if let Some(inferences) = self.all_body_types.get(&file_id) {
             for inference in inferences.values() {
                 for name_use in &inference.resolved_refs {
+                    if resolved_uses
+                        .find_use(name_use.span.start())
+                        .is_some_and(|resolved| resolved.span == name_use.span)
+                    {
+                        continue;
+                    }
+
                     self.add_name_use_token(&mut builder, name_use, resolved_uses);
                 }
             }

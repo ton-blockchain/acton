@@ -34,7 +34,7 @@ impl TolkWorkspaceEngine {
 }
 
 impl TolkResolveSnapshot {
-    fn references_for_resolved(
+    pub(super) fn references_for_resolved(
         &self,
         resolved: &Resolved,
         include_declaration: bool,

@@ -357,6 +357,19 @@ impl<'tree> ContractField<'tree> {
     pub fn value(&self) -> Option<ContractFieldValue<'tree>> {
         self.0.field("value")
     }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<Contract<'tree>> {
+        let mut node = self.0.parent()?;
+
+        loop {
+            if let Ok(contract) = Contract::try_from_node(node) {
+                return Some(contract);
+            }
+
+            node = node.parent()?;
+        }
+    }
 }
 
 impl<'tree> HasName<'tree> for ContractField<'tree> {
@@ -596,6 +609,17 @@ impl<'tree> StructField<'tree> {
     #[must_use]
     pub fn has_readonly(&self) -> bool {
         self.has_modifier(StructFieldModifier::Readonly)
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<Struct<'tree>> {
+        let mut node = self.0.parent()?;
+        loop {
+            if let Ok(structure) = Struct::try_from_node(node) {
+                return Some(structure);
+            }
+            node = node.parent()?;
+        }
     }
 }
 
@@ -949,6 +973,20 @@ impl<'tree> GetMethod<'tree> {
     }
 
     #[must_use]
+    pub fn explicit_method_id(&self, source: &'tree str) -> Option<u32> {
+        let annotation = self.annotations()?.annotations().find(|annotation| {
+            annotation
+                .name()
+                .is_some_and(|name| name.text_matches(source, "method_id"))
+        })?;
+        let Expr::NumberLit(value) = annotation.args()?.args().next()? else {
+            return None;
+        };
+
+        value.parse_u32(source)
+    }
+
+    #[must_use]
     pub fn is_test_function(&self, source: &'tree str) -> bool {
         self.name()
             .is_some_and(|name| is_test_get_method_name(name.normalized_name(source)))
@@ -1096,6 +1134,26 @@ impl<'tree> TypeParameter<'tree> {
     #[must_use]
     pub fn default(&self) -> Option<Type<'tree>> {
         self.0.field("default")
+    }
+
+    #[must_use]
+    pub fn owner(&self) -> Option<TopLevel<'tree>> {
+        let mut node = self.0.parent()?;
+
+        loop {
+            if matches!(
+                node.kind_bytes(),
+                b"function_declaration"
+                    | b"method_declaration"
+                    | b"get_method_declaration"
+                    | b"struct_declaration"
+                    | b"type_alias_declaration"
+            ) {
+                return TopLevel::try_from_node(node).ok();
+            }
+
+            node = node.parent()?;
+        }
     }
 }
 

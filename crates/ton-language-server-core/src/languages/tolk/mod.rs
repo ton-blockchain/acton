@@ -1,6 +1,9 @@
 use crate::language::{
-    CompletionRequest, DefinitionRequest, FeatureSet, InlayHintRequest, LanguagePlugin,
-    ParseRequest, ParsedDocument, ReferenceRequest, SemanticTokensRequest, WorkspaceLanguage,
+    CodeActionRequest, CompletionRequest, DefinitionRequest, DocumentHighlightRequest,
+    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest,
+    ReferenceRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
+    TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::{
@@ -15,16 +18,28 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{Arc, RwLock};
 use tolk_resolver::{
-    FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Resolved, Span, SymbolId,
+    FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Span, SymbolId,
 };
 use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
 use tree_sitter::Tree;
 
+mod code_actions;
 mod completion;
 mod definition;
+mod document_highlights;
+mod document_symbols;
+mod file_rename;
+mod folding;
+mod hover;
+mod import_edits;
 mod inlay_hints;
 mod references;
+mod rename;
+mod resolution;
 mod semantic_tokens;
+mod signature_help;
+mod type_definition;
+mod workspace_symbols;
 
 pub const LANGUAGE_ID: &str = "tolk";
 const TOLK_STDLIB_PATH: &str = "/__tolk_stdlib__";
@@ -78,6 +93,16 @@ impl LanguagePlugin for TolkLanguage {
             completion: true,
             semantic_tokens: true,
             inlay_hints: true,
+            folding_ranges: true,
+            hover: true,
+            document_symbols: true,
+            signature_help: true,
+            rename: true,
+            type_definition: true,
+            document_highlight: true,
+            workspace_symbols: true,
+            code_actions: true,
+            file_rename: true,
             ..FeatureSet::default()
         }
     }
@@ -237,6 +262,207 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk inlay hints"
         );
         Ok(hints)
+    }
+
+    fn folding_ranges(
+        &self,
+        request: FoldingRangeRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::FoldingRange>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let ranges = folding::folding_ranges(
+            request.context.document,
+            parsed.source_file.tree.root_node(),
+        );
+        request
+            .context
+            .profiler
+            .finish("tolk.folding_ranges", started_at);
+        Ok(ranges)
+    }
+
+    fn hover(&self, request: HoverRequest<'_>) -> anyhow::Result<Option<crate::Hover>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let hover = self
+            .engine
+            .hover(request.context.document, request.position);
+        request.context.profiler.finish("tolk.hover", started_at);
+        Ok(hover)
+    }
+
+    fn document_symbols(
+        &self,
+        request: DocumentSymbolRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::DocumentSymbol>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let symbols = self.engine.document_symbols(request.context.document);
+        request
+            .context
+            .profiler
+            .finish("tolk.document_symbols", started_at);
+        Ok(symbols)
+    }
+
+    fn signature_help(
+        &self,
+        request: SignatureHelpRequest<'_>,
+    ) -> anyhow::Result<Option<crate::SignatureHelp>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let signature_help = self
+            .engine
+            .signature_help(request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tolk.signature_help", started_at);
+        Ok(signature_help)
+    }
+
+    fn prepare_rename(
+        &self,
+        request: PrepareRenameRequest<'_>,
+    ) -> anyhow::Result<Option<crate::PrepareRename>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = self
+            .engine
+            .prepare_rename(request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tolk.rename.prepare", started_at);
+        result
+    }
+
+    fn rename(&self, request: RenameRequest<'_>) -> anyhow::Result<Option<crate::WorkspaceEdit>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result =
+            self.engine
+                .rename(request.context.document, request.position, request.new_name);
+        request.context.profiler.finish("tolk.rename", started_at);
+        result
+    }
+
+    fn type_definition(&self, request: TypeDefinitionRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let locations = self
+            .engine
+            .type_definition(request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tolk.type_definition", started_at);
+        Ok(locations)
+    }
+
+    fn document_highlights(
+        &self,
+        request: DocumentHighlightRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::DocumentHighlight>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let highlights = self
+            .engine
+            .document_highlights(request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tolk.document_highlights", started_at);
+        Ok(highlights)
+    }
+
+    fn workspace_symbols(
+        &self,
+        request: WorkspaceSymbolRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::WorkspaceSymbol>> {
+        let started_at = request.profiler.start();
+        let symbols = self.engine.workspace_symbols(request.query);
+        request
+            .profiler
+            .finish("tolk.workspace_symbols", started_at);
+        Ok(symbols)
+    }
+
+    fn code_actions(
+        &self,
+        request: CodeActionRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::CodeAction>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let actions = self
+            .engine
+            .code_actions(request.context.document, request.range);
+        request
+            .context
+            .profiler
+            .finish("tolk.code_actions", started_at);
+        Ok(actions)
+    }
+
+    fn will_rename_files(
+        &self,
+        request: FileRenameRequest<'_>,
+    ) -> anyhow::Result<Option<crate::WorkspaceEdit>> {
+        let started_at = request.profiler.start();
+        let edit = self.engine.will_rename_files(request.files);
+        request
+            .profiler
+            .finish("tolk.files.rename.prepare", started_at);
+        Ok(edit)
+    }
+
+    fn did_rename_files(&self, files: &[crate::FileRename]) -> anyhow::Result<()> {
+        self.engine.did_rename_files(files)
     }
 
     fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
@@ -464,6 +690,7 @@ impl TolkWorkspaceState {
 
     fn rebuild_snapshot_inner(&mut self, profiler: &mut Profiler) -> anyhow::Result<()> {
         if self.roots.is_empty() {
+            self.process_dirty_files(profiler)?;
             self.latest_snapshot = None;
             return Ok(());
         }
@@ -717,22 +944,6 @@ struct TolkResolveSnapshot {
     path_to_uri: BTreeMap<PathBuf, DocumentUri>,
 }
 
-impl TolkResolveSnapshot {
-    fn location_for_span(&self, file_id: FileId, span: Span) -> Vec<Location> {
-        let Some(file) = self.file_db.get_by_id(file_id) else {
-            return Vec::new();
-        };
-        let uri = self
-            .path_to_uri
-            .get(file.path())
-            .cloned()
-            .unwrap_or_else(|| fallback_uri_for_path(file.path()));
-        let source = file.source().source.as_ref();
-        let range = range_for_span(source, span);
-        vec![Location::new(uri, range)]
-    }
-}
-
 #[derive(Clone, Debug)]
 struct SnapshotSourceProvider {
     files: BTreeMap<PathBuf, TolkWorkspaceFile>,
@@ -758,17 +969,6 @@ impl ProjectSourceProvider for SnapshotSourceProvider {
         }
         Ok(embedded_stdlib_source(&path))
     }
-}
-
-fn resolved_from_inference(inference: &InferenceResult, offset: usize) -> Option<Resolved> {
-    if let Some(resolved) = inference.resolve(Span::from_offset(offset)) {
-        return Some(resolved.resolved.clone());
-    }
-    inference
-        .resolved_refs
-        .iter()
-        .find(|name_use| name_use.span.contains(offset))
-        .map(|resolved| resolved.resolved.clone())
 }
 
 fn infer_incremental_workspace_body_types(
