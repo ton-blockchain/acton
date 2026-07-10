@@ -480,16 +480,13 @@ fn collect_get_method_id_hint(
     builder: &mut TolkInlayHintsBuilder<'_>,
 ) {
     let source = builder.document.text();
-    if method.has_method_id_annotation(source) {
+    if method.has_method_id_annotation(source) || method.is_test_function(source) {
         return;
     }
     let Some(name) = method.name() else {
         return;
     };
     let name = name.normalized_name(source);
-    if name.starts_with("test ") || name.starts_with("test_") || name.starts_with("test-") {
-        return;
-    }
 
     let Some(get_keyword) = method.get_keyword() else {
         return;

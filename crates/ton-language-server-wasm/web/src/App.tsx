@@ -72,6 +72,11 @@ type PlainInlayHint = {
   readonly paddingRight?: boolean
 }
 
+type PlainCompletionItem = {
+  readonly label: string
+  readonly detail?: string
+}
+
 type PersistedState = {
   selectedLanguage: SupportedLanguage
   logLevel: LogLevelName
@@ -89,6 +94,8 @@ type SmokeApi = {
   foldingRanges: () => Promise<PlainFoldingRange[]>
   semanticTokens: () => Promise<PlainSemanticTokens>
   inlayHints: () => Promise<PlainInlayHint[]>
+  completionAt: (line: number, character: number) => Promise<PlainCompletionItem[]>
+  applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
   logs: () => Promise<string>
   profile: () => Promise<string>
   sidePanelText: () => string
@@ -624,6 +631,53 @@ export function App() {
               },
             },
           })
+        },
+        async completionAt(line: number, character: number) {
+          const result = await vscode.commands.executeCommand<vscode.CompletionList>(
+            "vscode.executeCompletionItemProvider",
+            documentUriFor(currentLanguageRef.current),
+            new vscode.Position(line, character),
+          )
+          return (result?.items ?? []).map(item => ({
+            label: typeof item.label === "string" ? item.label : item.label.label,
+            detail: item.detail,
+          }))
+        },
+        async applyCompletionAt(line: number, character: number, label: string) {
+          const result = await vscode.commands.executeCommand<vscode.CompletionList>(
+            "vscode.executeCompletionItemProvider",
+            documentUriFor(currentLanguageRef.current),
+            new vscode.Position(line, character),
+          )
+          const item = result?.items.find(
+            candidate =>
+              (typeof candidate.label === "string" ? candidate.label : candidate.label.label) ===
+              label,
+          )
+          const editor = editorRef.current
+          if (!item || !editor) {
+            return false
+          }
+          const rawInsertText = item.insertText ?? label
+          const insertText = typeof rawInsertText === "string" ? rawInsertText : rawInsertText.value
+          const itemRange = item.range
+          const range =
+            itemRange instanceof vscode.Range
+              ? itemRange
+              : (itemRange?.replacing ?? new vscode.Range(line, character, line, character))
+          editor.executeEdits("completion-e2e", [
+            {
+              range: new monaco.Range(
+                range.start.line + 1,
+                range.start.character + 1,
+                range.end.line + 1,
+                range.end.character + 1,
+              ),
+              text: insertText,
+            },
+          ])
+          saveCurrentFile(currentLanguageRef.current)
+          return true
         },
         async logs() {
           return sendRequest<string>(logsRequest)

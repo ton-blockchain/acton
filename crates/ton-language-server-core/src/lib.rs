@@ -1,3 +1,4 @@
+mod completion;
 mod language;
 mod logging;
 mod profiling;
@@ -8,9 +9,13 @@ mod types;
 
 pub mod languages;
 
+pub use completion::{
+    CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger, CompletionTriggerKind,
+    InsertTextFormat,
+};
 pub use language::{
-    CodeLensRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest, HoverRequest,
-    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    CodeLensRequest, CompletionRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
     SemanticTokensRequest, WorkspaceLanguage,
 };
 pub use logging::{

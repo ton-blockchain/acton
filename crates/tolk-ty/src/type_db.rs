@@ -28,6 +28,11 @@ pub struct TypeDbCache {
 }
 
 impl TypeDbCache {
+    #[must_use]
+    pub fn top_level_type(&self, symbol_id: SymbolId) -> Option<TyId> {
+        self.top_level_types.get(&symbol_id).copied()
+    }
+
     fn retain_current_except(
         &mut self,
         project_index: &ProjectIndex,

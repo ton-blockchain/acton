@@ -1,7 +1,7 @@
 use crate::language::{
-    CodeLensRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest, InlayHintRequest,
-    LanguagePlugin, ParseRequest, ParsedDocument, PluginContext, ReferenceRequest,
-    SemanticTokensRequest,
+    CodeLensRequest, CompletionRequest, DefinitionRequest, FoldingRangeRequest, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
+    ReferenceRequest, SemanticTokensRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
@@ -10,6 +10,7 @@ use crate::types::{
     CodeLens, DocumentSnapshot, DocumentUri, FoldingRange, Hover, InlayHint, LanguageId, Location,
     Position, Range, TextEdit, WorkspaceConfig,
 };
+use crate::{CompletionList, CompletionTrigger};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -842,6 +843,82 @@ impl LanguageService {
                     "references failed"
                 );
             }
+        }
+        result
+    }
+
+    pub fn completion(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+        trigger: CompletionTrigger,
+    ) -> anyhow::Result<CompletionList> {
+        let Some(state) = self.documents.get(uri) else {
+            tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "completion",
+                uri = uri.as_str(),
+                line = position.line,
+                character = position.character,
+                "completion request for unopened document"
+            );
+            anyhow::bail!("document not open: {uri}");
+        };
+        tracing::debug!(
+            target: logging::SERVICE_TARGET,
+            operation = "completion",
+            uri = state.document.uri().as_str(),
+            language_id = state.document.language_id().as_str(),
+            version = state.document.version(),
+            line = position.line,
+            character = position.character,
+            trigger_kind = ?trigger.kind,
+            trigger_character = trigger.character.as_deref(),
+            "completion requested"
+        );
+
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().completion {
+            return Ok(CompletionList::default());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.completion(CompletionRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+            trigger,
+        });
+        self.profiler.finish("completion", started_at);
+        match &result {
+            Ok(completion) => tracing::debug!(
+                target: logging::SERVICE_TARGET,
+                operation = "completion",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                line = position.line,
+                character = position.character,
+                result_count = completion.items.len(),
+                is_incomplete = completion.is_incomplete,
+                "completion completed"
+            ),
+            Err(error) => tracing::warn!(
+                target: logging::SERVICE_TARGET,
+                operation = "completion",
+                uri = state.document.uri().as_str(),
+                language_id = state.document.language_id().as_str(),
+                version = state.document.version(),
+                line = position.line,
+                character = position.character,
+                error = %error,
+                "completion failed"
+            ),
         }
         result
     }

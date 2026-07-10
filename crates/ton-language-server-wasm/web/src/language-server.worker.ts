@@ -48,6 +48,10 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       definitionProvider: true,
       referencesProvider: true,
       hoverProvider: true,
+      completionProvider: {
+        resolveProvider: false,
+        triggerCharacters: [".", '"', "'", "/", "@"],
+      },
       inlayHintProvider: true,
       semanticTokensProvider: {
         legend: {
@@ -106,6 +110,18 @@ connection.onReferences(async params =>
 connection.onHover(async params =>
   withLanguageServer("textDocument/hover", server =>
     server.hover(params.textDocument.uri, params.position.line, params.position.character),
+  ),
+)
+
+connection.onCompletion(async params =>
+  withLanguageServer("textDocument/completion", server =>
+    server.completion(
+      params.textDocument.uri,
+      params.position.line,
+      params.position.character,
+      params.context?.triggerKind ?? 1,
+      params.context?.triggerCharacter ?? "",
+    ),
   ),
 )
 

@@ -1,5 +1,8 @@
+mod completion;
+
 use crate::language::{
-    CodeLensRequest, FeatureSet, HoverRequest, LanguagePlugin, ParseRequest, ParsedDocument,
+    CodeLensRequest, CompletionRequest, FeatureSet, HoverRequest, LanguagePlugin, ParseRequest,
+    ParsedDocument,
 };
 use crate::logging;
 use crate::{CodeLens, Command, Hover, LanguageId};
@@ -52,6 +55,7 @@ impl LanguagePlugin for TasmLanguage {
         FeatureSet {
             hover: self.spec.is_some(),
             code_lens: self.spec.is_some(),
+            completion: self.spec.is_some(),
             ..FeatureSet::default()
         }
     }
@@ -154,6 +158,19 @@ impl LanguagePlugin for TasmLanguage {
         );
 
         Ok(lenses)
+    }
+
+    fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
+        let Some(spec) = &self.spec else {
+            return Ok(crate::CompletionList::default());
+        };
+        let started_at = request.context.profiler.start();
+        let result = completion::completion(spec, request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tasm.completion", started_at);
+        Ok(result)
     }
 }
 

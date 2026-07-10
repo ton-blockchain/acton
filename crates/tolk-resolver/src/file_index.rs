@@ -433,7 +433,7 @@ impl FileIndex {
                     let fields = fields
                         .filter_map(|f| {
                             let name_ident = f.name()?;
-                            let name = Arc::from(name_ident.text(&file.source));
+                            let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
                             let fqn = Arc::from(format!("{struct_name}.{name}"));
                             local_id += 1;
@@ -474,7 +474,7 @@ impl FileIndex {
                     let members = members
                         .filter_map(|f| {
                             let name_ident = f.name()?;
-                            let name = Arc::from(name_ident.text(&file.source));
+                            let name = Arc::from(name_ident.normalized_name(&file.source));
                             let name_span = name_ident.span();
                             let fqn = Arc::from(format!("{enum_name}.{name}"));
                             local_id += 1;

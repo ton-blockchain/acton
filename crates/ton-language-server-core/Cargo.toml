@@ -62,6 +62,11 @@ path = "tests/languages/tlb/definition.rs"
 required-features = ["tlb"]
 
 [[test]]
+name = "tlb_completion"
+path = "tests/languages/tlb/completion.rs"
+required-features = ["tlb"]
+
+[[test]]
 name = "tlb_incremental_edit"
 path = "tests/languages/tlb/incremental_edit.rs"
 required-features = ["tlb"]
@@ -77,6 +82,11 @@ path = "tests/languages/tasm/hover.rs"
 required-features = ["tasm"]
 
 [[test]]
+name = "tasm_completion"
+path = "tests/languages/tasm/completion.rs"
+required-features = ["tasm"]
+
+[[test]]
 name = "tasm_code_lens"
 path = "tests/languages/tasm/code_lens.rs"
 required-features = ["tasm"]
@@ -87,6 +97,11 @@ path = "tests/languages/fift/folding.rs"
 required-features = ["fift"]
 
 [[test]]
+name = "fift_completion"
+path = "tests/languages/fift/completion.rs"
+required-features = ["fift"]
+
+[[test]]
 name = "fift_semantic_tokens"
 path = "tests/languages/fift/semantic_tokens.rs"
 required-features = ["fift"]
@@ -94,6 +109,11 @@ required-features = ["fift"]
 [[test]]
 name = "tolk_definition"
 path = "tests/languages/tolk/definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_completion_providers"
+path = "tests/languages/tolk/completion/providers.rs"
 required-features = ["tolk"]
 
 [[test]]

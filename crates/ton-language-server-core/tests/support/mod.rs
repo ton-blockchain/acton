@@ -1,6 +1,6 @@
 use std::fmt::Write as _;
 use ton_language_server_core::{
-    InlayHint, InlayHintKind, Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES,
+    CompletionItem, InlayHint, InlayHintKind, Location, Position, SEMANTIC_TOKEN_MODIFIER_NAMES,
     SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, TextIndex,
 };
 
@@ -34,8 +34,8 @@ impl MarkedSource {
             };
             let marker_name = &rest[1..marker_end];
             if !is_marker_name(marker_name) {
-                clean.push_str(&rest[..=marker_end]);
-                rest = &rest[marker_end + 1..];
+                clean.push('<');
+                rest = &rest[1..];
                 continue;
             }
             markers.push(Marker {
@@ -168,6 +168,50 @@ pub(crate) fn render_inlay_hints(hints: &[InlayHint]) -> String {
 }
 
 #[allow(dead_code)]
+#[must_use]
+pub(crate) fn render_completion(items: &[CompletionItem]) -> String {
+    if items.is_empty() {
+        return "<none>".to_owned();
+    }
+    let mut output = String::new();
+    for item in items {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        let _ = write!(
+            output,
+            "{} kind={:?}",
+            escape_completion_text(&item.label),
+            item.kind
+        );
+        if let Some(detail) = &item.detail {
+            let _ = write!(output, " detail={}", escape_completion_text(detail));
+        }
+        if let Some(edit) = &item.text_edit {
+            let _ = write!(
+                output,
+                " edit={}:{}-{}:{}:{}",
+                edit.range.start.line,
+                edit.range.start.character,
+                edit.range.end.line,
+                edit.range.end.character,
+                escape_completion_text(&edit.new_text)
+            );
+        } else if let Some(insert_text) = &item.insert_text {
+            let _ = write!(output, " insert={}", escape_completion_text(insert_text));
+        }
+    }
+    output
+}
+
+fn escape_completion_text(text: &str) -> String {
+    text.replace('\\', "\\\\")
+        .replace('\n', "\\n")
+        .replace('\r', "\\r")
+        .replace('\t', "\\t")
+}
+
+#[allow(dead_code)]
 fn is_marker_name(name: &str) -> bool {
     name == "caret" || name == "target" || name.starts_with("caret:") || name.starts_with("target:")
 }
@@ -221,7 +265,7 @@ fn render_token_modifiers(bitset: u32) -> String {
     }
 }
 
-fn dedent_block(source: &str) -> String {
+pub(crate) fn dedent_block(source: &str) -> String {
     let mut lines = source.lines().collect::<Vec<_>>();
     while lines.first().is_some_and(|line| line.trim().is_empty()) {
         lines.remove(0);

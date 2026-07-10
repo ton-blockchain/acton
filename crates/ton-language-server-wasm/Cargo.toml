@@ -13,7 +13,6 @@ license = { workspace = true }
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
-test = false
 
 [features]
 default = ["all-languages"]
@@ -31,6 +30,9 @@ ton-language-server-core = { path = "../ton-language-server-core", default-featu
 tracing = { workspace = true }
 tree-sitter = { workspace = true }
 wasm-bindgen = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
 
 [lints]
 workspace = true

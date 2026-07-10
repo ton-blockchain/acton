@@ -42,6 +42,8 @@ type SmokeGlobal = typeof globalThis & {
         tooltip?: string
       }[]
     >
+    completionAt: (line: number, character: number) => Promise<{label: string; detail?: string}[]>
+    applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
     logs: () => Promise<string>
     profile: () => Promise<string>
     sidePanelText: () => string
@@ -120,6 +122,34 @@ fun main() {
       }),
     }),
   )
+
+  const completionSource = `struct Storage {
+    counter: int
+}
+fun main() {
+    var storage = Storage { counter: 1 };
+    storage.
+}
+`
+  await page.evaluate(source => {
+    ;(globalThis as SmokeGlobal).__tonLsSmoke?.setEditorText(source)
+  }, completionSource)
+  await expect
+    .poll(async () => {
+      const items = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.completionAt(5, 12),
+      )
+      return items?.map(item => item.label)
+    })
+    .toContain("counter")
+  expect(
+    await page.evaluate(() =>
+      (globalThis as SmokeGlobal).__tonLsSmoke?.applyCompletionAt(5, 12, "counter"),
+    ),
+  ).toBe(true)
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
+    .toContain("storage.counter")
 
   const inlaySource = `const COMPUTED = 1 + 2
 fun deliver(destination: int): void {}

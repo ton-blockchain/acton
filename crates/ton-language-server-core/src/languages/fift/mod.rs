@@ -1,6 +1,6 @@
 use crate::language::{
-    FeatureSet, FoldingRangeRequest, LanguagePlugin, ParseRequest, ParsedDocument,
-    SemanticTokensRequest,
+    CompletionRequest, FeatureSet, FoldingRangeRequest, LanguagePlugin, ParseRequest,
+    ParsedDocument, SemanticTokensRequest,
 };
 use crate::logging;
 use crate::{FoldingRange, LanguageId};
@@ -8,6 +8,7 @@ use anyhow::Context;
 use std::any::Any;
 use tree_sitter::{Node, Tree};
 
+mod completion;
 mod semantic_tokens;
 
 pub const LANGUAGE_ID: &str = "fift";
@@ -34,6 +35,7 @@ impl LanguagePlugin for FiftLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             folding_ranges: true,
+            completion: true,
             semantic_tokens: true,
             ..FeatureSet::default()
         }
@@ -144,6 +146,22 @@ impl LanguagePlugin for FiftLanguage {
         );
 
         Ok(tokens)
+    }
+
+    fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = completion::completion(request.context.document, parsed, request.position);
+        request
+            .context
+            .profiler
+            .finish("fift.completion", started_at);
+        Ok(result)
     }
 }
 

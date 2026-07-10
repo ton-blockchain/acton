@@ -8,9 +8,10 @@ use ton_language_server_core::languages::tasm::TasmLanguage;
 #[cfg(feature = "tolk")]
 use ton_language_server_core::languages::tolk::TolkLanguage;
 use ton_language_server_core::{
-    CORE_TARGET, CodeLens, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId,
-    LanguageService, Location, LogLevel, Position, ProfileSummary, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    CORE_TARGET, CodeLens, CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger,
+    CompletionTriggerKind, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind,
+    InsertTextFormat, LanguageId, LanguageService, Location, LogLevel, Position, ProfileSummary,
+    Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
     WorkspaceConfig,
 };
 use wasm_bindgen::prelude::*;
@@ -199,6 +200,36 @@ impl TonLanguageServer {
         serde_wasm_bindgen::to_value(&hover.map(hover_to_lsp)).map_err(js_error)
     }
 
+    #[wasm_bindgen(js_name = completion)]
+    pub fn completion(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+        trigger_kind: u32,
+        trigger_character: String,
+    ) -> Result<JsValue, JsValue> {
+        let trigger = CompletionTrigger {
+            kind: match trigger_kind {
+                2 => CompletionTriggerKind::TriggerCharacter,
+                3 => CompletionTriggerKind::TriggerForIncompleteCompletions,
+                _ => CompletionTriggerKind::Invoked,
+            },
+            character: (!trigger_character.is_empty()).then_some(trigger_character),
+        };
+        let completion = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .completion(
+                &DocumentUri::from(uri),
+                Position::new(line, character),
+                trigger,
+            )
+            .map_err(js_error)?;
+        serde_wasm_bindgen::to_value(&completion_list_to_lsp(completion)).map_err(js_error)
+    }
+
     #[wasm_bindgen(js_name = semanticTokens)]
     pub fn semantic_tokens(&self, uri: String) -> Result<JsValue, JsValue> {
         let tokens = self
@@ -305,6 +336,45 @@ struct LspMarkupContent {
 }
 
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspCompletionList {
+    is_incomplete: bool,
+    items: Vec<LspCompletionItem>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspCompletionItem {
+    label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    kind: Option<u8>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    documentation: Option<LspMarkupContent>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    deprecated: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    sort_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    filter_text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    insert_text: Option<String>,
+    insert_text_format: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text_edit: Option<LspTextEdit>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    additional_text_edits: Vec<LspTextEdit>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspTextEdit {
+    range: LspRange,
+    new_text: String,
+}
+
+#[derive(Serialize)]
 struct LspLocation {
     uri: String,
     range: LspRange,
@@ -389,6 +459,79 @@ fn hover_to_lsp(hover: Hover) -> LspHover {
             value: hover.contents,
         },
         range: hover.range.map(range_to_lsp),
+    }
+}
+
+fn completion_list_to_lsp(completion: CompletionList) -> LspCompletionList {
+    LspCompletionList {
+        is_incomplete: completion.is_incomplete,
+        items: completion
+            .items
+            .into_iter()
+            .map(completion_item_to_lsp)
+            .collect(),
+    }
+}
+
+fn completion_item_to_lsp(item: CompletionItem) -> LspCompletionItem {
+    LspCompletionItem {
+        label: item.label,
+        kind: item.kind.map(completion_item_kind_to_lsp),
+        detail: item.detail,
+        documentation: item.documentation.map(|value| LspMarkupContent {
+            kind: "markdown",
+            value,
+        }),
+        deprecated: item.deprecated.then_some(true),
+        sort_text: item.sort_text,
+        filter_text: item.filter_text,
+        insert_text: item.insert_text,
+        insert_text_format: match item.insert_text_format {
+            InsertTextFormat::PlainText => 1,
+            InsertTextFormat::Snippet => 2,
+        },
+        text_edit: item.text_edit.map(|edit| LspTextEdit {
+            range: range_to_lsp(edit.range),
+            new_text: edit.new_text,
+        }),
+        additional_text_edits: item
+            .additional_text_edits
+            .into_iter()
+            .map(|edit| LspTextEdit {
+                range: range_to_lsp(edit.range),
+                new_text: edit.new_text,
+            })
+            .collect(),
+    }
+}
+
+const fn completion_item_kind_to_lsp(kind: CompletionItemKind) -> u8 {
+    match kind {
+        CompletionItemKind::Text => 1,
+        CompletionItemKind::Method => 2,
+        CompletionItemKind::Function => 3,
+        CompletionItemKind::Constructor => 4,
+        CompletionItemKind::Field => 5,
+        CompletionItemKind::Variable => 6,
+        CompletionItemKind::Class => 7,
+        CompletionItemKind::Interface => 8,
+        CompletionItemKind::Module => 9,
+        CompletionItemKind::Property => 10,
+        CompletionItemKind::Unit => 11,
+        CompletionItemKind::Value => 12,
+        CompletionItemKind::Enum => 13,
+        CompletionItemKind::Keyword => 14,
+        CompletionItemKind::Snippet => 15,
+        CompletionItemKind::Color => 16,
+        CompletionItemKind::File => 17,
+        CompletionItemKind::Reference => 18,
+        CompletionItemKind::Folder => 19,
+        CompletionItemKind::EnumMember => 20,
+        CompletionItemKind::Constant => 21,
+        CompletionItemKind::Struct => 22,
+        CompletionItemKind::Event => 23,
+        CompletionItemKind::Operator => 24,
+        CompletionItemKind::TypeParameter => 25,
     }
 }
 
@@ -524,6 +667,60 @@ fn render_profile_summary(summary: &ProfileSummary) -> String {
 
 fn push_ms(output: &mut String, milliseconds: f64) {
     let _ = write!(output, "{milliseconds:.3}ms");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn completion_serializes_as_lsp_json() {
+        let mut item = CompletionItem::new("save", CompletionItemKind::Method)
+            .with_detail("fun Storage.save(self)")
+            .with_documentation("Saves storage.")
+            .with_filter_text("save")
+            .with_snippet_replacement(
+                Range::new(Position::new(3, 8), Position::new(3, 10)),
+                "save(${1:value})$0",
+            );
+        item.deprecated = true;
+        item.sort_text = Some("001-save".to_owned());
+
+        let value = serde_json::to_value(completion_list_to_lsp(CompletionList {
+            is_incomplete: true,
+            items: vec![item],
+        }))
+        .expect("LSP completion payload should be serializable");
+
+        assert_eq!(
+            value,
+            json!({
+                "isIncomplete": true,
+                "items": [{
+                    "label": "save",
+                    "kind": 2,
+                    "detail": "fun Storage.save(self)",
+                    "documentation": {
+                        "kind": "markdown",
+                        "value": "Saves storage."
+                    },
+                    "deprecated": true,
+                    "sortText": "001-save",
+                    "filterText": "save",
+                    "insertText": "save(${1:value})$0",
+                    "insertTextFormat": 2,
+                    "textEdit": {
+                        "range": {
+                            "start": { "line": 3, "character": 8 },
+                            "end": { "line": 3, "character": 10 }
+                        },
+                        "newText": "save(${1:value})$0"
+                    }
+                }]
+            })
+        );
+    }
 }
 
 fn install_logging() {

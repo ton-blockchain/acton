@@ -1,6 +1,6 @@
 use crate::language::{
-    DefinitionRequest, FeatureSet, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument,
-    ReferenceRequest, SemanticTokensRequest, WorkspaceLanguage,
+    CompletionRequest, DefinitionRequest, FeatureSet, InlayHintRequest, LanguagePlugin,
+    ParseRequest, ParsedDocument, ReferenceRequest, SemanticTokensRequest, WorkspaceLanguage,
 };
 use crate::logging;
 use crate::{
@@ -20,6 +20,7 @@ use tolk_resolver::{
 use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
 use tree_sitter::Tree;
 
+mod completion;
 mod definition;
 mod inlay_hints;
 mod references;
@@ -74,6 +75,7 @@ impl LanguagePlugin for TolkLanguage {
         FeatureSet {
             definition: true,
             references: true,
+            completion: true,
             semantic_tokens: true,
             inlay_hints: true,
             ..FeatureSet::default()
@@ -235,6 +237,28 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk inlay hints"
         );
         Ok(hints)
+    }
+
+    fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
+        let started_at = request.context.profiler.start();
+        let completion = self
+            .engine
+            .completion(request.context.document, request.position)?;
+        request
+            .context
+            .profiler
+            .finish("tolk.completion", started_at);
+        tracing::debug!(
+            target: logging::TOLK_TARGET,
+            operation = "tolk.completion",
+            uri = request.context.document.uri().as_str(),
+            version = request.context.document.version(),
+            line = request.position.line,
+            character = request.position.character,
+            result_count = completion.items.len(),
+            "resolved Tolk completion"
+        );
+        Ok(completion)
     }
 }
 
@@ -453,7 +477,21 @@ impl TolkWorkspaceState {
         let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
         roots.sort();
         let root = roots.remove(0);
+        roots.extend(
+            provider
+                .files
+                .iter()
+                .filter(|(path, file)| **path != root && file.active_source().is_some())
+                .map(|(path, _)| path.clone()),
+        );
         let project_config = self.project_config.clone();
+        if project_config.use_embedded_stdlib {
+            let mut stdlib_roots = BTreeSet::new();
+            collect_embedded_stdlib_paths(&TOLK_STDLIB_DIR, &mut stdlib_roots);
+            roots.extend(stdlib_roots);
+        }
+        roots.sort();
+        roots.dedup();
         let index_started_at = profiler.start();
         let project_index = ProjectIndex::builder(&file_db, root)
             .with_additional_roots(roots)
@@ -490,6 +528,7 @@ impl TolkWorkspaceState {
             project_index: Arc::new(project_index),
             all_body_types: self.all_body_types.clone(),
             type_interner: self.type_interner.clone(),
+            type_db_cache: self.type_db_cache.clone(),
             path_to_uri,
         }));
         profiler.finish("tolk.snapshot.materialize", materialize_started_at);
@@ -560,6 +599,8 @@ struct TolkProjectConfig {
     stdlib_path: PathBuf,
     use_embedded_stdlib: bool,
     import_mappings: Option<BTreeMap<String, String>>,
+    contract_ids: Vec<String>,
+    wallet_names: Vec<String>,
 }
 
 impl Default for TolkProjectConfig {
@@ -569,6 +610,8 @@ impl Default for TolkProjectConfig {
             stdlib_path: PathBuf::from(TOLK_STDLIB_PATH),
             use_embedded_stdlib: true,
             import_mappings: None,
+            contract_ids: Vec::new(),
+            wallet_names: Vec::new(),
         }
     }
 }
@@ -588,6 +631,8 @@ impl TolkProjectConfig {
             .map_or_else(|| PathBuf::from(TOLK_STDLIB_PATH), logical_path_for_uri);
         Ok(Self {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
+            contract_ids: manifest.contracts.keys().cloned().collect(),
+            wallet_names: manifest.wallets.keys().cloned().collect(),
             project_root,
             stdlib_path,
             use_embedded_stdlib: config.tolk_stdlib_root_uri().is_none(),
@@ -599,6 +644,10 @@ impl TolkProjectConfig {
 struct ActonManifest {
     #[serde(default, rename = "import-mappings")]
     import_mappings: Option<BTreeMap<String, String>>,
+    #[serde(default)]
+    contracts: BTreeMap<String, toml::Value>,
+    #[serde(default)]
+    wallets: BTreeMap<String, toml::Value>,
 }
 
 fn normalize_import_mappings(
@@ -664,6 +713,7 @@ struct TolkResolveSnapshot {
     project_index: Arc<ProjectIndex>,
     all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
     type_interner: TypeInterner,
+    type_db_cache: TypeDbCache,
     path_to_uri: BTreeMap<PathBuf, DocumentUri>,
 }
 
@@ -821,6 +871,15 @@ fn embedded_stdlib_source(path: &Path) -> Option<ProjectSource> {
     let file = TOLK_STDLIB_DIR.get_file(relative_path.as_ref())?;
     file.contents_utf8()
         .map(|content| ProjectSource::Text(Arc::from(content)))
+}
+
+fn collect_embedded_stdlib_paths(dir: &Dir<'_>, paths: &mut BTreeSet<PathBuf>) {
+    for file in dir.files() {
+        paths.insert(PathBuf::from(TOLK_STDLIB_PATH).join(file.path()));
+    }
+    for dir in dir.dirs() {
+        collect_embedded_stdlib_paths(dir, paths);
+    }
 }
 
 fn range_for_span(source: &str, span: Span) -> Range {

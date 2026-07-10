@@ -867,6 +867,11 @@ pub struct GetMethod<'tree>(pub Node<'tree>);
 
 impl_ast_node!(GetMethod, "get_method_declaration");
 
+#[must_use]
+pub fn is_test_get_method_name(name: &str) -> bool {
+    name.starts_with("test ") || name.starts_with("test_") || name.starts_with("test-")
+}
+
 impl<'tree> GetMethod<'tree> {
     #[must_use]
     pub fn get_keyword(&self) -> Option<Node<'tree>> {
@@ -885,6 +890,12 @@ impl<'tree> GetMethod<'tree> {
                     .is_some_and(|name| name.text_matches(source, "method_id"))
             })
         })
+    }
+
+    #[must_use]
+    pub fn is_test_function(&self, source: &'tree str) -> bool {
+        self.name()
+            .is_some_and(|name| is_test_get_method_name(name.normalized_name(source)))
     }
 
     pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {

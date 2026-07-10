@@ -4,6 +4,110 @@ use crate::{Position, Range};
 use ton_syntax::ast::PreorderTraverse;
 use tree_sitter::Node;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(super) enum TlbNamedItemKind {
+    Declaration,
+    NamedField,
+    Parameter,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(super) struct TlbNamedItem<'tree> {
+    pub(super) kind: TlbNamedItemKind,
+    pub(super) node: Node<'tree>,
+    pub(super) owner: Option<Node<'tree>>,
+}
+
+impl<'tree> TlbNamedItem<'tree> {
+    pub(super) fn name(self, source: &'tree str) -> Option<&'tree str> {
+        self.node.utf8_text(source.as_bytes()).ok().map(str::trim)
+    }
+
+    pub(super) fn owner_name(self, source: &'tree str) -> Option<&'tree str> {
+        self.owner?.utf8_text(source.as_bytes()).ok().map(str::trim)
+    }
+}
+
+pub(super) fn resolve_variants_at<'tree>(
+    source_file: &'tree tlb_syntax::SourceFile,
+    node: Node<'tree>,
+) -> Vec<TlbNamedItem<'tree>> {
+    let Some(identifier) = find_reference_identifier(node) else {
+        return Vec::new();
+    };
+    if find_parent_of_kind(identifier, "type_parameter").is_some() {
+        return Vec::new();
+    }
+
+    let mut result = Vec::new();
+    for top_level in source_file.top_levels() {
+        let tlb_syntax::TopLevel::Declaration(declaration) = top_level else {
+            continue;
+        };
+        if let Some(name_node) = declaration_name_node(declaration) {
+            result.push(TlbNamedItem {
+                kind: TlbNamedItemKind::Declaration,
+                node: name_node,
+                owner: None,
+            });
+        }
+    }
+
+    let Some(raw_declaration) = find_parent_of_kind(identifier, "declaration") else {
+        return result;
+    };
+    let declaration = tlb_syntax::Declaration(raw_declaration);
+    if let Some(combinator) = declaration.combinator() {
+        let owner = combinator.name().map(|name| name.0);
+        for parameter in combinator.params() {
+            if let Some(node) = find_type_parameter_node(parameter.0) {
+                result.push(TlbNamedItem {
+                    kind: TlbNamedItemKind::Parameter,
+                    node,
+                    owner,
+                });
+            }
+        }
+    }
+    for node in PreorderTraverse::new(declaration.0.walk()) {
+        if node.kind() != "combinator_expr" {
+            continue;
+        }
+        let combinator = tlb_syntax::CombinatorExpr(node);
+        let owner = combinator.name().map(|name| name.0);
+        for parameter in combinator.params() {
+            if let Some(node) = find_type_parameter_node(parameter.syntax()) {
+                result.push(TlbNamedItem {
+                    kind: TlbNamedItemKind::Parameter,
+                    node,
+                    owner,
+                });
+            }
+        }
+    }
+    for field in declaration.fields() {
+        let Some(value) = field.value() else {
+            continue;
+        };
+        let name = match value {
+            tlb_syntax::FieldKind::FieldNamed(field) => field.name().map(|name| name.0),
+            tlb_syntax::FieldKind::FieldBuiltin(field) => field.name().map(|name| name.0),
+            tlb_syntax::FieldKind::FieldCurlyExpr(_)
+            | tlb_syntax::FieldKind::FieldAnonymous(_)
+            | tlb_syntax::FieldKind::FieldExpr(_)
+            | tlb_syntax::FieldKind::Unmapped(_) => None,
+        };
+        if let Some(node) = name {
+            result.push(TlbNamedItem {
+                kind: TlbNamedItemKind::NamedField,
+                node,
+                owner: None,
+            });
+        }
+    }
+    result
+}
+
 pub(super) fn definition_ranges_at(psi_file: &TlbPsiFile<'_>, position: Position) -> Vec<Range> {
     let document = psi_file.document();
     tracing::trace!(

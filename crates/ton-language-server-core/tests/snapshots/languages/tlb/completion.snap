@@ -1,0 +1,35 @@
+[caret:type]
+# kind=Some(Struct) detail=Nat, 32-bit unsigned integer edit=2:14-2:16:#
+## kind=Some(Struct) detail=Nat: unsigned integer with `x` bits edit=2:14-2:16:##
+#< kind=Some(Struct) detail=Nat: unsigned integer less than `x` stored with minimum bits edit=2:14-2:16:#<
+#<= kind=Some(Struct) detail=Nat: unsigned integer less than or equal `x` stored with minimum bits edit=2:14-2:16:#<=
+Any kind=Some(Struct) detail=Remaining bits and references edit=2:14-2:16:Any
+Bits kind=Some(Struct) detail=1023 bits edit=2:14-2:16:Bits
+Cell kind=Some(Struct) detail=Remaining bits and references edit=2:14-2:16:Cell
+Int kind=Some(Struct) detail=257 bits edit=2:14-2:16:Int
+Type kind=Some(Struct) detail=Built-in TL-B type representing the type of types edit=2:14-2:16:Type
+UInt kind=Some(Struct) detail=256 bits edit=2:14-2:16:UInt
+bits kind=Some(Struct) detail=X bits edit=2:14-2:16:bits
+int kind=Some(Struct) edit=2:14-2:16:int
+int128 kind=Some(Struct) edit=2:14-2:16:int128
+int16 kind=Some(Struct) edit=2:14-2:16:int16
+int256 kind=Some(Struct) edit=2:14-2:16:int256
+int257 kind=Some(Struct) edit=2:14-2:16:int257
+int32 kind=Some(Struct) edit=2:14-2:16:int32
+int64 kind=Some(Struct) edit=2:14-2:16:int64
+int8 kind=Some(Struct) edit=2:14-2:16:int8
+uint kind=Some(Struct) edit=2:14-2:16:uint
+uint128 kind=Some(Struct) edit=2:14-2:16:uint128
+uint16 kind=Some(Struct) edit=2:14-2:16:uint16
+uint256 kind=Some(Struct) edit=2:14-2:16:uint256
+uint32 kind=Some(Struct) edit=2:14-2:16:uint32
+uint64 kind=Some(Struct) edit=2:14-2:16:uint64
+uint8 kind=Some(Struct) edit=2:14-2:16:uint8
+value kind=Some(Field) edit=2:14-2:16:value$0
+First kind=Some(Class) edit=2:14-2:16:First$0
+Probe kind=Some(Class) edit=2:14-2:16:Probe$0
+Second kind=Some(Class) edit=2:14-2:16:Second$0
+Third kind=Some(Class) edit=2:14-2:16:Third$0
+[caret:value]
+a kind=Some(Field) edit=3:0-3:7:a$0
+b kind=Some(Field) edit=3:0-3:7:b$0

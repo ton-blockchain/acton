@@ -1,3 +1,4 @@
+use crate::completion::{CompletionList, CompletionTrigger};
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
@@ -103,6 +104,12 @@ pub struct InlayHintRequest<'a> {
     pub range: Range,
 }
 
+pub struct CompletionRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+    pub trigger: CompletionTrigger,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -148,5 +155,9 @@ pub trait LanguagePlugin: Send + Sync {
 
     fn inlay_hints(&self, _request: InlayHintRequest<'_>) -> anyhow::Result<Vec<InlayHint>> {
         Ok(Vec::new())
+    }
+
+    fn completion(&self, _request: CompletionRequest<'_>) -> anyhow::Result<CompletionList> {
+        Ok(CompletionList::default())
     }
 }

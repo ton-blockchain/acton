@@ -1,10 +1,11 @@
+mod completion;
 mod index;
 mod psi;
 mod reference;
 mod semantic_tokens;
 
 use crate::language::{
-    DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument,
+    CompletionRequest, DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument,
     SemanticTokensRequest,
 };
 use crate::logging;
@@ -38,6 +39,7 @@ impl LanguagePlugin for TlbLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             definition: true,
+            completion: true,
             semantic_tokens: true,
             ..FeatureSet::default()
         }
@@ -152,6 +154,23 @@ impl LanguagePlugin for TlbLanguage {
             "resolved TL-B semantic tokens"
         );
         Ok(tokens)
+    }
+
+    fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let completion =
+            completion::completion(request.context.document, parsed, request.position)?;
+        request
+            .context
+            .profiler
+            .finish("tlb.completion", started_at);
+        Ok(completion)
     }
 }
 

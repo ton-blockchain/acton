@@ -12,9 +12,10 @@ use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, 
 use ton_language_server_core::languages::tlb::TlbLanguage;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    CodeLens, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId,
-    LanguageService, LanguageServiceConfig, Location, Position, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
+    CodeLens, CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger,
+    CompletionTriggerKind, DocumentUri, FoldingRange, Hover, InlayHint, InlayHintKind,
+    InsertTextFormat, LanguageId, LanguageService, LanguageServiceConfig, Location, Position,
+    Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
     TextEdit, TextIndex, WorkspaceConfig,
 };
 use tower_lsp::jsonrpc;
@@ -264,6 +265,16 @@ impl LanguageServer for NativeLanguageServer {
                 hover_provider: Some(lsp::HoverProviderCapability::Simple(true)),
                 definition_provider: Some(lsp::OneOf::Left(true)),
                 references_provider: Some(lsp::OneOf::Left(true)),
+                completion_provider: Some(lsp::CompletionOptions {
+                    resolve_provider: Some(false),
+                    trigger_characters: Some(
+                        [".", "\"", "'", "/", "@"]
+                            .into_iter()
+                            .map(str::to_owned)
+                            .collect(),
+                    ),
+                    ..lsp::CompletionOptions::default()
+                }),
                 inlay_hint_provider: Some(lsp::OneOf::Left(true)),
                 semantic_tokens_provider: Some(lsp::SemanticTokensServerCapabilities::from(
                     lsp::SemanticTokensOptions {
@@ -489,6 +500,23 @@ impl LanguageServer for NativeLanguageServer {
             .with_service(|service| service.hover(&DocumentUri::from(uri.to_string()), position))
             .map_err(rpc_error)?;
         Ok(hover.map(hover_to_lsp))
+    }
+
+    async fn completion(
+        &self,
+        params: lsp::CompletionParams,
+    ) -> jsonrpc::Result<Option<lsp::CompletionResponse>> {
+        let uri = params.text_document_position.text_document.uri;
+        let position = position_from_lsp(params.text_document_position.position);
+        let trigger = completion_trigger_from_lsp(params.context);
+        let completion = self
+            .with_service(|service| {
+                service.completion(&DocumentUri::from(uri.to_string()), position, trigger)
+            })
+            .map_err(rpc_error)?;
+        Ok(Some(lsp::CompletionResponse::List(completion_list_to_lsp(
+            completion,
+        ))))
     }
 
     async fn semantic_tokens_full(
@@ -801,6 +829,102 @@ fn hover_to_lsp(hover: Hover) -> lsp::Hover {
             value: hover.contents,
         }),
         range: hover.range.map(range_to_lsp),
+    }
+}
+
+fn completion_trigger_from_lsp(context: Option<lsp::CompletionContext>) -> CompletionTrigger {
+    let Some(context) = context else {
+        return CompletionTrigger::invoked();
+    };
+    let kind = match context.trigger_kind {
+        lsp::CompletionTriggerKind::TRIGGER_CHARACTER => CompletionTriggerKind::TriggerCharacter,
+        lsp::CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS => {
+            CompletionTriggerKind::TriggerForIncompleteCompletions
+        }
+        _ => CompletionTriggerKind::Invoked,
+    };
+    CompletionTrigger {
+        kind,
+        character: context.trigger_character,
+    }
+}
+
+fn completion_list_to_lsp(completion: CompletionList) -> lsp::CompletionList {
+    lsp::CompletionList {
+        is_incomplete: completion.is_incomplete,
+        items: completion
+            .items
+            .into_iter()
+            .map(completion_item_to_lsp)
+            .collect(),
+    }
+}
+
+fn completion_item_to_lsp(item: CompletionItem) -> lsp::CompletionItem {
+    lsp::CompletionItem {
+        label: item.label,
+        kind: item.kind.map(completion_item_kind_to_lsp),
+        detail: item.detail,
+        documentation: item.documentation.map(|value| {
+            lsp::Documentation::MarkupContent(lsp::MarkupContent {
+                kind: lsp::MarkupKind::Markdown,
+                value,
+            })
+        }),
+        deprecated: item.deprecated.then_some(true),
+        sort_text: item.sort_text,
+        filter_text: item.filter_text,
+        insert_text: item.insert_text,
+        insert_text_format: Some(match item.insert_text_format {
+            InsertTextFormat::PlainText => lsp::InsertTextFormat::PLAIN_TEXT,
+            InsertTextFormat::Snippet => lsp::InsertTextFormat::SNIPPET,
+        }),
+        text_edit: item.text_edit.map(|edit| {
+            lsp::CompletionTextEdit::Edit(lsp::TextEdit {
+                range: range_to_lsp(edit.range),
+                new_text: edit.new_text,
+            })
+        }),
+        additional_text_edits: (!item.additional_text_edits.is_empty()).then(|| {
+            item.additional_text_edits
+                .into_iter()
+                .map(|edit| lsp::TextEdit {
+                    range: range_to_lsp(edit.range),
+                    new_text: edit.new_text,
+                })
+                .collect()
+        }),
+        ..lsp::CompletionItem::default()
+    }
+}
+
+const fn completion_item_kind_to_lsp(kind: CompletionItemKind) -> lsp::CompletionItemKind {
+    match kind {
+        CompletionItemKind::Text => lsp::CompletionItemKind::TEXT,
+        CompletionItemKind::Method => lsp::CompletionItemKind::METHOD,
+        CompletionItemKind::Function => lsp::CompletionItemKind::FUNCTION,
+        CompletionItemKind::Constructor => lsp::CompletionItemKind::CONSTRUCTOR,
+        CompletionItemKind::Field => lsp::CompletionItemKind::FIELD,
+        CompletionItemKind::Variable => lsp::CompletionItemKind::VARIABLE,
+        CompletionItemKind::Class => lsp::CompletionItemKind::CLASS,
+        CompletionItemKind::Interface => lsp::CompletionItemKind::INTERFACE,
+        CompletionItemKind::Module => lsp::CompletionItemKind::MODULE,
+        CompletionItemKind::Property => lsp::CompletionItemKind::PROPERTY,
+        CompletionItemKind::Unit => lsp::CompletionItemKind::UNIT,
+        CompletionItemKind::Value => lsp::CompletionItemKind::VALUE,
+        CompletionItemKind::Enum => lsp::CompletionItemKind::ENUM,
+        CompletionItemKind::Keyword => lsp::CompletionItemKind::KEYWORD,
+        CompletionItemKind::Snippet => lsp::CompletionItemKind::SNIPPET,
+        CompletionItemKind::Color => lsp::CompletionItemKind::COLOR,
+        CompletionItemKind::File => lsp::CompletionItemKind::FILE,
+        CompletionItemKind::Reference => lsp::CompletionItemKind::REFERENCE,
+        CompletionItemKind::Folder => lsp::CompletionItemKind::FOLDER,
+        CompletionItemKind::EnumMember => lsp::CompletionItemKind::ENUM_MEMBER,
+        CompletionItemKind::Constant => lsp::CompletionItemKind::CONSTANT,
+        CompletionItemKind::Struct => lsp::CompletionItemKind::STRUCT,
+        CompletionItemKind::Event => lsp::CompletionItemKind::EVENT,
+        CompletionItemKind::Operator => lsp::CompletionItemKind::OPERATOR,
+        CompletionItemKind::TypeParameter => lsp::CompletionItemKind::TYPE_PARAMETER,
     }
 }
 

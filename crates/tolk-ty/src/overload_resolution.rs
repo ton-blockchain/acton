@@ -149,17 +149,28 @@ pub(crate) fn resolve_methods_for_call(
     called_name: &str,
     type_db: &mut TypeDb,
 ) -> Vec<MethodCallCandidate> {
+    resolve_methods(provided_receiver, called_name, None, type_db)
+}
+
+fn resolve_methods(
+    provided_receiver: TyId,
+    called_name: &str,
+    instance: Option<bool>,
+    type_db: &mut TypeDb,
+) -> Vec<MethodCallCandidate> {
     // find all methods theoretically applicable; we'll filter them by priority;
     // for instance, if there is `T.method`, it will be instantiated with T=provided_receiver
     let mut viable = Vec::with_capacity(4);
 
     for file_index in type_db.project_index.files().values() {
         for symbol in &file_index.decls {
-            let SymbolKind::Method { .. } = symbol.kind else {
+            let SymbolKind::Method { is_instance, .. } = symbol.kind else {
                 continue;
             };
 
-            if symbol.name.as_ref() != called_name {
+            if symbol.name.as_ref() != called_name
+                || instance.is_some_and(|expected| expected != is_instance)
+            {
                 continue;
             }
 
@@ -279,6 +290,43 @@ pub(crate) fn resolve_methods_for_call(
     }
 
     viable
+}
+
+/// Returns the best applicable method declaration for every method name available on a receiver.
+#[must_use]
+pub fn method_ids_for_completion(
+    provided_receiver: TyId,
+    instance: bool,
+    type_db: &mut TypeDb<'_>,
+) -> Vec<SymbolId> {
+    type_db.ensure_method_receivers_loaded();
+    let mut names = std::collections::BTreeSet::new();
+    for file_index in type_db.project_index.files().values() {
+        for symbol in &file_index.decls {
+            if matches!(
+                symbol.kind,
+                SymbolKind::Method {
+                    is_instance,
+                    ..
+                } if is_instance == instance
+            ) {
+                names.insert(symbol.name.clone());
+            }
+        }
+    }
+
+    let mut result = names
+        .into_iter()
+        .flat_map(|name| {
+            resolve_methods(provided_receiver, &name, Some(instance), type_db)
+                .into_iter()
+                .map(|candidate| candidate.method_id)
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    result.sort_unstable();
+    result.dedup();
+    result
 }
 
 pub(crate) fn choose_only_method_to_call(

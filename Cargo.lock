@@ -5428,6 +5428,7 @@ dependencies = [
  "console_error_panic_hook",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "ton-language-server-core",
  "tracing",
  "tree-sitter",
