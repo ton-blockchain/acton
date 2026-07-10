@@ -1,5 +1,7 @@
 use super::super::TomlParsedDocument;
-use super::super::schema::{contains_node, parse_key_path, schema_path, table_path_at_offset};
+use super::super::schema::{
+    ancestor, contains_node, parse_key_path, schema_path, table_path_at_offset,
+};
 use crate::{DocumentSnapshot, Position, Range};
 use std::collections::HashSet;
 use toml_syntax::{AstNode, TopLevel};
@@ -63,43 +65,55 @@ impl CompletionContext {
         node: Option<Node<'_>>,
         offset: usize,
         position: Position,
-    ) -> Self {
-        if let Some(header) = header_context(document, offset) {
-            return Self::Keys {
-                existing_keys: existing_keys(document, parsed, &header.object_path, node),
+    ) -> Option<Self> {
+        if node.is_some_and(|node| ancestor(node, "comment").is_some()) {
+            return None;
+        }
+
+        let string = node.and_then(|node| ancestor(node, "string"));
+        if string.is_none()
+            && let Some(header) = header_context(document, offset)
+        {
+            let existing_keys = if matches!(header.kind, HeaderKind::TableArray) {
+                HashSet::new()
+            } else {
+                existing_keys(document, parsed, &header.object_path, node)
+            };
+
+            return Some(Self::Keys {
+                existing_keys,
                 object_path: header.object_path,
                 header_kind: header.kind,
                 key_only: true,
                 replacement_range: header.replacement_range,
-            };
+            });
         }
 
         let Some(node) = node else {
-            return Self::root_keys(document, parsed, position);
+            return Some(Self::root_keys(document, parsed, position));
         };
         let full_path = schema_path(document, parsed, node)
             .unwrap_or_else(|| table_path_at_offset(document, parsed, offset));
         let collection_context = collection_key_context(node, offset);
 
         if !collection_context && is_in_pair_value(node, offset) {
-            let string = ancestor(node, "string");
-            return Self::Values {
+            return Some(Self::Values {
                 value_path: full_path,
                 in_string: string.is_some(),
                 replacement_range: string
                     .map(|string| string_content_range(document, string))
                     .unwrap_or_else(|| node_replacement_range(document, node, position)),
-            };
+            });
         }
 
         if !collection_context
             && let Some(assignment) = assignment_context(document, parsed, offset)
         {
-            return Self::Values {
+            return Some(Self::Values {
                 value_path: assignment.value_path,
                 in_string: assignment.in_string,
                 replacement_range: assignment.replacement_range,
-            };
+            });
         }
 
         let object_path = if collection_context {
@@ -110,14 +124,14 @@ impl CompletionContext {
             full_path
         };
         let assignment_key_range = assignment_key_range(document, offset);
-        Self::Keys {
+        Some(Self::Keys {
             existing_keys: existing_keys(document, parsed, &object_path, Some(node)),
             object_path,
             header_kind: HeaderKind::None,
             key_only: assignment_key_range.is_some(),
             replacement_range: assignment_key_range
                 .unwrap_or_else(|| node_replacement_range(document, node, position)),
-        }
+        })
     }
 
     fn root_keys(
@@ -144,15 +158,6 @@ fn collection_key_context(node: Node<'_>, offset: usize) -> bool {
 fn without_last(mut path: Vec<SchemaPathSegment>) -> Vec<SchemaPathSegment> {
     path.pop();
     path
-}
-
-fn ancestor<'tree>(mut node: Node<'tree>, kind: &str) -> Option<Node<'tree>> {
-    loop {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        node = node.parent()?;
-    }
 }
 
 fn is_in_pair_value(node: Node<'_>, offset: usize) -> bool {

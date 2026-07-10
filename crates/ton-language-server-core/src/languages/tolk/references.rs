@@ -62,7 +62,7 @@ impl TolkResolveSnapshot {
         //
         // If this becomes hot for large workspaces, use the import graph to
         // restrict candidate files to the definition file and files that can
-        // reach it, as the old ton-ls implementation intended.
+        // reach it, as the legacy implementation intended.
         let mut references = match resolved {
             Resolved::Global(symbol_id) => {
                 let usages = GlobalUsages::new(self.project_index.as_ref(), &self.all_body_types);

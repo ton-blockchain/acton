@@ -308,6 +308,38 @@ fn documents_table_array_items() {
             - Default: `"embed_code"`
             - Enum: `"embed_code" | "library_ref"`"#]],
     );
+
+    // Hover paths preserve the concrete index instead of normalizing every element to zero.
+    check_hover(
+        "file:///workspace/Acton.toml",
+        r#"
+            [contracts.wallet]
+            src = "wallet.tolk"
+
+            [[contracts.wallet.depends]]
+            name = "base"
+
+            [[contracts.wallet.depends]]
+            name = "wallet"
+            kind = "<caret>embed_code"
+        "#,
+        expect![[r#"
+            ```toml
+            contracts.wallet.depends[1].kind
+            ```
+
+            Embed dependency code directly into the output
+
+            Reference the dependency as an on-chain library
+
+            How a compiled dependency is linked into a contract
+
+            Dependency type
+
+            - Type: `string`
+            - Default: `"embed_code"`
+            - Enum: `"embed_code" | "library_ref"`"#]],
+    );
 }
 
 #[test]
@@ -320,7 +352,7 @@ fn documents_quoted_and_dotted_keys() {
         "#,
         expect![[r#"
             ```toml
-            networks.dev.net.api.v3
+            networks."dev.net".api.v3
             ```
 
             The URL for the `TonCenter` API v3. For localnet this defaults to `http://127.0.0.1:<localnet.port>/api/v3` with `5411` as the fallback port
@@ -354,5 +386,26 @@ fn ignores_unknown_keys_and_non_acton_manifests() {
             Package metadata for the Acton project
 
             - Type: `object`"#]],
+    );
+}
+
+#[test]
+fn ignores_comments_and_whitespace() {
+    check_hover(
+        "file:///workspace/Acton.toml",
+        "
+            [package]
+            # Project <caret>metadata
+        ",
+        expect!["<none>"],
+    );
+
+    check_hover(
+        "file:///workspace/Acton.toml",
+        r#"
+            [package]
+            name<caret> = "app"
+        "#,
+        expect!["<none>"],
     );
 }

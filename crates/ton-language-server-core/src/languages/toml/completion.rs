@@ -29,7 +29,9 @@ pub(super) fn completion(
         .source_file
         .root_node()
         .descendant_for_point_range(point, point);
-    let context = CompletionContext::new(document, parsed, node, offset, position);
+    let Some(context) = CompletionContext::new(document, parsed, node, offset, position) else {
+        return CompletionList::default();
+    };
 
     let items = match context {
         CompletionContext::Keys {

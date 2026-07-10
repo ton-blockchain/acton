@@ -6,7 +6,7 @@ use regex::Regex;
 use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-const ROOT_SCHEMA_URI: &str = "memory://ton-ls/root.schema.json";
+const ROOT_SCHEMA_URI: &str = "memory://acton-language-server/root.schema.json";
 const MAX_EXPANSION_DEPTH: usize = 32;
 const MAX_STATES: usize = 128;
 

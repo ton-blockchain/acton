@@ -207,9 +207,7 @@ fn selected_literal(value: &Value) -> Option<String> {
 fn json_to_toml(value: &Value) -> Option<String> {
     match value {
         Value::Null | Value::Object(_) => None,
-        Value::Bool(value) => Some(value.to_string()),
-        Value::Number(value) => Some(value.to_string()),
-        Value::String(value) => Some(format!("\"{}\"", value.replace('"', "\\\""))),
+        Value::Bool(_) | Value::Number(_) | Value::String(_) => Some(value.to_string()),
         Value::Array(values) => values
             .iter()
             .map(json_to_toml)

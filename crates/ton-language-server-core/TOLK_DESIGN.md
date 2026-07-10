@@ -28,14 +28,14 @@ host-provided files, not a backend service.
 - Do not include type inference, lint diagnostics, code actions, completion, or
   type-aware hover in the first Tolk version.
 
-## Legacy Implementation Reference
+## Legacy Behavior Reference
 
-The old `ton-ls` code may be inspected for behavior, edge cases, rendering
-formats, and localized implementation details after the new architecture is
-fixed. It should not define the public API, ownership model, threading model,
-workspace model, or native/browser boundary of the new implementation.
+Ported Rust tests and upstream fixtures preserve relevant behavior, edge cases,
+and rendering formats from the removed implementation. That behavior does not
+define the public API, ownership model, threading model, workspace model, or
+native/browser boundary of the new implementation.
 
-Useful things to borrow from old code:
+Useful things to preserve from legacy behavior:
 
 - feature behavior and user-visible edge cases;
 - test case shape and snapshot rendering ideas;

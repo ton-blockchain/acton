@@ -281,6 +281,50 @@ fn completes_union_object_fields_in_inline_tables_and_table_arrays() {
 }
 
 #[test]
+fn keeps_table_array_elements_independent() {
+    // A key used by one array element remains available in the next element.
+    check_labels(
+        r#"
+            [contracts.wallet]
+            src = "wallet.tolk"
+
+            [[contracts.wallet.depends]]
+            name = "base"
+
+            [[contracts.wallet.depends]]
+            <caret>
+        "#,
+        expect![[r"
+            function Some(Field) string
+            kind Some(Field) string
+            name Some(Field) Required, string
+            path Some(Field) string"]],
+    );
+
+    // Repeating an array-of-tables header must not be hidden by an earlier element.
+    check_applied(
+        r#"
+            [contracts.wallet]
+            src = "wallet.tolk"
+
+            [[contracts.wallet.depends]]
+            name = "base"
+
+            [[contracts.wallet.dep<caret>]]
+        "#,
+        "depends",
+        expect![[r#"
+            [contracts.wallet]
+            src = "wallet.tolk"
+
+            [[contracts.wallet.depends]]
+            name = "base"
+
+            [[contracts.wallet.depends]]"#]],
+    );
+}
+
+#[test]
 fn inserts_schema_appropriate_value_snippets_for_properties() {
     // Boolean properties use a choice placeholder.
     check_applied(
@@ -379,7 +423,7 @@ fn replaces_boolean_and_string_enum_values() {
 
 #[test]
 fn completes_values_for_resolved_refs_unions_and_dynamic_properties() {
-    // This used to fall back to root keys in ton-ls instead of following the enum reference.
+    // The legacy implementation fell back to root keys instead of following the enum reference.
     check_labels(
         "
             [lint]
@@ -515,6 +559,38 @@ fn completes_values_before_the_parser_has_a_scalar_node() {
         expect![[r"
             [test]
             debug = true # keep this comment"]],
+    );
+}
+
+#[test]
+fn ignores_comments_and_header_like_text_inside_multiline_strings() {
+    // Schema keys must never be offered in a standalone TOML comment.
+    check_labels(
+        "
+            [package]
+            # Project <caret>metadata
+        ",
+        expect![""],
+    );
+
+    // A trailing comment stays outside the preceding property's value context.
+    check_labels(
+        "
+            [test]
+            debug = true # <caret>enabled in development
+        ",
+        expect![""],
+    );
+
+    // A line that starts with `[` inside a multiline string is not a table header.
+    check_labels(
+        r#"
+            [package]
+            description = """
+            [<caret>not-a-table]
+            """
+        "#,
+        expect![""],
     );
 }
 

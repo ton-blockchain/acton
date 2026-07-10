@@ -1,6 +1,7 @@
 use super::TomlParsedDocument;
 use crate::{DocumentSnapshot, DocumentUri};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::OnceLock;
 use toml_syntax::{AstNode, Key, Pair, TopLevel, Value as TomlValue};
 use ton_json_schema::{SchemaDoc, SchemaPathSegment, SchemaStore};
@@ -10,9 +11,9 @@ static ACTON_SCHEMA: OnceLock<Option<SchemaStore>> = OnceLock::new();
 const ACTON_SCHEMA_JSON: &str = include_str!("../../../../acton-config/schemas/acton.schema.json");
 
 pub(super) fn is_acton_manifest(uri: &DocumentUri) -> bool {
-    uri.as_str()
-        .rsplit(['/', '\\'])
-        .next()
+    uri.logical_path()
+        .file_name()
+        .and_then(|name| name.to_str())
         .is_some_and(|name| name.eq_ignore_ascii_case("Acton.toml"))
 }
 
@@ -28,6 +29,7 @@ pub(super) fn schema_path(
     target: Node<'_>,
 ) -> Option<Vec<SchemaPathSegment>> {
     let mut current_table = Vec::new();
+    let mut table_array_indices = HashMap::new();
 
     for top_level in parsed.source_file.top_levels() {
         let contains_target = contains_node(top_level.syntax(), target);
@@ -49,8 +51,8 @@ pub(super) fn schema_path(
                 current_table = table_path;
             }
             TopLevel::TableArrayElement(table) => {
-                let mut table_path = key_path(document, table.key()?);
-                table_path.push(SchemaPathSegment::Index(0));
+                let table_path =
+                    indexed_table_array_path(document, table.key()?, &mut table_array_indices);
                 if contains_target {
                     for pair in table.pairs() {
                         if !contains_node(pair.syntax(), target) {
@@ -82,6 +84,7 @@ pub(super) fn table_path_at_offset(
     offset: usize,
 ) -> Vec<SchemaPathSegment> {
     let mut current_table = Vec::new();
+    let mut table_array_indices = HashMap::new();
 
     for top_level in parsed.source_file.top_levels() {
         if top_level.syntax().start_byte() > offset {
@@ -96,8 +99,8 @@ pub(super) fn table_path_at_offset(
             }
             TopLevel::TableArrayElement(table) => {
                 if let Some(key) = table.key() {
-                    current_table = key_path(document, key);
-                    current_table.push(SchemaPathSegment::Index(0));
+                    current_table =
+                        indexed_table_array_path(document, key, &mut table_array_indices);
                 }
             }
             TopLevel::Pair(_) | TopLevel::Unmapped(_) => {}
@@ -185,6 +188,20 @@ fn key_path(document: &DocumentSnapshot, key: Key<'_>) -> Vec<SchemaPathSegment>
     parse_key_path(document.text_of(key)).unwrap_or_default()
 }
 
+fn indexed_table_array_path(
+    document: &DocumentSnapshot,
+    key: Key<'_>,
+    indices: &mut HashMap<Vec<SchemaPathSegment>, usize>,
+) -> Vec<SchemaPathSegment> {
+    let mut path = key_path(document, key);
+    let index = indices.entry(path.clone()).or_default();
+
+    path.push(SchemaPathSegment::Index(*index));
+    *index += 1;
+
+    path
+}
+
 pub(super) fn hover_markdown(path: &[SchemaPathSegment], doc: &SchemaDoc) -> Option<String> {
     if doc.is_empty() {
         return None;
@@ -243,7 +260,15 @@ pub(super) fn format_path(path: &[SchemaPathSegment]) -> String {
                 if !result.is_empty() {
                     result.push('.');
                 }
-                result.push_str(key);
+                if !key.is_empty()
+                    && key.chars().all(|character| {
+                        character.is_ascii_alphanumeric() || "_-".contains(character)
+                    })
+                {
+                    result.push_str(key);
+                } else {
+                    result.push_str(&format_json(&Value::String(key.clone())));
+                }
             }
             SchemaPathSegment::Index(index) => {
                 result.push('[');
@@ -257,6 +282,15 @@ pub(super) fn format_path(path: &[SchemaPathSegment]) -> String {
 
 pub(super) fn contains_node(container: Node<'_>, node: Node<'_>) -> bool {
     node.start_byte() >= container.start_byte() && node.end_byte() <= container.end_byte()
+}
+
+pub(super) fn ancestor<'tree>(mut node: Node<'tree>, kind: &str) -> Option<Node<'tree>> {
+    loop {
+        if node.kind() == kind {
+            return Some(node);
+        }
+        node = node.parent()?;
+    }
 }
 
 pub(super) fn format_json(value: &Value) -> String {

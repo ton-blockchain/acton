@@ -5503,35 +5503,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ton-ls"
-version = "1.1.0"
-dependencies = [
- "acton-config",
- "anyhow",
- "dashmap 7.0.0-rc2",
- "expect-test",
- "fift-syntax",
- "function_name",
- "log",
- "lsp-types",
- "rustc-hash 2.1.1",
- "serde_json",
- "tasm-core",
- "tasm-syntax",
- "tlb-syntax",
- "tokio",
- "tolk-linter",
- "tolk-resolver",
- "tolk-syntax",
- "tolk-ty",
- "toml-syntax",
- "ton-json-schema",
- "ton-syntax",
- "tower-lsp",
- "tree-sitter",
-]
-
-[[package]]
 name = "ton-networks"
 version = "1.1.0"
 dependencies = [

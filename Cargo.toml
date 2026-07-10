@@ -71,7 +71,6 @@ ton-retrace = { path = "crates/ton-retrace" }
 tolk-fmt = { path = "crates/tolk-fmt" }
 ton-networks = { path = "crates/ton-networks" }
 ton-localnet = { path = "crates/ton-localnet" }
-ton-ls = { path = "crates/ton-ls" }
 ton-language-server-core = { path = "crates/ton-language-server-core" }
 ton-language-server-native = { path = "crates/ton-language-server-native" }
 ton-indexer = { path = "crates/ton-indexer" }

@@ -26,7 +26,7 @@ non-Cargo surfaces such as docs and UI packages.
 - Native/runtime bridge: `ton-objs`, `ton-executor`, `ton-emulator`, and
   `tvm-ffi`.
 - Services and tooling: `ton-api`, `ton-localnet`, `ton-indexer`, `ton-retrace`,
-  `ton-ls`, and `acton-debug`.
+  the `ton-language-server-*` crates, and `acton-debug`.
 - Repo tooling: `xtask` for release/schema/artifact maintenance workflows.
 - Non-Cargo surfaces: `docs/` (Next.js + Fumadocs), the Bun-built UI crates,
   and template/package-manager assets under `src/commands/new/templates/`.
@@ -401,7 +401,8 @@ just check-security
 - Rust dependencies with `cargo deny check`
 - RustSec advisories for `Cargo.lock` with `cargo audit`
 - root/UI workspace dependencies with `bun audit`
-- `crates/tree-sitter-*` and `crates/ton-ls/editors/code` with `yarn npm audit`
+- `crates/tree-sitter-*` with `yarn npm audit`
+- `crates/ton-language-server-native/editors/code` with `bun audit`
 
 Run this check when your PR changes lockfiles, dependency manifests, or package
 versions for the Rust, root/UI, tree-sitter, or VS Code extension dependency
@@ -543,7 +544,8 @@ When to rerun schema generation:
 Current consumers include:
 
 - repo editor settings such as `.vscode/settings.json`
-- `ton-ls`, which embeds the schema for TOML hover/completion help
+- `ton-language-server-core`, which embeds the schema for TOML hover/completion
+  help
 
 A stale schema usually shows up as `just check-schema` failure, missing hover
 docs, or editor completion that does not know about new config fields.

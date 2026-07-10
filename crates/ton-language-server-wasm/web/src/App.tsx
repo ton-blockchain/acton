@@ -441,10 +441,11 @@ export function App() {
         new TextEncoder().encode(persistedRef.current.actonToml),
       )
       await vscode.workspace.openTextDocument(actonTomlUri)
-      actonConfigModelRef.current = monaco.editor.getModel(actonTomlUri)
-      if (!actonConfigModelRef.current) {
+      const registeredActonConfigModel = monaco.editor.getModel(actonTomlUri)
+      if (!registeredActonConfigModel) {
         throw new Error("Acton.toml model was not registered by the workspace file service")
       }
+      actonConfigModelRef.current = registeredActonConfigModel
       actonConfigEditorRef.current = monaco.editor.create(actonConfigRoot, {
         automaticLayout: true,
         fixedOverflowWidgets: true,
@@ -452,7 +453,7 @@ export function App() {
         lineDecorationsWidth: 8,
         lineNumbersMinChars: 3,
         minimap: {enabled: false},
-        model: actonConfigModelRef.current,
+        model: registeredActonConfigModel,
         padding: {top: 8, bottom: 8},
         renderLineHighlight: "line",
         scrollBeyondLastLine: false,

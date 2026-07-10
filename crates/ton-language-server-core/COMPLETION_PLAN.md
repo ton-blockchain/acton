@@ -20,7 +20,7 @@ manifest itself is outside this plan.
 
 ## Reference Implementations
 
-Use the old `ton-ls` completion infrastructure as reference for:
+Use the legacy completion behavior as reference for:
 
 - provider-based candidate collection;
 - deterministic ranking and `sortText`;
@@ -122,7 +122,7 @@ module, and implement the plugin method.
 - Insert a synthetic identifier at the caret to recover type/value context.
 - In type context, offer declarations and builtin TL-B types.
 - In value context, offer fields visible in the current declaration.
-- Preserve old `ton-ls` labels, kinds, details, and ranking.
+- Preserve established labels, kinds, details, and ranking where they remain correct.
 
 ### TASM
 
@@ -278,7 +278,7 @@ Adapter tests:
 
 1. Add core completion types, collector, plugin request, service dispatch,
    logging, and profiling.
-2. Implement TL-B from the old `ton-ls` behavior.
+2. Implement TL-B from the legacy behavior.
 3. Implement TASM and Fift providers.
 4. Implement Tolk synthetic context and reference variants.
 5. Add Tolk context providers and insertion behavior.

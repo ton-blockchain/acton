@@ -8,9 +8,9 @@ fully local environments:
 - native Acton CLI or editor integration;
 - browser/Monaco integration through a local Web Worker and WASM.
 
-The current `ton-ls` crate is treated as legacy reference material only. The new
-implementation should not inherit its process-first backend shape, direct disk
-access, or `file://`-only assumptions.
+The legacy language server has been replaced and removed. This implementation
+does not inherit its process-first backend shape, direct disk access, or
+`file://`-only assumptions.
 
 ## Planned Crates
 
@@ -425,7 +425,7 @@ stdout. Tests should verify that:
 
 ## Testing Strategy
 
-The old `ton-ls` self-contained tests have the right user-facing shape and
+The legacy self-contained tests had the right user-facing shape and
 should heavily influence the new test harness:
 
 - inline source snippets;
@@ -486,7 +486,7 @@ Recommended layers:
 - **Core feature tests**
   - Exercise `LanguageService` operations such as `definition`,
     `document_symbols`, and `diagnostics`.
-  - Render results in a stable text format, similar to `ton-ls`
+  - Render results in a stable text format compatible with existing snapshots
     `render_resolve`.
 
 - **Adapter tests**
@@ -623,9 +623,9 @@ Initial TL-B test matrix:
 - Start with go-to-definition and diagnostics.
 - Add multi-file browser workspace loading.
 
-### 9. Migration from Legacy ton-ls
+### 9. Migration from the Legacy Language Server
 
-- Compare feature parity with old `ton-ls`.
+- Compare feature parity with the legacy implementation.
 - Move missing language features into the new core incrementally.
 - Add Tolk only after the core has a deliberate project indexing model for
   languages with imports and multiple files. See
@@ -633,8 +633,10 @@ Initial TL-B test matrix:
   model. The first Tolk slice should stop at resolver-backed features such as
   go to definition and references; type inference, lints, completion, and
   type-aware hover come later.
-- Keep old `ton-ls` available until native and web users can move.
-- Delete or deprecate old architecture only after replacement coverage is clear.
+- Native, VS Code, WASM, and Monaco users now run the shared core.
+- The legacy crate was deleted after replacement coverage was established.
+- Tolk diagnostics remain a separate future slice and are not part of the
+  completed migration scope.
 
 ## Open Decisions
 
@@ -664,4 +666,4 @@ Initial TL-B test matrix:
   server.
 - Profiling can be enabled to inspect parse/index/request timings in both native
   and WASM adapters.
-- Old `ton-ls` can remain untouched while the new crates grow next to it.
+- The legacy crate can be removed without changing native or browser behavior.
