@@ -461,6 +461,58 @@ fn renames_struct_fields_and_expands_shorthand_initializers() {
 }
 
 #[test]
+fn renames_struct_field_from_explicit_object_literal_key() {
+    let source = "
+        struct MinPriceConfig {
+            startMinPrice: int
+            endMinPrice: int
+        }
+
+        fun getMinPriceConfig(domainCharCount: int): MinPriceConfig {
+            var res = MinPriceConfig {
+                startMinPrice: 10,
+                <caret>endMinPrice: 1,
+            };
+        }
+    ";
+
+    check_rename(
+        source,
+        "minimumPrice",
+        expect![[r"
+            struct MinPriceConfig {
+                startMinPrice: int
+                minimumPrice: int
+            }
+
+            fun getMinPriceConfig(domainCharCount: int): MinPriceConfig {
+                var res = MinPriceConfig {
+                    startMinPrice: 10,
+                    minimumPrice: 1,
+                };
+            }"]],
+    );
+
+    let marked = MarkedSource::parse(source);
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = open_service(&uri, &marked);
+    let prepare = service
+        .prepare_rename(&uri, marked.marker("caret").position)
+        .expect("prepare rename should succeed")
+        .expect("object literal field should be renameable");
+    let actual = format!(
+        "{}:{}-{}:{} placeholder={}",
+        prepare.range.start.line,
+        prepare.range.start.character,
+        prepare.range.end.line,
+        prepare.range.end.character,
+        prepare.placeholder,
+    );
+
+    expect!["8:8-8:19 placeholder=endMinPrice"].assert_eq(&actual);
+}
+
+#[test]
 fn escapes_names_that_cannot_start_plain_identifiers() {
     check_rename("fun <caret>foo() {}", "1foo", expect!["fun `1foo`() {}"]);
 

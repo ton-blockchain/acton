@@ -1,3 +1,4 @@
+use super::resolution::ResolvedTarget;
 use super::{
     TolkResolveSnapshot, TolkWorkspaceEngine, fallback_uri_for_path, logical_path_for_uri,
 };
@@ -77,41 +78,10 @@ impl TolkWorkspaceEngine {
 }
 
 impl TolkResolveSnapshot {
-    fn rename_target(&self, file_id: FileId, offset: usize) -> Option<RenameTarget> {
+    fn rename_target(&self, file_id: FileId, offset: usize) -> Option<ResolvedTarget> {
         [offset, offset.saturating_sub(1)]
             .into_iter()
-            .find_map(|offset| self.rename_target_at(file_id, offset))
-    }
-
-    fn rename_target_at(&self, file_id: FileId, offset: usize) -> Option<RenameTarget> {
-        if let Some(name_use) = self.project_index.find_use(file_id, offset)
-            && !matches!(name_use.resolved, Resolved::Unresolved)
-        {
-            return Some(RenameTarget {
-                resolved: name_use.resolved.clone(),
-                span: name_use.span,
-            });
-        }
-
-        if let Some(symbol) = self.project_index.find_symbol_at(file_id, offset) {
-            return Some(RenameTarget {
-                resolved: Resolved::Global(symbol.id),
-                span: symbol.name_span,
-            });
-        }
-
-        if let Some(local) = self
-            .project_index
-            .get_resolved_uses(file_id)?
-            .find_local_at(offset)
-        {
-            return Some(RenameTarget {
-                resolved: Resolved::Local(local.id),
-                span: local.def_span,
-            });
-        }
-
-        None
+            .find_map(|offset| self.resolved_target_at(file_id, offset))
     }
 
     fn ensure_renameable(&self, resolved: &Resolved) -> anyhow::Result<()> {
@@ -194,11 +164,6 @@ impl TolkResolveSnapshot {
         }
         occurrences
     }
-}
-
-struct RenameTarget {
-    resolved: Resolved,
-    span: Span,
 }
 
 fn shorthand_replacement(
