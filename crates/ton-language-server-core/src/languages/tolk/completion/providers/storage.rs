@@ -2,6 +2,10 @@ use super::TolkCompletionProviderContext;
 use super::support::{ProviderGroup, add_snippet, provider_group};
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 
+/// Completes the Acton storage struct and its `load`/`save` helper template.
+///
+/// The template is offered at top level and provides editable names for the
+/// storage type and its generated helper methods.
 pub(crate) struct StorageCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for StorageCompletionProvider {
@@ -13,7 +17,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StorageCompletion
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         add_snippet(
             context.syntax,
             collector,
@@ -21,5 +25,6 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StorageCompletion
             "struct ${1:Storage} {\n    $0\n}\n\nfun ${1:Storage}.load() {\n    return ${1:Storage}.fromCell(contract.getData());\n}\n\nfun ${1:Storage}.save(self) {\n    contract.setData(self.toCell());\n}",
             CompletionCategory::Snippet,
         );
+        Some(())
     }
 }

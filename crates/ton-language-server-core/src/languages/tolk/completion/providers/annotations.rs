@@ -4,7 +4,12 @@ use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::{CompletionItem, CompletionItemKind};
+use tolk_syntax::{AnnotatedDeclaration, HasAnnotations, HasName};
 
+/// Completes root, ABI, test, and declaration-specific annotations.
+///
+/// The typed declaration owner controls which annotation paths are valid, while
+/// annotations already present on that declaration are omitted from the results.
 pub(crate) struct AnnotationCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for AnnotationCompletionProvider {
@@ -16,11 +21,9 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for AnnotationComplet
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some(path_prefix) = annotation_path_prefix(context.syntax) else {
-            return;
-        };
-        let owner = annotation_owner(context.syntax);
+    ) -> Option<()> {
+        let path_prefix = annotation_path_prefix(context.syntax)?;
+        let owner = context.syntax.annotation_owner();
         let existing = existing_annotations(context.syntax, owner);
         let annotations = if !path_prefix.contains('.') {
             ROOT_ANNOTATIONS
@@ -29,7 +32,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for AnnotationComplet
         } else if path_prefix.starts_with("test.") {
             TEST_ANNOTATIONS
         } else {
-            return;
+            return None;
         };
         for annotation in annotations {
             if existing.contains(annotation.full_name)
@@ -45,6 +48,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for AnnotationComplet
                     .with_prefix(&context.syntax.prefix, annotation.label),
             );
         }
+        Some(())
     }
 }
 
@@ -63,40 +67,17 @@ fn annotation_path_prefix(context: &TolkCompletionContext) -> Option<&str> {
     Some(&before[start..])
 }
 
-fn annotation_owner(context: &TolkCompletionContext) -> Option<tree_sitter::Node<'_>> {
-    let mut node = context.cursor_node()?;
-    loop {
-        if matches!(
-            node.kind(),
-            "function_declaration"
-                | "get_method_declaration"
-                | "method_declaration"
-                | "struct_declaration"
-                | "struct_field_declaration"
-                | "global_var_declaration"
-                | "constant_declaration"
-                | "type_alias_declaration"
-                | "enum_declaration"
-        ) {
-            return Some(node);
-        }
-        node = node.parent()?;
-    }
-}
-
 fn existing_annotations(
     context: &TolkCompletionContext,
-    owner: Option<tree_sitter::Node<'_>>,
+    owner: Option<AnnotatedDeclaration<'_>>,
 ) -> std::collections::BTreeSet<String> {
-    let Some(annotations) = owner.and_then(|owner| owner.child_by_field_name("annotations")) else {
+    let Some(annotations) = owner.and_then(|owner| owner.annotations()) else {
         return std::collections::BTreeSet::new();
     };
-    let mut cursor = annotations.walk();
     annotations
-        .named_children(&mut cursor)
-        .filter(|node| node.kind() == "annotation")
-        .filter_map(|node| node.child_by_field_name("name"))
-        .filter_map(|node| node.utf8_text(context.source().as_bytes()).ok())
+        .annotations()
+        .filter_map(|annotation| annotation.name())
+        .map(|name| context.text_of(name))
         .filter(|name| !name.ends_with(DUMMY_IDENTIFIER))
         .map(str::to_owned)
         .collect()
@@ -104,36 +85,20 @@ fn existing_annotations(
 
 fn annotation_applies(
     annotation: &AnnotationSpec,
-    owner: Option<tree_sitter::Node<'_>>,
+    owner: Option<AnnotatedDeclaration<'_>>,
     source: &str,
 ) -> bool {
     if annotation.owners.contains(&AnnotationOwner::Any) || owner.is_none() {
         return true;
     }
-    let Some(owner) = owner else {
-        return true;
-    };
+    let Some(owner) = owner else { return true };
     annotation.owners.iter().any(|kind| match kind {
         AnnotationOwner::Any => true,
-        AnnotationOwner::Function => matches!(
-            owner.kind(),
-            "function_declaration" | "method_declaration" | "get_method_declaration"
-        ),
-        AnnotationOwner::GetMethod => owner.kind() == "get_method_declaration",
-        AnnotationOwner::Struct => owner.kind() == "struct_declaration",
-        AnnotationOwner::Field => owner.kind() == "struct_field_declaration",
-        AnnotationOwner::EntryPoint => {
-            owner.kind() == "function_declaration"
-                && owner
-                    .child_by_field_name("name")
-                    .and_then(|name| name.utf8_text(source.as_bytes()).ok())
-                    .is_some_and(|name| {
-                        matches!(
-                            name,
-                            "onInternalMessage" | "onExternalMessage" | "onBouncedMessage"
-                        )
-                    })
-        }
+        AnnotationOwner::Function => owner.is_function(),
+        AnnotationOwner::GetMethod => owner.is_get_method(),
+        AnnotationOwner::Struct => owner.is_struct(),
+        AnnotationOwner::Field => owner.is_field(),
+        AnnotationOwner::EntryPoint => owner.is_entry_point(source),
     })
 }
 

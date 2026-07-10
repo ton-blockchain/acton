@@ -79,9 +79,7 @@ fn excludes_existing_union_and_else_arms() {
         ",
     )
     .labels(&["Foo", "else", "Fill all cases..."])
-    .check(expect![[r#"
-        label  kind     detail  edit     text
-        else   Keyword          5:8-5:8  else => {\n\t$0\n}"#]]);
+    .check(expect!["<none>"]);
 
     // An existing else arm suppresses another else candidate in a value match.
     CompletionTest::new(
@@ -97,9 +95,7 @@ fn excludes_existing_union_and_else_arms() {
         ",
     )
     .labels(&["else"])
-    .check(expect![[r#"
-        label  kind     detail  edit      text
-        else   Keyword          5:8-5:11  else => {\n\t$0\n}"#]]);
+    .check(expect!["<none>"]);
 }
 
 #[test]

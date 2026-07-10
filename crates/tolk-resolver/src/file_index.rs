@@ -176,6 +176,8 @@ pub struct Symbol {
     pub is_deprecated: bool,
     /// If this symbol is marked as `@pure`.
     pub is_pure: bool,
+    /// If this symbol is a private struct field.
+    pub is_private: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
@@ -398,6 +400,7 @@ impl FileIndex {
                     doc_span,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::Constant(_) => decls.push(Symbol {
                     id,
@@ -409,6 +412,7 @@ impl FileIndex {
                     doc_span,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::TypeAlias(decl) => decls.push(Symbol {
                     id,
@@ -426,6 +430,7 @@ impl FileIndex {
                     doc_span,
                     is_deprecated,
                     is_pure,
+                    is_private: false,
                 }),
                 tolk_syntax::TopLevel::Struct(decl) => {
                     let struct_name = name.clone();
@@ -449,6 +454,7 @@ impl FileIndex {
                                 doc_span,
                                 is_deprecated: false,
                                 is_pure: false,
+                                is_private: f.has_private(),
                             })
                         })
                         .collect();
@@ -466,6 +472,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Enum(decl) => {
@@ -490,6 +497,7 @@ impl FileIndex {
                                 doc_span,
                                 is_deprecated: false,
                                 is_pure: false,
+                                is_private: false,
                             })
                         })
                         .collect();
@@ -503,6 +511,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Func(func) => {
@@ -521,6 +530,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Method(func) => {
@@ -563,6 +573,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::GetMethod(func) => {
@@ -581,6 +592,7 @@ impl FileIndex {
                         doc_span,
                         is_deprecated,
                         is_pure,
+                        is_private: false,
                     });
                 }
                 tolk_syntax::TopLevel::Import(import) => {

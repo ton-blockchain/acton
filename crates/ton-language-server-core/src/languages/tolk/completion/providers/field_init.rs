@@ -5,8 +5,12 @@ use crate::completion::{
 use crate::{CompletionItem, CompletionItemKind};
 use tolk_resolver::symbol_resolver::GlobalEnv;
 use tolk_resolver::{Symbol, SymbolKind};
-use tolk_syntax::{StructField, TryFromNode, Type};
+use tolk_syntax::{HasName, InstanceArg, ObjectLit, StructField, TryFromNode, Type};
 
+/// Completes `Struct {}.toCell()` for fields expecting a `Cell<Struct>` value.
+///
+/// The struct type is inferred from the initialized field, so the snippet is only
+/// offered when the expected type is a compatible cell-backed struct.
 pub(crate) struct FieldInitCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldInitCompletionProvider {
@@ -18,13 +22,9 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldInitCompleti
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some(struct_field) = resolve_initialized_field(context) else {
-            return;
-        };
-        let Some(inner_struct_name) = cell_struct_name(context, struct_field) else {
-            return;
-        };
+    ) -> Option<()> {
+        let struct_field = resolve_initialized_field(context)?;
+        let inner_struct_name = cell_struct_name(context, struct_field)?;
         let label = format!("{inner_struct_name} {{}}.toCell()");
         let snippet = format!("{inner_struct_name} {{$0}}.toCell()");
         collector.add(
@@ -33,25 +33,18 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldInitCompleti
             CompletionRank::new(CompletionCategory::ContextElement)
                 .with_prefix(&context.syntax.prefix, &label),
         );
+        Some(())
     }
 }
 
 fn resolve_initialized_field<'a>(
     context: &'a TolkCompletionProviderContext<'_>,
 ) -> Option<&'a Symbol> {
-    let argument = context.syntax.cursor_node()?.parent()?;
-    let field_name = argument
-        .child_by_field_name("name")?
-        .utf8_text(context.syntax.source().as_bytes())
-        .ok()?;
-    let object = context.syntax.ancestor("object_literal")?;
-    let type_node = object
-        .child_by_field_name("type")
-        .or_else(|| object.named_child(0))?;
-    let type_name = type_node
-        .utf8_text(context.syntax.source().as_bytes())
-        .ok()?
-        .trim();
+    let argument = context.syntax.parent_as::<InstanceArg>()?;
+    let field_name = context.syntax.text_of(argument.name()?);
+    let object = context.syntax.ancestor_as::<ObjectLit>()?;
+    let type_name = context.syntax.text_of(object.typ()?);
+
     let env = GlobalEnv::new(&context.snapshot.project_index, context.file_id);
     let owner = env.visible.get(type_name)?.iter().find_map(|id| {
         context
@@ -60,6 +53,7 @@ fn resolve_initialized_field<'a>(
             .resolve_symbol(*id)
             .filter(|symbol| matches!(symbol.kind, SymbolKind::Struct { .. }))
     })?;
+
     let SymbolKind::Struct { fields, .. } = &owner.kind else {
         return None;
     };

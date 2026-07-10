@@ -2,16 +2,25 @@ use super::super::context::FiftCompletionContext;
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes built-in Fift words and snippets for common block declarations.
+///
+/// Snippets replace the current token and leave the cursor at the first editable
+/// position inside the generated block.
 pub(crate) struct LanguageWordCompletionProvider;
 
 impl CompletionProvider<FiftCompletionContext<'_>> for LanguageWordCompletionProvider {
-    fn collect(&self, context: &FiftCompletionContext<'_>, collector: &mut CompletionCollector) {
+    fn collect(
+        &self,
+        context: &FiftCompletionContext<'_>,
+        collector: &mut CompletionCollector,
+    ) -> Option<()> {
         for &(label, snippet, detail) in FIFT_WORDS {
             let item = CompletionItem::new(label, CompletionItemKind::Snippet)
                 .with_detail(detail)
                 .with_snippet_replacement(context.replacement_range, snippet);
             collector.add(item, context.rank_for(CompletionCategory::Snippet, label));
         }
+        Some(())
     }
 }
 

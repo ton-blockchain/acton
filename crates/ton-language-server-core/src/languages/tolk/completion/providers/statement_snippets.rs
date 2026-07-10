@@ -2,6 +2,10 @@ use super::TolkCompletionProviderContext;
 use super::support::{ProviderGroup, add_snippet, provider_group};
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 
+/// Completes common statement snippets in statement contexts.
+///
+/// The `catch` snippet is added only after a compatible `try` statement, avoiding
+/// invalid control-flow fragments elsewhere in a function body.
 pub(crate) struct StatementSnippetCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetCompletionProvider {
@@ -13,7 +17,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetC
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         for &(label, snippet) in STATEMENT_SNIPPETS {
             add_snippet(
                 context.syntax,
@@ -32,6 +36,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for StatementSnippetC
                 CompletionCategory::ContextElement,
             );
         }
+        Some(())
     }
 }
 

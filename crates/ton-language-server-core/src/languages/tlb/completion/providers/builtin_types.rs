@@ -2,6 +2,10 @@ use super::super::context::TlbCompletionContext;
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes TL-B builtin type constructors and their parameterized width forms.
+///
+/// The provider is active only in a type position and inserts the replacement for
+/// the type token under the cursor.
 pub(crate) struct BuiltinTypesCompletionProvider;
 
 impl CompletionProvider<TlbCompletionContext> for BuiltinTypesCompletionProvider {
@@ -9,7 +13,11 @@ impl CompletionProvider<TlbCompletionContext> for BuiltinTypesCompletionProvider
         context.is_type
     }
 
-    fn collect(&self, context: &TlbCompletionContext, collector: &mut CompletionCollector) {
+    fn collect(
+        &self,
+        context: &TlbCompletionContext,
+        collector: &mut CompletionCollector,
+    ) -> Option<()> {
         for &(label, detail) in BUILTIN_TYPES {
             let mut item = CompletionItem::new(label, CompletionItemKind::Struct)
                 .with_replacement(context.replacement_range, label);
@@ -21,6 +29,7 @@ impl CompletionProvider<TlbCompletionContext> for BuiltinTypesCompletionProvider
                 context.rank_for(CompletionCategory::ContextElement, label),
             );
         }
+        Some(())
     }
 }
 

@@ -2,10 +2,18 @@ use super::super::context::TasmCompletionContext;
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes TASM instructions from the externally supplied instruction specification.
+///
+/// Operand placeholders, stack effects, and hover documentation are read from the
+/// same specification, so completion stays consistent with the active TASM version.
 pub(crate) struct InstructionCompletionProvider;
 
 impl CompletionProvider<TasmCompletionContext<'_>> for InstructionCompletionProvider {
-    fn collect(&self, context: &TasmCompletionContext<'_>, collector: &mut CompletionCollector) {
+    fn collect(
+        &self,
+        context: &TasmCompletionContext<'_>,
+        collector: &mut CompletionCollector,
+    ) -> Option<()> {
         for instruction in context.spec.instructions.values() {
             let snippet = instruction_snippet(&instruction.name, &instruction.operands);
             let detail = if instruction.operands.is_empty() {
@@ -24,6 +32,7 @@ impl CompletionProvider<TasmCompletionContext<'_>> for InstructionCompletionProv
                 context.rank_for(CompletionCategory::Function, &instruction.name),
             );
         }
+        Some(())
     }
 }
 

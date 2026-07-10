@@ -4,7 +4,12 @@ use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::{CompletionItem, CompletionItemKind, Range};
+use tolk_syntax::StructField;
 
+/// Completes missing `private` and `readonly` modifiers on struct fields.
+///
+/// Existing modifiers are inspected from the typed field declaration and are not
+/// suggested a second time.
 pub(crate) struct FieldModifierCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldModifierCompletionProvider {
@@ -16,22 +21,18 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldModifierComp
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let modifiers = context
-            .syntax
-            .ancestor("struct_field_declaration")
-            .and_then(|field| field.utf8_text(context.syntax.source().as_bytes()).ok())
-            .unwrap_or_default();
+    ) -> Option<()> {
+        let field = context.syntax.ancestor_as::<StructField>();
         let cursor = context
             .document
             .text_index()
             .offset_to_position(context.document.text(), context.syntax.offset);
         let replacement_range = Range::new(context.syntax.replacement_range.start, cursor);
-        for modifier in ["private", "readonly"] {
-            if modifiers
-                .split_whitespace()
-                .any(|existing| existing == modifier)
-            {
+        for (modifier, already_present) in [
+            ("private", field.is_some_and(|field| field.has_private())),
+            ("readonly", field.is_some_and(|field| field.has_readonly())),
+        ] {
+            if already_present {
                 continue;
             }
             collector.add(
@@ -41,5 +42,6 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FieldModifierComp
                     .with_prefix(&context.syntax.prefix, modifier),
             );
         }
+        Some(())
     }
 }

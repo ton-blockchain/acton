@@ -2,6 +2,7 @@ use super::context::TolkCompletionContext;
 use crate::{DocumentSnapshot, Range};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use tolk_syntax::{AstNode, Call, Expr};
 
 #[derive(Clone, Copy)]
 pub(super) struct WorkspaceCompletionData<'a> {
@@ -27,69 +28,42 @@ pub(super) fn matches_call(
 }
 
 fn call_at_string(context: &TolkCompletionContext) -> Option<(String, Option<String>, usize)> {
-    let string = context.cursor_node()?;
-    let argument = ancestor(string, "call_argument")?;
-    let arguments = argument
-        .parent()
-        .filter(|node| node.kind() == "argument_list")?;
-    let call = arguments
-        .parent()
-        .filter(|node| node.kind() == "function_call")?;
-    let callee = call.child_by_field_name("callee")?;
-    let (function, qualifier) = if callee.kind() == "dot_access" {
-        let function = callee
-            .child_by_field_name("field")?
-            .utf8_text(context.source().as_bytes())
-            .ok()?
-            .to_owned();
-        let qualifier = callee
-            .child_by_field_name("obj")?
-            .utf8_text(context.source().as_bytes())
-            .ok()?
-            .to_owned();
-        (function, Some(qualifier))
-    } else {
-        (
-            callee
-                .utf8_text(context.source().as_bytes())
-                .ok()?
-                .to_owned(),
-            None,
-        )
+    let cursor = context.cursor_node()?;
+    let call = context.ancestor_as::<Call>()?;
+    let argument_index = call.arguments().position(|argument| {
+        let syntax = argument.syntax();
+        syntax.start_byte() <= cursor.start_byte() && cursor.end_byte() <= syntax.end_byte()
+    })?;
+    let callee = call.callee()?;
+    let (function, qualifier) = match callee {
+        Expr::DotAccess(dot_access) => {
+            let function = dot_access.field()?;
+            let qualifier = dot_access.obj()?;
+            (
+                context.text_of(function).to_owned(),
+                Some(context.text_of(qualifier).to_owned()),
+            )
+        }
+        _ => (context.text_of(callee).to_owned(), None),
     };
-    let mut cursor = arguments.walk();
-    let argument_index = arguments
-        .children(&mut cursor)
-        .filter(|node| node.kind() == "call_argument")
-        .position(|node| node == argument)?;
     Some((function, qualifier, argument_index))
 }
 
-fn ancestor<'tree>(
-    mut node: tree_sitter::Node<'tree>,
-    kind: &str,
-) -> Option<tree_sitter::Node<'tree>> {
-    loop {
-        if node.kind() == kind {
-            return Some(node);
-        }
-        node = node.parent()?;
-    }
-}
-
 pub(super) fn string_prefix_and_range(
+    context: &TolkCompletionContext,
     document: &DocumentSnapshot,
-    offset: usize,
 ) -> Option<(String, Range)> {
-    let source = document.text();
-    let offset = offset.min(source.len());
-    let start = source.as_bytes()[..offset]
-        .iter()
-        .rposition(|byte| matches!(byte, b'\"' | b'\''))?
-        + 1;
-    let prefix = source.get(start..offset)?.to_owned();
+    let literal = context.string_literal()?;
+    let literal_node = literal.syntax();
+    let start = literal_node.start_byte() + 1;
+    let offset = context
+        .offset
+        .min(literal_node.end_byte().saturating_sub(1));
+    let content = literal.content(context.source());
+    let prefix_length = offset.checked_sub(start)?;
+    let prefix = content.get(..prefix_length)?.to_owned();
     let range = document
         .text_index()
-        .range_for_offsets(source, start, offset);
+        .range_for_offsets(context.source(), start, offset);
     Some((prefix, range))
 }

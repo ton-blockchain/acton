@@ -69,6 +69,7 @@ impl TolkWorkspaceEngine {
 pub(super) struct TolkCompletionProviderContext<'a> {
     snapshot: &'a TolkResolveSnapshot,
     file_id: tolk_resolver::FileId,
+    visible_globals: tolk_resolver::symbol_resolver::GlobalEnv,
     document: &'a DocumentSnapshot,
     syntax: &'a TolkCompletionContext,
     workspace: WorkspaceCompletionData<'a>,

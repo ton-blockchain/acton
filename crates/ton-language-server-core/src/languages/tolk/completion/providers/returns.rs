@@ -6,6 +6,10 @@ use crate::completion::{
 use crate::{CompletionItem, CompletionItemKind};
 use tolk_ty::{TyData, TyId};
 
+/// Completes return statements and type-directed literal returns.
+///
+/// The enclosing function's inferred or declared return type determines whether
+/// the provider offers a value, an empty return, or a literal skeleton.
 pub(crate) struct ReturnCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReturnCompletionProvider {
@@ -17,20 +21,19 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReturnCompletionP
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         let return_ty = enclosing_return_type(context);
-        if return_ty
-            .is_some_and(|ty| matches!(context.snapshot.type_interner.data(ty), TyData::Void))
-        {
+        if return_ty.is_some_and(|ty| ty == context.snapshot.type_interner.ty_void) {
+            // explicit void return type
             add_return(context, collector, "return;", "return;");
-            return;
+            return Some(());
         }
 
         add_return(context, collector, "return <expr>;", "return $0;");
-        let Some(return_ty) = return_ty else {
-            return;
-        };
+
+        let return_ty = return_ty?;
         let return_ty = context.snapshot.type_interner.unwrap_alias(return_ty);
+
         match context.snapshot.type_interner.data(return_ty) {
             TyData::Bool { .. } => {
                 add_return(context, collector, "return true;", "return true;");
@@ -42,6 +45,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReturnCompletionP
             }
             _ => {}
         }
+        Some(())
     }
 }
 

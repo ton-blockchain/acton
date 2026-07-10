@@ -190,7 +190,7 @@ pub(crate) trait CompletionProvider<Context> {
         true
     }
 
-    fn collect(&self, context: &Context, collector: &mut CompletionCollector);
+    fn collect(&self, context: &Context, collector: &mut CompletionCollector) -> Option<()>;
 }
 
 pub(crate) fn collect_from_providers<Context>(
@@ -441,11 +441,12 @@ mod tests {
             self.applicable
         }
 
-        fn collect(&self, _context: &(), collector: &mut CompletionCollector) {
+        fn collect(&self, _context: &(), collector: &mut CompletionCollector) -> Option<()> {
             collector.add(
                 CompletionItem::new(self.label, CompletionItemKind::Keyword),
                 CompletionRank::new(CompletionCategory::Keyword),
             );
+            Some(())
         }
     }
 

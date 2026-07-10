@@ -5,6 +5,11 @@ use crate::completion::{
 use crate::{CompletionItem, CompletionItemKind};
 use tolk_resolver::SymbolKind;
 
+/// Completes non-test get-method names in the method-name argument of
+/// `net.runGetMethod`.
+///
+/// Test-only methods are excluded because they are not callable through this
+/// Acton runtime API.
 pub(crate) struct ActonGetMethodCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonGetMethodCompletionProvider {
@@ -16,12 +21,8 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonGetMethodCom
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some((prefix, range)) =
-            super::string_prefix_and_range(context.document, context.syntax.offset)
-        else {
-            return;
-        };
+    ) -> Option<()> {
+        let (prefix, range) = super::string_prefix_and_range(context.syntax, context.document)?;
         for symbol in context
             .snapshot
             .project_index
@@ -41,5 +42,6 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonGetMethodCom
                     .with_prefix(&prefix, symbol.name.as_ref()),
             );
         }
+        Some(())
     }
 }

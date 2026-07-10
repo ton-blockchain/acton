@@ -5,6 +5,10 @@ use crate::completion::{
 };
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes variable-width integer, byte, and bit type spellings.
+///
+/// Each item inserts a width placeholder, allowing the user to choose the size
+/// without manually rebuilding the type name.
 pub(crate) struct VariableSizeTypeCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for VariableSizeTypeCompletionProvider {
@@ -17,7 +21,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for VariableSizeTypeC
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         for &label in VARIABLE_SIZE_TYPES {
             let insertion = label.replace("{X}", "${1:32}");
             collector.add(
@@ -27,6 +31,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for VariableSizeTypeC
                     .with_prefix(&context.syntax.prefix, label),
             );
         }
+        Some(())
     }
 }
 

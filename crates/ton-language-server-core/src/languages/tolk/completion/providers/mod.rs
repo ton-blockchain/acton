@@ -40,6 +40,10 @@ pub(super) fn collect(
     let context = TolkCompletionProviderContext {
         snapshot,
         file_id,
+        visible_globals: tolk_resolver::symbol_resolver::GlobalEnv::new(
+            &snapshot.project_index,
+            file_id,
+        ),
         document,
         syntax,
         workspace,

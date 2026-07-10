@@ -6,6 +6,10 @@ use crate::{CompletionItem, CompletionItemKind};
 use std::collections::BTreeSet;
 use std::path::{Component, Path, PathBuf};
 
+/// Completes Tolk import paths from workspace files, stdlib roots, and Acton mappings.
+///
+/// Suggestions are limited to the current path segment and preserve the logical
+/// import spelling expected by the configured project.
 pub(crate) struct ImportPathCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathCompletionProvider {
@@ -17,12 +21,9 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathComplet
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some((import_path, full_range)) =
-            super::string_prefix_and_range(context.document, context.syntax.offset)
-        else {
-            return;
-        };
+    ) -> Option<()> {
+        let (import_path, full_range) =
+            super::string_prefix_and_range(context.syntax, context.document)?;
         let current_path = logical_path_for_uri(context.document.uri());
         let current_dir = current_path.parent().unwrap_or_else(|| Path::new("/"));
         if matches!(import_path.as_str(), "" | "@") {
@@ -54,7 +55,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathComplet
         } else if let Some((root, path)) = mapped_path(&import_path, context.workspace.mappings) {
             (root, path)
         } else if import_path.starts_with('@') {
-            return;
+            return None;
         } else {
             (current_dir, import_path.as_str())
         };
@@ -112,6 +113,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathComplet
                 Some(".tolk"),
             );
         }
+        Some(())
     }
 }
 

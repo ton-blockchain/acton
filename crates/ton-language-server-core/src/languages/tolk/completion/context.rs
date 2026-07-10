@@ -1,5 +1,6 @@
 use crate::completion::identifier_prefix;
 use crate::{DocumentSnapshot, Position, Range};
+use tolk_syntax::{AstNode, HasName, TryFromNode};
 use tree_sitter::Node;
 
 pub(super) const DUMMY_IDENTIFIER: &str = "DummyIdentifier";
@@ -73,6 +74,19 @@ impl TolkCompletionContext {
 
     pub(super) fn source(&self) -> &str {
         self.source_file.source.as_ref()
+    }
+
+    pub(super) fn text(&self) -> &str {
+        self.source()
+    }
+
+    pub(super) fn text_of<'tree, N>(&self, node: N) -> &str
+    where
+        N: AstNode<'tree>,
+    {
+        node.syntax()
+            .utf8_text(self.text().as_bytes())
+            .unwrap_or("")
     }
 
     pub(super) fn root(&self) -> Node<'_> {
@@ -197,40 +211,15 @@ impl TolkCompletionContext {
     }
 
     pub(super) fn is_declaration_name(&self) -> bool {
-        let Some(node) = self.cursor_node() else {
-            return false;
-        };
-        let Some(parent) = node.parent() else {
-            return false;
-        };
-        if parent.child_by_field_name("name") != Some(node) {
-            return false;
-        }
-        matches!(
-            parent.kind(),
-            "contract_declaration"
-                | "contract_field"
-                | "constant_declaration"
-                | "enum_declaration"
-                | "enum_member_declaration"
-                | "function_declaration"
-                | "get_method_declaration"
-                | "global_var_declaration"
-                | "method_declaration"
-                | "parameter_declaration"
-                | "struct_declaration"
-                | "struct_field_declaration"
-                | "type_alias_declaration"
-                | "type_parameter"
-                | "var_declaration"
-        )
+        self.cursor_node()
+            .is_some_and(tolk_syntax::is_declaration_name_node)
     }
 
     pub(super) fn is_function_name(&self) -> bool {
         self.cursor_node().is_some_and(|node| {
             node.parent().is_some_and(|parent| {
                 matches!(parent.kind(), "function_declaration" | "method_declaration")
-                    && parent.child_by_field_name("name") == Some(node)
+                    && tolk_syntax::is_declaration_name_node(node)
             })
         })
     }
@@ -244,7 +233,7 @@ impl TolkCompletionContext {
         }
         node.parent().is_some_and(|parent| {
             (parent.kind() == "struct_field_declaration"
-                && parent.child_by_field_name("name") == Some(node))
+                && tolk_syntax::is_declaration_name_node(node))
                 || matches!(parent.kind(), "ERROR" | "struct_body")
         })
     }
@@ -271,7 +260,10 @@ impl TolkCompletionContext {
             return false;
         };
         node.parent().is_some_and(|parent| {
-            parent.kind() == "instance_argument" && parent.child_by_field_name("name") == Some(node)
+            tolk_syntax::InstanceArg::try_from_node(parent)
+                .ok()
+                .and_then(|argument| argument.name())
+                .is_some_and(|name| name.syntax() == node)
         })
     }
 
@@ -280,8 +272,10 @@ impl TolkCompletionContext {
             return false;
         };
         node.parent().is_some_and(|parent| {
-            parent.kind() == "instance_argument"
-                && parent.child_by_field_name("value") == Some(node)
+            tolk_syntax::InstanceArg::try_from_node(parent)
+                .ok()
+                .and_then(|argument| argument.value())
+                .is_some_and(|value| value.syntax() == node)
         })
     }
 
@@ -304,6 +298,48 @@ impl TolkCompletionContext {
             if node.kind() == kind {
                 return Some(node);
             }
+            node = node.parent()?;
+        }
+    }
+
+    pub(super) fn ancestor_as<'tree, T>(&'tree self) -> Option<T>
+    where
+        T: TryFromNode<'tree> + tolk_syntax::HasTreeSitterKind,
+    {
+        let node = self.ancestor(T::TREE_SITTER_KIND)?;
+        T::try_from_node(node).ok()
+    }
+
+    pub(super) fn ancestor_base_function(&self) -> Option<tolk_syntax::BaseFunction<'_>> {
+        let mut node = self.cursor_node()?;
+        loop {
+            if let Ok(function) = tolk_syntax::BaseFunction::try_from_node(node) {
+                return Some(function);
+            }
+            node = node.parent()?;
+        }
+    }
+
+    pub(super) fn parent_as<'tree, T>(&'tree self) -> Option<T>
+    where
+        T: TryFromNode<'tree>,
+    {
+        let node = self.cursor_node()?.parent()?;
+        T::try_from_node(node).ok()
+    }
+
+    pub(super) fn string_literal(&self) -> Option<tolk_syntax::StringLit<'_>> {
+        self.ancestor_as::<tolk_syntax::StringLit>()
+    }
+
+    pub(super) fn annotation_owner(&self) -> Option<tolk_syntax::AnnotatedDeclaration<'_>> {
+        let mut node = self.cursor_node()?;
+
+        loop {
+            if let Ok(owner) = tolk_syntax::AnnotatedDeclaration::try_from_node(node) {
+                return Some(owner);
+            }
+
             node = node.parent()?;
         }
     }

@@ -1,62 +1,62 @@
 use super::TolkCompletionProviderContext;
 use crate::languages::tolk::TolkResolveSnapshot;
 use tolk_resolver::resolve_index::LocalDef;
-use tolk_resolver::symbol_resolver::GlobalEnv;
 use tolk_resolver::{FileId, Span, Symbol};
-use tolk_syntax::{StructField, TryFromNode};
+use tolk_syntax::AstNode;
 use tolk_ty::TyId;
 use tree_sitter::Node;
 
-pub(super) fn visit_visible_locals(
-    context: &TolkCompletionProviderContext<'_>,
-    mut visit: impl FnMut(&LocalDef),
-) {
-    let Some(file) = context.snapshot.file_db.get_by_id(context.file_id) else {
-        return;
-    };
-    let Some(resolve_index) = context
-        .snapshot
-        .project_index
-        .get_resolved_uses(context.file_id)
-    else {
-        return;
-    };
-    for local in &resolve_index.locals {
-        if local_is_visible(file.source().tree.root_node(), local, context.syntax.offset) {
-            visit(local);
+impl<'a> TolkCompletionProviderContext<'a> {
+    pub(super) fn visible_locals(&'a self) -> Box<dyn Iterator<Item = &'a LocalDef> + 'a> {
+        if self.snapshot.file_db.get_by_id(self.file_id).is_none() {
+            return Box::new(std::iter::empty());
         }
-    }
-}
+        let Some(resolve_index) = self.snapshot.project_index.get_resolved_uses(self.file_id)
+        else {
+            return Box::new(std::iter::empty());
+        };
 
-pub(super) fn visit_visible_globals(
-    context: &TolkCompletionProviderContext<'_>,
-    mut visit: impl FnMut(&Symbol),
-) {
-    let env = GlobalEnv::new(&context.snapshot.project_index, context.file_id);
-    for symbol_ids in env.visible.values() {
-        for &symbol_id in symbol_ids {
-            if let Some(symbol) = context.snapshot.project_index.resolve_symbol(symbol_id) {
-                visit(symbol);
-            }
-        }
+        let snapshot = self.snapshot;
+        let file_id = self.file_id;
+        let offset = self.syntax.offset;
+        Box::new(resolve_index.locals.iter().filter(move |local| {
+            snapshot
+                .file_db
+                .get_by_id(file_id)
+                .is_some_and(|file| local_is_visible(file.source().tree.root_node(), local, offset))
+        }))
     }
-}
 
-pub(super) fn type_of_node(
-    context: &TolkCompletionProviderContext<'_>,
-    node: Node<'_>,
-) -> Option<TyId> {
-    let file = context.snapshot.file_db.get_by_id(context.file_id)?;
-    let symbol = file.find_symbol_at(node.start_byte())?;
-    let inference = context
-        .snapshot
-        .all_body_types
-        .get(&context.file_id)?
-        .get(&symbol.id)?;
-    inference.type_of(Span::from_syntax(&node)).or_else(|| {
-        let original = original_node(file.source().tree.root_node(), node)?;
-        inference.type_of(Span::from_syntax(&original))
-    })
+    pub(super) fn visible_globals(&'a self) -> Box<dyn Iterator<Item = &'a Symbol> + 'a> {
+        let symbol_ids = self
+            .visible_globals
+            .visible
+            .values()
+            .flat_map(|symbol_ids| symbol_ids.iter());
+        Box::new(
+            symbol_ids
+                .filter_map(|symbol_id| self.snapshot.project_index.resolve_symbol(*symbol_id)),
+        )
+    }
+
+    pub(super) fn type_of_node<'tree, N>(&self, node: N) -> Option<TyId>
+    where
+        N: AstNode<'tree>,
+    {
+        let syntax = node.syntax();
+        let file = self.snapshot.file_db.get_by_id(self.file_id)?;
+        let symbol = file.find_symbol_at(syntax.start_byte())?;
+        let inference = self
+            .snapshot
+            .all_body_types
+            .get(&self.file_id)?
+            .get(&symbol.id)?;
+
+        inference.type_of(Span::from_syntax(&syntax)).or_else(|| {
+            let original = original_node(file.source().tree.root_node(), syntax)?;
+            inference.type_of(Span::from_syntax(&original))
+        })
+    }
 }
 
 pub(super) fn local_type(
@@ -83,24 +83,6 @@ pub(super) fn raw_text(
         .source
         .get(span.start()..span.end())
         .map(str::to_owned)
-}
-
-pub(super) fn struct_field_is_private(snapshot: &TolkResolveSnapshot, field: &Symbol) -> bool {
-    let Some(file) = snapshot.file_db.get_by_id(field.id.file_id) else {
-        return false;
-    };
-    let Some(name) = file
-        .source()
-        .tree
-        .root_node()
-        .descendant_for_byte_range(field.name_span.start(), field.name_span.end())
-    else {
-        return false;
-    };
-    name.parent()
-        .and_then(|node| StructField::try_from_node(node).ok())
-        .and_then(|field| field.modifiers())
-        .is_some_and(|modifiers| modifiers.has_private())
 }
 
 fn local_is_visible(root: Node<'_>, local: &LocalDef, offset: usize) -> bool {

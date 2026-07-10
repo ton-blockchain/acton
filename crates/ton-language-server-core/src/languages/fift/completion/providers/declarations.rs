@@ -3,10 +3,18 @@ use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvi
 use crate::{CompletionItem, CompletionItemKind};
 use fift_syntax::{AstNode, HasName, TopLevel};
 
+/// Completes names declared earlier in the current Fift document.
+///
+/// The provider preserves the declaration kind so variables, constants, and words
+/// are displayed with the corresponding completion icon.
 pub(crate) struct DeclarationCompletionProvider;
 
 impl CompletionProvider<FiftCompletionContext<'_>> for DeclarationCompletionProvider {
-    fn collect(&self, context: &FiftCompletionContext<'_>, collector: &mut CompletionCollector) {
+    fn collect(
+        &self,
+        context: &FiftCompletionContext<'_>,
+        collector: &mut CompletionCollector,
+    ) -> Option<()> {
         for top_level in context.parsed.source_file.top_levels() {
             let (name, kind) = match top_level {
                 TopLevel::Declaration(declaration) => (
@@ -48,5 +56,6 @@ impl CompletionProvider<FiftCompletionContext<'_>> for DeclarationCompletionProv
                 context.rank_for(category, name),
             );
         }
+        Some(())
     }
 }

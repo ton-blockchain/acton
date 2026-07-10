@@ -4,6 +4,10 @@ use crate::completion::{
 };
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes configured wallet names in the first argument of `scripts.wallet`.
+///
+/// Values are taken from the current workspace configuration and are inserted as
+/// string contents without replacing the surrounding quotes.
 pub(crate) struct ActonWalletNameCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonWalletNameCompletionProvider {
@@ -15,12 +19,8 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonWalletNameCo
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some((prefix, range)) =
-            super::string_prefix_and_range(context.document, context.syntax.offset)
-        else {
-            return;
-        };
+    ) -> Option<()> {
+        let (prefix, range) = super::string_prefix_and_range(context.syntax, context.document)?;
         for wallet in context.workspace.wallet_names {
             collector.add(
                 CompletionItem::new(wallet, CompletionItemKind::Value)
@@ -28,5 +28,6 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonWalletNameCo
                 CompletionRank::new(CompletionCategory::Variable).with_prefix(&prefix, wallet),
             );
         }
+        Some(())
     }
 }

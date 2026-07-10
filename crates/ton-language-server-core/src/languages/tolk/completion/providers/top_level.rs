@@ -2,6 +2,10 @@ use super::TolkCompletionProviderContext;
 use super::support::{ProviderGroup, add_snippet, provider_group};
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 
+/// Completes top-level declaration templates and the test get-method template.
+///
+/// The test-only template is restricted to `.test.tolk` files; regular declarations
+/// remain available in every top-level context.
 pub(crate) struct TopLevelCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for TopLevelCompletionProvider {
@@ -13,7 +17,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for TopLevelCompletio
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         for &(label, snippet) in TOP_LEVEL_SNIPPETS {
             add_snippet(
                 context.syntax,
@@ -32,6 +36,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for TopLevelCompletio
                 CompletionCategory::Keyword,
             );
         }
+        Some(())
     }
 }
 

@@ -3,13 +3,19 @@ use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvi
 use crate::languages::tlb::reference::{TlbNamedItemKind, resolve_variants_at};
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes visible TL-B declarations, fields, and type parameters.
+///
+/// In a type position it hides value-only fields; in a value position it keeps
+/// only names that can be used as field references.
 pub(crate) struct ReferenceCompletionProvider;
 
 impl CompletionProvider<TlbCompletionContext> for ReferenceCompletionProvider {
-    fn collect(&self, context: &TlbCompletionContext, collector: &mut CompletionCollector) {
-        let Some(node) = context.cursor_node() else {
-            return;
-        };
+    fn collect(
+        &self,
+        context: &TlbCompletionContext,
+        collector: &mut CompletionCollector,
+    ) -> Option<()> {
+        let node = context.cursor_node()?;
         for item in resolve_variants_at(context.source_file(), node) {
             if !context.is_type && item.kind != TlbNamedItemKind::NamedField {
                 continue;
@@ -43,5 +49,6 @@ impl CompletionProvider<TlbCompletionContext> for ReferenceCompletionProvider {
             }
             collector.add(completion, context.rank_for(category, name));
         }
+        Some(())
     }
 }

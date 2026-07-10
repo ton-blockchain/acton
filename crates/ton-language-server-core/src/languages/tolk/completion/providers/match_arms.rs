@@ -1,15 +1,17 @@
-use super::TolkCompletionProviderContext;
+use super::{TolkCompletionContext, TolkCompletionProviderContext};
 use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::languages::tolk::TolkResolveSnapshot;
-use crate::languages::tolk::completion::{items, semantics};
+use crate::languages::tolk::completion::items;
 use crate::{CompletionItem, CompletionItemKind};
 use std::collections::BTreeSet;
 use tolk_resolver::{Symbol, SymbolKind};
+use tolk_syntax::{Match, MatchPattern};
 use tolk_ty::{TyData, TyId};
-use tree_sitter::Node;
 
+/// Completes missing match arms for unions, enums, structs, and value matches.
+/// It also offers a single `else` arm and a fill-all snippet where that is meaningful.
 pub(crate) struct MatchArmCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for MatchArmCompletionProvider {
@@ -21,62 +23,85 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for MatchArmCompletio
         &self,
         provider_context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         let snapshot = provider_context.snapshot;
         let context = provider_context.syntax;
-        let Some(match_expression) = context.ancestor("match_expression") else {
-            return;
-        };
-        let Some(expression) = match_expression.child_by_field_name("expr") else {
-            return;
-        };
-        let Some(ty) = semantics::type_of_node(provider_context, expression) else {
-            return;
-        };
+        let match_expression = context.ancestor_as::<Match>()?;
+        let expression = match_expression.expr()?;
+        let ty = provider_context.type_of_node(expression)?;
+
         let base_ty = snapshot.type_interner.unwrap_alias(ty);
-        let enum_match = matches!(snapshot.type_interner.data(base_ty), TyData::Enum { .. });
         let mut variants = BTreeSet::new();
         collect_type_variants(snapshot, ty, &mut variants);
-        let existing = existing_arms(match_expression, context.source());
+        let existing = existing_arms(match_expression, context);
+
         if variants.is_empty() {
             collect_non_type_match_arms(provider_context, collector);
-        } else if !enum_match && existing.is_empty() {
-            let mut lines = variants
-                .iter()
-                .enumerate()
-                .map(|(index, variant)| {
-                    format!("{variant} => {{{}}}", if index == 0 { "$0" } else { "" })
-                })
-                .collect::<Vec<_>>();
-            lines.push("else => {}".to_owned());
-            collector.add(
-                CompletionItem::new("Fill all cases...", CompletionItemKind::Snippet)
-                    .with_snippet_replacement(context.replacement_range, lines.join("\n")),
-                CompletionRank::new(CompletionCategory::ContextElement),
-            );
-        }
-        for variant in variants {
-            if existing.contains(&variant) {
-                continue;
+        } else {
+            let is_enum = matches!(snapshot.type_interner.data(base_ty), TyData::Enum { .. });
+            if !is_enum && existing.is_empty() {
+                add_fill_all_completion(context, collector, &variants);
             }
-            let snippet = format!("{variant} => {{\n\t$0\n}}");
-            collector.add(
-                CompletionItem::new(&variant, CompletionItemKind::EnumMember)
-                    .with_snippet_replacement(context.replacement_range, snippet),
-                CompletionRank::new(CompletionCategory::ContextElement)
-                    .with_prefix(&context.prefix, &variant),
-            );
+
+            add_variant_completions(context, collector, variants, &existing);
         }
+
         if !existing.contains("else") {
-            let snippet = "else => {\n\t$0\n}";
-            collector.add(
-                CompletionItem::new("else", CompletionItemKind::Keyword)
-                    .with_snippet_replacement(context.replacement_range, snippet),
-                CompletionRank::new(CompletionCategory::ContextElement)
-                    .with_prefix(&context.prefix, "else"),
-            );
+            add_else_completion(context, collector);
         }
+
+        Some(())
     }
+}
+
+fn add_fill_all_completion(
+    context: &TolkCompletionContext,
+    collector: &mut CompletionCollector,
+    variants: &BTreeSet<String>,
+) {
+    let mut lines = variants
+        .iter()
+        .enumerate()
+        .map(|(index, variant)| format!("{variant} => {{{}}}", if index == 0 { "$0" } else { "" }))
+        .collect::<Vec<_>>();
+    lines.push("else => {}".to_owned());
+
+    collector.add(
+        CompletionItem::new("Fill all cases...", CompletionItemKind::Snippet)
+            .with_snippet_replacement(context.replacement_range, lines.join("\n")),
+        CompletionRank::new(CompletionCategory::ContextElement),
+    );
+}
+
+fn add_variant_completions(
+    context: &TolkCompletionContext,
+    collector: &mut CompletionCollector,
+    variants: BTreeSet<String>,
+    existing: &BTreeSet<String>,
+) {
+    for variant in variants {
+        if existing.contains(&variant) {
+            continue;
+        }
+
+        let snippet = format!("{variant} => {{\n\t$0\n}}");
+        collector.add(
+            CompletionItem::new(&variant, CompletionItemKind::EnumMember)
+                .with_snippet_replacement(context.replacement_range, snippet),
+            CompletionRank::new(CompletionCategory::ContextElement)
+                .with_prefix(&context.prefix, &variant),
+        );
+    }
+}
+
+fn add_else_completion(context: &TolkCompletionContext, collector: &mut CompletionCollector) {
+    let snippet = "else => {\n\t$0\n}";
+    collector.add(
+        CompletionItem::new("else", CompletionItemKind::Keyword)
+            .with_snippet_replacement(context.replacement_range, snippet),
+        CompletionRank::new(CompletionCategory::ContextElement)
+            .with_prefix(&context.prefix, "else"),
+    );
 }
 
 fn collect_non_type_match_arms(
@@ -84,17 +109,19 @@ fn collect_non_type_match_arms(
     collector: &mut CompletionCollector,
 ) {
     let mut candidates = CompletionCollector::new();
-    semantics::visit_visible_locals(context, |local| {
+    for local in context.visible_locals() {
         if let Some(candidate) = items::local(context, local) {
             candidates.add(candidate.item, candidate.rank);
         }
-    });
-    semantics::visit_visible_globals(context, |symbol| {
+    }
+
+    for symbol in context.visible_globals() {
         if is_expression_symbol(symbol)
             && let Some(candidate) = items::symbol(context, symbol, false)
         {
             candidates.add(candidate.item, candidate.rank);
         }
+
         if matches!(symbol.kind, SymbolKind::Enum { .. }) {
             let SymbolKind::Enum { members } = &symbol.kind else {
                 return;
@@ -104,7 +131,7 @@ fn collect_non_type_match_arms(
                 candidates.add(candidate.item, candidate.rank);
             }
         }
-    });
+    }
     for candidate in candidates.finish().items {
         let insertion = candidate
             .text_edit
@@ -183,29 +210,15 @@ fn collect_union_variant(
     }
 }
 
-fn existing_arms(match_expression: Node<'_>, source: &str) -> BTreeSet<String> {
-    let mut result = BTreeSet::new();
-    let mut cursor = match_expression.walk();
-    for node in match_expression.children(&mut cursor) {
-        collect_existing_arm(node, source, &mut result);
-    }
-    result
-}
-
-fn collect_existing_arm(node: Node<'_>, source: &str, result: &mut BTreeSet<String>) {
-    if node.kind() == "match_arm" {
-        let pattern = node
-            .child_by_field_name("pattern")
-            .or_else(|| node.named_child(0));
-        if let Some(pattern) = pattern
-            && let Ok(text) = pattern.utf8_text(source.as_bytes())
-        {
-            result.insert(text.trim().to_owned());
-        }
-        return;
-    }
-    let mut cursor = node.walk();
-    for child in node.children(&mut cursor) {
-        collect_existing_arm(child, source, result);
-    }
+fn existing_arms(match_expression: Match<'_>, context: &TolkCompletionContext) -> BTreeSet<String> {
+    match_expression
+        .arms()
+        .map(|arm| match arm.pattern() {
+            MatchPattern::Type(pattern) => context.text_of(pattern),
+            MatchPattern::Expr(pattern) => context.text_of(pattern),
+            MatchPattern::Else => "else",
+        })
+        .map(str::trim)
+        .map(str::to_owned)
+        .collect()
 }

@@ -4,6 +4,10 @@ use crate::completion::{
 };
 use crate::{CompletionItem, CompletionItemKind};
 
+/// Completes contract identifiers in the first argument of an Acton `build` call.
+///
+/// Candidates come from the workspace contract catalog and are offered only when
+/// the call and argument position match the Acton API.
 pub(crate) struct ActonContractIdCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonContractIdCompletionProvider {
@@ -15,17 +19,14 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonContractIdCo
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some((prefix, range)) =
-            super::string_prefix_and_range(context.document, context.syntax.offset)
-        else {
-            return;
-        };
+    ) -> Option<()> {
+        let (prefix, range) = super::string_prefix_and_range(context.syntax, context.document)?;
         for id in context.workspace.contract_ids {
             collector.add(
                 CompletionItem::new(id, CompletionItemKind::Class).with_replacement(range, id),
                 CompletionRank::new(CompletionCategory::Struct).with_prefix(&prefix, id),
             );
         }
+        Some(())
     }
 }

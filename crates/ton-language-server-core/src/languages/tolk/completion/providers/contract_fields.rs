@@ -4,7 +4,12 @@ use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
 use crate::{CompletionItem, CompletionItemKind};
+use tolk_syntax::{ContractBody, HasName};
 
+/// Completes Acton contract metadata fields at the top level of a contract body.
+///
+/// The provider reads existing typed contract fields and omits fields already
+/// declared in the same body.
 pub(crate) struct ContractFieldCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldCompletionProvider {
@@ -16,17 +21,14 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldComp
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         let existing = context
             .syntax
-            .ancestor("contract_body")
+            .ancestor_as::<ContractBody>()
             .map(|body| {
-                let mut cursor = body.walk();
-                body.children(&mut cursor)
-                    .filter(|node| node.kind() == "contract_field")
-                    .filter_map(|node| node.child_by_field_name("name"))
-                    .filter_map(|node| node.utf8_text(context.syntax.source().as_bytes()).ok())
-                    .map(str::to_owned)
+                body.fields()
+                    .filter_map(|field| field.name())
+                    .map(|name| context.syntax.text_of(name).to_owned())
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
@@ -44,6 +46,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldComp
                     .with_prefix(&context.syntax.prefix, label),
             );
         }
+        Some(())
     }
 }
 

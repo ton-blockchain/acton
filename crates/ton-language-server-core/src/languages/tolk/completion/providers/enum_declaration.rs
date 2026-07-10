@@ -2,6 +2,10 @@ use super::TolkCompletionProviderContext;
 use super::support::{ProviderGroup, add_snippet, provider_group};
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 
+/// Completes an enum member declaration inside an enum body.
+///
+/// The snippet supplies editable member name and value placeholders while keeping
+/// the declaration syntax valid for immediate continued editing.
 pub(crate) struct EnumDeclarationCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for EnumDeclarationCompletionProvider {
@@ -13,7 +17,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for EnumDeclarationCo
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         add_snippet(
             context.syntax,
             collector,
@@ -21,5 +25,6 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for EnumDeclarationCo
             "${1:MEMBER} = ${2:0}$0",
             CompletionCategory::ContextElement,
         );
+        Some(())
     }
 }

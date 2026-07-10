@@ -2,6 +2,10 @@ use super::TolkCompletionProviderContext;
 use super::support::{ProviderGroup, add_snippet, provider_group};
 use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
 
+/// Completes standard Tolk contract entry-point templates at the top level.
+///
+/// Templates cover internal, external, bounced, and tick-tock handlers and place
+/// the cursor in the generated handler body.
 pub(crate) struct EntryPointCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for EntryPointCompletionProvider {
@@ -13,7 +17,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for EntryPointComplet
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         for &(label, snippet) in ENTRY_POINTS {
             add_snippet(
                 context.syntax,
@@ -23,6 +27,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for EntryPointComplet
                 CompletionCategory::ContextElement,
             );
         }
+        Some(())
     }
 }
 

@@ -9,9 +9,12 @@ use std::path::{Component, Path, PathBuf};
 use tolk_resolver::resolve_index::Resolved;
 use tolk_resolver::symbol_resolver::GlobalEnv;
 use tolk_resolver::{Symbol, SymbolKind};
-use tolk_syntax::{HasName, ObjectLit, TryFromNode};
+use tolk_syntax::{DotAccess, Expr, HasName, ObjectLit};
 use tolk_ty::{TyData, TyId, TypeDb, method_ids_for_completion};
 
+/// Completes names visible in the current expression context.
+/// This includes locals, globals, fields, enum members, methods, and struct fields.
+/// Unique symbols from other files also receive an auto-import edit.
 pub(crate) struct ReferenceCompletionProvider;
 
 impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReferenceCompletionProvider {
@@ -36,30 +39,31 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReferenceCompleti
         &self,
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
+    ) -> Option<()> {
         if context.syntax.after_dot {
-            Self::collect_member_completions(context, collector);
-            return;
+            Self::collect_member_completions(context, collector)?;
+            return Some(());
         }
         if context.syntax.in_name_of_field_init() {
-            Self::collect_struct_initializer_fields(context, collector);
-            return;
+            Self::collect_struct_initializer_fields(context, collector)?;
+            return Some(());
         }
-        semantics::visit_visible_locals(context, |local| {
+        for local in context.visible_locals() {
             if let Some(candidate) = items::local(context, local) {
                 collector.add(candidate.item, candidate.rank);
             }
-        });
+        }
         let mut visible_symbols = BTreeSet::new();
-        semantics::visit_visible_globals(context, |symbol| {
+        for symbol in context.visible_globals() {
             visible_symbols.insert(symbol.id);
             if allowed_global(symbol, context.syntax.is_type())
                 && let Some(candidate) = items::symbol(context, symbol, false)
             {
                 collector.add(candidate.item, candidate.rank);
             }
-        });
+        }
         Self::collect_auto_imports(context, &visible_symbols, collector);
+        Some(())
     }
 }
 
@@ -119,27 +123,16 @@ impl ReferenceCompletionProvider {
     fn collect_member_completions(
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some(cursor) = context.syntax.cursor_node() else {
-            return;
-        };
-        let Some(dot_access) = cursor
-            .parent()
-            .filter(|parent| parent.kind() == "dot_access")
-        else {
-            return;
-        };
-        let Some(qualifier) = dot_access.child_by_field_name("obj") else {
-            return;
-        };
+    ) -> Option<()> {
+        let dot_access = context.syntax.parent_as::<DotAccess>()?;
+        let qualifier = dot_access.obj()?;
+        let qualifier_node = qualifier.syntax();
 
-        let static_lookup = if qualifier.kind() == "generic_instantiation" {
-            qualifier
-                .child_by_field_name("expr")
-                .or_else(|| qualifier.named_child(0))
-                .unwrap_or(qualifier)
-        } else {
-            qualifier
+        let static_lookup = match qualifier {
+            Expr::Instantiation(instantiation) => instantiation
+                .expr()
+                .map_or(qualifier_node, |expression| expression.syntax()),
+            _ => qualifier_node,
         };
         let resolved = context
             .snapshot
@@ -151,13 +144,10 @@ impl ReferenceCompletionProvider {
             Resolved::Local(_) | Resolved::Unresolved => None,
         });
         let static_type = static_symbol.filter(|symbol| symbol.is_type()).or_else(|| {
-            if qualifier.kind() == "generic_instantiation" {
+            if matches!(qualifier, Expr::Instantiation(_)) {
                 return None;
             }
-            let name = qualifier
-                .utf8_text(context.syntax.source().as_bytes())
-                .ok()?
-                .trim();
+            let name = context.syntax.text_of(qualifier).trim();
             GlobalEnv::new(&context.snapshot.project_index, context.file_id)
                 .visible
                 .get(name)?
@@ -174,20 +164,19 @@ impl ReferenceCompletionProvider {
             if matches!(symbol.kind, SymbolKind::Enum { .. }) {
                 Self::collect_type_members(context, symbol, collector);
             }
-            if let Some(receiver_ty) = semantics::type_of_node(context, qualifier)
+            if let Some(receiver_ty) = context
+                .type_of_node(qualifier)
                 .or_else(|| context.snapshot.type_db_cache.top_level_type(symbol.id))
             {
                 Self::collect_methods(context, receiver_ty, false, collector);
             }
-            return;
+            return Some(());
         }
 
-        let Some(receiver_ty) = semantics::type_of_node(context, qualifier) else {
-            return;
-        };
-        if qualifier.kind() == "generic_instantiation" {
+        let receiver_ty = context.type_of_node(qualifier)?;
+        if matches!(qualifier, Expr::Instantiation(_)) {
             Self::collect_methods(context, receiver_ty, false, collector);
-            return;
+            return Some(());
         }
         let ty = context.snapshot.type_interner.unwrap_alias(receiver_ty);
         match context.snapshot.type_interner.data(ty) {
@@ -199,6 +188,7 @@ impl ReferenceCompletionProvider {
             _ => {}
         }
         Self::collect_methods(context, receiver_ty, true, collector);
+        Some(())
     }
 
     fn collect_type_members(
@@ -209,7 +199,7 @@ impl ReferenceCompletionProvider {
         match &symbol.kind {
             SymbolKind::Struct { fields, .. } => {
                 for field in fields {
-                    if semantics::struct_field_is_private(context.snapshot, field) {
+                    if field.is_private {
                         continue;
                     }
                     if let Some(candidate) = items::symbol(context, field, true) {
@@ -254,23 +244,16 @@ impl ReferenceCompletionProvider {
     fn collect_struct_initializer_fields(
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
-    ) {
-        let Some(object) = context.syntax.ancestor("object_literal") else {
-            return;
-        };
-        let Ok(object) = ObjectLit::try_from_node(object) else {
-            return;
-        };
-        let Some(struct_symbol) = Self::object_struct(context, object) else {
-            return;
-        };
+    ) -> Option<()> {
+        let object = context.syntax.ancestor_as::<ObjectLit>()?;
+        let struct_symbol = Self::object_struct(context, object)?;
         let SymbolKind::Struct { fields, .. } = &struct_symbol.kind else {
-            return;
+            return None;
         };
         let initialized = object
             .arguments()
             .filter_map(|argument| argument.name())
-            .filter_map(|name| name.0.utf8_text(context.syntax.source().as_bytes()).ok())
+            .map(|name| context.syntax.text_of(name))
             .map(str::trim)
             .collect::<Vec<_>>();
         let field_names = fields
@@ -278,9 +261,7 @@ impl ReferenceCompletionProvider {
             .map(|field| field.name.as_ref())
             .collect::<BTreeSet<_>>();
         for field in fields {
-            if initialized.iter().any(|name| *name == field.name.as_ref())
-                || semantics::struct_field_is_private(context.snapshot, field)
-            {
+            if initialized.iter().any(|name| *name == field.name.as_ref()) || field.is_private {
                 continue;
             }
             let raw_name = semantics::raw_text(context.snapshot, field.id.file_id, field.name_span)
@@ -298,7 +279,7 @@ impl ReferenceCompletionProvider {
                     .with_prefix(&context.syntax.prefix, field.name.as_ref()),
             );
         }
-        semantics::visit_visible_locals(context, |local| {
+        for local in context.visible_locals() {
             if field_names.contains(local.name.as_ref())
                 && !initialized.iter().any(|name| *name == local.name.as_ref())
                 && let Some(mut candidate) = items::local(context, local)
@@ -310,21 +291,22 @@ impl ReferenceCompletionProvider {
                 }
                 collector.add(candidate.item, candidate.rank);
             }
-        });
+        }
+        Some(())
     }
 
     fn object_struct<'a>(
         context: &'a TolkCompletionProviderContext<'_>,
         object: ObjectLit<'_>,
     ) -> Option<&'a Symbol> {
-        if let Some(ty) = semantics::type_of_node(context, object.0) {
+        if let Some(ty) = context.type_of_node(object) {
             let ty = context.snapshot.type_interner.unwrap_alias(ty);
             if let TyData::Struct { def, .. } = context.snapshot.type_interner.data(ty) {
                 return context.snapshot.project_index.resolve_symbol(*def);
             }
         }
 
-        let type_name = object.typ()?.text(context.syntax.source()).trim();
+        let type_name = context.syntax.text_of(object.typ()?).trim();
         GlobalEnv::new(&context.snapshot.project_index, context.file_id)
             .visible
             .get(type_name)?
