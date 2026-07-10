@@ -3,7 +3,7 @@ use crate::language::{
     DocumentHighlightRequest, DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest,
     HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
     PrepareRenameRequest, ReferenceRequest, RenameRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
@@ -13,7 +13,7 @@ use crate::types::{
     DocumentUri, FileRename, FoldingRange, Hover, InlayHint, LanguageId, Location, Position,
     PrepareRename, Range, SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
-use crate::{CompletionList, CompletionTrigger};
+use crate::{CompletionList, CompletionTrigger, TypeAtPosition};
 use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 
@@ -790,6 +790,34 @@ impl LanguageService {
                 );
             }
         }
+        result
+    }
+
+    pub fn type_at_position(
+        &mut self,
+        uri: &DocumentUri,
+        position: Position,
+    ) -> anyhow::Result<Option<TypeAtPosition>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().type_at_position {
+            return Ok(None);
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.type_at_position(TypeAtPositionRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            position,
+        });
+        self.profiler.finish("type_at_position", started_at);
         result
     }
 

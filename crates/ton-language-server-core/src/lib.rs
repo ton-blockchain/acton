@@ -1,4 +1,5 @@
 mod completion;
+mod custom;
 mod language;
 mod logging;
 mod profiling;
@@ -13,12 +14,14 @@ pub use completion::{
     CompletionItem, CompletionItemKind, CompletionList, CompletionTrigger, CompletionTriggerKind,
     InsertTextFormat,
 };
+pub use custom::TypeAtPosition;
 pub use language::{
     CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
     DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet, FileRenameRequest,
     FoldingRangeRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
     ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
+    WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,

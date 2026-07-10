@@ -7,7 +7,7 @@ use tolk_analysis::{
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
 use tolk_resolver::{AstNodeSpanExt, FileDb, FileId, ProjectIndex, Resolved, Span, SymbolKind};
 use tolk_syntax::ast::expressions::{Call, Expr};
-use tolk_syntax::{AstNode, FunctionLike, HasName, TopLevel, TryFromNode};
+use tolk_syntax::{AstNode, BaseFunction, HasName, TopLevel, TryFromNode};
 use tolk_ty::{InferenceResult, TyId, TypeInterner};
 
 impl TolkWorkspaceEngine {
@@ -235,31 +235,30 @@ fn collect_return_type_hint(
         return;
     }
 
-    match declaration {
-        TopLevel::Func(function) if function.return_type().is_none() => {
-            add_return_type_hint(function, return_ty, interner, builder);
-        }
-        TopLevel::Method(method) if method.return_type().is_none() => {
-            add_return_type_hint(method, return_ty, interner, builder);
-        }
-        TopLevel::GetMethod(method) if method.return_type().is_none() => {
-            add_return_type_hint(method, return_ty, interner, builder);
-        }
-        _ => {}
+    let function = match declaration {
+        TopLevel::Func(function) => BaseFunction::Function(*function),
+        TopLevel::Method(method) => BaseFunction::MethodDeclaration(*method),
+        TopLevel::GetMethod(method) => BaseFunction::GetMethodDeclaration(*method),
+        _ => return,
+    };
+    if function.return_type().is_some() {
+        return;
     }
+
+    add_return_type_hint(function, return_ty, interner, builder);
 }
 
-fn add_return_type_hint<'tree, T: AstNode<'tree>>(
-    node: &T,
+fn add_return_type_hint(
+    function: BaseFunction<'_>,
     return_ty: TyId,
     interner: &TypeInterner,
     builder: &mut TolkInlayHintsBuilder<'_>,
 ) {
-    let Some(parameters) = node.syntax().child_by_field_name("parameters") else {
+    let Some(parameters) = function.parameter_list() else {
         return;
     };
     builder.add_type_hint(
-        builder.position_for_offset(parameters.end_byte()),
+        builder.position_for_offset(parameters.syntax().end_byte()),
         interner.format(return_ty),
     );
 }

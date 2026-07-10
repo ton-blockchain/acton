@@ -142,6 +142,11 @@ path = "tests/languages/tolk/type_definition.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_type_at_position"
+path = "tests/languages/tolk/type_at_position.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_document_highlights"
 path = "tests/languages/tolk/document_highlights.rs"
 required-features = ["tolk"]

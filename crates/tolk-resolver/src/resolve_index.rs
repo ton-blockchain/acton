@@ -35,7 +35,7 @@ pub enum NameUseKind {
 }
 
 /// The result of resolving a name.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Resolved {
     /// Resolved to a top-level symbol (global variable, function, etc.).
     Global(SymbolId),

@@ -1,5 +1,7 @@
 #[path = "../../support/mod.rs"]
 mod support;
+#[path = "rename/upstream.rs"]
+mod upstream;
 
 use expect_test::{Expect, expect};
 use std::collections::BTreeMap;
@@ -23,6 +25,19 @@ fn check_rename(source: &str, new_name: &str, expect: Expect) {
         .find(|document| document.uri == uri)
         .expect("rename should edit the main document");
     let actual = apply_document_edits(marked.source(), document);
+
+    expect.assert_eq(&actual);
+}
+
+fn check_rename_rejected(source: &str, new_name: &str, expect: Expect) {
+    let marked = MarkedSource::parse(source);
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = open_service(&uri, &marked);
+    let actual = match service.rename(&uri, marked.marker("caret").position, new_name) {
+        Ok(None) => "not renameable".to_owned(),
+        Ok(Some(_)) => "renameable".to_owned(),
+        Err(error) => format!("error: {error}"),
+    };
 
     expect.assert_eq(&actual);
 }

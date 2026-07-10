@@ -1,5 +1,7 @@
 #[path = "../../support/mod.rs"]
 mod support;
+#[path = "type_definition/upstream.rs"]
+mod upstream;
 
 use expect_test::{Expect, expect};
 use support::{MarkedSource, render_definition};
@@ -16,12 +18,22 @@ fn case_type_definition(source: &str, expect: Expect) {
     service
         .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
         .expect("Tolk document should open");
-    let marker = marked.marker("caret");
-    let locations = service
-        .type_definition(&uri, marker.position)
-        .expect("type definition request should succeed");
+    let carets = marked
+        .markers()
+        .iter()
+        .filter(|marker| marker.name == "caret" || marker.name.starts_with("caret:"));
+    let actual = carets
+        .map(|marker| {
+            let locations = service
+                .type_definition(&uri, marker.position)
+                .expect("type definition request should succeed");
 
-    expect.assert_eq(&render_definition(marker.position, &locations));
+            render_definition(marker.position, &locations)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    expect.assert_eq(&actual);
 }
 
 #[test]

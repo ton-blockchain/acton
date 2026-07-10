@@ -766,15 +766,31 @@ impl<'tree> HasName<'tree> for EnumMember<'tree> {
 }
 
 #[derive(Clone, Copy, Debug)]
+pub struct ParameterList<'tree>(pub Node<'tree>);
+
+impl_ast_node!(ParameterList, "parameter_list");
+
+impl<'tree> ParameterList<'tree> {
+    #[must_use]
+    pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
+        AstChildren::new(self.0)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
 pub struct Func<'tree>(pub Node<'tree>);
 
 impl_ast_node!(Func, "function_declaration");
 
 impl<'tree> Func<'tree> {
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
     pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -803,9 +819,8 @@ impl<'tree> FunctionLike<'tree> for Func<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -862,9 +877,15 @@ impl<'tree> Method<'tree> {
         self.receiver().and_then(|r| r.typ())
     }
 
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
     pub fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        let list = self.0.child_by_field_name("parameters");
-        list.map(AstChildren::<Parameter>::new).unwrap_or_default()
+        self.parameter_list()
+            .map(ParameterList::parameters)
+            .unwrap_or_default()
     }
 
     pub fn parameters_ext(
@@ -872,9 +893,9 @@ impl<'tree> Method<'tree> {
         sources: &str,
         skip_self: bool,
     ) -> impl Iterator<Item = Parameter<'tree>> + use<'tree> {
-        let list = self.0.child_by_field_name("parameters");
-        let mut params = list
-            .map(AstChildren::<Parameter>::new)
+        let mut params = self
+            .parameter_list()
+            .map(ParameterList::parameters)
             .into_iter()
             .flatten()
             .peekable();
@@ -937,8 +958,9 @@ impl<'tree> FunctionLike<'tree> for Method<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        let list = self.0.child_by_field_name("parameters");
-        list.map(AstChildren::<Parameter>::new).unwrap_or_default()
+        self.parameter_list()
+            .map(ParameterList::parameters)
+            .unwrap_or_default()
     }
 }
 
@@ -953,6 +975,11 @@ pub fn is_test_get_method_name(name: &str) -> bool {
 }
 
 impl<'tree> GetMethod<'tree> {
+    #[must_use]
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
+        self.0.field("parameters")
+    }
+
     #[must_use]
     pub fn get_keyword(&self) -> Option<Node<'tree>> {
         let mut cursor = self.0.walk();
@@ -993,9 +1020,8 @@ impl<'tree> GetMethod<'tree> {
     }
 
     pub fn parameters(self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 
@@ -1035,9 +1061,8 @@ impl<'tree> FunctionLike<'tree> for GetMethod<'tree> {
     }
 
     fn parameters(&self) -> AstChildren<'tree, Parameter<'tree>> {
-        self.0
-            .child_by_field_name("parameters")
-            .map(AstChildren::new)
+        self.parameter_list()
+            .map(ParameterList::parameters)
             .unwrap_or_default()
     }
 }
@@ -1326,14 +1351,17 @@ impl<'tree> BaseFunction<'tree> {
     }
 
     #[must_use]
-    pub fn has_parameters(&self) -> bool {
+    pub fn parameter_list(&self) -> Option<ParameterList<'tree>> {
         match self {
-            Self::Function(function) => function.0.child_by_field_name("parameters").is_some(),
-            Self::MethodDeclaration(method) => method.0.child_by_field_name("parameters").is_some(),
-            Self::GetMethodDeclaration(method) => {
-                method.0.child_by_field_name("parameters").is_some()
-            }
+            BaseFunction::Function(f) => f.parameter_list(),
+            BaseFunction::MethodDeclaration(m) => m.parameter_list(),
+            BaseFunction::GetMethodDeclaration(g) => g.parameter_list(),
         }
+    }
+
+    #[must_use]
+    pub fn has_parameters(&self) -> bool {
+        self.parameter_list().is_some()
     }
 
     #[must_use]

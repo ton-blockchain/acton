@@ -381,15 +381,6 @@ impl TolkResolveSnapshot {
         signature
     }
 
-    pub(super) fn local_type(&self, local: &LocalDef) -> Option<TyId> {
-        let file = self.file_db.get_by_id(local.id.file_id)?;
-        let symbol = file.find_symbol_at(local.def_span.start())?;
-        self.all_body_types
-            .get(&local.id.file_id)?
-            .get(&symbol.id)?
-            .type_of(local.def_span)
-    }
-
     fn range_for_span(&self, file_id: u32, span: tolk_resolver::Span) -> Option<Range> {
         let file = self.file_db.get_by_id(file_id)?;
         let source = file.source().source.as_ref();

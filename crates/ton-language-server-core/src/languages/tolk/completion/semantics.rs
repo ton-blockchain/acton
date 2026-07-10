@@ -63,14 +63,7 @@ pub(super) fn local_type(
     context: &TolkCompletionProviderContext<'_>,
     local: &LocalDef,
 ) -> Option<TyId> {
-    let file = context.snapshot.file_db.get_by_id(context.file_id)?;
-    let symbol = file.find_symbol_at(local.def_span.start())?;
-    context
-        .snapshot
-        .all_body_types
-        .get(&context.file_id)?
-        .get(&symbol.id)?
-        .type_of(local.def_span)
+    context.snapshot.local_type(local)
 }
 
 pub(super) fn raw_text(

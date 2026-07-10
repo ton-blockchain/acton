@@ -1,5 +1,7 @@
 #[path = "../../support/mod.rs"]
 mod support;
+#[path = "references/upstream.rs"]
+mod upstream;
 
 use expect_test::{Expect, expect};
 use std::fmt::Write as _;
@@ -17,7 +19,10 @@ fn case_tolk_references(
     expect: Expect,
 ) {
     let marked = MarkedSource::parse(source);
-    let caret = marked.marker("caret");
+    let carets = marked
+        .markers()
+        .iter()
+        .filter(|marker| marker.name == "caret" || marker.name.starts_with("caret:"));
     let uri = DocumentUri::from(uri);
     let mut service = LanguageService::new(LanguageServiceConfig::default());
     service.register_language(TolkLanguage::new());
@@ -26,10 +31,17 @@ fn case_tolk_references(
         .open_document(uri.clone(), LANGUAGE_ID, 1, marked.source().to_owned())
         .expect("Tolk document should open");
 
-    let locations = service
-        .references(&uri, caret.position, include_declaration)
-        .expect("references request should succeed");
-    expect.assert_eq(&render_references(caret.position, &locations));
+    let actual = carets
+        .map(|caret| {
+            let locations = service
+                .references(&uri, caret.position, include_declaration)
+                .expect("references request should succeed");
+
+            render_references(caret.position, &locations)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    expect.assert_eq(&actual);
 }
 
 #[test]

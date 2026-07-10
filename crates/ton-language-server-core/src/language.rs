@@ -1,4 +1,5 @@
 use crate::completion::{CompletionList, CompletionTrigger};
+use crate::custom::TypeAtPosition;
 use crate::profiling::Profiler;
 use crate::semantic_tokens::SemanticToken;
 use crate::types::{
@@ -29,6 +30,7 @@ pub struct FeatureSet {
     pub workspace_symbols: bool,
     pub code_actions: bool,
     pub file_rename: bool,
+    pub type_at_position: bool,
 }
 
 pub trait ParsedDocument: Any + Send + Sync {
@@ -163,6 +165,11 @@ pub struct CompletionRequest<'a> {
     pub trigger: CompletionTrigger,
 }
 
+pub struct TypeAtPositionRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub position: Position,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -273,5 +280,12 @@ pub trait LanguagePlugin: Send + Sync {
 
     fn completion(&self, _request: CompletionRequest<'_>) -> anyhow::Result<CompletionList> {
         Ok(CompletionList::default())
+    }
+
+    fn type_at_position(
+        &self,
+        _request: TypeAtPositionRequest<'_>,
+    ) -> anyhow::Result<Option<TypeAtPosition>> {
+        Ok(None)
     }
 }

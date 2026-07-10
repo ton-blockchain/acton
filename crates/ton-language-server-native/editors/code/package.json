@@ -15,6 +15,13 @@
     "watch": "tsc -watch -p ./"
   },
   "contributes": {
+    "commands": [
+      {
+        "command": "tolk.getTypeAtPosition",
+        "title": "Get Type At Position",
+        "category": "Tolk"
+      }
+    ],
     "configuration": {
       "type": "object",
       "title": "Acton Language Server",
@@ -101,6 +108,7 @@
     "onLanguage:fift",
     "onLanguage:tlb",
     "onLanguage:toml",
+    "onCommand:tolk.getTypeAtPosition",
     "workspaceContains:Acton.toml"
   ],
   "dependencies": {

@@ -3,7 +3,7 @@ use crate::language::{
     DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, HoverRequest,
     InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest,
     ReferenceRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
-    TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::{
@@ -38,6 +38,7 @@ mod rename;
 mod resolution;
 mod semantic_tokens;
 mod signature_help;
+mod type_at_position;
 mod type_definition;
 mod workspace_symbols;
 
@@ -103,6 +104,7 @@ impl LanguagePlugin for TolkLanguage {
             workspace_symbols: true,
             code_actions: true,
             file_rename: true,
+            type_at_position: true,
             ..FeatureSet::default()
         }
     }
@@ -485,6 +487,27 @@ impl LanguagePlugin for TolkLanguage {
             "resolved Tolk completion"
         );
         Ok(completion)
+    }
+
+    fn type_at_position(
+        &self,
+        request: TypeAtPositionRequest<'_>,
+    ) -> anyhow::Result<Option<crate::TypeAtPosition>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = self
+            .engine
+            .type_at_position(request.context.document, request.position);
+        request
+            .context
+            .profiler
+            .finish("tolk.type_at_position", started_at);
+        Ok(result)
     }
 }
 

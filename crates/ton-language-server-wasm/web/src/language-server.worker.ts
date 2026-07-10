@@ -6,6 +6,7 @@ import {
   TextDocumentSyncKind,
   TypeDefinitionRequest,
   type InitializeResult,
+  type TextDocumentPositionParams,
 } from "vscode-languageserver/browser"
 import {TextDocument} from "vscode-languageserver-textdocument"
 
@@ -25,6 +26,7 @@ const CLEAR_LOGS_REQUEST = "ton/clearLogs"
 const PROFILE_REQUEST = "ton/profile"
 const ADD_SOURCE_FILE_REQUEST = "ton/addSourceFile"
 const SET_WORKSPACE_CONFIG_REQUEST = "ton/setWorkspaceConfig"
+const TOLK_TYPE_AT_POSITION_REQUEST = "tolk.getTypeAtPosition"
 const STACK_EFFECT_CODE_LENS_COMMAND = "tonls.tasm.stackEffect"
 
 let languageServerPromise: Promise<TonLanguageServer> | undefined
@@ -291,6 +293,18 @@ connection.onRequest(CLEAR_LOGS_REQUEST, async () =>
 
 connection.onRequest(PROFILE_REQUEST, async () =>
   withLanguageServer(PROFILE_REQUEST, server => server.profileSummary()),
+)
+
+connection.onRequest(
+  TOLK_TYPE_AT_POSITION_REQUEST,
+  async (params: TextDocumentPositionParams) =>
+    withLanguageServer(TOLK_TYPE_AT_POSITION_REQUEST, server =>
+      server.typeAtPosition(
+        params.textDocument.uri,
+        params.position.line,
+        params.position.character,
+      ),
+    ),
 )
 
 connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>

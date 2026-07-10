@@ -16,6 +16,7 @@ profiling = []
 [dependencies]
 anyhow = { workspace = true }
 dunce = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 ton-language-server-core = { workspace = true }

@@ -193,14 +193,31 @@ impl<'a> SymbolResolver<'a> {
         while let Some(scope_idx) = current {
             let scope = &self.scopes[scope_idx];
             if let Some(symbol_id) = scope.symbols.get(&name) {
-                self.uses.push(NameUse {
-                    decl: decl_start,
-                    span: ident.span(),
-                    kind: use_kind,
-                    name,
-                    resolved: Resolved::Local(*symbol_id),
-                });
-                return Some(());
+                let local_kind = self
+                    .locals
+                    .iter()
+                    .find(|local| local.id == *symbol_id)
+                    .map(|local| local.kind);
+                let matches_namespace = match use_kind {
+                    NameUseKind::Type => {
+                        matches!(local_kind, Some(LocalDefKind::TypeParameter))
+                    }
+                    NameUseKind::Value | NameUseKind::LocalValue => {
+                        !matches!(local_kind, Some(LocalDefKind::TypeParameter))
+                    }
+                    NameUseKind::Mixed => true,
+                };
+
+                if matches_namespace {
+                    self.uses.push(NameUse {
+                        decl: decl_start,
+                        span: ident.span(),
+                        kind: use_kind,
+                        name,
+                        resolved: Resolved::Local(*symbol_id),
+                    });
+                    return Some(());
+                }
             }
             current = scope.parent;
         }

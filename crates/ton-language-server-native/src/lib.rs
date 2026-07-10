@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::net::TcpListener;
 use ton_language_server_core::languages::fift::FiftLanguage;
@@ -18,7 +19,7 @@ use ton_language_server_core::{
     InlayHintKind, InsertTextFormat, LanguageId, LanguageService, LanguageServiceConfig, Location,
     Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES,
     SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation, TextEdit, TextIndex,
-    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use tower_lsp::jsonrpc;
 use tower_lsp::lsp_types as lsp;
@@ -30,6 +31,37 @@ use tracing::{Event, Level, Metadata, Subscriber};
 pub use ton_language_server_core::LogLevel;
 
 const TASM_SPEC_JSON: &str = include_str!("../../tasm-core/spec/tvm-specification.json");
+const TOLK_TYPE_AT_POSITION_REQUEST: &str = "tolk.getTypeAtPosition";
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TypeAtPositionParams {
+    text_document: lsp::TextDocumentIdentifier,
+    position: lsp::Position,
+}
+
+#[derive(Debug, Serialize)]
+struct TypeAtPositionResponse {
+    #[serde(rename = "type")]
+    type_name: Option<String>,
+    range: Option<lsp::Range>,
+}
+
+impl From<Option<TypeAtPosition>> for TypeAtPositionResponse {
+    fn from(result: Option<TypeAtPosition>) -> Self {
+        let Some(result) = result else {
+            return Self {
+                type_name: None,
+                range: None,
+            };
+        };
+
+        Self {
+            type_name: Some(result.type_name),
+            range: Some(range_to_lsp(result.range)),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct ServerConfig {
@@ -72,7 +104,12 @@ pub async fn serve_stdio(config: ServerConfig) -> anyhow::Result<()> {
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
     let (service, socket) =
-        LspService::new(|client| NativeLanguageServer::new(client, config.clone()));
+        LspService::build(|client| NativeLanguageServer::new(client, config.clone()))
+            .custom_method(
+                TOLK_TYPE_AT_POSITION_REQUEST,
+                NativeLanguageServer::type_at_position,
+            )
+            .finish();
     Server::new(stdin, stdout, socket).serve(service).await;
     Ok(())
 }
@@ -89,7 +126,12 @@ pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
     let (stream, _) = listener.accept().await?;
     let (reader, writer) = tokio::io::split(stream);
     let (service, socket) =
-        LspService::new(|client| NativeLanguageServer::new(client, config.clone()));
+        LspService::build(|client| NativeLanguageServer::new(client, config.clone()))
+            .custom_method(
+                TOLK_TYPE_AT_POSITION_REQUEST,
+                NativeLanguageServer::type_at_position,
+            )
+            .finish();
     Server::new(reader, writer, socket).serve(service).await;
     Ok(())
 }
@@ -180,6 +222,19 @@ impl NativeLanguageServer {
             .lock()
             .map_err(|_| anyhow::anyhow!("language service lock poisoned"))?;
         f(&mut service)
+    }
+
+    async fn type_at_position(
+        &self,
+        params: TypeAtPositionParams,
+    ) -> jsonrpc::Result<TypeAtPositionResponse> {
+        let uri = DocumentUri::from(params.text_document.uri.to_string());
+        let position = position_from_lsp(params.position);
+        let result = self
+            .with_service(|service| service.type_at_position(&uri, position))
+            .map_err(rpc_error)?;
+
+        Ok(TypeAtPositionResponse::from(result))
     }
 
     fn apply_workspace_config_text(&self, text: String) -> anyhow::Result<()> {

@@ -46,9 +46,7 @@ impl CodeActionProvider for AddImportProvider {
         if already_visible {
             return None;
         }
-        let name = identifier
-            .utf8_text(context.document.text().as_bytes())
-            .unwrap_or_default();
+        let name = context.text_of(identifier);
         let candidates = context
             .snapshot
             .project_index

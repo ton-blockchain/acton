@@ -14,7 +14,8 @@ use ton_language_server_core::{
     FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
     Location, LogLevel, Position, PrepareRename, ProfileSummary, Range,
     SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    SignatureHelp, SignatureInformation, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    SignatureHelp, SignatureInformation, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
+    WorkspaceSymbol,
 };
 use wasm_bindgen::prelude::*;
 
@@ -232,6 +233,24 @@ impl TonLanguageServer {
             .hover(&DocumentUri::from(uri), Position::new(line, character))
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&hover.map(hover_to_lsp)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = typeAtPosition)]
+    pub fn type_at_position(
+        &self,
+        uri: String,
+        line: u32,
+        character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let result = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .type_at_position(&DocumentUri::from(uri), Position::new(line, character))
+            .map_err(js_error)?;
+        let response = LspTypeAtPosition::from(result);
+
+        serde_wasm_bindgen::to_value(&response).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = completion)]
@@ -652,6 +671,29 @@ struct LspParameterInformation {
 struct LspPrepareRename {
     range: LspRange,
     placeholder: String,
+}
+
+#[derive(Serialize)]
+struct LspTypeAtPosition {
+    #[serde(rename = "type")]
+    type_name: Option<String>,
+    range: Option<LspRange>,
+}
+
+impl From<Option<TypeAtPosition>> for LspTypeAtPosition {
+    fn from(result: Option<TypeAtPosition>) -> Self {
+        let Some(result) = result else {
+            return Self {
+                type_name: None,
+                range: None,
+            };
+        };
+
+        Self {
+            type_name: Some(result.type_name),
+            range: Some(range_to_lsp(result.range)),
+        }
+    }
 }
 
 #[derive(Serialize)]

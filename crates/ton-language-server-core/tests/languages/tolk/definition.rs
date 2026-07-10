@@ -1,5 +1,7 @@
 #[path = "../../support/mod.rs"]
 mod support;
+#[path = "definition/upstream.rs"]
+mod upstream;
 
 use expect_test::{Expect, expect};
 use std::fmt::Write as _;
