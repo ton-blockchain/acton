@@ -2,7 +2,7 @@ mod add_import;
 mod fill_struct_fields;
 mod generate_struct_opcode;
 
-use super::{TolkProjectConfig, TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri};
+use super::{TolkProjectConfig, TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{CodeAction, DocumentEdits, DocumentSnapshot, Range, TextEdit, WorkspaceEdit};
 use std::sync::Arc;
 use tolk_resolver::{FileId, FileInfo, Span};
@@ -30,8 +30,7 @@ impl TolkWorkspaceEngine {
         let Some(snapshot) = snapshot else {
             return Vec::new();
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Vec::new();
         };
         let Some(file) = snapshot.file_db.get_by_id(file_id) else {

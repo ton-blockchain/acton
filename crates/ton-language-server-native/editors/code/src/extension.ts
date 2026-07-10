@@ -1,4 +1,5 @@
 import * as net from "net"
+import * as path from "path"
 import * as vscode from "vscode"
 import {
   Executable,
@@ -10,6 +11,7 @@ import {
 let client: LanguageClient | undefined
 
 const typeAtPositionRequest = "tolk.getTypeAtPosition"
+const openFileCommand = "ton.openFile"
 
 interface TypeAtPositionParams {
   textDocument: {uri: string}
@@ -108,6 +110,33 @@ export function activate(context: vscode.ExtensionContext) {
         return result
       },
     ),
+    vscode.commands.registerCommand(
+      openFileCommand,
+      async (filePath: string, line?: string | number): Promise<void> => {
+        try {
+          const uri = await resolveWorkspaceFile(filePath)
+          const document = await vscode.workspace.openTextDocument(uri)
+          const editor = await vscode.window.showTextDocument(document)
+          const requestedLine = typeof line === "string" ? Number.parseInt(line, 10) : line
+
+          if (requestedLine !== undefined && Number.isFinite(requestedLine)) {
+            const lineNumber = Math.min(
+              Math.max(requestedLine - 1, 0),
+              Math.max(document.lineCount - 1, 0),
+            )
+            const position = new vscode.Position(lineNumber, 0)
+            editor.selection = new vscode.Selection(position, position)
+            editor.revealRange(
+              new vscode.Range(position, position),
+              vscode.TextEditorRevealType.InCenterIfOutsideViewport,
+            )
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error)
+          await vscode.window.showErrorMessage(`Failed to open ${filePath}: ${message}`)
+        }
+      },
+    ),
   )
 }
 
@@ -149,4 +178,35 @@ function connectToServer(port: number): ServerOptions {
       })
       socket.on("error", reject)
     })
+}
+
+async function resolveWorkspaceFile(filePath: string): Promise<vscode.Uri> {
+  if (path.isAbsolute(filePath)) {
+    return vscode.Uri.file(filePath)
+  }
+
+  const workspaceFolders = vscode.workspace.workspaceFolders ?? []
+  for (const folder of workspaceFolders) {
+    const candidate = vscode.Uri.joinPath(folder.uri, ...filePath.split(/[\\/]/))
+    try {
+      await vscode.workspace.fs.stat(candidate)
+      return candidate
+    } catch {
+      // Try the other workspace folders before falling back to a basename search.
+    }
+  }
+
+  const matches = await vscode.workspace.findFiles(
+    `**/${path.basename(filePath)}`,
+    "**/node_modules/**",
+    20,
+  )
+  const normalizedPath = filePath.replace(/\\/g, "/")
+  const exact = matches.find(uri => uri.path.endsWith(normalizedPath))
+  const resolved = exact ?? matches[0]
+  if (!resolved) {
+    throw new Error("file not found in the workspace")
+  }
+
+  return resolved
 }

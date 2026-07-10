@@ -1,25 +1,44 @@
 use crate::language::{
-    CompletionRequest, FeatureSet, FoldingRangeRequest, LanguagePlugin, ParseRequest,
-    ParsedDocument, SemanticTokensRequest,
+    CodeLensRequest, CompletionRequest, DefinitionRequest, FeatureSet, FoldingRangeRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, ReferenceRequest,
+    SemanticTokensRequest,
 };
+use crate::languages::instruction_docs::InstructionSpec;
 use crate::logging;
-use crate::{FoldingRange, LanguageId};
+use crate::{FoldingRange, LanguageId, Location};
 use anyhow::Context;
 use std::any::Any;
 use tree_sitter::{Node, Tree};
 
+mod code_lens;
 mod completion;
+mod definition;
+mod hover;
+mod inlay_hints;
+mod reference;
+mod references;
 mod semantic_tokens;
 
 pub const LANGUAGE_ID: &str = "fift";
 
-#[derive(Clone, Copy, Debug, Default)]
-pub struct FiftLanguage;
+#[derive(Clone, Debug, Default)]
+pub struct FiftLanguage {
+    spec: Option<InstructionSpec>,
+}
 
 impl FiftLanguage {
     #[must_use]
     pub const fn new() -> Self {
-        Self
+        Self { spec: None }
+    }
+
+    #[must_use]
+    pub(crate) const fn with_spec(spec: InstructionSpec) -> Self {
+        Self { spec: Some(spec) }
+    }
+
+    pub fn with_spec_json(spec_json: &str) -> serde_json::Result<Self> {
+        InstructionSpec::from_json(spec_json).map(Self::with_spec)
     }
 }
 
@@ -37,6 +56,11 @@ impl LanguagePlugin for FiftLanguage {
             folding_ranges: true,
             completion: true,
             semantic_tokens: true,
+            definition: true,
+            references: true,
+            hover: true,
+            code_lens: true,
+            inlay_hints: self.spec.is_some(),
             ..FeatureSet::default()
         }
     }
@@ -118,6 +142,102 @@ impl LanguagePlugin for FiftLanguage {
         );
 
         Ok(ranges)
+    }
+
+    fn definition(&self, request: DefinitionRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = definition::definition(request.context.document, parsed, request.position);
+        request
+            .context
+            .profiler
+            .finish("fift.definition.resolve", started_at);
+
+        Ok(result)
+    }
+
+    fn references(&self, request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = references::references(
+            request.context.document,
+            parsed,
+            request.position,
+            request.include_declaration,
+        );
+        request
+            .context
+            .profiler
+            .finish("fift.references.resolve", started_at);
+
+        Ok(result)
+    }
+
+    fn hover(&self, request: HoverRequest<'_>) -> anyhow::Result<Option<crate::Hover>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = hover::hover(
+            self.spec.as_ref(),
+            request.context.document,
+            parsed,
+            request.position,
+        );
+        request.context.profiler.finish("fift.hover", started_at);
+
+        Ok(result)
+    }
+
+    fn code_lens(&self, request: CodeLensRequest<'_>) -> anyhow::Result<Vec<crate::CodeLens>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = code_lens::code_lenses(request.context.document, parsed);
+        request
+            .context
+            .profiler
+            .finish("fift.code_lens", started_at);
+
+        Ok(result)
+    }
+
+    fn inlay_hints(&self, request: InlayHintRequest<'_>) -> anyhow::Result<Vec<crate::InlayHint>> {
+        let Some(spec) = self.spec.as_ref() else {
+            return Ok(Vec::new());
+        };
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<FiftParsedDocument>()
+            .context("Fift parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result =
+            inlay_hints::inlay_hints(spec, request.context.document, parsed, request.range);
+        request
+            .context
+            .profiler
+            .finish("fift.inlay_hints", started_at);
+
+        Ok(result)
     }
 
     fn semantic_tokens(

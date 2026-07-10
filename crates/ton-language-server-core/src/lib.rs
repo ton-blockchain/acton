@@ -25,7 +25,7 @@ pub use language::{
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
-    SERVICE_TARGET, TASM_TARGET, TLB_TARGET, TOLK_TARGET,
+    SERVICE_TARGET, TASM_TARGET, TLB_TARGET, TOLK_TARGET, TOML_TARGET,
 };
 pub use profiling::{ProfileEvent, ProfileSummary, Profiler};
 pub use semantic_tokens::{
@@ -37,9 +37,9 @@ pub use text::TextIndex;
 pub use types::{
     CodeAction, CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight,
     DocumentHighlightKind, DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId, Location,
-    ParameterInformation, Position, PrepareRename, Range, SignatureHelp, SignatureInformation,
-    TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId, Location, Position,
+    PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig,
+    WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]
@@ -53,5 +53,7 @@ pub fn default_language_service() -> LanguageService {
     service.register_language(languages::fift::FiftLanguage::new());
     #[cfg(feature = "tolk")]
     service.register_language(languages::tolk::TolkLanguage::new());
+    #[cfg(feature = "toml")]
+    service.register_language(languages::toml::TomlLanguage::new());
     service
 }

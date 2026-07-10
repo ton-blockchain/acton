@@ -1,4 +1,4 @@
-use super::{TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri};
+use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{DocumentSnapshot, InlayHint, InlayHintKind, Position, Range};
 use tolk_analysis::{
     ConstantEvaluationContext, ConstantEvaluator, ConstantValue, compute_get_method_id,
@@ -19,8 +19,7 @@ impl TolkWorkspaceEngine {
         let Some(snapshot) = snapshot else {
             return Vec::new();
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Vec::new();
         };
 
@@ -39,8 +38,6 @@ impl TolkResolveSnapshot {
             return Vec::new();
         };
         let mut builder = TolkInlayHintsBuilder::new(document, range);
-        let root = file.source().tree.root_node();
-        let source = file.source().source.as_ref();
 
         if let (Some(inferences), Some(resolve_index)) = (
             self.all_body_types.get(&file_id),
@@ -56,7 +53,7 @@ impl TolkResolveSnapshot {
                 let Some(inference) = inferences.get(&symbol.id) else {
                     continue;
                 };
-                collect_local_hint(inference, &self.type_interner, local, &mut builder);
+                let _ = collect_local_hint(inference, &self.type_interner, local, &mut builder);
             }
         }
 
@@ -68,17 +65,22 @@ impl TolkResolveSnapshot {
                 if !builder.intersects_span(declaration.span()) {
                     continue;
                 }
-                collect_return_type_hint(
+                let _ = collect_return_type_hint(
                     inference,
                     &self.type_interner,
                     &declaration,
                     &mut builder,
                 );
-                collect_constant_hint(inference, &self.type_interner, &declaration, &mut builder);
+                let _ = collect_constant_hint(
+                    inference,
+                    &self.type_interner,
+                    &declaration,
+                    &mut builder,
+                );
             }
         }
 
-        collect_parameter_hints(self, file_id, root, source, &mut builder);
+        let _ = collect_parameter_hints(self, file_id, &mut builder);
 
         let mut evaluator = ConstantEvaluator::new(self);
         if let Some(file_index) = self.project_index.get_file_index(file_id) {
@@ -90,17 +92,24 @@ impl TolkResolveSnapshot {
                     continue;
                 };
                 match declaration {
-                    TopLevel::Constant(constant) => collect_constant_value_hint(
-                        &mut evaluator,
-                        symbol.id,
-                        constant,
-                        &mut builder,
-                    ),
+                    TopLevel::Constant(constant) => {
+                        let _ = collect_constant_value_hint(
+                            &mut evaluator,
+                            symbol.id,
+                            constant,
+                            &mut builder,
+                        );
+                    }
                     TopLevel::Enum(enum_decl) => {
-                        collect_enum_value_hints(&mut evaluator, symbol, enum_decl, &mut builder)
+                        let _ = collect_enum_value_hints(
+                            &mut evaluator,
+                            symbol,
+                            enum_decl,
+                            &mut builder,
+                        );
                     }
                     TopLevel::GetMethod(method) => {
-                        collect_get_method_id_hint(method, &mut builder);
+                        let _ = collect_get_method_id_hint(method, &mut builder);
                     }
                     _ => {}
                 }
@@ -197,29 +206,28 @@ fn collect_local_hint(
     interner: &TypeInterner,
     local: &LocalDef,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
+) -> Option<()> {
     if matches!(local.kind, LocalDefKind::TypeParameter) || local.name.starts_with('_') {
-        return;
+        return None;
     }
     if let LocalDefKind::Param {
         has_type, is_self, ..
     } = local.kind
         && (has_type || is_self)
     {
-        return;
+        return None;
     }
     if let LocalDefKind::Var { has_type, .. } = local.kind
         && has_type
     {
-        return;
+        return None;
     }
-    let Some(ty_id) = inference.type_of(local.def_span) else {
-        return;
-    };
+    let ty_id = inference.type_of(local.def_span)?;
     if is_undefined_type(interner, ty_id) {
-        return;
+        return None;
     }
     builder.add_type_hint_at_span(local.def_span, interner.format(ty_id));
+    Some(())
 }
 
 fn collect_return_type_hint(
@@ -227,40 +235,28 @@ fn collect_return_type_hint(
     interner: &TypeInterner,
     declaration: &TopLevel<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
-    let Some(return_ty) = inference.inferred_return_type else {
-        return;
-    };
+) -> Option<()> {
+    let return_ty = inference.inferred_return_type?;
     if is_undefined_type(interner, return_ty) {
-        return;
+        return None;
     }
 
     let function = match declaration {
         TopLevel::Func(function) => BaseFunction::Function(*function),
         TopLevel::Method(method) => BaseFunction::MethodDeclaration(*method),
         TopLevel::GetMethod(method) => BaseFunction::GetMethodDeclaration(*method),
-        _ => return,
+        _ => return None,
     };
     if function.return_type().is_some() {
-        return;
+        return None;
     }
 
-    add_return_type_hint(function, return_ty, interner, builder);
-}
-
-fn add_return_type_hint(
-    function: BaseFunction<'_>,
-    return_ty: TyId,
-    interner: &TypeInterner,
-    builder: &mut TolkInlayHintsBuilder<'_>,
-) {
-    let Some(parameters) = function.parameter_list() else {
-        return;
-    };
+    let parameters = function.parameter_list()?;
     builder.add_type_hint(
         builder.position_for_offset(parameters.syntax().end_byte()),
         interner.format(return_ty),
     );
+    Some(())
 }
 
 fn collect_constant_hint(
@@ -268,29 +264,28 @@ fn collect_constant_hint(
     interner: &TypeInterner,
     declaration: &TopLevel<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
+) -> Option<()> {
     let TopLevel::Constant(constant) = declaration else {
-        return;
+        return None;
     };
     if constant.typ().is_some() {
-        return;
+        return None;
     }
-    let Some(name) = constant.name() else {
-        return;
-    };
-    let Some(expression) = constant.value() else {
-        return;
-    };
+
+    let name = constant.name()?;
+    let expression = constant.value()?;
+
     if has_obvious_type(&expression, builder.document.text()) {
-        return;
+        return None;
     }
-    let Some(ty_id) = inference.type_of(expression.span()) else {
-        return;
-    };
+
+    let ty_id = inference.type_of(expression.span())?;
     if is_undefined_type(interner, ty_id) {
-        return;
+        return None;
     }
+
     builder.add_type_hint_at_span(name.span(), interner.format(ty_id));
+    Some(())
 }
 
 fn has_obvious_type(expression: &Expr<'_>, source: &str) -> bool {
@@ -313,22 +308,24 @@ fn is_undefined_type(interner: &TypeInterner, ty_id: TyId) -> bool {
 fn collect_parameter_hints(
     snapshot: &TolkResolveSnapshot,
     file_id: FileId,
-    root: tree_sitter::Node<'_>,
-    source: &str,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
+) -> Option<()> {
+    let file = snapshot.file_db.get_by_id(file_id)?;
+    let root = file.source().tree.root_node();
+    let source = file.source().source.as_ref();
     let mut stack = vec![root];
     while let Some(node) = stack.pop() {
         if !builder.intersects_node(node) {
             continue;
         }
         if let Ok(call) = Call::try_from_node(node) {
-            collect_call_parameter_hints(snapshot, file_id, call, source, builder);
+            let _ = collect_call_parameter_hints(snapshot, file_id, call, source, builder);
         }
 
         let mut cursor = node.walk();
         stack.extend(node.children(&mut cursor));
     }
+    Some(())
 }
 
 fn collect_call_parameter_hints(
@@ -337,22 +334,17 @@ fn collect_call_parameter_hints(
     call: Call<'_>,
     source: &str,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
-    let Some(callee) = call.callee_identifier() else {
-        return;
+) -> Option<()> {
+    let callee = call.callee_identifier()?;
+    let Resolved::Global(symbol_id) = snapshot.resolved_at(file_id, callee.start_byte())? else {
+        return None;
     };
-    let Some(Resolved::Global(symbol_id)) = snapshot.resolved_at(file_id, callee.start_byte())
-    else {
-        return;
-    };
-    let Some(symbol) = snapshot.project_index.resolve_symbol(symbol_id) else {
-        return;
-    };
+    let symbol = snapshot.project_index.resolve_symbol(symbol_id)?;
     if matches!(
         symbol.name.as_ref(),
         "ton" | "println" | "address" | "send" | "expect"
     ) {
-        return;
+        return None;
     }
 
     let (parameters, skip_self) = match &symbol.kind {
@@ -367,7 +359,7 @@ fn collect_call_parameter_hints(
             parameters.as_slice(),
             *is_instance && call.callee_qualifier().is_some(),
         ),
-        _ => return,
+        _ => return None,
     };
     let parameters = parameters.iter().skip(usize::from(skip_self));
 
@@ -404,6 +396,7 @@ fn collect_call_parameter_hints(
             InlayHintKind::Parameter,
         ));
     }
+    Some(())
 }
 
 fn collect_constant_value_hint(
@@ -411,17 +404,17 @@ fn collect_constant_value_hint(
     symbol_id: tolk_resolver::SymbolId,
     constant: tolk_syntax::ast::Constant<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
-    let Some(expression) = constant.value() else {
-        return;
-    };
+) -> Option<()> {
+    let expression = constant.value()?;
     if is_simple_literal(&expression) {
-        return;
+        return None;
     }
+
     let value = evaluator.evaluate_constant(symbol_id);
     if value.is_unknown() {
-        return;
+        return None;
     }
+
     let formatted = value.format();
     let mut hint = InlayHint::plain(
         builder.position_for_offset(expression.syntax().end_byte()),
@@ -429,6 +422,7 @@ fn collect_constant_value_hint(
     );
     hint.tooltip = Some(format!("Evaluated value: {formatted}"));
     builder.add_hint(hint);
+    Some(())
 }
 
 fn collect_enum_value_hints(
@@ -436,16 +430,13 @@ fn collect_enum_value_hints(
     symbol: &tolk_resolver::Symbol,
     enum_decl: tolk_syntax::ast::Enum<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
+) -> Option<()> {
     let SymbolKind::Enum { members } = &symbol.kind else {
-        return;
+        return None;
     };
-    let Some(body) = enum_decl.body() else {
-        return;
-    };
-    let Some(values) = evaluator.evaluate_enum_values(symbol.id) else {
-        return;
-    };
+
+    let body = enum_decl.body()?;
+    let values = evaluator.evaluate_enum_values(symbol.id)?;
 
     for (member, member_symbol) in body.members().zip(members) {
         let Some(ConstantValue::Int(value)) = values.get(&member_symbol.id) else {
@@ -472,27 +463,26 @@ fn collect_enum_value_hints(
         hint.tooltip = Some(format!("Enum value: {value}"));
         builder.add_hint(hint);
     }
+    Some(())
 }
 
 fn collect_get_method_id_hint(
     method: tolk_syntax::ast::GetMethod<'_>,
     builder: &mut TolkInlayHintsBuilder<'_>,
-) {
+) -> Option<()> {
     let source = builder.document.text();
     if method.has_method_id_annotation(source) || method.is_test_function(source) {
-        return;
+        return None;
     }
-    let Some(name) = method.name() else {
-        return;
-    };
+
+    let name = method.name()?;
     let name = name.normalized_name(source);
 
-    let Some(get_keyword) = method.get_keyword() else {
-        return;
-    };
+    let get_keyword = method.get_keyword()?;
     builder.add_hint(InlayHint::new(
         builder.position_for_offset(get_keyword.end_byte()),
         format!("(0x{:x})", compute_get_method_id(name)),
         InlayHintKind::Type,
     ));
+    Some(())
 }

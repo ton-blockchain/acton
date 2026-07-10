@@ -16,11 +16,12 @@ doctest = false
 
 [features]
 default = ["all-languages"]
-all-languages = ["tlb", "tasm", "fift", "tolk"]
+all-languages = ["tlb", "tasm", "fift", "tolk", "toml"]
 tlb = ["ton-language-server-core/tlb"]
 tasm = ["ton-language-server-core/tasm"]
 fift = ["ton-language-server-core/fift"]
 tolk = ["ton-language-server-core/tolk"]
+toml = ["ton-language-server-core/toml"]
 
 [dependencies]
 console_error_panic_hook = "0.1.7"

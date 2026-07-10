@@ -1,13 +1,10 @@
+use super::file_info::FileInfoExt;
 use super::resolution::ResolvedTarget;
-use super::{
-    TolkResolveSnapshot, TolkWorkspaceEngine, fallback_uri_for_path, logical_path_for_uri,
-};
-use crate::{
-    DocumentEdits, DocumentSnapshot, Position, PrepareRename, TextEdit, TextIndex, WorkspaceEdit,
-};
+use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
+use crate::{DocumentEdits, DocumentSnapshot, Position, PrepareRename, TextEdit, WorkspaceEdit};
 use std::collections::BTreeMap;
 use tolk_resolver::{FileId, Resolved, Span, SymbolKind, resolve_index::LocalDefId};
-use tolk_syntax::{AstNode, HasName, InstanceArg, TryFromNode};
+use tolk_syntax::{HasName, InstanceArg, TryFromNode};
 use tolk_ty::GlobalUsages;
 
 impl TolkWorkspaceEngine {
@@ -22,19 +19,15 @@ impl TolkWorkspaceEngine {
         let Some(target) = snapshot.rename_target(file_id, offset) else {
             return Ok(None);
         };
+
         snapshot.ensure_renameable(&target.resolved)?;
+
         let Some(file) = snapshot.file_db.get_by_id(file_id) else {
             return Ok(None);
         };
-        let source = file.source().source.as_ref();
-        let placeholder = source
-            .get(target.span.start()..target.span.end())
-            .unwrap_or_default();
-        let range = TextIndex::new(source).range_for_offsets(
-            source,
-            target.span.start(),
-            target.span.end(),
-        );
+
+        let placeholder = file.text_at(target.span);
+        let range = file.range_for_span(target.span);
 
         Ok(Some(PrepareRename::new(range, placeholder)))
     }
@@ -67,8 +60,7 @@ impl TolkWorkspaceEngine {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             state.latest_snapshot.clone()
         }?;
-        let path = logical_path_for_uri(document.uri());
-        let file_id = snapshot.project_index.get_file_by_path(&path)?;
+        let file_id = snapshot.find_document_file(document)?;
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position);
@@ -103,24 +95,23 @@ impl TolkResolveSnapshot {
                     .resolve_symbol(*symbol_id)
                     .is_some_and(|symbol| matches!(symbol.kind, SymbolKind::StructField))
         );
-        let mut documents = BTreeMap::<String, DocumentEdits>::new();
+
+        let mut documents = BTreeMap::<FileId, DocumentEdits>::new();
 
         for (file_id, span) in self.rename_occurrences(resolved) {
             let Some(file) = self.file_db.get_by_id(file_id) else {
                 continue;
             };
-            let uri = self
-                .path_to_uri
-                .get(file.path())
-                .cloned()
-                .unwrap_or_else(|| fallback_uri_for_path(file.path()));
-            let source = file.source().source.as_ref();
-            let range = TextIndex::new(source).range_for_offsets(source, span.start(), span.end());
-            let new_text = shorthand_replacement(file.source(), span, replacement, is_field)
+            let Some(uri) = self.file_uri(file_id).cloned() else {
+                continue;
+            };
+
+            let range = file.range_for_span(span);
+            let new_text = shorthand_replacement(file.as_ref(), span, replacement, is_field)
                 .unwrap_or_else(|| replacement.to_owned());
-            let key = uri.as_str().to_owned();
+
             documents
-                .entry(key)
+                .entry(file_id)
                 .or_insert_with(|| DocumentEdits::new(uri, Vec::new()))
                 .edits
                 .push(TextEdit::new(range, new_text));
@@ -167,20 +158,17 @@ impl TolkResolveSnapshot {
 }
 
 fn shorthand_replacement(
-    source_file: &tolk_syntax::SourceFile,
+    file: &tolk_resolver::FileInfo,
     span: Span,
     replacement: &str,
     is_field: bool,
 ) -> Option<String> {
-    let identifier = source_file
-        .tree
-        .root_node()
-        .descendant_for_byte_range(span.start(), span.end())?;
+    let identifier = file.find_node_at_span(span)?;
     let argument = InstanceArg::try_from_node(identifier.parent()?).ok()?;
     if argument.has_value_separator() {
         return None;
     }
-    let original = argument.name()?.text(source_file.source.as_ref());
+    let original = file.text(&argument.name()?);
 
     Some(if is_field {
         format!("{replacement}: {original}")

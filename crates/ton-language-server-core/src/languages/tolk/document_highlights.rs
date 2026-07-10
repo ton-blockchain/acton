@@ -1,7 +1,6 @@
-use super::{TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri};
+use super::{TolkWorkspaceEngine, range_for_span};
 use crate::{DocumentHighlight, DocumentHighlightKind, DocumentSnapshot, Position};
-use tolk_resolver::{Resolved, SymbolKind};
-use tolk_syntax::{Assign, AstNode, Call, DotAccess, SetAssign, TryFromNode};
+use tolk_analysis::UseFlags;
 
 impl TolkWorkspaceEngine {
     pub(super) fn document_highlights(
@@ -16,8 +15,7 @@ impl TolkWorkspaceEngine {
         let Some(snapshot) = snapshot else {
             return Vec::new();
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Vec::new();
         };
         let offset = document
@@ -28,78 +26,24 @@ impl TolkWorkspaceEngine {
         };
 
         let mut highlights = snapshot
-            .references_for_resolved(&resolved, true)
+            .reference_spans_for_resolved(&resolved, true)
             .into_iter()
-            .filter(|location| location.uri == *document.uri())
-            .map(|location| {
-                let kind = snapshot.highlight_kind(document, file_id, location.range);
-                DocumentHighlight::new(location.range, kind)
+            .filter(|(reference_file_id, _)| *reference_file_id == file_id)
+            .map(|(_, span)| {
+                let kind = if snapshot
+                    .use_facts
+                    .get(&file_id)
+                    .and_then(|facts| facts.per_usage.get(&span))
+                    .is_some_and(|flags| flags.contains(UseFlags::WRITE))
+                {
+                    DocumentHighlightKind::Write
+                } else {
+                    DocumentHighlightKind::Read
+                };
+                DocumentHighlight::new(range_for_span(document.text(), span), kind)
             })
             .collect::<Vec<_>>();
         highlights.sort_by_key(|highlight| highlight.range.start);
         highlights
-    }
-}
-
-impl TolkResolveSnapshot {
-    fn highlight_kind(
-        &self,
-        document: &DocumentSnapshot,
-        file_id: u32,
-        range: crate::Range,
-    ) -> DocumentHighlightKind {
-        let Some(file) = self.file_db.get_by_id(file_id) else {
-            return DocumentHighlightKind::Read;
-        };
-        let start = document
-            .text_index()
-            .position_to_offset(document.text(), range.start);
-        let end = document
-            .text_index()
-            .position_to_offset(document.text(), range.end);
-        let Some(identifier) = file
-            .source()
-            .tree
-            .root_node()
-            .descendant_for_byte_range(start, end)
-        else {
-            return DocumentHighlightKind::Read;
-        };
-        let Some(parent) = identifier.parent() else {
-            return DocumentHighlightKind::Read;
-        };
-
-        if Assign::try_from_node(parent).is_ok_and(|assignment| assignment.is_lhs(&identifier))
-            || SetAssign::try_from_node(parent)
-                .is_ok_and(|assignment| assignment.is_lhs(&identifier))
-        {
-            return DocumentHighlightKind::Write;
-        }
-
-        self.mutating_call_kind(file_id, parent)
-            .unwrap_or(DocumentHighlightKind::Read)
-    }
-
-    fn mutating_call_kind(
-        &self,
-        file_id: u32,
-        parent: tree_sitter::Node<'_>,
-    ) -> Option<DocumentHighlightKind> {
-        let dot_access = DotAccess::try_from_node(parent).ok()?;
-        let call = Call::try_from_node(dot_access.syntax().parent()?).ok()?;
-        let callee = call.callee_identifier()?;
-        let Resolved::Global(symbol_id) = self.resolved_at(file_id, callee.start_byte())? else {
-            return None;
-        };
-        let symbol = self.project_index.resolve_symbol(symbol_id)?;
-
-        matches!(
-            symbol.kind,
-            SymbolKind::Method {
-                is_mutable: true,
-                ..
-            }
-        )
-        .then_some(DocumentHighlightKind::Write)
     }
 }

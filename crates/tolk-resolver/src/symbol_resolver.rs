@@ -184,7 +184,7 @@ impl<'a> SymbolResolver<'a> {
     }
 
     fn resolve_symbol(&mut self, ident: &Node, use_kind: NameUseKind) -> Option<()> {
-        let name = norm(self.file.text(ident).ok()?);
+        let name = norm(self.file.text(ident));
 
         let mut current = Some(self.current_scope);
         let decl_start = self.decl_start();

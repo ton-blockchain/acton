@@ -7,6 +7,8 @@ use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::TasmLanguage;
 #[cfg(feature = "tolk")]
 use ton_language_server_core::languages::tolk::TolkLanguage;
+#[cfg(feature = "toml")]
+use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
     CORE_TARGET, CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind,
     CompletionList, CompletionTrigger, CompletionTriggerKind, DocumentHighlight,
@@ -486,10 +488,17 @@ fn wasm_language_server(tasm_spec_json: Option<&str>) -> Result<TonLanguageServe
     let _ = tasm_spec_json;
 
     #[cfg(feature = "fift")]
-    service.register_language(FiftLanguage::new());
+    service.register_language(if let Some(spec_json) = tasm_spec_json {
+        FiftLanguage::with_spec_json(spec_json).map_err(js_error)?
+    } else {
+        FiftLanguage::new()
+    });
 
     #[cfg(feature = "tolk")]
     service.register_language(TolkLanguage::new());
+
+    #[cfg(feature = "toml")]
+    service.register_language(TomlLanguage::new());
 
     Ok(TonLanguageServer {
         service: RefCell::new(service),
@@ -592,6 +601,8 @@ struct LspInlayHint {
     kind: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     tooltip: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    text_edits: Option<Vec<LspTextEdit>>,
     padding_left: bool,
     padding_right: bool,
 }
@@ -662,8 +673,6 @@ struct LspSignatureInformation {
 #[derive(Serialize)]
 struct LspParameterInformation {
     label: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    documentation: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -866,6 +875,15 @@ fn inlay_hints_to_lsp(hints: Vec<InlayHint>) -> Vec<LspInlayHint> {
                 InlayHintKind::Parameter => 2,
             }),
             tooltip: hint.tooltip,
+            text_edits: (!hint.text_edits.is_empty()).then(|| {
+                hint.text_edits
+                    .into_iter()
+                    .map(|edit| LspTextEdit {
+                        range: range_to_lsp(edit.range),
+                        new_text: edit.new_text,
+                    })
+                    .collect()
+            }),
             padding_left: hint.padding_left,
             padding_right: hint.padding_right,
         })
@@ -945,10 +963,7 @@ fn signature_information_to_lsp(signature: SignatureInformation) -> LspSignature
         parameters: signature
             .parameters
             .into_iter()
-            .map(|parameter| LspParameterInformation {
-                label: parameter.label,
-                documentation: parameter.documentation,
-            })
+            .map(|label| LspParameterInformation { label })
             .collect(),
         active_parameter: signature.active_parameter,
     }

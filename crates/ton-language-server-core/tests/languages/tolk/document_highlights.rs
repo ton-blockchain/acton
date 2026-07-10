@@ -72,6 +72,39 @@ fn highlights_local_reads_and_assignment_writes() {
 }
 
 #[test]
+fn highlights_writes_collected_by_usage_analysis() {
+    case_highlights(
+        "
+            fun touch(mutate value: int) { value += 1; }
+            fun main() {
+                var <caret>value = 0;
+                touch(mutate value);
+                throw value;
+            }
+        ",
+        expect![[r"
+            2:8 read  value
+            3:17 write value
+            4:10 read  value"]],
+    );
+
+    case_highlights(
+        "
+            struct Foo { value: int }
+            fun main() {
+                var <caret>foo = Foo { value: 0 };
+                foo.value = 1;
+                foo;
+            }
+        ",
+        expect![[r"
+            2:8 read  foo
+            3:4 write foo
+            4:4 read  foo"]],
+    );
+}
+
+#[test]
 fn treats_mutating_method_calls_as_writes() {
     // A mutable receiver is written by an instance method call.
     case_highlights(

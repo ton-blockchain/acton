@@ -1,4 +1,4 @@
-use super::{TolkCompletionProviderContext, logical_path_for_uri};
+use super::TolkCompletionProviderContext;
 use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
@@ -24,7 +24,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathComplet
     ) -> Option<()> {
         let (import_path, full_range) =
             super::string_prefix_and_range(context.syntax, context.document)?;
-        let current_path = logical_path_for_uri(context.document.uri());
+        let current_path = context.document.uri().logical_path();
         let current_dir = current_path.parent().unwrap_or_else(|| Path::new("/"));
         if matches!(import_path.as_str(), "" | "@") {
             add_path(

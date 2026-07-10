@@ -1,7 +1,7 @@
 import type {languages} from "@codingame/monaco-vscode-editor-api"
 import type {LanguageSupport} from "../types"
 
-export const ACTON_TOML_LANGUAGE_ID = "acton-toml"
+export const ACTON_TOML_LANGUAGE_ID = "toml"
 
 export const defaultActonTomlSource = `[package]
 name = "web-playground"
@@ -18,7 +18,7 @@ export const actonTomlLanguageSupport = {
   defaultSource: defaultActonTomlSource,
   extensionPoint: {
     id: ACTON_TOML_LANGUAGE_ID,
-    aliases: ["Acton.toml", "acton-toml"],
+    aliases: ["Acton.toml", "TOML"],
     extensions: [".toml"],
     filenames: ["Acton.toml"],
   },

@@ -158,7 +158,7 @@ impl ReferenceCompletionProvider {
             if matches!(qualifier, Expr::Instantiation(_)) {
                 return None;
             }
-            let name = context.syntax.text_of(qualifier).trim();
+            let name = context.syntax.text_of(qualifier);
             GlobalEnv::new(&context.snapshot.project_index, context.file_id)
                 .visible
                 .get(name)?
@@ -265,7 +265,6 @@ impl ReferenceCompletionProvider {
             .arguments()
             .filter_map(|argument| argument.name())
             .map(|name| context.syntax.text_of(name))
-            .map(str::trim)
             .collect::<Vec<_>>();
         let field_names = fields
             .iter()
@@ -317,7 +316,7 @@ impl ReferenceCompletionProvider {
             }
         }
 
-        let type_name = context.syntax.text_of(object.typ()?).trim();
+        let type_name = context.syntax.text_of(object.typ()?);
         GlobalEnv::new(&context.snapshot.project_index, context.file_id)
             .visible
             .get(type_name)?

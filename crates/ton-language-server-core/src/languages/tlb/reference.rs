@@ -108,6 +108,28 @@ pub(super) fn resolve_variants_at<'tree>(
     result
 }
 
+pub(super) fn resolved_items_at<'tree>(
+    source_file: &'tree tlb_syntax::SourceFile,
+    node: Node<'tree>,
+) -> Vec<TlbNamedItem<'tree>> {
+    let Some(identifier) = find_reference_identifier(node) else {
+        return Vec::new();
+    };
+    let Ok(name) = identifier.utf8_text(source_file.source.as_bytes()) else {
+        return Vec::new();
+    };
+    let name = name.trim();
+
+    resolve_variants_at(source_file, identifier)
+        .into_iter()
+        .filter(|item| item.name(source_file.source.as_ref()) == Some(name))
+        .collect()
+}
+
+pub(super) fn reference_identifier(node: Node<'_>) -> Option<Node<'_>> {
+    find_reference_identifier(node)
+}
+
 pub(super) fn definition_ranges_at(psi_file: &TlbPsiFile<'_>, position: Position) -> Vec<Range> {
     let document = psi_file.document();
     tracing::trace!(

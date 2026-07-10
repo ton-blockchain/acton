@@ -1,9 +1,8 @@
-use super::{
-    TolkWorkspaceEngine, fallback_uri_for_path, import_edits, logical_path_for_uri, range_for_span,
-};
+use super::{TolkWorkspaceEngine, file_info::FileInfoExt, import_edits};
 use crate::{DocumentEdits, FileRename, TextEdit, WorkspaceEdit};
 use std::collections::BTreeMap;
 use std::path::Path;
+use tolk_resolver::FileId;
 use tolk_syntax::{AstNode, TopLevel};
 
 impl TolkWorkspaceEngine {
@@ -15,15 +14,15 @@ impl TolkWorkspaceEngine {
         let renames = files
             .iter()
             .filter_map(|rename| {
-                let old_path = logical_path_for_uri(&rename.old_uri);
-                let new_path = logical_path_for_uri(&rename.new_uri);
+                let old_path = rename.old_uri.logical_path();
+                let new_path = rename.new_uri.logical_path();
                 is_tolk_rename(&old_path, &new_path).then_some((old_path, new_path))
             })
             .collect::<BTreeMap<_, _>>();
         if renames.is_empty() {
             return None;
         }
-        let mut documents = BTreeMap::<String, DocumentEdits>::new();
+        let mut documents = BTreeMap::<FileId, DocumentEdits>::new();
 
         for (&file_id, imports) in snapshot.project_index.imports() {
             let Some(importer) = snapshot.project_index.files().get(&file_id) else {
@@ -62,18 +61,13 @@ impl TolkWorkspaceEngine {
                 else {
                     continue;
                 };
-                let uri = snapshot
-                    .path_to_uri
-                    .get(&importer.path)
-                    .cloned()
-                    .unwrap_or_else(|| fallback_uri_for_path(&importer.path));
-                let range = range_for_span(
-                    source_file.source().source.as_ref(),
-                    tolk_resolver::Span::from_syntax(&path_node),
-                );
-                let key = uri.as_str().to_owned();
+                let Some(uri) = snapshot.file_uri(file_id).cloned() else {
+                    continue;
+                };
+                let range =
+                    source_file.range_for_span(tolk_resolver::Span::from_syntax(&path_node));
                 documents
-                    .entry(key)
+                    .entry(file_id)
                     .or_insert_with(|| DocumentEdits::new(uri, Vec::new()))
                     .edits
                     .push(TextEdit::new(range, format!("\"{import_path}\"")));
@@ -88,8 +82,8 @@ impl TolkWorkspaceEngine {
         let mut state = self.state.write().expect("Tolk workspace lock poisoned");
 
         for rename in files {
-            let old_path = logical_path_for_uri(&rename.old_uri);
-            let new_path = logical_path_for_uri(&rename.new_uri);
+            let old_path = rename.old_uri.logical_path();
+            let new_path = rename.new_uri.logical_path();
             if !is_tolk_rename(&old_path, &new_path) {
                 continue;
             }

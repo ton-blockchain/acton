@@ -20,6 +20,7 @@ pub use serialization_size::{
 };
 
 bitflags::bitflags! {
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
     pub struct UseFlags: u8 {
         const READ    = 1 << 1;
         const WRITE   = 1 << 2;
@@ -27,10 +28,19 @@ bitflags::bitflags! {
     }
 }
 
+/// Cached read/write facts for name usages in one source file.
+#[derive(Debug)]
 pub struct FileUseFacts {
+    /// Aggregate usage facts for each local definition in the file.
     pub per_local: FxHashMap<LocalDefId, LocalUseFacts>,
+    /// Usage flags keyed by the exact byte span of each referenced name.
+    ///
+    /// The map includes references collected by both the resolver and type
+    /// inference. Definition spans are not usages and therefore are absent.
+    pub per_usage: FxHashMap<Span, UseFlags>,
 }
 
+#[derive(Debug)]
 pub struct LocalUseFacts {
     pub flags: UseFlags,
     pub first_write_span: Option<Span>,
@@ -101,61 +111,42 @@ impl AnalysisDb {
             .iter()
             .map(|l| (l.id, (UseFlags::empty(), None)))
             .collect();
+        let mut per_usage = FxHashMap::default();
 
-        for usage in &resolved_index.uses {
-            let Resolved::Local(local_id) = usage.resolved else {
-                continue;
-            };
-
-            let Some((flags, first_write_span)) = per_local_facts.get_mut(&local_id) else {
-                continue;
-            };
-
-            if flags.contains(UseFlags::READ) && flags.contains(UseFlags::WRITE) {
-                continue;
-            }
-
-            let mut is_write = false; // is this usage is mutation
-
+        let usages = resolved_index.uses.iter().chain(
+            inference
+                .values()
+                .flat_map(|inference| inference.resolved_refs.iter()),
+        );
+        for usage in usages {
             let Some(usage_node) =
                 root.descendant_for_byte_range(usage.span.start(), usage.span.end())
             else {
                 continue;
             };
 
+            let mut usage_flags = UseFlags::READ;
             let mut current = usage_node.parent();
             while let Some(node) = current {
                 if let Ok(assign) = Assign::try_from_node(node) {
                     if assign.is_lhs(&usage_node) {
-                        flags.insert(UseFlags::WRITE);
-                        if first_write_span.is_none() {
-                            *first_write_span = Some(usage.span);
-                        }
-                        is_write = true;
+                        usage_flags = UseFlags::WRITE;
                     }
                     break;
                 } else if let Ok(assign) = SetAssign::try_from_node(node) {
                     if assign.is_lhs(&usage_node) {
-                        flags.insert(UseFlags::READ | UseFlags::WRITE);
-                        if first_write_span.is_none() {
-                            *first_write_span = Some(usage.span);
-                        }
-                        is_write = true;
+                        usage_flags = UseFlags::READ | UseFlags::WRITE;
                     }
                     break;
                 } else if let Ok(argument) = CallArgument::try_from_node(node) {
                     if argument.mutate() {
-                        flags.insert(UseFlags::WRITE | UseFlags::MUTATE);
-                        if first_write_span.is_none() {
-                            *first_write_span = Some(usage.span);
-                        }
-                        is_write = true;
+                        usage_flags = UseFlags::WRITE | UseFlags::MUTATE;
                         break;
                     }
                 } else if let Ok(dot) = DotAccess::try_from_node(node)
-                    && dot.is_obj(&usage_node)
                     && let Some(call) = node.parent().and_then(|p| Call::try_from_node(p).ok())
                     && let Some(callee) = call.callee_identifier()
+                    && (dot.is_obj(&usage_node) || callee.span() == usage.span)
                     && let Some(decl) = file.find_symbol_at(usage_node.start_byte())
                     && let Some(inference) = inference.get(&decl.id)
                 {
@@ -169,19 +160,11 @@ impl AnalysisDb {
                             && let SymbolKind::Method { is_mutable, .. } = resolved.kind
                             && is_mutable
                         {
-                            flags.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
-                            if first_write_span.is_none() {
-                                *first_write_span = Some(usage.span);
-                            }
-                            is_write = true;
+                            usage_flags = UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE;
                         }
                     } else {
                         // we cannot resolve this method call, assume it mutates to avoid false positives
-                        flags.insert(UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE);
-                        if first_write_span.is_none() {
-                            *first_write_span = Some(usage.span);
-                        }
-                        is_write = true;
+                        usage_flags = UseFlags::READ | UseFlags::WRITE | UseFlags::MUTATE;
                     }
                     break;
                 }
@@ -189,9 +172,18 @@ impl AnalysisDb {
                 current = node.parent();
             }
 
-            if !is_write {
-                // if this usage is not mutation then it is read
-                flags.insert(UseFlags::READ);
+            per_usage
+                .entry(usage.span)
+                .and_modify(|flags: &mut UseFlags| flags.insert(usage_flags))
+                .or_insert(usage_flags);
+
+            if let Resolved::Local(local_id) = usage.resolved
+                && let Some((flags, first_write_span)) = per_local_facts.get_mut(&local_id)
+            {
+                flags.insert(usage_flags);
+                if usage_flags.contains(UseFlags::WRITE) && first_write_span.is_none() {
+                    *first_write_span = Some(usage.span);
+                }
             }
         }
 
@@ -210,6 +202,7 @@ impl AnalysisDb {
 
         let facts = Arc::new(FileUseFacts {
             per_local: use_facts,
+            per_usage,
         });
         self.use_facts.insert(file_id, facts.clone());
         Some(facts)

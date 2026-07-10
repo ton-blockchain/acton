@@ -1,4 +1,4 @@
-use super::{TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri};
+use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::semantic_tokens::{
     SemanticToken, SemanticTokenModifier, SemanticTokenType, SemanticTokensBuilder,
 };
@@ -15,8 +15,7 @@ impl TolkWorkspaceEngine {
         let Some(snapshot) = snapshot else {
             return Vec::new();
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Vec::new();
         };
 

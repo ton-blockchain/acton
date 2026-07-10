@@ -95,6 +95,8 @@ type SmokeApi = {
   semanticTokens: () => Promise<PlainSemanticTokens>
   inlayHints: () => Promise<PlainInlayHint[]>
   completionAt: (line: number, character: number) => Promise<PlainCompletionItem[]>
+  actonTomlCompletionAt: (line: number, character: number) => Promise<PlainCompletionItem[]>
+  actonTomlHoverAt: (line: number, character: number) => Promise<PlainHover[]>
   applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
   logs: () => Promise<string>
   profile: () => Promise<string>
@@ -112,6 +114,7 @@ type SmokeApi = {
   setActonTomlText: (text: string) => void
   editorText: () => string
   actonTomlText: () => string
+  actonTomlLanguageId: () => string | undefined
   languageId: () => string | undefined
 }
 
@@ -296,10 +299,17 @@ export function App() {
           },
         },
         clientOptions: {
-          documentSelector: languageSupports.map(language => ({
-            language: language.id,
-            scheme: "file",
-          })),
+          documentSelector: [
+            ...languageSupports.map(language => ({
+              language: language.id,
+              scheme: "file",
+            })),
+            {
+              language: actonTomlLanguageSupport.id,
+              scheme: "file",
+              pattern: "**/Acton.toml",
+            },
+          ],
           workspaceFolder: {
             index: 0,
             name: "workspace",
@@ -425,11 +435,16 @@ export function App() {
       await editorApp.start(editorRoot)
       editorRef.current = editorApp.getEditor()
 
-      actonConfigModelRef.current = monaco.editor.createModel(
-        persistedRef.current.actonToml,
-        actonTomlLanguageSupport.id,
+      await vscode.workspace.fs.createDirectory(workspaceUri)
+      await vscode.workspace.fs.writeFile(
         actonTomlUri,
+        new TextEncoder().encode(persistedRef.current.actonToml),
       )
+      await vscode.workspace.openTextDocument(actonTomlUri)
+      actonConfigModelRef.current = monaco.editor.getModel(actonTomlUri)
+      if (!actonConfigModelRef.current) {
+        throw new Error("Acton.toml model was not registered by the workspace file service")
+      }
       actonConfigEditorRef.current = monaco.editor.create(actonConfigRoot, {
         automaticLayout: true,
         fixedOverflowWidgets: true,
@@ -643,6 +658,25 @@ export function App() {
             detail: item.detail,
           }))
         },
+        async actonTomlCompletionAt(line: number, character: number) {
+          const result = await vscode.commands.executeCommand<vscode.CompletionList>(
+            "vscode.executeCompletionItemProvider",
+            actonTomlUri,
+            new vscode.Position(line, character),
+          )
+          return (result?.items ?? []).map(item => ({
+            label: typeof item.label === "string" ? item.label : item.label.label,
+            detail: item.detail,
+          }))
+        },
+        async actonTomlHoverAt(line: number, character: number) {
+          const result = await vscode.commands.executeCommand<vscode.Hover[]>(
+            "vscode.executeHoverProvider",
+            actonTomlUri,
+            new vscode.Position(line, character),
+          )
+          return (result ?? []).map(toPlainHover)
+        },
         async applyCompletionAt(line: number, character: number, label: string) {
           const result = await vscode.commands.executeCommand<vscode.CompletionList>(
             "vscode.executeCompletionItemProvider",
@@ -735,6 +769,9 @@ export function App() {
         },
         actonTomlText() {
           return actonConfigModelRef.current?.getValue() ?? ""
+        },
+        actonTomlLanguageId() {
+          return actonConfigModelRef.current?.getLanguageId()
         },
         languageId() {
           return editorRef.current?.getModel()?.getLanguageId()

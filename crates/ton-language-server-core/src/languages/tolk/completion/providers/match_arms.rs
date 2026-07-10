@@ -218,7 +218,6 @@ fn existing_arms(match_expression: Match<'_>, context: &TolkCompletionContext) -
             MatchPattern::Expr(pattern) => context.text_of(pattern),
             MatchPattern::Else => "else",
         })
-        .map(str::trim)
         .map(str::to_owned)
         .collect()
 }

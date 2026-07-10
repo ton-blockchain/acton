@@ -11,7 +11,6 @@ use smol_str::SmolStr;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::path::{Path, PathBuf};
-use std::str::Utf8Error;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use tolk_syntax::{AstNode, CONTRACT_ENTRYPOINTS, HasName, ast};
@@ -63,7 +62,7 @@ impl FileInfo {
         self.source
             .functions()
             .filter_map(|func| func.name())
-            .filter_map(|name| self.text(&name.0).ok())
+            .map(|name| self.text(&name))
             .any(|name| CONTRACT_ENTRYPOINTS.contains(&name))
     }
 
@@ -90,9 +89,43 @@ impl FileInfo {
         self.index.source_kind == FileSource::Workspace
     }
 
-    /// Returns the source text associated with a tree-sitter node.
-    pub fn text(&self, node: &Node) -> Result<&str, Utf8Error> {
-        node.utf8_text(self.source.source.as_ref().as_ref())
+    /// Returns the source text covered by a typed Tolk AST node.
+    ///
+    /// The method accepts any node that implements [`AstNode`], including a raw
+    /// [`tree_sitter::Node`], and returns a slice borrowed from this file's
+    /// source text. It does not allocate or normalize whitespace. Tolk source
+    /// files are UTF-8; if an invalid node boundary is encountered, the method
+    /// returns the `"<invalid utf8>"` placeholder used by [`AstNode::text`].
+    pub fn text<'tree, N: AstNode<'tree>>(&self, node: &N) -> &str {
+        node.text(self.source.source.as_ref())
+    }
+
+    /// Returns the exact source text covered by a resolver span.
+    ///
+    /// The span must use UTF-8 byte offsets from this file. The returned text
+    /// borrows the stored source and is not trimmed or otherwise normalized.
+    /// If the span is out of bounds or splits a UTF-8 code point, the method
+    /// returns the same `"<invalid utf8>"` placeholder as [`Self::text`].
+    #[must_use]
+    pub fn text_at(&self, span: Span) -> &str {
+        self.source
+            .source
+            .get(span.start()..span.end())
+            .unwrap_or("<invalid utf8>")
+    }
+
+    /// Finds the smallest syntax node that covers a resolver span in this file.
+    ///
+    /// The span uses UTF-8 byte offsets and must belong to this file's current
+    /// syntax tree. The returned node may be named or anonymous, matching
+    /// tree-sitter's `descendant_for_byte_range` semantics. Returns `None` when
+    /// the span is outside the tree or no descendant covers the complete range.
+    #[must_use]
+    pub fn find_node_at_span(&self, span: Span) -> Option<Node<'_>> {
+        self.source
+            .tree
+            .root_node()
+            .descendant_for_byte_range(span.start(), span.end())
     }
 
     /// Finds the `Symbol` declaration corresponding to an AST node that has a name.
@@ -283,10 +316,14 @@ impl FileDb {
         Ok(canonical)
     }
 
-    /// Retrieves the text content corresponding to a span in a file.
+    /// Returns the exact source text covered by a resolver span in a file.
+    ///
+    /// Returns `None` only when `file_id` is absent from the database. Invalid
+    /// span boundaries produce the `"<invalid utf8>"` placeholder documented by
+    /// [`FileInfo::text_at`] instead of making the file lookup appear to fail.
     pub fn text(&self, file_id: FileId, span: Span) -> Option<SmolStr> {
         let file = self.files_by_id.get(&file_id)?;
-        Some(file.source.source.get(span.start()..span.end())?.into())
+        Some(file.text_at(span).into())
     }
 
     /// Retrieves the text content of an AST node.

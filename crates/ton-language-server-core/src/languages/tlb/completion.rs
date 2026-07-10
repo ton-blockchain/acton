@@ -1,5 +1,5 @@
 mod context;
-mod providers;
+pub(super) mod providers;
 
 use super::TlbParsedDocument;
 use crate::completion::{CompletionProvider, collect_from_providers};

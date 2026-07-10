@@ -65,23 +65,19 @@ fn resolve_initialized_field<'a>(
 fn cell_struct_name(context: &TolkCompletionProviderContext<'_>, field: &Symbol) -> Option<String> {
     let field_file_id = field.id.file_id;
     let file = context.snapshot.file_db.get_by_id(field_file_id)?;
-    let source_file = file.source();
-    let name = source_file
-        .tree
-        .root_node()
-        .descendant_for_byte_range(field.name_span.start(), field.name_span.end())?;
+    let name = file.find_node_at_span(field.name_span)?;
     let node = name.parent()?;
     let field = StructField::try_from_node(node).ok()?;
     let Type::TypeInstantiatedTs(instantiated) = field.typ()? else {
         return None;
     };
-    if instantiated.name()?.text(source_file.source.as_ref()) != "Cell" {
+    if file.text(&instantiated.name()?) != "Cell" {
         return None;
     }
     let Type::TypeIdent(inner) = instantiated.arguments()?.types().next()? else {
         return None;
     };
-    let inner_name = inner.text(source_file.source.as_ref());
+    let inner_name = file.text(&inner);
     let env = GlobalEnv::new(&context.snapshot.project_index, field_file_id);
     env.visible.get(inner_name)?.iter().find_map(|id| {
         context

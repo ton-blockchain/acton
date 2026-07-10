@@ -14,14 +14,18 @@ impl CompletionProvider<TasmCompletionContext<'_>> for InstructionCompletionProv
         context: &TasmCompletionContext<'_>,
         collector: &mut CompletionCollector,
     ) -> Option<()> {
-        for instruction in context.spec.instructions.values() {
-            let snippet = instruction_snippet(&instruction.name, &instruction.operands);
-            let detail = if instruction.operands.is_empty() {
-                instruction.stack.clone().unwrap_or_default()
+        for instruction in context.spec.instructions() {
+            let snippet = instruction_snippet(instruction.name(), instruction.operands());
+            let detail = if instruction.operands().is_empty() {
+                instruction.stack().unwrap_or_default().to_owned()
             } else {
-                format!("{} {}", instruction.name, instruction.operands.join(" "))
+                format!(
+                    "{} {}",
+                    instruction.name(),
+                    instruction.operands().join(" ")
+                )
             };
-            let mut item = CompletionItem::new(&instruction.name, CompletionItemKind::Function)
+            let mut item = CompletionItem::new(instruction.name(), CompletionItemKind::Function)
                 .with_snippet_replacement(context.replacement_range, snippet)
                 .with_documentation(instruction.render_hover());
             if !detail.is_empty() {
@@ -29,7 +33,7 @@ impl CompletionProvider<TasmCompletionContext<'_>> for InstructionCompletionProv
             }
             collector.add(
                 item,
-                context.rank_for(CompletionCategory::Function, &instruction.name),
+                context.rank_for(CompletionCategory::Function, instruction.name()),
             );
         }
         Some(())

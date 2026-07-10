@@ -43,6 +43,22 @@ type SmokeGlobal = typeof globalThis & {
       }[]
     >
     completionAt: (line: number, character: number) => Promise<{label: string; detail?: string}[]>
+    actonTomlCompletionAt: (
+      line: number,
+      character: number,
+    ) => Promise<{label: string; detail?: string}[]>
+    actonTomlHoverAt: (
+      line: number,
+      character: number,
+    ) => Promise<
+      {
+        contents: readonly string[]
+        range: {
+          start: {line: number; character: number}
+          end: {line: number; character: number}
+        } | null
+      }[]
+    >
     applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
     logs: () => Promise<string>
     profile: () => Promise<string>
@@ -50,9 +66,12 @@ type SmokeGlobal = typeof globalThis & {
     logsPanelText: () => string
     profilePanelText: () => string
     editorText: () => string
+    actonTomlText: () => string
     languageId: () => string | undefined
+    actonTomlLanguageId: () => string | undefined
     selectedLanguage: () => "tolk" | "tasm" | "tlb" | "fift"
     setEditorText: (text: string) => void
+    setActonTomlText: (text: string) => void
     setLanguage: (languageId: "tolk" | "tasm" | "tlb" | "fift") => Promise<void>
     setProfileVisible: (visible: boolean) => void
   }
@@ -230,6 +249,30 @@ fun main(): void {
   expect(foldingRanges).toContainEqual({start: 10, end: 11, kind: null})
   expect(foldingRanges?.length).toBeGreaterThanOrEqual(5)
 
+  const actonToml = `[lint]
+output-format = "json"
+`
+  await page.evaluate(source => {
+    ;(globalThis as SmokeGlobal).__tonLsSmoke?.setActonTomlText(source)
+  }, actonToml)
+  expect(
+    await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.actonTomlLanguageId()),
+  ).toBe("toml")
+  await expect
+    .poll(async () => {
+      const items = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.actonTomlCompletionAt(1, 18),
+      )
+      return items?.map(item => item.label)
+    })
+    .toEqual(expect.arrayContaining(['"plain"', '"json"', '"sarif"', '"github"', '"gitlab"']))
+
+  const tomlHovers = await page.evaluate(() =>
+    (globalThis as SmokeGlobal).__tonLsSmoke?.actonTomlHoverAt(1, 2),
+  )
+  expect(tomlHovers?.[0]?.contents.join("\n")).toContain("Output format for `acton check`")
+  expect(tomlHovers?.[0]?.contents.join("\n")).toContain('`"plain" | "json"')
+
   await page.selectOption("#language-select", "tasm")
   await expect
     .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.selectedLanguage()))
@@ -288,6 +331,9 @@ fun main(): void {
   await expect
     .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
     .toBe("one$0 a:# = SavedTlb;\n")
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.actonTomlText()))
+    .toBe(actonToml)
 
   await page.selectOption("#language-select", "tasm")
   await expect

@@ -120,22 +120,13 @@ fn field_default(
     all_fields: bool,
 ) -> Option<String> {
     let file = context.snapshot.file_db.get_by_id(field.id.file_id)?;
-    let identifier = file
-        .source()
-        .tree
-        .root_node()
-        .descendant_for_byte_range(field.name_span.start(), field.name_span.end())?;
+    let identifier = file.find_node_at_span(field.name_span)?;
     let declaration = StructField::try_from_node(identifier.parent()?).ok()?;
     if !all_fields && declaration.default().is_some() {
         return None;
     }
     if let Some(default) = declaration.default() {
-        return Some(
-            default
-                .syntax()
-                .text(file.source().source.as_ref())
-                .to_owned(),
-        );
+        return Some(file.text(&default).to_owned());
     }
     Some(
         context

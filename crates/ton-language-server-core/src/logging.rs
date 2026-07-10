@@ -9,6 +9,7 @@ pub const TLB_TARGET: &str = "ton_language_server_core::languages::tlb";
 pub const TASM_TARGET: &str = "ton_language_server_core::languages::tasm";
 pub const FIFT_TARGET: &str = "ton_language_server_core::languages::fift";
 pub const TOLK_TARGET: &str = "ton_language_server_core::languages::tolk";
+pub const TOML_TARGET: &str = "ton_language_server_core::languages::toml";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LogLevel {

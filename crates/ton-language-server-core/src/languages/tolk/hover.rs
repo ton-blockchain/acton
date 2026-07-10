@@ -1,4 +1,5 @@
-use super::{TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri};
+use super::file_info::FileInfoExt;
+use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{DocumentSnapshot, Hover, Position, Range};
 use tolk_analysis::{
     ConstantEvaluator, SerializationSizeContext, compute_get_method_id,
@@ -22,8 +23,7 @@ impl TolkWorkspaceEngine {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             state.latest_snapshot.clone()
         }?;
-        let path = logical_path_for_uri(document.uri());
-        let file_id = snapshot.project_index.get_file_by_path(&path)?;
+        let file_id = snapshot.find_document_file(document)?;
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position);
@@ -199,7 +199,7 @@ impl TolkResolveSnapshot {
                 let typ = variable.typ()?.text(source);
                 format!("global {name}: {typ}")
             }
-            _ => declaration.syntax().text(source).trim().to_owned(),
+            _ => declaration.syntax().text(source).to_owned(),
         };
         let mut documentation = match declaration {
             TopLevel::GetMethod(method) => {
@@ -252,11 +252,7 @@ impl TolkResolveSnapshot {
 
     fn render_struct_field_hover(&self, symbol: &Symbol, source: &str) -> Option<String> {
         let file = self.file_db.get_by_id(symbol.id.file_id)?;
-        let name = file
-            .source()
-            .tree
-            .root_node()
-            .descendant_for_byte_range(symbol.name_span.start(), symbol.name_span.end())?;
+        let name = file.find_node_at_span(symbol.name_span)?;
         let field = StructField::try_from_node(name.parent()?).ok()?;
         let owner = field.owner()?;
         let signature = format!(
@@ -270,11 +266,7 @@ impl TolkResolveSnapshot {
 
     fn render_enum_member_hover(&self, symbol: &Symbol, source: &str) -> Option<String> {
         let file = self.file_db.get_by_id(symbol.id.file_id)?;
-        let name = file
-            .source()
-            .tree
-            .root_node()
-            .descendant_for_byte_range(symbol.name_span.start(), symbol.name_span.end())?;
+        let name = file.find_node_at_span(symbol.name_span)?;
         let member = EnumMember::try_from_node(name.parent()?).ok()?;
         let owner = member.owner()?;
         let default = member
@@ -293,11 +285,7 @@ impl TolkResolveSnapshot {
     fn render_local_hover(&self, local: &LocalDef) -> Option<String> {
         let file = self.file_db.get_by_id(local.id.file_id)?;
         let source = file.source().source.as_ref();
-        let node = file
-            .source()
-            .tree
-            .root_node()
-            .descendant_for_byte_range(local.def_span.start(), local.def_span.end())?;
+        let node = file.find_node_at_span(local.def_span)?;
         let ty = self
             .local_type(local)
             .map_or_else(|| "unknown".to_owned(), |ty| self.type_interner.format(ty));
@@ -329,7 +317,6 @@ impl TolkResolveSnapshot {
 
     fn usage_name(&self, file_id: u32, offset: usize) -> Option<String> {
         let file = self.file_db.get_by_id(file_id)?;
-        let source = file.source().source.as_ref();
         let span = self
             .project_index
             .find_use(file_id, offset)
@@ -340,9 +327,7 @@ impl TolkResolveSnapshot {
                     .map(|symbol| symbol.name_span)
             })?;
 
-        source
-            .get(span.start()..span.end())
-            .map(|name| name.trim_matches('`').to_owned())
+        Some(file.text_at(span).trim_matches('`').to_owned())
     }
 
     fn symbol_value_type(&self, symbol: &Symbol) -> String {
@@ -384,9 +369,7 @@ impl TolkResolveSnapshot {
 
     fn range_for_span(&self, file_id: u32, span: tolk_resolver::Span) -> Option<Range> {
         let file = self.file_db.get_by_id(file_id)?;
-        let source = file.source().source.as_ref();
-        let index = crate::TextIndex::new(source);
-        Some(index.range_for_offsets(source, span.start(), span.end()))
+        Some(file.range_for_span(span))
     }
 
     fn range_for_node(&self, file_id: u32, node: tree_sitter::Node<'_>) -> Option<Range> {
@@ -621,7 +604,7 @@ fn collect_union_variants<'tree>(
             collect_union_variants(rhs, source, output);
         }
     } else {
-        output.push(typ.text(source).trim());
+        output.push(typ.text(source));
     }
 }
 

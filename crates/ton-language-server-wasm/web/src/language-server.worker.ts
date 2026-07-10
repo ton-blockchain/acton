@@ -126,11 +126,7 @@ connection.onDefinition(async params =>
 
 connection.onRequest(TypeDefinitionRequest.type, async params =>
   withLanguageServer("textDocument/typeDefinition", server =>
-    server.typeDefinition(
-      params.textDocument.uri,
-      params.position.line,
-      params.position.character,
-    ),
+    server.typeDefinition(params.textDocument.uri, params.position.line, params.position.character),
   ),
 )
 
@@ -225,21 +221,13 @@ connection.onWorkspaceSymbol(async params =>
 
 connection.onSignatureHelp(async params =>
   withLanguageServer("textDocument/signatureHelp", server =>
-    server.signatureHelp(
-      params.textDocument.uri,
-      params.position.line,
-      params.position.character,
-    ),
+    server.signatureHelp(params.textDocument.uri, params.position.line, params.position.character),
   ),
 )
 
 connection.onPrepareRename(async params =>
   withLanguageServer("textDocument/prepareRename", server =>
-    server.prepareRename(
-      params.textDocument.uri,
-      params.position.line,
-      params.position.character,
-    ),
+    server.prepareRename(params.textDocument.uri, params.position.line, params.position.character),
   ),
 )
 
@@ -295,16 +283,10 @@ connection.onRequest(PROFILE_REQUEST, async () =>
   withLanguageServer(PROFILE_REQUEST, server => server.profileSummary()),
 )
 
-connection.onRequest(
-  TOLK_TYPE_AT_POSITION_REQUEST,
-  async (params: TextDocumentPositionParams) =>
-    withLanguageServer(TOLK_TYPE_AT_POSITION_REQUEST, server =>
-      server.typeAtPosition(
-        params.textDocument.uri,
-        params.position.line,
-        params.position.character,
-      ),
-    ),
+connection.onRequest(TOLK_TYPE_AT_POSITION_REQUEST, async (params: TextDocumentPositionParams) =>
+  withLanguageServer(TOLK_TYPE_AT_POSITION_REQUEST, server =>
+    server.typeAtPosition(params.textDocument.uri, params.position.line, params.position.character),
+  ),
 )
 
 connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>

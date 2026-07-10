@@ -1,6 +1,6 @@
-use super::{TolkWorkspaceEngine, logical_path_for_uri};
-use crate::{DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, Range, TextIndex};
-use tolk_resolver::{FileInfo, Span, Symbol, SymbolKind};
+use super::{TolkWorkspaceEngine, file_info::FileInfoExt};
+use crate::{DocumentSnapshot, DocumentSymbol, DocumentSymbolKind};
+use tolk_resolver::{FileInfo, Symbol, SymbolKind};
 use tolk_syntax::{
     AstNode, EnumMember, FunctionLike, HasGenericParams, StructField, TopLevel, TryFromNode,
 };
@@ -14,24 +14,19 @@ impl TolkWorkspaceEngine {
         let Some(snapshot) = snapshot else {
             return Vec::new();
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Vec::new();
         };
         let Some(file) = snapshot.file_db.get_by_id(file_id) else {
             return Vec::new();
         };
         let source = file.source().source.as_ref();
-        let index = TextIndex::new(source);
         let mut symbols = Vec::new();
 
         if let Some(imports) = snapshot.project_index.imports_of(file_id) {
             symbols.extend(imports.into_iter().map(|import| {
-                let range = range_for_span(&index, source, import.import().span);
-                let name = source
-                    .get(import.import().span.start()..import.import().span.end())
-                    .unwrap_or("import")
-                    .trim_end_matches(';');
+                let range = file.range_for_span(import.import().span);
+                let name = file.text_at(import.import().span).trim_end_matches(';');
                 DocumentSymbol::new(name, DocumentSymbolKind::Module, range, range)
             }));
         }
@@ -41,7 +36,7 @@ impl TolkWorkspaceEngine {
                 file_index
                     .decls
                     .iter()
-                    .map(|symbol| symbol_to_document_symbol(symbol, file.as_ref(), &index, source)),
+                    .map(|symbol| symbol_to_document_symbol(symbol, file.as_ref(), source)),
             );
         }
         symbols.sort_by_key(|symbol| symbol.range.start);
@@ -49,14 +44,9 @@ impl TolkWorkspaceEngine {
     }
 }
 
-fn symbol_to_document_symbol(
-    symbol: &Symbol,
-    file: &FileInfo,
-    index: &TextIndex,
-    source: &str,
-) -> DocumentSymbol {
-    let range = range_for_span(index, source, symbol.body_span);
-    let selection_range = range_for_span(index, source, symbol.name_span);
+fn symbol_to_document_symbol(symbol: &Symbol, file: &FileInfo, source: &str) -> DocumentSymbol {
+    let range = file.range_for_span(symbol.body_span);
+    let selection_range = file.range_for_span(symbol.name_span);
     let name = match symbol.kind {
         SymbolKind::Method { .. } => symbol.fqn.to_string(),
         SymbolKind::GetMethod { .. } => format!("get {}", symbol.name),
@@ -65,11 +55,11 @@ fn symbol_to_document_symbol(
     let children = match &symbol.kind {
         SymbolKind::Struct { fields, .. } => fields
             .iter()
-            .map(|field| symbol_to_document_symbol(field, file, index, source))
+            .map(|field| symbol_to_document_symbol(field, file, source))
             .collect(),
         SymbolKind::Enum { members } => members
             .iter()
-            .map(|member| symbol_to_document_symbol(member, file, index, source))
+            .map(|member| symbol_to_document_symbol(member, file, source))
             .collect(),
         _ => Vec::new(),
     };
@@ -140,11 +130,7 @@ fn child_declaration<'tree, N>(symbol: &Symbol, file: &'tree FileInfo) -> Option
 where
     N: TryFromNode<'tree>,
 {
-    let node = file
-        .source()
-        .tree
-        .root_node()
-        .descendant_for_byte_range(symbol.name_span.start(), symbol.name_span.end())?;
+    let node = file.find_node_at_span(symbol.name_span)?;
 
     N::try_from_node(node.parent()?).ok()
 }
@@ -162,8 +148,4 @@ pub(super) const fn symbol_kind(kind: &SymbolKind) -> DocumentSymbolKind {
         SymbolKind::Constant => DocumentSymbolKind::Constant,
         SymbolKind::TypeAlias { .. } => DocumentSymbolKind::TypeParameter,
     }
-}
-
-fn range_for_span(index: &TextIndex, source: &str, span: Span) -> Range {
-    index.range_for_offsets(source, span.start(), span.end())
 }

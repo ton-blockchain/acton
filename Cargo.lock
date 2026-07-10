@@ -5401,6 +5401,8 @@ dependencies = [
  "tolk-syntax",
  "tolk-ty",
  "toml",
+ "toml-syntax",
+ "ton-json-schema",
  "ton-syntax",
  "tracing",
  "tree-sitter",
@@ -5857,10 +5859,9 @@ dependencies = [
 [[package]]
 name = "tree-sitter-toml-ng"
 version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9adc2c898ae49730e857d75be403da3f92bb81d8e37a2f918a08dd10de5ebb1"
 dependencies = [
  "cc",
+ "tree-sitter",
  "tree-sitter-language",
 ]
 

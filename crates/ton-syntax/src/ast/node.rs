@@ -118,6 +118,20 @@ impl<'tree> RawNode<'tree> {
     }
 }
 
+impl<'tree> crate::ast::traits::TryFromNode<'tree> for RawNode<'tree> {
+    type Error = std::convert::Infallible;
+
+    fn try_from_node(node: Node<'tree>) -> Result<Self, Self::Error> {
+        Ok(Self(node))
+    }
+}
+
+impl<'tree> AstNode<'tree> for RawNode<'tree> {
+    fn syntax(&self) -> Node<'tree> {
+        self.0
+    }
+}
+
 /// Implements common `SourceFile` boilerplate for syntax crates.
 ///
 /// Expects the target type to have fields `tree: tree_sitter::Tree` and

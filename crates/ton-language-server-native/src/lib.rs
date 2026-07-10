@@ -12,6 +12,7 @@ use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
 use ton_language_server_core::languages::tlb::TlbLanguage;
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
+use ton_language_server_core::languages::toml::TomlLanguage;
 use ton_language_server_core::{
     CodeAction, CodeActionKind, CodeLens, CompletionItem, CompletionItemKind, CompletionList,
     CompletionTrigger, CompletionTriggerKind, DocumentHighlight, DocumentHighlightKind,
@@ -410,28 +411,22 @@ impl LanguageServer for NativeLanguageServer {
         let item = params.text_document;
         let uri = item.uri;
         let uri_string = uri.to_string();
-        if is_acton_manifest_uri(&uri) {
+        let updates_workspace_config = is_acton_manifest_uri(&uri);
+        if updates_workspace_config {
             if let Err(error) = self.apply_workspace_config_text(item.text.clone()) {
                 self.report_error("workspace.config.open", error).await;
             }
-            if let Ok(mut documents) = self.documents.lock() {
-                documents.insert(
-                    uri_string,
-                    OpenDocument {
-                        kind: OpenDocumentKind::ActonManifest,
-                        text: item.text,
-                    },
-                );
-            }
-            return;
         }
 
-        let kind = language_id_for_document(&item.language_id, &uri)
-            .map_or(OpenDocumentKind::Unsupported, |language_id| {
-                OpenDocumentKind::Language { language_id }
-            });
+        let kind = language_id_for_document(&item.language_id, &uri).map_or(
+            OpenDocumentKind::Unsupported,
+            |language_id| OpenDocumentKind::Language {
+                language_id,
+                updates_workspace_config,
+            },
+        );
 
-        if let OpenDocumentKind::Language { language_id } = &kind {
+        if let OpenDocumentKind::Language { language_id, .. } = &kind {
             let result = self.with_service(|service| {
                 service.open_document(
                     DocumentUri::from(uri_string.clone()),
@@ -468,17 +463,14 @@ impl LanguageServer for NativeLanguageServer {
             }
         };
 
+        if change.0.updates_workspace_config()
+            && let Err(error) = self.apply_workspace_config_text(change.1.clone())
+        {
+            self.report_error("workspace.config.change", error).await;
+        }
+
         match change {
-            (OpenDocumentKind::ActonManifest, text, _) => {
-                if let Err(error) = self.apply_workspace_config_text(text) {
-                    self.report_error("workspace.config.change", error).await;
-                }
-            }
-            (
-                OpenDocumentKind::Language { language_id: _ },
-                full_text,
-                AppliedChanges::FullText,
-            ) => {
+            (OpenDocumentKind::Language { .. }, full_text, AppliedChanges::FullText) => {
                 let result = self.with_service(|service| {
                     service.change_document(&DocumentUri::from(uri_string), version, full_text)
                 });
@@ -486,11 +478,7 @@ impl LanguageServer for NativeLanguageServer {
                     self.report_error("document.change", error).await;
                 }
             }
-            (
-                OpenDocumentKind::Language { language_id: _ },
-                _,
-                AppliedChanges::Incremental(edits),
-            ) => {
+            (OpenDocumentKind::Language { .. }, _, AppliedChanges::Incremental(edits)) => {
                 let result = self.with_service(|service| {
                     service.edit_document(&DocumentUri::from(uri_string), version, edits)
                 });
@@ -841,9 +829,23 @@ struct OpenDocument {
 
 #[derive(Clone, Debug)]
 enum OpenDocumentKind {
-    Language { language_id: LanguageId },
-    ActonManifest,
+    Language {
+        language_id: LanguageId,
+        updates_workspace_config: bool,
+    },
     Unsupported,
+}
+
+impl OpenDocumentKind {
+    const fn updates_workspace_config(&self) -> bool {
+        matches!(
+            self,
+            Self::Language {
+                updates_workspace_config: true,
+                ..
+            }
+        )
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -871,7 +873,21 @@ fn native_language_service(enable_profiling: bool) -> LanguageService {
         }
     }
 
-    service.register_language(FiftLanguage::new());
+    match FiftLanguage::with_spec_json(TASM_SPEC_JSON) {
+        Ok(language) => service.register_language(language),
+        Err(error) => {
+            tracing::warn!(
+                target: "ton_language_server_native",
+                operation = "language.register",
+                language_id = "fift",
+                error = %error,
+                "failed to load bundled TVM instruction specification"
+            );
+            service.register_language(FiftLanguage::new());
+        }
+    }
+
+    service.register_language(TomlLanguage::new());
     service.register_language(TolkLanguage::new());
 
     service
@@ -1003,6 +1019,10 @@ fn workspace_config(
 }
 
 fn language_id_for_document(language_id: &str, uri: &lsp::Url) -> Option<LanguageId> {
+    if is_acton_manifest_uri(uri) {
+        return Some(LanguageId::from("toml"));
+    }
+
     match language_id {
         "tolk" | "tasm" | "fift" | "tlb" => Some(LanguageId::from(language_id.to_owned())),
         _ => language_id_for_path(&uri.to_file_path().ok()?),
@@ -1227,7 +1247,15 @@ fn inlay_hint_to_lsp(hint: InlayHint) -> lsp::InlayHint {
             InlayHintKind::Type => lsp::InlayHintKind::TYPE,
             InlayHintKind::Parameter => lsp::InlayHintKind::PARAMETER,
         }),
-        text_edits: None,
+        text_edits: (!hint.text_edits.is_empty()).then(|| {
+            hint.text_edits
+                .into_iter()
+                .map(|edit| lsp::TextEdit {
+                    range: range_to_lsp(edit.range),
+                    new_text: edit.new_text,
+                })
+                .collect()
+        }),
         tooltip: hint.tooltip.map(lsp::InlayHintTooltip::String),
         padding_left: Some(hint.padding_left),
         padding_right: Some(hint.padding_right),
@@ -1345,9 +1373,9 @@ fn signature_information_to_lsp(signature: SignatureInformation) -> lsp::Signatu
             signature
                 .parameters
                 .into_iter()
-                .map(|parameter| lsp::ParameterInformation {
-                    label: lsp::ParameterLabel::Simple(parameter.label),
-                    documentation: parameter.documentation.map(lsp::Documentation::String),
+                .map(|label| lsp::ParameterInformation {
+                    label: lsp::ParameterLabel::Simple(label),
+                    documentation: None,
                 })
                 .collect(),
         ),
@@ -1632,6 +1660,7 @@ mod tests {
         let fift = lsp::Url::parse("file:///workspace/main.fif")?;
         let tlb = lsp::Url::parse("file:///workspace/schema.tlb")?;
         let acton_toml = lsp::Url::parse("file:///workspace/Acton.toml")?;
+        let other_toml = lsp::Url::parse("file:///workspace/config.toml")?;
 
         assert_eq!(
             language_id_for_document("plaintext", &fift).map(|id| id.to_string()),
@@ -1642,6 +1671,31 @@ mod tests {
             Some("tlb".to_owned())
         );
         assert!(is_acton_manifest_uri(&acton_toml));
+        assert_eq!(
+            language_id_for_document("plaintext", &acton_toml).map(|id| id.to_string()),
+            Some("toml".to_owned())
+        );
+        assert_eq!(language_id_for_document("toml", &other_toml), None);
+
+        Ok(())
+    }
+
+    #[test]
+    fn registers_acton_toml_support_in_the_native_service() -> anyhow::Result<()> {
+        let mut service = native_language_service(false);
+        let uri = DocumentUri::from("file:///workspace/Acton.toml");
+        service.open_document(uri.clone(), LanguageId::from("toml"), 1, "")?;
+
+        let completion =
+            service.completion(&uri, Position::new(0, 0), CompletionTrigger::invoked())?;
+        let labels = completion
+            .items
+            .iter()
+            .map(|item| item.label.as_str())
+            .collect::<Vec<_>>();
+
+        assert!(labels.contains(&"package"));
+        assert!(labels.contains(&"test"));
 
         Ok(())
     }

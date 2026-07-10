@@ -72,10 +72,7 @@ pub(super) fn raw_text(
     span: Span,
 ) -> Option<String> {
     let file = snapshot.file_db.get_by_id(file_id)?;
-    file.source()
-        .source
-        .get(span.start()..span.end())
-        .map(str::to_owned)
+    Some(file.text_at(span).to_owned())
 }
 
 fn local_is_visible(root: Node<'_>, local: &LocalDef, offset: usize) -> bool {

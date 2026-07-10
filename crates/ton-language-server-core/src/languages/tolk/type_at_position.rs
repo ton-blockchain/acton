@@ -1,4 +1,4 @@
-use super::{TolkResolveSnapshot, TolkWorkspaceEngine, logical_path_for_uri, range_for_span};
+use super::{TolkResolveSnapshot, TolkWorkspaceEngine, range_for_span};
 use crate::{DocumentSnapshot, Position, TypeAtPosition};
 use tolk_resolver::{FileId, Span};
 use tolk_syntax::{Stmt, TryFromNode};
@@ -17,8 +17,7 @@ impl TolkWorkspaceEngine {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             state.latest_snapshot.clone()
         }?;
-        let path = logical_path_for_uri(document.uri());
-        let file_id = snapshot.project_index.get_file_by_path(&path)?;
+        let file_id = snapshot.find_document_file(document)?;
         let file = snapshot.file_db.get_by_id(file_id)?;
         let offset = document
             .text_index()

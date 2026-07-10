@@ -1,11 +1,16 @@
 mod completion;
+mod document_symbols;
+mod hover;
 mod index;
+mod inlay_hints;
 mod psi;
 mod reference;
+mod references;
 mod semantic_tokens;
 
 use crate::language::{
-    CompletionRequest, DefinitionRequest, FeatureSet, LanguagePlugin, ParseRequest, ParsedDocument,
+    CompletionRequest, DefinitionRequest, DocumentSymbolRequest, FeatureSet, HoverRequest,
+    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, ReferenceRequest,
     SemanticTokensRequest,
 };
 use crate::logging;
@@ -39,6 +44,10 @@ impl LanguagePlugin for TlbLanguage {
     fn capabilities(&self) -> FeatureSet {
         FeatureSet {
             definition: true,
+            document_symbols: true,
+            references: true,
+            hover: true,
+            inlay_hints: true,
             completion: true,
             semantic_tokens: true,
             ..FeatureSet::default()
@@ -127,6 +136,79 @@ impl LanguagePlugin for TlbLanguage {
             .into_iter()
             .map(|range| Location::new(request.context.document.uri().clone(), range))
             .collect())
+    }
+
+    fn references(&self, request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let locations = references::references(
+            request.context.document,
+            parsed,
+            request.position,
+            request.include_declaration,
+        );
+        request
+            .context
+            .profiler
+            .finish("tlb.references.resolve", started_at);
+
+        Ok(locations)
+    }
+
+    fn hover(&self, request: HoverRequest<'_>) -> anyhow::Result<Option<crate::Hover>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = hover::hover(request.context.document, parsed, request.position);
+        request.context.profiler.finish("tlb.hover", started_at);
+
+        Ok(result)
+    }
+
+    fn document_symbols(
+        &self,
+        request: DocumentSymbolRequest<'_>,
+    ) -> anyhow::Result<Vec<crate::DocumentSymbol>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = document_symbols::document_symbols(request.context.document, parsed);
+        request
+            .context
+            .profiler
+            .finish("tlb.document_symbols", started_at);
+
+        Ok(result)
+    }
+
+    fn inlay_hints(&self, request: InlayHintRequest<'_>) -> anyhow::Result<Vec<crate::InlayHint>> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TlbParsedDocument>()
+            .context("TL-B parsed document has an unexpected type")?;
+        let started_at = request.context.profiler.start();
+        let result = inlay_hints::inlay_hints(request.context.document, parsed, request.range);
+        request
+            .context
+            .profiler
+            .finish("tlb.inlay_hints", started_at);
+
+        Ok(result)
     }
 
     fn semantic_tokens(

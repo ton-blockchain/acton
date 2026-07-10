@@ -38,7 +38,7 @@ fn render_signature_help(signature_help: Option<SignatureHelp>) -> String {
 
     active_parameter.map_or_else(
         || signature.label.clone(),
-        |parameter| format!("{}\n{}", parameter.label, signature.label),
+        |parameter| format!("{parameter}\n{}", signature.label),
     )
 }
 

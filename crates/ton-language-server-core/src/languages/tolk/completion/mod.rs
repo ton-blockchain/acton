@@ -8,7 +8,6 @@ use self::context::TolkCompletionContext;
 use self::imports::WorkspaceCompletionData;
 use super::{
     TOLK_STDLIB_DIR, TolkResolveSnapshot, TolkWorkspaceEngine, collect_embedded_stdlib_paths,
-    logical_path_for_uri,
 };
 use crate::{CompletionList, DocumentSnapshot, Position};
 use std::collections::BTreeSet;
@@ -45,8 +44,7 @@ impl TolkWorkspaceEngine {
                 state.project_config.wallet_names.clone(),
             )
         };
-        let path = logical_path_for_uri(document.uri());
-        let Some(file_id) = snapshot.project_index.get_file_by_path(&path) else {
+        let Some(file_id) = snapshot.find_document_file(document) else {
             return Ok(CompletionList::default());
         };
 

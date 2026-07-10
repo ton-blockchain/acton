@@ -6,6 +6,7 @@ use crate::language::{
     TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 use crate::logging;
+use crate::types::{normalize_logical_path, normalize_path};
 use crate::{
     DocumentSnapshot, DocumentUri, LanguageId, Location, Profiler, Range, TextIndex,
     WorkspaceConfig,
@@ -15,8 +16,9 @@ use include_dir::{Dir, include_dir};
 use serde::Deserialize;
 use std::any::Any;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::path::{Component, Path, PathBuf};
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
+use tolk_analysis::{AnalysisDb, FileUseFacts};
 use tolk_resolver::{
     FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Span, SymbolId,
 };
@@ -28,6 +30,7 @@ mod completion;
 mod definition;
 mod document_highlights;
 mod document_symbols;
+mod file_info;
 mod file_rename;
 mod folding;
 mod hover;
@@ -38,6 +41,7 @@ mod rename;
 mod resolution;
 mod semantic_tokens;
 mod signature_help;
+mod syntax;
 mod type_at_position;
 mod type_definition;
 mod workspace_symbols;
@@ -583,7 +587,7 @@ impl TolkWorkspaceEngine {
     }
 
     fn add_source_file(&self, uri: DocumentUri, text: Arc<str>) -> anyhow::Result<()> {
-        let path = logical_path_for_uri(&uri);
+        let path = uri.logical_path();
         let mut state = self.state.write().expect("Tolk workspace lock poisoned");
         let file = state.files.entry(path).or_default();
         file.base_uri = Some(uri);
@@ -594,7 +598,7 @@ impl TolkWorkspaceEngine {
     }
 
     fn remove_source_file(&self, uri: &DocumentUri) -> anyhow::Result<()> {
-        let path = logical_path_for_uri(uri);
+        let path = uri.logical_path();
         let mut state = self.state.write().expect("Tolk workspace lock poisoned");
         let mut remove_file = false;
         if let Some(file) = state.files.get_mut(&path) {
@@ -632,7 +636,7 @@ impl TolkWorkspaceEngine {
         parsed: &TolkParsedDocument,
         profiler: &mut Profiler,
     ) -> anyhow::Result<()> {
-        let path = logical_path_for_uri(document.uri());
+        let path = document.uri().logical_path();
         let mut state = self.state.write().expect("Tolk workspace lock poisoned");
         state.roots.insert(path.clone());
         let file = state.files.entry(path).or_default();
@@ -645,7 +649,7 @@ impl TolkWorkspaceEngine {
     }
 
     fn close_document(&self, uri: &DocumentUri) {
-        let path = logical_path_for_uri(uri);
+        let path = uri.logical_path();
         let mut state = self.state.write().expect("Tolk workspace lock poisoned");
         state.roots.remove(&path);
         let mut remove_file = false;
@@ -675,11 +679,28 @@ impl TolkWorkspaceEngine {
 }
 
 #[derive(Debug)]
-struct TolkWorkspaceState {
-    file_db: Arc<FileDb>,
+struct TolkAnalysisState {
     type_interner: TypeInterner,
     type_db_cache: TypeDbCache,
     all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    use_facts: HashMap<FileId, Arc<FileUseFacts>>,
+}
+
+impl Default for TolkAnalysisState {
+    fn default() -> Self {
+        Self {
+            type_interner: TypeInterner::new(),
+            type_db_cache: TypeDbCache::default(),
+            all_body_types: HashMap::new(),
+            use_facts: HashMap::new(),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct TolkWorkspaceState {
+    file_db: Arc<FileDb>,
+    analysis: TolkAnalysisState,
     project_config: TolkProjectConfig,
     files: BTreeMap<PathBuf, TolkWorkspaceFile>,
     roots: BTreeSet<PathBuf>,
@@ -691,9 +712,7 @@ impl Default for TolkWorkspaceState {
     fn default() -> Self {
         Self {
             file_db: Arc::new(FileDb::new(PathBuf::from(TOLK_STDLIB_PATH), None)),
-            type_interner: TypeInterner::new(),
-            type_db_cache: TypeDbCache::default(),
-            all_body_types: HashMap::new(),
+            analysis: TolkAnalysisState::default(),
             project_config: TolkProjectConfig::default(),
             files: BTreeMap::new(),
             roots: BTreeSet::new(),
@@ -758,28 +777,36 @@ impl TolkWorkspaceState {
         infer_incremental_workspace_body_types(
             &file_db,
             &project_index,
-            &mut self.type_interner,
-            &mut self.type_db_cache,
-            &mut self.all_body_types,
+            &mut self.analysis,
             &changed_file_ids,
             profiler,
         );
 
         self.generation += 1;
         let materialize_started_at = profiler.start();
-        let path_to_uri = provider
-            .files
+        let file_uris = project_index
+            .files()
             .iter()
-            .filter_map(|(path, file)| file.active_uri().map(|uri| (path.clone(), uri)))
+            .filter_map(|(&file_id, file)| {
+                let uri = if project_config.use_embedded_stdlib
+                    && file.path.starts_with(&project_config.stdlib_path)
+                {
+                    DocumentUri::from(format!("file://{}", file.path.display()))
+                } else {
+                    provider.files.get(&file.path)?.active_uri()?
+                };
+                Some((file_id, uri))
+            })
             .collect();
         self.latest_snapshot = Some(Arc::new(TolkResolveSnapshot {
             generation: self.generation,
             file_db,
             project_index: Arc::new(project_index),
-            all_body_types: self.all_body_types.clone(),
-            type_interner: self.type_interner.clone(),
-            type_db_cache: self.type_db_cache.clone(),
-            path_to_uri,
+            all_body_types: self.analysis.all_body_types.clone(),
+            use_facts: self.analysis.use_facts.clone(),
+            type_interner: self.analysis.type_interner.clone(),
+            type_db_cache: self.analysis.type_db_cache.clone(),
+            file_uris,
         }));
         profiler.finish("tolk.snapshot.materialize", materialize_started_at);
         tracing::debug!(
@@ -805,8 +832,7 @@ impl TolkWorkspaceState {
         for file in self.files.values_mut() {
             file.dirty = true;
         }
-        self.type_db_cache = TypeDbCache::default();
-        self.all_body_types.clear();
+        self.analysis = TolkAnalysisState::default();
     }
 
     fn process_dirty_files(&mut self, profiler: &mut Profiler) -> anyhow::Result<BTreeSet<FileId>> {
@@ -875,10 +901,11 @@ impl TolkProjectConfig {
                     .map_or("Acton.toml", DocumentUri::as_str);
                 format!("failed to parse {uri}")
             })?;
-        let project_root = logical_path_for_uri(config.root_uri());
-        let stdlib_path = config
-            .tolk_stdlib_root_uri()
-            .map_or_else(|| PathBuf::from(TOLK_STDLIB_PATH), logical_path_for_uri);
+        let project_root = config.root_uri().logical_path();
+        let stdlib_path = config.tolk_stdlib_root_uri().map_or_else(
+            || PathBuf::from(TOLK_STDLIB_PATH),
+            DocumentUri::logical_path,
+        );
         Ok(Self {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
             contract_ids: manifest.contracts.keys().cloned().collect(),
@@ -962,9 +989,10 @@ struct TolkResolveSnapshot {
     file_db: Arc<FileDb>,
     project_index: Arc<ProjectIndex>,
     all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    use_facts: HashMap<FileId, Arc<FileUseFacts>>,
     type_interner: TypeInterner,
     type_db_cache: TypeDbCache,
-    path_to_uri: BTreeMap<PathBuf, DocumentUri>,
+    file_uris: BTreeMap<FileId, DocumentUri>,
 }
 
 #[derive(Clone, Debug)]
@@ -997,18 +1025,23 @@ impl ProjectSourceProvider for SnapshotSourceProvider {
 fn infer_incremental_workspace_body_types(
     file_db: &FileDb,
     project_index: &ProjectIndex,
-    type_interner: &mut TypeInterner,
-    type_db_cache: &mut TypeDbCache,
-    all_body_types: &mut HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    analysis: &mut TolkAnalysisState,
     changed_file_ids: &BTreeSet<FileId>,
     profiler: &mut Profiler,
 ) {
+    let TolkAnalysisState {
+        type_interner,
+        type_db_cache,
+        all_body_types,
+        use_facts,
+    } = analysis;
     let workspace_file_ids = project_index
         .workspace_files()
         .into_iter()
         .map(|file| file.id)
         .collect::<BTreeSet<_>>();
     all_body_types.retain(|file_id, _| workspace_file_ids.contains(file_id));
+    use_facts.retain(|file_id, _| workspace_file_ids.contains(file_id));
 
     let affected_file_ids = affected_workspace_file_ids(
         project_index,
@@ -1031,7 +1064,7 @@ fn infer_incremental_workspace_body_types(
     }
 
     let body_inference_started_at = profiler.start();
-    for file_id in affected_file_ids {
+    for &file_id in &affected_file_ids {
         let Some(file_info) = file_db.get_by_id(file_id) else {
             continue;
         };
@@ -1047,6 +1080,18 @@ fn infer_incremental_workspace_body_types(
         all_body_types.insert(file_id, body_types);
     }
     profiler.finish("tolk.type_inference", body_inference_started_at);
+
+    let use_facts_started_at = profiler.start();
+    let mut analysis_db = AnalysisDb::new();
+    for file_id in affected_file_ids {
+        if let Some(facts) = analysis_db.use_facts(&mut type_db, all_body_types, file_id) {
+            use_facts.insert(file_id, facts);
+            profiler.increment("tolk.use_facts.file");
+        } else {
+            use_facts.remove(&file_id);
+        }
+    }
+    profiler.finish("tolk.use_facts", use_facts_started_at);
     *type_db_cache = type_db.into_cache();
 }
 
@@ -1107,55 +1152,4 @@ fn collect_embedded_stdlib_paths(dir: &Dir<'_>, paths: &mut BTreeSet<PathBuf>) {
 
 fn range_for_span(source: &str, span: Span) -> Range {
     TextIndex::new(source).range_for_offsets(source, span.start(), span.end())
-}
-
-fn fallback_uri_for_path(path: &Path) -> DocumentUri {
-    if path.to_string_lossy().starts_with('/') {
-        DocumentUri::from(format!("file://{}", path.display()))
-    } else {
-        DocumentUri::from(path.display().to_string())
-    }
-}
-
-fn logical_path_for_uri(uri: &DocumentUri) -> PathBuf {
-    let raw = uri.as_str();
-    let path = if let Some(file_path) = raw.strip_prefix("file://") {
-        PathBuf::from(format!("/{}", file_path.trim_start_matches('/')))
-    } else if let Some((_, rest)) = raw.split_once("://") {
-        PathBuf::from(format!("/{}", rest.trim_start_matches('/')))
-    } else {
-        PathBuf::from(raw)
-    };
-    normalize_logical_path(&path)
-}
-
-fn normalize_logical_path(path: &Path) -> PathBuf {
-    let normalized = normalize_path(path);
-    if normalized.is_absolute() {
-        return normalized;
-    }
-    if normalized.as_os_str().is_empty() || normalized == Path::new(".") {
-        return PathBuf::from("/");
-    }
-    Path::new("/").join(normalized)
-}
-
-fn normalize_path(path: &Path) -> PathBuf {
-    let mut normalized = PathBuf::new();
-    for component in path.components() {
-        match component {
-            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
-            Component::RootDir => normalized.push(Path::new("/")),
-            Component::CurDir => {}
-            Component::ParentDir => {
-                normalized.pop();
-            }
-            Component::Normal(part) => normalized.push(part),
-        }
-    }
-    if normalized.as_os_str().is_empty() {
-        PathBuf::from(".")
-    } else {
-        normalized
-    }
 }

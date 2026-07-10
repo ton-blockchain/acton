@@ -1,5 +1,6 @@
 use crate::text::TextIndex;
 use std::fmt;
+use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -14,6 +15,61 @@ impl DocumentUri {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Converts this URI into the normalized logical path used as a workspace
+    /// file key.
+    ///
+    /// `file://` URIs use their file path, while other URI schemes use the
+    /// portion after `://`. Values without a scheme are treated as paths. The
+    /// result is rooted at `/` and `.`/`..` components are resolved lexically;
+    /// this method does not access the filesystem or percent-decode the URI.
+    #[must_use]
+    pub fn logical_path(&self) -> PathBuf {
+        let path = if let Some(file_path) = self.0.strip_prefix("file://") {
+            PathBuf::from(format!("/{}", file_path.trim_start_matches('/')))
+        } else if let Some((_, rest)) = self.0.split_once("://") {
+            PathBuf::from(format!("/{}", rest.trim_start_matches('/')))
+        } else {
+            PathBuf::from(self.0.as_ref())
+        };
+        normalize_logical_path(&path)
+    }
+}
+
+/// Normalizes a workspace path lexically and ensures that it is rooted at `/`.
+///
+/// This helper deliberately does not canonicalize through the filesystem, so
+/// it also works for virtual documents and provider-backed source files.
+pub(crate) fn normalize_logical_path(path: &Path) -> PathBuf {
+    let normalized = normalize_path(path);
+    if normalized.is_absolute() {
+        return normalized;
+    }
+    if normalized.as_os_str().is_empty() || normalized == Path::new(".") {
+        return PathBuf::from("/");
+    }
+    Path::new("/").join(normalized)
+}
+
+/// Resolves `.` and `..` components without accessing the filesystem.
+pub(crate) fn normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            Component::RootDir => normalized.push(Path::new("/")),
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            Component::Normal(part) => normalized.push(part),
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        PathBuf::from(".")
+    } else {
+        normalized
     }
 }
 
@@ -169,6 +225,14 @@ impl DocumentSnapshot {
     #[must_use]
     pub fn text_index(&self) -> &TextIndex {
         &self.text_index
+    }
+
+    #[must_use]
+    pub fn text_of<'tree, N>(&self, node: N) -> &str
+    where
+        N: ton_syntax::ast::AstNode<'tree>,
+    {
+        self.text.get(node.syntax().byte_range()).unwrap_or("")
     }
 }
 
@@ -374,6 +438,7 @@ pub struct InlayHint {
     pub label: String,
     pub kind: Option<InlayHintKind>,
     pub tooltip: Option<String>,
+    pub text_edits: Vec<TextEdit>,
     pub padding_left: bool,
     pub padding_right: bool,
 }
@@ -386,6 +451,7 @@ impl InlayHint {
             label: label.into(),
             kind: Some(kind),
             tooltip: None,
+            text_edits: Vec::new(),
             padding_left: false,
             padding_right: false,
         }
@@ -398,9 +464,16 @@ impl InlayHint {
             label: label.into(),
             kind: None,
             tooltip: None,
+            text_edits: Vec::new(),
             padding_left: false,
             padding_right: false,
         }
+    }
+
+    #[must_use]
+    pub fn with_text_edit(mut self, edit: TextEdit) -> Self {
+        self.text_edits.push(edit);
+        self
     }
 }
 
@@ -538,32 +611,20 @@ impl DocumentSymbol {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ParameterInformation {
-    pub label: String,
-    pub documentation: Option<String>,
-}
-
-impl ParameterInformation {
-    #[must_use]
-    pub fn new(label: impl Into<String>) -> Self {
-        Self {
-            label: label.into(),
-            documentation: None,
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SignatureInformation {
     pub label: String,
     pub documentation: Option<String>,
-    pub parameters: Vec<ParameterInformation>,
+    /// Parameter labels in declaration order.
+    ///
+    /// Tolk parameters cannot carry their own documentation, so labels are
+    /// stored directly instead of wrapping each one in a metadata object.
+    pub parameters: Vec<String>,
     pub active_parameter: Option<u32>,
 }
 
 impl SignatureInformation {
     #[must_use]
-    pub fn new(label: impl Into<String>, parameters: Vec<ParameterInformation>) -> Self {
+    pub fn new(label: impl Into<String>, parameters: Vec<String>) -> Self {
         Self {
             label: label.into(),
             documentation: None,

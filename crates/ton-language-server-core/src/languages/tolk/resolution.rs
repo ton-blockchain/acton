@@ -1,5 +1,6 @@
-use super::{TolkResolveSnapshot, fallback_uri_for_path, range_for_span};
-use crate::Location;
+use super::TolkResolveSnapshot;
+use super::file_info::FileInfoExt;
+use crate::{DocumentSnapshot, DocumentUri, Location};
 use tolk_resolver::resolve_index::LocalDef;
 use tolk_resolver::{FileId, NameUse, Resolved, Span, SymbolId};
 use tolk_ty::{InferenceResult, TyId};
@@ -11,6 +12,28 @@ pub(super) struct ResolvedTarget {
 }
 
 impl TolkResolveSnapshot {
+    /// Returns the client-visible URI assigned to a file in this snapshot.
+    ///
+    /// The URI index is materialized together with the project index and is
+    /// expected to cover every project `FileId`, including virtual
+    /// embedded-stdlib files. Returning `None` lets request handlers omit an
+    /// isolated stale result instead of panicking if a snapshot is internally
+    /// inconsistent.
+    #[must_use]
+    pub(super) fn file_uri(&self, file_id: FileId) -> Option<&DocumentUri> {
+        self.file_uris.get(&file_id)
+    }
+
+    /// Finds the project file that corresponds to an open document.
+    ///
+    /// The document URI is converted with [`crate::DocumentUri::logical_path`], so
+    /// lookup uses the same normalized key as workspace indexing. Returns
+    /// `None` when the document is not part of this snapshot.
+    pub(super) fn find_document_file(&self, document: &DocumentSnapshot) -> Option<FileId> {
+        self.project_index
+            .get_file_by_path(&document.uri().logical_path())
+    }
+
     pub(super) fn resolved_at(&self, file_id: FileId, offset: usize) -> Option<Resolved> {
         self.resolved_target_at(file_id, offset)
             .map(|target| target.resolved)
@@ -111,13 +134,10 @@ impl TolkResolveSnapshot {
         let Some(file) = self.file_db.get_by_id(file_id) else {
             return Vec::new();
         };
-        let uri = self
-            .path_to_uri
-            .get(file.path())
-            .cloned()
-            .unwrap_or_else(|| fallback_uri_for_path(file.path()));
-        let source = file.source().source.as_ref();
-        let range = range_for_span(source, span);
+        let Some(uri) = self.file_uri(file_id).cloned() else {
+            return Vec::new();
+        };
+        let range = file.range_for_span(span);
 
         vec![Location::new(uri, range)]
     }

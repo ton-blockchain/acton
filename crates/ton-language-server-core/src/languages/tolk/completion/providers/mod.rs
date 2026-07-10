@@ -102,7 +102,6 @@ pub(super) fn collect(
 
 pub(super) use super::context::{DUMMY_IDENTIFIER, TolkCompletionContext};
 pub(super) use super::imports::{matches_call, string_prefix_and_range};
-pub(super) use super::logical_path_for_uri;
 pub(super) use acton_contract_id::ActonContractIdCompletionProvider;
 pub(super) use acton_get_method::ActonGetMethodCompletionProvider;
 pub(super) use acton_wallet_name::ActonWalletNameCompletionProvider;

@@ -1,6 +1,6 @@
-use super::{TolkWorkspaceEngine, document_symbols::symbol_kind, range_for_span};
+use super::{TolkWorkspaceEngine, document_symbols::symbol_kind, file_info::FileInfoExt};
 use crate::{Location, WorkspaceSymbol};
-use tolk_resolver::{Symbol, SymbolKind};
+use tolk_resolver::{FileInfo, Symbol, SymbolKind};
 
 impl TolkWorkspaceEngine {
     pub(super) fn workspace_symbols(&self, query: &str) -> Vec<WorkspaceSymbol> {
@@ -18,10 +18,8 @@ impl TolkWorkspaceEngine {
             let Some(file) = file_db.get_by_path(path) else {
                 continue;
             };
-            let source = file.source().source.as_ref();
-
             for symbol in &file.index().decls {
-                collect_symbol(symbol, &uri, source, &query, &mut symbols);
+                collect_symbol(symbol, file.as_ref(), &uri, &query, &mut symbols);
             }
         }
         symbols
@@ -30,8 +28,8 @@ impl TolkWorkspaceEngine {
 
 fn collect_symbol(
     symbol: &Symbol,
+    file: &FileInfo,
     uri: &crate::DocumentUri,
-    source: &str,
     query: &str,
     symbols: &mut Vec<WorkspaceSymbol>,
 ) {
@@ -40,7 +38,7 @@ fn collect_symbol(
         symbols.push(WorkspaceSymbol::new(
             name,
             symbol_kind(&symbol.kind),
-            Location::new(uri.clone(), range_for_span(source, symbol.name_span)),
+            Location::new(uri.clone(), file.range_for_span(symbol.name_span)),
         ));
     }
 
@@ -51,7 +49,7 @@ fn collect_symbol(
                 symbols.push(WorkspaceSymbol::new(
                     member_name,
                     symbol_kind(&member.kind),
-                    Location::new(uri.clone(), range_for_span(source, member.name_span)),
+                    Location::new(uri.clone(), file.range_for_span(member.name_span)),
                 ));
             }
         }

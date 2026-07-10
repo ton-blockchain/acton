@@ -33,7 +33,7 @@ impl CompletionProvider<TlbCompletionContext> for BuiltinTypesCompletionProvider
     }
 }
 
-const BUILTIN_TYPES: &[(&str, &str)] = &[
+pub(in crate::languages::tlb) const BUILTIN_TYPES: &[(&str, &str)] = &[
     ("#", "Nat, 32-bit unsigned integer"),
     ("##", "Nat: unsigned integer with `x` bits"),
     (
