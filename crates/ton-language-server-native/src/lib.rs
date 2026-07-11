@@ -111,7 +111,7 @@ pub struct NativeLoggingConfig {
     pub level: LogLevel,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct NativeSettings {
     tolk: TolkSettings,
@@ -119,32 +119,12 @@ struct NativeSettings {
     fift: FiftSettings,
 }
 
-impl Default for NativeSettings {
-    fn default() -> Self {
-        Self {
-            tolk: TolkSettings::default(),
-            tlb: TlbSettings::default(),
-            fift: FiftSettings::default(),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct TolkSettings {
     hints: TolkHintSettings,
     completion: TolkCompletionSettings,
     find_usages: FindUsagesSettings,
-}
-
-impl Default for TolkSettings {
-    fn default() -> Self {
-        Self {
-            hints: TolkHintSettings::default(),
-            completion: TolkCompletionSettings::default(),
-            find_usages: FindUsagesSettings::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -207,18 +187,10 @@ enum FindUsagesScope {
     Everywhere,
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default)]
 struct TlbSettings {
     hints: TlbHintSettings,
-}
-
-impl Default for TlbSettings {
-    fn default() -> Self {
-        Self {
-            hints: TlbHintSettings::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -237,20 +209,11 @@ impl Default for TlbHintSettings {
     }
 }
 
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Debug, Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct FiftSettings {
     hints: FiftHintSettings,
     semantic_highlighting: SemanticHighlightingSettings,
-}
-
-impl Default for FiftSettings {
-    fn default() -> Self {
-        Self {
-            hints: FiftHintSettings::default(),
-            semantic_highlighting: SemanticHighlightingSettings::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize)]

@@ -36,6 +36,11 @@ Write language\-server logs to a custom file.
 .RS 4
 Disable language\-server logging setup.
 .RE
+.sp
+\fB\-\-profile\fR
+.RS 4
+Collect performance counters and timings for the \fBton/profile\fR LSP request.
+.RE
 .SS "Display Options"
 .sp
 \fB\-\-color\fR \fIwhen\fR
@@ -92,6 +97,11 @@ build/logs/tolk\-language\-server.log
 .RE
 .sp
 Parent directories for a custom \fB\-\-log\-file\fR are created automatically.
+.SH "PROFILING"
+Pass \fB\-\-profile\fR to collect operation counters and timings. Clients can retrieve
+the current session data with the \fBton/profile\fR custom request. See
+\fILanguage server protocol extensions\fR <https://ton\-blockchain.github.io/acton/docs/ide\-support/language\-server\-protocol>
+for the request and response schema.
 .SH "PROJECT CONTEXT"
 Before starting the server, Acton:
 .sp

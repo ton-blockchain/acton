@@ -54,22 +54,6 @@ const TOLK_STDLIB_PATH: &str = "/__tolk_stdlib__";
 static TOLK_STDLIB_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/../tolk-compiler/assets/tolk-stdlib");
 
-/// Returns normalized filesystem roots referenced by `import-mappings` in an Acton manifest.
-pub fn import_mapping_roots(
-    project_root: &Path,
-    manifest_text: &str,
-) -> anyhow::Result<Vec<PathBuf>> {
-    let manifest = toml::from_str::<ActonManifest>(manifest_text)
-        .context("failed to parse Acton.toml import mappings")?;
-    let mappings = normalize_import_mappings(manifest.import_mappings, project_root);
-
-    Ok(mappings
-        .into_iter()
-        .flatten()
-        .map(|(_, path)| PathBuf::from(path))
-        .collect())
-}
-
 #[derive(Clone, Debug)]
 pub struct TolkLanguage {
     engine: Arc<TolkWorkspaceEngine>,
@@ -686,7 +670,14 @@ impl TolkWorkspaceEngine {
         document: &DocumentSnapshot,
         range: Option<Range>,
     ) -> anyhow::Result<Vec<TextEdit>> {
-        let state = self.state.read().expect("Tolk workspace lock poisoned");
+        let (format_width, separate_import_groups) = {
+            let state = self.state.read().expect("Tolk workspace lock poisoned");
+            (
+                state.project_config.format_width,
+                state.project_config.separate_import_groups,
+            )
+        };
+
         let range = range.map(|range| {
             let start = document
                 .text_index()
@@ -708,8 +699,8 @@ impl TolkWorkspaceEngine {
         let formatted = tolk_fmt::format_source(
             document.text(),
             tolk_fmt::FormatOptions {
-                width: state.project_config.format_width,
-                separate_import_groups: state.project_config.separate_import_groups,
+                width: format_width,
+                separate_import_groups,
                 range,
             },
         )?;
