@@ -292,6 +292,8 @@ impl Symbol {
 pub struct Import {
     /// Path string as it appears in the source code.
     pub path: Arc<str>,
+    /// Span of the path string literal, including its quotes.
+    pub path_span: Span,
     /// Span of the entire import declaration.
     pub span: Span,
 }
@@ -678,9 +680,10 @@ impl FileIndex {
                     let Some(path) = import.path() else {
                         continue;
                     };
-                    let path = path.content(&file.source);
+                    let content = path.content(&file.source);
                     imports.push(Import {
-                        path: Arc::from(path),
+                        path: Arc::from(content),
+                        path_span: path.span(),
                         span: import.span(),
                     });
                 }

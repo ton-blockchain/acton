@@ -967,7 +967,7 @@ fn prime_tolk_sources(
     root: &Path,
     excluded_roots: &[PathBuf],
 ) -> anyhow::Result<()> {
-    visit_tolk_sources(root, excluded_roots, &mut |path| {
+    visit_tolk_sources(root, root, excluded_roots, &mut |path| {
         let text = fs::read_to_string(path)?;
         service.add_source_file(
             LanguageId::from(TOLK_LANGUAGE_ID),
@@ -979,6 +979,7 @@ fn prime_tolk_sources(
 }
 
 fn visit_tolk_sources(
+    root: &Path,
     dir: &Path,
     excluded_roots: &[PathBuf],
     visit: &mut impl FnMut(&Path) -> anyhow::Result<()>,
@@ -994,9 +995,10 @@ fn visit_tolk_sources(
         let file_type = entry.file_type()?;
         let path = entry.path();
         if file_type.is_dir() {
-            if !is_excluded_workspace_dir(&path) && !is_excluded_source_root(&path, excluded_roots)
+            if !is_excluded_workspace_dir(root, &path)
+                && !is_excluded_source_root(&path, excluded_roots)
             {
-                visit_tolk_sources(&path, excluded_roots, visit)?;
+                visit_tolk_sources(root, &path, excluded_roots, visit)?;
             }
         } else if file_type.is_file() && is_tolk_path(&path) {
             visit(&path)?;
@@ -1490,10 +1492,21 @@ fn is_tolk_path(path: &Path) -> bool {
         .is_some_and(|extension| extension == "tolk")
 }
 
-fn is_excluded_workspace_dir(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|name| name.to_str())
-        .is_some_and(|name| matches!(name, ".git" | "target" | "node_modules" | ".direnv"))
+fn is_excluded_workspace_dir(root: &Path, path: &Path) -> bool {
+    let name = path.file_name().and_then(|name| name.to_str());
+
+    // A nested Acton project owns a separate dependency environment and must be indexed
+    // by a language-server workspace rooted at that project instead.
+    if name == Some(".acton") && path.parent() != Some(root) {
+        return true;
+    }
+
+    // The selected stdlib is primed separately and must not re-enter as workspace sources.
+    if path.ends_with(Path::new(".acton/tolk-stdlib")) {
+        return true;
+    }
+
+    name.is_some_and(|name| matches!(name, ".git" | "target" | "node_modules" | ".direnv"))
 }
 
 fn is_excluded_source_root(path: &Path, excluded_roots: &[PathBuf]) -> bool {
@@ -1798,6 +1811,63 @@ mod tests {
         assert_eq!(
             locations[0].uri,
             DocumentUri::from(file_uri_string(&stdlib_common_path))
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_scan_uses_only_root_acton_environment() -> anyhow::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let main_path = dir.path().join("main.tolk");
+        let package_path = dir.path().join(".acton/packages/helper.tolk");
+        let nested_package_path = dir
+            .path()
+            .join("nested-project/.acton/packages/helper.tolk");
+        let nested_stdlib_path = dir
+            .path()
+            .join("nested-project/.acton/tolk-stdlib/common.tolk");
+        let nested_stdlib_module_path = dir
+            .path()
+            .join("nested-project/.acton/tolk-stdlib/arrays.tolk");
+
+        fs::create_dir_all(package_path.parent().expect("package path has a parent"))?;
+        fs::create_dir_all(
+            nested_package_path
+                .parent()
+                .expect("nested package path has a parent"),
+        )?;
+        fs::create_dir_all(
+            nested_stdlib_path
+                .parent()
+                .expect("stdlib path has a parent"),
+        )?;
+        fs::write(&main_path, "fun main() {}\n")?;
+        fs::write(&package_path, "fun helper() {}\n")?;
+        fs::write(&nested_package_path, "fun nestedHelper() {}\n")?;
+        fs::write(&nested_stdlib_path, "fun duplicatedStdlibSymbol() {}\n")?;
+        fs::write(
+            &nested_stdlib_module_path,
+            "fun duplicatedStdlibMethod() {}\n",
+        )?;
+
+        let mut visited = Vec::new();
+        visit_tolk_sources(dir.path(), dir.path(), &[], &mut |path| {
+            visited.push(
+                path.strip_prefix(dir.path())
+                    .expect("visited path is inside workspace")
+                    .to_path_buf(),
+            );
+            Ok(())
+        })?;
+        visited.sort();
+
+        assert_eq!(
+            visited,
+            vec![
+                PathBuf::from(".acton/packages/helper.tolk"),
+                PathBuf::from("main.tolk"),
+            ]
         );
 
         Ok(())

@@ -89,6 +89,10 @@ impl TolkCompletionContext {
         self.source_file.source.as_ref()
     }
 
+    pub(super) const fn source_file(&self) -> &tolk_syntax::SourceFile {
+        &self.source_file
+    }
+
     pub(super) fn text(&self) -> &str {
         self.source()
     }

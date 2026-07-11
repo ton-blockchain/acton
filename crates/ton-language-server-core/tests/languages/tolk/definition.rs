@@ -131,6 +131,42 @@ fn resolves_imported_function() {
 }
 
 #[test]
+fn resolves_relative_import_path_but_not_the_import_keyword() {
+    case_tolk_definition(
+        "acton://fixture/main.tolk",
+        r#"
+            im<caret:keyword>port "<caret:path>lib"
+            fun main() {}
+        "#,
+        |service| {
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "acton://fixture/lib.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r#"
+            0:2 unresolved
+            0:8 -> acton://fixture/lib.tolk 0:0 resolved"#]],
+    );
+}
+
+#[test]
+fn unresolved_import_path_has_no_definition() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            import "<caret>missing"
+            fun main() {}
+        "#,
+        |_| {},
+        expect![["0:8 unresolved"]],
+    );
+}
+
+#[test]
 fn removes_provider_file_from_workspace() {
     let main_uri = DocumentUri::from("acton://fixture/main.tolk");
     let lib_uri = DocumentUri::from("acton://fixture/lib.tolk");
@@ -213,12 +249,51 @@ fn resolves_imported_function_through_acton_toml_mapping() {
 }
 
 #[test]
+fn resolves_mapped_import_path() {
+    case_tolk_definition(
+        "file:///workspace/main.tolk",
+        r#"
+            import "@lib/<caret>helper"
+            fun main() {}
+        "#,
+        |service| {
+            service
+                .set_workspace_config(
+                    LANGUAGE_ID,
+                    WorkspaceConfig::new(
+                        "file:///workspace",
+                        Some(DocumentUri::from("file:///workspace/Acton.toml")),
+                        r#"
+                            [package]
+                            name = "fixture"
+                            version = "0.1.0"
+
+                            [import-mappings]
+                            lib = "./src/lib"
+                        "#,
+                    ),
+                )
+                .expect("workspace config should be applied");
+            service
+                .add_source_file(
+                    LANGUAGE_ID,
+                    "file:///workspace/src/lib/helper.tolk",
+                    "fun helper(): int { return 1; }\n",
+                )
+                .expect("provider file should be added");
+        },
+        expect![[r#"
+            0:13 -> file:///workspace/src/lib/helper.tolk 0:0 resolved"#]],
+    );
+}
+
+#[test]
 fn resolves_stdlib_import_to_external_root() {
     case_tolk_definition(
         "file:///workspace/main.tolk",
         r#"
-            import "@stdlib/common"
-            fun main(): int { return <caret>stdlibHelper(); }
+            import "@stdlib/<caret:import>common"
+            fun main(): int { return <caret:symbol>stdlibHelper(); }
         "#,
         |service| {
             service
@@ -237,6 +312,7 @@ fn resolves_stdlib_import_to_external_root() {
                 .expect("provider stdlib file should be added");
         },
         expect![[r"
+            0:16 -> file:///workspace/.acton/tolk-stdlib/common.tolk 0:0 resolved
             1:25 -> file:///workspace/.acton/tolk-stdlib/common.tolk 0:4 resolved"]],
     );
 }
@@ -314,6 +390,32 @@ fn resolves_stdlib_static_and_generic_methods() {
         expect![[r"
             4:12 -> file:///__tolk_stdlib__/common.tolk 483:6 resolved
             5:13 -> file:///__tolk_stdlib__/common.tolk 378:13 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_chained_generic_stdlib_methods() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Body {
+                value: int
+            }
+            fun main() {
+                val body = Body { value: 1 };
+                beginCell()
+                    .<caret:store_uint>storeUint(1, 32)
+                    .<caret:store_slice>storeSlice(body.<caret:to_cell>toCell().<caret:begin_parse>beginParse())
+                    .<caret:end_cell>endCell();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            6:9 -> file:///__tolk_stdlib__/common.tolk 1320:12 resolved
+            7:9 -> file:///__tolk_stdlib__/common.tolk 1325:12 resolved
+            7:25 -> file:///__tolk_stdlib__/common.tolk 473:6 resolved
+            7:34 -> file:///__tolk_stdlib__/common.tolk 562:12 resolved
+            8:9 -> file:///__tolk_stdlib__/common.tolk 1299:12 resolved"]],
     );
 }
 

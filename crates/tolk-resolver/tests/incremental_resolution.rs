@@ -327,6 +327,40 @@ fn global_environment_uses_only_the_stdlib_common_file_as_prelude() {
     .assert_eq(&actual);
 }
 
+#[test]
+fn file_db_fork_preserves_ids_and_isolates_speculative_edits() {
+    let file_db = FileDb::new(PathBuf::from("/__stdlib__"), None);
+    let original_main = file_db
+        .process_content(PathBuf::from(MAIN_PATH), "fun main() {}")
+        .expect("main file must parse");
+    let original_lib = file_db
+        .process_content(PathBuf::from(LIB_PATH), "fun helper() {}")
+        .expect("library file must parse");
+
+    let fork = file_db.fork();
+    let speculative_main = fork
+        .process_content(PathBuf::from(MAIN_PATH), "fun main() { DummyIdentifier; }")
+        .expect("speculative main file must parse");
+    let shared_lib = fork
+        .get_by_path(Path::new(LIB_PATH))
+        .expect("unchanged file must exist in the fork");
+
+    let actual = format!(
+        "id preserved: {}\noriginal: {}\nspeculative: {}\nunchanged file shared: {}\n",
+        original_main.id() == speculative_main.id(),
+        original_main.source().source.trim(),
+        speculative_main.source().source.trim(),
+        Arc::ptr_eq(&original_lib, &shared_lib),
+    );
+    expect![[r#"
+        id preserved: true
+        original: fun main() {}
+        speculative: fun main() { DummyIdentifier; }
+        unchanged file shared: true
+    "#]]
+    .assert_eq(&actual);
+}
+
 fn check_reuse(
     first: ProjectIndex,
     mut second: ProjectIndex,

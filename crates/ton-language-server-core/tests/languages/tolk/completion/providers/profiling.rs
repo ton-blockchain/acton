@@ -19,17 +19,36 @@ fn completion_records_stable_profile_events() -> anyhow::Result<()> {
     )?;
     service.completion(&uri, Position::new(1, 19), CompletionTrigger::invoked())?;
 
-    let names = service
+    let mut names = service
         .profiler()
         .summary()
         .events
         .iter()
         .map(|event| event.name)
-        .filter(|name| *name == "completion" || *name == "tolk.completion")
-        .collect::<Vec<_>>()
-        .join("\n");
-    expect![[r#"tolk.completion
-completion"#]]
-    .assert_eq(&names);
+        .filter(|name| {
+            matches!(
+                *name,
+                "completion"
+                    | "tolk.completion"
+                    | "tolk.completion.context"
+                    | "tolk.completion.snapshot.fork"
+                    | "tolk.completion.snapshot.index"
+                    | "tolk.completion.snapshot.resolve"
+                    | "tolk.completion.snapshot.type_inference"
+                    | "tolk.completion.workspace"
+            )
+        })
+        .collect::<Vec<_>>();
+    names.sort_unstable();
+
+    expect![[r#"completion
+tolk.completion
+tolk.completion.context
+tolk.completion.snapshot.fork
+tolk.completion.snapshot.index
+tolk.completion.snapshot.resolve
+tolk.completion.snapshot.type_inference
+tolk.completion.workspace"#]]
+    .assert_eq(&names.join("\n"));
     Ok(())
 }

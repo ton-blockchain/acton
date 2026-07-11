@@ -297,16 +297,47 @@ fn completes_visible_locals_members_and_backticked_symbols() {
         first   Property  Foo.first   1:25-1:25  first
         second  Property  Foo.second  1:25-1:25  second"#]]);
 
-    // Member completion remains available inside an incomplete assert expression.
+    // Member completion remains available inside an assert expression.
     CompletionTest::new(
         "
             struct Foo { first: int, second: slice }
-            fun main(foo: Foo) { assert(foo.<caret>) }
+            fun main(foo: Foo) { assert(foo.<caret>) throw 1 }
         ",
     )
     .labels(&["first", "second"])
     .trigger_character(".")
-    .check(expect!["<none>"]);
+    .check(expect![[r#"
+        label   kind      detail      edit       text
+        first   Property  Foo.first   1:32-1:32  first
+        second  Property  Foo.second  1:32-1:32  second"#]]);
+
+    // A malformed member access keeps the type inferred from an imported factory call.
+    CompletionTest::new(
+        r#"
+            import "wallet"
+
+            fun consume(value: address, other: int) {}
+            fun main() {
+                val wallet = createWallet();
+                consume(wallet.<caret>, 1);
+            }
+        "#,
+    )
+    .file(
+        "wallet.tolk",
+        "
+            struct Wallet { address: address, stateInit: cell }
+            fun createWallet(): Wallet {
+                return Wallet { address: addressNone(), stateInit: beginCell().endCell() };
+            }
+        ",
+    )
+    .labels(&["address", "stateInit"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label      kind      detail            edit       text
+        address    Property  Wallet.address    5:19-5:19  address
+        stateInit  Property  Wallet.stateInit  5:19-5:19  stateInit"#]]);
 
     // A backticked function replaces the complete quoted identifier.
     CompletionTest::new(

@@ -3,7 +3,7 @@ use super::file_info::FileInfoExt;
 use crate::{DocumentSnapshot, DocumentUri, Location};
 use tolk_resolver::resolve_index::LocalDef;
 use tolk_resolver::{FileId, NameUse, Resolved, Span, SymbolId};
-use tolk_ty::{InferenceResult, TyId};
+use tolk_ty::{FileBodyTypes, InferenceResult, TyId};
 use tree_sitter::Node;
 
 pub(super) struct ResolvedTarget {
@@ -12,6 +12,16 @@ pub(super) struct ResolvedTarget {
 }
 
 impl TolkResolveSnapshot {
+    fn body_types(&self, file_id: FileId) -> Option<&FileBodyTypes> {
+        if let Some((override_file_id, body_types)) = &self.body_types_override
+            && *override_file_id == file_id
+        {
+            return Some(body_types);
+        }
+
+        self.all_body_types.get(&file_id)
+    }
+
     /// Returns the client-visible URI assigned to a file in this snapshot.
     ///
     /// The URI index is materialized together with the project index and is
@@ -69,6 +79,15 @@ impl TolkResolveSnapshot {
         }
 
         targets
+    }
+
+    pub(super) fn import_target_at(&self, file_id: FileId, offset: usize) -> Option<FileId> {
+        self.project_index
+            .imports()
+            .get(&file_id)?
+            .iter()
+            .find(|resolved| resolved.import().path_span.contains(offset))?
+            .target()
     }
 
     fn indexed_target_at(&self, file_id: FileId, offset: usize) -> Option<ResolvedTarget> {
@@ -145,7 +164,7 @@ impl TolkResolveSnapshot {
     pub(super) fn inferred_type_of_node(&self, file_id: FileId, node: Node<'_>) -> Option<TyId> {
         let file = self.file_db.get_by_id(file_id)?;
         let symbol = file.find_symbol_at(node.start_byte())?;
-        let inference = self.all_body_types.get(&file_id)?.get(&symbol.id)?;
+        let inference = self.body_types(file_id)?.get(&symbol.id)?;
 
         inference.type_of(Span::from_syntax(&node))
     }
@@ -169,17 +188,13 @@ impl TolkResolveSnapshot {
         let file = self.file_db.get_by_id(local.id.file_id)?;
         let symbol = file.find_symbol_at(local.def_span.start())?;
 
-        self.all_body_types
-            .get(&local.id.file_id)?
+        self.body_types(local.id.file_id)?
             .get(&symbol.id)?
             .type_of(local.def_span)
     }
 
     fn inferred_name_use_at(&self, symbol_id: SymbolId, offset: usize) -> Option<&NameUse> {
-        let inference = self
-            .all_body_types
-            .get(&symbol_id.file_id)?
-            .get(&symbol_id)?;
+        let inference = self.body_types(symbol_id.file_id)?.get(&symbol_id)?;
 
         name_use_from_inference(inference, offset)
     }

@@ -1,11 +1,12 @@
 use super::TolkWorkspaceEngine;
-use crate::{DocumentSnapshot, Location};
+use crate::{DocumentSnapshot, Location, Position};
+use tolk_resolver::Span;
 
 impl TolkWorkspaceEngine {
     pub(super) fn definition(
         &self,
         document: &DocumentSnapshot,
-        position: crate::Position,
+        position: Position,
     ) -> Vec<Location> {
         let snapshot = {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
@@ -20,6 +21,10 @@ impl TolkWorkspaceEngine {
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position);
+
+        if let Some(target) = snapshot.import_target_at(file_id, offset) {
+            return snapshot.location_for_span(target, Span::file_start());
+        }
 
         snapshot
             .resolved_targets_at(file_id, offset)

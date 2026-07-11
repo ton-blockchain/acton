@@ -199,6 +199,36 @@ impl FileDb {
         self.stdlib_path.as_path()
     }
 
+    /// Creates an independently mutable branch that shares immutable file data.
+    ///
+    /// File IDs are preserved, which lets speculative consumers update one file and
+    /// reuse project indexes built from this database without mutating the live state.
+    #[must_use]
+    pub fn fork(&self) -> Self {
+        let files = self
+            .files
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().clone()))
+            .collect::<DashMap<_, _>>();
+        let files_by_id = files
+            .iter()
+            .map(|entry| (entry.value().id(), entry.value().clone()))
+            .collect();
+
+        Self {
+            files,
+            files_by_id,
+            canonicalize_cache: self
+                .canonicalize_cache
+                .iter()
+                .map(|entry| (entry.key().clone(), entry.value().clone()))
+                .collect(),
+            stdlib_path: self.stdlib_path.clone(),
+            acton_stdlib_path: self.acton_stdlib_path.clone(),
+            next_id: AtomicU32::new(self.next_id.load(Ordering::Relaxed)),
+        }
+    }
+
     /// Reads and processes a file from the disk.
     /// Returns a cached version if already processed.
     pub fn process(&self, path: &Path) -> anyhow::Result<Arc<FileInfo>> {

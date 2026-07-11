@@ -44,18 +44,7 @@ impl<'a> TolkCompletionProviderContext<'a> {
         N: AstNode<'tree>,
     {
         let syntax = node.syntax();
-        let file = self.snapshot.file_db.get_by_id(self.file_id)?;
-        let symbol = file.find_symbol_at(syntax.start_byte())?;
-        let inference = self
-            .snapshot
-            .all_body_types
-            .get(&self.file_id)?
-            .get(&symbol.id)?;
-
-        inference.type_of(Span::from_syntax(&syntax)).or_else(|| {
-            let original = original_node(file.source().tree.root_node(), syntax)?;
-            inference.type_of(Span::from_syntax(&original))
-        })
+        self.snapshot.inferred_type_of_node(self.file_id, syntax)
     }
 }
 
@@ -102,17 +91,6 @@ fn local_scope(mut node: Node<'_>) -> Option<Node<'_>> {
                 | "struct_declaration"
                 | "type_alias_declaration"
         ) {
-            return Some(node);
-        }
-        node = node.parent()?;
-    }
-}
-
-fn original_node<'tree>(root: Node<'tree>, synthetic: Node<'_>) -> Option<Node<'tree>> {
-    let start = synthetic.start_byte();
-    let mut node = root.descendant_for_byte_range(start, start.saturating_add(1))?;
-    loop {
-        if node.start_byte() == start && node.kind() == synthetic.kind() {
             return Some(node);
         }
         node = node.parent()?;
