@@ -1,0 +1,118 @@
+/* Only for IDE completion/resolving */
+@media print {
+  :root {
+    --vscode-badge-background: inherit;
+    --vscode-badge-border: inherit;
+    --vscode-badge-foreground: inherit;
+    --vscode-button-background: inherit;
+    --vscode-button-border: inherit;
+    --vscode-button-foreground: inherit;
+    --vscode-button-hoverBackground: inherit;
+    --vscode-button-secondaryBackground: inherit;
+    --vscode-button-secondaryBorder: inherit;
+    --vscode-button-secondaryDisabledBackground: inherit;
+    --vscode-button-secondaryDisabledForeground: inherit;
+    --vscode-button-secondaryForeground: inherit;
+    --vscode-button-secondaryHoverBackground: inherit;
+    --vscode-charts-blue: inherit;
+    --vscode-charts-green: inherit;
+    --vscode-charts-red: inherit;
+    --vscode-charts-yellow: inherit;
+    --vscode-descriptionForeground: inherit;
+    --vscode-disabledForeground: inherit;
+    --vscode-dropdown-background: inherit;
+    --vscode-dropdown-border: inherit;
+    --vscode-dropdown-foreground: inherit;
+    --vscode-editor-background: inherit;
+    --vscode-editor-font-family: inherit;
+    --vscode-editor-foreground: inherit;
+    --vscode-editor-inactiveSelectionBackground: inherit;
+    --vscode-editorGroupHeader-tabsBackground: inherit;
+    --vscode-editorWidget-background: inherit;
+    --vscode-errorForeground: inherit;
+    --vscode-focusBorder: inherit;
+    --vscode-font-family: inherit;
+    --vscode-font-size: inherit;
+    --vscode-foreground: inherit;
+    --vscode-input-background: inherit;
+    --vscode-input-border: inherit;
+    --vscode-input-foreground: inherit;
+    --vscode-input-placeholderForeground: inherit;
+    --vscode-list-activeSelectionBackground: inherit;
+    --vscode-list-hoverBackground: inherit;
+    --vscode-list-inactiveSelectionBackground: inherit;
+    --vscode-notifications-background: inherit;
+    --vscode-notifications-border: inherit;
+    --vscode-notifications-foreground: inherit;
+    --vscode-notificationsInfoIcon-foreground: inherit;
+    --vscode-panel-border: inherit;
+    --vscode-panel-background: inherit;
+    --vscode-progressBar-background: inherit;
+    --vscode-quickInput-background: inherit;
+    --vscode-settings-checkboxBackground: inherit;
+    --vscode-settings-checkboxBorder: inherit;
+    --vscode-settings-checkboxCheck: inherit;
+    --vscode-settings-checkboxForeground: inherit;
+    --vscode-settings-textInputForeground: inherit;
+    --vscode-sideBar-background: inherit;
+    --vscode-testing-iconFailed: inherit;
+    --vscode-testing-iconPassed: inherit;
+    --vscode-textBlockQuote-background: inherit;
+    --vscode-textBlockQuote-border: inherit;
+    --vscode-textCodeBlock-background: inherit;
+    --vscode-textLink-foreground: inherit;
+    --vscode-textPreformat-foreground: inherit;
+    --vscode-toolbar-hoverBackground: inherit;
+    --vscode-widget-border: inherit;
+  }
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  background-color: var(--vscode-editor-background);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font:
+    13px / 1.4 system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    sans-serif;
+  color: var(--vscode-editor-foreground);
+  background-color: var(--vscode-editor-background);
+}
+
+.wrap {
+  padding: 16px;
+}
+
+h1 {
+  margin: 0 0 12px;
+  font-size: 18px;
+}
+
+button {
+  border: 1px solid var(--vscode-button-border, transparent);
+  background: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.05);
+}
+
+.status {
+  margin-top: 8px;
+  opacity: 0.8;
+}

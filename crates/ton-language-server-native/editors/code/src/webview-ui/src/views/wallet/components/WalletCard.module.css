@@ -1,0 +1,161 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--vscode-sideBar-background);
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 15px;
+  border-radius: 8px;
+  border: 1px solid var(--vscode-widget-border);
+  margin-bottom: 4px;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  width: 100%;
+}
+
+.name {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--vscode-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  flex-shrink: 0;
+}
+
+.addressRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.linkButton {
+  background: none;
+  border: none;
+  color: #3794ff; /* TON Blue */
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--vscode-editor-font-family, monospace);
+  font-size: 14px;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: calc(100% - 24px);
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  color: var(--vscode-icon-foreground);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.iconButton:hover {
+  color: var(--vscode-icon-hoverForeground);
+}
+
+.iconButton.copied {
+  color: var(--vscode-charts-green, #4ec9b0);
+}
+
+.balanceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.balance {
+  color: var(--vscode-charts-green, #4ec9b0);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.kind {
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.airdropGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.airdropButton {
+  background: none;
+  border: none;
+  color: #3794ff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0;
+}
+
+.airdropButton:disabled {
+  color: var(--vscode-disabledForeground);
+  cursor: default;
+}
+
+.airdropButton:not(:disabled):hover {
+  text-decoration: underline;
+}
+
+.helpIcon {
+  color: var(--vscode-descriptionForeground);
+  display: flex;
+  align-items: center;
+  cursor: help;
+}
+
+.helpIcon:hover {
+  color: var(--vscode-foreground);
+}
+
+.progressBar {
+  height: 2px;
+  background-color: var(--vscode-progressBar-background);
+  width: 100%;
+  margin-top: 4px;
+  border-radius: 1px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progressInner {
+  height: 100%;
+  background-color: var(--vscode-button-background);
+  width: 30%;
+  position: absolute;
+  animation: progress 1.5s infinite linear;
+}
+
+@keyframes progress {
+  0% {
+    left: -30%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}

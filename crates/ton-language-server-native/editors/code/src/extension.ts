@@ -1,212 +1,210 @@
-import * as net from "net"
-import * as path from "path"
+//  SPDX-License-Identifier: MIT
+//  Copyright © 2025 TON Studio
 import * as vscode from "vscode"
-import {
-  Executable,
-  LanguageClient,
-  LanguageClientOptions,
-  ServerOptions,
-} from "vscode-languageclient/node"
+import type {FileSystemWatcher} from "vscode"
 
-let client: LanguageClient | undefined
+import {consoleError} from "./client-log"
+import {startLanguageServer, stopLanguageServer} from "./language-server"
 
-const typeAtPositionRequest = "tolk.getTypeAtPosition"
-const openFileCommand = "ton.openFile"
+import {registerOpenBocCommand} from "./commands/openBocCommand"
+import {BocEditorProvider} from "./providers/boc/BocEditorProvider"
+import {BocFileSystemProvider} from "./providers/boc/BocFileSystemProvider"
+import {BocDecompilerProvider} from "./providers/boc/BocDecompilerProvider"
+import {registerSaveBocDecompiledCommand} from "./commands/saveBocDecompiledCommand"
 
-interface TypeAtPositionParams {
-  textDocument: {uri: string}
-  position: {line: number; character: number}
-}
+import {WalletWebviewProvider} from "./providers/wallet/WalletWebviewProvider"
 
-interface TypeAtPositionResponse {
-  type: string | null
-  range: {
-    start: {line: number; character: number}
-    end: {line: number; character: number}
-  } | null
-}
+import {ActonTomlCodeLensProvider} from "./acton/toml/ActonTomlCodeLensProvider"
+import {ActonTomlHoverProvider} from "./acton/toml/ActonTomlHoverProvider"
+import {ActonTolkCodeLensProvider} from "./acton/tolk/ActonTolkCodeLensProvider"
+import {ActonLinter} from "./acton/ActonLinter"
+import {ActonTestController} from "./acton/ActonTestController"
+import {formatTolkDocumentWithActon} from "./acton/ActonFormatter"
+import {registerActonRetraceDebugCommand} from "./acton/retrace/ActonRetraceDebug"
+import {registerActonSetupNotifications} from "./acton/ActonSetup"
+import {registerActonTerminalLinks} from "./acton/ActonTerminalLinks"
+import {ActonAssemblyPreviewProvider} from "./acton/tolk/ActonAssemblyPreview"
+import {configureDebugging} from "./debugging"
 
-export function activate(context: vscode.ExtensionContext) {
-  const config = vscode.workspace.getConfiguration("acton.languageServer")
-  const serverPath = config.get<string>("path") || "acton"
-  const serverArgs = config.get<string[]>("args") || ["ls", "--stdio"]
-  const serverPort = config.get<number>("port") || 0
-  const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
+  await checkConflictingExtensions()
 
-  const serverOptions =
-    serverPort > 0
-      ? connectToServer(serverPort)
-      : launchServer(serverPath, serverArgs, cwd)
+  startLanguageServer(context).catch(consoleError)
+  registerOpenBocCommand(context)
+  registerSaveBocDecompiledCommand(context)
+  registerActonSetupNotifications(context)
+  registerActonTerminalLinks(context)
+  registerActonFormatter(context)
 
-  const clientOptions: LanguageClientOptions = {
-    documentSelector: [
-      {scheme: "file", language: "tolk"},
-      {scheme: "file", language: "tasm"},
-      {scheme: "file", language: "fift"},
-      {scheme: "file", language: "tlb"},
-      {scheme: "file", language: "toml", pattern: "**/Acton.toml"},
-      {scheme: "file", pattern: "**/Acton.toml"},
-    ],
-    synchronize: {
-      fileEvents: [
-        vscode.workspace.createFileSystemWatcher("**/*.{tolk,tasm,fif,fift,tlb}"),
-        vscode.workspace.createFileSystemWatcher("**/Acton.toml"),
-      ],
-    },
-  }
-
-  client = new LanguageClient(
-    "acton-language-server",
-    "Acton Language Server",
-    serverOptions,
-    clientOptions,
+  const walletWebviewProvider = new WalletWebviewProvider(context.extensionUri)
+  walletWebviewProvider.registerCommands(context)
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      WalletWebviewProvider.viewType,
+      walletWebviewProvider,
+    ),
   )
 
-  client.start()
+  // Acton integration
+  const actonTolkCodeLensProvider = new ActonTolkCodeLensProvider()
+  const actonTomlCodeLensProvider = new ActonTomlCodeLensProvider()
+  const actonTomlHoverProvider = new ActonTomlHoverProvider()
+  const actonTestController = new ActonTestController()
+  const actonLinter = new ActonLinter()
+  const actonAssemblyPreviewProvider = new ActonAssemblyPreviewProvider()
+  actonAssemblyPreviewProvider.register(context)
+  context.subscriptions.push(
+    actonLinter,
+    actonTestController,
+    vscode.languages.registerCodeLensProvider({language: "tolk"}, actonTolkCodeLensProvider),
+    vscode.languages.registerCodeLensProvider(
+      {pattern: "**/Acton.toml"},
+      actonTomlCodeLensProvider,
+    ),
+    vscode.languages.registerHoverProvider({pattern: "**/Acton.toml"}, actonTomlHoverProvider),
+  )
+  ActonTomlCodeLensProvider.registerCommands(context)
+  ActonTolkCodeLensProvider.registerCommands(context)
+  registerActonRetraceDebugCommand(context)
+
+  configureDebugging(context)
+
+  const config = vscode.workspace.getConfiguration("ton")
+  const openDecompiled = config.get<boolean>("boc.openDecompiledOnOpen")
+  if (openDecompiled) {
+    BocEditorProvider.register()
+
+    const bocFsProvider = new BocFileSystemProvider()
+    context.subscriptions.push(
+      vscode.workspace.registerFileSystemProvider("boc", bocFsProvider, {
+        isCaseSensitive: true,
+        isReadonly: false,
+      }),
+    )
+  }
+
+  const bocDecompilerProvider = new BocDecompilerProvider()
+  context.subscriptions.push(
+    vscode.workspace.registerTextDocumentContentProvider(
+      BocDecompilerProvider.scheme,
+      bocDecompilerProvider,
+    ),
+  )
+
+  const bocWatcher = registerBocWatcher(bocDecompilerProvider)
+  context.subscriptions.push(bocWatcher)
+}
+
+function registerActonFormatter(context: vscode.ExtensionContext): void {
+  const selector: vscode.DocumentSelector = [
+    {scheme: "file", language: "tolk"},
+    {scheme: "untitled", language: "tolk"},
+  ]
 
   context.subscriptions.push(
-    vscode.commands.registerCommand(
-      typeAtPositionRequest,
-      async (params?: TypeAtPositionParams): Promise<TypeAtPositionResponse | null> => {
-        const languageClient = client
-        if (!languageClient) {
-          return null
-        }
-
-        const activeEditor = vscode.window.activeTextEditor
-        const invokedFromEditor = params === undefined
-        if (!params) {
-          if (!activeEditor) {
-            return null
-          }
-
-          params = {
-            textDocument: {uri: activeEditor.document.uri.toString()},
-            position: {
-              line: activeEditor.selection.active.line,
-              character: activeEditor.selection.active.character,
-            },
-          }
-        }
-
-        const result = await languageClient.sendRequest<TypeAtPositionResponse>(
-          typeAtPositionRequest,
-          params,
-        )
-
-        if (invokedFromEditor && result.type) {
-          if (activeEditor && result.range) {
-            const range = new vscode.Range(
-              new vscode.Position(result.range.start.line, result.range.start.character),
-              new vscode.Position(result.range.end.line, result.range.end.character),
-            )
-            activeEditor.selection = new vscode.Selection(range.start, range.end)
-            activeEditor.revealRange(range)
-          }
-
-          await vscode.window.showInformationMessage(`Type: ${result.type}`)
-        }
-
-        return result
+    vscode.languages.registerDocumentFormattingEditProvider(selector, {
+      async provideDocumentFormattingEdits(document: vscode.TextDocument) {
+        return (await formatTolkDocumentWithActon(document)) ?? []
       },
-    ),
-    vscode.commands.registerCommand(
-      openFileCommand,
-      async (filePath: string, line?: string | number): Promise<void> => {
-        try {
-          const uri = await resolveWorkspaceFile(filePath)
-          const document = await vscode.workspace.openTextDocument(uri)
-          const editor = await vscode.window.showTextDocument(document)
-          const requestedLine = typeof line === "string" ? Number.parseInt(line, 10) : line
-
-          if (requestedLine !== undefined && Number.isFinite(requestedLine)) {
-            const lineNumber = Math.min(
-              Math.max(requestedLine - 1, 0),
-              Math.max(document.lineCount - 1, 0),
-            )
-            const position = new vscode.Position(lineNumber, 0)
-            editor.selection = new vscode.Selection(position, position)
-            editor.revealRange(
-              new vscode.Range(position, position),
-              vscode.TextEditorRevealType.InCenterIfOutsideViewport,
-            )
-          }
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error)
-          await vscode.window.showErrorMessage(`Failed to open ${filePath}: ${message}`)
-        }
+    }),
+    vscode.languages.registerDocumentRangeFormattingEditProvider(selector, {
+      async provideDocumentRangeFormattingEdits(
+        document: vscode.TextDocument,
+        range: vscode.Range,
+      ) {
+        return (await formatTolkDocumentWithActon(document, range)) ?? []
       },
-    ),
+    }),
   )
 }
 
 export function deactivate(): Thenable<void> | undefined {
-  return client?.stop()
+  return stopLanguageServer()
 }
 
-function launchServer(
-  command: string,
-  args: string[],
-  cwd: string | undefined,
-): ServerOptions {
-  const run: Executable = {
-    command,
-    args,
-    options: {
-      cwd,
-      env: {
-        ...process.env,
-      },
-    },
-  }
+function registerBocWatcher(bocDecompilerProvider: BocDecompilerProvider): FileSystemWatcher {
+  const bocWatcher = vscode.workspace.createFileSystemWatcher("**/*.boc")
 
-  return {
-    run,
-    debug: run,
-  }
-}
-
-function connectToServer(port: number): ServerOptions {
-  return () =>
-    new Promise((resolve, reject) => {
-      const socket = new net.Socket()
-      socket.connect(port, "127.0.0.1", () => {
-        resolve({
-          reader: socket,
-          writer: socket,
-        })
-      })
-      socket.on("error", reject)
+  bocWatcher.onDidChange((uri: vscode.Uri) => {
+    const decompileUri = uri.with({
+      scheme: BocDecompilerProvider.scheme,
+      path: uri.path + ".decompiled.tasm",
     })
+
+    const openDocument = vscode.workspace.textDocuments.find(
+      doc => doc.uri.toString() === decompileUri.toString(),
+    )
+
+    if (openDocument) {
+      bocDecompilerProvider.update(decompileUri)
+    }
+  })
+
+  bocWatcher.onDidDelete((uri: vscode.Uri) => {
+    const decompileUri = uri.with({
+      scheme: BocDecompilerProvider.scheme,
+      path: uri.path + ".decompiled.tasm",
+    })
+
+    const openDocument = vscode.workspace.textDocuments.find(
+      doc => doc.uri.toString() === decompileUri.toString(),
+    )
+
+    if (openDocument) {
+      bocDecompilerProvider.update(decompileUri)
+    }
+  })
+
+  bocWatcher.onDidCreate((uri: vscode.Uri) => {
+    const decompileUri = uri.with({
+      scheme: BocDecompilerProvider.scheme,
+      path: uri.path + ".decompiled.tasm",
+    })
+
+    const openDocument = vscode.workspace.textDocuments.find(
+      doc => doc.uri.toString() === decompileUri.toString(),
+    )
+
+    if (openDocument) {
+      bocDecompilerProvider.update(decompileUri)
+    }
+  })
+  return bocWatcher
 }
 
-async function resolveWorkspaceFile(filePath: string): Promise<vscode.Uri> {
-  if (path.isAbsolute(filePath)) {
-    return vscode.Uri.file(filePath)
+async function checkConflictingExtensions(): Promise<void> {
+  const conflictingExtensions = [
+    {id: "dotcypress.language-fift", name: "Fift"},
+    {id: "tonwhales.func-vscode", name: "FunC Language Support"},
+    {id: "raiym.func", name: "FunC"},
+    {id: "natiiix.func-language-support", name: "FunC Language Support"},
+    {id: "ton-core.tolk-vscode", name: "Tolk"},
+  ]
+
+  const installedConflicting = conflictingExtensions.filter(ext => {
+    const extension = vscode.extensions.getExtension(ext.id)
+    return extension?.isActive
+  })
+
+  if (installedConflicting.length === 0) {
+    return
   }
 
-  const workspaceFolders = vscode.workspace.workspaceFolders ?? []
-  for (const folder of workspaceFolders) {
-    const candidate = vscode.Uri.joinPath(folder.uri, ...filePath.split(/[\\/]/))
-    try {
-      await vscode.workspace.fs.stat(candidate)
-      return candidate
-    } catch {
-      // Try the other workspace folders before falling back to a basename search.
-    }
-  }
+  const extensionNames = installedConflicting.map(ext => ext.name).join(", ")
+  const message = `Conflicting extensions detected: ${extensionNames}. We recommended to disable them to avoid conflicts. TON extension already includes the same functionality.`
 
-  const matches = await vscode.workspace.findFiles(
-    `**/${path.basename(filePath)}`,
-    "**/node_modules/**",
-    20,
+  const action = await vscode.window.showWarningMessage(
+    message,
+    "Show conflicting extensions",
+    "Ignore",
   )
-  const normalizedPath = filePath.replace(/\\/g, "/")
-  const exact = matches.find(uri => uri.path.endsWith(normalizedPath))
-  const resolved = exact ?? matches[0]
-  if (!resolved) {
-    throw new Error("file not found in the workspace")
-  }
 
-  return resolved
+  if (action === "Show conflicting extensions") {
+    await vscode.commands.executeCommand("workbench.view.extensions")
+
+    await vscode.commands.executeCommand(
+      "workbench.extensions.search",
+      `@id:${installedConflicting[0].id}`,
+    )
+  }
 }

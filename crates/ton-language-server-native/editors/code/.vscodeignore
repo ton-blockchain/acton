@@ -1,0 +1,10 @@
+**/*
+
+!dist/
+!dist/**
+dist/**/*.map
+
+# Include only this files
+!LICENSE
+!package.json
+!README.md

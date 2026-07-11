@@ -5,3 +5,5 @@ out/
 # Yarn artifacts
 yarn-error.log
 .yarn/
+
+*.vsix

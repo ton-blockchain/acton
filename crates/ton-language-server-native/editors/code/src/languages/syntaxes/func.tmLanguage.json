@@ -1,0 +1,192 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "func",
+  "scopeName": "source.func",
+  "fileTypes": ["fc", "func"],
+  "patterns": [
+    {
+      "include": "#comments"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#directives"
+    },
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#types"
+    },
+    {
+      "include": "#specifiers"
+    },
+    {
+      "include": "#operators"
+    },
+    {
+      "include": "#function-calls"
+    },
+    {
+      "include": "#punctuation"
+    },
+    {
+      "include": "#identifiers"
+    }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.double-semicolon.func",
+          "match": ";;.*$"
+        },
+        {
+          "name": "comment.block.func",
+          "begin": "\\{-",
+          "end": "-\\}",
+          "patterns": [
+            {
+              "include": "#comments"
+            }
+          ]
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.func",
+          "match": "\"(?:[^\\\"\\\\]|\\\\.)*\"[Hhcu]?"
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.hex.func",
+          "match": "(?<![0-9A-Za-z_])-?0x[0-9a-fA-F]+"
+        },
+        {
+          "name": "constant.numeric.dec.func",
+          "match": "(?<![0-9A-Za-z_])-?[0-9]+"
+        }
+      ]
+    },
+    "directives": {
+      "patterns": [
+        {
+          "name": "keyword.control.directive.include.func",
+          "match": "#include"
+        },
+        {
+          "name": "keyword.control.directive.pragma.func",
+          "match": "#pragma"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.func",
+          "match": "\\b(?:if|ifnot|elseif|elseifnot|else|while|do|until|repeat|return|try|catch)\\b"
+        },
+        {
+          "name": "keyword.declaration.func",
+          "match": "\\b(?:global|const|forall)\\b"
+        }
+      ]
+    },
+    "types": {
+      "patterns": [
+        {
+          "name": "storage.type.primitive.func",
+          "match": "\\b(?:int|cell|slice|builder|cont|tuple)\\b"
+        },
+        {
+          "name": "storage.type.modifier.func",
+          "match": "\\bvar\\b"
+        }
+      ]
+    },
+    "specifiers": {
+      "patterns": [
+        {
+          "name": "storage.modifier.func",
+          "match": "\\b(?:impure|inline|inline_ref|method_id|asm)\\b"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.func",
+          "match": "(?:==|!=|<=|>=|<=>|<<=|>>=|~>>=|\\^>>=|<<|>>|~>>|\\^>>|->|=|\\+=|-=|\\*=|\\/=|~\\/=|\\^\\/=|%|~%=|\\^%|&|\\|\\||~|\\^|\\?|\\.)"
+        }
+      ]
+    },
+    "function-calls": {
+      "patterns": [
+        {
+          "name": "meta.function-call.builtin.func",
+          "match": "(?x)\\b(?:throw_unless|equal_slices|send_raw_message|accept_message)\\b(?=\\s*\\()",
+          "captures": {
+            "0": {
+              "name": "support.function.builtin.func"
+            }
+          }
+        },
+        {
+          "name": "meta.function-call.method.func",
+          "begin": "(?<=\\.|~)\\s*(`[^`]+`|[A-Za-z_\\$][^\\s+\\-*\\/%,.;(){}\\[\\]=<>|\\^~]*)\\s*(?=\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "support.function.method.func"
+            }
+          },
+          "end": "(?=)",
+          "patterns": []
+        },
+        {
+          "name": "meta.function-call.func",
+          "begin": "(?x)(?<![\\.\\$~])(`[^`]+`|[A-Za-z_\\$][^\\s+\\-*\\/%,.;(){}\\[\\]=<>|\\^~]*)\\s*(?=\\()",
+          "beginCaptures": {
+            "1": {
+              "name": "support.function.call.func"
+            }
+          },
+          "end": "(?=)",
+          "patterns": []
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.brackets.func",
+          "match": "[()\\[\\]{}]"
+        },
+        {
+          "name": "punctuation.separator.func",
+          "match": "[,:;]"
+        }
+      ]
+    },
+    "identifiers": {
+      "patterns": [
+        {
+          "name": "entity.name.function.definition.func",
+          "match": "(?x)(?<=^|[;{]\\s*)(`[^`]+`|[A-Za-z_\\$][^\\s+\\-*\\/%,.;(){}\\[\\]=<>|\\^~]*)\\s*(?=\\()"
+        },
+        {
+          "name": "variable.other.func",
+          "match": "`[^`]+`|[A-Za-z_\\$][^\\s+\\-*\\/%,.;(){}\\[\\]=<>|\\^~]*"
+        }
+      ]
+    }
+  }
+}
