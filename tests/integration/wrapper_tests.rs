@@ -169,6 +169,52 @@ fn test_wrapper_generation_defaults() {
 }
 
 #[test]
+fn test_wrapper_deploy_preserves_address_sharding_options() {
+    let project = ProjectBuilder::new("wrapper_sharded_deploy")
+        .mapping("acton", ".acton")
+        .contract(
+            "my_contract",
+            r"
+                get fun answer(): int {
+                    return 42;
+                }
+
+                fun onInternalMessage(_: InMessage) {}
+                fun onBouncedMessage(_: InMessageBounced) {}
+            ",
+        )
+        .test_file(
+            "sharded_deploy",
+            r#"
+                import "@stdlib/gas-payments"
+                import "@acton/emulation/network"
+                import "@acton/emulation/testing"
+                import "@acton/testing/expect"
+                import "../wrappers/MyContract.gen"
+
+                get fun `test wrapper deploy preserves address sharding options`() {
+                    val deployer = testing.treasury("deployer");
+                    val unsharded = MyContract.fromStorage();
+                    val sharded = MyContract.fromStorage({
+                        fixedPrefixLength: 8,
+                        closeTo: deployer.address,
+                    });
+
+                    expect(sharded.address).toNotEqual(unsharded.address);
+
+                    val result = sharded.deploy(deployer.address, { value: grams("1") });
+                    expect(result).toHaveSuccessfulDeploy({ to: sharded.address });
+                    expect(sharded.answer()).toEqual(42);
+                }
+            "#,
+        )
+        .build();
+
+    project.acton().wrapper("my_contract").run().success();
+    project.acton().test().run().success().assert_passed(1);
+}
+
+#[test]
 fn test_wrapper_generation_without_test_stub() {
     let project = ProjectBuilder::new("wrapper_simple")
         .contract("my_contract", SIMPLE_CONTRACT)

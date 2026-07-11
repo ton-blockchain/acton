@@ -10,7 +10,11 @@ fun JettonMinter.sendDeploy(self, from: address, params: SendParams): SendResult
     val outMessage = createMessage({
         bounce: false,
         value: params.value,
-        dest: { stateInit: self.stateInit! },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit!,
+            toShard: self.toShard,
+        },
         body: TopUpGrams {},
     });
     return net.send(from, outMessage);

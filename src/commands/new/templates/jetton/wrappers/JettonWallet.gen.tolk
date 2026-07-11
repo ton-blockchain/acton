@@ -13,6 +13,7 @@ import "@contracts/storage"
 struct JettonWallet {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
@@ -26,7 +27,7 @@ fun JettonWallet.fromStorage(
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-    return JettonWallet { address, stateInit };
+    return JettonWallet { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -42,7 +43,11 @@ fun JettonWallet.deploy(self, from: address, config: SendParams = {}): SendResul
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }

@@ -13,6 +13,7 @@ import "@contracts/walletv5/storage"
 struct WalletV5 {
     address: address
     stateInit: ContractState? = null
+    toShard: AddressShardingOptions? = null
 }
 
 /// Creates a contract wrapper instance from the storage data
@@ -26,7 +27,7 @@ fun WalletV5.fromStorage(
         data: storage.toCell(),
     };
     val address = AutoDeployAddress { workchain, stateInit, toShard }.calculateAddress();
-    return WalletV5 { address, stateInit };
+    return WalletV5 { address, stateInit, toShard };
 }
 
 /// Creates a contract wrapper instance from the address
@@ -42,7 +43,11 @@ fun WalletV5.deploy(self, from: address, config: SendParams = {}): SendResultLis
     val genericMsg = createMessage({
         bounce: config.bounce,
         value: config.value,
-        dest: { stateInit: self.stateInit },
+        dest: {
+            workchain: self.address.getWorkchain(),
+            stateInit: self.stateInit,
+            toShard: self.toShard,
+        },
     });
     return net.send(from, genericMsg);
 }
