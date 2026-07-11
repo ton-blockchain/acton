@@ -277,6 +277,14 @@ impl Symbol {
             SymbolKind::Function { .. } | SymbolKind::Method { .. } | SymbolKind::GetMethod { .. }
         )
     }
+
+    fn nested_symbols(&self) -> &[Self] {
+        match &self.kind {
+            SymbolKind::Struct { fields, .. } => fields,
+            SymbolKind::Enum { members } => members,
+            _ => &[],
+        }
+    }
 }
 
 /// Represents an import statement.
@@ -318,6 +326,24 @@ pub struct FileIndex {
 }
 
 impl FileIndex {
+    /// Returns whether replacing this file leaves project-wide lookup tables valid.
+    ///
+    /// Declaration spans and semantic metadata may change. Import paths and every
+    /// global `(SymbolId, fqn)` entry must remain stable so the project index can
+    /// reuse its file graph and global symbol map.
+    #[must_use]
+    pub(crate) fn has_same_project_index_shape(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.path == other.path
+            && self.source_kind == other.source_kind
+            && self
+                .imports
+                .iter()
+                .map(|import| import.path.as_ref())
+                .eq(other.imports.iter().map(|import| import.path.as_ref()))
+            && symbols_have_same_global_identity(&self.decls, &other.decls)
+    }
+
     /// Returns whether this file exposes the same names to importing files.
     ///
     /// Source spans, bodies, signatures, and method declarations do not affect
@@ -368,6 +394,16 @@ impl FileIndex {
     #[must_use]
     pub fn is_stdlib_file(&self) -> bool {
         self.source_kind == FileSource::Stdlib
+    }
+
+    /// Returns whether this is the stdlib prelude implicitly visible from every file.
+    #[must_use]
+    pub fn is_stdlib_prelude(&self) -> bool {
+        self.is_stdlib_file()
+            && self
+                .path
+                .file_name()
+                .is_some_and(|name| name == "common.tolk")
     }
 
     /// Checks if passed file resides in Acton standard library.
@@ -729,8 +765,20 @@ impl FileIndex {
     }
 }
 
+fn symbols_have_same_global_identity(left: &[Symbol], right: &[Symbol]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left, right)| {
+            left.id == right.id
+                && left.name == right.name
+                && left.fqn == right.fqn
+                && matches!(left.kind, SymbolKind::Method { .. })
+                    == matches!(right.kind, SymbolKind::Method { .. })
+                && symbols_have_same_global_identity(left.nested_symbols(), right.nested_symbols())
+        })
+}
+
 impl Symbol {
-    fn is_name_resolution_export(&self) -> bool {
+    const fn is_name_resolution_export(&self) -> bool {
         !matches!(
             self.kind,
             SymbolKind::Method { .. } | SymbolKind::StructField | SymbolKind::EnumMember

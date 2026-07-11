@@ -6,13 +6,14 @@ use tolk_resolver::FileId;
 
 impl TolkResolveSnapshot {
     fn file_use_facts(&self, file_id: FileId) -> Option<Arc<FileUseFacts>> {
-        if let Some(facts) = self
+        let cached = self
             .use_facts
             .read()
             .expect("Tolk use-facts lock poisoned")
             .get(&file_id)
-            .cloned()
-        {
+            .cloned();
+
+        if let Some(facts) = cached {
             return Some(facts);
         }
 

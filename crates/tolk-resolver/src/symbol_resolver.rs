@@ -34,7 +34,7 @@ impl GlobalEnv {
         let common_tolk = index
             .files()
             .values()
-            .find(|f| f.path.ends_with("common.tolk"))
+            .find(|file| file.is_stdlib_prelude())
             .cloned();
 
         let file = index.get_file_index(file_id);

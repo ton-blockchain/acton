@@ -473,10 +473,19 @@ impl LanguagePlugin for TolkLanguage {
     }
 
     fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
+        let parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
         let started_at = request.context.profiler.start();
-        let completion = self
-            .engine
-            .completion(request.context.document, request.position)?;
+        let completion = self.engine.completion(
+            request.context.document,
+            &parsed.source_file,
+            request.position,
+            request.context.profiler,
+        )?;
         request
             .context
             .profiler
@@ -742,38 +751,52 @@ impl TolkWorkspaceState {
             .latest_snapshot
             .as_ref()
             .map(|snapshot| snapshot.project_index.clone());
-        let provider = SnapshotSourceProvider {
-            files: self.files.clone(),
-            use_embedded_stdlib: self.project_config.use_embedded_stdlib,
-        };
         let changed_file_ids = self.process_dirty_files(profiler)?;
         let file_db = self.file_db.clone();
-        let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
-        roots.sort();
-        let root = roots.remove(0);
-        roots.extend(
-            provider
-                .files
-                .iter()
-                .filter(|(path, file)| **path != root && file.active_source().is_some())
-                .map(|(path, _)| path.clone()),
-        );
         let project_config = self.project_config.clone();
-        if project_config.use_embedded_stdlib {
-            let mut stdlib_roots = BTreeSet::new();
-            collect_embedded_stdlib_paths(&TOLK_STDLIB_DIR, &mut stdlib_roots);
-            roots.extend(stdlib_roots);
-        }
-        roots.sort();
-        roots.dedup();
+
         let index_started_at = profiler.start();
-        let project_index = ProjectIndex::builder(&file_db, root)
-            .with_additional_roots(roots)
-            .with_stdlib(project_config.stdlib_path.clone())
-            .with_mappings(&project_config.import_mappings)
-            .build_with_provider(&provider);
+        let project_index = previous_project_index
+            .as_deref()
+            .and_then(|previous| previous.with_updated_files(&file_db, &changed_file_ids));
+
+        let mut project_index = if let Some(project_index) = project_index {
+            profiler.increment("tolk.snapshot.index.incremental");
+            project_index
+        } else {
+            let full_index_started_at = profiler.start();
+            let provider = SnapshotSourceProvider {
+                files: &self.files,
+                use_embedded_stdlib: project_config.use_embedded_stdlib,
+            };
+            let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
+            roots.sort();
+            let root = roots.remove(0);
+            roots.extend(
+                self.files
+                    .iter()
+                    .filter(|(path, file)| **path != root && file.active_source().is_some())
+                    .map(|(path, _)| path.clone()),
+            );
+
+            if project_config.use_embedded_stdlib {
+                let mut stdlib_roots = BTreeSet::new();
+                collect_embedded_stdlib_paths(&TOLK_STDLIB_DIR, &mut stdlib_roots);
+                roots.extend(stdlib_roots);
+            }
+
+            roots.sort();
+            roots.dedup();
+
+            let project_index = ProjectIndex::builder(&file_db, root)
+                .with_additional_roots(roots)
+                .with_stdlib(project_config.stdlib_path.clone())
+                .with_mappings(&project_config.import_mappings)
+                .build_with_provider(&provider)?;
+            profiler.finish("tolk.snapshot.index.full", full_index_started_at);
+            project_index
+        };
         profiler.finish("tolk.snapshot.index", index_started_at);
-        let mut project_index = project_index?;
 
         let resolve_started_at = profiler.start();
         let reused_files = previous_project_index.as_deref().map_or(0, |previous| {
@@ -820,7 +843,7 @@ impl TolkWorkspaceState {
                 {
                     DocumentUri::from(format!("file://{}", file.path.display()))
                 } else {
-                    provider.files.get(&file.path)?.active_uri()?
+                    self.files.get(&file.path)?.active_uri()?
                 };
                 Some((file_id, uri))
             })
@@ -1023,13 +1046,13 @@ struct TolkResolveSnapshot {
     file_uris: BTreeMap<FileId, DocumentUri>,
 }
 
-#[derive(Clone, Debug)]
-struct SnapshotSourceProvider {
-    files: BTreeMap<PathBuf, TolkWorkspaceFile>,
+#[derive(Debug)]
+struct SnapshotSourceProvider<'a> {
+    files: &'a BTreeMap<PathBuf, TolkWorkspaceFile>,
     use_embedded_stdlib: bool,
 }
 
-impl ProjectSourceProvider for SnapshotSourceProvider {
+impl ProjectSourceProvider for SnapshotSourceProvider<'_> {
     fn canonicalize(&self, path: &Path) -> anyhow::Result<PathBuf> {
         Ok(normalize_logical_path(path))
     }

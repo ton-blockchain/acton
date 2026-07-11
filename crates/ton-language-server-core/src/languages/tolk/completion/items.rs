@@ -182,10 +182,7 @@ fn callable_snippet(
             result.push(')');
         }
     }
-    if context.syntax.is_statement()
-        && !context.syntax.before_semicolon
-        && !context.syntax.before_paren
-    {
+    if context.syntax.needs_semicolon_for_call() {
         result.push(';');
     }
     result.push_str("$0");

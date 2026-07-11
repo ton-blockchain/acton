@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::BTreeMap;
 use web_time::{Duration, Instant};
 
@@ -17,6 +18,41 @@ pub struct ProfileSummary {
 pub struct Profiler {
     enabled: bool,
     summary: ProfileSummary,
+}
+
+#[derive(Debug)]
+pub(crate) struct BufferedProfiler {
+    enabled: bool,
+    events: RefCell<Vec<ProfileEvent>>,
+}
+
+impl BufferedProfiler {
+    pub(crate) const fn new(profiler: &Profiler) -> Self {
+        Self {
+            enabled: profiler.is_enabled(),
+            events: RefCell::new(Vec::new()),
+        }
+    }
+
+    pub(crate) fn start(&self) -> Option<Instant> {
+        self.enabled.then(Instant::now)
+    }
+
+    pub(crate) fn finish(&self, name: &'static str, started_at: Option<Instant>) {
+        if let Some(started_at) = started_at {
+            self.events.borrow_mut().push(ProfileEvent {
+                name,
+                elapsed: started_at.elapsed(),
+            });
+        }
+    }
+
+    pub(crate) fn flush_into(&self, profiler: &mut Profiler) {
+        profiler
+            .summary
+            .events
+            .append(&mut self.events.borrow_mut());
+    }
 }
 
 impl Profiler {

@@ -1,3 +1,5 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 #[path = "../../support/mod.rs"]
 mod support;
 
@@ -436,6 +438,132 @@ fn propagates_changed_inferred_types_through_transitive_importers() {
         .assert_eq(&format!("{delta} result={}", ty.type_name));
 }
 
+#[test]
+fn reuses_the_project_index_only_while_its_graph_shape_is_stable() {
+    let lib_uri = DocumentUri::from("file:///fixture/lib.tolk");
+    let alt_uri = DocumentUri::from("file:///fixture/alt.tolk");
+    let main_uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = profiling_service();
+    service
+        .open_document(lib_uri, LANGUAGE_ID, 1, "fun helper(): int { return 1; }")
+        .expect("first library should open");
+    service
+        .open_document(
+            alt_uri,
+            LANGUAGE_ID,
+            1,
+            "fun alternative(): int { return 2; }",
+        )
+        .expect("second library should open");
+    let initial = MarkedSource::parse(
+        r#"
+            import "lib"
+
+            fun main(): int {
+                return helper();
+            }
+        "#,
+    );
+    service
+        .open_document(
+            main_uri.clone(),
+            LANGUAGE_ID,
+            1,
+            initial.source().to_owned(),
+        )
+        .expect("main file should open");
+
+    let before_body = IndexCounters::capture(service.profiler().summary());
+    let body_changed = MarkedSource::parse(
+        r#"
+            import "lib"
+
+            fun main(): int {
+                return helper() + 1;
+            }
+        "#,
+    );
+    service
+        .change_document(&main_uri, 2, body_changed.source().to_owned())
+        .expect("body should change");
+    let after_body = IndexCounters::capture(service.profiler().summary());
+
+    let signature_changed = MarkedSource::parse(
+        r#"
+            import "lib"
+
+            fun main(unused: int): int {
+                return helper() + unused;
+            }
+        "#,
+    );
+    service
+        .change_document(&main_uri, 3, signature_changed.source().to_owned())
+        .expect("signature should change");
+    let after_signature = IndexCounters::capture(service.profiler().summary());
+
+    let incomplete = MarkedSource::parse(
+        r#"
+            import "lib"
+
+            fun main(unused: int): int {
+                return helper() +
+            }
+        "#,
+    );
+    service
+        .change_document(&main_uri, 4, incomplete.source().to_owned())
+        .expect("incomplete source should remain analyzable");
+    let after_incomplete = IndexCounters::capture(service.profiler().summary());
+
+    let import_changed = MarkedSource::parse(
+        r#"
+            import "alt"
+
+            fun main(unused: int): int {
+                return alternative() + unused;
+            }
+        "#,
+    );
+    service
+        .change_document(&main_uri, 5, import_changed.source().to_owned())
+        .expect("import should change");
+    let after_import = IndexCounters::capture(service.profiler().summary());
+
+    let declaration_added = MarkedSource::parse(
+        r#"
+            import "alt"
+
+            fun added(): int { return 1; }
+
+            fun main(unused: int): int {
+                return alternative() + unused;
+            }
+        "#,
+    );
+    service
+        .change_document(&main_uri, 6, declaration_added.source().to_owned())
+        .expect("declaration should be added");
+    let after_declaration = IndexCounters::capture(service.profiler().summary());
+
+    let actual = format!(
+        "body: {}\nsignature: {}\nincomplete: {}\nimport: {}\ndeclaration: {}\n",
+        after_body.delta(before_body),
+        after_signature.delta(after_body),
+        after_incomplete.delta(after_signature),
+        after_import.delta(after_incomplete),
+        after_declaration.delta(after_import),
+    );
+    expect![[r#"
+        body: incremental=1 full=0
+        signature: incremental=1 full=0
+        incomplete: incremental=1 full=0
+        import: incremental=0 full=1
+        declaration: incremental=0 full=1
+    "#]]
+    .assert_eq(&actual);
+}
+
 fn profiling_service() -> LanguageService {
     let mut service = LanguageService::new(LanguageServiceConfig {
         enable_profiling: true,
@@ -485,6 +613,46 @@ impl Display for AnalysisCounters {
     }
 }
 
+#[derive(Clone, Copy)]
+struct IndexCounters {
+    incremental: u64,
+    full: u64,
+}
+
+impl IndexCounters {
+    fn capture(summary: &ProfileSummary) -> Self {
+        Self {
+            incremental: counter(summary, "tolk.snapshot.index.incremental"),
+            full: span_count(summary, "tolk.snapshot.index.full"),
+        }
+    }
+
+    const fn delta(self, previous: Self) -> Self {
+        Self {
+            incremental: self.incremental - previous.incremental,
+            full: self.full - previous.full,
+        }
+    }
+}
+
+impl Display for IndexCounters {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "incremental={} full={}",
+            self.incremental, self.full,
+        )
+    }
+}
+
 fn counter(summary: &ProfileSummary, name: &'static str) -> u64 {
     summary.counters.get(name).copied().unwrap_or_default()
+}
+
+fn span_count(summary: &ProfileSummary, name: &'static str) -> u64 {
+    summary
+        .events
+        .iter()
+        .filter(|event| event.name == name)
+        .count() as u64
 }

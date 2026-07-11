@@ -9,16 +9,23 @@ use self::imports::WorkspaceCompletionData;
 use super::{
     TOLK_STDLIB_DIR, TolkResolveSnapshot, TolkWorkspaceEngine, collect_embedded_stdlib_paths,
 };
-use crate::{CompletionList, DocumentSnapshot, Position};
+use crate::profiling::BufferedProfiler;
+use crate::{CompletionList, DocumentSnapshot, Position, Profiler};
 use std::collections::BTreeSet;
 
 impl TolkWorkspaceEngine {
     pub(super) fn completion(
         &self,
         document: &DocumentSnapshot,
+        source_file: &tolk_syntax::SourceFile,
         position: Position,
+        profiler: &mut Profiler,
     ) -> anyhow::Result<CompletionList> {
-        let context = TolkCompletionContext::new(document, position)?;
+        let context_started_at = profiler.start();
+        let context = TolkCompletionContext::new(document, source_file, position)?;
+        profiler.finish("tolk.completion.context", context_started_at);
+
+        let workspace_started_at = profiler.start();
         let (snapshot, paths, stdlib_path, mappings, contract_ids, wallet_names) = {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             let Some(snapshot) = state.latest_snapshot.clone() else {
@@ -44,6 +51,8 @@ impl TolkWorkspaceEngine {
                 state.project_config.wallet_names.clone(),
             )
         };
+        profiler.finish("tolk.completion.workspace", workspace_started_at);
+
         let Some(file_id) = snapshot.find_document_file(document) else {
             return Ok(CompletionList::default());
         };
@@ -60,6 +69,7 @@ impl TolkWorkspaceEngine {
                 contract_ids: &contract_ids,
                 wallet_names: &wallet_names,
             },
+            profiler,
         ))
     }
 }
@@ -71,4 +81,5 @@ pub(super) struct TolkCompletionProviderContext<'a> {
     document: &'a DocumentSnapshot,
     syntax: &'a TolkCompletionContext,
     workspace: WorkspaceCompletionData<'a>,
+    profiler: &'a BufferedProfiler,
 }

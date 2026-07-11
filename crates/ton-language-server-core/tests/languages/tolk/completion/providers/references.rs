@@ -795,6 +795,50 @@ fn completes_static_and_generic_methods_for_compatible_receivers() {
 }
 
 #[test]
+fn completes_only_methods_from_indexed_stdlib_files() {
+    // Embedded stdlib modules are available as sources but are not implicit project roots.
+    CompletionTest::new(
+        "
+            struct Storage {}
+            fun main(storage: Storage) { storage.<caret> }
+        ",
+    )
+    .labels(&["toCell", "iDictGet"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail    edit       text
+        toCell  Method  T.toCell  1:37-1:37  toCell(${1:options});$0"#]]);
+
+    // Importing a specialized stdlib module indexes and exposes its methods normally.
+    CompletionTest::new(
+        r#"
+            import "@stdlib/tvm-dicts"
+
+            fun main(value: dict) { value.<caret> }
+        "#,
+    )
+    .labels(&["toCell", "iDictGet"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label     kind    detail         edit       text
+        iDictGet  Method  dict.iDictGet  2:30-2:30  iDictGet(${1:keyLen}, ${2:key});$0
+        toCell    Method  T.toCell       2:30-2:30  toCell(${1:options});$0"#]]);
+
+    // Indexing the module must not make dict-only methods compatible with arbitrary structs.
+    CompletionTest::new(
+        r#"
+            import "@stdlib/tvm-dicts"
+
+            struct Storage {}
+            fun main(value: Storage) { value.<caret> }
+        "#,
+    )
+    .labels(&["iDictGet"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+}
+
+#[test]
 fn completes_methods_through_aliases_and_smart_casts() {
     // An alias value receives methods declared on both the alias and its base type.
     CompletionTest::new(
@@ -890,6 +934,574 @@ fn completes_methods_on_string_literals() {
     .check(expect![[r#"
         label       kind    detail             edit       text
         beginParse  Method  string.beginParse  1:26-1:32  beginParse()$0"#]]);
+}
+
+#[test]
+fn filters_methods_by_receiver_kind_and_nominal_type() {
+    // An instance method is offered on its nominal struct receiver.
+    CompletionTest::new(
+        "
+            struct Left {}
+            fun Left.onlyLeft(self) {}
+            fun main(value: Left) { value.only<caret> }
+        ",
+    )
+    .labels(&["onlyLeft"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label     kind    detail         edit       text
+        onlyLeft  Method  Left.onlyLeft  2:30-2:34  onlyLeft();$0"#]]);
+
+    // Structurally equal structs do not inherit each other's nominal methods.
+    CompletionTest::new(
+        "
+            struct Left { value: int }
+            struct Right { value: int }
+            fun Left.onlyLeft(self) {}
+            fun main(value: Right) { value.only<caret> }
+        ",
+    )
+    .labels(&["onlyLeft"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+
+    // Static methods are not offered after an instance expression.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.staticOnly() {}
+            fun main(value: Foo) { value.static<caret> }
+        ",
+    )
+    .labels(&["staticOnly"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+
+    // Instance methods are not offered after a type expression.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.instanceOnly(self) {}
+            fun main() { Foo.instance<caret> }
+        ",
+    )
+    .labels(&["instanceOnly"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+
+    // A method declared specifically for a nullable receiver remains available.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo?.recover(self): Foo { return self! }
+            fun main(value: Foo?) { value.reco<caret> }
+        ",
+    )
+    .labels(&["recover"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label    kind    detail        edit       text
+        recover  Method  Foo?.recover  2:30-2:34  recover();$0"#]]);
+
+    // A method requiring a non-null receiver is hidden until the value is narrowed.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo?) { value.tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+}
+
+#[test]
+fn completes_generic_methods_with_exact_overload_semantics() {
+    // A generic receiver method is instantiated for a concrete type argument.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            fun Box<T>.take(self): T {}
+            fun main(value: Box<bool>) { value.ta<caret> }
+        ",
+    )
+    .labels(&["take"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail       edit       text
+        take   Method  Box<T>.take  2:35-2:37  take();$0"#]]);
+
+    // A generic method from another nominal type is not considered compatible.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            struct Bag<T> {}
+            fun Box<T>.take(self): T {}
+            fun main(value: Bag<int>) { value.ta<caret> }
+        ",
+    )
+    .labels(&["take"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+
+    // A concrete overload wins over a generic overload with the same name.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            fun Box<T>.pick(self): T {}
+            fun Box<int>.pick(self): int { return 1 }
+            fun main(value: Box<int>) { value.pi<caret> }
+        ",
+    )
+    .labels(&["pick"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail         edit       text
+        pick   Method  Box<int>.pick  3:34-3:36  pick();$0"#]]);
+
+    // Nested generic receiver shapes are matched recursively.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            fun Box<Box<T>>.deep(self): T {}
+            fun main(value: Box<Box<int>>) { value.de<caret> }
+        ",
+    )
+    .labels(&["deep"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail            edit       text
+        deep   Method  Box<Box<T>>.deep  2:39-2:41  deep();$0"#]]);
+
+    // The more specific nested generic overload wins for the same method name.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            fun Box<T>.select(self): int { return 1 }
+            fun Box<Box<T>>.select(self): int { return 2 }
+            fun main(value: Box<Box<int>>) { value.se<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail              edit       text
+        select  Method  Box<Box<T>>.select  3:39-3:41  select();$0"#]]);
+
+    // Repeated receiver type parameters accept matching concrete arguments.
+    CompletionTest::new(
+        "
+            struct Pair<A, B> {}
+            fun Pair<T, T>.same(self) {}
+            fun main(value: Pair<int, int>) { value.sa<caret> }
+        ",
+    )
+    .labels(&["same"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail           edit       text
+        same   Method  Pair<T, T>.same  2:40-2:42  same();$0"#]]);
+
+    // Repeated receiver type parameters reject conflicting concrete arguments.
+    CompletionTest::new(
+        "
+            struct Pair<A, B> {}
+            fun Pair<T, T>.same(self) {}
+            fun main(value: Pair<int, bool>) { value.sa<caret> }
+        ",
+    )
+    .labels(&["same"])
+    .trigger_character(".")
+    .check(expect!["<none>"]);
+}
+
+#[test]
+fn chooses_the_most_specific_generic_receiver_shape() {
+    // A structured map receiver is more specific than a bare type parameter.
+    CompletionTest::new(
+        "
+            fun T.select(self) {}
+            fun map<K, V>.select(self) {}
+            fun main(value: map<int, slice>) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail            edit       text
+        select  Method  map<K, V>.select  2:41-2:44  select();$0"#]]);
+
+    // A constrained map receiver dominates the fully generic map receiver.
+    CompletionTest::new(
+        "
+            fun map<K, V>.select(self) {}
+            fun map<int, V>.select(self) {}
+            fun main(value: map<int, slice>) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail              edit       text
+        select  Method  map<int, V>.select  2:41-2:44  select();$0"#]]);
+
+    // An instantiated array receiver is more specific than a bare type parameter.
+    CompletionTest::new(
+        "
+            fun T.select(self) {}
+            fun array<T>.select(self) {}
+            fun main(value: array<int>) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail           edit       text
+        select  Method  array<T>.select  2:36-2:39  select();$0"#]]);
+
+    // A tensor receiver is more specific than a bare type parameter.
+    CompletionTest::new(
+        "
+            fun T.select(self) {}
+            fun [T, int].select(self) {}
+            fun main(value: [bool, int]) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail           edit       text
+        select  Method  [T, int].select  2:37-2:40  select();$0"#]]);
+
+    // A nullable receiver shape wins over the unconstrained generic receiver.
+    CompletionTest::new(
+        "
+            fun T.select(self) {}
+            fun T?.select(self) {}
+            fun main(value: int?) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail     edit       text
+        select  Method  T?.select  2:30-2:33  select();$0"#]]);
+
+    // A concrete tensor overload wins over a compatible generic tensor overload.
+    CompletionTest::new(
+        "
+            fun [T, int].select(self) {}
+            fun [bool, int].select(self) {}
+            fun main(value: [bool, int]) { value.sel<caret> }
+        ",
+    )
+    .labels(&["select"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail              edit       text
+        select  Method  [bool, int].select  2:37-2:40  select();$0"#]]);
+}
+
+#[test]
+fn completes_methods_for_all_supported_receiver_expressions() {
+    // Parentheses around a receiver do not lose its inferred type.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo) { (value).tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  2:31-2:34  touch();$0"#]]);
+
+    // A freshly constructed object exposes its instance methods.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main() { (Foo {}).tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  2:22-2:25  touch();$0"#]]);
+
+    // A function-call result exposes methods from its inferred return type.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun makeFoo(): Foo { return Foo {} }
+            fun main() { makeFoo().tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  3:23-3:26  touch();$0"#]]);
+
+    // An instantiated generic type exposes compatible static methods.
+    CompletionTest::new(
+        "
+            struct Box<T> {}
+            fun Box<T>.create(): Box<T> { return Box<T> {} }
+            fun main() { Box<int>.cre<caret> }
+        ",
+    )
+    .labels(&["create"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind    detail         edit       text
+        create  Method  Box<T>.create  2:22-2:25  create();$0"#]]);
+
+    // A non-null assertion exposes methods of the narrowed receiver type.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo?) { value!.tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  2:31-2:34  touch();$0"#]]);
+
+    // An explicit cast determines the receiver used for method lookup.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: unknown) { (value as Foo).tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  2:42-2:45  touch();$0"#]]);
+
+    // A previous method call can provide the receiver for the next completion.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.next(self): Foo { return self }
+            fun Foo.touch(self) {}
+            fun main(value: Foo) { value.next().tou<caret> }
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  3:36-3:39  touch();$0"#]]);
+}
+
+#[test]
+fn applies_method_completion_at_edit_boundaries() {
+    // Existing call parentheses are preserved instead of duplicated.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo) { value.tou<caret>() }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "touch",
+        expect![[r#"
+        struct Foo {}
+        fun Foo.touch(self) {}
+        fun main(value: Foo) { value.touch<caret>() }"#]],
+    );
+
+    // An existing statement semicolon is preserved instead of duplicated.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo) { value.tou<caret>; }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "touch",
+        expect![[r#"
+        struct Foo {}
+        fun Foo.touch(self) {}
+        fun main(value: Foo) { value.touch()<caret>; }"#]],
+    );
+
+    // A method inserted as a call argument does not append a statement semicolon.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.value(self): int { return 1 }
+            fun consume(value: int) {}
+            fun main(foo: Foo) { consume(foo.val<caret>); }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "value",
+        expect![[r#"
+            struct Foo {}
+            fun Foo.value(self): int { return 1 }
+            fun consume(value: int) {}
+            fun main(foo: Foo) { consume(foo.value()<caret>); }"#]],
+    );
+
+    // A method inserted in a return expression does not append a statement semicolon.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.value(self): int { return 1 }
+            fun read(foo: Foo): int { return foo.val<caret> }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "value",
+        expect![[r#"
+        struct Foo {}
+        fun Foo.value(self): int { return 1 }
+        fun read(foo: Foo): int { return foo.value()<caret> }"#]],
+    );
+
+    // Backticked method names replace both existing backticks as one range.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.`touch me`(self) {}
+            fun main(value: Foo) { value.`touch m<caret>`; }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "touch me",
+        expect![[r#"
+        struct Foo {}
+        fun Foo.`touch me`(self) {}
+        fun main(value: Foo) { value.`touch me`()<caret>; }"#]],
+    );
+
+    // Mutate-self is omitted while ordinary parameters remain snippet arguments.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.update(mutate self, value: int) {}
+            fun main(value: Foo) { value.upd<caret> }
+        ",
+    )
+    .trigger_character(".")
+    .check_applied(
+        "update",
+        expect![[r#"
+        struct Foo {}
+        fun Foo.update(mutate self, value: int) {}
+        fun main(value: Foo) { value.update(value<caret>); }"#]],
+    );
+}
+
+#[test]
+fn handles_method_visibility_across_workspace_files() {
+    // Methods from an imported file participate in receiver completion.
+    CompletionTest::new(
+        r#"
+            import "lib"
+            fun main(value: Foo) { value.imp<caret> }
+        "#,
+    )
+    .file(
+        "lib.tolk",
+        "
+            struct Foo {}
+            fun Foo.imported(self) {}
+        ",
+    )
+    .labels(&["imported"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label     kind    detail        edit       text
+        imported  Method  Foo.imported  1:29-1:32  imported();$0"#]]);
+
+    // Selecting a compatible method from an unimported file adds its import.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun main(value: Foo) { value.hid<caret> }
+        ",
+    )
+    .file("unrelated.tolk", "fun Foo.hidden(self) {}")
+    .trigger_character(".")
+    .check_applied(
+        "hidden",
+        expect![[r#"
+        import "unrelated"
+
+        struct Foo {}
+        fun main(value: Foo) { value.hidden();<caret> }"#]],
+    );
+
+    // A same-file method remains visible without any imports.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.localMethod(self) {}
+            fun main(value: Foo) { value.local<caret> }
+        ",
+    )
+    .labels(&["localMethod"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label        kind    detail           edit       text
+        localMethod  Method  Foo.localMethod  2:29-2:34  localMethod();$0"#]]);
+
+    // Static and instance methods keep their receiver mode across an import boundary.
+    CompletionTest::new(
+        r#"
+            import "lib"
+            fun main(value: Foo) { value.cross<caret> }
+        "#,
+    )
+    .file(
+        "lib.tolk",
+        "
+            struct Foo {}
+            fun Foo.crossStatic() {}
+            fun Foo.crossInstance(self) {}
+        ",
+    )
+    .labels(&["crossStatic", "crossInstance"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label          kind    detail             edit       text
+        crossInstance  Method  Foo.crossInstance  1:29-1:34  crossInstance();$0"#]]);
+
+    // Error-tolerant parsing still completes a method at the end of an open block.
+    CompletionTest::new(
+        "
+            struct Foo {}
+            fun Foo.touch(self) {}
+            fun main(value: Foo) {
+                value.tou<caret>
+        ",
+    )
+    .labels(&["touch"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label  kind    detail     edit       text
+        touch  Method  Foo.touch  3:10-3:13  touch();$0"#]]);
 }
 
 #[test]
@@ -1287,7 +1899,7 @@ fn applies_static_and_instance_method_completions() {
         "build",
         expect![[r#"
             fun int.build(): int { return 0 }
-            fun main() { val value = int.build();<caret>.toString }"#]],
+            fun main() { val value = int.build()<caret>.toString }"#]],
     );
 }
 

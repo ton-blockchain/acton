@@ -5,7 +5,7 @@ use crate::completion::{
 use crate::languages::tolk::completion::{items, semantics};
 use crate::languages::tolk::import_edits;
 use crate::{CompletionItem, CompletionItemKind};
-use std::collections::{BTreeMap, BTreeSet};
+use rustc_hash::{FxHashMap, FxHashSet};
 use tolk_resolver::resolve_index::Resolved;
 use tolk_resolver::symbol_resolver::GlobalEnv;
 use tolk_resolver::{Symbol, SymbolKind};
@@ -53,7 +53,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReferenceCompleti
                 collector.add(candidate.item, candidate.rank);
             }
         }
-        let mut visible_symbols = BTreeSet::new();
+        let mut visible_symbols = FxHashSet::default();
         for symbol in context.visible_globals() {
             visible_symbols.insert(symbol.id);
             if allowed_global(symbol, context.syntax.is_type())
@@ -70,65 +70,89 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReferenceCompleti
 impl ReferenceCompletionProvider {
     fn collect_auto_imports(
         context: &TolkCompletionProviderContext<'_>,
-        visible_symbols: &BTreeSet<tolk_resolver::SymbolId>,
+        visible_symbols: &FxHashSet<tolk_resolver::SymbolId>,
         collector: &mut CompletionCollector,
     ) {
-        let mut by_name = BTreeMap::<_, Vec<_>>::new();
-        for file in context.snapshot.project_index.files().values() {
-            if file.id == context.file_id {
-                continue;
-            }
-            for symbol in &file.decls {
-                if !visible_symbols.contains(&symbol.id)
-                    && allowed_global(symbol, context.syntax.is_type())
-                {
-                    by_name.entry(symbol.name.clone()).or_default().push(symbol);
-                }
-            }
-        }
+        let project_index = &context.snapshot.project_index;
+        let is_type = context.syntax.is_type();
+        let mut import_edits = FxHashMap::default();
 
-        let imported_targets = context
-            .snapshot
-            .project_index
-            .imports()
-            .get(&context.file_id)
-            .into_iter()
-            .flatten()
-            .filter_map(tolk_resolver::ResolvedImport::target)
-            .collect::<BTreeSet<_>>();
-        for symbols in by_name.into_values() {
-            let Some(symbol) = symbols.first() else {
+        for symbol_ids in project_index.global_symbols().values() {
+            let mut symbols = symbol_ids.iter().filter_map(|symbol_id| {
+                let symbol = project_index.resolve_symbol(*symbol_id)?;
+                (!visible_symbols.contains(symbol_id) && allowed_global(symbol, is_type))
+                    .then_some(symbol)
+            });
+
+            let Some(symbol) = symbols.next() else {
                 continue;
             };
             let Some(mut candidate) = items::symbol(context, symbol, false) else {
                 continue;
             };
-            if symbols.len() == 1
-                && !imported_targets.contains(&symbol.id.file_id)
-                && let Some(target) = context
-                    .snapshot
-                    .project_index
-                    .files()
-                    .get(&symbol.id.file_id)
-                && let Some(import_path) = import_edits::import_path_for(
-                    context.snapshot,
-                    context.file_id,
-                    &target.path,
-                    context.workspace.stdlib_path,
-                    context.workspace.mappings,
-                )
+            if symbols.next().is_none()
+                && let Some(edit) = import_edits
+                    .entry(symbol.id.file_id)
+                    .or_insert_with(|| Self::auto_import_edit(context, symbol))
+                    .clone()
             {
-                candidate.item =
-                    candidate
-                        .item
-                        .with_additional_text_edit(import_edits::import_edit(
-                            context.document,
-                            context.syntax.root(),
-                            &import_path,
-                        ));
+                candidate.item = candidate.item.with_additional_text_edit(edit);
             }
             collector.add(candidate.item, candidate.rank);
         }
+    }
+
+    fn with_auto_import(
+        context: &TolkCompletionProviderContext<'_>,
+        symbol: &Symbol,
+        item: CompletionItem,
+    ) -> CompletionItem {
+        let Some(edit) = Self::auto_import_edit(context, symbol) else {
+            return item;
+        };
+
+        item.with_additional_text_edit(edit)
+    }
+
+    fn auto_import_edit(
+        context: &TolkCompletionProviderContext<'_>,
+        symbol: &Symbol,
+    ) -> Option<crate::TextEdit> {
+        if symbol.id.file_id == context.file_id
+            || context
+                .snapshot
+                .project_index
+                .imports()
+                .get(&context.file_id)
+                .into_iter()
+                .flatten()
+                .filter_map(tolk_resolver::ResolvedImport::target)
+                .any(|target| target == symbol.id.file_id)
+        {
+            return None;
+        }
+
+        let target = context
+            .snapshot
+            .project_index
+            .files()
+            .get(&symbol.id.file_id)?;
+        if target.is_stdlib_prelude() {
+            return None;
+        }
+        let import_path = import_edits::import_path_for(
+            context.snapshot,
+            context.file_id,
+            &target.path,
+            context.workspace.stdlib_path,
+            context.workspace.mappings,
+        )?;
+
+        Some(import_edits::import_edit(
+            context.document,
+            context.syntax.root(),
+            &import_path,
+        ))
     }
 
     fn collect_member_completions(
@@ -235,21 +259,53 @@ impl ReferenceCompletionProvider {
         instance: bool,
         collector: &mut CompletionCollector,
     ) {
+        let clone_started_at = context.profiler.start();
         let mut interner = context.snapshot.type_interner.as_ref().clone();
-        let mut type_db = TypeDb::new_with_cache(
+        context
+            .profiler
+            .finish("tolk.completion.methods.clone_interner", clone_started_at);
+
+        let query_db_started_at = context.profiler.start();
+        let mut type_db = TypeDb::new_for_query(
             &mut interner,
             &context.snapshot.file_db,
             &context.snapshot.project_index,
-            context.snapshot.type_db_cache.as_ref().clone(),
-            std::iter::empty(),
+            &context.snapshot.type_db_cache,
         );
-        for method_id in method_ids_for_completion(receiver_ty, instance, &mut type_db) {
+        context
+            .profiler
+            .finish("tolk.completion.methods.query_db", query_db_started_at);
+
+        let resolve_started_at = context.profiler.start();
+        let method_ids = method_ids_for_completion(receiver_ty, instance, &mut type_db);
+        context
+            .profiler
+            .finish("tolk.completion.methods.resolve", resolve_started_at);
+
+        let items_started_at = context.profiler.start();
+        for method_id in method_ids {
             if let Some(symbol) = context.snapshot.project_index.resolve_symbol(method_id)
-                && let Some(candidate) = items::symbol(context, symbol, true)
+                && let Some(mut candidate) = items::symbol(context, symbol, true)
             {
+                tracing::trace!(
+                    target: crate::logging::TOLK_TARGET,
+                    operation = "tolk.completion.method_candidate",
+                    method = symbol.fqn.as_ref(),
+                    provided_receiver = %context.snapshot.type_interner.display(receiver_ty),
+                    declared_receiver = context
+                        .snapshot
+                        .type_db_cache
+                        .method_receiver_type(method_id)
+                        .map(|ty| context.snapshot.type_interner.format(ty)),
+                    "method completion candidate accepted"
+                );
+                candidate.item = Self::with_auto_import(context, symbol, candidate.item);
                 collector.add(candidate.item, candidate.rank);
             }
         }
+        context
+            .profiler
+            .finish("tolk.completion.methods.items", items_started_at);
     }
 
     fn collect_struct_initializer_fields(
@@ -269,7 +325,7 @@ impl ReferenceCompletionProvider {
         let field_names = fields
             .iter()
             .map(|field| field.name.as_ref())
-            .collect::<BTreeSet<_>>();
+            .collect::<FxHashSet<_>>();
         for field in fields {
             if initialized.iter().any(|name| *name == field.name.as_ref()) || field.is_private {
                 continue;

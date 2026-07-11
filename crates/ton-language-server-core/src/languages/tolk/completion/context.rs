@@ -1,6 +1,6 @@
 use crate::completion::identifier_prefix;
 use crate::{DocumentSnapshot, Position, Range};
-use tolk_syntax::{AstNode, HasName, TryFromNode};
+use tolk_syntax::{AstNode, Block, ExprStmt, HasName, TryFromNode};
 use tree_sitter::Node;
 
 pub(super) const DUMMY_IDENTIFIER: &str = "DummyIdentifier";
@@ -17,15 +17,28 @@ pub(super) struct TolkCompletionContext {
 }
 
 impl TolkCompletionContext {
-    pub(super) fn new(document: &DocumentSnapshot, position: Position) -> anyhow::Result<Self> {
+    pub(super) fn new(
+        document: &DocumentSnapshot,
+        parsed: &tolk_syntax::SourceFile,
+        position: Position,
+    ) -> anyhow::Result<Self> {
         let (prefix, replacement_range) = identifier_prefix(document, position);
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position)
             .min(document.text().len());
-        let (left, right) = document.text().split_at(offset);
-        let rewritten = format!("{left}{DUMMY_IDENTIFIER}{right}");
-        let source_file = tolk_syntax::parse(&rewritten)?;
+        let insertion_position = document
+            .text_index()
+            .offset_to_position(document.text(), offset);
+        let insertion_range = Range::new(insertion_position, insertion_position);
+        let mut rewritten = document.text().to_owned();
+        let input_edit =
+            document
+                .text_index()
+                .apply_edit(&mut rewritten, insertion_range, DUMMY_IDENTIFIER)?;
+        let mut old_tree = parsed.tree.clone();
+        old_tree.edit(&input_edit);
+        let source_file = tolk_syntax::parse_with_old_tree(&rewritten, Some(&old_tree))?;
         let (prefix, replacement_range) = if let Some(backtick_start) = document.text().as_bytes()
             [..offset]
             .iter()
@@ -196,6 +209,14 @@ impl TolkCompletionContext {
             };
             node = parent;
         }
+    }
+
+    pub(super) fn needs_semicolon_for_call(&self) -> bool {
+        if self.before_semicolon || self.before_paren {
+            return false;
+        }
+
+        self.cursor_node().is_some_and(needs_semicolon_for_call)
     }
 
     pub(super) fn expression(&self) -> bool {
@@ -374,4 +395,51 @@ fn has_ancestor(mut node: Node<'_>, kind: &str) -> bool {
         };
         node = parent;
     }
+}
+
+fn needs_semicolon_for_call(node: Node<'_>) -> bool {
+    let Some(parent) = node.parent() else {
+        return false;
+    };
+
+    if let Ok(access) = tolk_syntax::DotAccess::try_from_node(parent) {
+        if access.obj().is_some_and(|object| object.syntax() == node) {
+            return false;
+        }
+
+        return needs_semicolon_for_call(parent);
+    }
+
+    if ExprStmt::try_from_node(parent).is_ok() {
+        return true;
+    }
+
+    if let Ok(declaration) = tolk_syntax::VarDeclLhs::try_from_node(parent) {
+        return parent
+            .parent()
+            .is_some_and(|grandparent| Block::try_from_node(grandparent).is_ok())
+            && declaration
+                .assigned_value()
+                .is_some_and(|value| value.syntax() == node);
+    }
+
+    if let Ok(assignment) = tolk_syntax::Assign::try_from_node(parent) {
+        return parent
+            .parent()
+            .is_some_and(|grandparent| ExprStmt::try_from_node(grandparent).is_ok())
+            && assignment
+                .right()
+                .is_some_and(|right| right.syntax() == node);
+    }
+
+    if let Ok(assignment) = tolk_syntax::SetAssign::try_from_node(parent) {
+        return parent
+            .parent()
+            .is_some_and(|grandparent| ExprStmt::try_from_node(grandparent).is_ok())
+            && assignment
+                .right()
+                .is_some_and(|right| right.syntax() == node);
+    }
+
+    false
 }

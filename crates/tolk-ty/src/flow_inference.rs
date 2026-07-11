@@ -370,7 +370,7 @@ impl<'db, 'a> InferenceContext<'db, 'a> {
     }
 
     pub fn set_top_level_type(&mut self, symbol_id: SymbolId, ty: TyId) {
-        self.type_db.top_level_types.insert(symbol_id, ty);
+        self.type_db.top_level_types.to_mut().insert(symbol_id, ty);
     }
 
     pub fn get_top_level_type(&mut self, symbol_id: SymbolId) -> Option<TyId> {

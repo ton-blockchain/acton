@@ -162,43 +162,48 @@ fn resolve_methods(
     // for instance, if there is `T.method`, it will be instantiated with T=provided_receiver
     let mut viable = Vec::with_capacity(4);
 
-    for file_index in type_db.project_index.files().values() {
-        for symbol in &file_index.decls {
-            let SymbolKind::Method { is_instance, .. } = symbol.kind else {
-                continue;
-            };
+    let method_ids = type_db
+        .project_index
+        .methods_by_name()
+        .get(called_name)
+        .map(Vec::as_slice)
+        .unwrap_or_default();
+    for method_id in method_ids {
+        let Some(symbol) = type_db.project_index.resolve_symbol(*method_id) else {
+            continue;
+        };
+        let SymbolKind::Method { is_instance, .. } = symbol.kind else {
+            continue;
+        };
 
-            if symbol.name.as_ref() != called_name
-                || instance.is_some_and(|expected| expected != is_instance)
-            {
-                continue;
-            }
+        if instance.is_some_and(|expected| expected != is_instance) {
+            continue;
+        }
 
-            let Some(&receiver) = type_db.receiver_types.get(&symbol.id) else {
-                continue;
-            };
+        let Some(&receiver) = type_db.receiver_types.get(&symbol.id) else {
+            continue;
+        };
 
-            let intn = &mut type_db.intrn;
-            if intn.has_generics(receiver) {
-                let mut deducer = GenericSubstitutionsDeducing::new();
-                let replaced = deducer.auto_deduce_from_argument(receiver, provided_receiver, intn);
+        let intn = &mut type_db.intrn;
+        if intn.has_generics(receiver) {
+            let mut deducer = GenericSubstitutionsDeducing::new();
+            let replaced = deducer.auto_deduce_from_argument(receiver, provided_receiver, intn);
 
-                if intn.can_rhs_be_assigned(replaced, provided_receiver) {
-                    viable.push(MethodCallCandidate {
-                        original_receiver: receiver,
-                        instantiated_receiver: replaced,
-                        method_id: symbol.id,
-                        substitutions: deducer.substitutions.mapping,
-                    });
-                }
-            } else if intn.can_rhs_be_assigned(receiver, provided_receiver) {
+            if intn.can_rhs_be_assigned(replaced, provided_receiver) {
                 viable.push(MethodCallCandidate {
                     original_receiver: receiver,
-                    instantiated_receiver: receiver,
+                    instantiated_receiver: replaced,
                     method_id: symbol.id,
-                    substitutions: FxHashMap::default(),
+                    substitutions: deducer.substitutions.mapping,
                 });
             }
+        } else if intn.can_rhs_be_assigned(receiver, provided_receiver) {
+            viable.push(MethodCallCandidate {
+                original_receiver: receiver,
+                instantiated_receiver: receiver,
+                method_id: symbol.id,
+                substitutions: FxHashMap::default(),
+            });
         }
     }
 
@@ -300,30 +305,33 @@ pub fn method_ids_for_completion(
     type_db: &mut TypeDb<'_>,
 ) -> Vec<SymbolId> {
     type_db.ensure_method_receivers_loaded();
-    let mut names = std::collections::BTreeSet::new();
-    for file_index in type_db.project_index.files().values() {
-        for symbol in &file_index.decls {
-            if matches!(
-                symbol.kind,
-                SymbolKind::Method {
-                    is_instance,
-                    ..
-                } if is_instance == instance
-            ) {
-                names.insert(symbol.name.clone());
-            }
+    let mut result = Vec::new();
+    for (name, method_ids) in type_db.project_index.methods_by_name() {
+        let has_matching_receiver_kind = method_ids.iter().any(|method_id| {
+            type_db
+                .project_index
+                .resolve_symbol(*method_id)
+                .is_some_and(|symbol| {
+                    matches!(
+                        symbol.kind,
+                        SymbolKind::Method {
+                            is_instance,
+                            ..
+                        } if is_instance == instance
+                    )
+                })
+        });
+        if !has_matching_receiver_kind {
+            continue;
         }
+
+        result.extend(
+            resolve_methods(provided_receiver, name, Some(instance), type_db)
+                .into_iter()
+                .map(|candidate| candidate.method_id),
+        );
     }
 
-    let mut result = names
-        .into_iter()
-        .flat_map(|name| {
-            resolve_methods(provided_receiver, &name, Some(instance), type_db)
-                .into_iter()
-                .map(|candidate| candidate.method_id)
-                .collect::<Vec<_>>()
-        })
-        .collect::<Vec<_>>();
     result.sort_unstable();
     result.dedup();
     result

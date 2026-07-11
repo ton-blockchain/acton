@@ -2,10 +2,9 @@
 
 ## Status
 
-This document defines the performance work required before the Tolk language
-server can be considered responsive on large projects. It supersedes the
-eager semantic rebuild described by the current implementation while keeping
-the source-provider and workspace model from `TOLK_DESIGN.md`.
+This document records the design and implementation outcome of the Tolk
+incremental-analysis work. It supersedes the eager semantic rebuild while
+keeping the source-provider and workspace model from `TOLK_DESIGN.md`.
 
 The implementation must remain shared by native and WebAssembly adapters.
 Adapter-specific debouncing is not a substitute for fixing core invalidation.
@@ -89,6 +88,63 @@ has been fully indexed and `Elector.tolk` has been opened:
 
 The first optimization target is project-wide name resolution, not type
 inference. Deferring only type inference would leave most of the latency.
+
+## Implementation Result
+
+The incremental resolver, project-index fast path, declaration-level semantic
+reuse, and copy-on-write immutable snapshot publication are implemented.
+Completion also uses an indexed method lookup, a borrowed query-only `TypeDb`,
+and hash-indexed candidate deduplication.
+
+The final comparison uses the same `acton-contracts` input as the baseline,
+release builds, five process runs, and rotated server order. The table reports
+the median of the five run-level measurements. This keeps isolated process
+startup and scheduler stalls from dominating the comparison.
+
+| Operation | WASM | Native | TypeScript |
+| --- | ---: | ---: | ---: |
+| Cold start and indexing | 289.6 ms | 113.9 ms | 401.7 ms |
+| Member completion | 2.098 ms | 1.655 ms | 4.236 ms |
+| Hover | 0.159 ms | 0.108 ms | 0.116 ms |
+| Definition | 0.143 ms | 0.102 ms | 0.112 ms |
+| References | 0.134 ms | 0.096 ms | 0.272 ms |
+| Semantic tokens | 0.862 ms | 0.525 ms | 5.649 ms |
+| Inlay hints | 1.831 ms | 1.420 ms | 5.368 ms |
+| Edit and completion per character | 13.516 ms | 9.748 ms | 13.435 ms |
+| Typing p95 | 18.401 ms | 13.760 ms | 18.216 ms |
+| Edit to definition | 4.598 ms | 2.077 ms | 2.760 ms |
+
+Native and WASM return identical results in this benchmark: 12 member
+completion items, one definition, one reference, 8,690 semantic-token
+integers, and 251 inlay hints. TypeScript result cardinalities differ for some
+features, so its timings are a reference implementation comparison rather
+than an assertion of output equivalence.
+
+Relative to the original large-project baseline, edit-to-definition is about
+15 times faster in WASM and 30 times faster natively. Edit-and-completion
+latency is about 6.3 times faster in WASM and 7.9 times faster natively.
+
+### Final WASM Differential Profile
+
+The following averages cover 333 edits in `Elector.tolk`:
+
+| Phase | Mean |
+| --- | ---: |
+| Incremental parse | 2.579 ms |
+| Update changed `FileDb` entry | 0.096 ms |
+| Update `ProjectIndex` | 0.198 ms |
+| Resolve invalidated files | 1.105 ms |
+| Classify semantic invalidation | 0.182 ms |
+| Refresh type signatures | 0.196 ms |
+| Infer affected bodies | 0.622 ms |
+| Materialize snapshot | 0.181 ms |
+| Total snapshot rebuild | 2.736 ms |
+
+All 333 edits used the incremental project-index path. The profile records
+94,905 reused file-resolution entries and only one full index build, during
+initialization. The remaining WASM typing cost is dominated by parsing the
+31.5 KiB edited file and serializing large global completion lists, not by
+workspace-wide invalidation.
 
 ## Goals
 

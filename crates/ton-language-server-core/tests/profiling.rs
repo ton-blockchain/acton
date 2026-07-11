@@ -1,9 +1,11 @@
+#![allow(clippy::needless_raw_string_hashes)]
+
 use expect_test::expect;
 use ton_language_server_core::languages::tlb::{LANGUAGE_ID as TLB_LANGUAGE_ID, TlbLanguage};
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    DocumentUri, LanguageService, LanguageServiceConfig, Position, ProfileSummary, Profiler, Range,
-    TextEdit, default_language_service,
+    CompletionTrigger, DocumentUri, LanguageService, LanguageServiceConfig, Position,
+    ProfileSummary, Profiler, Range, TextEdit, default_language_service,
 };
 
 #[test]
@@ -160,6 +162,47 @@ fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
     assert_eq!(event_count(summary, "tolk.definition.resolve"), 3);
     assert_eq!(event_count(summary, "inlay_hints"), 1);
     assert_eq!(event_count(summary, "tolk.inlay_hints"), 1);
+
+    Ok(())
+}
+
+#[test]
+fn records_tolk_method_completion_stages() -> anyhow::Result<()> {
+    let uri = DocumentUri::from("file:///fixture/method-completion.tolk");
+    let mut service = tolk_profiling_service();
+    service.open_document(
+        uri.clone(),
+        TOLK_LANGUAGE_ID,
+        1,
+        "struct Storage {}
+fun Storage.save(self) {}
+fun main(storage: Storage) { storage. }
+",
+    )?;
+
+    let completion = service.completion(
+        &uri,
+        Position::new(2, 37),
+        CompletionTrigger::character("."),
+    )?;
+    assert!(completion.items.iter().any(|item| item.label == "save"));
+
+    let summary = service.profiler().summary();
+    let actual = [
+        "tolk.completion.methods.clone_interner",
+        "tolk.completion.methods.query_db",
+        "tolk.completion.methods.resolve",
+        "tolk.completion.methods.items",
+    ]
+    .map(|name| format!("{name}: {}", event_count(summary, name)))
+    .join("\n");
+
+    expect![[r#"
+        tolk.completion.methods.clone_interner: 1
+        tolk.completion.methods.query_db: 1
+        tolk.completion.methods.resolve: 1
+        tolk.completion.methods.items: 1"#]]
+    .assert_eq(&actual);
 
     Ok(())
 }

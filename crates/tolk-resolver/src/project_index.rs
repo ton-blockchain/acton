@@ -4,10 +4,10 @@
 //! `FileIndex`es and tracks the relationships between files through imports.
 
 use crate::file_db::FileDb;
-use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
+use crate::file_index::{FileId, FileIndex, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -90,13 +90,15 @@ pub struct ProjectIndex {
     /// Map from `FileId` to a list of file IDs that import this file.
     pub(crate) dependents: FxHashMap<FileId, Vec<FileId>>,
     /// Map from absolute file path to `FileId`.
-    pub(crate) path_to_file_id: HashMap<PathBuf, FileId>,
+    pub(crate) path_to_file_id: FxHashMap<PathBuf, FileId>,
     /// Path to the Tolk standard library, if provided.
     pub(crate) stdlib_path: Option<PathBuf>,
     /// Path mappings used to resolve `@alias/...` imports.
     pub(crate) mappings: FxHashMap<String, String>,
     /// Map from symbol name to all `SymbolId`s that declare it across the project.
-    pub(crate) global_symbols: HashMap<Arc<str>, Vec<SymbolId>>,
+    pub(crate) global_symbols: FxHashMap<Arc<str>, Vec<SymbolId>>,
+    /// Map from an unqualified method name to every declaration with that name.
+    pub(crate) methods_by_name: FxHashMap<Arc<str>, Vec<SymbolId>>,
     /// List of errors encountered during project indexing.
     pub(crate) errors: Vec<String>,
     /// Map from `FileId` to its name resolution index.
@@ -137,7 +139,7 @@ impl ProjectIndex {
     }
 
     #[must_use]
-    pub const fn path_to_file_id(&self) -> &HashMap<PathBuf, FileId> {
+    pub const fn path_to_file_id(&self) -> &FxHashMap<PathBuf, FileId> {
         &self.path_to_file_id
     }
 
@@ -158,10 +160,7 @@ impl ProjectIndex {
             // very unlikely and likely a bug
             return Vec::new();
         };
-        let is_common = file.source_kind == FileSource::Stdlib
-            && file.path.file_name().is_some_and(|n| n == "common.tolk");
-
-        if is_common {
+        if file.is_stdlib_prelude() {
             // all files depend on common.tolk
             return self.files.keys().copied().collect();
         }
@@ -232,6 +231,64 @@ impl ProjectIndex {
         reused
     }
 
+    /// Replaces changed per-file indexes while sharing the unchanged project graph.
+    ///
+    /// This fast path is available only when import paths and the identities used by
+    /// the global symbol map are unchanged. Import and declaration spans are copied
+    /// from the current [`FileDb`]. Name-resolution results are intentionally cleared
+    /// and can then be restored selectively with [`Self::reuse_resolved_uses_from`].
+    #[must_use]
+    pub fn with_updated_files(
+        &self,
+        file_db: &FileDb,
+        changed_file_ids: &BTreeSet<FileId>,
+    ) -> Option<Self> {
+        if changed_file_ids.is_empty() {
+            return None;
+        }
+
+        let updates = changed_file_ids
+            .iter()
+            .map(|&file_id| {
+                let previous_file = self.files.get(&file_id)?;
+                let current_file = file_db.get_by_id(file_id)?.index().clone();
+
+                if !current_file.has_same_project_index_shape(previous_file) {
+                    return None;
+                }
+
+                let previous_imports = self.imports.get(&file_id)?;
+                if current_file.imports.len() != previous_imports.len() {
+                    return None;
+                }
+
+                let imports = current_file
+                    .imports
+                    .iter()
+                    .cloned()
+                    .zip(previous_imports)
+                    .map(|(import, previous)| ResolvedImport {
+                        import,
+                        path: previous.path.clone(),
+                        target: previous.target,
+                    })
+                    .collect();
+
+                Some((file_id, current_file, imports))
+            })
+            .collect::<Option<Vec<_>>>()?;
+
+        let mut updated = self.clone();
+        updated.resolved_uses.clear();
+
+        for (file_id, file, imports) in updates {
+            updated.files.insert(file_id, file);
+            updated.imports.insert(file_id, imports);
+        }
+
+        Some(updated)
+    }
+
     fn invalidated_resolution_files(
         &self,
         previous: &Self,
@@ -279,12 +336,9 @@ impl ProjectIndex {
     }
 
     fn has_same_resolved_imports(&self, previous: &Self, file_id: FileId) -> bool {
-        let imports = self.imports.get(&file_id).map(Vec::as_slice).unwrap_or(&[]);
-        let previous_imports = previous
-            .imports
-            .get(&file_id)
-            .map(Vec::as_slice)
-            .unwrap_or(&[]);
+        let imports: &[ResolvedImport] = self.imports.get(&file_id).map_or(&[], Vec::as_slice);
+        let previous_imports: &[ResolvedImport] =
+            previous.imports.get(&file_id).map_or(&[], Vec::as_slice);
 
         imports
             .iter()
@@ -295,8 +349,14 @@ impl ProjectIndex {
     }
 
     #[must_use]
-    pub const fn global_symbols(&self) -> &HashMap<Arc<str>, Vec<SymbolId>> {
+    pub const fn global_symbols(&self) -> &FxHashMap<Arc<str>, Vec<SymbolId>> {
         &self.global_symbols
+    }
+
+    /// Returns method declarations grouped by their unqualified name.
+    #[must_use]
+    pub const fn methods_by_name(&self) -> &FxHashMap<Arc<str>, Vec<SymbolId>> {
+        &self.methods_by_name
     }
 
     /// Returns a list of all file IDs that are recursively reachable from the given file.
@@ -375,7 +435,7 @@ impl ProjectIndex {
 
     fn resolve_imports_with_provider(
         index: &FileIndex,
-        path_to_id: &HashMap<PathBuf, FileId>,
+        path_to_id: &FxHashMap<PathBuf, FileId>,
         provider: &dyn ProjectSourceProvider,
         stdlib_path: Option<&Path>,
         mappings: &FxHashMap<String, String>,
@@ -540,7 +600,7 @@ impl<'a> ProjectIndexBuilder<'a> {
         let mut files = FxHashMap::default();
         let mut queue = VecDeque::new();
 
-        let mut path_to_file_id = HashMap::new();
+        let mut path_to_file_id = FxHashMap::default();
         queue.extend(
             first_root
                 .imports
@@ -645,10 +705,17 @@ impl<'a> ProjectIndexBuilder<'a> {
             }
         }
 
-        let mut global_symbols = HashMap::new();
+        let mut global_symbols = FxHashMap::default();
+        let mut methods_by_name: FxHashMap<Arc<str>, Vec<SymbolId>> = FxHashMap::default();
         for file in files.values() {
             for decl in &file.decls {
                 Self::add_symbol_to_global_index(&mut global_symbols, decl);
+                if matches!(decl.kind, SymbolKind::Method { .. }) {
+                    methods_by_name
+                        .entry(decl.name.clone())
+                        .or_default()
+                        .push(decl.id);
+                }
             }
         }
 
@@ -662,6 +729,7 @@ impl<'a> ProjectIndexBuilder<'a> {
             mappings: self.mappings,
             errors,
             global_symbols,
+            methods_by_name,
         })
     }
 
@@ -685,7 +753,7 @@ impl<'a> ProjectIndexBuilder<'a> {
     }
 
     fn add_symbol_to_global_index(
-        global_symbols: &mut HashMap<Arc<str>, Vec<SymbolId>>,
+        global_symbols: &mut FxHashMap<Arc<str>, Vec<SymbolId>>,
         symbol: &Symbol,
     ) {
         global_symbols

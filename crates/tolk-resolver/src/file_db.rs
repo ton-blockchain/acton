@@ -181,6 +181,10 @@ impl FileDb {
     /// Creates a new, empty `FileDb`.
     #[must_use]
     pub fn new(stdlib_path: PathBuf, acton_stdlib_path: Option<PathBuf>) -> Self {
+        let stdlib_path = dunce::canonicalize(&stdlib_path).unwrap_or(stdlib_path);
+        let acton_stdlib_path =
+            acton_stdlib_path.map(|path| dunce::canonicalize(&path).unwrap_or(path));
+
         FileDb {
             files: DashMap::new(),
             files_by_id: DashMap::new(),

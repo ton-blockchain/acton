@@ -1,5 +1,7 @@
 use crate::{DocumentSnapshot, Position, Range, TextEdit};
+use rustc_hash::{FxHashMap, FxHasher};
 use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CompletionTriggerKind {
@@ -193,6 +195,7 @@ pub(crate) trait CompletionProvider<Context> {
     fn collect(&self, context: &Context, collector: &mut CompletionCollector) -> Option<()>;
 }
 
+#[cfg(any(test, feature = "tlb", feature = "tasm", feature = "fift"))]
 pub(crate) fn collect_from_providers<Context>(
     context: &Context,
     providers: &[&dyn CompletionProvider<Context>],
@@ -292,29 +295,41 @@ struct RankedCompletionItem {
 #[derive(Default)]
 pub(crate) struct CompletionCollector {
     items: Vec<RankedCompletionItem>,
+    candidates_by_hash: FxHashMap<u64, Vec<usize>>,
 }
 
 impl CompletionCollector {
     #[must_use]
-    pub(crate) const fn new() -> Self {
-        Self { items: Vec::new() }
+    pub(crate) fn new() -> Self {
+        Self::default()
     }
 
     pub(crate) fn add(&mut self, item: CompletionItem, rank: CompletionRank) {
         if item.label.is_empty() {
             return;
         }
-        if let Some(existing) = self
-            .items
-            .iter_mut()
-            .find(|existing| same_candidate(&existing.item, &item))
-        {
+        let candidate_hash = candidate_hash(&item);
+        let existing_index = self
+            .candidates_by_hash
+            .get(&candidate_hash)
+            .into_iter()
+            .flatten()
+            .copied()
+            .find(|&index| same_candidate(&self.items[index].item, &item));
+        if let Some(existing_index) = existing_index {
+            let existing = &mut self.items[existing_index];
             if rank.key() < existing.rank.key() {
                 *existing = RankedCompletionItem { item, rank };
             }
             return;
         }
+
+        let index = self.items.len();
         self.items.push(RankedCompletionItem { item, rank });
+        self.candidates_by_hash
+            .entry(candidate_hash)
+            .or_default()
+            .push(index);
     }
 
     #[must_use]
@@ -332,6 +347,22 @@ impl CompletionCollector {
             .collect();
         CompletionList::new(items)
     }
+}
+
+fn candidate_hash(item: &CompletionItem) -> u64 {
+    let mut hasher = FxHasher::default();
+    item.label.hash(&mut hasher);
+    item.kind.hash(&mut hasher);
+    item.insert_text.hash(&mut hasher);
+    item.text_edit
+        .as_ref()
+        .map(|edit| &edit.range)
+        .hash(&mut hasher);
+    item.text_edit
+        .as_ref()
+        .map(|edit| &edit.new_text)
+        .hash(&mut hasher);
+    hasher.finish()
 }
 
 fn same_candidate(left: &CompletionItem, right: &CompletionItem) -> bool {

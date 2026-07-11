@@ -3,6 +3,7 @@ use crate::type_interner::{TyId, TypeInterner};
 use crate::type_substitutor::TypeSubstitutor;
 use crate::types::{AddressKind, TyData};
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::borrow::Cow;
 use std::sync::Arc;
 use tolk_resolver::AstNodeSpanExt;
 use tolk_resolver::file_db::FileDb;
@@ -31,6 +32,11 @@ impl TypeDbCache {
     #[must_use]
     pub fn top_level_type(&self, symbol_id: SymbolId) -> Option<TyId> {
         self.top_level_types.get(&symbol_id).copied()
+    }
+
+    #[must_use]
+    pub fn method_receiver_type(&self, symbol_id: SymbolId) -> Option<TyId> {
+        self.receiver_types.get(&symbol_id).copied()
     }
 
     fn retain_current_except(
@@ -92,9 +98,9 @@ pub struct TypeDb<'a> {
     /// It is also used to get information about resolved symbols by their [`Span`].
     pub project_index: &'a ProjectIndex,
     /// Stores all inferred types for top-level definitions by their [`SymbolId`].
-    pub top_level_types: FxHashMap<SymbolId, TyId>,
+    pub top_level_types: Cow<'a, FxHashMap<SymbolId, TyId>>,
     /// Stores all receiver types for methods by their [`SymbolId`].
-    pub receiver_types: FxHashMap<SymbolId, TyId>,
+    pub receiver_types: Cow<'a, FxHashMap<SymbolId, TyId>>,
     /// Stores call graph
     pub call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
     pub inverted_call_graph: FxHashMap<SymbolId, FxHashSet<SymbolId>>,
@@ -103,7 +109,7 @@ pub struct TypeDb<'a> {
     /// Keeps track of definitions that have already been processed or are currently
     /// being processed (to handle `A -> B -> A` dependencies).
     currently_lowering: FxHashSet<SymbolId>,
-    initialized_files: FxHashSet<FileId>,
+    initialized_files: Cow<'a, FxHashSet<FileId>>,
     refreshed_files: Vec<FileId>,
     method_receivers_loaded: bool,
     treat_unresolved_as_type_parameter: bool,
@@ -159,10 +165,10 @@ impl<'a> TypeDb<'a> {
             inverted_call_graph: FxHashMap::default(),
             call_graph: FxHashMap::default(),
             type_lower_cache: FxHashMap::default(),
-            top_level_types: cache.top_level_types,
-            receiver_types: cache.receiver_types,
+            top_level_types: Cow::Owned(cache.top_level_types),
+            receiver_types: Cow::Owned(cache.receiver_types),
             currently_lowering: FxHashSet::default(),
-            initialized_files: cache.initialized_files,
+            initialized_files: Cow::Owned(cache.initialized_files),
             refreshed_files: files_to_collect.clone(),
             method_receivers_loaded: false,
             treat_unresolved_as_type_parameter: false,
@@ -170,6 +176,34 @@ impl<'a> TypeDb<'a> {
         db.collect_top_level_types_for(files_to_collect);
         db.method_receivers_loaded = true;
         db
+    }
+
+    /// Creates a query-only view over a fully initialized cache.
+    ///
+    /// Read-only operations borrow the cached maps without cloning them. Existing
+    /// mutation paths remain correct through [`Cow::to_mut`] and pay for a clone
+    /// only if a supposedly query-only operation needs to lower a missing type.
+    pub fn new_for_query(
+        type_interner: &'a mut TypeInterner,
+        file_db: &'a FileDb,
+        project_index: &'a ProjectIndex,
+        cache: &'a TypeDbCache,
+    ) -> TypeDb<'a> {
+        TypeDb {
+            intrn: type_interner,
+            file_db,
+            project_index,
+            inverted_call_graph: FxHashMap::default(),
+            call_graph: FxHashMap::default(),
+            type_lower_cache: FxHashMap::default(),
+            top_level_types: Cow::Borrowed(&cache.top_level_types),
+            receiver_types: Cow::Borrowed(&cache.receiver_types),
+            currently_lowering: FxHashSet::default(),
+            initialized_files: Cow::Borrowed(&cache.initialized_files),
+            refreshed_files: Vec::new(),
+            method_receivers_loaded: true,
+            treat_unresolved_as_type_parameter: false,
+        }
     }
 
     #[must_use]
@@ -180,9 +214,9 @@ impl<'a> TypeDb<'a> {
     #[must_use]
     pub fn into_cache(self) -> TypeDbCache {
         TypeDbCache {
-            top_level_types: self.top_level_types,
-            receiver_types: self.receiver_types,
-            initialized_files: self.initialized_files,
+            top_level_types: self.top_level_types.into_owned(),
+            receiver_types: self.receiver_types.into_owned(),
+            initialized_files: self.initialized_files.into_owned(),
         }
     }
 
@@ -343,7 +377,7 @@ impl<'a> TypeDb<'a> {
                     _ => continue,
                 };
                 if let Some(ty) = ty {
-                    self.top_level_types.insert(symbol.id, ty);
+                    self.top_level_types.to_mut().insert(symbol.id, ty);
                 }
             }
         }
@@ -353,7 +387,7 @@ impl<'a> TypeDb<'a> {
             for symbol in &file_index.decls {
                 let _ = self.get_top_level_type(Some(&symbol.kind), symbol.id);
             }
-            self.initialized_files.insert(file_index.id);
+            self.initialized_files.to_mut().insert(file_index.id);
         }
     }
 
@@ -439,7 +473,7 @@ impl<'a> TypeDb<'a> {
             }
         ) {
             let ty = self.as_primitive_type(&symbol.name)?;
-            self.top_level_types.insert(symbol_id, ty);
+            self.top_level_types.to_mut().insert(symbol_id, ty);
             return Some(ty);
         }
 
@@ -455,7 +489,7 @@ impl<'a> TypeDb<'a> {
             return self.top_level_types.get(&symbol_id).copied();
         }
         let ty = self.lower_top_level_decl(file_id, &ast_decl, symbol)?;
-        self.top_level_types.insert(symbol_id, ty);
+        self.top_level_types.to_mut().insert(symbol_id, ty);
         Some(ty)
     }
 
@@ -474,7 +508,9 @@ impl<'a> TypeDb<'a> {
         let ast_fields = body.fields();
         for (field_info, ast_field) in fields.iter().zip(ast_fields) {
             if let Some(field_ty) = self.lower_opt_type(file_id, ast_field.typ().as_ref()) {
-                self.top_level_types.insert(field_info.id, field_ty);
+                self.top_level_types
+                    .to_mut()
+                    .insert(field_info.id, field_ty);
             }
         }
 
@@ -531,7 +567,7 @@ impl<'a> TypeDb<'a> {
                     self.intrn.ty_undefined
                 };
 
-                self.receiver_types.insert(symbol.id, receiver_ty);
+                self.receiver_types.to_mut().insert(symbol.id, receiver_ty);
 
                 if is_instance_method {
                     params.insert(0, receiver_ty);
