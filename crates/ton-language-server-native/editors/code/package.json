@@ -519,6 +519,11 @@
       ],
       "editor/context": [
         {
+          "when": "editorLangId == tolk",
+          "command": "tolk.getTypeAtPosition",
+          "group": "z_commands@999"
+        },
+        {
           "when": "resourceLangId == tolk",
           "command": "ton.acton.openAssemblyPreview",
           "group": "navigation"

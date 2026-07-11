@@ -55,6 +55,33 @@ fn shows_function_signatures_and_documentation() {
 }
 
 #[test]
+fn preserves_indentation_in_line_comment_code_examples() {
+    case_tolk_hover(
+        r#"
+            /// Builds a cell.
+            ///
+            /// ```tolk
+            /// beginCell()
+            ///     .storeUint(1, 32)
+            ///     .endCell()
+            /// ```
+            fun <caret>buildCell() {}
+        "#,
+        expect![[r#"
+            ```tolk
+            fun buildCell(): void
+            ```
+            Builds a cell.
+
+            ```tolk
+            beginCell()
+                .storeUint(1, 32)
+                .endCell()
+            ```"#]],
+    );
+}
+
+#[test]
 fn shows_inferred_local_types() {
     case_tolk_hover(
         r#"
@@ -65,6 +92,36 @@ fn shows_inferred_local_types() {
         expect![[r#"
             ```tolk
             val valid: slice = "abc-123".beginParse()
+            ```"#]],
+    );
+}
+
+#[test]
+fn removes_the_enclosing_block_indent_from_multiline_values() {
+    case_tolk_hover(
+        r#"
+            struct Options {
+                value: int
+                bounce: bool
+            }
+
+            fun send(options: Options): int {
+                return options.value;
+            }
+
+            fun main() {
+                val <caret>result = send({
+                    value: 1,
+                    bounce: true,
+                });
+            }
+        "#,
+        expect![[r#"
+            ```tolk
+            val result: int = send({
+                value: 1,
+                bounce: true,
+            })
             ```"#]],
     );
 }

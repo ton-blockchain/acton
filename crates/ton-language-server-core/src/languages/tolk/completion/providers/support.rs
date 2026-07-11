@@ -19,6 +19,8 @@ pub(crate) fn provider_group(context: &TolkCompletionContext) -> ProviderGroup {
         ProviderGroup::None
     } else if context.is_annotation_name() {
         ProviderGroup::Annotation
+    } else if context.in_contract_field_value() {
+        ProviderGroup::General
     } else if context.contract_top_level() {
         ProviderGroup::Contract
     } else if context.enum_top_level() {

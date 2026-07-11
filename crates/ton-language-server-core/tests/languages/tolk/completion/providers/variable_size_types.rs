@@ -21,6 +21,14 @@ fn completes_variable_size_integer_and_bits_types() {
             label    kind           detail  edit       text
             bits256  TypeParameter          0:25-0:29  bits256
             bits{X}  TypeParameter          0:25-0:29  bits${1:32}"#]]);
+
+    // Typed contract metadata uses the same variable-width type provider.
+    CompletionTest::new("contract C { storage: int<caret> }")
+        .labels(&["int8", "int{X}"])
+        .check(expect![[r#"
+            label   kind           detail  edit       text
+            int8    TypeParameter          0:22-0:25  int8
+            int{X}  TypeParameter          0:22-0:25  int${1:32}"#]]);
 }
 
 #[test]

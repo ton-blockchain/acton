@@ -73,17 +73,17 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
   context.subscriptions.push(
     vscode.commands.registerCommand(
       typeAtPositionRequest,
-      async (params?: TypeAtPositionParams): Promise<TypeAtPositionResponse | null> => {
+      async (params?: unknown): Promise<TypeAtPositionResponse | null> => {
         const languageClient = client
         if (!languageClient) {
           return null
         }
 
         const activeEditor = vscode.window.activeTextEditor
-        const invokedFromEditor = params === undefined
-        const requestParams =
-          params ??
-          (activeEditor
+        const hasExplicitParams = isTypeAtPositionParams(params)
+        const requestParams = hasExplicitParams
+          ? params
+          : activeEditor
             ? {
                 textDocument: {uri: activeEditor.document.uri.toString()},
                 position: {
@@ -91,7 +91,7 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
                   character: activeEditor.selection.active.character,
                 },
               }
-            : undefined)
+            : undefined
         if (!requestParams) {
           return null
         }
@@ -101,7 +101,7 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
           requestParams,
         )
 
-        if (invokedFromEditor && result.type) {
+        if (!hasExplicitParams && result.type) {
           if (activeEditor && result.range) {
             const range = new vscode.Range(
               new vscode.Position(result.range.start.line, result.range.start.character),
@@ -151,6 +151,19 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
     new vscode.Disposable(() => {
       void client?.stop()
     }),
+  )
+}
+
+function isTypeAtPositionParams(value: unknown): value is TypeAtPositionParams {
+  if (typeof value !== "object" || value === null) {
+    return false
+  }
+
+  const params = value as Partial<TypeAtPositionParams>
+  return (
+    typeof params.textDocument?.uri === "string" &&
+    typeof params.position?.line === "number" &&
+    typeof params.position.character === "number"
   )
 }
 

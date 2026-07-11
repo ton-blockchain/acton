@@ -1,4 +1,5 @@
 mod context;
+mod contract;
 mod imports;
 mod items;
 mod providers;

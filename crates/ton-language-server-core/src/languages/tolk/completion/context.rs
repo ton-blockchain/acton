@@ -1,6 +1,7 @@
+use super::contract::{ContractFieldValueKind, contract_field};
 use crate::completion::identifier_prefix;
 use crate::{DocumentSnapshot, Position, Range};
-use tolk_syntax::{AstNode, Block, ExprStmt, HasName, TryFromNode};
+use tolk_syntax::{AstNode, Block, ContractField, ExprStmt, HasName, TryFromNode};
 use tree_sitter::Node;
 
 pub(super) const DUMMY_IDENTIFIER: &str = "DummyIdentifier";
@@ -127,6 +128,10 @@ impl TolkCompletionContext {
     }
 
     pub(super) fn is_type(&self) -> bool {
+        if let Some(value_kind) = self.contract_field_value_kind() {
+            return value_kind == ContractFieldValueKind::Type;
+        }
+
         let Some(mut node) = self.cursor_node() else {
             return false;
         };
@@ -195,6 +200,10 @@ impl TolkCompletionContext {
 
     pub(super) fn contract_top_level(&self) -> bool {
         self.has_ancestor("contract_body") && !self.has_ancestor("block_statement")
+    }
+
+    pub(super) fn in_contract_field_value(&self) -> bool {
+        self.contract_field_value().is_some()
     }
 
     pub(super) fn is_statement(&self) -> bool {
@@ -386,6 +395,22 @@ impl TolkCompletionContext {
             };
             node = parent;
         }
+    }
+
+    fn contract_field_value_kind(&self) -> Option<ContractFieldValueKind> {
+        let field = self.contract_field_value()?;
+        let name = field.name()?;
+
+        contract_field(self.text_of(name)).map(|field| field.value_kind)
+    }
+
+    fn contract_field_value(&self) -> Option<ContractField<'_>> {
+        let cursor = self.cursor_node()?;
+        let field = self.ancestor_as::<ContractField>()?;
+        let value = field.value()?.syntax();
+
+        (value.start_byte() <= cursor.start_byte() && cursor.end_byte() <= value.end_byte())
+            .then_some(field)
     }
 }
 

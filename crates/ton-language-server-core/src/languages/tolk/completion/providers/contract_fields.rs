@@ -3,6 +3,7 @@ use super::support::{ProviderGroup, provider_group};
 use crate::completion::{
     CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
 };
+use crate::languages::tolk::completion::contract::CONTRACT_FIELDS;
 use crate::{CompletionItem, CompletionItemKind};
 use tolk_syntax::{ContractBody, HasName};
 
@@ -32,13 +33,14 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldComp
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
-        for &(label, detail) in CONTRACT_FIELDS {
+        for field in CONTRACT_FIELDS {
+            let label = field.name;
             if existing.iter().any(|field| field == label) {
                 continue;
             }
             let insertion = format!("{label}: $0");
             let item = CompletionItem::new(label, CompletionItemKind::Field)
-                .with_detail(detail)
+                .with_detail(field.detail)
                 .with_snippet_replacement(context.syntax.replacement_range, insertion);
             collector.add(
                 item,
@@ -49,17 +51,3 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldComp
         Some(())
     }
 }
-
-const CONTRACT_FIELDS: &[(&str, &str)] = &[
-    ("author", "Author of the contract"),
-    ("version", "Version of the contract"),
-    ("description", "Description of the contract"),
-    ("incomingMessages", "Allowed incoming messages type"),
-    (
-        "incomingExternal",
-        "Allowed incoming external messages type",
-    ),
-    ("storage", "Persistent storage structure"),
-    ("storageAtDeployment", "Storage structure at deployment"),
-    ("forceAbiExport", "Symbols additionally exported to ABI"),
-];

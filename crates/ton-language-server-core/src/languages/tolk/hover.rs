@@ -678,9 +678,30 @@ fn local_variable_signature(variable: VarDecl<'_>, source: &str, typ: &str) -> O
     }
 
     let name = variable.name()?.text(source);
+    let declaration_start = declaration.syntax().start_byte();
+    let line_start = source[..declaration_start]
+        .rfind('\n')
+        .map_or(0, |offset| offset + 1);
+    let indentation = &source[line_start..declaration_start];
     let value = declaration
         .assigned_value()
-        .map(|value| format!(" = {}", value.text(source)))
+        .map(|value| {
+            let value = value
+                .text(source)
+                .lines()
+                .enumerate()
+                .map(|(index, line)| {
+                    if index == 0 {
+                        line
+                    } else {
+                        line.strip_prefix(indentation).unwrap_or(line)
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            format!(" = {value}")
+        })
         .unwrap_or_default();
 
     Some(format!(
@@ -777,31 +798,26 @@ fn documentation_before(node: tree_sitter::Node<'_>, source: &str) -> String {
     comments
         .into_iter()
         .map(|comment| clean_comment(&comment))
-        .filter(|comment| !comment.is_empty())
         .collect::<Vec<_>>()
         .join("\n")
 }
 
 fn clean_comment(comment: &str) -> String {
-    if let Some(comment) = comment.strip_prefix("///") {
-        return comment.trim_start().to_owned();
-    }
-    if let Some(comment) = comment.strip_prefix("//") {
-        return comment.trim().to_owned();
-    }
     if let Some(comment) = comment
-        .strip_prefix("/*")
-        .and_then(|comment| comment.strip_suffix("*/"))
+        .strip_prefix("///")
+        .or_else(|| comment.strip_prefix("//"))
     {
-        return comment
-            .lines()
-            .map(|line| line.trim().trim_start_matches('*').trim_start())
-            .collect::<Vec<_>>()
-            .join("\n")
-            .trim()
-            .to_owned();
+        return comment.strip_prefix(' ').unwrap_or(comment).to_owned();
     }
-    String::new()
+
+    let comment = comment
+        .strip_prefix("/**")
+        .or_else(|| comment.strip_prefix("/*"))
+        .and_then(|comment| comment.strip_suffix("*/"))
+        .unwrap_or_default();
+    let comment = comment.strip_prefix(' ').unwrap_or(comment);
+
+    comment.strip_suffix(' ').unwrap_or(comment).to_owned()
 }
 
 fn field_documentation<'tree, N>(node: N, source: &str) -> String

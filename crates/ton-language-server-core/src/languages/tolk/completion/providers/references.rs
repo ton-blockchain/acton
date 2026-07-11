@@ -32,7 +32,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReferenceCompleti
                 || syntax.top_level()
                 || (syntax.struct_top_level() && !syntax.is_type())
                 || syntax.enum_top_level()
-                || syntax.contract_top_level())
+                || (syntax.contract_top_level() && !syntax.in_contract_field_value()))
     }
 
     fn collect(

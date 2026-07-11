@@ -686,6 +686,149 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
 }
 
 #[test]
+fn completes_types_in_every_typed_contract_field() {
+    // Internal incoming message metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { incomingMessages: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+
+    // External incoming message metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { incomingExternal: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+
+    // Outgoing message metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { outgoingMessages: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+
+    // Emitted event metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { emittedEvents: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:28-2:37  ContractType"#]]);
+
+    // Thrown error metadata accepts enum and other type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { thrownErrors: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:27-2:36  ContractType"#]]);
+
+    // Persistent storage metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C {
+                storage:
+                    ContractT<caret>
+            }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit      text
+        ContractType  Struct  ContractType  4:8-4:17  ContractType"#]]);
+
+    // Deployment storage metadata accepts type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { storageAtDeployment: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:34-2:43  ContractType"#]]);
+
+    // Forced ABI exports accept type declarations only.
+    CompletionTest::new(
+        "
+            struct ContractType {}
+            fun contractValue() {}
+            contract C { forceAbiExport: ContractT<caret> }
+        ",
+    )
+    .labels(&["ContractType", "contractValue", "author"])
+    .check(expect![[r#"
+        label         kind    detail        edit       text
+        ContractType  Struct  ContractType  2:29-2:38  ContractType"#]]);
+}
+
+#[test]
+fn completes_types_in_an_empty_contract_field_value() {
+    // An empty value is represented by recovery syntax before the synthetic completion name.
+    CompletionTest::new(
+        "
+            struct Storage {}
+            fun storageValue() {}
+            contract C {
+                storage:
+                    <caret>
+            }
+        ",
+    )
+    .labels(&["Storage", "storageValue", "author"])
+    .check(expect![[r#"
+        label    kind    detail   edit     text
+        Storage  Struct  Storage  4:8-4:8  Storage"#]]);
+}
+
+#[test]
+fn applies_auto_imported_type_in_contract_metadata() {
+    // Contract type completion keeps the normal cross-file auto-import behavior.
+    CompletionTest::new("contract C { storage: Remote<caret> }")
+        .file("types.tolk", "struct RemoteStorage {}")
+        .check_applied(
+            "RemoteStorage",
+            expect![[r#"
+                import "types"
+
+                contract C { storage: RemoteStorage<caret> }"#]],
+        );
+}
+
+#[test]
 fn resolves_alias_and_generic_member_types() {
     // Member lookup unwraps a direct alias to its underlying struct.
     CompletionTest::new(
