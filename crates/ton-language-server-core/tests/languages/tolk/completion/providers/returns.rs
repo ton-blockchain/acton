@@ -22,8 +22,8 @@ fn completes_return_variants_from_declared_type() {
         .prefix("return")
         .check(expect![[r#"
             label           kind     detail  edit       text
-            return true;    Keyword          0:18-0:21  return true;
-            return false;   Keyword          0:18-0:21  return false;
+            return true;    Snippet          0:18-0:21  return true;
+            return false;   Snippet          0:18-0:21  return false;
             return <expr>;  Keyword          0:18-0:21  return $0;"#]]);
 
     // An int function offers zero and an arbitrary expression.
@@ -31,7 +31,7 @@ fn completes_return_variants_from_declared_type() {
         .prefix("return")
         .check(expect![[r#"
             label           kind     detail  edit       text
-            return 0;       Keyword          0:17-0:20  return 0;
+            return 0;       Snippet          0:17-0:20  return 0;
             return <expr>;  Keyword          0:17-0:20  return $0;"#]]);
 
     // A nullable function offers null and an arbitrary expression.
@@ -39,7 +39,7 @@ fn completes_return_variants_from_declared_type() {
         .prefix("return")
         .check(expect![[r#"
             label           kind     detail  edit       text
-            return null;    Keyword          0:19-0:22  return null;
+            return null;    Snippet          0:19-0:22  return null;
             return <expr>;  Keyword          0:19-0:22  return $0;"#]]);
 
     // A variable-width signed integer alias is recognized as integer-like.
@@ -52,7 +52,7 @@ fn completes_return_variants_from_declared_type() {
     .prefix("return")
     .check(expect![[r#"
         label           kind     detail  edit       text
-        return 0;       Keyword          1:19-1:22  return 0;
+        return 0;       Snippet          1:19-1:22  return 0;
         return <expr>;  Keyword          1:19-1:22  return $0;"#]]);
 
     // A variable-width unsigned integer alias is recognized as integer-like.
@@ -65,7 +65,7 @@ fn completes_return_variants_from_declared_type() {
     .prefix("return")
     .check(expect![[r#"
         label           kind     detail  edit       text
-        return 0;       Keyword          1:20-1:23  return 0;
+        return 0;       Snippet          1:20-1:23  return 0;
         return <expr>;  Keyword          1:20-1:23  return $0;"#]]);
 }
 
@@ -85,7 +85,7 @@ fn completes_return_variants_from_inferred_type() {
     .prefix("return")
     .check(expect![[r#"
         label           kind     detail  edit     text
-        return 0;       Keyword          4:4-4:7  return 0;
+        return 0;       Snippet          4:4-4:7  return 0;
         return <expr>;  Keyword          4:4-4:7  return $0;"#]]);
 
     // An earlier boolean return exposes the boolean-specific variants.
@@ -102,8 +102,8 @@ fn completes_return_variants_from_inferred_type() {
     .prefix("return")
     .check(expect![[r#"
         label           kind     detail  edit     text
-        return true;    Keyword          4:4-4:7  return true;
-        return false;   Keyword          4:4-4:7  return false;
+        return true;    Snippet          4:4-4:7  return true;
+        return false;   Snippet          4:4-4:7  return false;
         return <expr>;  Keyword          4:4-4:7  return $0;"#]]);
 }
 

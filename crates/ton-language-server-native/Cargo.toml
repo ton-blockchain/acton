@@ -10,9 +10,6 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
-[features]
-profiling = []
-
 [dependencies]
 anyhow = { workspace = true }
 dunce = { workspace = true }

@@ -13,8 +13,8 @@ fn completes_non_test_get_methods_in_second_argument() {
     )
     .labels(&["currentCounter", "test_helper"])
     .check(expect![[r#"
-        label           kind    detail  edit       text
-        currentCounter  Method          2:37-2:40  currentCounter"#]]);
+        label           kind    detail      edit       text
+        currentCounter  Method   main.tolk  2:37-2:40  currentCounter"#]]);
 
     // A regular get method merely starting with test remains available.
     CompletionTest::new(
@@ -25,8 +25,8 @@ fn completes_non_test_get_methods_in_second_argument() {
     )
     .labels(&["testHelper"])
     .check(expect![[r#"
-        label       kind    detail  edit       text
-        testHelper  Method          1:37-1:41  testHelper"#]]);
+        label       kind    detail      edit       text
+        testHelper  Method   main.tolk  1:37-1:41  testHelper"#]]);
 }
 
 #[test]

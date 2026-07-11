@@ -3,6 +3,7 @@ use super::resolution::ResolvedTarget;
 use super::{TolkResolveSnapshot, TolkWorkspaceEngine};
 use crate::{DocumentEdits, DocumentSnapshot, Position, PrepareRename, TextEdit, WorkspaceEdit};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 use tolk_resolver::{FileId, Resolved, Span, SymbolKind, resolve_index::LocalDefId};
 use tolk_syntax::{HasName, InstanceArg, TryFromNode};
 use tolk_ty::GlobalUsages;
@@ -55,7 +56,7 @@ impl TolkWorkspaceEngine {
         &self,
         document: &DocumentSnapshot,
         position: Position,
-    ) -> Option<(std::sync::Arc<TolkResolveSnapshot>, FileId, usize)> {
+    ) -> Option<(Arc<TolkResolveSnapshot>, FileId, usize)> {
         let snapshot = {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             state.latest_snapshot.clone()

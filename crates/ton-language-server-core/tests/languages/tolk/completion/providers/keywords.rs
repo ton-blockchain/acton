@@ -9,19 +9,19 @@ fn completes_keywords_in_expression_contexts() {
         .check(expect![[r#"
             label   kind     detail  edit       text
             true    Keyword          0:34-0:36  true
-            as      Keyword          0:34-0:36  as 
+            as      Keyword          0:34-0:36  as\s
             false   Keyword          0:34-0:36  false
-            is      Keyword          0:34-0:36  is 
-            lazy    Keyword          0:34-0:36  lazy 
-            mutate  Keyword          0:34-0:36  mutate "#]]);
+            is      Keyword          0:34-0:36  is\s
+            lazy    Keyword          0:34-0:36  lazy\s
+            mutate  Keyword          0:34-0:36  mutate\s"#]]);
 
     // Keywords remain available after an existing expression operand.
     CompletionTest::new("fun main(value: int) { val flag = value as<caret>; }")
         .labels(&["as", "is"])
         .check(expect![[r#"
             label  kind     detail  edit       text
-            as     Keyword          0:40-0:42  as 
-            is     Keyword          0:40-0:42  is "#]]);
+            as     Keyword          0:40-0:42  as\s
+            is     Keyword          0:40-0:42  is\s"#]]);
 
     // A struct field-name slot is owned by field completion, not keyword completion.
     CompletionTest::new(

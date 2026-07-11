@@ -42,6 +42,36 @@ pub const TOLK_TYPE_AT_POSITION_REQUEST: &str = "tolk.getTypeAtPosition";
 pub const PROFILE_REQUEST: &str = "ton/profile";
 pub const DISASSEMBLE_REQUEST: &str = "ton/disassemble";
 
+trait ToCore {
+    type Core;
+
+    fn to_core(&self) -> Self::Core;
+}
+
+impl ToCore for lsp::Url {
+    type Core = DocumentUri;
+
+    fn to_core(&self) -> Self::Core {
+        DocumentUri::from(self.as_str())
+    }
+}
+
+impl ToCore for lsp::Position {
+    type Core = Position;
+
+    fn to_core(&self) -> Self::Core {
+        Position::new(self.line, self.character)
+    }
+}
+
+impl ToCore for lsp::Range {
+    type Core = Range;
+
+    fn to_core(&self) -> Self::Core {
+        Range::new(self.start.to_core(), self.end.to_core())
+    }
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct TypeAtPositionParams {
@@ -102,7 +132,7 @@ impl ServerConfig {
             project_root: project_root.into(),
             tolk_stdlib_path: None,
             logging: None,
-            enable_profiling: cfg!(feature = "profiling"),
+            enable_profiling: false,
         }
     }
 }
@@ -460,8 +490,8 @@ impl NativeLanguageServer {
         &self,
         params: TypeAtPositionParams,
     ) -> jsonrpc::Result<TypeAtPositionResponse> {
-        let uri = DocumentUri::from(params.text_document.uri.to_string());
-        let position = position_from_lsp(params.position);
+        let uri = params.text_document.uri.to_core();
+        let position = params.position.to_core();
         let result = self
             .with_service(|service| service.type_at_position(&uri, position))
             .map_err(rpc_error)?;
@@ -519,7 +549,7 @@ impl NativeLanguageServer {
             return Ok(());
         }
         let text = fs::read_to_string(&path)?;
-        let uri = DocumentUri::from(uri.to_string());
+        let uri = uri.to_core();
         self.with_service(|service| {
             service.add_source_file(LanguageId::from(TOLK_LANGUAGE_ID), uri, text)
         })
@@ -532,7 +562,7 @@ impl NativeLanguageServer {
         if !is_tolk_path(&path) {
             return Ok(());
         }
-        let uri = DocumentUri::from(uri.to_string());
+        let uri = uri.to_core();
         self.with_service(|service| {
             service.remove_source_file(LanguageId::from(TOLK_LANGUAGE_ID), &uri)
         })
@@ -593,10 +623,7 @@ impl LanguageServer for NativeLanguageServer {
                 completion_provider: Some(lsp::CompletionOptions {
                     resolve_provider: Some(false),
                     trigger_characters: Some(
-                        [".", "\"", "'", "/", "@"]
-                            .into_iter()
-                            .map(str::to_owned)
-                            .collect(),
+                        [".", "@", "#"].into_iter().map(str::to_owned).collect(),
                     ),
                     ..lsp::CompletionOptions::default()
                 }),
@@ -715,7 +742,6 @@ impl LanguageServer for NativeLanguageServer {
     async fn did_open(&self, params: lsp::DidOpenTextDocumentParams) {
         let item = params.text_document;
         let uri = item.uri;
-        let uri_string = uri.to_string();
         let updates_workspace_config = is_acton_manifest_uri(&uri);
         if updates_workspace_config
             && let Err(error) = self.apply_workspace_config_text(item.text.clone())
@@ -734,7 +760,7 @@ impl LanguageServer for NativeLanguageServer {
         if let OpenDocumentKind::Language { language_id, .. } = &kind {
             let result = self.with_service(|service| {
                 service.open_document(
-                    DocumentUri::from(uri_string.clone()),
+                    uri.to_core(),
                     language_id.clone(),
                     item.version,
                     item.text.clone(),
@@ -747,7 +773,7 @@ impl LanguageServer for NativeLanguageServer {
 
         if let Ok(mut documents) = self.documents.lock() {
             documents.insert(
-                uri_string,
+                uri.to_string(),
                 OpenDocument {
                     kind,
                     text: item.text,
@@ -758,7 +784,6 @@ impl LanguageServer for NativeLanguageServer {
 
     async fn did_change(&self, params: lsp::DidChangeTextDocumentParams) {
         let uri = params.text_document.uri;
-        let uri_string = uri.to_string();
         let version = params.text_document.version;
         let change = match self.prepare_document_change(&uri, &params.content_changes) {
             Ok(change) => change,
@@ -777,16 +802,15 @@ impl LanguageServer for NativeLanguageServer {
         match change {
             (OpenDocumentKind::Language { .. }, full_text, AppliedChanges::FullText) => {
                 let result = self.with_service(|service| {
-                    service.change_document(&DocumentUri::from(uri_string), version, full_text)
+                    service.change_document(&uri.to_core(), version, full_text)
                 });
                 if let Err(error) = result {
                     self.report_error("document.change", error).await;
                 }
             }
             (OpenDocumentKind::Language { .. }, _, AppliedChanges::Incremental(edits)) => {
-                let result = self.with_service(|service| {
-                    service.edit_document(&DocumentUri::from(uri_string), version, edits)
-                });
+                let result = self
+                    .with_service(|service| service.edit_document(&uri.to_core(), version, edits));
                 if let Err(error) = result {
                     self.report_error("document.edit", error).await;
                 }
@@ -814,12 +838,11 @@ impl LanguageServer for NativeLanguageServer {
 
     async fn did_close(&self, params: lsp::DidCloseTextDocumentParams) {
         let uri = params.text_document.uri;
-        let uri_string = uri.to_string();
         let document = self
             .documents
             .lock()
             .ok()
-            .and_then(|mut documents| documents.remove(&uri_string));
+            .and_then(|mut documents| documents.remove(&uri.to_string()));
 
         if matches!(
             document,
@@ -829,7 +852,7 @@ impl LanguageServer for NativeLanguageServer {
             })
         ) {
             self.with_service(|service| {
-                service.close_document(&DocumentUri::from(uri_string));
+                service.close_document(&uri.to_core());
                 Ok(())
             })
             .unwrap_or_else(|error| {
@@ -848,11 +871,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::GotoDefinitionParams,
     ) -> jsonrpc::Result<Option<lsp::GotoDefinitionResponse>> {
         let uri = params.text_document_position_params.text_document.uri;
-        let position = position_from_lsp(params.text_document_position_params.position);
+        let position = params.text_document_position_params.position.to_core();
         let locations = self
-            .with_service(|service| {
-                service.definition(&DocumentUri::from(uri.to_string()), position)
-            })
+            .with_service(|service| service.definition(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(locations_to_definition_response(locations))
     }
@@ -862,14 +883,10 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::ReferenceParams,
     ) -> jsonrpc::Result<Option<Vec<lsp::Location>>> {
         let uri = params.text_document_position.text_document.uri;
-        let position = position_from_lsp(params.text_document_position.position);
+        let position = params.text_document_position.position.to_core();
         let mut locations = self
             .with_service(|service| {
-                service.references(
-                    &DocumentUri::from(uri.to_string()),
-                    position,
-                    params.context.include_declaration,
-                )
+                service.references(&uri.to_core(), position, params.context.include_declaration)
             })
             .map_err(rpc_error)?;
         if is_language_uri(&uri, "tolk")
@@ -888,7 +905,7 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<Vec<lsp::TextEdit>>> {
         let uri = params.text_document.uri;
         let edits = self
-            .with_service(|service| service.formatting(&DocumentUri::from(uri.to_string()), None))
+            .with_service(|service| service.formatting(&uri.to_core(), None))
             .map_err(rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
@@ -898,11 +915,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::DocumentRangeFormattingParams,
     ) -> jsonrpc::Result<Option<Vec<lsp::TextEdit>>> {
         let uri = params.text_document.uri;
-        let range = range_from_lsp(params.range);
+        let range = params.range.to_core();
         let edits = self
-            .with_service(|service| {
-                service.formatting(&DocumentUri::from(uri.to_string()), Some(range))
-            })
+            .with_service(|service| service.formatting(&uri.to_core(), Some(range)))
             .map_err(rpc_error)?;
         Ok(Some(edits.into_iter().map(text_edit_to_lsp).collect()))
     }
@@ -912,11 +927,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::DocumentHighlightParams,
     ) -> jsonrpc::Result<Option<Vec<lsp::DocumentHighlight>>> {
         let uri = params.text_document_position_params.text_document.uri;
-        let position = position_from_lsp(params.text_document_position_params.position);
+        let position = params.text_document_position_params.position.to_core();
         let highlights = self
-            .with_service(|service| {
-                service.document_highlights(&DocumentUri::from(uri.to_string()), position)
-            })
+            .with_service(|service| service.document_highlights(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(Some(
             highlights
@@ -928,9 +941,9 @@ impl LanguageServer for NativeLanguageServer {
 
     async fn hover(&self, params: lsp::HoverParams) -> jsonrpc::Result<Option<lsp::Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
-        let position = position_from_lsp(params.text_document_position_params.position);
+        let position = params.text_document_position_params.position.to_core();
         let hover = self
-            .with_service(|service| service.hover(&DocumentUri::from(uri.to_string()), position))
+            .with_service(|service| service.hover(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(hover.map(hover_to_lsp))
     }
@@ -940,12 +953,10 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::CompletionParams,
     ) -> jsonrpc::Result<Option<lsp::CompletionResponse>> {
         let uri = params.text_document_position.text_document.uri;
-        let position = position_from_lsp(params.text_document_position.position);
+        let position = params.text_document_position.position.to_core();
         let trigger = completion_trigger_from_lsp(params.context);
         let mut completion = self
-            .with_service(|service| {
-                service.completion(&DocumentUri::from(uri.to_string()), position, trigger)
-            })
+            .with_service(|service| service.completion(&uri.to_core(), position, trigger))
             .map_err(rpc_error)?;
         if is_language_uri(&uri, "tolk") {
             let settings = self.settings().map_err(rpc_error)?.tolk.completion;
@@ -983,7 +994,7 @@ impl LanguageServer for NativeLanguageServer {
             )));
         }
         let tokens = self
-            .with_service(|service| service.semantic_tokens(&DocumentUri::from(uri.to_string())))
+            .with_service(|service| service.semantic_tokens(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(lsp::SemanticTokensResult::Tokens(
             semantic_tokens_to_lsp(tokens),
@@ -995,9 +1006,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::InlayHintParams,
     ) -> jsonrpc::Result<Option<Vec<lsp::InlayHint>>> {
         let uri = params.text_document.uri;
-        let range = range_from_lsp(params.range);
+        let range = params.range.to_core();
         let mut hints = self
-            .with_service(|service| service.inlay_hints(&DocumentUri::from(uri.to_string()), range))
+            .with_service(|service| service.inlay_hints(&uri.to_core(), range))
             .map_err(rpc_error)?;
         let settings = self.settings().map_err(rpc_error)?;
         hints.retain(|hint| inlay_hint_enabled(&settings, &uri, hint.category));
@@ -1010,7 +1021,7 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<Vec<lsp::CodeLens>>> {
         let uri = params.text_document.uri;
         let lenses = self
-            .with_service(|service| service.code_lens(&DocumentUri::from(uri.to_string())))
+            .with_service(|service| service.code_lens(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(lenses.into_iter().map(code_lens_to_lsp).collect()))
     }
@@ -1021,7 +1032,7 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<Vec<lsp::FoldingRange>>> {
         let uri = params.text_document.uri;
         let ranges = self
-            .with_service(|service| service.folding_ranges(&DocumentUri::from(uri.to_string())))
+            .with_service(|service| service.folding_ranges(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(ranges.into_iter().map(folding_range_to_lsp).collect()))
     }
@@ -1032,7 +1043,7 @@ impl LanguageServer for NativeLanguageServer {
     ) -> jsonrpc::Result<Option<lsp::DocumentSymbolResponse>> {
         let uri = params.text_document.uri;
         let symbols = self
-            .with_service(|service| service.document_symbols(&DocumentUri::from(uri.to_string())))
+            .with_service(|service| service.document_symbols(&uri.to_core()))
             .map_err(rpc_error)?;
         Ok(Some(lsp::DocumentSymbolResponse::Nested(
             symbols.into_iter().map(document_symbol_to_lsp).collect(),
@@ -1044,11 +1055,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::CodeActionParams,
     ) -> jsonrpc::Result<Option<lsp::CodeActionResponse>> {
         let uri = params.text_document.uri;
-        let range = range_from_lsp(params.range);
+        let range = params.range.to_core();
         let actions = self
-            .with_service(|service| {
-                service.code_actions(&DocumentUri::from(uri.to_string()), range)
-            })
+            .with_service(|service| service.code_actions(&uri.to_core(), range))
             .map_err(rpc_error)?;
         let actions = actions
             .into_iter()
@@ -1078,11 +1087,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::request::GotoTypeDefinitionParams,
     ) -> jsonrpc::Result<Option<lsp::request::GotoTypeDefinitionResponse>> {
         let uri = params.text_document_position_params.text_document.uri;
-        let position = position_from_lsp(params.text_document_position_params.position);
+        let position = params.text_document_position_params.position.to_core();
         let locations = self
-            .with_service(|service| {
-                service.type_definition(&DocumentUri::from(uri.to_string()), position)
-            })
+            .with_service(|service| service.type_definition(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(locations_to_definition_response(locations))
     }
@@ -1092,11 +1099,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::SignatureHelpParams,
     ) -> jsonrpc::Result<Option<lsp::SignatureHelp>> {
         let uri = params.text_document_position_params.text_document.uri;
-        let position = position_from_lsp(params.text_document_position_params.position);
+        let position = params.text_document_position_params.position.to_core();
         let signature_help = self
-            .with_service(|service| {
-                service.signature_help(&DocumentUri::from(uri.to_string()), position)
-            })
+            .with_service(|service| service.signature_help(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(signature_help.map(signature_help_to_lsp))
     }
@@ -1106,11 +1111,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::TextDocumentPositionParams,
     ) -> jsonrpc::Result<Option<lsp::PrepareRenameResponse>> {
         let uri = params.text_document.uri;
-        let position = position_from_lsp(params.position);
+        let position = params.position.to_core();
         let prepare = self
-            .with_service(|service| {
-                service.prepare_rename(&DocumentUri::from(uri.to_string()), position)
-            })
+            .with_service(|service| service.prepare_rename(&uri.to_core(), position))
             .map_err(rpc_error)?;
         Ok(prepare.map(prepare_rename_to_lsp))
     }
@@ -1120,15 +1123,9 @@ impl LanguageServer for NativeLanguageServer {
         params: lsp::RenameParams,
     ) -> jsonrpc::Result<Option<lsp::WorkspaceEdit>> {
         let uri = params.text_document_position.text_document.uri;
-        let position = position_from_lsp(params.text_document_position.position);
+        let position = params.text_document_position.position.to_core();
         let edit = self
-            .with_service(|service| {
-                service.rename(
-                    &DocumentUri::from(uri.to_string()),
-                    position,
-                    &params.new_name,
-                )
-            })
+            .with_service(|service| service.rename(&uri.to_core(), position, &params.new_name))
             .map_err(rpc_error)?;
         edit.map(workspace_edit_to_lsp)
             .transpose()
@@ -1466,7 +1463,7 @@ fn apply_lsp_changes_to_text(
             continue;
         };
 
-        let range = range_from_lsp(range);
+        let range = range.to_core();
         let index = TextIndex::new(text);
         let start = index.position_to_offset(text, range.start);
         let end = index.position_to_offset(text, range.end);
@@ -1579,6 +1576,12 @@ fn completion_list_to_lsp(completion: CompletionList) -> lsp::CompletionList {
 fn completion_item_to_lsp(item: CompletionItem) -> lsp::CompletionItem {
     lsp::CompletionItem {
         label: item.label,
+        label_details: item
+            .label_details
+            .map(|details| lsp::CompletionItemLabelDetails {
+                detail: details.detail,
+                description: details.description,
+            }),
         kind: item.kind.map(completion_item_kind_to_lsp),
         detail: item.detail,
         documentation: item.documentation.map(|value| {
@@ -1870,14 +1873,6 @@ const fn document_symbol_kind_to_lsp(kind: DocumentSymbolKind) -> lsp::SymbolKin
         DocumentSymbolKind::Operator => lsp::SymbolKind::OPERATOR,
         DocumentSymbolKind::TypeParameter => lsp::SymbolKind::TYPE_PARAMETER,
     }
-}
-
-const fn position_from_lsp(position: lsp::Position) -> Position {
-    Position::new(position.line, position.character)
-}
-
-const fn range_from_lsp(range: lsp::Range) -> Range {
-    Range::new(position_from_lsp(range.start), position_from_lsp(range.end))
 }
 
 const fn position_to_lsp(position: Position) -> lsp::Position {

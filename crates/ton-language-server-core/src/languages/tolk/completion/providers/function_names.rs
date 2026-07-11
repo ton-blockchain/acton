@@ -30,20 +30,38 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FunctionNameCompl
                 .map(|receiver| format!(": {}", context.syntax.text_of(receiver)))
                 .unwrap_or_default();
 
-            let unpack = if has_body_and_params {
-                "unpackFromSlice".to_owned()
+            let (unpack_detail, unpack) = if has_body_and_params {
+                (
+                    format!("(mutate s: slice){return_type}"),
+                    "unpackFromSlice".to_owned(),
+                )
             } else {
-                format!("unpackFromSlice(mutate s: slice){return_type} {{$0}}")
+                (
+                    format!("(mutate s: slice){return_type} {{}}"),
+                    format!("unpackFromSlice(mutate s: slice){return_type} {{$0}}"),
+                )
             };
 
-            add_function_name(context, collector, "unpackFromSlice", unpack);
+            add_function_name(
+                context,
+                collector,
+                "unpackFromSlice",
+                &unpack_detail,
+                unpack,
+            );
 
             let pack = if has_body_and_params {
                 "packToBuilder".to_owned()
             } else {
                 "packToBuilder(self, mutate b: builder) {$0}".to_owned()
             };
-            add_function_name(context, collector, "packToBuilder", pack);
+            add_function_name(
+                context,
+                collector,
+                "packToBuilder",
+                "(self, mutate b: builder)",
+                pack,
+            );
             return Some(());
         }
 
@@ -69,7 +87,11 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for FunctionNameCompl
             } else {
                 format!("{label}({signature}) {{$0}}")
             };
-            add_function_name(context, collector, label, insertion);
+            let detail = format!(
+                "({signature}){}",
+                if has_body_and_params { "" } else { " {}" }
+            );
+            add_function_name(context, collector, label, &detail, insertion);
         }
         Some(())
     }
@@ -79,10 +101,12 @@ fn add_function_name(
     context: &TolkCompletionProviderContext<'_>,
     collector: &mut CompletionCollector,
     label: &str,
+    detail: &str,
     insertion: String,
 ) {
     collector.add(
         CompletionItem::new(label, CompletionItemKind::Function)
+            .with_label_detail(detail)
             .with_snippet_replacement(context.syntax.replacement_range, insertion),
         CompletionRank::new(CompletionCategory::Function)
             .with_prefix(&context.syntax.prefix, label),

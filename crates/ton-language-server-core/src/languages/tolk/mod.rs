@@ -130,7 +130,7 @@ impl LanguagePlugin for TolkLanguage {
             text_len = request.document.text().len(),
             "parsing Tolk document"
         );
-        let parse_started_at = request.profiler.start();
+        let profile = request.profiler.span("tolk.parse");
         let source_file =
             match tolk_syntax::parse_with_old_tree(request.document.text(), request.old_tree) {
                 Ok(source_file) => source_file,
@@ -147,7 +147,7 @@ impl LanguagePlugin for TolkLanguage {
                     return Err(error);
                 }
             };
-        request.profiler.finish("tolk.parse", parse_started_at);
+        drop(profile);
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.parse",
@@ -162,20 +162,11 @@ impl LanguagePlugin for TolkLanguage {
     }
 
     fn definition(&self, request: DefinitionRequest<'_>) -> anyhow::Result<Vec<Location>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let profile = request.context.profiler.span("tolk.definition.resolve");
         let locations = self
             .engine
             .definition(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.definition.resolve", started_at);
+        drop(profile);
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.definition.resolve",
@@ -190,22 +181,14 @@ impl LanguagePlugin for TolkLanguage {
     }
 
     fn references(&self, request: ReferenceRequest<'_>) -> anyhow::Result<Vec<Location>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let profile = request.context.profiler.span("tolk.references.resolve");
         let locations = self.engine.references(
             request.context.document,
             request.position,
             request.include_declaration,
         );
-        request
-            .context
-            .profiler
-            .finish("tolk.references.resolve", started_at);
+        drop(profile);
+
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.references.resolve",
@@ -224,18 +207,9 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: SemanticTokensRequest<'_>,
     ) -> anyhow::Result<Vec<crate::SemanticToken>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let profile = request.context.profiler.span("tolk.semantic_tokens");
         let tokens = self.engine.semantic_tokens(request.context.document);
-        request
-            .context
-            .profiler
-            .finish("tolk.semantic_tokens", started_at);
+        drop(profile);
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.semantic_tokens",
@@ -248,20 +222,11 @@ impl LanguagePlugin for TolkLanguage {
     }
 
     fn inlay_hints(&self, request: InlayHintRequest<'_>) -> anyhow::Result<Vec<crate::InlayHint>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let profile = request.context.profiler.span("tolk.inlay_hints");
         let hints = self
             .engine
             .inlay_hints(request.context.document, request.range);
-        request
-            .context
-            .profiler
-            .finish("tolk.inlay_hints", started_at);
+        drop(profile);
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.inlay_hints",
@@ -277,36 +242,20 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: FoldingRangeRequest<'_>,
     ) -> anyhow::Result<Vec<crate::FoldingRange>> {
-        let parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let parsed = request.context.parsed.as_tolk()?;
+        let _profile = request.context.profiler.span("tolk.folding_ranges");
         let ranges = folding::folding_ranges(
             request.context.document,
             parsed.source_file.tree.root_node(),
         );
-        request
-            .context
-            .profiler
-            .finish("tolk.folding_ranges", started_at);
         Ok(ranges)
     }
 
     fn hover(&self, request: HoverRequest<'_>) -> anyhow::Result<Option<crate::Hover>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.hover");
         let hover = self
             .engine
             .hover(request.context.document, request.position);
-        request.context.profiler.finish("tolk.hover", started_at);
         Ok(hover)
     }
 
@@ -314,18 +263,8 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: DocumentSymbolRequest<'_>,
     ) -> anyhow::Result<Vec<crate::DocumentSymbol>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.document_symbols");
         let symbols = self.engine.document_symbols(request.context.document);
-        request
-            .context
-            .profiler
-            .finish("tolk.document_symbols", started_at);
         Ok(symbols)
     }
 
@@ -333,20 +272,10 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: SignatureHelpRequest<'_>,
     ) -> anyhow::Result<Option<crate::SignatureHelp>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.signature_help");
         let signature_help = self
             .engine
             .signature_help(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.signature_help", started_at);
         Ok(signature_help)
     }
 
@@ -354,53 +283,22 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: PrepareRenameRequest<'_>,
     ) -> anyhow::Result<Option<crate::PrepareRename>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
-        let result = self
-            .engine
-            .prepare_rename(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.rename.prepare", started_at);
-        result
+        let _profile = request.context.profiler.span("tolk.rename.prepare");
+        self.engine
+            .prepare_rename(request.context.document, request.position)
     }
 
     fn rename(&self, request: RenameRequest<'_>) -> anyhow::Result<Option<crate::WorkspaceEdit>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
-        let result =
-            self.engine
-                .rename(request.context.document, request.position, request.new_name);
-        request.context.profiler.finish("tolk.rename", started_at);
-        result
+        let _profile = request.context.profiler.span("tolk.rename");
+        self.engine
+            .rename(request.context.document, request.position, request.new_name)
     }
 
     fn type_definition(&self, request: TypeDefinitionRequest<'_>) -> anyhow::Result<Vec<Location>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.type_definition");
         let locations = self
             .engine
             .type_definition(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.type_definition", started_at);
         Ok(locations)
     }
 
@@ -408,20 +306,11 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: DocumentHighlightRequest<'_>,
     ) -> anyhow::Result<Vec<crate::DocumentHighlight>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.document_highlights");
         let highlights = self
             .engine
-            .document_highlights(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.document_highlights", started_at);
+            .document_highlights(request.context.document, request.position)
+            .unwrap_or_default();
         Ok(highlights)
     }
 
@@ -429,11 +318,8 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: WorkspaceSymbolRequest<'_>,
     ) -> anyhow::Result<Vec<crate::WorkspaceSymbol>> {
-        let started_at = request.profiler.start();
+        let _profile = request.profiler.span("tolk.workspace_symbols");
         let symbols = self.engine.workspace_symbols(request.query);
-        request
-            .profiler
-            .finish("tolk.workspace_symbols", started_at);
         Ok(symbols)
     }
 
@@ -441,20 +327,10 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: CodeActionRequest<'_>,
     ) -> anyhow::Result<Vec<crate::CodeAction>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.code_actions");
         let actions = self
             .engine
             .code_actions(request.context.document, request.range);
-        request
-            .context
-            .profiler
-            .finish("tolk.code_actions", started_at);
         Ok(actions)
     }
 
@@ -462,11 +338,8 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: FileRenameRequest<'_>,
     ) -> anyhow::Result<Option<crate::WorkspaceEdit>> {
-        let started_at = request.profiler.start();
+        let _profile = request.profiler.span("tolk.files.rename.prepare");
         let edit = self.engine.will_rename_files(request.files);
-        request
-            .profiler
-            .finish("tolk.files.rename.prepare", started_at);
         Ok(edit)
     }
 
@@ -475,23 +348,15 @@ impl LanguagePlugin for TolkLanguage {
     }
 
     fn completion(&self, request: CompletionRequest<'_>) -> anyhow::Result<crate::CompletionList> {
-        let parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let parsed = request.context.parsed.as_tolk()?;
+        let mut profile = request.context.profiler.span("tolk.completion");
         let completion = self.engine.completion(
             request.context.document,
             &parsed.source_file,
             request.position,
-            request.context.profiler,
+            profile.profiler(),
         )?;
-        request
-            .context
-            .profiler
-            .finish("tolk.completion", started_at);
+        drop(profile);
         tracing::debug!(
             target: logging::TOLK_TARGET,
             operation = "tolk.completion",
@@ -509,39 +374,18 @@ impl LanguagePlugin for TolkLanguage {
         &self,
         request: TypeAtPositionRequest<'_>,
     ) -> anyhow::Result<Option<crate::TypeAtPosition>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.type_at_position");
         let result = self
             .engine
             .type_at_position(request.context.document, request.position);
-        request
-            .context
-            .profiler
-            .finish("tolk.type_at_position", started_at);
         Ok(result)
     }
 
     fn formatting(&self, request: FormattingRequest<'_>) -> anyhow::Result<Vec<TextEdit>> {
-        let _parsed = request
-            .context
-            .parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
-
-        let started_at = request.context.profiler.start();
+        let _profile = request.context.profiler.span("tolk.formatting");
         let edits = self
             .engine
             .formatting(request.context.document, request.range)?;
-        request
-            .context
-            .profiler
-            .finish("tolk.formatting", started_at);
         Ok(edits)
     }
 }
@@ -565,10 +409,7 @@ impl WorkspaceLanguage for TolkLanguage {
         parsed: &dyn ParsedDocument,
         profiler: &mut Profiler,
     ) -> anyhow::Result<()> {
-        let parsed = parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
+        let parsed = parsed.as_tolk()?;
         self.engine.open_document(document, parsed, profiler)
     }
 
@@ -578,10 +419,7 @@ impl WorkspaceLanguage for TolkLanguage {
         parsed: &dyn ParsedDocument,
         profiler: &mut Profiler,
     ) -> anyhow::Result<()> {
-        let parsed = parsed
-            .as_any()
-            .downcast_ref::<TolkParsedDocument>()
-            .context("Tolk parsed document has an unexpected type")?;
+        let parsed = parsed.as_tolk()?;
         self.engine.open_document(document, parsed, profiler)
     }
 
@@ -602,6 +440,18 @@ impl ParsedDocument for TolkParsedDocument {
 
     fn tree(&self) -> &Tree {
         &self.source_file.tree
+    }
+}
+
+trait ParsedDocumentExt {
+    fn as_tolk(&self) -> anyhow::Result<&TolkParsedDocument>;
+}
+
+impl ParsedDocumentExt for dyn ParsedDocument + '_ {
+    fn as_tolk(&self) -> anyhow::Result<&TolkParsedDocument> {
+        self.as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")
     }
 }
 

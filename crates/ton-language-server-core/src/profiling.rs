@@ -39,6 +39,13 @@ pub struct Profiler {
     summary: ProfileSummary,
 }
 
+#[must_use = "the profiling span must be kept alive for the measured scope"]
+pub(crate) struct ProfileGuard<'a> {
+    profiler: &'a mut Profiler,
+    name: &'static str,
+    started_at: Option<Instant>,
+}
+
 #[derive(Debug)]
 pub(crate) struct BufferedProfiler {
     enabled: bool,
@@ -98,6 +105,15 @@ impl Profiler {
         self.enabled.then(Instant::now)
     }
 
+    pub(crate) fn span(&mut self, name: &'static str) -> ProfileGuard<'_> {
+        let started_at = self.start();
+        ProfileGuard {
+            profiler: self,
+            name,
+            started_at,
+        }
+    }
+
     pub fn finish(&mut self, name: &'static str, started_at: Option<Instant>) {
         if let Some(started_at) = started_at {
             self.summary.events.push(ProfileEvent {
@@ -121,6 +137,18 @@ impl Profiler {
     #[must_use]
     pub fn report(&self) -> ProfileReport {
         ProfileReport::new(self.enabled, &self.summary)
+    }
+}
+
+impl ProfileGuard<'_> {
+    pub(crate) fn profiler(&mut self) -> &mut Profiler {
+        self.profiler
+    }
+}
+
+impl Drop for ProfileGuard<'_> {
+    fn drop(&mut self) {
+        self.profiler.finish(self.name, self.started_at);
     }
 }
 

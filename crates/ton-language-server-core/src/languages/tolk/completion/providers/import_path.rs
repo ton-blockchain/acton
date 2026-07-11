@@ -88,6 +88,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ImportPathComplet
                     folders.insert(label);
                 }
             } else if let Some(stem) = path.file_stem().and_then(|stem| stem.to_str())
+                && !stem.starts_with("__")
                 && stem.starts_with(segment)
             {
                 files.insert(stem.to_owned());
@@ -123,10 +124,12 @@ fn add_path(
     range: crate::Range,
     path: &str,
     kind: CompletionItemKind,
-    detail: Option<&str>,
+    label_detail: Option<&str>,
 ) {
     let mut item = CompletionItem::new(path, kind).with_replacement(range, path);
-    item.detail = detail.map(str::to_owned);
+    if let Some(detail) = label_detail {
+        item = item.with_label_detail(detail);
+    }
     collector.add(
         item,
         CompletionRank::new(CompletionCategory::ContextElement).with_prefix(prefix, path),

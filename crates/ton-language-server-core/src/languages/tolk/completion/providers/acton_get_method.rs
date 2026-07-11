@@ -23,20 +23,27 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonGetMethodCom
         collector: &mut CompletionCollector,
     ) -> Option<()> {
         let (prefix, range) = super::string_prefix_and_range(context.syntax, context.document)?;
-        for symbol in context
+        for (file, symbol) in context
             .snapshot
             .project_index
             .files()
             .values()
             .filter(|file| !file.path.to_string_lossy().contains(".acton"))
-            .flat_map(|file| &file.decls)
-            .filter(|symbol| {
+            .flat_map(|file| file.decls.iter().map(move |symbol| (file, symbol)))
+            .filter(|(_, symbol)| {
                 matches!(symbol.kind, SymbolKind::GetMethod { .. })
                     && !tolk_syntax::is_test_get_method_name(symbol.name.as_ref())
             })
         {
             collector.add(
                 CompletionItem::new(symbol.name.as_ref(), CompletionItemKind::Method)
+                    .with_label_detail(format!(
+                        " {}",
+                        file.path
+                            .file_name()
+                            .and_then(|name| name.to_str())
+                            .unwrap_or_default()
+                    ))
                     .with_replacement(range, symbol.name.as_ref()),
                 CompletionRank::new(CompletionCategory::Function)
                     .with_prefix(&prefix, symbol.name.as_ref()),

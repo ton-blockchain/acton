@@ -72,3 +72,16 @@ fn applies_import_path_completion_without_replacing_parent_segments() {
         .file("lib/helpers.tolk", "fun helper() {}")
         .check_applied("helpers", expect![[r#"import "@lib/helpers<caret>""#]]);
 }
+
+#[test]
+fn hides_internal_double_underscore_files() {
+    // Generated implementation files stay out of import completion, while a single
+    // leading underscore remains a normal user-visible file name.
+    CompletionTest::new(r#"import "<caret>""#)
+        .file("__impl_emul.tolk", "fun internal() {}")
+        .file("_helpers.tolk", "fun helper() {}")
+        .labels(&["__impl_emul", "_helpers"])
+        .check(expect![[r#"
+            label     kind  detail  edit     text
+            _helpers  File  .tolk   0:8-0:8  _helpers"#]]);
+}

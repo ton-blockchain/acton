@@ -162,7 +162,7 @@ fn render_completion_table(items: &[CompletionItem]) -> String {
             let kind = item
                 .kind
                 .map_or_else(|| "-".to_owned(), |kind| format!("{kind:?}"));
-            let detail = item.detail.as_deref().map_or_else(String::new, escape);
+            let detail = completion_detail(item);
             let (edit, text) = if let Some(edit) = &item.text_edit {
                 (
                     format!(
@@ -201,15 +201,38 @@ fn render_completion_table(items: &[CompletionItem]) -> String {
     output
 }
 
+fn completion_detail(item: &CompletionItem) -> String {
+    let Some(label_details) = &item.label_details else {
+        return item.detail.as_deref().map_or_else(String::new, escape);
+    };
+
+    let mut result = label_details
+        .detail
+        .as_deref()
+        .map_or_else(String::new, escape);
+    if let Some(description) = &label_details.description {
+        if !result.is_empty() {
+            result.push_str("  ");
+        }
+        result.push_str(description.trim());
+    }
+    result
+}
+
 fn column_width<'a>(header: &str, values: impl Iterator<Item = &'a str>) -> usize {
     values.map(str::len).fold(header.len(), usize::max)
 }
 
 fn escape(text: &str) -> String {
-    text.replace('\\', "\\\\")
+    let trailing_spaces = text.len() - text.trim_end_matches(' ').len();
+    let mut escaped = text
+        .trim_end_matches(' ')
+        .replace('\\', "\\\\")
         .replace('\n', "\\n")
         .replace('\r', "\\r")
-        .replace('\t', "\\t")
+        .replace('\t', "\\t");
+    escaped.push_str(&"\\s".repeat(trailing_spaces));
+    escaped
 }
 
 fn apply_completion(source: &str, position: Position, item: &CompletionItem) -> String {

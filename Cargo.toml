@@ -415,7 +415,6 @@ workspace = true
 
 [features]
 profile_rules = ["tolk-linter/profile_rules"] # for acton check
-profiling = ["ton-language-server-native/profiling"]
 only_ci = []
 
 [lib]

@@ -24,6 +24,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ActonWalletNameCo
         for wallet in context.workspace.wallet_names {
             collector.add(
                 CompletionItem::new(wallet, CompletionItemKind::Value)
+                    .with_label_detail(" (local)")
                     .with_replacement(range, wallet),
                 CompletionRank::new(CompletionCategory::Variable).with_prefix(&prefix, wallet),
             );

@@ -7,9 +7,9 @@ fn completes_throw_and_assert_snippets_in_statements() {
     CompletionTest::new("fun main() { th<caret> }")
         .labels(&["throw", "assert"])
         .check(expect![[r#"
-            label   kind     detail  edit       text
-            throw   Snippet          0:13-0:15  throw ${1:5};$0
-            assert  Snippet          0:13-0:15  assert (${1:cond}) throw ${2:5};$0"#]]);
+            label   kind     detail                   edit       text
+            throw   Keyword   EXIT_CODE               0:13-0:15  throw ${1:5};$0
+            assert  Keyword   (cond) throw EXIT_CODE  0:13-0:15  assert (${1:cond}) throw ${2:5};$0"#]]);
 }
 
 #[test]

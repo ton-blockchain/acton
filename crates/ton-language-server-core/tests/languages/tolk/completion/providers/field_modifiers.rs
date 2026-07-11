@@ -8,30 +8,30 @@ fn completes_only_missing_field_modifiers() {
         .labels(&["private", "readonly"])
         .check(expect![[r#"
             label     kind     detail  edit       text
-            private   Keyword          0:13-0:13  private 
-            readonly  Keyword          0:13-0:13  readonly "#]]);
+            private   Keyword          0:13-0:13  private\s
+            readonly  Keyword          0:13-0:13  readonly\s"#]]);
 
     // An existing private modifier leaves only readonly available.
     CompletionTest::new("struct Foo { private <caret>foo: int }")
         .labels(&["private", "readonly"])
         .check(expect![[r#"
             label     kind     detail  edit       text
-            readonly  Keyword          0:21-0:21  readonly "#]]);
+            readonly  Keyword          0:21-0:21  readonly\s"#]]);
 
     // An existing readonly modifier leaves only private available.
     CompletionTest::new("struct Foo { readonly <caret>foo: int }")
         .labels(&["private", "readonly"])
         .check(expect![[r#"
             label    kind     detail  edit       text
-            private  Keyword          0:22-0:22  private "#]]);
+            private  Keyword          0:22-0:22  private\s"#]]);
 
     // Replacing a partially typed modifier still exposes both candidates.
     CompletionTest::new("struct Foo { <caret>readonly foo: int }")
         .labels(&["private", "readonly"])
         .check(expect![[r#"
             label     kind     detail  edit       text
-            private   Keyword          0:13-0:13  private 
-            readonly  Keyword          0:13-0:13  readonly "#]]);
+            private   Keyword          0:13-0:13  private\s
+            readonly  Keyword          0:13-0:13  readonly\s"#]]);
 
     // A field with both modifiers has no remaining modifier completion.
     CompletionTest::new("struct Foo { private readonly <caret>foo: int }")
@@ -50,8 +50,8 @@ fn completes_only_missing_field_modifiers() {
     .labels(&["private", "readonly"])
     .check(expect![[r#"
         label     kind     detail  edit     text
-        private   Keyword          2:4-2:4  private 
-        readonly  Keyword          2:4-2:4  readonly "#]]);
+        private   Keyword          2:4-2:4  private\s
+        readonly  Keyword          2:4-2:4  readonly\s"#]]);
 }
 
 #[test]

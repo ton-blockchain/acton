@@ -42,37 +42,37 @@ fn completes_statement_and_contextual_catch_snippets() {
         ",
     )
     .check(expect![[r#"
-        label                              kind           detail  edit       text
-        BounceMode.NoBounce                EnumMember             1:27-1:30  BounceMode.NoBounce
-        BounceMode.Only256BitsOfBody       EnumMember             1:27-1:30  BounceMode.Only256BitsOfBody
-        BounceMode.RichBounce              EnumMember             1:27-1:30  BounceMode.RichBounce
-        BounceMode.RichBounceOnlyRootCell  EnumMember             1:27-1:30  BounceMode.RichBounceOnlyRootCell
-        as                                 Keyword                1:27-1:30  as 
-        false                              Keyword                1:27-1:30  false
-        is                                 Keyword                1:27-1:30  is 
-        lazy                               Keyword                1:27-1:30  lazy 
-        mutate                             Keyword                1:27-1:30  mutate 
-        true                               Keyword                1:27-1:30  true
-        match                              Snippet                1:27-1:30  match (${1:condition}) {\n\t$0\n}
-        bits256                            TypeParameter          1:27-1:30  bits256
-        bits{X}                            TypeParameter          1:27-1:30  bits${1:32}
-        bytes32                            TypeParameter          1:27-1:30  bytes32
-        bytes{X}                           TypeParameter          1:27-1:30  bytes${1:32}
-        int128                             TypeParameter          1:27-1:30  int128
-        int16                              TypeParameter          1:27-1:30  int16
-        int256                             TypeParameter          1:27-1:30  int256
-        int257                             TypeParameter          1:27-1:30  int257
-        int32                              TypeParameter          1:27-1:30  int32
-        int64                              TypeParameter          1:27-1:30  int64
-        int8                               TypeParameter          1:27-1:30  int8
-        int{X}                             TypeParameter          1:27-1:30  int${1:32}
-        uint128                            TypeParameter          1:27-1:30  uint128
-        uint16                             TypeParameter          1:27-1:30  uint16
-        uint256                            TypeParameter          1:27-1:30  uint256
-        uint32                             TypeParameter          1:27-1:30  uint32
-        uint64                             TypeParameter          1:27-1:30  uint64
-        uint8                              TypeParameter          1:27-1:30  uint8
-        uint{X}                            TypeParameter          1:27-1:30  uint${1:32}"#]]);
+        label                              kind           detail         edit       text
+        BounceMode.NoBounce                EnumMember     of BounceMode  1:27-1:30  BounceMode.NoBounce
+        BounceMode.Only256BitsOfBody       EnumMember     of BounceMode  1:27-1:30  BounceMode.Only256BitsOfBody
+        BounceMode.RichBounce              EnumMember     of BounceMode  1:27-1:30  BounceMode.RichBounce
+        BounceMode.RichBounceOnlyRootCell  EnumMember     of BounceMode  1:27-1:30  BounceMode.RichBounceOnlyRootCell
+        as                                 Keyword                       1:27-1:30  as\s
+        false                              Keyword                       1:27-1:30  false
+        is                                 Keyword                       1:27-1:30  is\s
+        lazy                               Keyword                       1:27-1:30  lazy\s
+        mutate                             Keyword                       1:27-1:30  mutate\s
+        true                               Keyword                       1:27-1:30  true
+        match                              Snippet                       1:27-1:30  match (${1:condition}) {\n\t$0\n}
+        bits256                            TypeParameter                 1:27-1:30  bits256
+        bits{X}                            TypeParameter                 1:27-1:30  bits${1:32}
+        bytes32                            TypeParameter                 1:27-1:30  bytes32
+        bytes{X}                           TypeParameter                 1:27-1:30  bytes${1:32}
+        int128                             TypeParameter                 1:27-1:30  int128
+        int16                              TypeParameter                 1:27-1:30  int16
+        int256                             TypeParameter                 1:27-1:30  int256
+        int257                             TypeParameter                 1:27-1:30  int257
+        int32                              TypeParameter                 1:27-1:30  int32
+        int64                              TypeParameter                 1:27-1:30  int64
+        int8                               TypeParameter                 1:27-1:30  int8
+        int{X}                             TypeParameter                 1:27-1:30  int${1:32}
+        uint128                            TypeParameter                 1:27-1:30  uint128
+        uint16                             TypeParameter                 1:27-1:30  uint16
+        uint256                            TypeParameter                 1:27-1:30  uint256
+        uint32                             TypeParameter                 1:27-1:30  uint32
+        uint64                             TypeParameter                 1:27-1:30  uint64
+        uint8                              TypeParameter                 1:27-1:30  uint8
+        uint{X}                            TypeParameter                 1:27-1:30  uint${1:32}"#]]);
 }
 
 #[test]

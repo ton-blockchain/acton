@@ -1,6 +1,9 @@
 use super::TolkCompletionProviderContext;
-use super::support::{ProviderGroup, add_snippet, provider_group};
-use crate::completion::{CompletionCategory, CompletionCollector, CompletionProvider};
+use super::support::{ProviderGroup, provider_group};
+use crate::completion::{
+    CompletionCategory, CompletionCollector, CompletionProvider, CompletionRank,
+};
+use crate::{CompletionItem, CompletionItemKind};
 
 /// Completes top-level declaration templates and the test get-method template.
 ///
@@ -18,53 +21,80 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for TopLevelCompletio
         context: &TolkCompletionProviderContext<'_>,
         collector: &mut CompletionCollector,
     ) -> Option<()> {
-        for &(label, snippet) in TOP_LEVEL_SNIPPETS {
-            add_snippet(
-                context.syntax,
-                collector,
-                label,
-                snippet,
-                CompletionCategory::Keyword,
+        for &(label, detail, snippet) in TOP_LEVEL_SNIPPETS {
+            collector.add(
+                CompletionItem::new(label, CompletionItemKind::Keyword)
+                    .with_label_detail(detail)
+                    .with_snippet_replacement(context.syntax.replacement_range, snippet),
+                CompletionRank::new(CompletionCategory::Keyword)
+                    .with_prefix(&context.syntax.prefix, label),
             );
         }
         if context.document.uri().as_str().ends_with(".test.tolk") {
-            add_snippet(
-                context.syntax,
-                collector,
-                "get fun test",
-                "get fun `test $1`() {$0}",
-                CompletionCategory::Keyword,
+            collector.add(
+                CompletionItem::new("get fun test", CompletionItemKind::Keyword)
+                    .with_label_detail("() {}")
+                    .with_snippet_replacement(
+                        context.syntax.replacement_range,
+                        "get fun `test $1`() {$0}",
+                    ),
+                CompletionRank::new(CompletionCategory::Keyword)
+                    .with_prefix(&context.syntax.prefix, "get fun test"),
             );
         }
         Some(())
     }
 }
 
-const TOP_LEVEL_SNIPPETS: &[(&str, &str)] = &[
-    ("import", "import \"$1\"$0"),
+const TOP_LEVEL_SNIPPETS: &[(&str, &str, &str)] = &[
+    ("import", " \"\"", "import \"$1\"$0"),
     (
         "contract",
+        " Name {}",
         "contract ${1:Name} {\n    author: \"${2:}\"\n    version: \"${3:1.0.0}\"\n    description: \"${4:My TON contract}\"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0",
     ),
-    ("struct", "struct ${1:Name} {\n    $0\n}"),
-    ("enum", "enum ${1:Name} {\n    $0\n}"),
-    ("type", "type ${1:Int} = ${2:int}$0"),
-    ("const", "const ${1:FOO}: ${2:int} = ${3:0}$0"),
-    ("global", "global ${1:foo}: ${2:int}$0"),
-    ("fun", "fun ${1:name}($2)$3 {\n    $0\n}"),
-    ("inline fun", "@inline\nfun ${1:name}($2)$3 {\n    $0\n}"),
+    ("struct", " Name {}", "struct ${1:Name} {\n    $0\n}"),
+    ("enum", " Name {}", "enum ${1:Name} {\n    $0\n}"),
+    ("type", " Int = int", "type ${1:Int} = ${2:int}$0"),
+    (
+        "const",
+        " FOO: <type> = <value>",
+        "const ${1:FOO}: ${2:int} = ${3:0}$0",
+    ),
+    (
+        "global",
+        " foo: <type> = <value>",
+        "global ${1:foo}: ${2:int}$0",
+    ),
+    ("fun", " name() {}", "fun ${1:name}($2)$3 {\n    $0\n}"),
+    (
+        "inline fun",
+        " name() {}",
+        "@inline\nfun ${1:name}($2)$3 {\n    $0\n}",
+    ),
     (
         "inline_ref fun",
+        " name() {}",
         "@inline_ref\nfun ${1:name}($2)$3 {\n    $0\n}",
     ),
-    ("asm fun", "fun ${1:name}($2)$3 asm \"$0\""),
+    (
+        "asm fun",
+        " name() asm \"...\"",
+        "fun ${1:name}($2)$3 asm \"$0\"",
+    ),
     (
         "method fun",
+        " Foo.name(self) {}",
         "fun ${1:Foo}.${2:name}(${3:self}$4)$5 {\n    $0\n}",
     ),
     (
         "static method fun",
+        " Foo.name() {}",
         "fun ${1:Foo}.${2:name}($3)$4 {\n    $0\n}",
     ),
-    ("get fun", "get fun ${1:name}($2)$3 {\n    $0\n}"),
+    (
+        "get fun",
+        " name() {}",
+        "get fun ${1:name}($2)$3 {\n    $0\n}",
+    ),
 ];

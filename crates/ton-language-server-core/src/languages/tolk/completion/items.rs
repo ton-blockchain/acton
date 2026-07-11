@@ -5,6 +5,8 @@ use crate::{CompletionItem, CompletionItemKind};
 use tolk_resolver::file_index::Parameter;
 use tolk_resolver::resolve_index::{LocalDef, LocalDefKind};
 use tolk_resolver::{Symbol, SymbolKind};
+use tolk_syntax::{BaseFunction, EnumMember, TopLevel, TryFromNode};
+use tolk_ty::TyData;
 
 pub(super) struct RankedCompletionItem {
     pub(super) item: CompletionItem,
@@ -39,7 +41,22 @@ pub(super) fn local(
         .with_filter_text(local.name.as_ref())
         .with_replacement(context.syntax.replacement_range, raw_name);
     if let Some(ty) = semantics::local_type(context, local) {
-        item.detail = Some(format!(": {}", context.snapshot.type_interner.format(ty)));
+        if is_type_parameter {
+            if let TyData::TypeParameter {
+                default_type: Some(default_type),
+                ..
+            } = context.snapshot.type_interner.data(ty)
+            {
+                item = item.with_label_detail(format!(
+                    " = {}",
+                    context.snapshot.type_interner.format(*default_type)
+                ));
+            }
+            item = item.with_label_description("type parameter");
+        } else {
+            item = item
+                .with_label_description(format!(" {}", context.snapshot.type_interner.format(ty)));
+        }
     }
     Some(RankedCompletionItem {
         item,
@@ -119,7 +136,7 @@ pub(super) fn symbol(
     let mut item = CompletionItem::new(symbol.name.as_ref(), kind)
         .with_filter_text(symbol.name.as_ref())
         .with_snippet_replacement(context.syntax.replacement_range, insertion);
-    item.detail = Some(symbol.fqn.to_string());
+    item = with_symbol_label_details(item, context, symbol, member);
     item.deprecated = symbol.is_deprecated;
     if let Some(documentation) = symbol
         .doc_span
@@ -144,13 +161,145 @@ pub(super) fn prefixed_enum_member(
     let raw_member = semantics::raw_text(context.snapshot, member.id.file_id, member.name_span)
         .unwrap_or_else(|| member.name.to_string());
     let label = format!("{raw_owner}.{raw_member}");
+    let item = CompletionItem::new(&label, CompletionItemKind::EnumMember)
+        .with_filter_text(member.name.as_ref())
+        .with_replacement(context.syntax.replacement_range, &label);
     RankedCompletionItem {
-        item: CompletionItem::new(&label, CompletionItemKind::EnumMember)
-            .with_filter_text(member.name.as_ref())
-            .with_replacement(context.syntax.replacement_range, &label),
+        item: with_symbol_label_details(item, context, member, true),
         rank: CompletionRank::new(CompletionCategory::Field)
             .with_prefix(&context.syntax.prefix, member.name.as_ref()),
     }
+}
+
+pub(super) fn with_symbol_label_details(
+    mut item: CompletionItem,
+    context: &TolkCompletionProviderContext<'_>,
+    symbol: &Symbol,
+    member: bool,
+) -> CompletionItem {
+    match &symbol.kind {
+        SymbolKind::Function { .. } | SymbolKind::GetMethod { .. } => {
+            if let Some(signature) = callable_label_detail(context, symbol) {
+                item = item.with_label_detail(signature);
+            }
+        }
+        SymbolKind::Method { is_instance, .. } => {
+            if let Some(signature) = callable_label_detail(context, symbol) {
+                item = item.with_label_detail(signature);
+            }
+
+            if !is_instance
+                && let Some(receiver) = context
+                    .snapshot
+                    .type_db_cache
+                    .method_receiver_type(symbol.id)
+            {
+                item = item.with_label_description(format!(
+                    "of {}",
+                    context.snapshot.type_interner.format(receiver)
+                ));
+            }
+        }
+        SymbolKind::Struct { fields, .. } => {
+            if !context.syntax.is_type() && !member && !fields.is_empty() {
+                item = item.with_label_detail(" {}");
+            }
+        }
+        SymbolKind::Constant => {
+            if let Some(typ) = symbol_type(context, symbol) {
+                let value = constant_value(context, symbol)
+                    .map(|value| format!(" = {value}"))
+                    .unwrap_or_default();
+                item = item.with_label_detail(format!(": {typ}{value}"));
+            }
+        }
+        SymbolKind::GlobalVariable => {
+            if let Some(typ) = symbol_type(context, symbol) {
+                item = item.with_label_detail(format!(": {typ}"));
+            }
+        }
+        SymbolKind::StructField => {
+            if let Some(typ) = symbol_type(context, symbol) {
+                item = item.with_label_detail(format!(": {typ}"));
+            }
+            if let Some(owner) = owner_name(symbol) {
+                item = item.with_label_description(format!(" of {owner}"));
+            }
+        }
+        SymbolKind::EnumMember => {
+            if let Some(default) = enum_member_default(context, symbol) {
+                item = item.with_label_detail(format!(" = {default}"));
+            }
+            if let Some(owner) = owner_name(symbol) {
+                item = item.with_label_description(format!(" of {owner}"));
+            }
+        }
+        SymbolKind::Enum { .. } | SymbolKind::TypeAlias { .. } => {}
+    }
+
+    item
+}
+
+fn callable_label_detail(
+    context: &TolkCompletionProviderContext<'_>,
+    symbol: &Symbol,
+) -> Option<String> {
+    let file = context.snapshot.file_db.get_by_id(symbol.id.file_id)?;
+    let declaration = file.find_syntax_declaration(symbol.id)?;
+    let function = BaseFunction::try_from_node(declaration.syntax()).ok()?;
+    let type_parameters = function
+        .type_parameters_node()
+        .map(|parameters| file.text(&parameters))
+        .unwrap_or_default();
+    let parameters = function
+        .parameters()
+        .map(|parameter| file.text(&parameter))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let return_type = function
+        .return_type()
+        .map(|return_type| format!(": {}", file.text(&return_type)))
+        .unwrap_or_default();
+
+    Some(format!("{type_parameters}({parameters}){return_type}"))
+}
+
+fn symbol_type(context: &TolkCompletionProviderContext<'_>, symbol: &Symbol) -> Option<String> {
+    context
+        .snapshot
+        .type_db_cache
+        .top_level_type(symbol.id)
+        .map(|ty| context.snapshot.type_interner.format(ty))
+}
+
+fn constant_value(context: &TolkCompletionProviderContext<'_>, symbol: &Symbol) -> Option<String> {
+    let file = context.snapshot.file_db.get_by_id(symbol.id.file_id)?;
+    let TopLevel::Constant(constant) = file.find_syntax_declaration(symbol.id)? else {
+        return None;
+    };
+    let value = constant.value()?;
+
+    Some(file.text(&value).to_owned())
+}
+
+fn enum_member_default(
+    context: &TolkCompletionProviderContext<'_>,
+    symbol: &Symbol,
+) -> Option<String> {
+    let file = context.snapshot.file_db.get_by_id(symbol.id.file_id)?;
+    let source_file = file.source();
+    let node = source_file
+        .tree
+        .root_node()
+        .descendant_for_byte_range(symbol.body_span.start(), symbol.body_span.end())?;
+    let member = EnumMember::try_from_node(node).ok()?;
+    let default = member.default()?;
+
+    Some(file.text(&default).to_owned())
+}
+
+fn owner_name(symbol: &Symbol) -> Option<&str> {
+    symbol.fqn.rsplit_once('.').map(|(owner, _)| owner)
 }
 
 fn callable_snippet(

@@ -25,23 +25,59 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ReturnCompletionP
         let return_ty = enclosing_return_type(context);
         if return_ty.is_some_and(|ty| ty == context.snapshot.type_interner.ty_void) {
             // explicit void return type
-            add_return(context, collector, "return;", "return;");
+            add_return(
+                context,
+                collector,
+                "return;",
+                "return;",
+                CompletionItemKind::Keyword,
+            );
             return Some(());
         }
 
-        add_return(context, collector, "return <expr>;", "return $0;");
+        add_return(
+            context,
+            collector,
+            "return <expr>;",
+            "return $0;",
+            CompletionItemKind::Keyword,
+        );
 
         let return_ty = return_ty?;
         let return_ty = context.snapshot.type_interner.unwrap_alias(return_ty);
 
         match context.snapshot.type_interner.data(return_ty) {
             TyData::Bool { .. } => {
-                add_return(context, collector, "return true;", "return true;");
-                add_return(context, collector, "return false;", "return false;");
+                add_return(
+                    context,
+                    collector,
+                    "return true;",
+                    "return true;",
+                    CompletionItemKind::Snippet,
+                );
+                add_return(
+                    context,
+                    collector,
+                    "return false;",
+                    "return false;",
+                    CompletionItemKind::Snippet,
+                );
             }
-            TyData::Int(_) => add_return(context, collector, "return 0;", "return 0;"),
+            TyData::Int(_) => add_return(
+                context,
+                collector,
+                "return 0;",
+                "return 0;",
+                CompletionItemKind::Snippet,
+            ),
             _ if contains_null(context, return_ty) => {
-                add_return(context, collector, "return null;", "return null;");
+                add_return(
+                    context,
+                    collector,
+                    "return null;",
+                    "return null;",
+                    CompletionItemKind::Snippet,
+                );
             }
             _ => {}
         }
@@ -73,9 +109,10 @@ fn add_return(
     collector: &mut CompletionCollector,
     label: &str,
     snippet: &str,
+    kind: CompletionItemKind,
 ) {
     collector.add(
-        CompletionItem::new(label, CompletionItemKind::Keyword)
+        CompletionItem::new(label, kind)
             .with_snippet_replacement(context.syntax.replacement_range, snippet),
         CompletionRank::new(CompletionCategory::Keyword).with_prefix(&context.syntax.prefix, label),
     );

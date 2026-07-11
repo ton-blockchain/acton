@@ -66,7 +66,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       documentRangeFormattingProvider: true,
       completionProvider: {
         resolveProvider: false,
-        triggerCharacters: [".", '"', "'", "/", "@"],
+        triggerCharacters: [".", "@", "#"],
       },
       inlayHintProvider: true,
       semanticTokensProvider: {

@@ -338,9 +338,15 @@ impl ReferenceCompletionProvider {
                 ""
             };
             let snippet = format!("{raw_name}: $1{comma}$0");
-            collector.add(
+            let item = items::with_symbol_label_details(
                 CompletionItem::new(&raw_name, CompletionItemKind::Property)
                     .with_snippet_replacement(context.syntax.replacement_range, snippet),
+                context,
+                field,
+                true,
+            );
+            collector.add(
+                item,
                 CompletionRank::new(CompletionCategory::ContextElement)
                     .with_prefix(&context.syntax.prefix, field.name.as_ref()),
             );

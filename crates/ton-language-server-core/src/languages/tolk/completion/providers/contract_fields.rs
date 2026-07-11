@@ -40,7 +40,7 @@ impl CompletionProvider<TolkCompletionProviderContext<'_>> for ContractFieldComp
             }
             let insertion = format!("{label}: $0");
             let item = CompletionItem::new(label, CompletionItemKind::Field)
-                .with_detail(field.detail)
+                .with_label_detail(format!(": {}", field.detail))
                 .with_snippet_replacement(context.syntax.replacement_range, insertion);
             collector.add(
                 item,

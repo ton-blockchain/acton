@@ -29,6 +29,8 @@ pub(crate) fn provider_group(context: &TolkCompletionContext) -> ProviderGroup {
         ProviderGroup::FieldModifier
     } else if context.is_function_name() {
         ProviderGroup::FunctionName
+    } else if context.is_declaration_name() {
+        ProviderGroup::None
     } else if context.after_dot {
         ProviderGroup::None
     } else if context.top_level() {

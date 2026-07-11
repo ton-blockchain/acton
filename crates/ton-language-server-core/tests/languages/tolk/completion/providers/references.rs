@@ -21,8 +21,8 @@ fn excludes_already_initialized_fields_in_multiline_literals() {
     )
     .labels(&["counter", "id"])
     .check(expect![[r#"
-        label  kind      detail  edit     text
-        id     Property          7:8-7:8  id: $1,$0"#]]);
+        label  kind      detail             edit     text
+        id     Property  : int  of Storage  7:8-7:8  id: $1,$0"#]]);
 }
 
 #[test]
@@ -43,9 +43,9 @@ fn completes_fields_in_short_literal_from_expected_return_type() {
     )
     .labels(&["counter", "id"])
     .check(expect![[r#"
-        label    kind      detail  edit     text
-        counter  Property          6:8-6:8  counter: $1,$0
-        id       Property          6:8-6:8  id: $1,$0"#]]);
+        label    kind      detail             edit     text
+        counter  Property  : int  of Storage  6:8-6:8  counter: $1,$0
+        id       Property  : int  of Storage  6:8-6:8  id: $1,$0"#]]);
 }
 
 #[test]
@@ -59,8 +59,8 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          1:19-1:19  age: $1$0"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  1:19-1:19  age: $1$0"#]]);
 
     // A short literal gets its expected struct type from a variable declaration.
     CompletionTest::new(
@@ -71,8 +71,8 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          1:30-1:30  age: $1$0"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  1:30-1:30  age: $1$0"#]]);
 
     // A short literal gets its expected struct type from a function argument.
     CompletionTest::new(
@@ -84,8 +84,8 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          2:23-2:23  age: $1$0"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  2:23-2:23  age: $1$0"#]]);
 
     // A matching local is offered alongside the explicit field initializer.
     CompletionTest::new(
@@ -96,9 +96,9 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          1:33-1:33  age: $1$0
-        age    Variable  : int   1:33-1:33  age"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  1:33-1:33  age: $1$0
+        age    Variable  int            1:33-1:33  age"#]]);
 
     // A matching parameter is offered alongside the explicit field initializer.
     CompletionTest::new(
@@ -109,9 +109,9 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          1:27-1:27  age: $1$0
-        age    Variable  : int   1:27-1:27  age"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  1:27-1:27  age: $1$0
+        age    Variable  int            1:27-1:27  age"#]]);
 
     // An already initialized field is excluded even when completion occurs before a later field.
     CompletionTest::new(
@@ -122,8 +122,8 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["age", "value"])
     .check(expect![[r#"
-        label  kind      detail  edit       text
-        age    Property          1:19-1:20  age: $1$0"#]]);
+        label  kind      detail         edit       text
+        age    Property  : int  of Foo  1:19-1:20  age: $1$0"#]]);
 
     // A field value is an expression context rather than another field-name position.
     CompletionTest::new(
@@ -135,7 +135,7 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     .labels(&["age", "value"])
     .check(expect![[r#"
         label  kind      detail  edit       text
-        value  Variable  : int   1:34-1:36  value"#]]);
+        value  Variable  int     1:34-1:36  value"#]]);
 
     // Generic function argument inference supplies the short literal's struct type.
     CompletionTest::new(
@@ -157,9 +157,9 @@ fn completes_struct_initializer_fields_in_all_expected_contexts() {
     )
     .labels(&["first", "second"])
     .check(expect![[r#"
-        label   kind      detail  edit       text
-        first   Property          1:22-1:22  first: $1$0
-        second  Property          1:22-1:22  second: $1$0"#]]);
+        label   kind      detail           edit       text
+        first   Property  : int  of Foo    1:22-1:22  first: $1$0
+        second  Property  : slice  of Foo  1:22-1:22  second: $1$0"#]]);
 }
 
 #[test]
@@ -280,8 +280,8 @@ fn completes_visible_locals_members_and_backticked_symbols() {
         .labels(&["local", "parameter"])
         .check(expect![[r#"
             label      kind      detail  edit       text
-            local      Variable  : int   0:42-0:45  local
-            parameter  Variable  : int   0:42-0:45  parameter"#]]);
+            local      Variable  int     0:42-0:45  local
+            parameter  Variable  int     0:42-0:45  parameter"#]]);
 
     // Member completion uses the inferred type of the qualifier.
     CompletionTest::new(
@@ -293,9 +293,9 @@ fn completes_visible_locals_members_and_backticked_symbols() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind      detail      edit       text
-        first   Property  Foo.first   1:25-1:25  first
-        second  Property  Foo.second  1:25-1:25  second"#]]);
+        label   kind      detail         edit       text
+        first   Property  : int  of Foo  1:25-1:25  first
+        second  Property  : int  of Foo  1:25-1:25  second"#]]);
 
     // Member completion remains available inside an assert expression.
     CompletionTest::new(
@@ -307,9 +307,9 @@ fn completes_visible_locals_members_and_backticked_symbols() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind      detail      edit       text
-        first   Property  Foo.first   1:32-1:32  first
-        second  Property  Foo.second  1:32-1:32  second"#]]);
+        label   kind      detail           edit       text
+        first   Property  : int  of Foo    1:32-1:32  first
+        second  Property  : slice  of Foo  1:32-1:32  second"#]]);
 
     // A malformed member access keeps the type inferred from an imported factory call.
     CompletionTest::new(
@@ -335,9 +335,9 @@ fn completes_visible_locals_members_and_backticked_symbols() {
     .labels(&["address", "stateInit"])
     .trigger_character(".")
     .check(expect![[r#"
-        label      kind      detail            edit       text
-        address    Property  Wallet.address    5:19-5:19  address
-        stateInit  Property  Wallet.stateInit  5:19-5:19  stateInit"#]]);
+        label      kind      detail                edit       text
+        address    Property  : address  of Wallet  5:19-5:19  address
+        stateInit  Property  : cell  of Wallet     5:19-5:19  stateInit"#]]);
 
     // A backticked function replaces the complete quoted identifier.
     CompletionTest::new(
@@ -348,8 +348,8 @@ fn completes_visible_locals_members_and_backticked_symbols() {
     )
     .labels(&["calculate total"])
     .check(expect![[r#"
-        label            kind      detail           edit       text
-        calculate total  Function  calculate total  1:13-1:26  `calculate total`$0"#]]);
+        label            kind      detail   edit       text
+        calculate total  Function  (): int  1:13-1:26  `calculate total`$0"#]]);
 }
 
 #[test]
@@ -365,9 +365,9 @@ fn completes_locals_from_destructuring_catch_and_match_scopes() {
     )
     .labels(&["some", "someOther"])
     .check(expect![[r#"
-        label      kind      detail    edit     text
-        some       Variable  : int     2:4-2:8  some
-        someOther  Variable  : string  2:4-2:8  someOther"#]]);
+        label      kind      detail  edit     text
+        some       Variable  int     2:4-2:8  some
+        someOther  Variable  string  2:4-2:8  someOther"#]]);
 
     // Both catch variables are visible inside the catch body, including unknown types.
     CompletionTest::new(
@@ -381,9 +381,9 @@ fn completes_locals_from_destructuring_catch_and_match_scopes() {
     )
     .labels(&["error", "errorData"])
     .check(expect![[r#"
-        label      kind      detail     edit      text
-        error      Variable  : int      2:8-2:11  error
-        errorData  Variable  : unknown  2:8-2:11  errorData"#]]);
+        label      kind      detail   edit      text
+        error      Variable  int      2:8-2:11  error
+        errorData  Variable  unknown  2:8-2:11  errorData"#]]);
 
     // A value declared by a match expression is visible only inside its arms.
     CompletionTest::new(
@@ -398,7 +398,7 @@ fn completes_locals_from_destructuring_catch_and_match_scopes() {
     .labels(&["data"])
     .check(expect![[r#"
         label  kind      detail  edit       text
-        data   Variable  : int   2:16-2:19  data"#]]);
+        data   Variable  int     2:16-2:19  data"#]]);
 
     // Locals remain available inside nested match-arm blocks.
     CompletionTest::new(
@@ -415,8 +415,8 @@ fn completes_locals_from_destructuring_catch_and_match_scopes() {
     .labels(&["some", "someOther"])
     .check(expect![[r#"
         label      kind      detail  edit       text
-        some       Variable  : int   4:16-4:20  some
-        someOther  Variable  : int   4:16-4:20  someOther"#]]);
+        some       Variable  int     4:16-4:20  some
+        someOther  Variable  int     4:16-4:20  someOther"#]]);
 }
 
 #[test]
@@ -432,7 +432,7 @@ fn completes_references_in_incomplete_expressions() {
     .labels(&["someParameter"])
     .check(expect![[r#"
         label          kind      detail  edit      text
-        someParameter  Variable  : int   1:8-1:12  someParameter"#]]);
+        someParameter  Variable  int     1:8-1:12  someParameter"#]]);
 
     // An incomplete match condition preserves the same lexical scope.
     CompletionTest::new(
@@ -445,7 +445,7 @@ fn completes_references_in_incomplete_expressions() {
     .labels(&["someParameter"])
     .check(expect![[r#"
         label          kind      detail  edit       text
-        someParameter  Variable  : int   1:11-1:15  someParameter"#]]);
+        someParameter  Variable  int     1:11-1:15  someParameter"#]]);
 
     // An incomplete assert condition also remains an expression context.
     CompletionTest::new(
@@ -458,7 +458,7 @@ fn completes_references_in_incomplete_expressions() {
     .labels(&["someParameter"])
     .check(expect![[r#"
         label          kind      detail  edit       text
-        someParameter  Variable  : int   1:11-1:15  someParameter"#]]);
+        someParameter  Variable  int     1:11-1:15  someParameter"#]]);
 }
 
 #[test]
@@ -467,25 +467,25 @@ fn separates_type_parameters_from_value_completion() {
     CompletionTest::new("fun foo<TName, TValue>(value: TN<caret>) {}")
         .labels(&["TName", "TValue"])
         .check(expect![[r#"
-            label   kind           detail    edit       text
-            TName   TypeParameter  : TName   0:30-0:32  TName
-            TValue  TypeParameter  : TValue  0:30-0:32  TValue"#]]);
+            label   kind           detail          edit       text
+            TName   TypeParameter  type parameter  0:30-0:32  TName
+            TValue  TypeParameter  type parameter  0:30-0:32  TValue"#]]);
 
     // Every function type parameter is offered for a shared prefix.
     CompletionTest::new("fun generic<TName, TValue, TOther>(): T<caret> {}")
         .labels(&["TName", "TValue", "TOther"])
         .check(expect![[r#"
-            label   kind           detail    edit       text
-            TName   TypeParameter  : TName   0:38-0:39  TName
-            TOther  TypeParameter  : TOther  0:38-0:39  TOther
-            TValue  TypeParameter  : TValue  0:38-0:39  TValue"#]]);
+            label   kind           detail          edit       text
+            TName   TypeParameter  type parameter  0:38-0:39  TName
+            TOther  TypeParameter  type parameter  0:38-0:39  TOther
+            TValue  TypeParameter  type parameter  0:38-0:39  TValue"#]]);
 
     // A type parameter with a default remains available by its declared name.
     CompletionTest::new("fun generic<TName = int>(): TNam<caret> {}")
         .labels(&["TName"])
         .check(expect![[r#"
-            label  kind           detail   edit       text
-            TName  TypeParameter  : TName  0:28-0:32  TName"#]]);
+            label  kind           detail                  edit       text
+            TName  TypeParameter   = int  type parameter  0:28-0:32  TName"#]]);
 
     // Struct type parameters are visible in field type declarations.
     CompletionTest::new(
@@ -497,9 +497,9 @@ fn separates_type_parameters_from_value_completion() {
     )
     .labels(&["TName", "TValue"])
     .check(expect![[r#"
-        label   kind           detail    edit       text
-        TName   TypeParameter  : TName   1:11-1:13  TName
-        TValue  TypeParameter  : TValue  1:11-1:13  TValue"#]]);
+        label   kind           detail          edit       text
+        TName   TypeParameter  type parameter  1:11-1:13  TName
+        TValue  TypeParameter  type parameter  1:11-1:13  TValue"#]]);
 
     // Every struct type parameter is visible in a field type.
     CompletionTest::new(
@@ -511,10 +511,10 @@ fn separates_type_parameters_from_value_completion() {
     )
     .labels(&["TName", "TValue", "TOther"])
     .check(expect![[r#"
-        label   kind           detail    edit       text
-        TName   TypeParameter  : TName   1:11-1:12  TName
-        TOther  TypeParameter  : TOther  1:11-1:12  TOther
-        TValue  TypeParameter  : TValue  1:11-1:12  TValue"#]]);
+        label   kind           detail          edit       text
+        TName   TypeParameter  type parameter  1:11-1:12  TName
+        TOther  TypeParameter  type parameter  1:11-1:12  TOther
+        TValue  TypeParameter  type parameter  1:11-1:12  TValue"#]]);
 
     // Type parameters are not valid expression values.
     CompletionTest::new("fun foo<TName>() { TNam<caret>; }")
@@ -551,9 +551,9 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["MAX_VALUE", "globalValue"])
     .check(expect![[r#"
-        label        kind      detail       edit       text
-        MAX_VALUE    Constant  MAX_VALUE    2:25-2:28  MAX_VALUE
-        globalValue  Variable  globalValue  2:25-2:28  globalValue"#]]);
+        label        kind      detail      edit       text
+        MAX_VALUE    Constant  : int = 10  2:25-2:28  MAX_VALUE
+        globalValue  Variable  : int       2:25-2:28  globalValue"#]]);
 
     // Constants with inferred non-integer types remain available together.
     CompletionTest::new(
@@ -566,8 +566,8 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     .labels(&["CONSTANT_TEXT", "CONSTANT_FLAG"])
     .check(expect![[r#"
         label          kind      detail         edit       text
-        CONSTANT_FLAG  Constant  CONSTANT_FLAG  2:13-2:21  CONSTANT_FLAG
-        CONSTANT_TEXT  Constant  CONSTANT_TEXT  2:13-2:21  CONSTANT_TEXT"#]]);
+        CONSTANT_FLAG  Constant  : bool = true  2:13-2:21  CONSTANT_FLAG
+        CONSTANT_TEXT  Constant  : string = ""  2:13-2:21  CONSTANT_TEXT"#]]);
 
     // Multiple globals sharing a prefix are all offered.
     CompletionTest::new(
@@ -579,9 +579,9 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["globalFirst", "globalSecond"])
     .check(expect![[r#"
-        label         kind      detail        edit       text
-        globalFirst   Variable  globalFirst   2:13-2:19  globalFirst
-        globalSecond  Variable  globalSecond  2:13-2:19  globalSecond"#]]);
+        label         kind      detail  edit       text
+        globalFirst   Variable  : int   2:13-2:19  globalFirst
+        globalSecond  Variable  : int   2:13-2:19  globalSecond"#]]);
 
     // Structs are inserted as types in a type position.
     CompletionTest::new(
@@ -592,8 +592,8 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["Storage"])
     .check(expect![[r#"
-            label    kind    detail   edit       text
-            Storage  Struct  Storage  1:16-1:19  Storage"#]]);
+        label    kind    detail  edit       text
+        Storage  Struct          1:16-1:19  Storage"#]]);
 
     // Non-empty structs are inserted as object literals in expression positions.
     CompletionTest::new(
@@ -604,8 +604,8 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["Storage"])
     .check(expect![[r#"
-            label    kind    detail   edit       text
-            Storage  Struct  Storage  1:25-1:28  Storage {$1}$0"#]]);
+        label    kind    detail  edit       text
+        Storage  Struct   {}     1:25-1:28  Storage {$1}$0"#]]);
 
     // Empty structs do not receive an unnecessary object-literal placeholder.
     CompletionTest::new(
@@ -616,8 +616,8 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["Empty"])
     .check(expect![[r#"
-            label  kind    detail  edit       text
-            Empty  Struct  Empty   1:25-1:28  Empty"#]]);
+        label  kind    detail  edit       text
+        Empty  Struct          1:25-1:28  Empty"#]]);
 
     // Enums are available both as types and as expression qualifiers.
     CompletionTest::new(
@@ -629,7 +629,7 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     .labels(&["Color"])
     .check(expect![[r#"
         label  kind  detail  edit       text
-        Color  Enum  Color   1:16-1:20  Color"#]]);
+        Color  Enum          1:16-1:20  Color"#]]);
 
     // An enum expression offers the enum itself and its qualified members.
     CompletionTest::new(
@@ -640,10 +640,10 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["Color", "Color.Red", "Color.Blue"])
     .check(expect![[r#"
-        label       kind        detail  edit       text
-        Color.Blue  EnumMember          1:13-1:17  Color.Blue
-        Color.Red   EnumMember          1:13-1:17  Color.Red
-        Color       Enum        Color   1:13-1:17  Color"#]]);
+        label       kind        detail    edit       text
+        Color.Blue  EnumMember  of Color  1:13-1:17  Color.Blue
+        Color.Red   EnumMember  of Color  1:13-1:17  Color.Red
+        Color       Enum                  1:13-1:17  Color"#]]);
 
     // Type aliases are available as types.
     CompletionTest::new(
@@ -654,8 +654,8 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     )
     .labels(&["Amount"])
     .check(expect![[r#"
-            label   kind           detail  edit       text
-            Amount  TypeParameter  Amount  1:16-1:19  Amount"#]]);
+        label   kind           detail  edit       text
+        Amount  TypeParameter          1:16-1:19  Amount"#]]);
 
     // Type aliases are also available as expression/static-receiver values.
     CompletionTest::new(
@@ -667,7 +667,7 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     .labels(&["Amount"])
     .check(expect![[r#"
         label   kind           detail  edit       text
-        Amount  TypeParameter  Amount  1:13-1:16  Amount"#]]);
+        Amount  TypeParameter          1:13-1:16  Amount"#]]);
 
     // A struct field type position exposes both local and stdlib types.
     CompletionTest::new(
@@ -680,9 +680,9 @@ fn completes_global_symbol_kinds_in_matching_contexts() {
     .labels(&["Foo", "int", "Cell"])
     .check(expect![[r#"
         label  kind           detail  edit       text
-        Foo    Struct         Foo     1:11-1:13  Foo
-        Cell   Struct         Cell    1:11-1:13  Cell
-        int    TypeParameter  int     1:11-1:13  int"#]]);
+        Foo    Struct                 1:11-1:13  Foo
+        Cell   Struct                 1:11-1:13  Cell
+        int    TypeParameter          1:11-1:13  int"#]]);
 }
 
 #[test]
@@ -697,8 +697,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:31-2:40  ContractType"#]]);
 
     // External incoming message metadata accepts type declarations only.
     CompletionTest::new(
@@ -710,8 +710,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:31-2:40  ContractType"#]]);
 
     // Outgoing message metadata accepts type declarations only.
     CompletionTest::new(
@@ -723,8 +723,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:31-2:40  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:31-2:40  ContractType"#]]);
 
     // Emitted event metadata accepts type declarations only.
     CompletionTest::new(
@@ -736,8 +736,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:28-2:37  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:28-2:37  ContractType"#]]);
 
     // Thrown error metadata accepts enum and other type declarations only.
     CompletionTest::new(
@@ -749,8 +749,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:27-2:36  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:27-2:36  ContractType"#]]);
 
     // Persistent storage metadata accepts type declarations only.
     CompletionTest::new(
@@ -765,8 +765,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit      text
-        ContractType  Struct  ContractType  4:8-4:17  ContractType"#]]);
+        label         kind    detail  edit      text
+        ContractType  Struct          4:8-4:17  ContractType"#]]);
 
     // Deployment storage metadata accepts type declarations only.
     CompletionTest::new(
@@ -778,8 +778,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:34-2:43  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:34-2:43  ContractType"#]]);
 
     // Forced ABI exports accept type declarations only.
     CompletionTest::new(
@@ -791,8 +791,8 @@ fn completes_types_in_every_typed_contract_field() {
     )
     .labels(&["ContractType", "contractValue", "author"])
     .check(expect![[r#"
-        label         kind    detail        edit       text
-        ContractType  Struct  ContractType  2:29-2:38  ContractType"#]]);
+        label         kind    detail  edit       text
+        ContractType  Struct          2:29-2:38  ContractType"#]]);
 }
 
 #[test]
@@ -810,8 +810,8 @@ fn completes_types_in_an_empty_contract_field_value() {
     )
     .labels(&["Storage", "storageValue", "author"])
     .check(expect![[r#"
-        label    kind    detail   edit     text
-        Storage  Struct  Storage  4:8-4:8  Storage"#]]);
+        label    kind    detail  edit     text
+        Storage  Struct          4:8-4:8  Storage"#]]);
 }
 
 #[test]
@@ -841,9 +841,9 @@ fn resolves_alias_and_generic_member_types() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind      detail      edit       text
-        first   Property  Foo.first   2:37-2:37  first
-        second  Property  Foo.second  2:37-2:37  second"#]]);
+        label   kind      detail           edit       text
+        first   Property  : int  of Foo    2:37-2:37  first
+        second  Property  : slice  of Foo  2:37-2:37  second"#]]);
 
     // Generic struct instantiations expose the fields of their base type.
     CompletionTest::new(
@@ -855,9 +855,9 @@ fn resolves_alias_and_generic_member_types() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind      detail      edit       text
-        first   Property  Foo.first   1:40-1:40  first
-        second  Property  Foo.second  1:40-1:40  second"#]]);
+        label   kind      detail           edit       text
+        first   Property  : T  of Foo      1:40-1:40  first
+        second  Property  : slice  of Foo  1:40-1:40  second"#]]);
 
     // An alias of an instantiated generic struct exposes its base fields.
     CompletionTest::new(
@@ -870,9 +870,9 @@ fn resolves_alias_and_generic_member_types() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind      detail      edit       text
-        first   Property  Foo.first   2:38-2:38  first
-        second  Property  Foo.second  2:38-2:38  second"#]]);
+        label   kind      detail           edit       text
+        first   Property  : T  of Foo      2:38-2:38  first
+        second  Property  : slice  of Foo  2:38-2:38  second"#]]);
 
     // Private fields are excluded from member completion outside the owner.
     CompletionTest::new(
@@ -884,8 +884,8 @@ fn resolves_alias_and_generic_member_types() {
     .labels(&["first", "second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind      detail     edit       text
-        first  Property  Foo.first  1:35-1:35  first"#]]);
+        label  kind      detail         edit       text
+        first  Property  : int  of Foo  1:35-1:35  first"#]]);
 }
 
 #[test]
@@ -903,10 +903,10 @@ fn completes_static_and_generic_methods_for_compatible_receivers() {
     .labels(&["bar", "baz", "bad"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail   edit       text
-        bad    Method  Foo.bad  4:17-4:19  bad();$0
-        bar    Method  Foo.bar  4:17-4:19  bar();$0
-        baz    Method  Foo.baz  4:17-4:19  baz();$0"#]]);
+        label  kind    detail      edit       text
+        bad    Method  ()  of Foo  4:17-4:19  bad();$0
+        bar    Method  ()  of Foo  4:17-4:19  bar();$0
+        baz    Method  ()  of Foo  4:17-4:19  baz();$0"#]]);
 
     // Methods from an unrelated generic receiver are not offered.
     CompletionTest::new(
@@ -932,8 +932,8 @@ fn completes_static_and_generic_methods_for_compatible_receivers() {
     .labels(&["new"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail           edit       text
-        new    Method  Second<int>.new  3:25-3:25  new();$0"#]]);
+        label  kind    detail                           edit       text
+        new    Method  (): Second<int>  of Second<int>  3:25-3:25  new();$0"#]]);
 
     // Generic and concrete instance methods are both available on a compatible value.
     CompletionTest::new(
@@ -947,9 +947,9 @@ fn completes_static_and_generic_methods_for_compatible_receivers() {
     .labels(&["add", "addInt"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail                  edit       text
-        add     Method  Collection<T>.add       3:41-3:42  add();$0
-        addInt  Method  Collection<int>.addInt  3:41-3:42  addInt();$0"#]]);
+        label   kind    detail  edit       text
+        add     Method  (self)  3:41-3:42  add();$0
+        addInt  Method  (self)  3:41-3:42  addInt();$0"#]]);
 
     // Static generic methods retain their type parameters in completion detail.
     CompletionTest::new(
@@ -963,9 +963,9 @@ fn completes_static_and_generic_methods_for_compatible_receivers() {
     .labels(&["bar", "baz"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail   edit       text
-        bar    Method  Foo.bar  3:17-3:19  bar(${1:value});$0
-        baz    Method  Foo.baz  3:17-3:19  baz(${1:value});$0"#]]);
+        label  kind    detail                       edit       text
+        bar    Method  <T>(value: T)  of Foo        3:17-3:19  bar(${1:value});$0
+        baz    Method  <T, U>(value: T): U  of Foo  3:17-3:19  baz(${1:value});$0"#]]);
 }
 
 #[test]
@@ -980,8 +980,8 @@ fn completes_only_methods_from_indexed_stdlib_files() {
     .labels(&["toCell", "iDictGet"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail    edit       text
-        toCell  Method  T.toCell  1:37-1:37  toCell(${1:options});$0"#]]);
+        label   kind    detail                                      edit       text
+        toCell  Method  (self, options: PackOptions = {}): Cell<T>  1:37-1:37  toCell(${1:options});$0"#]]);
 
     // Importing a specialized stdlib module indexes and exposes its methods normally.
     CompletionTest::new(
@@ -994,9 +994,9 @@ fn completes_only_methods_from_indexed_stdlib_files() {
     .labels(&["toCell", "iDictGet"])
     .trigger_character(".")
     .check(expect![[r#"
-        label     kind    detail         edit       text
-        iDictGet  Method  dict.iDictGet  2:30-2:30  iDictGet(${1:keyLen}, ${2:key});$0
-        toCell    Method  T.toCell       2:30-2:30  toCell(${1:options});$0"#]]);
+        label     kind    detail                                         edit       text
+        iDictGet  Method  (self, keyLen: int, key: int): (slice?, bool)  2:30-2:30  iDictGet(${1:keyLen}, ${2:key});$0
+        toCell    Method  (self, options: PackOptions = {}): Cell<T>     2:30-2:30  toCell(${1:options});$0"#]]);
 
     // Indexing the module must not make dict-only methods compatible with arbitrary structs.
     CompletionTest::new(
@@ -1026,9 +1026,9 @@ fn completes_methods_through_aliases_and_smart_casts() {
     .labels(&["subtract", "add"])
     .trigger_character(".")
     .check(expect![[r#"
-        label     kind    detail        edit       text
-        add       Method  Alias.add     3:31-3:31  add(${1:value});$0
-        subtract  Method  int.subtract  3:31-3:31  subtract(${1:value});$0"#]]);
+        label     kind    detail                   edit       text
+        add       Method  (self, value: int): int  3:31-3:31  add(${1:value});$0
+        subtract  Method  (self, value: int): int  3:31-3:31  subtract(${1:value});$0"#]]);
 
     // A chain of aliases receives methods declared at every compatible level.
     CompletionTest::new(
@@ -1044,10 +1044,10 @@ fn completes_methods_through_aliases_and_smart_casts() {
     .labels(&["multiply", "add", "subtract"])
     .trigger_character(".")
     .check(expect![[r#"
-        label     kind    detail                  edit       text
-        add       Method  Alias.add               5:39-5:39  add(${1:value});$0
-        multiply  Method  int.multiply            5:39-5:39  multiply(${1:value});$0
-        subtract  Method  AliasForAlias.subtract  5:39-5:39  subtract(${1:value});$0"#]]);
+        label     kind    detail                   edit       text
+        add       Method  (self, value: int): int  5:39-5:39  add(${1:value});$0
+        multiply  Method  (self, value: int): int  5:39-5:39  multiply(${1:value});$0
+        subtract  Method  (self, value: int): int  5:39-5:39  subtract(${1:value});$0"#]]);
 
     // A nullable alias does not expose methods requiring its non-null base type.
     CompletionTest::new(
@@ -1075,8 +1075,8 @@ fn completes_methods_through_aliases_and_smart_casts() {
     .labels(&["beginParse", "tvmCell"])
     .trigger_character(".")
     .check(expect![[r#"
-        label       kind    detail              edit       text
-        beginParse  Method  Cell<T>.beginParse  3:15-3:15  beginParse();$0"#]]);
+        label       kind    detail         edit       text
+        beginParse  Method  (self): slice  3:15-3:15  beginParse();$0"#]]);
 }
 
 #[test]
@@ -1106,8 +1106,8 @@ fn completes_methods_on_string_literals() {
     .labels(&["beginParse"])
     .trigger_character(".")
     .check(expect![[r#"
-        label       kind    detail             edit       text
-        beginParse  Method  string.beginParse  1:26-1:32  beginParse()$0"#]]);
+        label       kind    detail         edit       text
+        beginParse  Method  (self): slice  1:26-1:32  beginParse()$0"#]]);
 }
 
 #[test]
@@ -1123,8 +1123,8 @@ fn filters_methods_by_receiver_kind_and_nominal_type() {
     .labels(&["onlyLeft"])
     .trigger_character(".")
     .check(expect![[r#"
-        label     kind    detail         edit       text
-        onlyLeft  Method  Left.onlyLeft  2:30-2:34  onlyLeft();$0"#]]);
+        label     kind    detail  edit       text
+        onlyLeft  Method  (self)  2:30-2:34  onlyLeft();$0"#]]);
 
     // Structurally equal structs do not inherit each other's nominal methods.
     CompletionTest::new(
@@ -1174,8 +1174,8 @@ fn filters_methods_by_receiver_kind_and_nominal_type() {
     .labels(&["recover"])
     .trigger_character(".")
     .check(expect![[r#"
-        label    kind    detail        edit       text
-        recover  Method  Foo?.recover  2:30-2:34  recover();$0"#]]);
+        label    kind    detail       edit       text
+        recover  Method  (self): Foo  2:30-2:34  recover();$0"#]]);
 
     // A method requiring a non-null receiver is hidden until the value is narrowed.
     CompletionTest::new(
@@ -1203,8 +1203,8 @@ fn completes_generic_methods_with_exact_overload_semantics() {
     .labels(&["take"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail       edit       text
-        take   Method  Box<T>.take  2:35-2:37  take();$0"#]]);
+        label  kind    detail     edit       text
+        take   Method  (self): T  2:35-2:37  take();$0"#]]);
 
     // A generic method from another nominal type is not considered compatible.
     CompletionTest::new(
@@ -1231,8 +1231,8 @@ fn completes_generic_methods_with_exact_overload_semantics() {
     .labels(&["pick"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail         edit       text
-        pick   Method  Box<int>.pick  3:34-3:36  pick();$0"#]]);
+        label  kind    detail       edit       text
+        pick   Method  (self): int  3:34-3:36  pick();$0"#]]);
 
     // Nested generic receiver shapes are matched recursively.
     CompletionTest::new(
@@ -1245,8 +1245,8 @@ fn completes_generic_methods_with_exact_overload_semantics() {
     .labels(&["deep"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail            edit       text
-        deep   Method  Box<Box<T>>.deep  2:39-2:41  deep();$0"#]]);
+        label  kind    detail     edit       text
+        deep   Method  (self): T  2:39-2:41  deep();$0"#]]);
 
     // The more specific nested generic overload wins for the same method name.
     CompletionTest::new(
@@ -1260,8 +1260,8 @@ fn completes_generic_methods_with_exact_overload_semantics() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail              edit       text
-        select  Method  Box<Box<T>>.select  3:39-3:41  select();$0"#]]);
+        label   kind    detail       edit       text
+        select  Method  (self): int  3:39-3:41  select();$0"#]]);
 
     // Repeated receiver type parameters accept matching concrete arguments.
     CompletionTest::new(
@@ -1274,8 +1274,8 @@ fn completes_generic_methods_with_exact_overload_semantics() {
     .labels(&["same"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail           edit       text
-        same   Method  Pair<T, T>.same  2:40-2:42  same();$0"#]]);
+        label  kind    detail  edit       text
+        same   Method  (self)  2:40-2:42  same();$0"#]]);
 
     // Repeated receiver type parameters reject conflicting concrete arguments.
     CompletionTest::new(
@@ -1303,8 +1303,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail            edit       text
-        select  Method  map<K, V>.select  2:41-2:44  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:41-2:44  select();$0"#]]);
 
     // A constrained map receiver dominates the fully generic map receiver.
     CompletionTest::new(
@@ -1317,8 +1317,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail              edit       text
-        select  Method  map<int, V>.select  2:41-2:44  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:41-2:44  select();$0"#]]);
 
     // An instantiated array receiver is more specific than a bare type parameter.
     CompletionTest::new(
@@ -1331,8 +1331,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail           edit       text
-        select  Method  array<T>.select  2:36-2:39  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:36-2:39  select();$0"#]]);
 
     // A tensor receiver is more specific than a bare type parameter.
     CompletionTest::new(
@@ -1345,8 +1345,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail           edit       text
-        select  Method  [T, int].select  2:37-2:40  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:37-2:40  select();$0"#]]);
 
     // A nullable receiver shape wins over the unconstrained generic receiver.
     CompletionTest::new(
@@ -1359,8 +1359,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail     edit       text
-        select  Method  T?.select  2:30-2:33  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:30-2:33  select();$0"#]]);
 
     // A concrete tensor overload wins over a compatible generic tensor overload.
     CompletionTest::new(
@@ -1373,8 +1373,8 @@ fn chooses_the_most_specific_generic_receiver_shape() {
     .labels(&["select"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail              edit       text
-        select  Method  [bool, int].select  2:37-2:40  select();$0"#]]);
+        label   kind    detail  edit       text
+        select  Method  (self)  2:37-2:40  select();$0"#]]);
 }
 
 #[test]
@@ -1390,8 +1390,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  2:31-2:34  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  2:31-2:34  touch();$0"#]]);
 
     // A freshly constructed object exposes its instance methods.
     CompletionTest::new(
@@ -1404,8 +1404,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  2:22-2:25  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  2:22-2:25  touch();$0"#]]);
 
     // A function-call result exposes methods from its inferred return type.
     CompletionTest::new(
@@ -1419,8 +1419,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  3:23-3:26  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  3:23-3:26  touch();$0"#]]);
 
     // An instantiated generic type exposes compatible static methods.
     CompletionTest::new(
@@ -1433,8 +1433,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["create"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind    detail         edit       text
-        create  Method  Box<T>.create  2:22-2:25  create();$0"#]]);
+        label   kind    detail                 edit       text
+        create  Method  (): Box<T>  of Box<T>  2:22-2:25  create();$0"#]]);
 
     // A non-null assertion exposes methods of the narrowed receiver type.
     CompletionTest::new(
@@ -1447,8 +1447,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  2:31-2:34  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  2:31-2:34  touch();$0"#]]);
 
     // An explicit cast determines the receiver used for method lookup.
     CompletionTest::new(
@@ -1461,8 +1461,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  2:42-2:45  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  2:42-2:45  touch();$0"#]]);
 
     // A previous method call can provide the receiver for the next completion.
     CompletionTest::new(
@@ -1476,8 +1476,8 @@ fn completes_methods_for_all_supported_receiver_expressions() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  3:36-3:39  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  3:36-3:39  touch();$0"#]]);
 }
 
 #[test]
@@ -1606,8 +1606,8 @@ fn handles_method_visibility_across_workspace_files() {
     .labels(&["imported"])
     .trigger_character(".")
     .check(expect![[r#"
-        label     kind    detail        edit       text
-        imported  Method  Foo.imported  1:29-1:32  imported();$0"#]]);
+        label     kind    detail  edit       text
+        imported  Method  (self)  1:29-1:32  imported();$0"#]]);
 
     // Selecting a compatible method from an unimported file adds its import.
     CompletionTest::new(
@@ -1638,8 +1638,8 @@ fn handles_method_visibility_across_workspace_files() {
     .labels(&["localMethod"])
     .trigger_character(".")
     .check(expect![[r#"
-        label        kind    detail           edit       text
-        localMethod  Method  Foo.localMethod  2:29-2:34  localMethod();$0"#]]);
+        label        kind    detail  edit       text
+        localMethod  Method  (self)  2:29-2:34  localMethod();$0"#]]);
 
     // Static and instance methods keep their receiver mode across an import boundary.
     CompletionTest::new(
@@ -1659,8 +1659,8 @@ fn handles_method_visibility_across_workspace_files() {
     .labels(&["crossStatic", "crossInstance"])
     .trigger_character(".")
     .check(expect![[r#"
-        label          kind    detail             edit       text
-        crossInstance  Method  Foo.crossInstance  1:29-1:34  crossInstance();$0"#]]);
+        label          kind    detail  edit       text
+        crossInstance  Method  (self)  1:29-1:34  crossInstance();$0"#]]);
 
     // Error-tolerant parsing still completes a method at the end of an open block.
     CompletionTest::new(
@@ -1674,16 +1674,20 @@ fn handles_method_visibility_across_workspace_files() {
     .labels(&["touch"])
     .trigger_character(".")
     .check(expect![[r#"
-        label  kind    detail     edit       text
-        touch  Method  Foo.touch  3:10-3:13  touch();$0"#]]);
+        label  kind    detail  edit       text
+        touch  Method  (self)  3:10-3:13  touch();$0"#]]);
 }
 
 #[test]
 fn excludes_declaration_names_and_internal_symbols() {
-    // A local declaration name is not treated as a reference-completion position.
-    CompletionTest::new("fun main() { val from<caret> = 10; }")
-        .labels(&["fromCell", "from"])
-        .check(expect!["<none>"]);
+    // A local declaration name produces no completion items from any provider.
+    CompletionTest::new("fun main() { val d<caret> = value; }").check(expect!["<none>"]);
+
+    // Mutable local names use the same declaration-only context.
+    CompletionTest::new("fun main() { var d<caret> = value; }").check(expect!["<none>"]);
+
+    // Names inside a destructuring declaration do not receive value or snippet completion.
+    CompletionTest::new("fun main() { val [first, sec<caret>] = pair; }").check(expect!["<none>"]);
 
     // Internal functions whose names start with double underscores stay hidden.
     CompletionTest::new(
@@ -1759,8 +1763,8 @@ fn excludes_every_declaration_name_position() {
     // Struct-field declaration names do not receive completion.
     CompletionTest::new("struct Foo { from<caret>: int }").check(expect![[r#"
         label     kind     detail  edit       text
-        private   Keyword          0:13-0:17  private 
-        readonly  Keyword          0:13-0:17  readonly "#]]);
+        private   Keyword          0:13-0:17  private\s
+        readonly  Keyword          0:13-0:17  readonly\s"#]]);
 
     // Function parameter declaration names do not receive completion.
     CompletionTest::new("fun foo(from<caret>: int) {}").check(expect!["<none>"]);

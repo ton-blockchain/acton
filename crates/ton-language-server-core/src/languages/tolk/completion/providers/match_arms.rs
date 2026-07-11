@@ -86,7 +86,8 @@ fn add_variant_completions(
 
         let snippet = format!("{variant} => {{\n\t$0\n}}");
         collector.add(
-            CompletionItem::new(&variant, CompletionItemKind::EnumMember)
+            CompletionItem::new(&variant, CompletionItemKind::Event)
+                .with_label_detail(" => {}")
                 .with_snippet_replacement(context.replacement_range, snippet),
             CompletionRank::new(CompletionCategory::ContextElement)
                 .with_prefix(&context.prefix, &variant),
@@ -97,7 +98,8 @@ fn add_variant_completions(
 fn add_else_completion(context: &TolkCompletionContext, collector: &mut CompletionCollector) {
     let snippet = "else => {\n\t$0\n}";
     collector.add(
-        CompletionItem::new("else", CompletionItemKind::Keyword)
+        CompletionItem::new("else", CompletionItemKind::Event)
+            .with_label_detail(" => {}")
             .with_snippet_replacement(context.replacement_range, snippet),
         CompletionRank::new(CompletionCategory::ContextElement)
             .with_prefix(&context.prefix, "else"),
@@ -132,7 +134,7 @@ fn collect_non_type_match_arms(
             }
         }
     }
-    for candidate in candidates.finish().items {
+    for mut candidate in candidates.finish().items {
         let insertion = candidate
             .text_edit
             .as_ref()
@@ -140,15 +142,16 @@ fn collect_non_type_match_arms(
             .or(candidate.insert_text.as_deref())
             .unwrap_or(&candidate.label);
         let snippet = format!("{insertion}$1 => {{$0}}");
-        collector.add(
-            CompletionItem::new(
-                &candidate.label,
-                candidate.kind.unwrap_or(CompletionItemKind::Value),
-            )
-            .with_snippet_replacement(context.syntax.replacement_range, snippet),
-            CompletionRank::new(CompletionCategory::ContextElement)
-                .with_prefix(&context.syntax.prefix, &candidate.label),
-        );
+        candidate.insert_text = Some(snippet.clone());
+        candidate.insert_text_format = crate::InsertTextFormat::Snippet;
+        candidate.text_edit = Some(crate::TextEdit::new(
+            context.syntax.replacement_range,
+            snippet,
+        ));
+        let rank = CompletionRank::new(CompletionCategory::ContextElement)
+            .with_prefix(&context.syntax.prefix, &candidate.label);
+
+        collector.add(candidate, rank);
     }
 }
 

@@ -12,9 +12,9 @@ fn completes_prefixed_enum_members_in_expressions() {
     )
     .labels(&["Mode.First", "Mode.Second"])
     .check(expect![[r#"
-            label        kind        detail  edit       text
-            Mode.First   EnumMember          1:24-1:27  Mode.First
-            Mode.Second  EnumMember          1:24-1:27  Mode.Second"#]]);
+        label        kind        detail   edit       text
+        Mode.First   EnumMember  of Mode  1:24-1:27  Mode.First
+        Mode.Second  EnumMember  of Mode  1:24-1:27  Mode.Second"#]]);
 }
 
 #[test]
@@ -29,9 +29,27 @@ fn completes_enum_members_after_the_enum_name() {
     .labels(&["First", "Second"])
     .trigger_character(".")
     .check(expect![[r#"
-        label   kind        detail       edit       text
-        First   EnumMember  Mode.First   1:29-1:29  First
-        Second  EnumMember  Mode.Second  1:29-1:29  Second"#]]);
+        label   kind        detail   edit       text
+        First   EnumMember  of Mode  1:29-1:29  First
+        Second  EnumMember  of Mode  1:29-1:29  Second"#]]);
+}
+
+#[test]
+fn includes_enum_member_values_and_owner_metadata() {
+    // Explicit enum values remain visible next to both qualified and unqualified
+    // completion labels.
+    CompletionTest::new(
+        "
+            enum Mode { First = 10, Second = 20 }
+            fun main() { val mode = Mode.<caret>; }
+        ",
+    )
+    .labels(&["First", "Second"])
+    .trigger_character(".")
+    .check(expect![[r#"
+        label   kind        detail          edit       text
+        First   EnumMember   = 10  of Mode  1:29-1:29  First
+        Second  EnumMember   = 20  of Mode  1:29-1:29  Second"#]]);
 }
 
 #[test]

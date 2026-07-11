@@ -76,9 +76,16 @@ pub enum InsertTextFormat {
     Snippet,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CompletionItemLabelDetails {
+    pub detail: Option<String>,
+    pub description: Option<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CompletionItem {
     pub label: String,
+    pub label_details: Option<CompletionItemLabelDetails>,
     pub kind: Option<CompletionItemKind>,
     pub detail: Option<String>,
     pub documentation: Option<String>,
@@ -96,6 +103,7 @@ impl CompletionItem {
     pub fn new(label: impl Into<String>, kind: CompletionItemKind) -> Self {
         Self {
             label: label.into(),
+            label_details: None,
             kind: Some(kind),
             detail: None,
             documentation: None,
@@ -107,6 +115,18 @@ impl CompletionItem {
             additional_text_edits: Vec::new(),
             deprecated: false,
         }
+    }
+
+    #[must_use]
+    pub fn with_label_detail(mut self, detail: impl Into<String>) -> Self {
+        self.label_details.get_or_insert_default().detail = Some(detail.into());
+        self
+    }
+
+    #[must_use]
+    pub fn with_label_description(mut self, description: impl Into<String>) -> Self {
+        self.label_details.get_or_insert_default().description = Some(description.into());
+        self
     }
 
     #[must_use]

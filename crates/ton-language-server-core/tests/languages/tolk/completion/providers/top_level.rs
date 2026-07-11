@@ -24,21 +24,21 @@ fn completes_top_level_declarations_but_not_inside_functions() {
     CompletionTest::new("<caret>")
         .labels(&labels)
         .check(expect![[r#"
-            label              kind     detail  edit     text
-            asm fun            Snippet          0:0-0:0  fun ${1:name}($2)$3 asm "$0"
-            const              Snippet          0:0-0:0  const ${1:FOO}: ${2:int} = ${3:0}$0
-            contract           Snippet          0:0-0:0  contract ${1:Name} {\n    author: "${2:}"\n    version: "${3:1.0.0}"\n    description: "${4:My TON contract}"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0
-            enum               Snippet          0:0-0:0  enum ${1:Name} {\n    $0\n}
-            fun                Snippet          0:0-0:0  fun ${1:name}($2)$3 {\n    $0\n}
-            get fun            Snippet          0:0-0:0  get fun ${1:name}($2)$3 {\n    $0\n}
-            global             Snippet          0:0-0:0  global ${1:foo}: ${2:int}$0
-            import             Snippet          0:0-0:0  import "$1"$0
-            inline fun         Snippet          0:0-0:0  @inline\nfun ${1:name}($2)$3 {\n    $0\n}
-            inline_ref fun     Snippet          0:0-0:0  @inline_ref\nfun ${1:name}($2)$3 {\n    $0\n}
-            method fun         Snippet          0:0-0:0  fun ${1:Foo}.${2:name}(${3:self}$4)$5 {\n    $0\n}
-            static method fun  Snippet          0:0-0:0  fun ${1:Foo}.${2:name}($3)$4 {\n    $0\n}
-            struct             Snippet          0:0-0:0  struct ${1:Name} {\n    $0\n}
-            type               Snippet          0:0-0:0  type ${1:Int} = ${2:int}$0"#]]);
+            label              kind     detail                  edit     text
+            asm fun            Keyword   name() asm "..."       0:0-0:0  fun ${1:name}($2)$3 asm "$0"
+            const              Keyword   FOO: <type> = <value>  0:0-0:0  const ${1:FOO}: ${2:int} = ${3:0}$0
+            contract           Keyword   Name {}                0:0-0:0  contract ${1:Name} {\n    author: "${2:}"\n    version: "${3:1.0.0}"\n    description: "${4:My TON contract}"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0
+            enum               Keyword   Name {}                0:0-0:0  enum ${1:Name} {\n    $0\n}
+            fun                Keyword   name() {}              0:0-0:0  fun ${1:name}($2)$3 {\n    $0\n}
+            get fun            Keyword   name() {}              0:0-0:0  get fun ${1:name}($2)$3 {\n    $0\n}
+            global             Keyword   foo: <type> = <value>  0:0-0:0  global ${1:foo}: ${2:int}$0
+            import             Keyword   ""                     0:0-0:0  import "$1"$0
+            inline fun         Keyword   name() {}              0:0-0:0  @inline\nfun ${1:name}($2)$3 {\n    $0\n}
+            inline_ref fun     Keyword   name() {}              0:0-0:0  @inline_ref\nfun ${1:name}($2)$3 {\n    $0\n}
+            method fun         Keyword   Foo.name(self) {}      0:0-0:0  fun ${1:Foo}.${2:name}(${3:self}$4)$5 {\n    $0\n}
+            static method fun  Keyword   Foo.name() {}          0:0-0:0  fun ${1:Foo}.${2:name}($3)$4 {\n    $0\n}
+            struct             Keyword   Name {}                0:0-0:0  struct ${1:Name} {\n    $0\n}
+            type               Keyword   Int = int              0:0-0:0  type ${1:Int} = ${2:int}$0"#]]);
 
     // Top-level templates are suppressed inside a function body.
     CompletionTest::new("fun main() { <caret> }")
@@ -58,10 +58,10 @@ fn completes_before_and_after_other_top_level_declarations() {
     )
     .labels(&["import", "struct", "fun"])
     .check(expect![[r#"
-        label   kind     detail  edit     text
-        fun     Snippet          1:0-1:0  fun ${1:name}($2)$3 {\n    $0\n}
-        import  Snippet          1:0-1:0  import "$1"$0
-        struct  Snippet          1:0-1:0  struct ${1:Name} {\n    $0\n}"#]]);
+        label   kind     detail      edit     text
+        fun     Keyword   name() {}  1:0-1:0  fun ${1:name}($2)$3 {\n    $0\n}
+        import  Keyword   ""         1:0-1:0  import "$1"$0
+        struct  Keyword   Name {}    1:0-1:0  struct ${1:Name} {\n    $0\n}"#]]);
 
     // Templates also remain available after a completed declaration.
     CompletionTest::new(
@@ -72,10 +72,10 @@ fn completes_before_and_after_other_top_level_declarations() {
     )
     .labels(&["struct", "fun", "contract"])
     .check(expect![[r#"
-        label     kind     detail  edit     text
-        contract  Snippet          1:0-1:0  contract ${1:Name} {\n    author: "${2:}"\n    version: "${3:1.0.0}"\n    description: "${4:My TON contract}"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0
-        fun       Snippet          1:0-1:0  fun ${1:name}($2)$3 {\n    $0\n}
-        struct    Snippet          1:0-1:0  struct ${1:Name} {\n    $0\n}"#]]);
+        label     kind     detail      edit     text
+        contract  Keyword   Name {}    1:0-1:0  contract ${1:Name} {\n    author: "${2:}"\n    version: "${3:1.0.0}"\n    description: "${4:My TON contract}"\n    incomingMessages: ${5:AllowedMessages}\n    storage: ${6:Storage}\n}$0
+        fun       Keyword   name() {}  1:0-1:0  fun ${1:name}($2)$3 {\n    $0\n}
+        struct    Keyword   Name {}    1:0-1:0  struct ${1:Name} {\n    $0\n}"#]]);
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn completes_test_function_template_only_in_test_files() {
         .labels(&["get fun test"])
         .check(expect![[r#"
             label         kind     detail  edit     text
-            get fun test  Snippet          0:0-0:0  get fun `test $1`() {$0}"#]]);
+            get fun test  Keyword  () {}   0:0-0:0  get fun `test $1`() {$0}"#]]);
 
     // Ordinary source files do not receive the test-only template.
     CompletionTest::new("<caret>")

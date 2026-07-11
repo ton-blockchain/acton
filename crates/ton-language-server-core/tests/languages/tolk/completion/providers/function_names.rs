@@ -7,9 +7,9 @@ fn completes_well_known_function_and_serialization_method_names() {
     CompletionTest::new("fun <caret>")
         .labels(&["main", "onInternalMessage"])
         .check(expect![[r#"
-            label              kind      detail  edit     text
-            main               Function          0:4-0:4  main() {$0}
-            onInternalMessage  Function          0:4-0:4  onInternalMessage(in: InMessage) {$0}"#]]);
+            label              kind      detail              edit     text
+            main               Function  () {}               0:4-0:4  main() {$0}
+            onInternalMessage  Function  (in: InMessage) {}  0:4-0:4  onInternalMessage(in: InMessage) {$0}"#]]);
 
     // A method name keeps the receiver and inserts the complete serialization signature.
     CompletionTest::new(
@@ -20,38 +20,38 @@ fn completes_well_known_function_and_serialization_method_names() {
     )
     .labels(&["packToBuilder", "unpackFromSlice"])
     .check(expect![[r#"
-        label            kind      detail  edit       text
-        packToBuilder    Function          1:12-1:14  packToBuilder(self, mutate b: builder) {$0}
-        unpackFromSlice  Function          1:12-1:14  unpackFromSlice(mutate s: slice): Storage {$0}"#]]);
+        label            kind      detail                         edit       text
+        packToBuilder    Function  (self, mutate b: builder)      1:12-1:14  packToBuilder(self, mutate b: builder) {$0}
+        unpackFromSlice  Function  (mutate s: slice): Storage {}  1:12-1:14  unpackFromSlice(mutate s: slice): Storage {$0}"#]]);
 
     // Existing parameters and body are preserved; only the function name is replaced.
     CompletionTest::new("fun <caret>(): int {}")
         .labels(&["main", "onInternalMessage"])
         .check(expect![[r#"
-            label              kind      detail  edit     text
-            main               Function          0:4-0:4  main
-            onInternalMessage  Function          0:4-0:4  onInternalMessage"#]]);
+            label              kind      detail           edit     text
+            main               Function  ()               0:4-0:4  main
+            onInternalMessage  Function  (in: InMessage)  0:4-0:4  onInternalMessage"#]]);
 
     // Existing method parameters and body are preserved for packToBuilder.
     CompletionTest::new("fun int.pa<caret>() {}")
         .labels(&["packToBuilder"])
         .check(expect![[r#"
-            label          kind      detail  edit      text
-            packToBuilder  Function          0:8-0:10  packToBuilder"#]]);
+            label          kind      detail                     edit      text
+            packToBuilder  Function  (self, mutate b: builder)  0:8-0:10  packToBuilder"#]]);
 
     // A missing method signature includes the receiver-dependent return type.
     CompletionTest::new("fun int.unpa<caret>")
         .labels(&["unpackFromSlice"])
         .check(expect![[r#"
-            label            kind      detail  edit      text
-            unpackFromSlice  Function          0:8-0:12  unpackFromSlice(mutate s: slice): int {$0}"#]]);
+            label            kind      detail                     edit      text
+            unpackFromSlice  Function  (mutate s: slice): int {}  0:8-0:12  unpackFromSlice(mutate s: slice): int {$0}"#]]);
 
     // An existing method signature receives only the method name.
     CompletionTest::new("fun int.unpa<caret>() {}")
         .labels(&["unpackFromSlice"])
         .check(expect![[r#"
-            label            kind      detail  edit      text
-            unpackFromSlice  Function          0:8-0:12  unpackFromSlice"#]]);
+            label            kind      detail                  edit      text
+            unpackFromSlice  Function  (mutate s: slice): int  0:8-0:12  unpackFromSlice"#]]);
 }
 
 #[test]
@@ -65,8 +65,8 @@ fn excludes_already_defined_well_known_functions() {
     )
     .labels(&["onInternalMessage", "onExternalMessage"])
     .check(expect![[r#"
-        label              kind      detail  edit     text
-        onExternalMessage  Function          1:4-1:4  onExternalMessage(inMsg: slice) {$0}"#]]);
+        label              kind      detail             edit     text
+        onExternalMessage  Function  (inMsg: slice) {}  1:4-1:4  onExternalMessage(inMsg: slice) {$0}"#]]);
 }
 
 #[test]

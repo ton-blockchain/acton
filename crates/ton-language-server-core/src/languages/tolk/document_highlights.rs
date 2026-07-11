@@ -38,23 +38,18 @@ impl TolkWorkspaceEngine {
         &self,
         document: &DocumentSnapshot,
         position: Position,
-    ) -> Vec<DocumentHighlight> {
+    ) -> Option<Vec<DocumentHighlight>> {
         let snapshot = {
             let state = self.state.read().expect("Tolk workspace lock poisoned");
             state.latest_snapshot.clone()
-        };
-        let Some(snapshot) = snapshot else {
-            return Vec::new();
-        };
-        let Some(file_id) = snapshot.find_document_file(document) else {
-            return Vec::new();
-        };
+        }?;
+
+        let file_id = snapshot.find_document_file(document)?;
         let offset = document
             .text_index()
             .position_to_offset(document.text(), position);
-        let Some(resolved) = snapshot.resolved_at(file_id, offset) else {
-            return Vec::new();
-        };
+
+        let resolved = snapshot.resolved_at(file_id, offset)?;
         let use_facts = snapshot.file_use_facts(file_id);
 
         let mut highlights = snapshot
@@ -75,6 +70,6 @@ impl TolkWorkspaceEngine {
             })
             .collect::<Vec<_>>();
         highlights.sort_by_key(|highlight| highlight.range.start);
-        highlights
+        Some(highlights)
     }
 }

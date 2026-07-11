@@ -12,8 +12,8 @@ fn completes_wallet_names_only_in_scripts_wallet_first_argument() {
         .manifest(manifest)
         .labels(&["deployer"])
         .check(expect![[r#"
-            label     kind   detail  edit       text
-            deployer  Value          0:29-0:32  deployer"#]]);
+            label     kind   detail    edit       text
+            deployer  Value   (local)  0:29-0:32  deployer"#]]);
 
     // An unqualified wallet call is not treated as the Acton helper.
     CompletionTest::new(r#"fun main() { wallet("dep<caret>"); }"#)

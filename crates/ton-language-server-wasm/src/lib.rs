@@ -664,6 +664,8 @@ struct LspCompletionList {
 struct LspCompletionItem {
     label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    label_details: Option<LspCompletionItemLabelDetails>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     kind: Option<u8>,
     #[serde(skip_serializing_if = "Option::is_none")]
     detail: Option<String>,
@@ -682,6 +684,15 @@ struct LspCompletionItem {
     text_edit: Option<LspTextEdit>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     additional_text_edits: Vec<LspTextEdit>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LspCompletionItemLabelDetails {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    description: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -914,6 +925,12 @@ fn completion_list_to_lsp(completion: CompletionList) -> LspCompletionList {
 fn completion_item_to_lsp(item: CompletionItem) -> LspCompletionItem {
     LspCompletionItem {
         label: item.label,
+        label_details: item
+            .label_details
+            .map(|details| LspCompletionItemLabelDetails {
+                detail: details.detail,
+                description: details.description,
+            }),
         kind: item.kind.map(completion_item_kind_to_lsp),
         detail: item.detail,
         documentation: item.documentation.map(|value| LspMarkupContent {
@@ -1223,6 +1240,8 @@ mod tests {
     #[test]
     fn completion_serializes_as_lsp_json() {
         let mut item = CompletionItem::new("save", CompletionItemKind::Method)
+            .with_label_detail("(self)")
+            .with_label_description("of Storage")
             .with_detail("fun Storage.save(self)")
             .with_documentation("Saves storage.")
             .with_filter_text("save")
@@ -1245,6 +1264,10 @@ mod tests {
                 "isIncomplete": true,
                 "items": [{
                     "label": "save",
+                    "labelDetails": {
+                        "detail": "(self)",
+                        "description": "of Storage"
+                    },
                     "kind": 2,
                     "detail": "fun Storage.save(self)",
                     "documentation": {

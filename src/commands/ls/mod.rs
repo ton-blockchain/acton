@@ -9,8 +9,8 @@ pub async fn ls_cmd(
     log_file: Option<String>,
     no_log: bool,
     log_level: String,
-    stdlib_path: Option<PathBuf>,
-    profile: bool,
+    tolk_stdlib_path: Option<PathBuf>,
+    enable_profiling: bool,
 ) -> anyhow::Result<()> {
     let log_level = log_level.parse::<LogLevel>()?;
     let project_root = configured_project_root().to_path_buf();
@@ -27,9 +27,9 @@ pub async fn ls_cmd(
     };
     let config = ServerConfig {
         project_root,
-        tolk_stdlib_path: stdlib_path,
+        tolk_stdlib_path,
         logging,
-        enable_profiling: profile || cfg!(feature = "profiling"),
+        enable_profiling,
     };
 
     match (port, stdio) {

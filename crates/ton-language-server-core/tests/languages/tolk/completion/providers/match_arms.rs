@@ -17,11 +17,11 @@ fn completes_missing_union_enum_and_else_arms() {
     )
     .labels(&["Foo", "Bar", "else", "Fill all cases..."])
     .check(expect![[r#"
-        label              kind        detail  edit     text
-        Bar                EnumMember          4:8-4:8  Bar => {\n\t$0\n}
-        Fill all cases...  Snippet             4:8-4:8  Bar => {$0}\nFoo => {}\nelse => {}
-        Foo                EnumMember          4:8-4:8  Foo => {\n\t$0\n}
-        else               Keyword             4:8-4:8  else => {\n\t$0\n}"#]]);
+        label              kind     detail  edit     text
+        Bar                Event     => {}  4:8-4:8  Bar => {\n\t$0\n}
+        Fill all cases...  Snippet          4:8-4:8  Bar => {$0}\nFoo => {}\nelse => {}
+        Foo                Event     => {}  4:8-4:8  Foo => {\n\t$0\n}
+        else               Event     => {}  4:8-4:8  else => {\n\t$0\n}"#]]);
 
     // A filled enum arm is removed while the remaining enum member and else stay available.
     CompletionTest::new(
@@ -37,9 +37,9 @@ fn completes_missing_union_enum_and_else_arms() {
     )
     .labels(&["Mode.First", "Mode.Second", "else"])
     .check(expect![[r#"
-        label        kind        detail  edit     text
-        Mode.Second  EnumMember          4:8-4:8  Mode.Second => {\n\t$0\n}
-        else         Keyword             4:8-4:8  else => {\n\t$0\n}"#]]);
+        label        kind   detail  edit     text
+        Mode.Second  Event   => {}  4:8-4:8  Mode.Second => {\n\t$0\n}
+        else         Event   => {}  4:8-4:8  else => {\n\t$0\n}"#]]);
 }
 
 #[test]
@@ -61,9 +61,9 @@ fn excludes_existing_union_and_else_arms() {
     )
     .labels(&["Foo", "Bar", "Baz", "else", "Fill all cases..."])
     .check(expect![[r#"
-        label  kind        detail  edit     text
-        Baz    EnumMember          7:8-7:8  Baz => {\n\t$0\n}
-        else   Keyword             7:8-7:8  else => {\n\t$0\n}"#]]);
+        label  kind   detail  edit     text
+        Baz    Event   => {}  7:8-7:8  Baz => {\n\t$0\n}
+        else   Event   => {}  7:8-7:8  else => {\n\t$0\n}"#]]);
 
     // Once all typed and else arms exist, the provider returns no candidates.
     CompletionTest::new(
@@ -113,8 +113,8 @@ fn completes_value_and_enum_match_arms() {
     )
     .labels(&["FOO"])
     .check(expect![[r#"
-        label  kind      detail  edit      text
-        FOO    Constant          3:8-3:10  FOO$1 => {$0}"#]]);
+        label  kind      detail       edit      text
+        FOO    Constant  : int = 100  3:8-3:10  FOO$1 => {$0}"#]]);
 
     // Enum members are qualified and an already filled member is excluded.
     CompletionTest::new(
@@ -130,8 +130,8 @@ fn completes_value_and_enum_match_arms() {
     )
     .labels(&["Color.Red", "Color.Blue"])
     .check(expect![[r#"
-        label       kind        detail  edit      text
-        Color.Blue  EnumMember          4:8-4:12  Color.Blue => {\n\t$0\n}"#]]);
+        label       kind   detail  edit      text
+        Color.Blue  Event   => {}  4:8-4:12  Color.Blue => {\n\t$0\n}"#]]);
 }
 
 #[test]
