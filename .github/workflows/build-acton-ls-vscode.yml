@@ -78,6 +78,13 @@ jobs:
         working-directory: crates/ton-language-server-native/editors/code
         run: bun run test
 
+      - name: Build Acton language server
+        run: cargo build --bin acton
+
+      - name: Run Extension Host smoke tests
+        working-directory: crates/ton-language-server-native/editors/code
+        run: xvfb-run -a bun run test:e2e
+
       - name: Build extension
         working-directory: crates/ton-language-server-native/editors/code
         run: bun run build

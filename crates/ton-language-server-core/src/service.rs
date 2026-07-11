@@ -563,6 +563,9 @@ impl LanguageService {
             workspace.did_close(uri);
         }
         let removed = removed.is_some();
+        if removed {
+            self.profiler.increment("document.close");
+        }
         tracing::info!(
             target: logging::SERVICE_TARGET,
             operation = "document.close",

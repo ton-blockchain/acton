@@ -60,6 +60,8 @@ type SmokeGlobal = typeof globalThis & {
       }[]
     >
     applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
+    addSourceFile: (uri: string, text: string, languageId?: string) => Promise<void>
+    removeSourceFile: (uri: string, languageId?: string) => Promise<void>
     logs: () => Promise<string>
     profile: () => Promise<string>
     sidePanelText: () => string
@@ -79,6 +81,9 @@ type SmokeGlobal = typeof globalThis & {
 
 const codeLensProfileCount = (text: string | undefined) =>
   Number(/code_lens: count=(\d+)/.exec(text ?? "")?.[1] ?? 0)
+
+const profileCounter = (text: string | undefined, name: string) =>
+  Number(new RegExp(`^\\s*${name.replaceAll(".", "\\.")}: (\\d+)$`, "m").exec(text ?? "")?.[1] ?? 0)
 
 test("Monaco runs the local WASM language server with persisted files and logs", async ({page}) => {
   await page.addInitScript(() => {
@@ -354,4 +359,83 @@ output-format = "json"
   await expect
     .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
     .toBe("SUB\nADD")
+})
+
+test("WASM transport applies incremental edits and releases closed documents", async ({page}) => {
+  await page.addInitScript(() => localStorage.clear())
+  await page.goto("/")
+  await expect(page.locator("#status")).toHaveText(/Tolk saved locally, 0 hovers/)
+
+  const libraryUri = "file:///workspace/lib.tolk"
+  const mainSource = `import "lib"
+fun main(): int { return helper(); }
+`
+  await page.evaluate(
+    async ({uri, source}) => {
+      const smoke = (globalThis as SmokeGlobal).__tonLsSmoke
+      await smoke?.addSourceFile(uri, "fun helper(): int { return 1; }\n")
+      smoke?.setEditorText(source)
+    },
+    {uri: libraryUri, source: mainSource},
+  )
+
+  await expect
+    .poll(async () => {
+      const definitions = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(1, 27),
+      )
+      return definitions?.[0]?.uri
+    })
+    .toBe(libraryUri)
+  await expect
+    .poll(async () =>
+      profileCounter(
+        await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.profile()),
+        "document.edit",
+      ),
+    )
+    .toBeGreaterThan(0)
+
+  await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.setLanguage("tasm"))
+  await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.setLanguage("tolk"))
+  await expect
+    .poll(async () =>
+      profileCounter(
+        await page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.profile()),
+        "document.close",
+      ),
+    )
+    .toBeGreaterThan(0)
+  await expect
+    .poll(async () => {
+      const definitions = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(1, 27),
+      )
+      return definitions?.[0]?.uri
+    })
+    .toBe(libraryUri)
+
+  await page.evaluate(uri => {
+    return (globalThis as SmokeGlobal).__tonLsSmoke?.removeSourceFile(uri)
+  }, libraryUri)
+  await expect
+    .poll(async () => {
+      return page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(1, 27))
+    })
+    .toEqual([])
+
+  await page.evaluate(uri => {
+    return (globalThis as SmokeGlobal).__tonLsSmoke?.addSourceFile(
+      uri,
+      "fun helper(): int { return 2; }\n",
+    )
+  }, libraryUri)
+  await expect
+    .poll(async () => {
+      const definitions = await page.evaluate(() =>
+        (globalThis as SmokeGlobal).__tonLsSmoke?.definitionAt(1, 27),
+      )
+      return definitions?.[0]?.uri
+    })
+    .toBe(libraryUri)
 })

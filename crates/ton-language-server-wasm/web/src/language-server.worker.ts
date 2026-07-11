@@ -6,6 +6,7 @@ import {
   TextDocumentSyncKind,
   TypeDefinitionRequest,
   type InitializeResult,
+  type TextDocumentContentChangeEvent,
   type TextDocumentPositionParams,
 } from "vscode-languageserver/browser"
 import {TextDocument} from "vscode-languageserver-textdocument"
@@ -18,13 +19,21 @@ const connection = createConnection(
   new BrowserMessageReader(workerSelf),
   new BrowserMessageWriter(workerSelf),
 )
-const documents = new TextDocuments(TextDocument)
+const pendingDocumentChanges = new Map<string, readonly TextDocumentContentChangeEvent[]>()
+const documents = new TextDocuments({
+  create: TextDocument.create,
+  update(document, changes, version) {
+    pendingDocumentChanges.set(document.uri, changes)
+    return TextDocument.update(document, changes, version)
+  },
+})
 
 const LOG_LEVEL_REQUEST = "ton/setLogLevel"
 const LOGS_REQUEST = "ton/logs"
 const CLEAR_LOGS_REQUEST = "ton/clearLogs"
 const PROFILE_REQUEST = "ton/profile"
 const ADD_SOURCE_FILE_REQUEST = "ton/addSourceFile"
+const REMOVE_SOURCE_FILE_REQUEST = "ton/removeSourceFile"
 const SET_WORKSPACE_CONFIG_REQUEST = "ton/setWorkspaceConfig"
 const TOLK_TYPE_AT_POSITION_REQUEST = "tolk.getTypeAtPosition"
 const STACK_EFFECT_CODE_LENS_COMMAND = "tonls.tasm.stackEffect"
@@ -98,7 +107,7 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
           },
         },
       },
-      textDocumentSync: TextDocumentSyncKind.Full,
+      textDocumentSync: TextDocumentSyncKind.Incremental,
     },
   }
 })
@@ -115,8 +124,21 @@ documents.onDidOpen(async event => {
 })
 
 documents.onDidChangeContent(async event => {
+  const changes = pendingDocumentChanges.get(event.document.uri)
+  pendingDocumentChanges.delete(event.document.uri)
+  if (!changes) {
+    throw new Error(`textDocument/didChange did not capture edits for ${event.document.uri}`)
+  }
+
   await withLanguageServer("textDocument/didChange", server =>
-    server.changeDocument(event.document.uri, event.document.version, event.document.getText()),
+    server.editDocument(event.document.uri, event.document.version, JSON.stringify(changes)),
+  )
+})
+
+documents.onDidClose(async event => {
+  pendingDocumentChanges.delete(event.document.uri)
+  await withLanguageServer("textDocument/didClose", server =>
+    server.closeDocument(event.document.uri),
   )
 })
 
@@ -316,6 +338,15 @@ connection.onRequest(ADD_SOURCE_FILE_REQUEST, async params =>
     }
     const languageId = typeof params.languageId === "string" ? params.languageId : "tolk"
     server.addSourceFileForLanguage(languageId, String(params.uri), String(params.text))
+    return null
+  }),
+)
+
+connection.onRequest(REMOVE_SOURCE_FILE_REQUEST, async params =>
+  withLanguageServer(REMOVE_SOURCE_FILE_REQUEST, server => {
+    const value = params as Record<string, unknown>
+    const languageId = String(value.languageId ?? "tolk")
+    server.removeSourceFileForLanguage(languageId, String(value.uri))
     return null
   }),
 )

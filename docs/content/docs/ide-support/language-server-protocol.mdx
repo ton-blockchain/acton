@@ -103,13 +103,14 @@ or disassembly fails. Passing both inputs or neither input is also an error.
 The browser worker exposes additional methods for embedding the WASM server. They are host
 controls, not part of the native `acton ls` contract.
 
-| Method | Params | Result |
-| --- | --- | --- |
-| `ton/setLogLevel` | `"off"`, `"error"`, `"warn"`, `"info"`, `"debug"`, or `"trace"` | Rendered log text |
-| `ton/logs` | none | Rendered log text |
-| `ton/clearLogs` | none | Empty rendered log text |
-| `ton/addSourceFile` | `{ "uri": string, "text": string, "languageId"?: string }` | `null` |
-| `ton/setWorkspaceConfig` | `{ "languageId": string, "rootUri": string, "manifestUri"?: string, "text": string }` | `null` |
+| Method                   | Params                                                                                | Result                  |
+|--------------------------|---------------------------------------------------------------------------------------|-------------------------|
+| `ton/setLogLevel`        | `"off"`, `"error"`, `"warn"`, `"info"`, `"debug"`, or `"trace"`                       | Rendered log text       |
+| `ton/logs`               | none                                                                                  | Rendered log text       |
+| `ton/clearLogs`          | none                                                                                  | Empty rendered log text |
+| `ton/addSourceFile`      | `{ "uri": string, "text": string, "languageId"?: string }`                            | `null`                  |
+| `ton/removeSourceFile`   | `{ "uri": string, "languageId"?: string }`                                            | `null`                  |
+| `ton/setWorkspaceConfig` | `{ "languageId": string, "rootUri": string, "manifestUri"?: string, "text": string }` | `null`                  |
 
 The WASM worker also implements `ton/profile` and `tolk.getTypeAtPosition` with the response shapes
 documented above.

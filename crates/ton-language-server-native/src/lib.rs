@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::env;
 use std::fs::{self, File, OpenOptions};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
@@ -9,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tasm_core::decompile::Disassembler;
 use tasm_core::printer::FormatOptions as TasmFormatOptions;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
 use ton_language_server_core::languages::fift::FiftLanguage;
 use ton_language_server_core::languages::tasm::{STACK_EFFECT_CODE_LENS_COMMAND, TasmLanguage};
@@ -88,7 +90,7 @@ struct DisassembleResponse {
 #[derive(Clone, Debug)]
 pub struct ServerConfig {
     pub project_root: PathBuf,
-    pub tolk_stdlib_root: Option<PathBuf>,
+    pub tolk_stdlib_path: Option<PathBuf>,
     pub logging: Option<NativeLoggingConfig>,
     pub enable_profiling: bool,
 }
@@ -98,7 +100,7 @@ impl ServerConfig {
     pub fn new(project_root: impl Into<PathBuf>) -> Self {
         Self {
             project_root: project_root.into(),
-            tolk_stdlib_root: None,
+            tolk_stdlib_path: None,
             logging: None,
             enable_profiling: cfg!(feature = "profiling"),
         }
@@ -254,19 +256,7 @@ impl NativeLoggingConfig {
 
 pub async fn serve_stdio(config: ServerConfig) -> anyhow::Result<()> {
     install_logging(config.logging.as_ref())?;
-    let stdin = tokio::io::stdin();
-    let stdout = tokio::io::stdout();
-    let (service, socket) =
-        LspService::build(|client| NativeLanguageServer::new(client, config.clone()))
-            .custom_method(
-                TOLK_TYPE_AT_POSITION_REQUEST,
-                NativeLanguageServer::type_at_position,
-            )
-            .custom_method(PROFILE_REQUEST, NativeLanguageServer::profile)
-            .custom_method(DISASSEMBLE_REQUEST, NativeLanguageServer::disassemble)
-            .finish();
-    Server::new(stdin, stdout, socket).serve(service).await;
-    Ok(())
+    serve_stream(config, tokio::io::stdin(), tokio::io::stdout()).await
 }
 
 pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
@@ -280,6 +270,14 @@ pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
     );
     let (stream, _) = listener.accept().await?;
     let (reader, writer) = tokio::io::split(stream);
+    serve_stream(config, reader, writer).await
+}
+
+pub async fn serve_stream<R, W>(config: ServerConfig, reader: R, writer: W) -> anyhow::Result<()>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite,
+{
     let (service, socket) =
         LspService::build(|client| NativeLanguageServer::new(client, config.clone()))
             .custom_method(
@@ -296,64 +294,53 @@ pub async fn serve_tcp(config: ServerConfig, port: u16) -> anyhow::Result<()> {
 pub struct NativeLanguageServer {
     client: Client,
     service: Mutex<LanguageService>,
-    project_root: PathBuf,
-    root_uri: DocumentUri,
-    manifest_uri: Option<DocumentUri>,
-    tolk_stdlib_root_uri: Option<DocumentUri>,
+    fallback_project_root: PathBuf,
+    tolk_stdlib_path: Option<PathBuf>,
+    workspace: Mutex<Option<NativeWorkspace>>,
+    startup_warnings: Mutex<Vec<String>>,
     documents: Mutex<HashMap<String, OpenDocument>>,
     settings: Mutex<NativeSettings>,
+}
+
+#[derive(Clone, Debug)]
+struct NativeWorkspace {
+    project_root: PathBuf,
+    root_uri: DocumentUri,
+    manifest_uri: DocumentUri,
+    tolk_stdlib_root: Option<PathBuf>,
+    tolk_stdlib_root_uri: Option<DocumentUri>,
+}
+
+impl NativeWorkspace {
+    fn new(project_root: PathBuf, tolk_stdlib_path: Option<PathBuf>) -> anyhow::Result<Self> {
+        let project_root = absolute_project_root(project_root);
+        let root_uri = DocumentUri::from(file_uri_string(&project_root));
+        let manifest_uri = DocumentUri::from(file_uri_string(&project_root.join("Acton.toml")));
+        let tolk_stdlib_root = resolve_tolk_stdlib_root(&project_root, tolk_stdlib_path)?;
+        let tolk_stdlib_root_uri = tolk_stdlib_root
+            .as_ref()
+            .map(|path| DocumentUri::from(file_uri_string(path)));
+
+        Ok(Self {
+            project_root,
+            root_uri,
+            manifest_uri,
+            tolk_stdlib_root,
+            tolk_stdlib_root_uri,
+        })
+    }
 }
 
 impl NativeLanguageServer {
     #[must_use]
     pub fn new(client: Client, config: ServerConfig) -> Self {
-        let project_root = canonicalize_project_root(config.project_root);
-        let root_uri = DocumentUri::from(file_uri_string(&project_root));
-        let manifest_path = project_root.join("Acton.toml");
-        let manifest_uri = Some(DocumentUri::from(file_uri_string(&manifest_path)));
-        let tolk_stdlib_root = config.tolk_stdlib_root.map(canonicalize_project_root);
-        let tolk_stdlib_root_uri = tolk_stdlib_root
-            .as_ref()
-            .map(|path| DocumentUri::from(file_uri_string(path)));
-        let mut service = native_language_service(config.enable_profiling);
-
-        if let Err(error) = apply_initial_workspace_config(
-            &mut service,
-            &root_uri,
-            manifest_uri.as_ref(),
-            tolk_stdlib_root_uri.as_ref(),
-        ) {
-            tracing::warn!(
-                target: "ton_language_server_native",
-                operation = "workspace.config.init",
-                error = %error,
-                "failed to apply initial Acton.toml"
-            );
-        }
-        if let Err(error) =
-            prime_workspace_sources(&mut service, &project_root, tolk_stdlib_root.as_deref())
-        {
-            let tolk_stdlib_root_log = tolk_stdlib_root
-                .as_deref()
-                .map(|path| path.to_string_lossy().to_string())
-                .unwrap_or_default();
-            tracing::warn!(
-                target: "ton_language_server_native",
-                operation = "workspace.scan",
-                project_root = project_root.to_string_lossy().as_ref(),
-                tolk_stdlib_root = tolk_stdlib_root_log.as_str(),
-                error = %error,
-                "failed to scan workspace sources"
-            );
-        }
-
         Self {
             client,
-            service: Mutex::new(service),
-            project_root,
-            root_uri,
-            manifest_uri,
-            tolk_stdlib_root_uri,
+            service: Mutex::new(native_language_service(config.enable_profiling)),
+            fallback_project_root: absolute_project_root(config.project_root),
+            tolk_stdlib_path: config.tolk_stdlib_path,
+            workspace: Mutex::new(None),
+            startup_warnings: Mutex::new(Vec::new()),
             documents: Mutex::new(HashMap::new()),
             settings: Mutex::new(NativeSettings::default()),
         }
@@ -381,6 +368,75 @@ impl NativeLanguageServer {
             .lock()
             .map_err(|_| anyhow::anyhow!("language service lock poisoned"))?;
         f(&mut service)
+    }
+
+    fn workspace(&self) -> anyhow::Result<NativeWorkspace> {
+        self.workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))?
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("language server workspace is not initialized"))
+    }
+
+    fn initialize_workspace(&self, params: &lsp::InitializeParams) -> anyhow::Result<()> {
+        if self
+            .workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))?
+            .is_some()
+        {
+            anyhow::bail!("language server workspace is already initialized");
+        }
+
+        let project_root = project_root_from_initialize(params, &self.fallback_project_root)?;
+        let workspace = NativeWorkspace::new(project_root, self.tolk_stdlib_path.clone())?;
+
+        self.with_service(|service| {
+            if let Err(error) = apply_initial_workspace_config(
+                service,
+                &workspace.root_uri,
+                Some(&workspace.manifest_uri),
+                workspace.tolk_stdlib_root_uri.as_ref(),
+            ) {
+                self.record_startup_warning("workspace.config.init", error);
+            }
+
+            let scan = prime_workspace_sources(
+                service,
+                &workspace.project_root,
+                workspace.tolk_stdlib_root.as_deref(),
+            );
+            if scan.failed > 0 {
+                self.record_startup_warning(
+                    "workspace.scan",
+                    format!(
+                        "indexed {} Tolk source files and skipped {} files or directories",
+                        scan.indexed, scan.failed
+                    ),
+                );
+            }
+            Ok(())
+        })?;
+
+        *self
+            .workspace
+            .lock()
+            .map_err(|_| anyhow::anyhow!("language server workspace lock poisoned"))? =
+            Some(workspace);
+        Ok(())
+    }
+
+    fn record_startup_warning(&self, operation: &'static str, error: impl ToString) {
+        let message = format!("{operation}: {}", error.to_string());
+        tracing::warn!(
+            target: "ton_language_server_native",
+            operation,
+            error = %message,
+            "language server startup operation failed"
+        );
+        if let Ok(mut warnings) = self.startup_warnings.lock() {
+            warnings.push(message);
+        }
     }
 
     fn settings(&self) -> anyhow::Result<NativeSettings> {
@@ -441,13 +497,16 @@ impl NativeLanguageServer {
     }
 
     fn apply_workspace_config_text(&self, text: String) -> anyhow::Result<()> {
-        let root_uri = self.root_uri.clone();
-        let manifest_uri = self.manifest_uri.clone();
-        let tolk_stdlib_root_uri = self.tolk_stdlib_root_uri.clone();
+        let workspace = self.workspace()?;
         self.with_service(|service| {
             service.set_workspace_config(
                 LanguageId::from(TOLK_LANGUAGE_ID),
-                workspace_config(root_uri, manifest_uri, tolk_stdlib_root_uri, text),
+                workspace_config(
+                    workspace.root_uri,
+                    Some(workspace.manifest_uri),
+                    workspace.tolk_stdlib_root_uri,
+                    text,
+                ),
             )
         })
     }
@@ -504,8 +563,10 @@ impl NativeLanguageServer {
 impl LanguageServer for NativeLanguageServer {
     async fn initialize(
         &self,
-        _params: lsp::InitializeParams,
+        params: lsp::InitializeParams,
     ) -> jsonrpc::Result<lsp::InitializeResult> {
+        self.initialize_workspace(&params).map_err(rpc_error)?;
+
         Ok(lsp::InitializeResult {
             capabilities: lsp::ServerCapabilities {
                 position_encoding: Some(lsp::PositionEncodingKind::UTF16),
@@ -596,15 +657,30 @@ impl LanguageServer for NativeLanguageServer {
     }
 
     async fn initialized(&self, _: lsp::InitializedParams) {
+        let project_root = self.workspace().map_or_else(
+            |_| self.fallback_project_root.clone(),
+            |workspace| workspace.project_root,
+        );
         self.client
             .log_message(
                 lsp::MessageType::INFO,
                 format!(
                     "Acton language server started for {}",
-                    self.project_root.display()
+                    project_root.display()
                 ),
             )
             .await;
+
+        let warnings = self
+            .startup_warnings
+            .lock()
+            .map(|mut warnings| std::mem::take(&mut *warnings))
+            .unwrap_or_default();
+        for warning in warnings {
+            self.client
+                .log_message(lsp::MessageType::WARNING, warning)
+                .await;
+        }
     }
 
     async fn did_change_configuration(&self, params: lsp::DidChangeConfigurationParams) {
@@ -800,7 +876,8 @@ impl LanguageServer for NativeLanguageServer {
             && self.settings().map_err(rpc_error)?.tolk.find_usages.scope
                 == FindUsagesScope::Workspace
         {
-            locations.retain(|location| location_is_in_root(location, &self.project_root));
+            let project_root = self.workspace().map_err(rpc_error)?.project_root;
+            locations.retain(|location| location_is_in_root(location, &project_root));
         }
         Ok(Some(locations.iter().filter_map(location_to_lsp).collect()))
     }
@@ -1241,61 +1318,103 @@ fn prime_workspace_sources(
     service: &mut LanguageService,
     project_root: &Path,
     tolk_stdlib_root: Option<&Path>,
-) -> anyhow::Result<()> {
+) -> SourceScanReport {
+    let mut report = SourceScanReport::default();
     if let Some(tolk_stdlib_root) = tolk_stdlib_root {
-        prime_tolk_sources(service, tolk_stdlib_root, &[])?;
+        prime_tolk_sources(service, tolk_stdlib_root, &[], &mut report);
     }
 
     let excluded_roots = tolk_stdlib_root
         .into_iter()
         .map(Path::to_path_buf)
         .collect::<Vec<_>>();
-    prime_tolk_sources(service, project_root, &excluded_roots)
+    prime_tolk_sources(service, project_root, &excluded_roots, &mut report);
+    report
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+struct SourceScanReport {
+    indexed: usize,
+    failed: usize,
 }
 
 fn prime_tolk_sources(
     service: &mut LanguageService,
     root: &Path,
     excluded_roots: &[PathBuf],
-) -> anyhow::Result<()> {
-    visit_tolk_sources(root, root, excluded_roots, &mut |path| {
+    report: &mut SourceScanReport,
+) {
+    visit_tolk_sources(root, root, excluded_roots, report, &mut |path| {
         let text = fs::read_to_string(path)?;
         service.add_source_file(
             LanguageId::from(TOLK_LANGUAGE_ID),
             DocumentUri::from(file_uri_string(path)),
             text,
         )
-    })?;
-    Ok(())
+    });
 }
 
 fn visit_tolk_sources(
     root: &Path,
     dir: &Path,
     excluded_roots: &[PathBuf],
+    report: &mut SourceScanReport,
     visit: &mut impl FnMut(&Path) -> anyhow::Result<()>,
-) -> anyhow::Result<()> {
+) {
     let entries = match fs::read_dir(dir) {
         Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error.into()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+        Err(error) => {
+            report.failed += 1;
+            log_source_scan_error(dir, &error);
+            return;
+        }
     };
 
     for entry in entries {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                report.failed += 1;
+                log_source_scan_error(dir, &error);
+                continue;
+            }
+        };
         let path = entry.path();
+        let file_type = match entry.file_type() {
+            Ok(file_type) => file_type,
+            Err(error) => {
+                report.failed += 1;
+                log_source_scan_error(&path, &error);
+                continue;
+            }
+        };
         if file_type.is_dir() {
             if !is_excluded_workspace_dir(root, &path)
                 && !is_excluded_source_root(&path, excluded_roots)
             {
-                visit_tolk_sources(root, &path, excluded_roots, visit)?;
+                visit_tolk_sources(root, &path, excluded_roots, report, visit);
             }
         } else if file_type.is_file() && is_tolk_path(&path) {
-            visit(&path)?;
+            match visit(&path) {
+                Ok(()) => report.indexed += 1,
+                Err(error) => {
+                    report.failed += 1;
+                    log_source_scan_error(&path, &error);
+                }
+            }
         }
     }
-    Ok(())
+}
+
+fn log_source_scan_error(path: &Path, error: &impl std::fmt::Display) {
+    tracing::warn!(
+        target: "ton_language_server_native",
+        operation = "workspace.source.index",
+        path = path.to_string_lossy().as_ref(),
+        error = %error,
+        "failed to index Tolk source; continuing workspace scan"
+    );
 }
 
 fn workspace_config(
@@ -1871,8 +1990,103 @@ fn is_excluded_source_root(path: &Path, excluded_roots: &[PathBuf]) -> bool {
         .any(|root| path == root || path.starts_with(root))
 }
 
-fn canonicalize_project_root(project_root: PathBuf) -> PathBuf {
-    dunce::canonicalize(&project_root).unwrap_or(project_root)
+fn project_root_from_initialize(
+    params: &lsp::InitializeParams,
+    fallback: &Path,
+) -> anyhow::Result<PathBuf> {
+    let root_uri = params.root_uri.as_ref().or_else(|| {
+        params
+            .workspace_folders
+            .as_ref()
+            .and_then(|folders| folders.first())
+            .map(|folder| &folder.uri)
+    });
+    if let Some(root_uri) = root_uri {
+        return root_uri
+            .to_file_path()
+            .map(absolute_project_root)
+            .map_err(|()| anyhow::anyhow!("workspace root is not a file URI: {root_uri}"));
+    }
+    #[allow(deprecated)]
+    if let Some(root_path) = params.root_path.as_ref() {
+        return Ok(absolute_project_root(PathBuf::from(root_path)));
+    }
+
+    Ok(absolute_project_root(fallback.to_path_buf()))
+}
+
+pub fn resolve_tolk_stdlib_root(
+    project_root: &Path,
+    stdlib_path: Option<PathBuf>,
+) -> anyhow::Result<Option<PathBuf>> {
+    if let Some(path) = stdlib_path {
+        if !path.is_dir() {
+            anyhow::bail!("Tolk stdlib path is not a directory: {}", path.display());
+        }
+        return Ok(Some(absolute_project_root(path)));
+    }
+
+    let candidates = default_tolk_stdlib_candidates(project_root);
+    if let Some(path) = candidates.iter().find(|path| path.is_dir()) {
+        return Ok(Some(absolute_project_root(path.clone())));
+    }
+
+    Ok(None)
+}
+
+fn default_tolk_stdlib_candidates(project_root: &Path) -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Some(path) = path_from_env("TEST_TOLK_STDLIB_PATH") {
+        candidates.push(path);
+    }
+    candidates.extend([
+        project_root.join(".acton").join("tolk-stdlib"),
+        project_root
+            .join("node_modules")
+            .join("@ton")
+            .join("tolk-js")
+            .join("dist")
+            .join("tolk-stdlib"),
+        project_root.join("stdlib"),
+        project_root.join("tolk-stdlib"),
+    ]);
+    if let Some(path) = path_from_env("TOLK_STDLIB") {
+        candidates.push(path);
+    }
+    candidates.extend(platform_tolk_stdlib_candidates());
+    candidates
+}
+
+fn path_from_env(name: &str) -> Option<PathBuf> {
+    let value = env::var_os(name)?;
+    (!value.is_empty()).then_some(PathBuf::from(value))
+}
+
+fn platform_tolk_stdlib_candidates() -> Vec<PathBuf> {
+    if cfg!(target_os = "linux") {
+        vec![PathBuf::from("/usr/share/ton/smartcont/tolk-stdlib")]
+    } else if cfg!(target_os = "macos") {
+        vec![
+            PathBuf::from("/opt/homebrew/share/ton/ton/smartcont/tolk-stdlib"),
+            PathBuf::from("/usr/local/share/ton/ton/smartcont/tolk-stdlib"),
+        ]
+    } else if cfg!(target_os = "windows") {
+        vec![PathBuf::from(
+            "C:\\ProgramData\\chocolatey\\lib\\ton\\smartcont\\tolk-stdlib",
+        )]
+    } else {
+        Vec::new()
+    }
+}
+
+fn absolute_project_root(project_root: PathBuf) -> PathBuf {
+    if project_root.is_absolute() {
+        project_root
+    } else {
+        env::current_dir()
+            .map(|current_dir| current_dir.join(&project_root))
+            .unwrap_or(project_root)
+    }
 }
 
 fn file_uri_string(path: &Path) -> String {
@@ -2183,7 +2397,8 @@ mod tests {
         fs::write(&main_path, main_source)?;
 
         let mut service = native_language_service(false);
-        prime_workspace_sources(&mut service, dir.path(), None)?;
+        let report = prime_workspace_sources(&mut service, dir.path(), None);
+        assert_eq!(report.failed, 0);
         let main_uri = DocumentUri::from(file_uri_string(&main_path));
         service.open_document(
             main_uri.clone(),
@@ -2224,7 +2439,8 @@ mod tests {
             LanguageId::from(TOLK_LANGUAGE_ID),
             workspace_config(root_uri, None, Some(stdlib_uri), ""),
         )?;
-        prime_workspace_sources(&mut service, dir.path(), Some(&stdlib_dir))?;
+        let report = prime_workspace_sources(&mut service, dir.path(), Some(&stdlib_dir));
+        assert_eq!(report.failed, 0);
         let main_uri = DocumentUri::from(file_uri_string(&main_path));
         service.open_document(
             main_uri.clone(),
@@ -2280,14 +2496,16 @@ mod tests {
         )?;
 
         let mut visited = Vec::new();
-        visit_tolk_sources(dir.path(), dir.path(), &[], &mut |path| {
+        let mut report = SourceScanReport::default();
+        visit_tolk_sources(dir.path(), dir.path(), &[], &mut report, &mut |path| {
             visited.push(
                 path.strip_prefix(dir.path())
                     .expect("visited path is inside workspace")
                     .to_path_buf(),
             );
             Ok(())
-        })?;
+        });
+        assert_eq!(report.failed, 0);
         visited.sort();
 
         assert_eq!(

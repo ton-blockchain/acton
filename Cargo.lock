@@ -5417,6 +5417,7 @@ version = "1.1.0"
 dependencies = [
  "anyhow",
  "dunce",
+ "expect-test",
  "hex",
  "serde",
  "serde_json",

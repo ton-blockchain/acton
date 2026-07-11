@@ -106,6 +106,8 @@ type SmokeApi = {
   actonTomlCompletionAt: (line: number, character: number) => Promise<PlainCompletionItem[]>
   actonTomlHoverAt: (line: number, character: number) => Promise<PlainHover[]>
   applyCompletionAt: (line: number, character: number, label: string) => Promise<boolean>
+  addSourceFile: (uri: string, text: string, languageId?: string) => Promise<void>
+  removeSourceFile: (uri: string, languageId?: string) => Promise<void>
   logs: () => Promise<string>
   profile: () => Promise<string>
   sidePanelText: () => string
@@ -133,6 +135,8 @@ const logLevelRequest = "ton/setLogLevel"
 const logsRequest = "ton/logs"
 const clearLogsRequest = "ton/clearLogs"
 const profileRequest = "ton/profile"
+const addSourceFileRequest = "ton/addSourceFile"
+const removeSourceFileRequest = "ton/removeSourceFile"
 const setWorkspaceConfigRequest = "ton/setWorkspaceConfig"
 
 const logLevels: readonly LogLevelName[] = ["off", "error", "warn", "info", "debug", "trace"]
@@ -727,6 +731,12 @@ export function App() {
           ])
           saveCurrentFile(currentLanguageRef.current)
           return true
+        },
+        async addSourceFile(uri: string, text: string, languageId = TOLK_LANGUAGE_ID) {
+          await sendRequest<null>(addSourceFileRequest, {uri, text, languageId})
+        },
+        async removeSourceFile(uri: string, languageId = TOLK_LANGUAGE_ID) {
+          await sendRequest<null>(removeSourceFileRequest, {uri, languageId})
         },
         async logs() {
           return sendRequest<string>(logsRequest)

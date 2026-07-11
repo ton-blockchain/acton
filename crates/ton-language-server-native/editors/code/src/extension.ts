@@ -110,7 +110,7 @@ function registerLanguageServerLifecycle(context: vscode.ExtensionContext): void
     vscode.commands.registerCommand("ton.restartLanguageServer", async () => {
       try {
         await restartLanguageServer(context)
-        await vscode.window.showInformationMessage("Acton language server restarted.")
+        void vscode.window.showInformationMessage("Acton language server restarted.")
       } catch (error) {
         consoleError("Failed to restart Acton language server", error)
         const message = error instanceof Error ? error.message : String(error)

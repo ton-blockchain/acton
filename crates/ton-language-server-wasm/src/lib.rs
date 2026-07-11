@@ -15,9 +15,29 @@ use ton_language_server_core::{
     FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
     Location, LogLevel, Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
     SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation,
-    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
+    TextEdit, TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DocumentChange {
+    range: Option<DocumentChangeRange>,
+    text: String,
+}
+
+#[derive(Deserialize)]
+struct DocumentChangeRange {
+    start: DocumentChangePosition,
+    end: DocumentChangePosition,
+}
+
+#[derive(Deserialize)]
+struct DocumentChangePosition {
+    line: u32,
+    character: u32,
+}
 
 #[wasm_bindgen]
 pub struct TonLanguageServer {
@@ -59,6 +79,24 @@ impl TonLanguageServer {
             .try_borrow_mut()
             .map_err(|_| language_server_busy())?
             .add_source_file(LanguageId::from(language_id), DocumentUri::from(uri), text)
+            .map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = removeSourceFile)]
+    pub fn remove_source_file(&self, uri: String) -> Result<(), JsValue> {
+        self.remove_source_file_for_language("tolk".to_owned(), uri)
+    }
+
+    #[wasm_bindgen(js_name = removeSourceFileForLanguage)]
+    pub fn remove_source_file_for_language(
+        &self,
+        language_id: String,
+        uri: String,
+    ) -> Result<(), JsValue> {
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .remove_source_file(LanguageId::from(language_id), &DocumentUri::from(uri))
             .map_err(js_error)
     }
 
@@ -171,6 +209,54 @@ impl TonLanguageServer {
             .map_err(|_| language_server_busy())?
             .change_document(&DocumentUri::from(uri), version, text)
             .map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = editDocument)]
+    pub fn edit_document(
+        &self,
+        uri: String,
+        version: i32,
+        changes_json: String,
+    ) -> Result<(), JsValue> {
+        let changes =
+            serde_json::from_str::<Vec<DocumentChange>>(&changes_json).map_err(js_error)?;
+        let mut service = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?;
+        let uri = DocumentUri::from(uri);
+
+        if let [DocumentChange { range: None, text }] = changes.as_slice() {
+            return service
+                .change_document(&uri, version, text.clone())
+                .map_err(js_error);
+        }
+
+        let mut edits = Vec::with_capacity(changes.len());
+        for change in changes {
+            let range = change.range.ok_or_else(|| {
+                js_error("full-text changes cannot be mixed with incremental changes")
+            })?;
+            edits.push(TextEdit::new(
+                Range::new(
+                    Position::new(range.start.line, range.start.character),
+                    Position::new(range.end.line, range.end.character),
+                ),
+                change.text,
+            ));
+        }
+        service
+            .edit_document(&uri, version, edits)
+            .map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = closeDocument)]
+    pub fn close_document(&self, uri: String) -> Result<(), JsValue> {
+        self.service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .close_document(&DocumentUri::from(uri));
+        Ok(())
     }
 
     #[wasm_bindgen(js_name = definition)]
@@ -1055,7 +1141,7 @@ fn file_renames_from_json(files_json: &str) -> Result<Vec<FileRename>, JsValue> 
         })
 }
 
-fn text_edit_to_lsp(edit: ton_language_server_core::TextEdit) -> LspTextEdit {
+fn text_edit_to_lsp(edit: TextEdit) -> LspTextEdit {
     LspTextEdit {
         range: range_to_lsp(edit.range),
         new_text: edit.new_text,

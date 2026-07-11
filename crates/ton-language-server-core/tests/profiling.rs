@@ -104,11 +104,13 @@ fn records_document_lifecycle_counters() -> anyhow::Result<()> {
     )?;
     service.change_document(&uri, 2, "foo$0 a:# = New;\nbar$1 x:New = Wrap;\n")?;
     service.edit_document(&uri, 3, [TextEdit::new(range(1, 8, 1, 11), "Box")])?;
+    service.close_document(&uri);
 
     let summary = service.profiler().summary();
     assert_eq!(counter(summary, "document.open"), 1);
     assert_eq!(counter(summary, "document.change"), 1);
     assert_eq!(counter(summary, "document.edit"), 1);
+    assert_eq!(counter(summary, "document.close"), 1);
     assert_eq!(event_count(summary, "tlb.parse"), 3);
     assert_eq!(event_count(summary, "tlb.index"), 3);
 
