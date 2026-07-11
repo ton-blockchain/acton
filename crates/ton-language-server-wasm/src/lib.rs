@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use std::fmt::Write as _;
 #[cfg(feature = "fift")]
 use ton_language_server_core::languages::fift::FiftLanguage;
 #[cfg(feature = "tasm")]
@@ -14,10 +13,9 @@ use ton_language_server_core::{
     CompletionList, CompletionTrigger, CompletionTriggerKind, DocumentHighlight,
     DocumentHighlightKind, DocumentSymbol, DocumentSymbolKind, DocumentUri, FileRename,
     FoldingRange, Hover, InlayHint, InlayHintKind, InsertTextFormat, LanguageId, LanguageService,
-    Location, LogLevel, Position, PrepareRename, ProfileSummary, Range,
-    SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens,
-    SignatureHelp, SignatureInformation, TypeAtPosition, WorkspaceConfig, WorkspaceEdit,
-    WorkspaceSymbol,
+    Location, LogLevel, Position, PrepareRename, Range, SEMANTIC_TOKEN_MODIFIER_NAMES,
+    SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokens, SignatureHelp, SignatureInformation,
+    TypeAtPosition, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol, render_profile_summary,
 };
 use wasm_bindgen::prelude::*;
 
@@ -121,6 +119,19 @@ impl TonLanguageServer {
             .summary()
             .clone();
         Ok(render_profile_summary(&summary))
+    }
+
+    #[wasm_bindgen(js_name = profileReport)]
+    pub fn profile_report(&self) -> Result<JsValue, JsValue> {
+        let report = self
+            .service
+            .try_borrow()
+            .map_err(|_| language_server_busy())?
+            .profiler()
+            .report();
+        report
+            .serialize(&serde_wasm_bindgen::Serializer::json_compatible())
+            .map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = semanticTokenTypes)]
@@ -318,6 +329,43 @@ impl TonLanguageServer {
             )
             .map_err(js_error)?;
         serde_wasm_bindgen::to_value(&inlay_hints_to_lsp(hints)).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = formatDocument)]
+    pub fn format_document(&self, uri: String) -> Result<JsValue, JsValue> {
+        let edits = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .formatting(&DocumentUri::from(uri), None)
+            .map_err(js_error)?;
+        let edits = edits.into_iter().map(text_edit_to_lsp).collect::<Vec<_>>();
+        serde_wasm_bindgen::to_value(&edits).map_err(js_error)
+    }
+
+    #[wasm_bindgen(js_name = formatRange)]
+    pub fn format_range(
+        &self,
+        uri: String,
+        start_line: u32,
+        start_character: u32,
+        end_line: u32,
+        end_character: u32,
+    ) -> Result<JsValue, JsValue> {
+        let edits = self
+            .service
+            .try_borrow_mut()
+            .map_err(|_| language_server_busy())?
+            .formatting(
+                &DocumentUri::from(uri),
+                Some(Range::new(
+                    Position::new(start_line, start_character),
+                    Position::new(end_line, end_character),
+                )),
+            )
+            .map_err(js_error)?;
+        let edits = edits.into_iter().map(text_edit_to_lsp).collect::<Vec<_>>();
+        serde_wasm_bindgen::to_value(&edits).map_err(js_error)
     }
 
     #[wasm_bindgen(js_name = codeLens)]
@@ -1079,55 +1127,6 @@ fn js_error(error: impl ToString) -> JsValue {
 
 fn language_server_busy() -> JsValue {
     JsValue::from_str("language server is busy")
-}
-
-fn render_profile_summary(summary: &ProfileSummary) -> String {
-    if summary.events.is_empty() && summary.counters.is_empty() {
-        return "No profiling data".to_owned();
-    }
-
-    let mut output = String::new();
-    if !summary.counters.is_empty() {
-        output.push_str("Counters\n");
-        for (name, count) in &summary.counters {
-            output.push_str("  ");
-            output.push_str(name);
-            output.push_str(": ");
-            output.push_str(&count.to_string());
-            output.push('\n');
-        }
-    }
-
-    if !summary.events.is_empty() {
-        if !output.is_empty() {
-            output.push('\n');
-        }
-        output.push_str("Spans\n");
-        let mut spans = std::collections::BTreeMap::<&'static str, (usize, f64)>::new();
-        for event in &summary.events {
-            let entry = spans.entry(event.name).or_default();
-            entry.0 += 1;
-            entry.1 += event.elapsed.as_secs_f64() * 1000.0;
-        }
-        for (name, (count, total_ms)) in spans {
-            let average_ms = total_ms / count as f64;
-            output.push_str("  ");
-            output.push_str(name);
-            output.push_str(": count=");
-            output.push_str(&count.to_string());
-            output.push_str(" total=");
-            push_ms(&mut output, total_ms);
-            output.push_str(" avg=");
-            push_ms(&mut output, average_ms);
-            output.push('\n');
-        }
-    }
-
-    output
-}
-
-fn push_ms(output: &mut String, milliseconds: f64) {
-    let _ = write!(output, "{milliseconds:.3}ms");
 }
 
 #[cfg(test)]

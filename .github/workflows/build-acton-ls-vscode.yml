@@ -6,12 +6,26 @@ on:
       - master
     paths:
       - ".github/workflows/build-acton-ls-vscode.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "src/bin/acton.rs"
+      - "src/commands/ls/**"
+      - "crates/ton-language-server-core/**"
+      - "crates/ton-language-server-native/Cargo.toml"
+      - "crates/ton-language-server-native/src/**"
       - "crates/ton-language-server-native/editors/code/**"
   push:
     branches:
       - master
     paths:
       - ".github/workflows/build-acton-ls-vscode.yml"
+      - "Cargo.lock"
+      - "Cargo.toml"
+      - "src/bin/acton.rs"
+      - "src/commands/ls/**"
+      - "crates/ton-language-server-core/**"
+      - "crates/ton-language-server-native/Cargo.toml"
+      - "crates/ton-language-server-native/src/**"
       - "crates/ton-language-server-native/editors/code/**"
   workflow_dispatch:
 
@@ -38,6 +52,12 @@ jobs:
       - name: Setup Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
 
+      - name: Cache Cargo
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+
+      - name: Install Rust
+        run: rustup toolchain install
+
       - name: Install dependencies
         working-directory: crates/ton-language-server-native/editors/code
         run: bun install --frozen-lockfile
@@ -61,3 +81,14 @@ jobs:
       - name: Build extension
         working-directory: crates/ton-language-server-native/editors/code
         run: bun run build
+
+      - name: Build VSIX
+        working-directory: crates/ton-language-server-native/editors/code
+        run: bunx vsce package --no-dependencies --out acton-language-server.vsix
+
+#      - name: Upload VSIX
+#        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+#        with:
+#          name: acton-language-server-vsix
+#          path: crates/ton-language-server-native/editors/code/acton-language-server.vsix
+#          if-no-files-found: error

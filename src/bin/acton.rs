@@ -1009,6 +1009,8 @@ enum Commands {
         stdlib_path: Option<PathBuf>,
         #[arg(long, help = "Disable logging")]
         no_log: bool,
+        #[arg(long, help = "Collect language server performance profiles")]
+        profile: bool,
     },
     #[command(
         about = "Install or update Acton CLI releases",
@@ -2566,6 +2568,7 @@ fn main() {
             log_level,
             stdlib_path,
             no_log,
+            profile,
         } => {
             let rt = tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
@@ -2578,6 +2581,7 @@ fn main() {
                 no_log,
                 log_level,
                 stdlib_path,
+                profile,
             ))
         }
         Commands::InternalRegisterContract { path, id } => internal_register_contract(&path, id),

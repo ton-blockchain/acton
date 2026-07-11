@@ -21,6 +21,7 @@ tolk = [
     "dep:include_dir",
     "dep:rustc-hash",
     "dep:tolk-analysis",
+    "dep:tolk-fmt",
     "dep:tolk-resolver",
     "dep:tolk-syntax",
     "dep:tolk-ty",
@@ -38,6 +39,7 @@ tasm-syntax = { workspace = true, optional = true }
 tlb-syntax = { workspace = true, optional = true }
 tolk-resolver = { workspace = true, optional = true }
 tolk-analysis = { workspace = true, optional = true }
+tolk-fmt = { workspace = true, optional = true }
 tolk-syntax = { workspace = true, optional = true }
 tolk-ty = { workspace = true, optional = true }
 toml = { workspace = true, optional = true }
@@ -244,6 +246,11 @@ required-features = ["tolk"]
 [[test]]
 name = "tolk_inlay_hints"
 path = "tests/languages/tolk/inlay_hints.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_formatting"
+path = "tests/languages/tolk/formatting.rs"
 required-features = ["tolk"]
 
 [[test]]

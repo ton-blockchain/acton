@@ -11,6 +11,7 @@ pub async fn ls_cmd(
     no_log: bool,
     log_level: String,
     stdlib_path: Option<PathBuf>,
+    profile: bool,
 ) -> anyhow::Result<()> {
     let log_level = log_level.parse::<LogLevel>()?;
     let project_root = configured_project_root().to_path_buf();
@@ -30,7 +31,7 @@ pub async fn ls_cmd(
         project_root,
         tolk_stdlib_root,
         logging,
-        enable_profiling: cfg!(feature = "profiling"),
+        enable_profiling: profile || cfg!(feature = "profiling"),
     };
 
     match (port, stdio) {

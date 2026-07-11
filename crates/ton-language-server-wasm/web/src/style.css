@@ -68,6 +68,12 @@ select {
   background: #20242d;
 }
 
+.toolbar-button:disabled {
+  color: #697181;
+  cursor: default;
+  opacity: 0.65;
+}
+
 select:focus-visible,
 input[type="checkbox"]:focus-visible,
 .toolbar-button:focus-visible {

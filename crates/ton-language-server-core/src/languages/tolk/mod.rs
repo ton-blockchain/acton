@@ -1,15 +1,16 @@
 use self::incremental_analysis::{DeclarationChanges, collect_declaration_stamps, imports_changed};
 use crate::language::{
     CodeActionRequest, CompletionRequest, DefinitionRequest, DocumentHighlightRequest,
-    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, HoverRequest,
-    InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PrepareRenameRequest,
-    ReferenceRequest, RenameRequest, SemanticTokensRequest, SignatureHelpRequest,
-    TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage, WorkspaceSymbolRequest,
+    DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, FormattingRequest,
+    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument,
+    PrepareRenameRequest, ReferenceRequest, RenameRequest, SemanticTokensRequest,
+    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
+    WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::types::{normalize_logical_path, normalize_path};
 use crate::{
-    DocumentSnapshot, DocumentUri, LanguageId, Location, Profiler, Range, TextIndex,
+    DocumentSnapshot, DocumentUri, LanguageId, Location, Profiler, Range, TextEdit, TextIndex,
     WorkspaceConfig,
 };
 use anyhow::Context;
@@ -52,6 +53,22 @@ const TOLK_STDLIB_PATH: &str = "/__tolk_stdlib__";
 
 static TOLK_STDLIB_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/../tolk-compiler/assets/tolk-stdlib");
+
+/// Returns normalized filesystem roots referenced by `import-mappings` in an Acton manifest.
+pub fn import_mapping_roots(
+    project_root: &Path,
+    manifest_text: &str,
+) -> anyhow::Result<Vec<PathBuf>> {
+    let manifest = toml::from_str::<ActonManifest>(manifest_text)
+        .context("failed to parse Acton.toml import mappings")?;
+    let mappings = normalize_import_mappings(manifest.import_mappings, project_root);
+
+    Ok(mappings
+        .into_iter()
+        .flatten()
+        .map(|(_, path)| PathBuf::from(path))
+        .collect())
+}
 
 #[derive(Clone, Debug)]
 pub struct TolkLanguage {
@@ -110,6 +127,7 @@ impl LanguagePlugin for TolkLanguage {
             code_actions: true,
             file_rename: true,
             type_at_position: true,
+            formatting: true,
             ..FeatureSet::default()
         }
     }
@@ -523,6 +541,25 @@ impl LanguagePlugin for TolkLanguage {
             .finish("tolk.type_at_position", started_at);
         Ok(result)
     }
+
+    fn formatting(&self, request: FormattingRequest<'_>) -> anyhow::Result<Vec<TextEdit>> {
+        let _parsed = request
+            .context
+            .parsed
+            .as_any()
+            .downcast_ref::<TolkParsedDocument>()
+            .context("Tolk parsed document has an unexpected type")?;
+
+        let started_at = request.context.profiler.start();
+        let edits = self
+            .engine
+            .formatting(request.context.document, request.range)?;
+        request
+            .context
+            .profiler
+            .finish("tolk.formatting", started_at);
+        Ok(edits)
+    }
 }
 
 impl WorkspaceLanguage for TolkLanguage {
@@ -634,10 +671,59 @@ impl TolkWorkspaceEngine {
         if state.project_config == project_config {
             return Ok(());
         }
+        let affects_analysis = state.project_config.affects_analysis(&project_config);
         state.project_config = project_config;
+        if !affects_analysis {
+            return Ok(());
+        }
         state.invalidate_project_config();
         let mut profiler = Profiler::disabled();
         state.rebuild_snapshot(&mut profiler)
+    }
+
+    fn formatting(
+        &self,
+        document: &DocumentSnapshot,
+        range: Option<Range>,
+    ) -> anyhow::Result<Vec<TextEdit>> {
+        let state = self.state.read().expect("Tolk workspace lock poisoned");
+        let range = range.map(|range| {
+            let start = document
+                .text_index()
+                .position_to_point(document.text(), range.start);
+            let end = document
+                .text_index()
+                .position_to_point(document.text(), range.end);
+            tolk_fmt::FormatRange {
+                start: tolk_fmt::FormatPosition {
+                    line: start.row,
+                    character: start.column,
+                },
+                end: tolk_fmt::FormatPosition {
+                    line: end.row,
+                    character: end.column,
+                },
+            }
+        });
+        let formatted = tolk_fmt::format_source(
+            document.text(),
+            tolk_fmt::FormatOptions {
+                width: state.project_config.format_width,
+                separate_import_groups: state.project_config.separate_import_groups,
+                range,
+            },
+        )?;
+        if formatted == document.text() {
+            return Ok(Vec::new());
+        }
+
+        let end = document
+            .text_index()
+            .offset_to_position(document.text(), document.text().len());
+        Ok(vec![TextEdit::new(
+            Range::new(crate::Position::new(0, 0), end),
+            formatted,
+        )])
     }
 
     fn open_document(
@@ -929,6 +1015,8 @@ struct TolkProjectConfig {
     import_mappings: Option<BTreeMap<String, String>>,
     contract_ids: Vec<String>,
     wallet_names: Vec<String>,
+    format_width: usize,
+    separate_import_groups: bool,
 }
 
 impl Default for TolkProjectConfig {
@@ -940,11 +1028,22 @@ impl Default for TolkProjectConfig {
             import_mappings: None,
             contract_ids: Vec::new(),
             wallet_names: Vec::new(),
+            format_width: 100,
+            separate_import_groups: false,
         }
     }
 }
 
 impl TolkProjectConfig {
+    fn affects_analysis(&self, other: &Self) -> bool {
+        self.project_root != other.project_root
+            || self.stdlib_path != other.stdlib_path
+            || self.use_embedded_stdlib != other.use_embedded_stdlib
+            || self.import_mappings != other.import_mappings
+            || self.contract_ids != other.contract_ids
+            || self.wallet_names != other.wallet_names
+    }
+
     fn from_workspace_config(config: &WorkspaceConfig) -> anyhow::Result<Self> {
         let manifest = toml::from_str::<ActonManifest>(config.manifest_text().as_ref())
             .with_context(|| {
@@ -962,6 +1061,8 @@ impl TolkProjectConfig {
             import_mappings: normalize_import_mappings(manifest.import_mappings, &project_root),
             contract_ids: manifest.contracts.keys().cloned().collect(),
             wallet_names: manifest.wallets.keys().cloned().collect(),
+            format_width: manifest.fmt.width.unwrap_or(100),
+            separate_import_groups: manifest.fmt.separate_import_groups.unwrap_or(false),
             project_root,
             stdlib_path,
             use_embedded_stdlib: config.tolk_stdlib_root_uri().is_none(),
@@ -977,6 +1078,15 @@ struct ActonManifest {
     contracts: BTreeMap<String, toml::Value>,
     #[serde(default)]
     wallets: BTreeMap<String, toml::Value>,
+    #[serde(default)]
+    fmt: FormatterManifest,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+struct FormatterManifest {
+    width: Option<usize>,
+    separate_import_groups: Option<bool>,
 }
 
 fn normalize_import_mappings(

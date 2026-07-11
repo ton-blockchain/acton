@@ -4,7 +4,8 @@ import * as vscode from "vscode"
 import type {FileSystemWatcher} from "vscode"
 
 import {consoleError} from "./client-log"
-import {startLanguageServer, stopLanguageServer} from "./language-server"
+import {restartLanguageServer, startLanguageServer, stopLanguageServer} from "./language-server"
+import {LanguageServerProfileProvider} from "./language-server-profile-provider"
 
 import {registerOpenBocCommand} from "./commands/openBocCommand"
 import {BocEditorProvider} from "./providers/boc/BocEditorProvider"
@@ -19,7 +20,6 @@ import {ActonTomlHoverProvider} from "./acton/toml/ActonTomlHoverProvider"
 import {ActonTolkCodeLensProvider} from "./acton/tolk/ActonTolkCodeLensProvider"
 import {ActonLinter} from "./acton/ActonLinter"
 import {ActonTestController} from "./acton/ActonTestController"
-import {formatTolkDocumentWithActon} from "./acton/ActonFormatter"
 import {registerActonRetraceDebugCommand} from "./acton/retrace/ActonRetraceDebug"
 import {registerActonSetupNotifications} from "./acton/ActonSetup"
 import {registerActonTerminalLinks} from "./acton/ActonTerminalLinks"
@@ -29,12 +29,13 @@ import {configureDebugging} from "./debugging"
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
   await checkConflictingExtensions()
 
+  registerLanguageServerLifecycle(context)
+  new LanguageServerProfileProvider().register(context)
   startLanguageServer(context).catch(consoleError)
   registerOpenBocCommand(context)
   registerSaveBocDecompiledCommand(context)
   registerActonSetupNotifications(context)
   registerActonTerminalLinks(context)
-  registerActonFormatter(context)
 
   const walletWebviewProvider = new WalletWebviewProvider(context.extensionUri)
   walletWebviewProvider.registerCommands(context)
@@ -95,25 +96,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(bocWatcher)
 }
 
-function registerActonFormatter(context: vscode.ExtensionContext): void {
-  const selector: vscode.DocumentSelector = [
-    {scheme: "file", language: "tolk"},
-    {scheme: "untitled", language: "tolk"},
-  ]
+const languageServerLaunchSettings = [
+  "ton.acton.path",
+  "ton.languageServer.args",
+  "ton.languageServer.profiling.enabled",
+  "ton.tolk.stdlib.path",
+] as const
 
+let restartPromptVisible = false
+
+function registerLanguageServerLifecycle(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.languages.registerDocumentFormattingEditProvider(selector, {
-      async provideDocumentFormattingEdits(document: vscode.TextDocument) {
-        return (await formatTolkDocumentWithActon(document)) ?? []
-      },
+    vscode.commands.registerCommand("ton.restartLanguageServer", async () => {
+      try {
+        await restartLanguageServer(context)
+        await vscode.window.showInformationMessage("Acton language server restarted.")
+      } catch (error) {
+        consoleError("Failed to restart Acton language server", error)
+        const message = error instanceof Error ? error.message : String(error)
+        await vscode.window.showErrorMessage(`Failed to restart Acton language server: ${message}`)
+        throw error
+      }
     }),
-    vscode.languages.registerDocumentRangeFormattingEditProvider(selector, {
-      async provideDocumentRangeFormattingEdits(
-        document: vscode.TextDocument,
-        range: vscode.Range,
-      ) {
-        return (await formatTolkDocumentWithActon(document, range)) ?? []
-      },
+    vscode.workspace.onDidChangeConfiguration(async event => {
+      if (!languageServerLaunchSettings.some(setting => event.affectsConfiguration(setting))) {
+        return
+      }
+      if (restartPromptVisible) {
+        return
+      }
+
+      restartPromptVisible = true
+      try {
+        const action = await vscode.window.showInformationMessage(
+          "Restart the Acton language server to apply the changed settings.",
+          "Restart",
+        )
+        if (action === "Restart") {
+          await vscode.commands.executeCommand("ton.restartLanguageServer")
+        }
+      } finally {
+        restartPromptVisible = false
+      }
     }),
   )
 }

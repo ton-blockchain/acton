@@ -205,6 +205,21 @@ fun main(): void {
   })
   expect(valueHint).not.toHaveProperty("kind")
 
+  const unformattedSource = `fun main(){
+val value=1+2;
+}
+`
+  await page.evaluate(source => {
+    ;(globalThis as SmokeGlobal).__tonLsSmoke?.setEditorText(source)
+  }, unformattedSource)
+  await page.getByRole("button", {name: "Format"}).click()
+  await expect
+    .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.editorText()))
+    .toBe(`fun main() {
+    val value = 1 + 2;
+}
+`)
+
   await page.selectOption("#language-select", "tasm")
   await expect
     .poll(() => page.evaluate(() => (globalThis as SmokeGlobal).__tonLsSmoke?.selectedLanguage()))

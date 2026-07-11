@@ -30,6 +30,7 @@
   },
   "dependencies": {
     "@codingame/monaco-vscode-editor-api": "^25.1.2",
+    "@codingame/monaco-vscode-monarch-service-override": "^25.1.2",
     "monaco-languageclient": "10.7.0",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",

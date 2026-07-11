@@ -1,0 +1,115 @@
+---
+title: "Language server protocol extensions"
+description: "Custom requests exposed by the Acton language server"
+---
+
+`acton ls` implements the standard Language Server Protocol and a small set of custom requests.
+Use standard LSP methods for editor features whenever one exists. For example, formatting uses
+`textDocument/formatting` and `textDocument/rangeFormatting` rather than a custom method.
+
+Positions and ranges use the LSP UTF-16 coordinate system. File locations are absolute `file:`
+URIs unless a request says otherwise.
+
+## `tolk.getTypeAtPosition`
+
+Returns the inferred Tolk type at a source position. This request is available in native and WASM
+servers.
+
+```json title="Request params"
+{
+  "textDocument": {"uri": "file:///workspace/main.tolk"},
+  "position": {"line": 12, "character": 20}
+}
+```
+
+```json title="Response"
+{
+  "type": "cell",
+  "range": {
+    "start": {"line": 12, "character": 16},
+    "end": {"line": 12, "character": 23}
+  }
+}
+```
+
+Both fields are `null` when the server cannot determine a type.
+
+## `ton/profile`
+
+Returns accumulated language-server performance data. Pass an empty object as the request params.
+Profiling must be enabled when starting the native server:
+
+```sh
+acton ls --stdio --profile
+```
+
+```json title="Request params"
+{}
+```
+
+```json title="Response"
+{
+  "enabled": true,
+  "counters": {
+    "document.open": 1,
+    "document.change": 4
+  },
+  "spans": {
+    "tolk.type_inference": {
+      "count": 5,
+      "totalMs": 42.75,
+      "averageMs": 8.55
+    }
+  }
+}
+```
+
+`counters` contains operation counts. `spans` contains timings aggregated by operation name for the
+current server session. Values are not reset when this request is called. A disabled profiler
+returns `enabled: false` with empty data.
+
+## `ton/disassemble`
+
+Disassembles a Bag of Cells into TON assembly. This request is available in the native server.
+Provide exactly one of `uri` or `data`.
+
+Use `uri` for a binary or text-encoded BoC file:
+
+```json title="Request params"
+{
+  "uri": "file:///workspace/build/contract.boc"
+}
+```
+
+Use `data` for a hex- or base64-encoded BoC:
+
+```json title="Request params"
+{
+  "data": "te6ccgEBAQEAAgAAAA=="
+}
+```
+
+```json title="Response"
+{
+  "assembly": "SETCP 0\n..."
+}
+```
+
+The server returns JSON-RPC error `-32603` when the URI cannot be read, the input cannot be decoded,
+or disassembly fails. Passing both inputs or neither input is also an error.
+
+## WASM host requests
+
+The browser worker exposes additional methods for embedding the WASM server. They are host
+controls, not part of the native `acton ls` contract.
+
+| Method | Params | Result |
+| --- | --- | --- |
+| `ton/setLogLevel` | `"off"`, `"error"`, `"warn"`, `"info"`, `"debug"`, or `"trace"` | Rendered log text |
+| `ton/logs` | none | Rendered log text |
+| `ton/clearLogs` | none | Empty rendered log text |
+| `ton/addSourceFile` | `{ "uri": string, "text": string, "languageId"?: string }` | `null` |
+| `ton/setWorkspaceConfig` | `{ "languageId": string, "rootUri": string, "manifestUri"?: string, "text": string }` | `null` |
+
+The WASM worker also implements `ton/profile` and `tolk.getTypeAtPosition` with the response shapes
+documented above.

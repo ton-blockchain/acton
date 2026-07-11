@@ -47,6 +47,7 @@ fn constructor_hint(
     let edit_range = Range::new(position, position);
 
     let mut hint = InlayHint::new(position, &tag, InlayHintKind::Type)
+        .with_category(crate::InlayHintCategory::ConstructorTag)
         .with_text_edit(TextEdit::new(edit_range, &tag));
     hint.padding_right = true;
     Some(hint)

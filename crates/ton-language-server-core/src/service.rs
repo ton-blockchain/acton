@@ -1,9 +1,10 @@
 use crate::language::{
     CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
     DocumentHighlightRequest, DocumentSymbolRequest, FileRenameRequest, FoldingRangeRequest,
-    HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest, ParsedDocument, PluginContext,
-    PrepareRenameRequest, ReferenceRequest, RenameRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceSymbolRequest,
+    FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
+    ParsedDocument, PluginContext, PrepareRenameRequest, ReferenceRequest, RenameRequest,
+    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
+    WorkspaceSymbolRequest,
 };
 use crate::logging;
 use crate::profiling::Profiler;
@@ -818,6 +819,34 @@ impl LanguageService {
             position,
         });
         self.profiler.finish("type_at_position", started_at);
+        result
+    }
+
+    pub fn formatting(
+        &mut self,
+        uri: &DocumentUri,
+        range: Option<Range>,
+    ) -> anyhow::Result<Vec<TextEdit>> {
+        let Some(state) = self.documents.get(uri) else {
+            anyhow::bail!("document not open: {uri}");
+        };
+        let Some(plugin) = self.plugins.get(state.document.language_id()) else {
+            anyhow::bail!("unsupported language '{}'", state.document.language_id());
+        };
+        if !plugin.capabilities().formatting {
+            return Ok(Vec::new());
+        }
+
+        let started_at = self.profiler.start();
+        let result = plugin.formatting(FormattingRequest {
+            context: PluginContext {
+                document: &state.document,
+                parsed: state.parsed.as_ref(),
+                profiler: &mut self.profiler,
+            },
+            range,
+        });
+        self.profiler.finish("formatting", started_at);
         result
     }
 

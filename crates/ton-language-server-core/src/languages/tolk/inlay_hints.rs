@@ -419,7 +419,8 @@ fn collect_constant_value_hint(
     let mut hint = InlayHint::plain(
         builder.position_for_offset(expression.syntax().end_byte()),
         format!(" /* = {formatted} */"),
-    );
+    )
+    .with_category(crate::InlayHintCategory::ConstantValue);
     hint.tooltip = Some(format!("Evaluated value: {formatted}"));
     builder.add_hint(hint);
     Some(())
@@ -459,7 +460,8 @@ fn collect_enum_value_hints(
             builder.position_for_offset(anchor.end_byte()),
             format!(" = {value}"),
             InlayHintKind::Parameter,
-        );
+        )
+        .with_category(crate::InlayHintCategory::ConstantValue);
         hint.tooltip = Some(format!("Enum value: {value}"));
         builder.add_hint(hint);
     }
@@ -479,10 +481,13 @@ fn collect_get_method_id_hint(
     let name = name.normalized_name(source);
 
     let get_keyword = method.get_keyword()?;
-    builder.add_hint(InlayHint::new(
-        builder.position_for_offset(get_keyword.end_byte()),
-        format!("(0x{:x})", compute_get_method_id(name)),
-        InlayHintKind::Type,
-    ));
+    builder.add_hint(
+        InlayHint::new(
+            builder.position_for_offset(get_keyword.end_byte()),
+            format!("(0x{:x})", compute_get_method_id(name)),
+            InlayHintKind::Type,
+        )
+        .with_category(crate::InlayHintCategory::MethodId),
+    );
     Some(())
 }

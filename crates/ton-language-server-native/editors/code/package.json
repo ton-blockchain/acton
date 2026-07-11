@@ -56,6 +56,18 @@
         "category": "Tolk"
       },
       {
+        "command": "ton.restartLanguageServer",
+        "title": "Restart Language Server",
+        "category": "Acton",
+        "icon": "$(debug-restart)"
+      },
+      {
+        "command": "ton.showLanguageServerProfile",
+        "title": "Show Language Server Profile",
+        "category": "Acton",
+        "icon": "$(pulse)"
+      },
+      {
         "command": "ton.openBocFile",
         "title": "Open Disassembled BoC file",
         "category": "TON"
@@ -216,28 +228,6 @@
       {
         "title": "Editor › Inspections",
         "properties": {
-          "ton.tolk.inspections.disabled": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "enum": [
-                "unused-parameter",
-                "unused-type-parameter",
-                "unused-variable",
-                "unused-top-level-declaration",
-                "deprecated-symbol-usage",
-                "unused-import",
-                "struct-initialization",
-                "cannot-reassign",
-                "need-not-null-unwrapping",
-                "missed-semicolon"
-              ]
-            },
-            "default": [
-              "type-compatibility"
-            ],
-            "description": "List of disabled code inspections. All inspections are enabled by default."
-          },
           "ton.func.inspections.disabled": {
             "type": "array",
             "items": {
@@ -316,6 +306,11 @@
             ],
             "description": "Arguments used to start the Acton language server. The command must use stdio transport."
           },
+          "ton.languageServer.profiling.enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Collect language server performance profiles. Requires a server restart."
+          },
           "ton.acton.explorer": {
             "type": "string",
             "enum": [
@@ -339,11 +334,6 @@
             "type": "number",
             "default": 100,
             "description": "Debounce time in milliseconds for the Acton linter"
-          },
-          "ton.tolk.formatter.useFormatter": {
-            "type": "boolean",
-            "default": true,
-            "description": "Format Tolk files with `acton fmt`"
           }
         }
       }

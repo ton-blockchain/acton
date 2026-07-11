@@ -26,11 +26,10 @@ pub(super) fn inlay_hints(
         let Some(instruction) = spec.instruction(document.text_of(node).trim()) else {
             continue;
         };
-        hints.push(InlayHint::new(
-            position,
-            instruction.gas(),
-            InlayHintKind::Type,
-        ));
+        hints.push(
+            InlayHint::new(position, instruction.gas(), InlayHintKind::Type)
+                .with_category(crate::InlayHintCategory::GasConsumption),
+        );
     }
 
     hints

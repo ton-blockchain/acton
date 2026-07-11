@@ -5,7 +5,7 @@ use crate::semantic_tokens::SemanticToken;
 use crate::types::{
     CodeAction, CodeLens, DocumentHighlight, DocumentSnapshot, DocumentSymbol, DocumentUri,
     FileRename, FoldingRange, Hover, InlayHint, Location, Position, PrepareRename, Range,
-    SignatureHelp, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
+    SignatureHelp, TextEdit, WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 use std::any::Any;
 use std::sync::Arc;
@@ -31,6 +31,7 @@ pub struct FeatureSet {
     pub code_actions: bool,
     pub file_rename: bool,
     pub type_at_position: bool,
+    pub formatting: bool,
 }
 
 pub trait ParsedDocument: Any + Send + Sync {
@@ -170,6 +171,11 @@ pub struct TypeAtPositionRequest<'a> {
     pub position: Position,
 }
 
+pub struct FormattingRequest<'a> {
+    pub context: PluginContext<'a>,
+    pub range: Option<Range>,
+}
+
 pub trait LanguagePlugin: Send + Sync {
     fn language_id(&self) -> crate::LanguageId;
 
@@ -287,5 +293,9 @@ pub trait LanguagePlugin: Send + Sync {
         _request: TypeAtPositionRequest<'_>,
     ) -> anyhow::Result<Option<TypeAtPosition>> {
         Ok(None)
+    }
+
+    fn formatting(&self, _request: FormattingRequest<'_>) -> anyhow::Result<Vec<TextEdit>> {
+        Ok(Vec::new())
     }
 }

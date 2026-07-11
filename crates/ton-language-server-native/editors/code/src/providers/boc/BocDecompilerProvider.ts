@@ -1,11 +1,12 @@
 //  SPDX-License-Identifier: MIT
 //  Copyright © 2025 TON Studio
-import * as path from "node:path"
-
 import * as vscode from "vscode"
 
-import {Acton} from "../../acton/Acton"
-import {DisasmCommand} from "../../acton/ActonCommand"
+import {sendLanguageServerRequest} from "../../language-server"
+
+interface DisassembleResponse {
+  readonly assembly: string
+}
 
 export class BocDecompilerProvider implements vscode.TextDocumentContentProvider {
   private readonly _onDidChange: vscode.EventEmitter<vscode.Uri> = new vscode.EventEmitter()
@@ -27,22 +28,16 @@ export class BocDecompilerProvider implements vscode.TextDocumentContentProvider
   }
 
   private getBocPath(uri: vscode.Uri): vscode.Uri {
-    console.log("Original URI:", uri.toString())
     const bocPath = uri.fsPath.replace(".decompiled.tasm", "")
-    console.log("BoC path:", bocPath)
     return vscode.Uri.file(bocPath)
   }
 
   private async disassembleBoc(bocUri: vscode.Uri): Promise<string> {
     try {
-      const command = new DisasmCommand(bocUri.fsPath)
-      const result = await Acton.getInstance().spawn(command, path.dirname(bocUri.fsPath))
-      if (result.exitCode !== 0) {
-        const details = result.stderr.trim() || result.stdout.trim() || "unknown error"
-        throw new Error(details)
-      }
-
-      return this.formatDisassembledOutput(result.stdout, bocUri)
+      const result = await sendLanguageServerRequest<DisassembleResponse>("ton/disassemble", {
+        uri: bocUri.toString(),
+      })
+      return this.formatDisassembledOutput(result.assembly, bocUri)
     } catch (error: unknown) {
       const details = error instanceof Error ? error.message : String(error)
       throw new Error(`Disassembly failed: ${details}`)

@@ -12,6 +12,8 @@ import {createClientLog} from "./client-log"
 import process from "node:process"
 
 let client: LanguageClient | undefined
+let clientCommandsRegistered = false
+let restartOperation: Promise<void> = Promise.resolve()
 
 const typeAtPositionRequest = "tolk.getTypeAtPosition"
 const openFileCommand = "ton.openFile"
@@ -32,7 +34,7 @@ interface TypeAtPositionResponse {
 export async function startLanguageServer(context: vscode.ExtensionContext): Promise<void> {
   const config = vscode.workspace.getConfiguration("ton")
   const serverPath = config.get<string>("acton.path", "acton")
-  const serverArgs = config.get<string[]>("languageServer.args", ["ls", "--stdio"])
+  const serverArgs = resolveServerArgs(config)
   const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
 
   const clientOptions: LanguageClientOptions = {
@@ -70,6 +72,10 @@ export async function startLanguageServer(context: vscode.ExtensionContext): Pro
 
   await client.start()
 
+  if (clientCommandsRegistered) {
+    return
+  }
+  clientCommandsRegistered = true
   context.subscriptions.push(
     vscode.commands.registerCommand(
       typeAtPositionRequest,
@@ -167,10 +173,55 @@ function isTypeAtPositionParams(value: unknown): value is TypeAtPositionParams {
   )
 }
 
-export function stopLanguageServer(): Thenable<void> | undefined {
+export async function stopLanguageServer(): Promise<void> {
   const runningClient = client
   client = undefined
-  return runningClient?.stop()
+  if (!runningClient) {
+    return
+  }
+
+  try {
+    await runningClient.stop()
+  } finally {
+    await runningClient.dispose()
+  }
+}
+
+export function restartLanguageServer(context: vscode.ExtensionContext): Promise<void> {
+  const nextRestart = restartOperation
+    .catch(() => {})
+    .then(async () => {
+      await stopLanguageServer()
+      await startLanguageServer(context)
+    })
+  restartOperation = nextRestart
+  return nextRestart
+}
+
+export async function sendLanguageServerRequest<T>(method: string, params?: unknown): Promise<T> {
+  const languageClient = client
+  if (!languageClient) {
+    throw new Error("Acton language server is not running")
+  }
+  return languageClient.sendRequest<T>(method, params)
+}
+
+function resolveServerArgs(config: vscode.WorkspaceConfiguration): string[] {
+  const args = [...config.get<string[]>("languageServer.args", ["ls", "--stdio"])]
+  const stdlibPath = config.get<string>("tolk.stdlib.path")?.trim()
+  if (
+    stdlibPath &&
+    !args.some(arg => arg === "--stdlib-path" || arg.startsWith("--stdlib-path="))
+  ) {
+    args.push("--stdlib-path", stdlibPath)
+  }
+  if (
+    config.get<boolean>("languageServer.profiling.enabled", false) &&
+    !args.includes("--profile")
+  ) {
+    args.push("--profile")
+  }
+  return args
 }
 
 function launchServer(command: string, args: string[], cwd: string | undefined): ServerOptions {

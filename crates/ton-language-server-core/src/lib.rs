@@ -18,16 +18,19 @@ pub use custom::TypeAtPosition;
 pub use language::{
     CodeActionRequest, CodeLensRequest, CompletionRequest, DefinitionRequest,
     DocumentHighlightRequest, DocumentSymbolRequest, FeatureSet, FileRenameRequest,
-    FoldingRangeRequest, HoverRequest, InlayHintRequest, LanguagePlugin, ParseRequest,
-    ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest, SemanticTokensRequest,
-    SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest, WorkspaceLanguage,
-    WorkspaceSymbolRequest,
+    FoldingRangeRequest, FormattingRequest, HoverRequest, InlayHintRequest, LanguagePlugin,
+    ParseRequest, ParsedDocument, PluginContext, PrepareRenameRequest, RenameRequest,
+    SemanticTokensRequest, SignatureHelpRequest, TypeAtPositionRequest, TypeDefinitionRequest,
+    WorkspaceLanguage, WorkspaceSymbolRequest,
 };
 pub use logging::{
     CORE_TARGET, EDIT_TARGET, FIFT_TARGET, LogLevel, LoggingConfig, ParseLogLevelError,
     SERVICE_TARGET, TASM_TARGET, TLB_TARGET, TOLK_TARGET, TOML_TARGET,
 };
-pub use profiling::{ProfileEvent, ProfileSummary, Profiler};
+pub use profiling::{
+    ProfileEvent, ProfileReport, ProfileSpan, ProfileSummary, Profiler, render_profile_report,
+    render_profile_summary,
+};
 pub use semantic_tokens::{
     SEMANTIC_TOKEN_MODIFIER_NAMES, SEMANTIC_TOKEN_TYPE_NAMES, SemanticToken, SemanticTokenModifier,
     SemanticTokenType, SemanticTokens, SemanticTokensBuilder,
@@ -37,9 +40,9 @@ pub use text::TextIndex;
 pub use types::{
     CodeAction, CodeActionKind, CodeLens, Command, DocumentEdits, DocumentHighlight,
     DocumentHighlightKind, DocumentSnapshot, DocumentSymbol, DocumentSymbolKind, DocumentUri,
-    FileRename, FoldingRange, Hover, InlayHint, InlayHintKind, LanguageId, Location, Position,
-    PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit, WorkspaceConfig,
-    WorkspaceEdit, WorkspaceSymbol,
+    FileRename, FoldingRange, Hover, InlayHint, InlayHintCategory, InlayHintKind, LanguageId,
+    Location, Position, PrepareRename, Range, SignatureHelp, SignatureInformation, TextEdit,
+    WorkspaceConfig, WorkspaceEdit, WorkspaceSymbol,
 };
 
 #[must_use]

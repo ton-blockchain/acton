@@ -53,6 +53,8 @@ connection.onInitialize(async (): Promise<InitializeResult> => {
       referencesProvider: true,
       documentHighlightProvider: true,
       hoverProvider: true,
+      documentFormattingProvider: true,
+      documentRangeFormattingProvider: true,
       completionProvider: {
         resolveProvider: false,
         triggerCharacters: [".", '"', "'", "/", "@"],
@@ -136,7 +138,25 @@ connection.onReferences(async params =>
       params.textDocument.uri,
       params.position.line,
       params.position.character,
-      false,
+      params.context.includeDeclaration,
+    ),
+  ),
+)
+
+connection.onDocumentFormatting(async params =>
+  withLanguageServer("textDocument/formatting", server =>
+    server.formatDocument(params.textDocument.uri),
+  ),
+)
+
+connection.onDocumentRangeFormatting(async params =>
+  withLanguageServer("textDocument/rangeFormatting", server =>
+    server.formatRange(
+      params.textDocument.uri,
+      params.range.start.line,
+      params.range.start.character,
+      params.range.end.line,
+      params.range.end.character,
     ),
   ),
 )
@@ -280,7 +300,7 @@ connection.onRequest(CLEAR_LOGS_REQUEST, async () =>
 )
 
 connection.onRequest(PROFILE_REQUEST, async () =>
-  withLanguageServer(PROFILE_REQUEST, server => server.profileSummary()),
+  withLanguageServer(PROFILE_REQUEST, server => server.profileReport()),
 )
 
 connection.onRequest(TOLK_TYPE_AT_POSITION_REQUEST, async (params: TextDocumentPositionParams) =>

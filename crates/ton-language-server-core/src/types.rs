@@ -432,11 +432,23 @@ pub enum InlayHintKind {
     Parameter,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum InlayHintCategory {
+    Type,
+    Parameter,
+    ConstantValue,
+    MethodId,
+    ConstructorTag,
+    GasConsumption,
+    Other,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct InlayHint {
     pub position: Position,
     pub label: String,
     pub kind: Option<InlayHintKind>,
+    pub category: InlayHintCategory,
     pub tooltip: Option<String>,
     pub text_edits: Vec<TextEdit>,
     pub padding_left: bool,
@@ -450,6 +462,10 @@ impl InlayHint {
             position,
             label: label.into(),
             kind: Some(kind),
+            category: match kind {
+                InlayHintKind::Type => InlayHintCategory::Type,
+                InlayHintKind::Parameter => InlayHintCategory::Parameter,
+            },
             tooltip: None,
             text_edits: Vec::new(),
             padding_left: false,
@@ -463,6 +479,7 @@ impl InlayHint {
             position,
             label: label.into(),
             kind: None,
+            category: InlayHintCategory::Other,
             tooltip: None,
             text_edits: Vec::new(),
             padding_left: false,
@@ -473,6 +490,12 @@ impl InlayHint {
     #[must_use]
     pub fn with_text_edit(mut self, edit: TextEdit) -> Self {
         self.text_edits.push(edit);
+        self
+    }
+
+    #[must_use]
+    pub const fn with_category(mut self, category: InlayHintCategory) -> Self {
+        self.category = category;
         self
     }
 }

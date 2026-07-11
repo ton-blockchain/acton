@@ -1,6 +1,9 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use web_time::{Duration, Instant};
+
+use serde::Serialize;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProfileEvent {
@@ -12,6 +15,22 @@ pub struct ProfileEvent {
 pub struct ProfileSummary {
     pub events: Vec<ProfileEvent>,
     pub counters: BTreeMap<&'static str, u64>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileReport {
+    pub enabled: bool,
+    pub counters: BTreeMap<String, u64>,
+    pub spans: BTreeMap<String, ProfileSpan>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProfileSpan {
+    pub count: u64,
+    pub total_ms: f64,
+    pub average_ms: f64,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -98,4 +117,81 @@ impl Profiler {
     pub const fn summary(&self) -> &ProfileSummary {
         &self.summary
     }
+
+    #[must_use]
+    pub fn report(&self) -> ProfileReport {
+        ProfileReport::new(self.enabled, &self.summary)
+    }
+}
+
+#[must_use]
+pub fn render_profile_summary(summary: &ProfileSummary) -> String {
+    render_profile_report(&ProfileReport::new(true, summary))
+}
+
+impl ProfileReport {
+    #[must_use]
+    pub fn new(enabled: bool, summary: &ProfileSummary) -> Self {
+        let counters = summary
+            .counters
+            .iter()
+            .map(|(name, count)| ((*name).to_owned(), *count))
+            .collect();
+        let mut aggregated = BTreeMap::<&'static str, (u64, f64)>::new();
+        for event in &summary.events {
+            let entry = aggregated.entry(event.name).or_default();
+            entry.0 += 1;
+            entry.1 += event.elapsed.as_secs_f64() * 1000.0;
+        }
+        let spans = aggregated
+            .into_iter()
+            .map(|(name, (count, total_ms))| {
+                (
+                    name.to_owned(),
+                    ProfileSpan {
+                        count,
+                        total_ms,
+                        average_ms: total_ms / count as f64,
+                    },
+                )
+            })
+            .collect();
+
+        Self {
+            enabled,
+            counters,
+            spans,
+        }
+    }
+}
+
+#[must_use]
+pub fn render_profile_report(report: &ProfileReport) -> String {
+    if report.counters.is_empty() && report.spans.is_empty() {
+        return "No profiling data".to_owned();
+    }
+
+    let mut output = String::new();
+    if !report.counters.is_empty() {
+        output.push_str("Counters\n");
+        for (name, count) in &report.counters {
+            let _ = writeln!(output, "  {name}: {count}");
+        }
+    }
+
+    if !report.spans.is_empty() {
+        if !output.is_empty() {
+            output.push('\n');
+        }
+        output.push_str("Spans\n");
+        for (name, span) in &report.spans {
+            let _ = writeln!(
+                output,
+                "  {name}: count={} total={:.3}ms avg={:.3}ms",
+                span.count, span.total_ms, span.average_ms
+            );
+        }
+    }
+
+    output
 }

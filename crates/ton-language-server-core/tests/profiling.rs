@@ -1,12 +1,61 @@
 #![allow(clippy::needless_raw_string_hashes)]
 
 use expect_test::expect;
+use std::collections::BTreeMap;
+use std::time::Duration;
 use ton_language_server_core::languages::tlb::{LANGUAGE_ID as TLB_LANGUAGE_ID, TlbLanguage};
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
-    CompletionTrigger, DocumentUri, LanguageService, LanguageServiceConfig, Position,
-    ProfileSummary, Profiler, Range, TextEdit, default_language_service,
+    CompletionTrigger, DocumentUri, LanguageService, LanguageServiceConfig, Position, ProfileEvent,
+    ProfileReport, ProfileSummary, Profiler, Range, TextEdit, default_language_service,
+    render_profile_report,
 };
+
+#[test]
+fn serializes_and_renders_an_aggregated_profile() {
+    let summary = ProfileSummary {
+        events: vec![
+            ProfileEvent {
+                name: "tolk.resolve",
+                elapsed: Duration::from_micros(1_250),
+            },
+            ProfileEvent {
+                name: "tolk.resolve",
+                elapsed: Duration::from_micros(750),
+            },
+        ],
+        counters: BTreeMap::from([("document.open", 1), ("document.change", 3)]),
+    };
+    let report = ProfileReport::new(true, &summary);
+    let json = serde_json::to_string_pretty(&report).expect("profile report should serialize");
+    let rendered = render_profile_report(&report);
+
+    expect![[r#"
+        {
+          "enabled": true,
+          "counters": {
+            "document.change": 3,
+            "document.open": 1
+          },
+          "spans": {
+            "tolk.resolve": {
+              "count": 2,
+              "totalMs": 2.0,
+              "averageMs": 1.0
+            }
+          }
+        }"#]]
+    .assert_eq(&json);
+    expect![[r#"
+        Counters
+          document.change: 3
+          document.open: 1
+
+        Spans
+          tolk.resolve: count=2 total=2.000ms avg=1.000ms
+        "#]]
+    .assert_eq(&rendered);
+}
 
 #[test]
 fn disabled_profiler_does_not_record_events_or_counters() {

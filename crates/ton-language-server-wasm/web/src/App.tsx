@@ -77,6 +77,14 @@ type PlainCompletionItem = {
   readonly detail?: string
 }
 
+type ProfileReport = {
+  readonly enabled: boolean
+  readonly counters: Readonly<Record<string, number>>
+  readonly spans: Readonly<
+    Record<string, {readonly count: number; readonly totalMs: number; readonly averageMs: number}>
+  >
+}
+
 type PersistedState = {
   selectedLanguage: SupportedLanguage
   logLevel: LogLevelName
@@ -166,6 +174,7 @@ export function App() {
   const setProfileVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const setActonTomlVisibleRef = useRef<(visible: boolean) => Promise<void>>(async () => {})
   const clearLogsRef = useRef<() => Promise<void>>(async () => {})
+  const formatDocumentRef = useRef<() => Promise<void>>(async () => {})
 
   const persist = useCallback((next: PersistedState, updateReact = true) => {
     persistedRef.current = next
@@ -239,12 +248,12 @@ export function App() {
       logsEditorRef.current?.revealLine(logsModel.getLineCount())
     }
 
-    const updateProfileEditor = (profile: string) => {
+    const updateProfileEditor = (report: ProfileReport) => {
       const profileModel = profileModelRef.current
       if (!profileModel) {
         return
       }
-      const nextValue = profile || "No profiling data"
+      const nextValue = renderProfileReport(report)
       if (profileModel.getValue() === nextValue) {
         return
       }
@@ -358,7 +367,7 @@ export function App() {
         if (!persistedRef.current.profileVisible) {
           return
         }
-        updateProfileEditor(await sendRequest<string>(profileRequest))
+        updateProfileEditor(await sendRequest<ProfileReport>(profileRequest))
       }
 
       const applyLogLevel = async (level: LogLevelName) => {
@@ -434,6 +443,11 @@ export function App() {
       const editorApp = new EditorApp(editorConfig)
       await editorApp.start(editorRoot)
       editorRef.current = editorApp.getEditor()
+      formatDocumentRef.current = async () => {
+        editorRef.current?.focus()
+        await vscode.commands.executeCommand("editor.action.formatDocument")
+        saveCurrentFile()
+      }
 
       await vscode.workspace.fs.createDirectory(workspaceUri)
       await vscode.workspace.fs.writeFile(
@@ -718,7 +732,7 @@ export function App() {
           return sendRequest<string>(logsRequest)
         },
         async profile() {
-          return sendRequest<string>(profileRequest)
+          return renderProfileReport(await sendRequest<ProfileReport>(profileRequest))
         },
         sidePanelText() {
           return persistedRef.current.profileVisible
@@ -878,6 +892,13 @@ export function App() {
     })
   }
 
+  const handleFormatDocument = () => {
+    void formatDocumentRef.current().catch((error: unknown) => {
+      console.error(error)
+      setStatus({state: "error", text: errorText(error)})
+    })
+  }
+
   return (
     <div
       id="app-shell"
@@ -922,6 +943,15 @@ export function App() {
         </label>
         <button type="button" className="toolbar-button" onClick={handleClearLogs}>
           Clear
+        </button>
+        <button
+          type="button"
+          className="toolbar-button"
+          disabled={persisted.selectedLanguage !== TOLK_LANGUAGE_ID}
+          onClick={handleFormatDocument}
+          title="Format document"
+        >
+          Format
         </button>
         <label className="check-field">
           <input
@@ -1064,6 +1094,34 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function languageLabel(languageId: SupportedLanguage) {
   return languageSupportById[languageId].label
+}
+
+function renderProfileReport(report: ProfileReport) {
+  const counters = Object.entries(report.counters)
+  const spans = Object.entries(report.spans)
+  if (counters.length === 0 && spans.length === 0) {
+    return report.enabled ? "No profiling data" : "Profiling is disabled"
+  }
+
+  const sections: string[] = []
+  if (counters.length > 0) {
+    sections.push(
+      ["Counters", ...counters.map(([name, count]) => `  ${name}: ${count}`)].join("\n"),
+    )
+  }
+  if (spans.length > 0) {
+    sections.push(
+      [
+        "Spans",
+        ...spans.map(
+          ([name, span]) =>
+            `  ${name}: count=${span.count} total=${span.totalMs.toFixed(3)}ms ` +
+            `avg=${span.averageMs.toFixed(3)}ms`,
+        ),
+      ].join("\n"),
+    )
+  }
+  return sections.join("\n\n")
 }
 
 function hoverContentToString(content: vscode.MarkedString | vscode.MarkdownString) {
