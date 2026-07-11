@@ -72,62 +72,67 @@ impl<'t> TypeInferenceWalker<'_, '_> {
 
     //+ CHECKED
     fn process_repeat_stmt(&mut self, v: Repeat<'t>, flow: FlowContext) -> FlowContext {
-        // loops are inferred twice, to merge body outcome with the state before the loop
         // in `repeat` (as opposed to `while`), a condition is not boolean, it's a number
         let count = try_flow!(flow, v.count());
         let body = try_flow!(flow, v.body());
 
         let after_count = self.infer_expr(count, flow, false, None);
         let loop_entry_flow = after_count.out_flow.clone();
-        let body_out = self.process_block_stmt(body, after_count.out_flow);
+        let mut loop_flow = after_count.out_flow;
 
-        // second time, to refine all types
-        let merged = loop_entry_flow.merge_flow(&body_out, self.intrn());
-        let body_out2 = self.process_block_stmt(body, merged.clone());
-        merged.merge_flow(&body_out2, self.intrn())
+        loop {
+            let body_flow = self.process_block_stmt(body, loop_flow.clone());
+            let next_loop_flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
+
+            if next_loop_flow.equivalent_to(&loop_flow) {
+                return next_loop_flow;
+            }
+
+            loop_flow = next_loop_flow;
+        }
     }
 
     //+ CHECKED
     fn process_while_stmt(&mut self, v: While<'t>, flow: FlowContext) -> FlowContext {
-        // loops are inferred twice, to merge body outcome with the state before the loop
-        // (a more correct approach would be not "twice", but "find a fixed point when state stop changing")
-        // also remember, we don't have a `break` statement, that's why when loop exits, condition became false
         let condition = try_flow!(flow, v.condition());
         let body = try_flow!(flow, v.body());
 
         let loop_entry_flow = flow.clone();
-        let after_cond = self.infer_expr(condition, flow, true, None);
-        let body_flow = self.process_block_stmt(body, after_cond.true_flow);
+        let mut loop_flow = flow;
 
-        // second time, to refine all types
-        let mut flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
-        let after_cond2 = self.infer_expr(condition, flow.clone(), true, None);
-        let body_flow2 = self.process_block_stmt(body, after_cond2.true_flow);
+        loop {
+            let after_condition = self.infer_expr(condition, loop_flow.clone(), true, None);
+            let body_flow = self.process_block_stmt(body, after_condition.true_flow);
+            let next_loop_flow = loop_entry_flow.merge_flow(&body_flow, self.intrn());
 
-        // unlike do_while (where cond is last and already sees body effects), in while cond precedes body,
-        // so merge second body output back and re-evaluate the condition (third time!)
-        flow = flow.merge_flow(&body_flow2, self.intrn());
-        let after_cond3 = self.infer_expr(condition, flow, true, None);
+            if next_loop_flow.equivalent_to(&loop_flow) {
+                return after_condition.false_flow;
+            }
 
-        after_cond3.false_flow
+            loop_flow = next_loop_flow;
+        }
     }
 
     //+ CHECKED
     fn process_do_while_stmt(&mut self, v: DoWhile<'t>, flow: FlowContext) -> FlowContext {
-        // do while is also handled twice; read comments above
         let condition = try_flow!(flow, v.condition());
         let body = try_flow!(flow, v.body());
 
         let loop_entry_flow = flow.clone();
-        let flow = self.process_block_stmt(body, flow);
-        let after_cond = self.infer_expr(condition, flow, true, None);
+        let mut loop_flow = flow;
 
-        // second time
-        let flow = loop_entry_flow.merge_flow(&after_cond.true_flow, self.intrn());
-        let flow = self.process_block_stmt(body, flow);
-        let after_cond2 = self.infer_expr(condition, flow, true, None);
+        loop {
+            let body_flow = self.process_block_stmt(body, loop_flow.clone());
+            let after_condition = self.infer_expr(condition, body_flow, true, None);
+            let next_loop_flow =
+                loop_entry_flow.merge_flow(&after_condition.true_flow, self.intrn());
 
-        after_cond2.false_flow
+            if next_loop_flow.equivalent_to(&loop_flow) {
+                return after_condition.false_flow;
+            }
+
+            loop_flow = next_loop_flow;
+        }
     }
 
     //+ CHECKED

@@ -50,6 +50,11 @@ mod workspace_symbols;
 
 pub const LANGUAGE_ID: &str = "tolk";
 const TOLK_STDLIB_PATH: &str = "/__tolk_stdlib__";
+const TOLK_BUILTIN_FILE_NAME: &str = "builtin.tolk";
+const TOLK_BUILTIN_SOURCE: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/assets/tolk/builtin.tolk"
+));
 
 static TOLK_STDLIB_DIR: Dir<'static> =
     include_dir!("$CARGO_MANIFEST_DIR/../tolk-compiler/assets/tolk-stdlib");
@@ -75,6 +80,16 @@ impl TolkLanguage {
         text: impl Into<Arc<str>>,
     ) -> anyhow::Result<()> {
         self.engine.add_source_file(uri.into(), text.into())
+    }
+
+    /// Returns the inferred type of the syntax node occupying the exact byte range.
+    #[must_use]
+    pub fn type_of_range(
+        &self,
+        uri: &DocumentUri,
+        range: std::ops::Range<usize>,
+    ) -> Option<String> {
+        self.engine.type_of_range(uri, range)
     }
 }
 
@@ -695,6 +710,7 @@ impl TolkWorkspaceState {
             let provider = SnapshotSourceProvider {
                 files: &self.files,
                 use_embedded_stdlib: project_config.use_embedded_stdlib,
+                builtin_path: project_config.stdlib_path.join(TOLK_BUILTIN_FILE_NAME),
             };
             let mut roots = self.roots.iter().cloned().collect::<Vec<_>>();
             roots.sort();
@@ -711,6 +727,7 @@ impl TolkWorkspaceState {
                 collect_embedded_stdlib_paths(&TOLK_STDLIB_DIR, &mut stdlib_roots);
                 roots.extend(stdlib_roots);
             }
+            roots.push(provider.builtin_path.clone());
 
             roots.sort();
             roots.dedup();
@@ -765,8 +782,10 @@ impl TolkWorkspaceState {
             .files()
             .iter()
             .filter_map(|(&file_id, file)| {
-                let uri = if project_config.use_embedded_stdlib
-                    && file.path.starts_with(&project_config.stdlib_path)
+                let builtin_path = project_config.stdlib_path.join(TOLK_BUILTIN_FILE_NAME);
+                let uri = if file.path == builtin_path
+                    || project_config.use_embedded_stdlib
+                        && file.path.starts_with(&project_config.stdlib_path)
                 {
                     DocumentUri::from(format!("file://{}", file.path.display()))
                 } else {
@@ -1003,6 +1022,7 @@ struct TolkResolveSnapshot {
 struct SnapshotSourceProvider<'a> {
     files: &'a BTreeMap<PathBuf, TolkWorkspaceFile>,
     use_embedded_stdlib: bool,
+    builtin_path: PathBuf,
 }
 
 impl ProjectSourceProvider for SnapshotSourceProvider<'_> {
@@ -1018,6 +1038,9 @@ impl ProjectSourceProvider for SnapshotSourceProvider<'_> {
             .and_then(TolkWorkspaceFile::active_source)
         {
             return Ok(Some(source));
+        }
+        if path == self.builtin_path {
+            return Ok(Some(ProjectSource::Text(Arc::from(TOLK_BUILTIN_SOURCE))));
         }
         if !self.use_embedded_stdlib {
             return Ok(None);

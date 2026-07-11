@@ -44,3 +44,4 @@ debug.entitlements
 .codegraph/
 .playwright-mcp/
 .mcp.json
+/crates/ton-language-server-core/tests/languages/tolk/compiler/fixtures/

@@ -248,7 +248,6 @@ fn test_types_generics() {
 }
 
 #[test]
-#[ignore]
 fn test_types_map() {
     run_tests_from_file(&get_test_path("map.test"));
 }

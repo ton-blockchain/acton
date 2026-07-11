@@ -51,8 +51,7 @@ impl ShapeScore {
 /// calculate score for a receiver;
 /// note: it's an original receiver, with generics, not an instantiated one
 pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeScore {
-    let unwrapped = interner.unwrap_alias(id);
-    let data = interner.data(unwrapped);
+    let data = interner.data(id);
     match data {
         TyData::TypeParameter { .. } => ShapeScore {
             kind: ShapeKind::GenericT,
@@ -101,6 +100,24 @@ pub(crate) fn calculate_shape_score(id: TyId, interner: &TypeInterner) -> ShapeS
                 depth: 1 + depth,
             }
         }
+        TyData::TypeAlias {
+            args: Some(args), ..
+        }
+        | TyData::Struct {
+            args: Some(args),
+            base: Some(_),
+            ..
+        } => {
+            let depth = args
+                .iter()
+                .map(|&arg| calculate_shape_score(arg, interner).depth)
+                .max()
+                .unwrap_or(0);
+            ShapeScore {
+                kind: ShapeKind::Instantiated,
+                depth: 1 + depth,
+            }
+        }
         TyData::TypeAlias { inner_ty, .. } => calculate_shape_score(*inner_ty, interner),
         _ => ShapeScore {
             kind: ShapeKind::Primitive,
@@ -114,7 +131,7 @@ pub struct MethodCallCandidate {
     pub original_receiver: TyId,
     pub instantiated_receiver: TyId,
     pub method_id: SymbolId,
-    pub substitutions: FxHashMap<String, TyId>,
+    pub substitutions: FxHashMap<TyId, TyId>,
 }
 
 impl MethodCallCandidate {
@@ -197,7 +214,9 @@ fn resolve_methods(
                     substitutions: deducer.substitutions.mapping,
                 });
             }
-        } else if intn.can_rhs_be_assigned(receiver, provided_receiver) {
+        } else if intn.can_rhs_be_assigned(receiver, provided_receiver)
+            && provided_receiver != intn.ty_never
+        {
             viable.push(MethodCallCandidate {
                 original_receiver: receiver,
                 instantiated_receiver: receiver,
@@ -216,7 +235,9 @@ fn resolve_methods(
     // 1) exact match candidates with equal_to()
     //    (for instance, an alias equals to its underlying type, as well as `T1|T2` equals to `T2|T1`)
     let mut exact = Vec::new();
+    let mut generic_count = 0;
     for candidate in &viable {
+        generic_count += usize::from(candidate.is_generic(type_db.intrn));
         if type_db
             .intrn
             .equals(candidate.instantiated_receiver, provided_receiver)
@@ -236,14 +257,13 @@ fn resolve_methods(
         viable = exact;
     }
 
-    // 2) if there are both generic and non-generic functions, filter out generic
-    let n_generics = viable
-        .iter()
-        .filter(|c| c.is_generic(type_db.intrn))
-        .count();
-    if n_generics < viable.len() {
-        viable.retain(|c| !c.is_generic(type_db.intrn));
+    if generic_count == 0 {
         return viable;
+    }
+
+    // 2) Prefer a receiver pattern that is strictly more specific than every other candidate.
+    if let Some(idx) = find_only_generic_dominator(&viable, type_db) {
+        return vec![viable.remove(idx)];
     }
 
     // 3) better shape in terms of structural depth
@@ -264,37 +284,49 @@ fn resolve_methods(
         return viable;
     }
 
-    // 4) find the overload that dominates all others
-    //    (prefer `Container<int>` over `Container<T>` and `map<K, slice>` over `map<K, V>`)
-    let mut dominator_idx = None;
-    for i in 0..viable.len() {
-        let mut dominates_all = true;
-        for j in 0..viable.len() {
-            if i != j
-                && !is_more_specific_generic(
-                    viable[i].original_receiver,
-                    viable[j].original_receiver,
-                    type_db,
-                )
-            {
-                dominates_all = false;
-                break;
-            }
-        }
-        if dominates_all {
-            if dominator_idx.is_some() {
-                // Ambiguous
-                return viable;
-            }
-            dominator_idx = Some(i);
-        }
+    // 4) Within the same shape, a concrete receiver beats a generic receiver.
+    let generic_count = viable
+        .iter()
+        .filter(|candidate| candidate.is_generic(type_db.intrn))
+        .count();
+    if generic_count < viable.len() {
+        viable.retain(|candidate| !candidate.is_generic(type_db.intrn));
+        return viable;
     }
 
-    if let Some(idx) = dominator_idx {
+    // 5) Shape filtering can reveal a dominator hidden by less-specific candidates.
+    if let Some(idx) = find_only_generic_dominator(&viable, type_db) {
         return vec![viable.remove(idx)];
     }
 
     viable
+}
+
+fn find_only_generic_dominator(
+    candidates: &[MethodCallCandidate],
+    type_db: &mut TypeDb<'_>,
+) -> Option<usize> {
+    let mut dominator = None;
+
+    for (candidate_idx, candidate) in candidates.iter().enumerate() {
+        let dominates_all = candidates.iter().enumerate().all(|(other_idx, other)| {
+            candidate_idx == other_idx
+                || is_more_specific_generic(
+                    candidate.original_receiver,
+                    other.original_receiver,
+                    type_db,
+                )
+        });
+
+        if dominates_all {
+            if dominator.is_some() {
+                return None;
+            }
+            dominator = Some(candidate_idx);
+        }
+    }
+
+    dominator
 }
 
 /// Returns the best applicable method declaration for every method name available on a receiver.

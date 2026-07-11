@@ -81,6 +81,111 @@ fn resolves_stdlib_method_on_string_literal() {
 }
 
 #[test]
+fn resolves_compiler_provided_builtin() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r#"
+            fun main() {
+                __expect_<caret>lazy("value");
+            }
+        "#,
+        |_| {},
+        expect![[r"
+            1:13 -> file:///__tolk_stdlib__/builtin.tolk 85:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_backticked_method_name() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun int.`~increment`(self): int { return self + 1; }
+            fun main(value: int) {
+                value.`~inc<caret>rement`();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            2:15 -> file:///fixture/main.tolk 0:8 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_sized_builtin_type_to_its_family() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            fun main(value: int<caret>32) {}
+        ",
+        |_| {},
+        expect![[r"
+            0:19 -> file:///__tolk_stdlib__/common.tolk 63:5 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_method_on_null_coalescing_expression() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            global callOrder: tuple;
+            fun int.double(self) { return self * 2; }
+            fun get(value: int?, fallback: int) {
+                callOrder.push(value);
+                return value ?? fallback;
+            }
+            fun main(value: int?) {
+                return (get(value, 5) ?? get(100, 10)).dou<caret>ble();
+            }
+        ",
+        |_| {},
+        expect![[r"
+            7:46 -> file:///fixture/main.tolk 1:8 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_field_on_generic_struct_parameter() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Wrapper<T> {
+                value: T
+            }
+
+            fun read<T>(wrapper: Wrapper<T>): T {
+                return wrapper.va<caret>lue;
+            }
+        ",
+        |_| {},
+        expect![[r"
+            5:21 -> file:///fixture/main.tolk 1:4 resolved"]],
+    );
+}
+
+#[test]
+fn resolves_nested_generic_object_literal_fields_from_cast_hint() {
+    case_tolk_definition(
+        "file:///fixture/main.tolk",
+        r"
+            struct Wrapper<T> {
+                value: T
+            }
+
+            fun main() {
+                return ({ va<caret:outer>lue: { va<caret:inner>lue: 1 } } }
+                    as Wrapper<Wrapper<int8>>);
+            }
+        ",
+        |_| {},
+        expect![[r"
+            5:16 -> file:///fixture/main.tolk 1:4 resolved
+            5:25 -> file:///fixture/main.tolk 1:4 resolved"]],
+    );
+}
+
+#[test]
 fn accepts_file_uri_with_authority() {
     case_tolk_definition(
         "file://fixture/main.tolk",

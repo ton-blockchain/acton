@@ -112,6 +112,10 @@ impl FlowContext {
         self.unreachable
     }
 
+    pub(crate) fn equivalent_to(&self, other: &Self) -> bool {
+        self.unreachable == other.unreachable && self.known_facts == other.known_facts
+    }
+
     /// invalidate knowledge about sub-fields of a variable or its field
     /// example: `tensorVar = 2`, invalidate facts about `tensorVar`, `tensorVar.0`, `tensorVar.1.2`, and all others
     /// example: `user.id = rhs`, invalidate facts about `user.id` (sign, etc.) and `user.id.*` if exist

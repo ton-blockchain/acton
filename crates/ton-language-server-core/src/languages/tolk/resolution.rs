@@ -162,11 +162,15 @@ impl TolkResolveSnapshot {
     }
 
     pub(super) fn inferred_type_of_node(&self, file_id: FileId, node: Node<'_>) -> Option<TyId> {
+        self.inferred_type_of_span(file_id, Span::from_syntax(&node))
+    }
+
+    pub(super) fn inferred_type_of_span(&self, file_id: FileId, span: Span) -> Option<TyId> {
         let file = self.file_db.get_by_id(file_id)?;
-        let symbol = file.find_symbol_at(node.start_byte())?;
+        let symbol = file.find_symbol_at(span.start())?;
         let inference = self.body_types(file_id)?.get(&symbol.id)?;
 
-        inference.type_of(Span::from_syntax(&node))
+        inference.type_of(span)
     }
 
     pub(super) fn type_of_resolved(&self, resolved: &Resolved) -> Option<TyId> {

@@ -6,7 +6,7 @@ use rustc_hash::FxHashMap;
 /// Stores the mapping of generic parameter names to their actual types.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct GenericsSubstitutions {
-    pub mapping: FxHashMap<String, TyId>,
+    pub mapping: FxHashMap<TyId, TyId>,
 }
 
 impl GenericsSubstitutions {
@@ -14,13 +14,17 @@ impl GenericsSubstitutions {
         Self::default()
     }
 
-    pub(crate) fn set_type_t(&mut self, name: String, ty: TyId) {
-        self.mapping.entry(name).or_insert(ty);
+    pub(crate) fn set_type_t(&mut self, parameter: TyId, ty: TyId) {
+        if parameter == ty {
+            return;
+        }
+
+        self.mapping.entry(parameter).or_insert(ty);
     }
 
     #[allow(dead_code)]
-    pub(crate) fn get_substitution(&self, name: &str) -> Option<TyId> {
-        self.mapping.get(name).copied()
+    pub(crate) fn get_substitution(&self, parameter: TyId) -> Option<TyId> {
+        self.mapping.get(&parameter).copied()
     }
 }
 
@@ -58,6 +62,12 @@ impl GenericSubstitutionsDeducing {
         arg_ty: TyId,
         interner: &mut TypeInterner,
     ) {
+        // An omitted type annotation reaches inference as `undefined`. It carries no
+        // constraint and must not replace a generic from an enclosing declaration.
+        if arg_ty == interner.ty_undefined || arg_ty == interner.ty_auto {
+            return;
+        }
+
         // all Ts deduced up to this point are apriori
         let mut substitutor = TypeSubstitutor::new(interner);
         let param_ty = substitutor.substitute(param_ty, &self.substitutions.mapping);
@@ -85,9 +95,9 @@ impl GenericSubstitutionsDeducing {
         }
 
         match (param_data, arg_data.clone()) {
-            (TyData::TypeParameter { name, .. }, _) => {
+            (TyData::TypeParameter { .. }, _) => {
                 // `(arg: T)` called as `f([1, 2])` => T is [int, int]
-                self.substitutions.set_type_t(name, arg_ty);
+                self.substitutions.set_type_t(param_ty, arg_ty);
             }
             (TyData::Array(p_item), _) => {
                 let arg_unwrapped = interner.unwrap_alias(arg_ty);
@@ -209,6 +219,7 @@ impl GenericSubstitutionsDeducing {
             (
                 TyData::TypeAlias {
                     def: p_def,
+                    inner_ty: p_inner,
                     args: Some(p_args),
                     ..
                 },
@@ -237,7 +248,7 @@ impl GenericSubstitutionsDeducing {
                         }
                     }
                 }
-                _ => {}
+                _ => self.consider_next_condition(p_inner, arg_ty, interner),
             },
             (
                 TyData::GenericTypeWithTs {
@@ -331,6 +342,35 @@ impl GenericSubstitutionsDeducing {
                                     for (&p, &a) in p_args.iter().zip(a_args.iter()) {
                                         self.consider_next_condition(p, a, interner);
                                     }
+                                }
+                            }
+                            TyData::Union(variants) => {
+                                let p_inner = interner.unwrap_alias(p_inner);
+                                let p_def = match interner.data(p_inner) {
+                                    TyData::Struct { def, .. } => Some(*def),
+                                    _ => None,
+                                };
+                                let mut matching_variant = None;
+
+                                for variant in variants {
+                                    let variant = interner.unwrap_alias(variant);
+                                    let matches = matches!(
+                                        (p_def, interner.data(variant)),
+                                        (Some(p_def), TyData::Struct { def, .. }) if p_def == *def
+                                    );
+                                    if !matches {
+                                        continue;
+                                    }
+
+                                    if matching_variant.is_some() {
+                                        matching_variant = None;
+                                        break;
+                                    }
+                                    matching_variant = Some(variant);
+                                }
+
+                                if let Some(variant) = matching_variant {
+                                    self.consider_next_condition(param_ty, variant, interner);
                                 }
                             }
                             _ => {}

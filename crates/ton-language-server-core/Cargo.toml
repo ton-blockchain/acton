@@ -209,6 +209,11 @@ path = "tests/languages/tolk/type_at_position.rs"
 required-features = ["tolk"]
 
 [[test]]
+name = "tolk_compiler_corpus"
+path = "tests/languages/tolk/compiler/mod.rs"
+required-features = ["tolk"]
+
+[[test]]
 name = "tolk_document_highlights"
 path = "tests/languages/tolk/document_highlights.rs"
 required-features = ["tolk"]

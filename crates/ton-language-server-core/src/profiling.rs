@@ -141,7 +141,7 @@ impl Profiler {
 }
 
 impl ProfileGuard<'_> {
-    pub(crate) fn profiler(&mut self) -> &mut Profiler {
+    pub(crate) const fn profiler(&mut self) -> &mut Profiler {
         self.profiler
     }
 }

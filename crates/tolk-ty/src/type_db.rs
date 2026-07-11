@@ -12,7 +12,7 @@ use tolk_resolver::file_index::{
     TypeParameter as DeclTypeParameter,
 };
 use tolk_resolver::project_index::ProjectIndex;
-use tolk_resolver::resolve_index::{LocalDefKind, Resolved};
+use tolk_resolver::resolve_index::{LocalDefId, LocalDefKind, Resolved};
 use tolk_syntax::{
     AstChildren, AstNode, Expr, FunCallableType, FunctionLike, HasGenericParams, HasName,
     Instantiation, Method, NullableType, TensorType, TupleType, Type, TypeIdent,
@@ -355,11 +355,16 @@ impl<'a> TypeDb<'a> {
                         type_parameters, ..
                     } => {
                         if name.as_ref() == "array" {
-                            let element_ty = type_parameters
-                                .first()
-                                .map_or(self.intrn.ty_undefined, |p| {
-                                    self.intrn.type_parameter(p.name.to_string(), None)
-                                });
+                            let element_ty =
+                                type_parameters
+                                    .first()
+                                    .map_or(self.intrn.ty_undefined, |p| {
+                                        self.intrn.scoped_type_parameter(
+                                            LocalDefId::new(id.file_id, p.span.start),
+                                            p.name.to_string(),
+                                            None,
+                                        )
+                                    });
                             Some(self.intrn.array(element_ty))
                         } else {
                             let base_ty = self.intrn.struct_ty(*id, name.clone());
@@ -403,12 +408,18 @@ impl<'a> TypeDb<'a> {
                     params
                         .parameters()
                         .map(|param| {
-                            let name = param
-                                .name()
+                            let name_node = param.name();
+                            let name = name_node
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
                             let default_ty = self.lower_opt_type(file_id, param.default().as_ref());
-                            self.intrn.type_parameter(name.to_string(), default_ty)
+                            let local_id = LocalDefId::new(
+                                file_id,
+                                name_node
+                                    .map_or_else(|| param.span().start, |name| name.span().start),
+                            );
+                            self.intrn
+                                .scoped_type_parameter(local_id, name.to_string(), default_ty)
                         })
                         .collect::<Vec<_>>()
                 })
@@ -425,7 +436,13 @@ impl<'a> TypeDb<'a> {
 
         fallback
             .iter()
-            .map(|p| self.intrn.type_parameter(p.name.to_string(), None))
+            .map(|p| {
+                self.intrn.scoped_type_parameter(
+                    LocalDefId::new(file_id, p.span.start),
+                    p.name.to_string(),
+                    None,
+                )
+            })
             .collect()
     }
 
@@ -609,12 +626,20 @@ impl<'a> TypeDb<'a> {
                     let type_params = type_parameters
                         .parameters()
                         .map(|p| {
-                            let name = p
-                                .name()
+                            let name_node = p.name();
+                            let name = name_node
                                 .and_then(|n| self.file_db.text_of(file_id, &n))
                                 .unwrap_or_else(|| "unknown".into());
                             let default_ty = self.lower_opt_type(file_id, p.default().as_ref());
-                            self.intrn.type_parameter(name.to_string(), default_ty)
+                            self.intrn.scoped_type_parameter(
+                                LocalDefId::new(
+                                    file_id,
+                                    name_node
+                                        .map_or_else(|| p.span().start, |name| name.span().start),
+                                ),
+                                name.to_string(),
+                                default_ty,
+                            )
                         })
                         .collect::<Vec<_>>();
 
@@ -712,10 +737,11 @@ impl<'a> TypeDb<'a> {
                     return Some(primitive);
                 }
                 let default_ty = self.local_type_parameter_default(file_id, local.def_span);
-                return Some(
-                    self.intrn
-                        .type_parameter(local.name.to_string(), default_ty),
-                );
+                return Some(self.intrn.scoped_type_parameter(
+                    local.id,
+                    local.name.to_string(),
+                    default_ty,
+                ));
             }
             return None;
         };
@@ -727,10 +753,11 @@ impl<'a> TypeDb<'a> {
                     && matches!(resolved.kind, LocalDefKind::TypeParameter)
                 {
                     let default_ty = self.local_type_parameter_default(file_id, resolved.def_span);
-                    return Some(
-                        self.intrn
-                            .type_parameter(resolved.name.to_string(), default_ty),
-                    );
+                    return Some(self.intrn.scoped_type_parameter(
+                        local,
+                        resolved.name.to_string(),
+                        default_ty,
+                    ));
                 }
                 return None;
             }
@@ -867,46 +894,43 @@ impl<'a> TypeDb<'a> {
         }
 
         let inner_data = self.intrn.data(inner_ty);
-        if let TyData::GenericTypeWithTs { inner_ty, .. } = inner_data {
-            if non_generic {
-                if let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
-                    return Some(
-                        self.intrn
-                            .struct_instantiation(*def, name.clone(), *def, tys),
-                    );
+        if let TyData::GenericTypeWithTs {
+            inner_ty,
+            types: formal_types,
+        } = inner_data
+        {
+            if non_generic && let TyData::Struct { def, name, .. } = self.intrn.data(*inner_ty) {
+                return Some(
+                    self.intrn
+                        .struct_instantiation(*def, name.clone(), *def, tys),
+                );
+            }
+
+            if let TyData::TypeAlias {
+                def,
+                name,
+                inner_ty,
+                ..
+            } = self.intrn.data(*inner_ty).clone()
+            {
+                let mut inner_ty = inner_ty;
+
+                // type Alias<T> = Generic<T>
+                // Alias<int> -> Alias<int> with base=Generic<int>
+                let mut substitution = GenericsSubstitutions::new();
+                for (&formal, &ty) in formal_types.iter().zip(&tys) {
+                    substitution.set_type_t(formal, ty);
                 }
 
-                if let TyData::TypeAlias {
-                    def,
-                    name,
-                    inner_ty,
-                    ..
-                } = self.intrn.data(*inner_ty).clone()
-                {
-                    let mut inner_ty = inner_ty;
-
-                    // type Alias<T> = Generic<T>
-                    // Alias<int> -> Alias<int> with base=Generic<int>
-                    let resolved = self.project_index.resolve_symbol(def)?;
-                    if let SymbolKind::TypeAlias {
-                        type_parameters, ..
-                    } = &resolved.kind
-                    {
-                        let mut substitution = GenericsSubstitutions::new();
-
-                        for (param, &ty) in type_parameters.iter().zip(&tys) {
-                            substitution.set_type_t(param.name.to_string(), ty);
-                        }
-
-                        let mut substitutor = TypeSubstitutor::new(self.intrn);
-                        inner_ty = substitutor.substitute(inner_ty, &substitution.mapping);
-                    }
-
-                    return Some(
-                        self.intrn
-                            .type_alias_instantiation(def, name, inner_ty, tys),
-                    );
+                if !substitution.mapping.is_empty() {
+                    let mut substitutor = TypeSubstitutor::new(self.intrn);
+                    inner_ty = substitutor.substitute(inner_ty, &substitution.mapping);
                 }
+
+                return Some(
+                    self.intrn
+                        .type_alias_instantiation(def, name, inner_ty, tys),
+                );
             }
 
             return Some(self.intrn.generic_type_with_ts(*inner_ty, tys));
@@ -926,7 +950,12 @@ impl<'a> TypeDb<'a> {
             {
                 let mut substitution = GenericsSubstitutions::new();
                 for (param, &ty) in type_parameters.iter().zip(&tys) {
-                    substitution.set_type_t(param.name.to_string(), ty);
+                    let parameter_ty = self.intrn.scoped_type_parameter(
+                        LocalDefId::new(file_id, param.span.start),
+                        param.name.to_string(),
+                        None,
+                    );
+                    substitution.set_type_t(parameter_ty, ty);
                 }
                 let mut substitutor = TypeSubstitutor::new(self.intrn);
                 instantiated_inner =

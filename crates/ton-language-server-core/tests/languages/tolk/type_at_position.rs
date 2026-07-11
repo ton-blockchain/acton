@@ -124,3 +124,73 @@ fn returns_unknown_with_the_original_syntax_range() {
 fn returns_unknown_for_an_empty_document() {
     case_tolk_type_at_position("<caret>", expect!["void or unknown at 0:0-0:0"]);
 }
+
+#[test]
+fn exact_range_distinguishes_a_call_from_its_callee() {
+    let source = r#"
+        fun main() {
+            val hash = stringCrc32("value");
+        }
+    "#;
+    let source = support::dedent_block(source);
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let language = TolkLanguage::new();
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(language.clone());
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, source.clone())
+        .expect("Tolk document should open");
+
+    let call_start = source.find("stringCrc32").expect("call should exist");
+    let callee_end = call_start + "stringCrc32".len();
+    let call_end = source[call_start..]
+        .find(';')
+        .map(|offset| call_start + offset)
+        .expect("call should end before a semicolon");
+
+    let actual = format!(
+        "callee={}\ncall={}",
+        language
+            .type_of_range(&uri, call_start..callee_end)
+            .unwrap_or_else(|| "<none>".to_owned()),
+        language
+            .type_of_range(&uri, call_start..call_end)
+            .unwrap_or_else(|| "<none>".to_owned()),
+    );
+
+    expect![[r#"
+        callee=(string) -> int
+        call=int"#]]
+    .assert_eq(&actual);
+}
+
+#[test]
+fn infers_the_complete_null_coalescing_expression() {
+    let source = r"
+        global callOrder: tuple;
+        fun int.double(self) { return self * 2; }
+        fun get(value: int?, fallback: int) {
+            callOrder.push(value);
+            return value ?? fallback;
+        }
+        fun main(value: int?) {
+            return (get(value, 5) ?? get(100, 10)).double();
+        }
+    ";
+    let source = support::dedent_block(source);
+    let uri = DocumentUri::from("file:///fixture/main.tolk");
+    let language = TolkLanguage::new();
+    let mut service = LanguageService::new(LanguageServiceConfig::default());
+    service.register_language(language.clone());
+    service
+        .open_document(uri.clone(), LANGUAGE_ID, 1, source.clone())
+        .expect("Tolk document should open");
+
+    let expression = "get(value, 5) ?? get(100, 10)";
+    let start = source.find(expression).expect("expression should exist");
+    let actual = language
+        .type_of_range(&uri, start..start + expression.len())
+        .unwrap_or_else(|| "<none>".to_owned());
+
+    expect!["int"].assert_eq(&actual);
+}

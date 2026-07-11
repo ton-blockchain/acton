@@ -28,19 +28,21 @@ pub struct GlobalEnv {
 
 impl GlobalEnv {
     /// Creates a new `GlobalEnv` for the given file, including its own symbols,
-    /// directly imported symbols, and symbols from `common.tolk`.
+    /// directly imported symbols, and implicit stdlib preludes.
     #[must_use]
     pub fn new(index: &ProjectIndex, file_id: FileId) -> Self {
-        let common_tolk = index
+        let mut preludes = index
             .files()
             .values()
-            .find(|file| file.is_stdlib_prelude())
-            .cloned();
+            .filter(|file| file.is_stdlib_prelude())
+            .cloned()
+            .collect::<Vec<_>>();
+        preludes.sort_by(|left, right| left.path.cmp(&right.path));
 
         let file = index.get_file_index(file_id);
 
-        // Since common.tolk is quite big, preallocate memory for the map to avoid reallocations
-        let capacity = common_tolk.as_ref().map_or(0, |f| f.decls.len())
+        // Since common.tolk is quite big, preallocate memory for the map to avoid reallocations.
+        let capacity = preludes.iter().map(|file| file.decls.len()).sum::<usize>()
             + file.as_ref().map_or(0, |f| f.decls.len())
             + 50;
 
@@ -65,9 +67,9 @@ impl GlobalEnv {
             }
         }
 
-        // common.tolk is the lowest-priority implicit import.
-        if let Some(common_tolk) = common_tolk {
-            Self::add_file_declaration(&mut visible, &common_tolk);
+        // Prelude declarations have the lowest priority.
+        for prelude in preludes {
+            Self::add_file_declaration(&mut visible, &prelude);
         }
 
         GlobalEnv { visible }
@@ -253,7 +255,7 @@ impl<'a> SymbolResolver<'a> {
                 return None;
             }
 
-            if use_kind == NameUseKind::Type
+            if matches!(use_kind, NameUseKind::Type | NameUseKind::Mixed)
                 && let Some(base_name) = parse_builtin_type_base_name(name.as_ref())
                 && let Some(symbol_id) = self.resolve_global_type_symbol(base_name)
             {

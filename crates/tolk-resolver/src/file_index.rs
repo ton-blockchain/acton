@@ -201,6 +201,7 @@ pub struct Parameter {
 #[derive(Debug, Clone, PartialEq, Eq, Ord, PartialOrd)]
 pub struct TypeParameter {
     pub name: Arc<str>,
+    pub span: Span,
 }
 
 /// Distinguishes between different kinds of top-level declarations.
@@ -405,7 +406,7 @@ impl FileIndex {
             && self
                 .path
                 .file_name()
-                .is_some_and(|name| name == "common.tolk")
+                .is_some_and(|name| matches!(name.to_str(), Some("common.tolk" | "builtin.tolk")))
     }
 
     /// Checks if passed file resides in Acton standard library.
@@ -725,6 +726,7 @@ impl FileIndex {
                         let name_ident = p.name()?;
                         Some(TypeParameter {
                             name: Arc::from(name_ident.text(&file.source)),
+                            span: name_ident.span(),
                         })
                     })
                     .collect::<Vec<_>>()

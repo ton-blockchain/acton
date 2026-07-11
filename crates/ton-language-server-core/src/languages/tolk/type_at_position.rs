@@ -26,6 +26,26 @@ impl TolkWorkspaceEngine {
 
         Some(snapshot.type_at_node(file_id, file.source().source.as_ref(), node))
     }
+
+    pub(super) fn type_of_range(
+        &self,
+        uri: &crate::DocumentUri,
+        range: std::ops::Range<usize>,
+    ) -> Option<String> {
+        let snapshot = {
+            let state = self.state.read().expect("Tolk workspace lock poisoned");
+            state.latest_snapshot.clone()
+        }?;
+        let file_id = snapshot
+            .project_index
+            .get_file_by_path(&uri.logical_path())?;
+        let span = Span {
+            start: u32::try_from(range.start).ok()?,
+            end: u32::try_from(range.end).ok()?,
+        };
+        let ty = snapshot.inferred_type_of_span(file_id, span)?;
+        Some(snapshot.type_interner.format(ty))
+    }
 }
 
 impl TolkResolveSnapshot {

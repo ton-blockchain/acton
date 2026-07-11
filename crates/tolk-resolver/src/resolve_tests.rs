@@ -385,7 +385,7 @@ mod tests {
     }
 
     #[test]
-    fn test_match_ambiguous_arm() {
+    fn test_match_type_pattern_wins_over_local_value() {
         check_definition(
             r#"
                 type ctring = slice;
@@ -399,7 +399,7 @@ mod tests {
                 }
             "#,
             expect![[r"
-                ctring -> Local(ctring at 92-98)
+                ctring -> Global(ctring at test.tolk:22-28)
             "]],
         );
     }

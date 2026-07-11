@@ -13,8 +13,8 @@ use tolk_resolver::file_index::{
 };
 use tolk_resolver::resolve_index::LocalDefId;
 use tolk_syntax::{
-    AstNode, Constant, Enum, FuncBody, FunctionLike, GlobalVar, HasGenericParams, HasName, Method,
-    Parameter, Struct, TopLevel, Type, TypeAlias,
+    AstNode, Constant, Enum, FuncBody, FunctionLike, GlobalVar, HasGenericParams, HasName, Ident,
+    Method, Parameter, Struct, TopLevel, Type, TypeAlias,
 };
 
 /// Runs type inference on a top-level declaration.
@@ -148,6 +148,11 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
         })
     }
 
+    pub(crate) fn name_of(&self, ident: &Ident<'_>) -> SmolStr {
+        let text = self.text_of(ident);
+        SmolStr::new(text.trim_matches('`'))
+    }
+
     pub(crate) fn infer_global_var(&mut self, v: &GlobalVar<'_>, symbol_id: SymbolId) {
         let declared_type = self.lower(v.typ());
         self.ctx.set_top_level_type(symbol_id, declared_type);
@@ -267,7 +272,10 @@ impl<'db, 'a> TypeInferenceWalker<'db, 'a> {
 
             let default_type = param.default();
             let default_ty = self.lower_or_none(default_type);
-            let param_ty = self.intrn().type_parameter(param_name, default_ty);
+            let param_id = self.local_id_of(param_name_node.span());
+            let param_ty = self
+                .intrn()
+                .scoped_type_parameter(param_id, param_name, default_ty);
 
             self.ctx.set_node_type(&param, param_ty);
             self.ctx.set_node_type(&param_name_node, param_ty);
