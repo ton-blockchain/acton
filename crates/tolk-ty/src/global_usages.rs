@@ -1,5 +1,4 @@
-use crate::InferenceResult;
-use std::collections::HashMap;
+use crate::WorkspaceBodyTypes;
 use tolk_resolver::file_index::{FileId, SymbolId};
 use tolk_resolver::project_index::ProjectIndex;
 use tolk_resolver::resolve_index::NameUse;
@@ -14,15 +13,12 @@ pub struct GlobalUsage<'a> {
 /// Unified iterator source for global usages from resolver indexes and body inference.
 pub struct GlobalUsages<'a> {
     project_index: &'a ProjectIndex,
-    body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    body_types: &'a WorkspaceBodyTypes,
 }
 
 impl<'a> GlobalUsages<'a> {
     #[must_use]
-    pub const fn new(
-        project_index: &'a ProjectIndex,
-        body_types: &'a HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
-    ) -> Self {
+    pub const fn new(project_index: &'a ProjectIndex, body_types: &'a WorkspaceBodyTypes) -> Self {
         Self {
             project_index,
             body_types,

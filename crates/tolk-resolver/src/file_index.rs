@@ -113,6 +113,18 @@ impl Span {
     pub const fn is_empty(&self) -> bool {
         self.start == self.end
     }
+
+    /// Relocates this span by a signed byte offset.
+    #[must_use]
+    pub fn shifted(self, delta: i64) -> Option<Self> {
+        let start = i64::from(self.start).checked_add(delta)?;
+        let end = i64::from(self.end).checked_add(delta)?;
+
+        Some(Self {
+            start: u32::try_from(start).ok()?,
+            end: u32::try_from(end).ok()?,
+        })
+    }
 }
 
 /// Extension trait to easily get a `Span` from an AST node.
@@ -306,6 +318,35 @@ pub struct FileIndex {
 }
 
 impl FileIndex {
+    /// Returns whether this file exposes the same names to importing files.
+    ///
+    /// Source spans, bodies, signatures, and method declarations do not affect
+    /// name resolution in another file. Symbol IDs do: a declaration inserted
+    /// earlier in the file can renumber every declaration after it.
+    #[must_use]
+    pub fn has_same_name_resolution_exports(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.path == other.path
+            && self.source_kind == other.source_kind
+            && self
+                .name_resolution_exports()
+                .eq(other.name_resolution_exports())
+    }
+
+    fn name_resolution_exports(&self) -> impl Iterator<Item = (SymbolId, &str, bool, bool)> {
+        self.decls
+            .iter()
+            .filter(|symbol| symbol.is_name_resolution_export())
+            .map(|symbol| {
+                (
+                    symbol.id,
+                    symbol.name.as_ref(),
+                    symbol.is_type(),
+                    symbol.is_func(),
+                )
+            })
+    }
+
     #[must_use]
     pub fn find_symbol_index_at_offset(&self, offset: usize) -> Option<usize> {
         let idx = self
@@ -685,6 +726,15 @@ impl FileIndex {
                     .is_some_and(|name| name.text_matches(content, "pure"))
             })
         })
+    }
+}
+
+impl Symbol {
+    fn is_name_resolution_export(&self) -> bool {
+        !matches!(
+            self.kind,
+            SymbolKind::Method { .. } | SymbolKind::StructField | SymbolKind::EnumMember
+        )
     }
 }
 

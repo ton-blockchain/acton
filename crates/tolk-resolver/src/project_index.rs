@@ -7,7 +7,7 @@ use crate::file_db::FileDb;
 use crate::file_index::{FileId, FileIndex, FileSource, Import, Symbol, SymbolId, SymbolKind};
 use crate::resolve_index::{FileResolveIndex, NameUse};
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashMap, VecDeque};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -197,6 +197,101 @@ impl ProjectIndex {
     #[must_use]
     pub fn get_resolved_uses(&self, file_id: FileId) -> Option<&Arc<FileResolveIndex>> {
         self.resolved_uses.get(&file_id)
+    }
+
+    /// Reuses name-resolution results that cannot be affected by the current edit.
+    ///
+    /// The edited file itself is always resolved again because local definitions and
+    /// source spans can change. Importers are invalidated only when an exported name
+    /// or symbol ID changes. Unchanged cached entries are shared through `Arc`.
+    pub fn reuse_resolved_uses_from(
+        &mut self,
+        previous: &Self,
+        changed_file_ids: &BTreeSet<FileId>,
+    ) -> usize {
+        let invalidated = self.invalidated_resolution_files(previous, changed_file_ids);
+        let reusable = self
+            .files
+            .iter()
+            .filter_map(|(&file_id, file)| {
+                if invalidated.contains(&file_id) {
+                    return None;
+                }
+
+                let previous_file = previous.files.get(&file_id)?;
+                if file != previous_file || !self.has_same_resolved_imports(previous, file_id) {
+                    return None;
+                }
+
+                Some((file_id, previous.resolved_uses.get(&file_id)?.clone()))
+            })
+            .collect::<Vec<_>>();
+
+        let reused = reusable.len();
+        self.resolved_uses.extend(reusable);
+        reused
+    }
+
+    fn invalidated_resolution_files(
+        &self,
+        previous: &Self,
+        changed_file_ids: &BTreeSet<FileId>,
+    ) -> BTreeSet<FileId> {
+        if self.files.keys().collect::<BTreeSet<_>>()
+            != previous.files.keys().collect::<BTreeSet<_>>()
+        {
+            return self.files.keys().copied().collect();
+        }
+
+        let mut invalidated = changed_file_ids.clone();
+        let mut changed_exports = VecDeque::new();
+
+        for &file_id in changed_file_ids {
+            let Some(file) = self.files.get(&file_id) else {
+                return self.files.keys().copied().collect();
+            };
+            let Some(previous_file) = previous.files.get(&file_id) else {
+                return self.files.keys().copied().collect();
+            };
+
+            if !file.has_same_name_resolution_exports(previous_file) {
+                changed_exports.push_back(file_id);
+            }
+        }
+
+        let mut visited = FxHashSet::default();
+        while let Some(file_id) = changed_exports.pop_front() {
+            if !visited.insert(file_id) {
+                continue;
+            }
+
+            for index in [self, previous] {
+                for dependent in index.direct_dependents(file_id) {
+                    if self.files.contains_key(&dependent) {
+                        invalidated.insert(dependent);
+                        changed_exports.push_back(dependent);
+                    }
+                }
+            }
+        }
+
+        invalidated
+    }
+
+    fn has_same_resolved_imports(&self, previous: &Self, file_id: FileId) -> bool {
+        let imports = self.imports.get(&file_id).map(Vec::as_slice).unwrap_or(&[]);
+        let previous_imports = previous
+            .imports
+            .get(&file_id)
+            .map(Vec::as_slice)
+            .unwrap_or(&[]);
+
+        imports
+            .iter()
+            .map(|import| (import.path(), import.target()))
+            .eq(previous_imports
+                .iter()
+                .map(|import| (import.path(), import.target())))
     }
 
     #[must_use]

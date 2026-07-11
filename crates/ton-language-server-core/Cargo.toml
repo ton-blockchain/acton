@@ -19,6 +19,7 @@ fift = ["dep:fift-syntax"]
 toml = ["dep:toml", "dep:toml-syntax", "dep:ton-json-schema"]
 tolk = [
     "dep:include_dir",
+    "dep:rustc-hash",
     "dep:tolk-analysis",
     "dep:tolk-resolver",
     "dep:tolk-syntax",
@@ -29,6 +30,7 @@ tolk = [
 [dependencies]
 anyhow = { workspace = true }
 include_dir = { workspace = true, optional = true }
+rustc-hash = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 fift-syntax = { workspace = true, optional = true }
@@ -162,6 +164,11 @@ required-features = ["fift"]
 [[test]]
 name = "tolk_definition"
 path = "tests/languages/tolk/definition.rs"
+required-features = ["tolk"]
+
+[[test]]
+name = "tolk_incremental_analysis"
+path = "tests/languages/tolk/incremental_analysis.rs"
 required-features = ["tolk"]
 
 [[test]]

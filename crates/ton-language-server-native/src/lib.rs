@@ -412,10 +412,10 @@ impl LanguageServer for NativeLanguageServer {
         let uri = item.uri;
         let uri_string = uri.to_string();
         let updates_workspace_config = is_acton_manifest_uri(&uri);
-        if updates_workspace_config {
-            if let Err(error) = self.apply_workspace_config_text(item.text.clone()) {
-                self.report_error("workspace.config.open", error).await;
-            }
+        if updates_workspace_config
+            && let Err(error) = self.apply_workspace_config_text(item.text.clone())
+        {
+            self.report_error("workspace.config.open", error).await;
         }
 
         let kind = language_id_for_document(&item.language_id, &uri).map_or(

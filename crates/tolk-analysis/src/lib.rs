@@ -1,11 +1,12 @@
 use rustc_hash::FxHashMap;
-use std::collections::HashMap;
 use std::sync::Arc;
 use tolk_dataflow::{ControlFlowGraph, build_cfg_for_top_level_with_source};
 use tolk_resolver::resolve_index::LocalDefId;
-use tolk_resolver::{AstNodeSpanExt, FileId, Resolved, Span, SymbolId, SymbolKind};
+use tolk_resolver::{
+    AstNodeSpanExt, FileDb, FileId, ProjectIndex, Resolved, Span, SymbolId, SymbolKind,
+};
 use tolk_syntax::{Assign, Call, CallArgument, DotAccess, SetAssign, TryFromNode};
-use tolk_ty::{InferenceResult, TypeDb};
+use tolk_ty::{TypeDb, WorkspaceBodyTypes};
 
 mod constant_evaluator;
 mod hashes;
@@ -93,16 +94,17 @@ impl AnalysisDb {
 
     pub fn use_facts(
         &mut self,
-        type_db: &mut TypeDb,
-        body_types: &HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+        file_db: &FileDb,
+        project_index: &ProjectIndex,
+        body_types: &WorkspaceBodyTypes,
         file_id: FileId,
     ) -> Option<Arc<FileUseFacts>> {
         if let Some(facts) = self.use_facts.get(&file_id) {
             return Some(facts.clone());
         }
 
-        let file = type_db.file_db.get_by_id(file_id)?;
-        let resolved_index = type_db.project_index.resolved_uses.get(&file_id).cloned()?;
+        let file = file_db.get_by_id(file_id)?;
+        let resolved_index = project_index.resolved_uses.get(&file_id).cloned()?;
         let root = file.source().tree.root_node();
         let inference = body_types.get(&file_id)?;
 
@@ -155,7 +157,7 @@ impl AnalysisDb {
                     if let Some(resolved) = resolved
                         && let Resolved::Global(id) = resolved.resolved
                     {
-                        let resolved = type_db.project_index.resolve_symbol(id);
+                        let resolved = project_index.resolve_symbol(id);
                         if let Some(resolved) = resolved
                             && let SymbolKind::Method { is_mutable, .. } = resolved.kind
                             && is_mutable

@@ -235,12 +235,12 @@ impl ReferenceCompletionProvider {
         instance: bool,
         collector: &mut CompletionCollector,
     ) {
-        let mut interner = context.snapshot.type_interner.clone();
+        let mut interner = context.snapshot.type_interner.as_ref().clone();
         let mut type_db = TypeDb::new_with_cache(
             &mut interner,
             &context.snapshot.file_db,
             &context.snapshot.project_index,
-            context.snapshot.type_db_cache.clone(),
+            context.snapshot.type_db_cache.as_ref().clone(),
             std::iter::empty(),
         );
         for method_id in method_ids_for_completion(receiver_ty, instance, &mut type_db) {

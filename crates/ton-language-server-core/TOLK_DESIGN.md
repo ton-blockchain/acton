@@ -1,5 +1,10 @@
 # Tolk Language Server Design
 
+> **Current performance design:** the eager semantic snapshot implementation
+> has outgrown the V1 model described here. See
+> [`TOLK_INCREMENTAL_ANALYSIS.md`](TOLK_INCREMENTAL_ANALYSIS.md) for measured
+> bottlenecks, invalidation rules, and the incremental analysis plan.
+
 ## Goal
 
 Add Tolk support to the new language server architecture without inheriting any
@@ -201,7 +206,7 @@ A later semantic snapshot can layer on top of this:
 ```rust
 pub struct TolkSemanticSnapshot {
     resolve: Arc<TolkResolveSnapshot>,
-    body_types: Arc<HashMap<FileId, HashMap<SymbolId, InferenceResult>>>,
+    body_types: Arc<WorkspaceBodyTypes>,
     diagnostics: Arc<HashMap<FileId, Vec<TolkDiagnostic>>>,
     timing: SemanticAnalysisTiming,
 }

@@ -100,9 +100,10 @@ impl CompletionContext {
             return Some(Self::Values {
                 value_path: full_path,
                 in_string: string.is_some(),
-                replacement_range: string
-                    .map(|string| string_content_range(document, string))
-                    .unwrap_or_else(|| node_replacement_range(document, node, position)),
+                replacement_range: string.map_or_else(
+                    || node_replacement_range(document, node, position),
+                    |string| string_content_range(document, string),
+                ),
             });
         }
 

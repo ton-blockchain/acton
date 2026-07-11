@@ -42,7 +42,7 @@ pub(super) fn schema_path(
                         if !contains_node(pair.syntax(), target) {
                             continue;
                         }
-                        let mut path = table_path.clone();
+                        let mut path = table_path;
                         path.extend(pair_path(document, pair, target)?);
                         return Some(path);
                     }
@@ -58,7 +58,7 @@ pub(super) fn schema_path(
                         if !contains_node(pair.syntax(), target) {
                             continue;
                         }
-                        let mut path = table_path.clone();
+                        let mut path = table_path;
                         path.extend(pair_path(document, pair, target)?);
                         return Some(path);
                     }
@@ -67,7 +67,7 @@ pub(super) fn schema_path(
                 current_table = table_path;
             }
             TopLevel::Pair(pair) if contains_target => {
-                let mut path = current_table.clone();
+                let mut path = current_table;
                 path.extend(pair_path(document, pair, target)?);
                 return Some(path);
             }

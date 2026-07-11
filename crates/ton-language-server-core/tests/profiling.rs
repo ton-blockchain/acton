@@ -1,3 +1,4 @@
+use expect_test::expect;
 use ton_language_server_core::languages::tlb::{LANGUAGE_ID as TLB_LANGUAGE_ID, TlbLanguage};
 use ton_language_server_core::languages::tolk::{LANGUAGE_ID as TOLK_LANGUAGE_ID, TolkLanguage};
 use ton_language_server_core::{
@@ -164,7 +165,76 @@ fn records_tolk_resolve_and_type_inference_spans() -> anyhow::Result<()> {
 }
 
 #[test]
-fn records_incremental_tolk_type_inference_by_import_dependents() -> anyhow::Result<()> {
+fn records_tolk_type_inference_by_declaration_and_signature() -> anyhow::Result<()> {
+    let lib_uri = DocumentUri::from("file:///fixture/lib.tolk");
+    let main_uri = DocumentUri::from("file:///fixture/main.tolk");
+    let mut service = tolk_profiling_service();
+
+    service.open_document(
+        lib_uri.clone(),
+        TOLK_LANGUAGE_ID,
+        1,
+        "fun helper(): int { return 1; }",
+    )?;
+    service.open_document(
+        main_uri,
+        TOLK_LANGUAGE_ID,
+        1,
+        "import \"lib\"\nfun main(): int { return helper(); }\n",
+    )?;
+    let mut signature_files = counter(service.profiler().summary(), "tolk.type_signature.file");
+    let mut inference_files = counter(service.profiler().summary(), "tolk.type_inference.file");
+    let mut inferred_declarations = counter(
+        service.profiler().summary(),
+        "tolk.type_inference.declaration",
+    );
+
+    service.change_document(
+        &DocumentUri::from("file:///fixture/main.tolk"),
+        2,
+        "import \"lib\"\nfun main(): int { return helper() + 1; }\n",
+    )?;
+    let main_body = profile_delta(
+        service.profiler().summary(),
+        &mut signature_files,
+        &mut inference_files,
+        &mut inferred_declarations,
+    );
+
+    service.change_document(&lib_uri, 2, "fun helper(): int { return 2; }\n")?;
+    let lib_body = profile_delta(
+        service.profiler().summary(),
+        &mut signature_files,
+        &mut inference_files,
+        &mut inferred_declarations,
+    );
+
+    service.change_document(
+        &lib_uri,
+        3,
+        "fun helper(value: int): int { return value; }\n",
+    )?;
+    let lib_signature = profile_delta(
+        service.profiler().summary(),
+        &mut signature_files,
+        &mut inference_files,
+        &mut inferred_declarations,
+    );
+
+    let actual =
+        format!("main body: {main_body}\nlib body: {lib_body}\nlib signature: {lib_signature}\n");
+    expect![[r#"
+        main body: signatures=0 files=1 declarations=1
+        lib body: signatures=0 files=1 declarations=1
+        lib signature: signatures=2 files=2 declarations=2
+    "#]]
+    .assert_eq(&actual);
+
+    Ok(())
+}
+
+#[test]
+fn records_incremental_tolk_name_resolution_by_export_surface() -> anyhow::Result<()> {
     let lib_uri = DocumentUri::from("file:///fixture/lib.tolk");
     let main_uri = DocumentUri::from("file:///fixture/main.tolk");
     let mut service = tolk_profiling_service();
@@ -176,41 +246,57 @@ fn records_incremental_tolk_type_inference_by_import_dependents() -> anyhow::Res
         "fun helper(): int { return 1; }\n",
     )?;
     service.open_document(
-        main_uri,
+        main_uri.clone(),
         TOLK_LANGUAGE_ID,
         1,
-        "import \"lib\"\nfun main(): int { return helper(); }\n",
+        r#"import "lib"
+fun main(): int { return helper(); }"#,
     )?;
-    let signature_files_after_open =
-        counter(service.profiler().summary(), "tolk.type_signature.file");
-    assert_eq!(
-        counter(service.profiler().summary(), "tolk.type_inference.file"),
-        2
-    );
+
+    let mut resolved = counter(service.profiler().summary(), "tolk.resolve.file");
+    let mut reused = counter(service.profiler().summary(), "tolk.resolve.reused_file");
 
     service.change_document(
-        &DocumentUri::from("file:///fixture/main.tolk"),
+        &main_uri,
         2,
-        "import \"lib\"\nfun main(): int { return helper() + 1; }\n",
+        r#"import "lib"
+fun main(): int { return helper() + 1; }"#,
     )?;
-    assert_eq!(
-        counter(service.profiler().summary(), "tolk.type_signature.file"),
-        signature_files_after_open + 1
-    );
-    assert_eq!(
-        counter(service.profiler().summary(), "tolk.type_inference.file"),
-        3
-    );
+    let main_body_resolved = counter(service.profiler().summary(), "tolk.resolve.file") - resolved;
+    let main_body_reused =
+        counter(service.profiler().summary(), "tolk.resolve.reused_file") - reused;
+    resolved += main_body_resolved;
+    reused += main_body_reused;
 
-    service.change_document(&lib_uri, 2, "fun helper(): int { return 2; }\n")?;
-    assert_eq!(
-        counter(service.profiler().summary(), "tolk.type_signature.file"),
-        signature_files_after_open + 3
+    service.change_document(&lib_uri, 2, "fun helper(): int { return 2; }")?;
+    let lib_body_resolved = counter(service.profiler().summary(), "tolk.resolve.file") - resolved;
+    let lib_body_reused =
+        counter(service.profiler().summary(), "tolk.resolve.reused_file") - reused;
+    resolved += lib_body_resolved;
+    reused += lib_body_reused;
+
+    service.change_document(&lib_uri, 3, "fun renamed(): int { return 2; }")?;
+    let export_resolved = counter(service.profiler().summary(), "tolk.resolve.file") - resolved;
+    let export_reused = counter(service.profiler().summary(), "tolk.resolve.reused_file") - reused;
+    let definition_count = service.definition(&main_uri, Position::new(1, 26))?.len();
+
+    let actual = format!(
+        "main body: resolved={main_body_resolved} reused_others={}
+lib body: resolved={lib_body_resolved} reused_others={}
+lib export: resolved={export_resolved} reused_others={}
+definitions after rename: {definition_count}
+",
+        main_body_reused > 0,
+        lib_body_reused > 0,
+        export_reused > 0,
     );
-    assert_eq!(
-        counter(service.profiler().summary(), "tolk.type_inference.file"),
-        5
-    );
+    expect![[r#"
+        main body: resolved=1 reused_others=true
+        lib body: resolved=1 reused_others=true
+        lib export: resolved=2 reused_others=true
+        definitions after rename: 0
+    "#]]
+    .assert_eq(&actual);
 
     Ok(())
 }
@@ -241,6 +327,28 @@ fn event_count(summary: &ProfileSummary, name: &'static str) -> usize {
 
 fn counter(summary: &ProfileSummary, name: &'static str) -> u64 {
     summary.counters.get(name).copied().unwrap_or_default()
+}
+
+fn profile_delta(
+    summary: &ProfileSummary,
+    signature_files: &mut u64,
+    inference_files: &mut u64,
+    inferred_declarations: &mut u64,
+) -> String {
+    let current_signature_files = counter(summary, "tolk.type_signature.file");
+    let current_inference_files = counter(summary, "tolk.type_inference.file");
+    let current_inferred_declarations = counter(summary, "tolk.type_inference.declaration");
+    let result = format!(
+        "signatures={} files={} declarations={}",
+        current_signature_files - *signature_files,
+        current_inference_files - *inference_files,
+        current_inferred_declarations - *inferred_declarations,
+    );
+
+    *signature_files = current_signature_files;
+    *inference_files = current_inference_files;
+    *inferred_declarations = current_inferred_declarations;
+    result
 }
 
 const fn range(start_line: u32, start_character: u32, end_line: u32, end_character: u32) -> Range {

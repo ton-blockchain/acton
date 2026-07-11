@@ -1,3 +1,4 @@
+use self::incremental_analysis::{DeclarationChanges, collect_declaration_stamps, imports_changed};
 use crate::language::{
     CodeActionRequest, CompletionRequest, DefinitionRequest, DocumentHighlightRequest,
     DocumentSymbolRequest, FeatureSet, FileRenameRequest, FoldingRangeRequest, HoverRequest,
@@ -13,16 +14,15 @@ use crate::{
 };
 use anyhow::Context;
 use include_dir::{Dir, include_dir};
+use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use std::any::Any;
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, RwLock};
-use tolk_analysis::{AnalysisDb, FileUseFacts};
-use tolk_resolver::{
-    FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Span, SymbolId,
-};
-use tolk_ty::{InferenceResult, TypeDb, TypeDbCache, TypeInterner, infer};
+use tolk_analysis::FileUseFacts;
+use tolk_resolver::{FileDb, FileId, ProjectIndex, ProjectSource, ProjectSourceProvider, Span};
+use tolk_ty::{FileBodyTypes, TypeDb, TypeDbCache, TypeInterner, WorkspaceBodyTypes, infer};
 use tree_sitter::Tree;
 
 mod code_actions;
@@ -35,6 +35,7 @@ mod file_rename;
 mod folding;
 mod hover;
 mod import_edits;
+mod incremental_analysis;
 mod inlay_hints;
 mod references;
 mod rename;
@@ -680,19 +681,19 @@ impl TolkWorkspaceEngine {
 
 #[derive(Debug)]
 struct TolkAnalysisState {
-    type_interner: TypeInterner,
-    type_db_cache: TypeDbCache,
-    all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
-    use_facts: HashMap<FileId, Arc<FileUseFacts>>,
+    type_interner: Arc<TypeInterner>,
+    type_db_cache: Arc<TypeDbCache>,
+    all_body_types: Arc<WorkspaceBodyTypes>,
+    declaration_stamps: FxHashMap<FileId, incremental_analysis::FileDeclarationStamps>,
 }
 
 impl Default for TolkAnalysisState {
     fn default() -> Self {
         Self {
-            type_interner: TypeInterner::new(),
-            type_db_cache: TypeDbCache::default(),
-            all_body_types: HashMap::new(),
-            use_facts: HashMap::new(),
+            type_interner: Arc::new(TypeInterner::new()),
+            type_db_cache: Arc::new(TypeDbCache::default()),
+            all_body_types: Arc::new(WorkspaceBodyTypes::default()),
+            declaration_stamps: FxHashMap::default(),
         }
     }
 }
@@ -737,6 +738,10 @@ impl TolkWorkspaceState {
             return Ok(());
         }
 
+        let previous_project_index = self
+            .latest_snapshot
+            .as_ref()
+            .map(|snapshot| snapshot.project_index.clone());
         let provider = SnapshotSourceProvider {
             files: self.files.clone(),
             use_embedded_stdlib: self.project_config.use_embedded_stdlib,
@@ -771,12 +776,34 @@ impl TolkWorkspaceState {
         let mut project_index = project_index?;
 
         let resolve_started_at = profiler.start();
-        tolk_resolver::resolve(&file_db, &mut project_index);
+        let reused_files = previous_project_index.as_deref().map_or(0, |previous| {
+            project_index.reuse_resolved_uses_from(previous, &changed_file_ids)
+        });
+        let mut files_to_resolve = project_index
+            .files()
+            .keys()
+            .filter(|file_id| !project_index.resolved_uses().contains_key(file_id))
+            .copied()
+            .collect::<Vec<_>>();
+        files_to_resolve.sort_unstable();
+
+        for _ in 0..reused_files {
+            profiler.increment("tolk.resolve.reused_file");
+        }
+        for _ in 0..files_to_resolve.len() {
+            profiler.increment("tolk.resolve.file");
+        }
+
+        tolk_resolver::resolve_files(&file_db, &mut project_index, files_to_resolve);
         profiler.finish("tolk.resolve", resolve_started_at);
 
+        // Release the engine's old snapshot before mutating copy-on-write analysis state.
+        // Concurrent requests can still retain their own immutable snapshot safely.
+        self.latest_snapshot = None;
         infer_incremental_workspace_body_types(
             &file_db,
             &project_index,
+            previous_project_index.as_deref(),
             &mut self.analysis,
             &changed_file_ids,
             profiler,
@@ -803,7 +830,7 @@ impl TolkWorkspaceState {
             file_db,
             project_index: Arc::new(project_index),
             all_body_types: self.analysis.all_body_types.clone(),
-            use_facts: self.analysis.use_facts.clone(),
+            use_facts: RwLock::new(FxHashMap::default()),
             type_interner: self.analysis.type_interner.clone(),
             type_db_cache: self.analysis.type_db_cache.clone(),
             file_uris,
@@ -833,6 +860,7 @@ impl TolkWorkspaceState {
             file.dirty = true;
         }
         self.analysis = TolkAnalysisState::default();
+        self.latest_snapshot = None;
     }
 
     fn process_dirty_files(&mut self, profiler: &mut Profiler) -> anyhow::Result<BTreeSet<FileId>> {
@@ -988,10 +1016,10 @@ struct TolkResolveSnapshot {
     generation: u64,
     file_db: Arc<FileDb>,
     project_index: Arc<ProjectIndex>,
-    all_body_types: HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
-    use_facts: HashMap<FileId, Arc<FileUseFacts>>,
-    type_interner: TypeInterner,
-    type_db_cache: TypeDbCache,
+    all_body_types: Arc<WorkspaceBodyTypes>,
+    use_facts: RwLock<FxHashMap<FileId, Arc<FileUseFacts>>>,
+    type_interner: Arc<TypeInterner>,
+    type_db_cache: Arc<TypeDbCache>,
     file_uris: BTreeMap<FileId, DocumentUri>,
 }
 
@@ -1025,6 +1053,7 @@ impl ProjectSourceProvider for SnapshotSourceProvider {
 fn infer_incremental_workspace_body_types(
     file_db: &FileDb,
     project_index: &ProjectIndex,
+    previous_project_index: Option<&ProjectIndex>,
     analysis: &mut TolkAnalysisState,
     changed_file_ids: &BTreeSet<FileId>,
     profiler: &mut Profiler,
@@ -1033,22 +1062,122 @@ fn infer_incremental_workspace_body_types(
         type_interner,
         type_db_cache,
         all_body_types,
-        use_facts,
+        declaration_stamps,
     } = analysis;
+    let type_interner = Arc::make_mut(type_interner);
+    let type_db_cache = Arc::make_mut(type_db_cache);
+    let all_body_types = Arc::make_mut(all_body_types);
+
     let workspace_file_ids = project_index
         .workspace_files()
         .into_iter()
         .map(|file| file.id)
         .collect::<BTreeSet<_>>();
     all_body_types.retain(|file_id, _| workspace_file_ids.contains(file_id));
-    use_facts.retain(|file_id, _| workspace_file_ids.contains(file_id));
+    declaration_stamps.retain(|file_id, _| workspace_file_ids.contains(file_id));
 
-    let affected_file_ids = affected_workspace_file_ids(
+    let invalidation_started_at = profiler.start();
+    let mut current_stamps = FxHashMap::default();
+    let mut declaration_changes = FxHashMap::default();
+    let mut signature_changed_file_ids = BTreeSet::new();
+
+    if changed_file_ids
+        .iter()
+        .any(|file_id| project_index.get_file_index(*file_id).is_none())
+    {
+        signature_changed_file_ids.extend(workspace_file_ids.iter().copied());
+    }
+
+    for &file_id in &workspace_file_ids {
+        if !changed_file_ids.contains(&file_id)
+            && declaration_stamps.contains_key(&file_id)
+            && all_body_types.contains_key(&file_id)
+        {
+            continue;
+        }
+
+        let Some(file_info) = file_db.get_by_id(file_id) else {
+            signature_changed_file_ids.extend(workspace_file_ids.iter().copied());
+            continue;
+        };
+        let stamps = collect_declaration_stamps(&file_info);
+        let changes = DeclarationChanges::between(&stamps, declaration_stamps.get(&file_id));
+
+        if changes.signature_changed
+            || imports_changed(project_index, previous_project_index, file_id)
+            || !all_body_types.contains_key(&file_id)
+        {
+            signature_changed_file_ids.insert(file_id);
+        }
+
+        current_stamps.insert(file_id, stamps);
+        declaration_changes.insert(file_id, changes);
+    }
+
+    let full_inference_file_ids = affected_workspace_file_ids(
         project_index,
         &workspace_file_ids,
         all_body_types,
-        changed_file_ids,
+        &signature_changed_file_ids,
     );
+
+    for (&file_id, changes) in &mut declaration_changes {
+        if full_inference_file_ids.contains(&file_id) {
+            continue;
+        }
+
+        let Some(body_types) = all_body_types.get_mut(&file_id) else {
+            signature_changed_file_ids.insert(file_id);
+            continue;
+        };
+        let Some(stamps) = current_stamps.get(&file_id) else {
+            continue;
+        };
+
+        body_types.retain(|symbol_id, _| stamps.contains_key(symbol_id));
+        for (&symbol_id, &delta) in &changes.relocated {
+            let Some(inference) = body_types.remove(&symbol_id) else {
+                changes.changed.insert(symbol_id);
+                continue;
+            };
+            let Some(inference) = inference.shifted(file_id, delta) else {
+                changes.changed.insert(symbol_id);
+                continue;
+            };
+
+            body_types.insert(symbol_id, inference);
+            profiler.increment("tolk.type_inference.relocated_declaration");
+        }
+
+        let reused = stamps
+            .len()
+            .saturating_sub(changes.changed.len() + changes.relocated.len());
+        for _ in 0..reused {
+            profiler.increment("tolk.type_inference.reused_declaration");
+        }
+    }
+    profiler.finish("tolk.invalidation", invalidation_started_at);
+
+    for (file_id, stamps) in current_stamps {
+        declaration_stamps.insert(file_id, stamps);
+    }
+
+    let cached_type_db: &TypeDbCache = type_db_cache;
+    let previous_inferred_signatures = declaration_changes
+        .iter()
+        .filter(|(file_id, _)| !full_inference_file_ids.contains(file_id))
+        .flat_map(|(&file_id, changes)| {
+            changes
+                .potential_signature_changes
+                .iter()
+                .map(move |&symbol_id| {
+                    (
+                        symbol_id,
+                        (file_id, cached_type_db.top_level_type(symbol_id)),
+                    )
+                })
+        })
+        .collect::<FxHashMap<_, _>>();
 
     let signature_started_at = profiler.start();
     let mut type_db = TypeDb::new_with_cache(
@@ -1056,7 +1185,7 @@ fn infer_incremental_workspace_body_types(
         file_db,
         project_index,
         std::mem::take(type_db_cache),
-        affected_file_ids.iter().copied(),
+        full_inference_file_ids.iter().copied(),
     );
     profiler.finish("tolk.type_signature", signature_started_at);
     for _ in type_db.refreshed_files() {
@@ -1064,41 +1193,122 @@ fn infer_incremental_workspace_body_types(
     }
 
     let body_inference_started_at = profiler.start();
-    for &file_id in &affected_file_ids {
+    infer_entire_files(
+        file_db,
+        &mut type_db,
+        all_body_types,
+        &full_inference_file_ids,
+        profiler,
+    );
+
+    for (file_id, changes) in declaration_changes {
+        if full_inference_file_ids.contains(&file_id) || changes.changed.is_empty() {
+            continue;
+        }
+
         let Some(file_info) = file_db.get_by_id(file_id) else {
             continue;
         };
-        let mut body_types = HashMap::new();
-        for decl in file_info.source().top_levels() {
-            let Some(index_decl) = file_info.find_declaration(&decl) else {
+        let Some(body_types) = all_body_types.get_mut(&file_id) else {
+            continue;
+        };
+        let mut inferred_any = false;
+
+        for declaration in file_info.source().top_levels() {
+            let Some(symbol) = file_info.find_declaration(&declaration) else {
                 continue;
             };
-            let inference = infer(&mut type_db, file_id, index_decl.id, &decl);
-            body_types.insert(index_decl.id, inference);
+            if !changes.changed.contains(&symbol.id) {
+                continue;
+            }
+
+            let inference = infer(&mut type_db, file_id, symbol.id, &declaration);
+            body_types.insert(symbol.id, inference);
+            inferred_any = true;
+            profiler.increment("tolk.type_inference.declaration");
         }
-        profiler.increment("tolk.type_inference.file");
-        all_body_types.insert(file_id, body_types);
+
+        if inferred_any {
+            profiler.increment("tolk.type_inference.file");
+        }
+    }
+
+    let changed_inferred_signature_file_ids = previous_inferred_signatures
+        .into_iter()
+        .filter_map(|(symbol_id, (file_id, previous_ty))| {
+            (type_db.top_level_types.get(&symbol_id).copied() != previous_ty).then_some(file_id)
+        })
+        .collect::<BTreeSet<_>>();
+
+    if !changed_inferred_signature_file_ids.is_empty() {
+        profiler.increment("tolk.type_inference.signature_fallback");
+        let fallback_file_ids = affected_workspace_file_ids(
+            project_index,
+            &workspace_file_ids,
+            all_body_types,
+            &changed_inferred_signature_file_ids,
+        );
+        let cache = type_db.into_cache();
+        let fallback_signature_started_at = profiler.start();
+        type_db = TypeDb::new_with_cache(
+            type_interner,
+            file_db,
+            project_index,
+            cache,
+            fallback_file_ids.iter().copied(),
+        );
+        profiler.finish(
+            "tolk.type_signature.fallback",
+            fallback_signature_started_at,
+        );
+        for _ in type_db.refreshed_files() {
+            profiler.increment("tolk.type_signature.file");
+        }
+
+        infer_entire_files(
+            file_db,
+            &mut type_db,
+            all_body_types,
+            &fallback_file_ids,
+            profiler,
+        );
     }
     profiler.finish("tolk.type_inference", body_inference_started_at);
 
-    let use_facts_started_at = profiler.start();
-    let mut analysis_db = AnalysisDb::new();
-    for file_id in affected_file_ids {
-        if let Some(facts) = analysis_db.use_facts(&mut type_db, all_body_types, file_id) {
-            use_facts.insert(file_id, facts);
-            profiler.increment("tolk.use_facts.file");
-        } else {
-            use_facts.remove(&file_id);
-        }
-    }
-    profiler.finish("tolk.use_facts", use_facts_started_at);
     *type_db_cache = type_db.into_cache();
+}
+
+fn infer_entire_files(
+    file_db: &FileDb,
+    type_db: &mut TypeDb<'_>,
+    all_body_types: &mut WorkspaceBodyTypes,
+    file_ids: &BTreeSet<FileId>,
+    profiler: &mut Profiler,
+) {
+    for &file_id in file_ids {
+        let Some(file_info) = file_db.get_by_id(file_id) else {
+            continue;
+        };
+        let mut body_types = FileBodyTypes::default();
+
+        for declaration in file_info.source().top_levels() {
+            let Some(symbol) = file_info.find_declaration(&declaration) else {
+                continue;
+            };
+            let inference = infer(type_db, file_id, symbol.id, &declaration);
+            body_types.insert(symbol.id, inference);
+            profiler.increment("tolk.type_inference.declaration");
+        }
+
+        profiler.increment("tolk.type_inference.file");
+        all_body_types.insert(file_id, body_types);
+    }
 }
 
 fn affected_workspace_file_ids(
     project_index: &ProjectIndex,
     workspace_file_ids: &BTreeSet<FileId>,
-    all_body_types: &HashMap<FileId, HashMap<SymbolId, InferenceResult>>,
+    all_body_types: &WorkspaceBodyTypes,
     changed_file_ids: &BTreeSet<FileId>,
 ) -> BTreeSet<FileId> {
     if all_body_types.is_empty() {

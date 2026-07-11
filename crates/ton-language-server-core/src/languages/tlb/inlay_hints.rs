@@ -174,7 +174,6 @@ fn print_type_expression(
         | "cond_expr" => node.named_child(0).map_or_else(String::new, |child| {
             print_type_expression(document, child, priority, skip_parens, normalize_binary)
         }),
-        "type_identifier" | "number" | "identifier" => document.text_of(node).trim().to_owned(),
         "binary_expression" => {
             print_binary_expression(document, node, priority, skip_parens, normalize_binary)
         }
