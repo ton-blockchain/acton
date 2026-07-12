@@ -250,8 +250,26 @@ pub struct RawTransaction {
     pub fee: String,
     pub storage_fee: String,
     pub other_fee: String,
-    pub in_msg: RawMessage,
-    pub out_msgs: Vec<RawMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_msg: Option<MessageStd>,
+    pub out_msgs: Vec<MessageStd>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionExt {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub address: AccountAddress,
+    pub account: String,
+    pub utime: u64,
+    pub data: String,
+    pub transaction_id: InternalTransactionId,
+    pub fee: String,
+    pub storage_fee: String,
+    pub other_fee: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub in_msg: Option<MessageStd>,
+    pub out_msgs: Vec<MessageStd>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -278,16 +296,9 @@ pub struct MessageFull {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "@type")]
-pub enum RawMessage {
-    #[serde(rename = "msg.message")]
-    Empty,
-    #[serde(rename = "raw.message")]
-    Full(Box<RawMessageFull>),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RawMessageFull {
+pub struct MessageStd {
+    #[serde(rename = "@type")]
+    pub type_field: String,
     pub hash: String,
     pub source: AccountAddress,
     pub destination: AccountAddress,
@@ -301,11 +312,16 @@ pub struct RawMessageFull {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct MessageData {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub body: String,
-    pub init_state: String,
+#[serde(tag = "@type")]
+pub enum MessageData {
+    #[serde(rename = "msg.dataRaw")]
+    Raw { body: String, init_state: String },
+    #[serde(rename = "msg.dataText")]
+    Text { text: String },
+    #[serde(rename = "msg.dataDecryptedText")]
+    DecryptedText { text: String },
+    #[serde(rename = "msg.dataEncryptedText")]
+    EncryptedText { text: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -315,7 +331,7 @@ pub struct BlockTransactionsExt {
     pub id: TonBlockIdExt,
     pub req_count: usize,
     pub incomplete: bool,
-    pub transactions: Vec<Transaction>,
+    pub transactions: Vec<TransactionExt>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -517,5 +533,87 @@ mod tests {
         .expect("generic response must deserialize");
 
         assert_eq!(response.into_result(), "active");
+    }
+
+    #[test]
+    fn transaction_ext_deserializes_openapi_message_std_and_optional_in_msg() {
+        let transaction = serde_json::json!({
+            "@type": "raw.transactionExt",
+            "address": {
+                "@type": "accountAddress",
+                "account_address": "0:1111111111111111111111111111111111111111111111111111111111111111"
+            },
+            "account": "0:1111111111111111111111111111111111111111111111111111111111111111",
+            "utime": 1,
+            "data": "te6ccgEBAQEAAgAAAA==",
+            "transaction_id": {
+                "@type": "internal.transactionId",
+                "lt": "1",
+                "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            },
+            "fee": "0",
+            "storage_fee": "0",
+            "other_fee": "0",
+            "in_msg": {
+                "@type": "raw.message",
+                "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "source": {"@type": "accountAddress", "account_address": ""},
+                "destination": {
+                    "@type": "accountAddress",
+                    "account_address": "0:1111111111111111111111111111111111111111111111111111111111111111"
+                },
+                "value": "0",
+                "fwd_fee": "0",
+                "ihr_fee": "0",
+                "created_lt": "0",
+                "body_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "msg_data": {"@type": "msg.dataRaw", "body": "", "init_state": ""},
+                "extra_currencies": []
+            },
+            "out_msgs": []
+        });
+
+        let parsed: TransactionExt =
+            serde_json::from_value(transaction.clone()).expect("transactionExt must deserialize");
+        assert_eq!(parsed.type_field, "raw.transactionExt");
+        assert_eq!(
+            parsed
+                .in_msg
+                .as_ref()
+                .map(|message| message.type_field.as_str()),
+            Some("raw.message")
+        );
+
+        let mut without_in_msg = transaction;
+        without_in_msg
+            .as_object_mut()
+            .expect("fixture must be object")
+            .remove("in_msg");
+        let parsed: TransactionExt = serde_json::from_value(without_in_msg)
+            .expect("transactionExt without in_msg must deserialize");
+        assert!(parsed.in_msg.is_none());
+    }
+
+    #[test]
+    fn message_data_deserializes_all_openapi_variants() {
+        let fixtures = [
+            serde_json::json!({
+                "@type": "msg.dataRaw",
+                "body": "te6ccgEBAQEAAgAAAA==",
+                "init_state": ""
+            }),
+            serde_json::json!({"@type": "msg.dataText", "text": "aGVsbG8="}),
+            serde_json::json!({"@type": "msg.dataDecryptedText", "text": "aGVsbG8="}),
+            serde_json::json!({"@type": "msg.dataEncryptedText", "text": "aGVsbG8="}),
+        ];
+
+        for fixture in fixtures {
+            let parsed: MessageData =
+                serde_json::from_value(fixture.clone()).expect("message data must deserialize");
+            assert_eq!(
+                serde_json::to_value(parsed).expect("message data must serialize"),
+                fixture
+            );
+        }
     }
 }

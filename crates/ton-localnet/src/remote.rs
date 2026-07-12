@@ -1,6 +1,7 @@
 use crate::storage::{AccountMeta, AccountStatus, CellStore};
 use crate::types::{Addr, BocBytes, Hash256};
 use acton_config::config;
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use ton_api::TonApiClient;
 use ton_networks::Network;
@@ -15,14 +16,31 @@ pub struct RemoteProvider {
     pub fork_block_number: Option<u64>,
 }
 
-pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {
-    let config = config::ActonConfig::load().unwrap_or_default();
-    let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(provider.network.clone(), custom_networks)?;
+// TODO: remove
+fn with_api_client<T: Send + 'static>(
+    provider: &RemoteProvider,
+    request: impl FnOnce(&TonApiClient) -> anyhow::Result<T> + Send + 'static,
+) -> anyhow::Result<T> {
+    let network = provider.network.clone();
+    std::thread::Builder::new()
+        .name("acton-remote-provider".to_owned())
+        .spawn(move || {
+            let config = config::ActonConfig::load().unwrap_or_default();
+            let api_client = TonApiClient::new(network, config.custom_networks())?;
+            request(&api_client)
+        })
+        .context("Failed to start remote provider worker")?
+        .join()
+        .map_err(|_| anyhow::anyhow!("Remote provider worker panicked"))?
+}
 
-    let lib = api_client.get_library_by_hash(&HashBytes(hash.0))?;
+pub fn fetch_remote_library(hash: &Hash256, provider: &RemoteProvider) -> anyhow::Result<Cell> {
+    let hash = *hash;
+    let lib = with_api_client(provider, move |api_client| {
+        api_client.get_library_by_hash(&HashBytes(hash.0))
+    })?;
     let actual_hash = Hash256::from(lib.repr_hash());
-    if actual_hash != *hash {
+    if actual_hash != hash {
         anyhow::bail!(
             "Remote library hash mismatch: requested {}, got {}",
             hash.to_hex(),
@@ -39,11 +57,11 @@ pub fn fetch_remote_shard_account(
 ) -> anyhow::Result<(BocBytes, AccountMeta)> {
     tracing::info!("Fetching remote account state for {}", addr);
 
-    let config = config::ActonConfig::load().unwrap_or_default();
-    let custom_networks = config.custom_networks();
-    let api_client = TonApiClient::new(provider.network.clone(), custom_networks)?;
-
-    let cell = api_client.get_shard_account_cell(provider.fork_block_number, &addr.to_string())?;
+    let fork_block_number = provider.fork_block_number;
+    let address = addr.to_string();
+    let cell = with_api_client(provider, move |api_client| {
+        api_client.get_shard_account_cell(fork_block_number, &address)
+    })?;
     let shard_account = cell.parse::<ShardAccount>()?;
     let boc = BocBytes::from(Boc::encode(cell));
     let meta = account_meta_from_shard_account(&shard_account, &boc, cas)?;
@@ -78,8 +96,8 @@ pub(crate) fn account_meta_from_shard_account(
     let mut frozen_hash = None;
     let status = match account.state {
         AccountState::Active(state) => {
-            code_hash = state.code.map(|cell| put_cell(cas, cell));
-            data_hash = state.data.map(|cell| put_cell(cas, cell));
+            code_hash = state.code.map(|cell| cas.put_cell(cell));
+            data_hash = state.data.map(|cell| cas.put_cell(cell));
             AccountStatus::Active
         }
         AccountState::Uninit => AccountStatus::Uninit,
@@ -99,10 +117,4 @@ pub(crate) fn account_meta_from_shard_account(
         data_hash,
         frozen_hash,
     })
-}
-
-fn put_cell(cas: &mut CellStore, cell: Cell) -> Hash256 {
-    let hash = Hash256::from(cell.repr_hash());
-    cas.put(Boc::encode(cell).into(), hash);
-    hash
 }

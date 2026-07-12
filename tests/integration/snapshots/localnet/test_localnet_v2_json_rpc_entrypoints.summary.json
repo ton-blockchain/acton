@@ -1,0 +1,29 @@
+[
+  {
+    "has_extra": true,
+    "has_id": false,
+    "has_jsonrpc": false,
+    "ok": true,
+    "path": "/api/v2",
+    "result_type": "blocks.masterchainInfo",
+    "same_seqno": true
+  },
+  {
+    "has_extra": true,
+    "has_id": false,
+    "has_jsonrpc": false,
+    "ok": true,
+    "path": "/api/v2/jsonRPC",
+    "result_type": "blocks.masterchainInfo",
+    "same_seqno": true
+  },
+  {
+    "has_extra": true,
+    "has_id": false,
+    "has_jsonrpc": false,
+    "ok": true,
+    "path": "/api/v2/v2/jsonRPC",
+    "result_type": "blocks.masterchainInfo",
+    "same_seqno": true
+  }
+]

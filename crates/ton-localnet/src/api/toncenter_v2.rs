@@ -87,7 +87,23 @@ pub fn map_transaction_std(tx: &LocalnetTransaction) -> response::RawTransaction
         storage_fee: tx.storage_fees.to_string(),
         other_fee: tx.other_fees.to_string(),
         in_msg: map_message_std(&tx.in_msg),
-        out_msgs: tx.out_msgs.iter().map(map_message_std).collect(),
+        out_msgs: tx.out_msgs.iter().filter_map(map_message_std).collect(),
+    }
+}
+
+pub fn map_transaction_ext(tx: &LocalnetTransaction) -> response::TransactionExt {
+    response::TransactionExt {
+        type_field: "raw.transactionExt".to_owned(),
+        address: map_account_address(&tx.address),
+        account: tx.address.to_string(),
+        utime: u64::from(tx.utime),
+        data: tx.data.to_base64(),
+        transaction_id: map_internal_transaction_id(&tx.transaction_id),
+        fee: tx.total_fees.to_string(),
+        storage_fee: tx.storage_fees.to_string(),
+        other_fee: tx.other_fees.to_string(),
+        in_msg: map_message_std(&tx.in_msg),
+        out_msgs: tx.out_msgs.iter().filter_map(map_message_std).collect(),
     }
 }
 
@@ -119,11 +135,12 @@ pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::M
 }
 
 #[must_use]
-pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> response::RawMessage {
+pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> Option<response::MessageStd> {
     if msg.hash.0 == [0; 32] {
-        return response::RawMessage::Empty;
+        return None;
     }
-    response::RawMessage::Full(Box::new(response::RawMessageFull {
+    Some(response::MessageStd {
+        type_field: "raw.message".to_owned(),
         hash: msg.hash.to_base64(),
         source: map_optional_account_address(msg.source.as_ref()),
         destination: map_optional_account_address(msg.destination.as_ref()),
@@ -134,7 +151,7 @@ pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> response::RawM
         body_hash: msg.body_hash.to_base64(),
         msg_data: map_message_data(msg),
         extra_currencies: Vec::new(),
-    }))
+    })
 }
 
 #[must_use]
@@ -153,13 +170,17 @@ pub fn map_account_state(s: &LocalnetAccountState) -> response::AddressInformati
             .map(Hash256::to_base64)
             .unwrap_or_default(),
         sync_utime: s.sync_utime,
-        state: match s.state {
-            AccountStatus::Active => "active",
-            AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
-            AccountStatus::Frozen => "frozen",
-        }
-        .to_owned(),
+        state: map_account_status(&s.state).to_owned(),
         suspended: false,
+    }
+}
+
+#[must_use]
+pub const fn map_account_status(status: &AccountStatus) -> &'static str {
+    match status {
+        AccountStatus::Active => "active",
+        AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
+        AccountStatus::Frozen => "frozen",
     }
 }
 
@@ -249,12 +270,7 @@ pub fn map_wallet_information(
         wallet: wallet_type.is_some(),
         balance: s.balance.to_string(),
         extra_currencies: Vec::new(),
-        account_state: match s.state {
-            AccountStatus::Active => "active",
-            AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
-            AccountStatus::Frozen => "frozen",
-        }
-        .to_owned(),
+        account_state: map_account_status(&s.state).to_owned(),
         last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
         wallet_type: wallet_type.map(ToOwned::to_owned),
         seqno: wallet_type.and(seqno),
@@ -451,7 +467,7 @@ pub fn map_block_transactions_ext(
         id: map_block_id(&bt.id),
         req_count: bt.requested_count,
         incomplete: bt.incomplete,
-        transactions: bt.transactions.iter().map(map_transaction).collect(),
+        transactions: bt.transactions.iter().map(map_transaction_ext).collect(),
     }
 }
 
@@ -688,8 +704,7 @@ fn map_optional_account_address(addr: Option<&Addr>) -> response::AccountAddress
 }
 
 fn map_message_data(msg: &crate::localnet::LocalnetMessage) -> response::MessageData {
-    response::MessageData {
-        type_field: "msg.dataRaw".to_owned(),
+    response::MessageData::Raw {
         body: msg.body.to_base64(),
         init_state: msg.init_state.to_base64(),
     }

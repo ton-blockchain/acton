@@ -61,6 +61,11 @@ impl CellStore {
         hash
     }
 
+    pub fn put_cell(&mut self, cell: Cell) -> Hash256 {
+        let hash = Hash256::from(cell.repr_hash());
+        self.put(Boc::encode(cell).into(), hash)
+    }
+
     #[must_use]
     pub fn get_cell(&self, hash: &Hash256) -> Option<Cell> {
         if let Some(cell) = self.cached_cell(hash) {

@@ -705,9 +705,7 @@ impl Node {
             .parse::<ShardAccount>()
             .context("Failed to parse new ShardAccount")?;
         let account_state_cell = new_shard_account.account.inner().clone();
-        let account_state_hash = Hash256::from(account_state_cell.repr_hash());
-        self.cas
-            .put(Boc::encode(account_state_cell).into(), account_state_hash);
+        let account_state_hash = self.cas.put_cell(account_state_cell);
 
         if let Some(acc) = new_shard_account
             .account
@@ -2567,9 +2565,7 @@ fn store_account_state_cell_from_shard_account_boc(
     let cell = Boc::decode(shard_account_boc).ok()?;
     let shard_account = cell.parse::<ShardAccount>().ok()?;
     let account_cell = shard_account.account.inner().clone();
-    let hash = Hash256::from(account_cell.repr_hash());
-    cas.put(Boc::encode(account_cell).into(), hash);
-    Some(hash)
+    Some(cas.put_cell(account_cell))
 }
 
 fn account_state_snapshot_from_boc(boc: &BocBytes) -> Option<AccountStateSnapshot> {

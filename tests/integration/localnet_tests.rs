@@ -535,6 +535,45 @@ fn localnet_starts_and_serves_masterchain_info() {
 }
 
 #[test]
+fn localnet_v2_json_rpc_entrypoints_share_canonical_envelope() {
+    let project = ProjectBuilder::new("localnet-v2-json-rpc-entrypoints").build();
+    let node = project.localnet().start();
+    let request = json!({
+        "jsonrpc": "2.0",
+        "id": "masterchain",
+        "method": "getMasterchainInfo",
+        "params": {}
+    });
+
+    let responses = ["/api/v2", "/api/v2/jsonRPC", "/api/v2/v2/jsonRPC"]
+        .map(|path| (path, node.post_json(path, &request)));
+    let expected_seqno = responses[0].1["result"]["last"]["seqno"].clone();
+    let summary = Value::Array(
+        responses
+            .into_iter()
+            .map(|(path, response)| {
+                json!({
+                    "path": path,
+                    "ok": response["ok"],
+                    "result_type": response["result"]["@type"],
+                    "same_seqno": response["result"]["last"]["seqno"] == expected_seqno,
+                    "has_extra": response["@extra"].as_str().is_some_and(|value| !value.is_empty()),
+                    "has_jsonrpc": response.get("jsonrpc").is_some(),
+                    "has_id": response.get("id").is_some(),
+                })
+            })
+            .collect(),
+    );
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_json_rpc_entrypoints.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn localnet_mines_empty_blocks_on_interval_without_transactions() {
     let project = ProjectBuilder::new("localnet-empty-interval-blocks").build();
     let node = project.localnet().args(["--mine-empty-blocks"]).start();
@@ -1075,13 +1114,14 @@ fn localnet_serves_get_shard_account_cell_for_empty_account() {
     normalize_extra_for_snapshot(&mut rpc_response);
     let _rpc_parsed = decode_shard_account_cell_response(&rpc_response);
 
-    let mut invalid_response =
-        node.get_json("/api/v2/getShardAccountCell?address=not-a-ton-address");
+    let (invalid_status, mut invalid_response) =
+        node.get_json_with_status("/api/v2/getShardAccountCell?address=not-a-ton-address");
     normalize_extra_for_snapshot(&mut invalid_response);
 
     let snapshot = json!({
         "empty_http": response,
         "empty_json_rpc": rpc_response,
+        "invalid_status": invalid_status,
         "invalid_address": invalid_response,
     });
 
@@ -2484,13 +2524,13 @@ fn localnet_raw_internal_messages_use_acton_endpoint() {
     let internal_boc = build_localnet_internal_boc();
     let target = "0:2222222222222222222222222222222222222222222222222222222222222222";
 
-    let send_boc = node.post_json(
+    let (send_boc_status, send_boc) = node.post_json_with_status(
         "/api/v2/sendBoc",
         &json!({
             "boc": internal_boc,
         }),
     );
-    let send_boc_return_hash = node.post_json(
+    let (send_boc_return_hash_status, send_boc_return_hash) = node.post_json_with_status(
         "/api/v2/sendBocReturnHash",
         &json!({
             "boc": internal_boc,
@@ -2536,7 +2576,9 @@ fn localnet_raw_internal_messages_use_acton_endpoint() {
 
     let snapshot = json!({
         "send_boc": summarize_admin_response(&send_boc),
+        "send_boc_status": send_boc_status,
         "send_boc_return_hash": summarize_admin_response(&send_boc_return_hash),
+        "send_boc_return_hash_status": send_boc_return_hash_status,
         "json_rpc_send_boc_status": json_rpc_send_boc_status,
         "json_rpc_send_boc": summarize_admin_response(&json_rpc_send_boc),
         "json_rpc_send_boc_return_hash_status": json_rpc_send_boc_return_hash_status,
@@ -4764,6 +4806,19 @@ fn localnet_supports_v3_account_states_endpoint() {
         .expect("deployer must have a jetton wallet after mint")
         .to_owned();
 
+    let master_token_data = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={minter_address}"),
+        Duration::from_secs(12),
+    );
+    let wallet_token_data = wait_for_ok_response(
+        &node,
+        &format!("/api/v2/getTokenData?address={jetton_wallet_address}"),
+        Duration::from_secs(12),
+    );
+    let (non_token_status, non_token_data) =
+        node.get_json_with_status(&format!("/api/v2/getTokenData?address={owner_address}"));
+
     let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
     let response = wait_for_ok_response(
         &node,
@@ -4957,6 +5012,43 @@ fn localnet_supports_v3_account_states_endpoint() {
         !metadata.contains_key(missing_address),
         "Missing account must not have metadata:\n{}",
         serde_json::to_string_pretty(metadata).unwrap_or_default()
+    );
+
+    let master_token = response_payload(&master_token_data);
+    let wallet_token = response_payload(&wallet_token_data);
+    let token_data_summary = json!({
+        "master": {
+            "type": master_token["@type"],
+            "contract_type": master_token["contract_type"],
+            "address_present": master_token["address"].as_str().is_some_and(|value| !value.is_empty()),
+            "total_supply_positive": master_token["total_supply"].as_str()
+                .and_then(|value| value.parse::<u128>().ok())
+                .is_some_and(|value| value > 0),
+            "wallet_code_present": master_token["jetton_wallet_code"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+            "content_type": master_token["jetton_content"]["type"],
+        },
+        "wallet": {
+            "type": wallet_token["@type"],
+            "contract_type": wallet_token["contract_type"],
+            "address_present": wallet_token["address"].as_str().is_some_and(|value| !value.is_empty()),
+            "owner_present": wallet_token["owner"].as_str().is_some_and(|value| !value.is_empty()),
+            "master_present": wallet_token["jetton"].as_str().is_some_and(|value| !value.is_empty()),
+            "balance_positive": wallet_token["balance"].as_str()
+                .and_then(|value| value.parse::<u128>().ok())
+                .is_some_and(|value| value > 0),
+            "wallet_code_present": wallet_token["jetton_wallet_code"].as_str()
+                .is_some_and(|value| !value.is_empty()),
+        },
+        "non_token": {
+            "status": non_token_status,
+            "ok": non_token_data["ok"],
+            "code": non_token_data["code"],
+        }
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&token_data_summary, project.path()),
+        snapbox::file!("snapshots/localnet/test_localnet_v2_token_data.summary.json"),
     );
 
     node.stop();

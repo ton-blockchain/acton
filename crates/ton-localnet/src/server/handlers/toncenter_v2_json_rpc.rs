@@ -2,7 +2,7 @@ use super::toncenter_v2::{
     parse_config_param, parse_libraries_request, parse_seqno, parse_transactions_request,
     resolve_block_header, resolve_block_transactions, token_wallet_code_hash,
 };
-use super::utils::{get_extra, parse_method_name, parse_params};
+use super::utils::{error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
@@ -44,14 +44,9 @@ pub async fn json_rpc(
         wire::StringOrNumber::Number(value) => Value::Number((*value).into()),
         wire::StringOrNumber::Unsigned(value) => Value::Number((*value).into()),
     };
-    let id_str = payload.id.clone();
 
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
-
-    let mut response = match result {
-        Ok(resp) => resp,
-        Err(e) => json_rpc_error(StatusCode::INTERNAL_SERVER_ERROR, id_str, e.to_string()),
-    };
+    let mut response = result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()));
 
     api_calls.record(
         ApiCallInput {
@@ -83,7 +78,6 @@ async fn json_rpc_router(
 ) -> anyhow::Result<Response> {
     let params = payload.params;
     let method = payload.method.as_str();
-    let id_str = payload.id;
 
     let result: wire::JsonRpcResult = match method {
         "sendBoc" => {
@@ -360,23 +354,19 @@ async fn json_rpc_router(
             ))
         }
         _ => {
-            return Ok(json_rpc_error(
-                StatusCode::NOT_FOUND,
-                id_str,
-                "Method not found",
-            ));
+            return Ok(json_rpc_error(StatusCode::NOT_FOUND, "Method not found"));
         }
     };
 
-    Ok(json_rpc_success(id_str, result))
+    Ok(json_rpc_success(result))
 }
 
-fn json_rpc_success<T: Serialize>(id: wire::StringOrNumber, result: T) -> Response {
+fn json_rpc_success<T: Serialize>(result: T) -> Response {
     (
         StatusCode::OK,
         Json(wire::JsonRpcResponse {
-            jsonrpc: Some("2.0".to_owned()),
-            id: Some(id),
+            jsonrpc: None,
+            id: None,
             response: wire::TonlibResponse {
                 ok: true,
                 result,
@@ -387,11 +377,7 @@ fn json_rpc_success<T: Serialize>(id: wire::StringOrNumber, result: T) -> Respon
         .into_response()
 }
 
-fn json_rpc_error(
-    status: StatusCode,
-    id: wire::StringOrNumber,
-    error: impl Into<String>,
-) -> Response {
+fn json_rpc_error(status: StatusCode, error: impl Into<String>) -> Response {
     (
         status,
         Json(wire::TonlibErrorResponse {
@@ -399,8 +385,8 @@ fn json_rpc_error(
             error: error.into(),
             code: i32::from(status.as_u16()),
             extra: get_extra(),
-            jsonrpc: Some("2.0".to_owned()),
-            id: Some(id),
+            jsonrpc: None,
+            id: None,
         }),
     )
         .into_response()

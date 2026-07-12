@@ -139,6 +139,65 @@ fn transactions_request_covers_limit_cursor_and_archival() -> Result<()> {
             archival: Some(true),
         },
     )?;
+    let _: v2::TonlibResponse<v2::RawTransactions> = live.get(
+        &live.v2_url,
+        "/getTransactionsStd",
+        &v2::TransactionsRequest {
+            address: fixture.transaction.account.clone(),
+            limit: Some(2.into()),
+            lt: None,
+            hash: None,
+            to_lt: None,
+            archival: Some(false),
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn block_transactions_ext_uses_raw_transaction_ext_wire_types() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let masterchain = masterchain_info(&live)?;
+    let shards: v2::TonlibResponse<v2::Shards> = live.get(
+        &live.v2_url,
+        "/getShards",
+        &v2::SeqnoRequest {
+            seqno: i32::try_from(masterchain.last.seqno)?.into(),
+        },
+    )?;
+    let block = shards
+        .result
+        .shards
+        .first()
+        .context("latest masterchain block returned no shards")?;
+
+    let response: v2::TonlibResponse<v2::BlockTransactionsExt> = live.get(
+        &live.v2_url,
+        "/getBlockTransactionsExt",
+        &v2::BlockTransactionsRequest {
+            workchain: block.workchain.into(),
+            shard: v2::StringOrNumber::String(block.shard.clone()),
+            seqno: i32::try_from(block.seqno)?.into(),
+            root_hash: Some(block.root_hash.clone()),
+            file_hash: Some(block.file_hash.clone()),
+            after_lt: None,
+            after_hash: None,
+            count: Some(5.into()),
+        },
+    )?;
+
+    let transaction = response
+        .result
+        .transactions
+        .first()
+        .context("fixture block returned no extended transactions")?;
+    anyhow::ensure!(transaction.type_field == "raw.transactionExt");
+    if let Some(message) = transaction.in_msg.as_ref() {
+        anyhow::ensure!(message.type_field == "raw.message");
+        anyhow::ensure!(message.source.type_field == "accountAddress");
+        anyhow::ensure!(message.destination.type_field == "accountAddress");
+    }
     Ok(())
 }
 

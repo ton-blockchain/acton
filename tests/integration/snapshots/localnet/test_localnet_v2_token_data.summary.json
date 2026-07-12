@@ -1,0 +1,24 @@
+{
+  "master": {
+    "address_present": true,
+    "content_type": "onchain",
+    "contract_type": "jetton_master",
+    "total_supply_positive": true,
+    "type": "ext.tokens.jettonMasterData",
+    "wallet_code_present": true
+  },
+  "non_token": {
+    "code": 409,
+    "ok": false,
+    "status": 409
+  },
+  "wallet": {
+    "address_present": true,
+    "balance_positive": true,
+    "contract_type": "jetton_wallet",
+    "master_present": true,
+    "owner_present": true,
+    "type": "ext.tokens.jettonWalletData",
+    "wallet_code_present": true
+  }
+}

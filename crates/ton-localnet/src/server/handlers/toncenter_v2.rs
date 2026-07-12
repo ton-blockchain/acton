@@ -1,4 +1,4 @@
-use super::utils::{get_extra, handle_result, parse_method_name};
+use super::utils::{ToncenterHttpError, get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{
     Localnet, LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockTransactions,
@@ -93,10 +93,9 @@ pub async fn get_address_state(
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
     let seqno = parse!(parse_seqno(payload.seqno));
-    handle_result(
-        node.get_address_state(payload.address, seqno),
-        ToString::to_string,
-    )
+    handle_result(node.get_address_state(payload.address, seqno), |status| {
+        v2::map_account_status(status).to_owned()
+    })
     .await
 }
 
@@ -156,7 +155,10 @@ pub async fn get_token_data(
             };
 
             v2::map_token_data(&info, jetton_wallet_code.as_ref(), None).ok_or_else(|| {
-                anyhow::anyhow!("Smart contract {} is not Jetton or NFT", payload.address)
+                ToncenterHttpError::conflict(format!(
+                    "Smart contract {} is not Jetton or NFT",
+                    payload.address
+                ))
             })
         },
         Clone::clone,
@@ -430,15 +432,18 @@ pub async fn lookup_block(
 }
 
 fn v2_bad_request(error: impl std::fmt::Display) -> Response {
-    Json(ton_api::toncenter::v2::TonlibErrorResponse {
-        ok: false,
-        error: error.to_string(),
-        code: 400,
-        extra: get_extra(),
-        jsonrpc: None,
-        id: None,
-    })
-    .into_response()
+    (
+        axum::http::StatusCode::BAD_REQUEST,
+        Json(ton_api::toncenter::v2::TonlibErrorResponse {
+            ok: false,
+            error: error.to_string(),
+            code: 400,
+            extra: get_extra(),
+            jsonrpc: None,
+            id: None,
+        }),
+    )
+        .into_response()
 }
 
 fn parse_std_addr(
