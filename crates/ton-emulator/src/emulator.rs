@@ -665,6 +665,7 @@ impl Emulator {
     }
 }
 
+#[must_use]
 pub fn is_external_not_accepted_error(error: &str) -> bool {
     error.contains("external_not_accepted")
         || error.contains("External message not accepted")

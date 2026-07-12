@@ -4050,6 +4050,13 @@ fn localnet_supports_v3_estimate_fee_and_top_accounts() {
         .iter()
         .map(|account| account.balance.parse::<u128>().expect("valid balance"))
         .collect::<Vec<_>>();
+    let pending_actions: toncenter_v3::ActionsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/pendingActions?account={address}&include_transactions=true"),
+    ))
+    .expect("pendingActions response must match typed contract");
+    let pending_traces: toncenter_v3::TracesResponse =
+        serde_json::from_value(node.get_json(&format!("/api/v3/pendingTraces?account={address}")))
+            .expect("pendingTraces response must match typed contract");
 
     let snapshot = json!({
         "estimate_fee": {
@@ -4063,7 +4070,15 @@ fn localnet_supports_v3_estimate_fee_and_top_accounts() {
         "top_accounts": {
             "count": top_accounts.len(),
             "sorted_descending": balances.windows(2).all(|pair| pair[0] >= pair[1]),
-        }
+        },
+        "pending": {
+            "actions": pending_actions.actions.len(),
+            "action_address_book": pending_actions.address_book.len(),
+            "action_metadata": pending_actions.metadata.len(),
+            "traces": pending_traces.traces.len(),
+            "trace_address_book": pending_traces.address_book.len(),
+            "trace_metadata": pending_traces.metadata.len(),
+        },
     });
     assertion().eq(
         format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),

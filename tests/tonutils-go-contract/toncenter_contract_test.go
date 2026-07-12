@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -25,6 +26,8 @@ const (
 	noStateAccount = "0:4242424242424242424242424242424242424242424242424242424242424242"
 	blockAccount   = "0:0000000000000000000000000000000000000000000000000000000000000002"
 	unknownHash    = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+	estimateWallet = "0:5A488AA94CF819D3F7F86DA09C349C6E29CF018082D30B8B040A06F26929B284"
+	estimateBody   = "te6ccgEBBAEAtAABoXNpZ25///8RalP3EQAAAnSAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAIAECCg7DyG0DAwIApUgAtJEVUpnwM6fv8NtBOGk43FOeAwEFphcWCBQN5NJTZQkAFpIiqlM+BnT9/htoJw0nG4pzwGAgtMLiwQKBvJpKbKEEBAAAAAAAAAAAANSn68pAAAA="
 )
 
 type detectedAddressV2 struct {
@@ -487,6 +490,72 @@ func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 			t.Fatal("walletStates must omit an account without state")
 		}
 	})
+	t.Run("top accounts by balance", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[[]accountBalanceV3](ctx, v3, "topAccountsByBalance", url.Values{
+			"limit":  {"10"},
+			"offset": {"0"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(*result) == 0 {
+			t.Fatal("topAccountsByBalance returned no accounts")
+		}
+		for index := 1; index < len(*result); index++ {
+			previous, ok := new(big.Int).SetString((*result)[index-1].Balance, 10)
+			if !ok {
+				t.Fatalf("invalid balance %q", (*result)[index-1].Balance)
+			}
+			current, ok := new(big.Int).SetString((*result)[index].Balance, 10)
+			if !ok || previous.Cmp(current) < 0 {
+				t.Fatalf("balances are not sorted descending: %+v", *result)
+			}
+		}
+	})
+	t.Run("estimate fee accepts base64 and hex BOCs", func(t *testing.T) {
+		messages, err := toncenter.V3GetCall[messagesResponseV3](ctx, v3, "messages", url.Values{
+			"source":         {"null"},
+			"only_externals": {"true"},
+			"limit":          {"20"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		destination, body := estimateWallet, estimateBody
+		for _, message := range messages.Messages {
+			if message.Destination != nil && message.MessageContent != nil && message.MessageContent.Body != nil {
+				destination = *message.Destination
+				body = *message.MessageContent.Body
+				break
+			}
+		}
+		bodyBytes, err := base64.StdEncoding.DecodeString(body)
+		if err != nil {
+			t.Fatalf("decode message body: %v", err)
+		}
+
+		call := func(encodedBody string) *estimateFeeResultV3 {
+			result, err := toncenter.V3PostCall[estimateFeeResultV3](ctx, v3, "estimateFee", estimateFeeRequestV3{
+				Address:      destination,
+				Body:         encodedBody,
+				IgnoreChkSig: true,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return result
+		}
+		base64Result := call(body)
+		hexResult := call(hex.EncodeToString(bodyBytes))
+		base64JSON, _ := json.Marshal(base64Result)
+		hexJSON, _ := json.Marshal(hexResult)
+		if !bytes.Equal(base64JSON, hexJSON) {
+			t.Fatalf("base64 and hex estimates differ: %s != %s", base64JSON, hexJSON)
+		}
+		if base64Result.SourceFees.InFwdFee == 0 || len(base64Result.DestinationFees) != 0 {
+			t.Fatalf("unexpected estimateFee result: %+v", base64Result)
+		}
+	})
 	t.Run("adjacent transactions reports a missing relation", func(t *testing.T) {
 		if _, err := toncenter.V3GetCall[transactionsResponseV3](ctx, v3, "adjacentTransactions", url.Values{
 			"hash":      {unknownHash},
@@ -543,6 +612,30 @@ func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 			"account": {mainnetWallet, noStateAccount},
 		}); err != nil {
 			t.Fatal(err)
+		}
+	})
+	t.Run("pending actions use the upstream envelope", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[actionsResponseV3](ctx, v3, "pendingActions", url.Values{
+			"account":                {mainnetWallet},
+			"supported_action_types": {"TonTransfer", "JettonTransfer"},
+			"include_transactions":   {"true"},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Actions) != 0 || len(result.AddressBook) != 0 || len(result.Metadata) != 0 {
+			t.Fatalf("local pendingActions must be an empty upstream envelope: %+v", result)
+		}
+	})
+	t.Run("pending traces use the upstream envelope", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[tracesResponseV3](ctx, v3, "pendingTraces", url.Values{
+			"account": {noStateAccount},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Traces) != 0 || len(result.AddressBook) != 0 || len(result.Metadata) != 0 {
+			t.Fatalf("local pendingTraces must be an empty upstream envelope: %+v", result)
 		}
 	})
 	t.Run("jetton masters", func(t *testing.T) {

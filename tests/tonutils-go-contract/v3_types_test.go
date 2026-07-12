@@ -369,6 +369,31 @@ type walletStatesResponseV3 struct {
 	Metadata    map[string]addressMetadataV3 `json:"metadata"`
 }
 
+type accountBalanceV3 struct {
+	Account string `json:"account"`
+	Balance string `json:"balance"`
+}
+
+type estimateFeeRequestV3 struct {
+	Address      string `json:"address"`
+	Body         string `json:"body"`
+	InitCode     string `json:"init_code,omitempty"`
+	InitData     string `json:"init_data,omitempty"`
+	IgnoreChkSig bool   `json:"ignore_chksig"`
+}
+
+type estimatedFeeV3 struct {
+	InFwdFee   uint64 `json:"in_fwd_fee"`
+	StorageFee uint64 `json:"storage_fee"`
+	GasFee     uint64 `json:"gas_fee"`
+	FwdFee     uint64 `json:"fwd_fee"`
+}
+
+type estimateFeeResultV3 struct {
+	SourceFees      estimatedFeeV3   `json:"source_fees"`
+	DestinationFees []estimatedFeeV3 `json:"destination_fees"`
+}
+
 type blocksResponseV3 struct {
 	Blocks []blockV3 `json:"blocks"`
 }
@@ -396,6 +421,12 @@ type accountStatesResponseV3 struct {
 
 type tracesResponseV3 struct {
 	Traces      []traceV3                    `json:"traces"`
+	AddressBook map[string]addressBookRowV3  `json:"address_book"`
+	Metadata    map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type actionsResponseV3 struct {
+	Actions     []actionV3                   `json:"actions"`
 	AddressBook map[string]addressBookRowV3  `json:"address_book"`
 	Metadata    map[string]addressMetadataV3 `json:"metadata"`
 }

@@ -29,7 +29,7 @@ pub struct ExecResult {
 }
 
 pub enum FeeEstimationExecution {
-    Executed(ExecResult),
+    Executed(Box<ExecResult>),
     ExternalNotAccepted,
 }
 
@@ -76,6 +76,7 @@ pub trait TvmExecutor {
         libs: Option<&BocBytes>,
     ) -> anyhow::Result<FeeEstimationExecution> {
         self.execute(shard_account, in_msg, ctx, config, libs)
+            .map(Box::new)
             .map(FeeEstimationExecution::Executed)
     }
 }
@@ -183,9 +184,9 @@ impl TvmExecutor for TvmEmulatorAdapter {
         libs: Option<&BocBytes>,
     ) -> anyhow::Result<FeeEstimationExecution> {
         match self.run_emulation(shard_account, in_msg, ctx, config, libs)? {
-            EmulationResult::Success(result) => {
-                Self::decode_success(result).map(FeeEstimationExecution::Executed)
-            }
+            EmulationResult::Success(result) => Self::decode_success(result)
+                .map(Box::new)
+                .map(FeeEstimationExecution::Executed),
             EmulationResult::Error(error)
                 if error.external_not_accepted || is_external_not_accepted_error(&error.error) =>
             {

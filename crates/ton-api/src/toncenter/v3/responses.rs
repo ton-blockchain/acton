@@ -3,6 +3,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
+fn deserialize_null_default<'de, D, T>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de> + Default,
+{
+    Ok(Option::<T>::deserialize(deserializer)?.unwrap_or_default())
+}
+
 pub type AddressBook = HashMap<String, AddressBookRow>;
 pub type Metadata = HashMap<String, AddressMetadata>;
 
@@ -58,7 +66,17 @@ pub struct AccountStatesResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracesResponse {
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub traces: Vec<Trace>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ActionsResponse {
+    pub actions: Vec<Action>,
     #[serde(default)]
     pub address_book: AddressBook,
     #[serde(default)]
@@ -713,5 +731,17 @@ mod tests {
         .expect("v3 trace response must accept the full upstream envelope");
 
         assert_eq!(trace.trace_id, "trace");
+    }
+
+    #[test]
+    fn traces_response_accepts_null_from_pending_traces() {
+        let response: TracesResponse = serde_json::from_value(serde_json::json!({
+            "traces": null,
+            "address_book": {},
+            "metadata": {}
+        }))
+        .expect("pendingTraces returns null instead of an empty OpenAPI array");
+
+        assert!(response.traces.is_empty());
     }
 }

@@ -54,7 +54,7 @@ pub fn map_estimate_fee(result: &LocalnetEstimateFeeResult) -> response::Estimat
     }
 }
 
-fn map_estimated_fee(fee: LocalnetEstimatedFee) -> response::EstimatedFee {
+const fn map_estimated_fee(fee: LocalnetEstimatedFee) -> response::EstimatedFee {
     response::EstimatedFee {
         in_fwd_fee: fee.in_fwd_fee,
         storage_fee: fee.storage_fee,

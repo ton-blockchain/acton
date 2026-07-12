@@ -313,6 +313,51 @@ fn estimate_fee_request_and_response_match_typed_contract() -> Result<()> {
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn pending_actions_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let fixture = fixture(&live)?;
+
+    for request in [
+        v3::PendingActionsQuery {
+            account: Some(fixture.transaction.account.clone()),
+            include_transactions: Some(true),
+            ..Default::default()
+        },
+        v3::PendingActionsQuery {
+            ext_msg_hash: vec![fixture.transaction.hash.clone()],
+            supported_action_types: vec!["TonTransfer".to_owned(), "JettonTransfer".to_owned()],
+            include_transactions: Some(false),
+            ..Default::default()
+        },
+    ] {
+        let _: v3::ActionsResponse = live.get(&live.v3_url, "/pendingActions", &request)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn pending_traces_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let fixture = fixture(&live)?;
+
+    for request in [
+        v3::PendingTracesQuery {
+            account: Some(fixture.transaction.account.clone()),
+            ..Default::default()
+        },
+        v3::PendingTracesQuery {
+            ext_msg_hash: vec![fixture.transaction.hash.clone()],
+            ..Default::default()
+        },
+    ] {
+        let _: v3::TracesResponse = live.get(&live.v3_url, "/pendingTraces", &request)?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;

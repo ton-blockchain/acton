@@ -51,6 +51,23 @@ pub struct TracesQuery {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingActionsQuery {
+    pub account: Option<String>,
+    #[serde(default)]
+    pub ext_msg_hash: Vec<String>,
+    #[serde(default)]
+    pub supported_action_types: Vec<String>,
+    pub include_transactions: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct PendingTracesQuery {
+    pub account: Option<String>,
+    #[serde(default)]
+    pub ext_msg_hash: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransactionsQuery {
     pub workchain: Option<i32>,
     pub shard: Option<String>,

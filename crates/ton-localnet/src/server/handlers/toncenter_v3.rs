@@ -24,9 +24,10 @@ use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
     BlocksQuery, EstimateFeeRequest, JettonMastersQuery, JettonWalletsQuery, MessagesQuery,
-    NftItemsQuery, PendingTransactionsQuery, RunGetMethodRequest, SendMessageRequest, StackEntry,
-    TopAccountsByBalanceQuery, TracesQuery, TransactionsByMasterchainBlockQuery,
-    TransactionsByMessageQuery, TransactionsQuery, WalletInformationQuery, WalletStatesQuery,
+    NftItemsQuery, PendingActionsQuery, PendingTracesQuery, PendingTransactionsQuery,
+    RunGetMethodRequest, SendMessageRequest, StackEntry, TopAccountsByBalanceQuery, TracesQuery,
+    TransactionsByMasterchainBlockQuery, TransactionsByMessageQuery, TransactionsQuery,
+    WalletInformationQuery, WalletStatesQuery,
 };
 use toncenter_v3 as v3;
 
@@ -51,6 +52,52 @@ pub async fn get_traces(
         Ok(response) => (StatusCode::OK, Json(response)).into_response(),
         Err(e) => v3_bad_request(e.to_string()),
     }
+}
+
+pub async fn get_pending_actions_v3(RawQuery(raw_query): RawQuery) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<PendingActionsQuery>(raw_query.as_deref()));
+    parse!(validate_pending_filter(
+        payload.account.as_deref(),
+        &payload.ext_msg_hash,
+    ));
+
+    Json(v3_types::ActionsResponse {
+        actions: Vec::new(),
+        address_book: v3_types::AddressBook::new(),
+        metadata: v3_types::Metadata::new(),
+    })
+    .into_response()
+}
+
+pub async fn get_pending_traces_v3(RawQuery(raw_query): RawQuery) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<PendingTracesQuery>(raw_query.as_deref()));
+    parse!(validate_pending_filter(
+        payload.account.as_deref(),
+        &payload.ext_msg_hash,
+    ));
+
+    Json(v3_types::TracesResponse {
+        traces: Vec::new(),
+        address_book: v3_types::AddressBook::new(),
+        metadata: v3_types::Metadata::new(),
+    })
+    .into_response()
+}
+
+fn validate_pending_filter(
+    account: Option<&str>,
+    external_hashes: &[String],
+) -> anyhow::Result<()> {
+    if account.is_none() && external_hashes.is_empty() {
+        anyhow::bail!("account or ext_msg_hash should be specified");
+    }
+    if let Some(account) = account {
+        Addr::parse(account)?;
+    }
+    for hash in external_hashes {
+        parse_hash_any(hash)?;
+    }
+    Ok(())
 }
 
 async fn collect_v3_traces(

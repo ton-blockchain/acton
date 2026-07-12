@@ -9,19 +9,19 @@ use super::handlers::{
     get_config_all, get_config_param, get_consensus_block, get_extended_address_information,
     get_jetton_masters, get_jetton_wallets, get_libraries, get_masterchain_info,
     get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_nft_items,
-    get_out_msg_queue_size, get_pending_transactions_v3, get_registered_verified_source,
-    get_shard_account_cell, get_shards, get_startup_wallets, get_status, get_token_data,
-    get_top_accounts_by_balance_v3, get_traces, get_transactions,
-    get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
-    get_transactions_v3, get_verified_source, get_wallet_information, get_wallet_information_v3,
-    get_wallet_states_v3, import_recovery_point, increase_time, json_rpc, list_compiler_abis,
-    list_recovery_points, list_verified_sources, load_state, lookup_block, mine_blocks,
-    pack_address, register_compiler_abis, register_verified_sources, revert_recovery_point,
-    run_get_method, run_get_method_std, run_get_method_v3, send_boc, send_boc_return_hash,
-    send_internal_message, send_message_v3, set_address_name, set_mining_mode,
-    set_network_conditions, set_next_block_timestamp, set_shard_account, set_time,
-    source_trace::build_source_trace, streaming_sse, streaming_ws, try_locate_result_tx,
-    try_locate_source_tx, try_locate_tx, unpack_address,
+    get_out_msg_queue_size, get_pending_actions_v3, get_pending_traces_v3,
+    get_pending_transactions_v3, get_registered_verified_source, get_shard_account_cell,
+    get_shards, get_startup_wallets, get_status, get_token_data, get_top_accounts_by_balance_v3,
+    get_traces, get_transactions, get_transactions_by_masterchain_block_v3,
+    get_transactions_by_message_v3, get_transactions_std, get_transactions_v3, get_verified_source,
+    get_wallet_information, get_wallet_information_v3, get_wallet_states_v3, import_recovery_point,
+    increase_time, json_rpc, list_compiler_abis, list_recovery_points, list_verified_sources,
+    load_state, lookup_block, mine_blocks, pack_address, register_compiler_abis,
+    register_verified_sources, revert_recovery_point, run_get_method, run_get_method_std,
+    run_get_method_v3, send_boc, send_boc_return_hash, send_internal_message, send_message_v3,
+    set_address_name, set_mining_mode, set_network_conditions, set_next_block_timestamp,
+    set_shard_account, set_time, source_trace::build_source_trace, streaming_sse, streaming_ws,
+    try_locate_result_tx, try_locate_source_tx, try_locate_tx, unpack_address,
 };
 use crate::server::{
     ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType,
@@ -128,6 +128,8 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
             get(get_transactions_by_message_v3),
         )
         .route("/v3/pendingTransactions", get(get_pending_transactions_v3))
+        .route("/v3/pendingActions", get(get_pending_actions_v3))
+        .route("/v3/pendingTraces", get(get_pending_traces_v3))
         .route("/v3/message", post(send_message_v3))
         .route("/v3/estimateFee", post(estimate_fee_v3))
         .route("/v3/runGetMethod", post(run_get_method_v3))
