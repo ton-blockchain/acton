@@ -5,7 +5,7 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
-use tycho_types::models::{IntAddr, StdAddr};
+use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, Default)]
@@ -166,6 +166,36 @@ pub struct Addr {
     pub addr: [u8; 32],
 }
 
+impl Addr {
+    #[must_use]
+    pub fn as_user_friendly(self) -> String {
+        DisplayBase64StdAddr {
+            addr: &StdAddr::from(self),
+            flags: Base64StdAddrFlags {
+                testnet: false,
+                base64_url: true,
+                bounceable: false,
+            },
+        }
+        .to_string()
+    }
+}
+
+impl From<Addr> for StdAddr {
+    fn from(value: Addr) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl From<&Addr> for StdAddr {
+    fn from(value: &Addr) -> Self {
+        StdAddr::new(
+            i8::try_from(value.workchain).unwrap_or_default(),
+            HashBytes(value.addr),
+        )
+    }
+}
+
 impl FromStr for Addr {
     type Err = anyhow::Error;
 
@@ -224,10 +254,7 @@ impl From<Addr> for IntAddr {
 
 impl From<&Addr> for IntAddr {
     fn from(value: &Addr) -> Self {
-        Self::Std(StdAddr::new(
-            value.workchain.try_into().unwrap_or_default(),
-            HashBytes(value.addr),
-        ))
+        Self::Std(StdAddr::from(value))
     }
 }
 
@@ -256,6 +283,8 @@ pub type Lt = u64;
 #[cfg(test)]
 mod tests {
     use super::{Addr, BocBytes, Hash256};
+    use tycho_types::models::StdAddr;
+    use tycho_types::prelude::HashBytes;
 
     #[test]
     fn hash256_serializes_as_hex_string() {
@@ -334,5 +363,37 @@ mod tests {
         let json = r#"{ "workchain": 0, "addr": [1, 2, 3] }"#;
         let parsed: Result<Addr, _> = serde_json::from_str(json);
         assert!(parsed.is_err(), "object JSON must be rejected");
+    }
+
+    #[test]
+    fn addr_converts_to_std_addr_without_truncating_workchain() {
+        let address = Addr {
+            workchain: -1,
+            addr: [0xEF; 32],
+        };
+        let std_addr = StdAddr::from(address);
+
+        assert_eq!(std_addr.workchain, -1);
+        assert_eq!(std_addr.address.0, [0xEF; 32]);
+        assert_eq!(
+            StdAddr::from(Addr {
+                workchain: i32::MAX,
+                addr: [0; 32],
+            }),
+            StdAddr::new(0, HashBytes([0; 32]))
+        );
+    }
+
+    #[test]
+    fn addr_formats_as_non_bounceable_mainnet_address() {
+        let address = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+
+        assert_eq!(
+            address.as_user_friendly(),
+            "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
+        );
     }
 }

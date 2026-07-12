@@ -71,8 +71,6 @@ Acton local development node currently supports 12 TonCenter v3 endpoints:
 | `GET`  | `/api/v3/jetton/wallets`        | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
 | `GET`  | `/api/v3/nft/items`             | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
 
-`/api/v3/transactions` currently supports only single-value query filters for `account` and `exclude_account`; `/api/v3/pendingTransactions` supports only single-value query filters for `account` and `trace_id`. `/api/v3/transactionsByMessage` filters such as `msg_hash`, `body_hash`, `opcode`, and `direction` are also single-value in local development node (no repeated multi-value form yet).
-
 `/api/v3/message` accepts external-in messages only. Use
 `/acton_sendInternalMessage` to inject a raw internal message in local tooling.
 
@@ -99,3 +97,7 @@ used for local indexing.
 | Method | Endpoint                       | Available in local node | Purpose                                                                      |
 |--------|--------------------------------|-------------------------|------------------------------------------------------------------------------|
 | `POST` | `/api/emulate/v1/emulateTrace` | ✅                       | Emulates external message execution trace against current state (no commit). |
+
+`include_address_book=true` enriches the response with every address referenced by the trace.
+`include_metadata=true` adds locally indexed jetton and NFT metadata, including referenced jetton
+masters. `include_code_data=true` adds collected code and data cells keyed by their base64 hashes.

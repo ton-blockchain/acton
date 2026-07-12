@@ -3406,6 +3406,36 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
         serde_json::to_string_pretty(&by_msg_hash).unwrap_or_default()
     );
 
+    let trace_account = traces_payload[0]["trace"]["transaction"]["account"]
+        .as_str()
+        .expect("trace root transaction must include account");
+    let transaction_account = matched[0]["account"]
+        .as_str()
+        .expect("matched transaction must include account");
+    let trace_address_book = response_payload(&traces)["address_book"]
+        .as_object()
+        .expect("traces response must include address_book");
+    let transaction_address_book = response_payload(&by_msg_hash)["address_book"]
+        .as_object()
+        .expect("transactionsByMessage response must include address_book");
+    let address_book_summary = json!({
+        "trace": {
+            "contains_account": trace_address_book.contains_key(trace_account),
+            "user_friendly": trace_address_book[trace_account]["user_friendly"].is_string(),
+        },
+        "transactions_by_message": {
+            "contains_account": transaction_address_book.contains_key(transaction_account),
+            "user_friendly": transaction_address_book[transaction_account]["user_friendly"].is_string(),
+        }
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&address_book_summary, project.path()),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_v3_trace_and_transaction_address_books.summary.json"
+        ),
+    );
+
     node.stop();
 }
 
@@ -3750,10 +3780,8 @@ fn localnet_supports_v3_address_information_endpoint() {
         v3_payload["data"].as_str(),
         v2_response["result"]["data"].as_str()
     );
-    assert_eq!(
-        v3_payload["frozen_hash"].as_str(),
-        v2_response["result"]["frozen_hash"].as_str()
-    );
+    assert!(v3_payload["frozen_hash"].is_null());
+    assert_eq!(v2_response["result"]["frozen_hash"].as_str(), Some(""));
     assert_eq!(
         v3_payload["last_transaction_hash"].as_str(),
         v2_response["result"]["last_transaction_id"]["hash"].as_str()
@@ -3804,6 +3832,12 @@ fn localnet_supports_v3_address_information_endpoint() {
         v3_missing_default_payload["status"].as_str(),
         v3_missing_use_v2_false_payload["status"].as_str()
     );
+    for field in ["code", "data", "frozen_hash"] {
+        assert!(
+            v3_missing_default_payload[field].is_null(),
+            "missing account {field} must be null"
+        );
+    }
 
     node.stop();
 }

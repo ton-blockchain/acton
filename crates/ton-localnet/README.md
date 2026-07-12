@@ -131,7 +131,8 @@ The response includes:
 The response includes:
 
 - `nft_items` list
-- `address_book` (empty object in local node)
+- `address_book` rows for item, owner, and collection addresses, including user-friendly forms and
+  locally known interfaces
 - `metadata` with `token_info` for:
   - NFT item addresses (`type: "nft_items"`, includes `nft_index`, optional `name/description/image/symbol`, `extra`)
   - collection addresses (`type: "nft_collections"`)
@@ -167,5 +168,7 @@ Action extraction is not implemented yet.
 }
 ```
 
-- `include_address_book` and `include_metadata` are currently unavailable in local node and
-  produce HTTP `400` (`invalid request: address book and metadata are not available`).
+- `include_address_book=true` includes every address referenced by the trace with a user-friendly
+  form and locally detected interfaces.
+- `include_metadata=true` includes locally indexed jetton and NFT token metadata for trace
+  addresses and referenced jetton masters.

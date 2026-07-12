@@ -411,16 +411,13 @@ pub struct Transaction {
     pub in_msg: Option<Message>,
     #[serde(default)]
     pub out_msgs: Vec<Message>,
-    #[serde(default)]
-    pub account_state_before: Option<AccountState>,
-    #[serde(default)]
-    pub account_state_after: Option<AccountState>,
+    pub account_state_before: AccountState,
+    pub account_state_after: AccountState,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountState {
-    #[serde(default)]
-    pub hash: Option<String>,
+    pub hash: String,
     #[serde(default)]
     pub account_status: Option<String>,
     #[serde(default)]

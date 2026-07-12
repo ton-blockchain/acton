@@ -4379,20 +4379,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         other: ExtraCurrencyCollection::new(),
     };
 
-    let state_update_old = summary
-        .account_state_before
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
-    let state_update_new = summary
-        .account_state_after
-        .as_ref()
-        .and_then(|s| s.hash.as_deref())
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let state_update_old = parse_hash_bytes(&summary.account_state_before.hash)?;
+    let state_update_new = parse_hash_bytes(&summary.account_state_after.hash)?;
 
     let tx_info = build_tx_info_from_v3(summary.description.as_ref())?;
     let tx = Transaction {

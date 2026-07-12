@@ -29,7 +29,7 @@ fn localnet_supports_streaming_v2_sse() {
             .post(url)
             .json(&json!({
                 "addresses": [STREAMING_TEST_ACCOUNT_A],
-                "types": ["transactions", "account_state_change"],
+                "types": ["transactions", "account_state_change", "trace_invalidated"],
                 "min_finality": "confirmed",
                 "include_address_book": true
             }))
@@ -91,18 +91,9 @@ fn localnet_streaming_v2_sse_validates_subscription_shape() {
             "addresses": [STREAMING_TEST_ACCOUNT_A]
         }),
     );
-    let invalid_event_type = node.post_json_with_status(
-        "/api/streaming/v2/sse",
-        &json!({
-            "addresses": [STREAMING_TEST_ACCOUNT_A],
-            "types": ["trace_invalidated"]
-        }),
-    );
-
     let summary = json!({
         "missing_types": summarize_error_response(missing_types),
         "missing_trace_hash": summarize_error_response(missing_trace_hash),
-        "invalid_event_type": summarize_error_response(invalid_event_type),
     });
 
     assertion().eq(

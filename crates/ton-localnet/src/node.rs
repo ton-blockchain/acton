@@ -2434,7 +2434,7 @@ impl Node {
         balance: u128,
     ) -> anyhow::Result<BocBytes> {
         let account = Account {
-            address: IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr))),
+            address: IntAddr::Std(StdAddr::from(addr)),
             storage_stat: Default::default(),
             last_trans_lt: 0,
             balance: CurrencyCollection::new(balance),
@@ -2467,7 +2467,7 @@ impl Node {
             AccountState::Frozen(_) => anyhow::bail!("Account is already frozen"),
         };
 
-        account.address = IntAddr::Std(StdAddr::new(addr.workchain as i8, HashBytes(addr.addr)));
+        account.address = IntAddr::Std(StdAddr::from(addr));
         account.state = AccountState::Frozen(state_hash);
         Ok(account)
     }

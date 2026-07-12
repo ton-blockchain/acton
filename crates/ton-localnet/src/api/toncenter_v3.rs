@@ -1,7 +1,8 @@
-//! Localnet-to-`TonCenter` v3 response adapters.
+//! Localnet-to-`TonCenter` v3 typed response mappers.
 //!
-//! Known `OpenAPI` deviations:
-//! - address-book and metadata objects contain only data derivable by localnet and may be empty;
+//! Mapping notes:
+//! - address books include every address referenced by a response, with user-friendly forms and
+//!   interfaces derivable from the local index;
 //! - jetton and NFT metadata is a local projection and omits fields unavailable in local state;
 //! - `map_run_get_method_v3` emits the observed result shape (`gas_used`, `exit_code`, `stack`,
 //!   local `vm_log`); upstream v3 `OpenAPI` 1.2.6 incorrectly declares the request type as the
@@ -30,9 +31,72 @@ use tycho_types::models::{
     AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
 };
 
+trait AddressBookExt {
+    fn insert_address(&mut self, address: Addr, interfaces: &[&str]);
+    fn insert_opt_address(&mut self, address: Option<Addr>, interfaces: &[&str]);
+    fn insert_message(&mut self, source: Option<Addr>, destination: Option<Addr>);
+    fn insert_transaction(&mut self, transaction: &LocalnetTransaction);
+    fn insert_trace(&mut self, trace: &TraceNode);
+}
+
+impl AddressBookExt for response::AddressBook {
+    fn insert_address(&mut self, address: Addr, interfaces: &[&str]) {
+        let row = self
+            .entry(address.to_string())
+            .or_insert_with(|| response::AddressBookRow {
+                user_friendly: Some(address.as_user_friendly()),
+                domain: None,
+                interfaces: Some(Vec::new()),
+            });
+        let row_interfaces = row.interfaces.get_or_insert_default();
+        for interface in interfaces {
+            if !row_interfaces.iter().any(|value| value == interface) {
+                row_interfaces.push((*interface).to_owned());
+            }
+        }
+    }
+
+    fn insert_opt_address(&mut self, address: Option<Addr>, interfaces: &[&str]) {
+        if let Some(address) = address {
+            self.insert_address(address, interfaces);
+        }
+    }
+
+    fn insert_message(&mut self, source: Option<Addr>, destination: Option<Addr>) {
+        self.insert_opt_address(source, &[]);
+        self.insert_opt_address(destination, &[]);
+    }
+
+    fn insert_transaction(&mut self, transaction: &LocalnetTransaction) {
+        self.insert_address(transaction.address, &[]);
+        self.insert_message(transaction.in_msg.source, transaction.in_msg.destination);
+        for message in &transaction.out_msgs {
+            self.insert_message(message.source, message.destination);
+        }
+    }
+
+    fn insert_trace(&mut self, trace: &TraceNode) {
+        self.insert_address(trace.transaction.meta.account, &[]);
+        if let Some(message) = &trace.transaction.in_msg {
+            self.insert_message(message.meta.src, message.meta.dst);
+        }
+        for message in &trace.transaction.out_msgs {
+            self.insert_message(message.meta.src, message.meta.dst);
+        }
+        for child in &trace.children {
+            self.insert_trace(child);
+        }
+    }
+}
+
 pub fn map_jetton_masters(masters: &[JettonMasterMeta]) -> response::JettonMastersResponse {
+    let mut address_book = response::AddressBook::new();
     let mut metadata = response::Metadata::new();
+
     for master in masters {
+        address_book.insert_address(master.address, &["jetton_master"]);
+        address_book.insert_opt_address(master.admin_address, &[]);
+
         metadata.insert(
             master.address.to_string(),
             response::AddressMetadata {
@@ -43,7 +107,7 @@ pub fn map_jetton_masters(masters: &[JettonMasterMeta]) -> response::JettonMaste
     }
 
     response::JettonMastersResponse {
-        address_book: response::AddressBook::new(),
+        address_book,
         metadata,
         jetton_masters: masters.iter().map(map_jetton_master).collect(),
     }
@@ -72,10 +136,14 @@ pub fn map_jetton_wallets_with_metadata(
     wallets: &[JettonWalletMeta],
     masters_by_jetton: &HashMap<Addr, JettonMasterMeta>,
 ) -> response::JettonWalletsResponse {
+    let mut address_book = response::AddressBook::new();
     let mut token_info_by_address: HashMap<String, Vec<response::TokenInfo>> = HashMap::new();
     let mut master_info_added = std::collections::HashSet::new();
 
     for wallet in wallets {
+        address_book.insert_address(wallet.address, &["jetton_wallet"]);
+        address_book.insert_address(wallet.owner_address, &[]);
+        address_book.insert_address(wallet.jetton_address, &["jetton_master"]);
         token_info_by_address
             .entry(wallet.address.to_string())
             .or_default()
@@ -103,7 +171,7 @@ pub fn map_jetton_wallets_with_metadata(
     }
 
     response::JettonWalletsResponse {
-        address_book: response::AddressBook::new(),
+        address_book,
         metadata,
         jetton_wallets: wallets.iter().map(map_jetton_wallet).collect(),
     }
@@ -115,18 +183,25 @@ pub fn map_nft_items(items: &[NftItemMeta]) -> response::NftItemsResponse {
 }
 
 pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsResponse {
+    let mut address_book = response::AddressBook::new();
     let mut token_info_by_address: HashMap<String, Vec<response::TokenInfo>> = HashMap::new();
     let mut collection_info_added = std::collections::HashSet::new();
 
     for item in items {
+        address_book.insert_address(item.address, &["nft_item"]);
+        address_book.insert_opt_address(item.owner_address, &[]);
+        address_book.insert_opt_address(item.collection_address, &["nft_collection"]);
+
         token_info_by_address
             .entry(item.address.to_string())
             .or_default()
             .push(map_nft_item_token_info(item));
 
-        if let Some(collection_address) = item.collection_address
-            && collection_info_added.insert(collection_address)
-        {
+        let Some(collection_address) = item.collection_address else {
+            continue;
+        };
+
+        if collection_info_added.insert(collection_address) {
             token_info_by_address
                 .entry(collection_address.to_string())
                 .or_default()
@@ -146,7 +221,7 @@ pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsR
     }
 
     response::NftItemsResponse {
-        address_book: response::AddressBook::new(),
+        address_book,
         metadata,
         nft_items: items.iter().map(map_nft_item).collect(),
     }
@@ -214,27 +289,9 @@ pub fn map_account_states(
 pub fn map_address_information(state: &LocalnetAccountState) -> response::V2AddressInformation {
     response::V2AddressInformation {
         balance: state.balance.to_string(),
-        code: Some(
-            state
-                .code
-                .as_ref()
-                .map(BocBytes::to_base64)
-                .unwrap_or_default(),
-        ),
-        data: Some(
-            state
-                .data
-                .as_ref()
-                .map(BocBytes::to_base64)
-                .unwrap_or_default(),
-        ),
-        frozen_hash: Some(
-            state
-                .frozen_hash
-                .as_ref()
-                .map(Hash256::to_base64)
-                .unwrap_or_default(),
-        ),
+        code: state.code.as_ref().map(BocBytes::to_base64),
+        data: state.data.as_ref().map(BocBytes::to_base64),
+        frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
         last_transaction_hash: Some(state.last_transaction_id.hash.to_base64()),
         last_transaction_lt: Some(state.last_transaction_id.lt.to_string()),
         status: map_address_information_status(&state.state).to_owned(),
@@ -252,8 +309,13 @@ pub fn map_send_message(message: &LocalnetAcceptedExternalMessage) -> response::
 pub fn map_transactions_response(
     transactions: &[LocalnetTransaction],
 ) -> response::TransactionsResponse {
+    let mut address_book = response::AddressBook::new();
+    for transaction in transactions {
+        address_book.insert_transaction(transaction);
+    }
+
     response::TransactionsResponse {
-        address_book: response::AddressBook::new(),
+        address_book,
         transactions: transactions.iter().map(map_v3_transaction).collect(),
     }
 }
@@ -356,16 +418,14 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
         }),
         in_msg,
         out_msgs,
-        account_state_before: Some(map_transaction_account_state(
+        account_state_before: map_transaction_account_state(
             None,
             &tx_details.account_state_before_hash,
-            tx_details.orig_status,
-        )),
-        account_state_after: Some(map_transaction_account_state(
+        ),
+        account_state_after: map_transaction_account_state(
             None,
             &tx_details.account_state_after_hash,
-            tx_details.end_status,
-        )),
+        ),
         block_ref: Some(response::BlockId {
             workchain: 0,
             shard: format_v3_shard_id(i64::MIN),
@@ -576,10 +636,12 @@ pub fn map_traces(tn: &TraceNode) -> response::TracesResponse {
 fn map_traces_with_emulated(tn: &TraceNode, emulated: bool) -> response::TracesResponse {
     let mut transactions = HashMap::new();
     let mut transactions_order = Vec::new();
+    let mut address_book = response::AddressBook::new();
     collect_transactions(tn, &mut transactions, &mut transactions_order, emulated);
+    address_book.insert_trace(tn);
 
     response::TracesResponse {
-        address_book: response::AddressBook::new(),
+        address_book,
         metadata: response::Metadata::new(),
         traces: vec![map_trace(tn, transactions, transactions_order, emulated)],
     }
@@ -763,16 +825,14 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transactio
             .iter()
             .map(|m| map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false))
             .collect(),
-        account_state_before: Some(map_transaction_account_state(
+        account_state_before: map_transaction_account_state(
             tx.account_state_before.as_ref(),
             &tx_details.account_state_before_hash,
-            tx_details.orig_status,
-        )),
-        account_state_after: Some(map_transaction_account_state(
+        ),
+        account_state_after: map_transaction_account_state(
             tx.account_state_after.as_ref(),
             &tx_details.account_state_after_hash,
-            tx_details.end_status,
-        )),
+        ),
         block_ref: Some(response::BlockId {
             workchain: 0,
             shard: format_v3_shard_id(i64::MIN),
@@ -997,13 +1057,12 @@ const fn map_compute_skip_reason(reason: ComputePhaseSkipReason) -> &'static str
 fn map_transaction_account_state(
     snapshot: Option<&AccountStateSnapshot>,
     fallback_hash: &str,
-    fallback_status: &str,
 ) -> response::AccountState {
     if let Some(snapshot) = snapshot {
         let data_hash = snapshot.data_hash();
         let code_hash = snapshot.code_hash();
         return response::AccountState {
-            hash: Some(fallback_hash.to_owned()),
+            hash: snapshot.hash.to_base64(),
             account_status: Some(map_account_state_status(&snapshot.status).to_owned()),
             balance: Some(snapshot.balance.to_string()),
             code_boc: snapshot.code.as_ref().map(Boc::encode_base64),
@@ -1015,27 +1074,16 @@ fn map_transaction_account_state(
         };
     }
 
-    map_emulation_account_state(fallback_hash, "0", fallback_status, None, None, None)
-}
-
-fn map_emulation_account_state(
-    hash: &str,
-    balance: &str,
-    account_status: &str,
-    frozen_hash: Option<&Hash256>,
-    data_hash: Option<&Hash256>,
-    code_hash: Option<&Hash256>,
-) -> response::AccountState {
     response::AccountState {
-        hash: Some(hash.to_owned()),
-        account_status: Some(account_status.to_owned()),
-        balance: Some(balance.to_owned()),
+        hash: fallback_hash.to_owned(),
+        account_status: None,
+        balance: None,
         code_boc: None,
-        code_hash: code_hash.map(Hash256::to_base64),
+        code_hash: None,
         data_boc: None,
-        data_hash: data_hash.map(Hash256::to_base64),
-        extra_currencies: Some(HashMap::new()),
-        frozen_hash: frozen_hash.map(Hash256::to_base64),
+        data_hash: None,
+        extra_currencies: None,
+        frozen_hash: None,
     }
 }
 
@@ -1213,11 +1261,12 @@ const fn map_account_state_status(status: &AccountStatus) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        format_v3_shard_id, map_blocks_response, map_jetton_masters, map_nft_collection_token_info,
-        map_nft_item_token_info,
+        format_v3_shard_id, map_address_information, map_blocks_response, map_jetton_masters,
+        map_jetton_wallets, map_nft_collection_token_info, map_nft_item_token_info, map_nft_items,
+        map_transaction_account_state,
     };
-    use crate::localnet::{LocalnetBlock, LocalnetBlockId};
-    use crate::storage::{JettonMasterMeta, NftItemMeta};
+    use crate::localnet::{LocalnetAccountState, LocalnetBlock, LocalnetBlockId};
+    use crate::storage::{JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use crate::types::Hash256;
     use serde_json::json;
 
@@ -1283,9 +1332,21 @@ mod tests {
     fn jetton_masters_response_includes_token_metadata() {
         let master = sample_jetton_master();
         let address = master.address.to_string();
+        let admin_address = master.admin_address.expect("admin address").to_string();
         let mapped = map_jetton_masters(&[master]);
         let metadata = mapped.metadata.get(&address).expect("master metadata");
         let token_info = &metadata.token_info[0];
+
+        let master_row = mapped
+            .address_book
+            .get(&address)
+            .expect("master address row");
+        assert!(master_row.user_friendly.is_some());
+        assert_eq!(
+            master_row.interfaces.as_deref(),
+            Some(["jetton_master".to_owned()].as_slice())
+        );
+        assert!(mapped.address_book.contains_key(&admin_address));
 
         assert_eq!(metadata.is_indexed, Some(true));
         assert_eq!(token_info.kind.as_deref(), Some("jetton_masters"));
@@ -1297,11 +1358,99 @@ mod tests {
 
     #[test]
     fn nft_item_token_info_uses_nft_items_type() {
-        let token_info = map_nft_item_token_info(&sample_nft_item());
+        let item = sample_nft_item();
+        let item_address = item.address.to_string();
+        let owner_address = item.owner_address.expect("owner address").to_string();
+        let collection_address = item
+            .collection_address
+            .expect("collection address")
+            .to_string();
+        let token_info = map_nft_item_token_info(&item);
+        let mapped = map_nft_items(&[item]);
 
         assert_eq!(token_info.kind.as_deref(), Some("nft_items"));
         assert_eq!(token_info.nft_index.as_deref(), Some("7"));
         assert_eq!(token_info.name.as_deref(), Some("Sample NFT"));
+        assert_eq!(mapped.address_book.len(), 3);
+        assert_eq!(
+            mapped.address_book[&item_address].interfaces.as_deref(),
+            Some(["nft_item".to_owned()].as_slice())
+        );
+        assert!(mapped.address_book.contains_key(&owner_address));
+        assert_eq!(
+            mapped.address_book[&collection_address]
+                .interfaces
+                .as_deref(),
+            Some(["nft_collection".to_owned()].as_slice())
+        );
+    }
+
+    #[test]
+    fn jetton_wallets_response_includes_wallet_owner_and_master_addresses() {
+        let wallet = JettonWalletMeta {
+            address: "0:4444444444444444444444444444444444444444444444444444444444444444"
+                .parse()
+                .expect("valid wallet address"),
+            balance: 10,
+            code_hash: Hash256([4; 32]),
+            data_hash: Hash256([5; 32]),
+            jetton_address: sample_jetton_master().address,
+            last_transaction_lt: 43,
+            owner_address: "0:5555555555555555555555555555555555555555555555555555555555555555"
+                .parse()
+                .expect("valid owner address"),
+        };
+        let wallet_address = wallet.address.to_string();
+        let owner_address = wallet.owner_address.to_string();
+        let master_address = wallet.jetton_address.to_string();
+        let mapped = map_jetton_wallets(&[wallet]);
+
+        assert_eq!(mapped.address_book.len(), 3);
+        assert_eq!(
+            mapped.address_book[&wallet_address].interfaces.as_deref(),
+            Some(["jetton_wallet".to_owned()].as_slice())
+        );
+        assert!(mapped.address_book.contains_key(&owner_address));
+        assert_eq!(
+            mapped.address_book[&master_address].interfaces.as_deref(),
+            Some(["jetton_master".to_owned()].as_slice())
+        );
+    }
+
+    #[test]
+    fn transaction_account_state_without_snapshot_contains_only_hash() {
+        let mapped = map_transaction_account_state(None, "state-hash");
+
+        assert_eq!(mapped.hash, "state-hash");
+        assert!(mapped.balance.is_none());
+        assert!(mapped.account_status.is_none());
+        assert!(mapped.extra_currencies.is_none());
+        assert!(mapped.code_boc.is_none());
+        assert!(mapped.data_boc.is_none());
+    }
+
+    #[test]
+    fn missing_address_information_omits_optional_state_fields() {
+        let address = "0:6666666666666666666666666666666666666666666666666666666666666666"
+            .parse()
+            .expect("valid address");
+        let mapped = map_address_information(&LocalnetAccountState::empty(
+            address,
+            LocalnetBlockId {
+                workchain: 0,
+                shard: i64::MIN,
+                seqno: 0,
+                root_hash: Hash256([0; 32]),
+                file_hash: Hash256([0; 32]),
+            },
+            0,
+        ));
+
+        assert!(mapped.code.is_none());
+        assert!(mapped.data.is_none());
+        assert!(mapped.frozen_hash.is_none());
+        assert_eq!(mapped.last_transaction_lt.as_deref(), Some("0"));
+        assert_eq!(mapped.status, "uninitialized");
     }
 
     #[test]

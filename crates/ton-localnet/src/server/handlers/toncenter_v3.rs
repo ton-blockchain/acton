@@ -28,8 +28,7 @@ use ton_api::toncenter::v3::requests::{
 use ton_indexer::categorize_wallet;
 use toncenter_v3 as v3;
 use tycho_types::cell::HashBytes as CellHashBytes;
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
-use tycho_types::prelude::HashBytes;
+use tycho_types::models::{StdAddr, StdAddrFormat};
 
 const BLOCK_WORKCHAIN: i32 = 0;
 const BLOCK_SHARD: i64 = i64::MIN;
@@ -205,7 +204,7 @@ pub async fn get_account_states_v3(
             v3::AccountStateContext {
                 interfaces: info.interfaces.into_iter().collect(),
                 token_info: info.token_info,
-                user_friendly: as_user_friendly(address),
+                user_friendly: address.as_user_friendly(),
             },
         );
         states.push(state_with_info.state);
@@ -1122,7 +1121,7 @@ async fn build_emulate_v1_extra_data(
             address_book.insert(
                 address.to_string(),
                 v3_types::AddressBookRow {
-                    user_friendly: Some(as_user_friendly(address)),
+                    user_friendly: Some(address.as_user_friendly()),
                     domain: None,
                     interfaces: Some(info.interfaces.into_iter().collect()),
                 },
@@ -1226,20 +1225,6 @@ fn map_address_info(info: LocalnetAddressInfo) -> AddressInfo {
     }
 
     out
-}
-
-fn as_user_friendly(address: Addr) -> String {
-    let workchain = i8::try_from(address.workchain).ok().unwrap_or_default();
-    let std_addr = StdAddr::new(workchain, HashBytes(address.addr));
-    DisplayBase64StdAddr {
-        addr: &std_addr,
-        flags: Base64StdAddrFlags {
-            testnet: false,
-            base64_url: true,
-            bounceable: false,
-        },
-    }
-    .to_string()
 }
 
 fn parse_opcode(opcode: &str) -> anyhow::Result<u32> {

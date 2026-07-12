@@ -9,7 +9,6 @@ use std::collections::{BTreeSet, HashMap};
 use ton_api::toncenter::streaming::v2 as streaming;
 use ton_api::toncenter::v3 as v3_types;
 use ton_indexer::categorize_wallet;
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, Copy, Debug)]
@@ -209,9 +208,6 @@ pub async fn notifications_for_commit(
 fn validate_event_types(types: &[streaming::EventType]) -> anyhow::Result<()> {
     if types.is_empty() {
         anyhow::bail!("types are required for subscription");
-    }
-    if types.contains(&streaming::EventType::TraceInvalidated) {
-        anyhow::bail!("invalid event type: trace_invalidated");
     }
     Ok(())
 }
@@ -485,7 +481,7 @@ async fn jettons_notification(
 
 fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> v3_types::AccountState {
     v3_types::AccountState {
-        hash: Some(state.account_state_hash.to_base64()),
+        hash: state.account_state_hash.to_base64(),
         balance: Some(state.balance.to_string()),
         account_status: Some(
             match state.state {
@@ -525,7 +521,7 @@ async fn build_extra_data(
             address_book.insert(
                 address.to_string(),
                 v3_types::AddressBookRow {
-                    user_friendly: Some(as_user_friendly(*address)),
+                    user_friendly: Some(address.as_user_friendly()),
                     domain: None,
                     interfaces: Some(info.interfaces.into_iter().collect()),
                 },
@@ -652,18 +648,4 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     Ok(info)
-}
-
-fn as_user_friendly(address: Addr) -> String {
-    let workchain = i8::try_from(address.workchain).ok().unwrap_or_default();
-    let std_addr = StdAddr::new(workchain, HashBytes(address.addr));
-    DisplayBase64StdAddr {
-        addr: &std_addr,
-        flags: Base64StdAddrFlags {
-            testnet: false,
-            base64_url: true,
-            bounceable: false,
-        },
-    }
-    .to_string()
 }
