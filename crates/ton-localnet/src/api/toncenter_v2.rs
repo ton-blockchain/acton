@@ -109,7 +109,7 @@ pub fn map_transaction_ext(tx: &LocalnetTransaction) -> response::TransactionExt
 
 #[must_use]
 pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::Message> {
-    if msg.hash.0 == [0; 32] {
+    if msg.hash.is_zero() {
         return None;
     }
     Some(response::Message::Full(Box::new(response::MessageFull {
@@ -136,7 +136,7 @@ pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::M
 
 #[must_use]
 pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> Option<response::MessageStd> {
-    if msg.hash.0 == [0; 32] {
+    if msg.hash.is_zero() {
         return None;
     }
     Some(response::MessageStd {

@@ -19,5 +19,8 @@
     "transaction_id_hash_present": true,
     "type": "ext.transaction"
   },
-  "try_locate_tx_rpc_hash_matches": true
+  "try_locate_tx_rpc_hash_matches": true,
+  "v3_adjacent_in_finds_source": true,
+  "v3_adjacent_out_finds_result": true,
+  "v3_message_links_both_transactions": true
 }

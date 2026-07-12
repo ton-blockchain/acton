@@ -107,6 +107,38 @@ pub struct TransactionsByMasterchainBlockQuery {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MessagesQuery {
+    #[serde(default)]
+    pub msg_hash: Vec<String>,
+    pub body_hash: Option<String>,
+    pub source: Option<String>,
+    pub destination: Option<String>,
+    pub opcode: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub direction: Option<String>,
+    pub exclude_externals: Option<bool>,
+    pub only_externals: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdjacentTransactionsQuery {
+    pub hash: String,
+    pub direction: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct WalletStatesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PendingTransactionsQuery {
     /// `TonCenter` currently requires at least one account even though its Swagger marks it optional.
     #[serde(default)]

@@ -441,6 +441,60 @@ func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	t.Run("messages with typed filters and external variants", func(t *testing.T) {
+		values := url.Values{
+			"limit": {"10"},
+			"sort":  {"desc"},
+		}
+		if len(transactions.Transactions) > 0 {
+			transaction := transactions.Transactions[0]
+			if transaction.InMsg != nil && transaction.InMsg.Hash != nil {
+				values["msg_hash"] = []string{*transaction.InMsg.Hash, *transaction.InMsg.Hash}
+				values["direction"] = []string{"in"}
+			}
+		}
+		result, err := toncenter.V3GetCall[messagesResponseV3](ctx, v3, "messages", values)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = result.Messages
+
+		if _, err := toncenter.V3GetCall[messagesResponseV3](ctx, v3, "messages", url.Values{
+			"source":         {"null"},
+			"only_externals": {"true"},
+			"limit":          {"1"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := toncenter.V3GetCall[messagesResponseV3](ctx, v3, "messages", url.Values{
+			"exclude_externals": {"true"},
+			"limit":             {"1"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("wallet states with and without state", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[walletStatesResponseV3](ctx, v3, "walletStates", url.Values{
+			"address": {mainnetWallet, noStateAccount},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(result.Wallets) != 1 || !result.Wallets[0].IsWallet {
+			t.Fatalf("expected one recognized wallet, got %+v", result.Wallets)
+		}
+		if result.Wallets[0].Address == noStateAccount {
+			t.Fatal("walletStates must omit an account without state")
+		}
+	})
+	t.Run("adjacent transactions reports a missing relation", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[transactionsResponseV3](ctx, v3, "adjacentTransactions", url.Values{
+			"hash":      {unknownHash},
+			"direction": {"in"},
+		}); err == nil {
+			t.Fatal("unknown transaction unexpectedly has an adjacent transaction")
+		}
+	})
 	t.Run("account states with and without state", func(t *testing.T) {
 		result, err := toncenter.V3GetCall[accountStatesResponseV3](ctx, v3, "accountStates", url.Values{
 			"address":     {mainnetWallet, noStateAccount},

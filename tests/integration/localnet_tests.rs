@@ -2810,6 +2810,40 @@ fn localnet_supports_try_locate_transaction_endpoints() {
         Some(try_locate_tx_hash)
     );
 
+    let source_tx_hash_hex = Hash256::from_base64(&source_tx_hash)
+        .expect("source transaction hash must be valid base64")
+        .to_hex();
+    let result_tx_hash_hex = Hash256::from_base64(try_locate_tx_hash)
+        .expect("result transaction hash must be valid base64")
+        .to_hex();
+    let adjacent_out_response = node.get_json(&format!(
+        "/api/v3/adjacentTransactions?hash={source_tx_hash_hex}&direction=out"
+    ));
+    let adjacent_out: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&adjacent_out_response).clone())
+            .expect("outgoing adjacentTransactions must match its typed response");
+    let adjacent_in_response = node.get_json(&format!(
+        "/api/v3/adjacentTransactions?hash={result_tx_hash_hex}&direction=in"
+    ));
+    let adjacent_in: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&adjacent_in_response).clone())
+            .expect("incoming adjacentTransactions must match its typed response");
+
+    let message_hash = source_transaction["out_msgs"]
+        .as_array()
+        .and_then(|messages| messages.first())
+        .and_then(|message| message["hash"].as_str())
+        .expect("source transaction must contain an outgoing message");
+    let message_hash_hex = Hash256::from_base64(message_hash)
+        .expect("outgoing message hash must be valid base64")
+        .to_hex();
+    let messages_response = node.get_json(&format!(
+        "/api/v3/messages?msg_hash={message_hash_hex}&limit=10"
+    ));
+    let messages: toncenter_v3::MessagesResponse =
+        serde_json::from_value(response_payload(&messages_response).clone())
+            .expect("messages must match its typed response");
+
     let shape_summary = json!({
         "get_transactions": summarize_v2_ext_transaction_shape(source_transaction),
         "try_locate_tx": summarize_v2_ext_transaction_shape(&try_locate_tx["result"]),
@@ -2819,6 +2853,19 @@ fn localnet_supports_try_locate_transaction_endpoints() {
             == Some(source_tx_hash.as_str()),
         "try_locate_tx_rpc_hash_matches": v2_transaction_id_hash(&try_locate_tx_rpc["result"])
             == Some(try_locate_tx_hash),
+        "v3_adjacent_out_finds_result": adjacent_out
+            .transactions
+            .iter()
+            .any(|transaction| transaction.hash == try_locate_tx_hash),
+        "v3_adjacent_in_finds_source": adjacent_in
+            .transactions
+            .iter()
+            .any(|transaction| transaction.hash == source_tx_hash),
+        "v3_message_links_both_transactions": messages.messages.iter().any(|message| {
+            message.hash == message_hash
+                && message.in_msg_tx_hash.as_deref() == Some(try_locate_tx_hash)
+                && message.out_msg_tx_hash.as_deref() == Some(source_tx_hash.as_str())
+        }),
     });
     assertion().eq(
         pretty_json_for_snapshot(&shape_summary, project.path()),
@@ -4182,6 +4229,26 @@ fn localnet_supports_v3_core_lookup_endpoints() {
         serde_json::from_value(response_payload(&by_masterchain_response).clone())
             .expect("transactionsByMasterchainBlock must match its typed response");
 
+    let message_hash = expected_tx["in_msg"]["hash"]
+        .as_str()
+        .expect("funded account transaction must have an inbound message");
+    let message_hash_hex = Hash256::from_base64(message_hash)
+        .expect("message hash must be valid base64")
+        .to_hex();
+    let messages_response = node.get_json(&format!(
+        "/api/v3/messages?msg_hash={message_hash_hex}&limit=10&sort=asc"
+    ));
+    let messages: toncenter_v3::MessagesResponse =
+        serde_json::from_value(response_payload(&messages_response).clone())
+            .expect("messages must match its typed response");
+
+    let wallet_states_response = node.get_json(&format!(
+        "/api/v3/walletStates?address={wallet_address}&address={V3_TRANSACTIONS_TEST_ACCOUNT_A}&address={missing_address}"
+    ));
+    let wallet_states: toncenter_v3::WalletStatesResponse =
+        serde_json::from_value(response_payload(&wallet_states_response).clone())
+            .expect("walletStates must match its typed response");
+
     let (address_book_empty_status, address_book_empty) =
         node.get_json_with_status("/api/v3/addressBook");
     let (metadata_empty_status, metadata_empty) = node.get_json_with_status("/api/v3/metadata");
@@ -4189,6 +4256,10 @@ fn localnet_supports_v3_core_lookup_endpoints() {
         node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=-1");
     let (invalid_sort_status, invalid_sort) =
         node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=1&sort=invalid");
+    let (messages_invalid_direction_status, messages_invalid_direction) =
+        node.get_json_with_status("/api/v3/messages?direction=sideways");
+    let (wallet_states_empty_status, wallet_states_empty) =
+        node.get_json_with_status("/api/v3/walletStates");
 
     let summary = json!({
         "wallet_information": {
@@ -4230,6 +4301,31 @@ fn localnet_supports_v3_core_lookup_endpoints() {
                 .all(|tx| u64::from(tx.mc_block_seqno) == mc_seqno),
             "address_book_present": !by_masterchain.address_book.is_empty(),
         },
+        "messages": {
+            "count": messages.messages.len(),
+            "contains_expected": messages.messages.iter().any(|message| message.hash == message_hash),
+            "links_both_transactions": messages.messages.iter().any(|message| {
+                message.hash == message_hash
+                    && message.in_msg_tx_hash.is_some()
+                    && message.out_msg_tx_hash.is_some()
+            }),
+            "address_book_present": !messages.address_book.is_empty(),
+        },
+        "wallet_states": {
+            "contains_wallet": wallet_states
+                .wallets
+                .iter()
+                .any(|wallet| wallet.is_wallet && wallet.seqno.is_some()),
+            "contains_funded_non_wallet": wallet_states.wallets.iter().any(|wallet| {
+                wallet.address == V3_TRANSACTIONS_TEST_ACCOUNT_A && !wallet.is_wallet
+            }),
+            "omits_missing_account": wallet_states
+                .wallets
+                .iter()
+                .all(|wallet| wallet.address != missing_address),
+            "address_book_matches_returned_states": wallet_states.address_book.len()
+                == wallet_states.wallets.len(),
+        },
         "bad_requests": {
             "address_book_empty": {
                 "status": address_book_empty_status,
@@ -4246,6 +4342,14 @@ fn localnet_supports_v3_core_lookup_endpoints() {
             "invalid_sort": {
                 "status": invalid_sort_status,
                 "error": invalid_sort["error"],
+            },
+            "messages_invalid_direction": {
+                "status": messages_invalid_direction_status,
+                "error": messages_invalid_direction["error"],
+            },
+            "wallet_states_empty": {
+                "status": wallet_states_empty_status,
+                "error": wallet_states_empty["error"],
             },
         },
     });

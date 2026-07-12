@@ -6,6 +6,7 @@
 //!   local `vm_log`); upstream v3 `OpenAPI` 1.2.6 incorrectly declares the request type as the
 //!   successful response schema;
 
+use crate::api::toncenter_wallet::StandardWalletState;
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAccountState, LocalnetBlock, LocalnetMessage,
     LocalnetRunGetMethodResult, LocalnetTransaction, convert_to_message_struct,
@@ -323,6 +324,7 @@ pub fn map_blocks_response(blocks: &[LocalnetBlock]) -> response::BlocksResponse
     }
 }
 
+#[must_use]
 pub fn map_masterchain_info_v3(blocks: &[LocalnetBlock]) -> Option<response::MasterchainInfo> {
     let first = blocks
         .iter()
@@ -353,6 +355,31 @@ pub(crate) fn map_wallet_information_v3(
         last_transaction_lt: state.last_transaction_id.lt.to_string(),
         last_transaction_hash: state.last_transaction_id.hash.to_base64(),
         status: map_wallet_information_status(&state.state).to_owned(),
+    }
+}
+
+pub(crate) fn map_wallet_state_v3(
+    state: &LocalnetAccountState,
+    wallet_type: Option<&str>,
+    wallet: Option<&StandardWalletState>,
+) -> response::WalletState {
+    let has_last_transaction =
+        state.last_transaction_id.lt != 0 || !state.last_transaction_id.hash.is_zero();
+
+    response::WalletState {
+        address: state.address.to_string(),
+        is_wallet: wallet_type.is_some(),
+        wallet_type: wallet_type.map(ToOwned::to_owned),
+        seqno: wallet.map(|wallet| wallet.seqno),
+        wallet_id: wallet.and_then(|wallet| wallet.wallet_id),
+        balance: Some(state.balance.to_string()),
+        extra_currencies: None,
+        is_signature_allowed: wallet.and_then(|wallet| wallet.is_signature_allowed),
+        status: Some(map_account_state_status(&state.state).to_owned()),
+        code_hash: state.code_hash.as_ref().map(Hash256::to_base64),
+        last_transaction_hash: has_last_transaction
+            .then(|| state.last_transaction_id.hash.to_base64()),
+        last_transaction_lt: has_last_transaction.then(|| state.last_transaction_id.lt.to_string()),
     }
 }
 
@@ -421,11 +448,11 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
         .unwrap_or(&tx.in_msg.hash)
         .to_base64();
     let in_msg =
-        (tx.in_msg.hash.0 != [0; 32]).then(|| map_v3_message(&tx.in_msg, &tx.hash, tx.utime, true));
+        (!tx.in_msg.hash.is_zero()).then(|| map_v3_message(&tx.in_msg, &tx.hash, tx.utime, true));
     let out_msgs = tx
         .out_msgs
         .iter()
-        .filter(|msg| msg.hash.0 != [0; 32])
+        .filter(|msg| !msg.hash.is_zero())
         .map(|msg| map_v3_message(msg, &tx.hash, tx.utime, false))
         .collect::<Vec<_>>();
     response::Transaction {
@@ -477,29 +504,33 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
     }
 }
 
-fn map_v3_message(
+pub(crate) fn map_v3_message(
     msg: &LocalnetMessage,
     tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
 ) -> response::Message {
+    let is_internal = msg.source.is_some() && msg.destination.is_some();
+    let has_created_lt = msg.source.is_some();
+    let is_external_in = msg.source.is_none();
+
     response::Message {
         hash: msg.hash.to_base64(),
         hash_norm: msg.hash_norm.as_ref().map(Hash256::to_base64),
         source: msg.source.as_ref().map(ToString::to_string),
         destination: msg.destination.as_ref().map(ToString::to_string),
-        value: Some(msg.value.to_string()),
-        value_extra_currencies: Some(HashMap::new()),
-        fwd_fee: Some(msg.fwd_fee.to_string()),
-        ihr_fee: Some(msg.ihr_fee.to_string()),
-        import_fee: Some("0".to_owned()),
-        created_lt: Some(msg.created_lt.to_string()),
-        created_at: Some(tx_utime.to_string()),
+        value: is_internal.then(|| msg.value.to_string()),
+        value_extra_currencies: is_internal.then(HashMap::new),
+        fwd_fee: is_internal.then(|| msg.fwd_fee.to_string()),
+        ihr_fee: is_internal.then(|| msg.ihr_fee.to_string()),
+        import_fee: is_external_in.then(|| "0".to_owned()),
+        created_lt: has_created_lt.then(|| msg.created_lt.to_string()),
+        created_at: has_created_lt.then(|| tx_utime.to_string()),
         decoded_opcode: None,
-        extra_flags: None,
-        ihr_disabled: Some(true),
-        bounce: Some(msg.bounce),
-        bounced: Some(msg.bounced),
+        extra_flags: is_internal.then(|| "0".to_owned()),
+        ihr_disabled: is_internal.then_some(true),
+        bounce: is_internal.then_some(msg.bounce),
+        bounced: is_internal.then_some(msg.bounced),
         in_msg_tx_hash: is_in_msg.then(|| tx_hash.to_base64()),
         out_msg_tx_hash: (!is_in_msg).then(|| tx_hash.to_base64()),
         opcode: msg

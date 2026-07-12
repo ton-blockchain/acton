@@ -54,7 +54,7 @@ local development flows that need to inject a raw internal message.
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 17 TonCenter v3 endpoints:
+Acton local development node currently supports 20 TonCenter v3 endpoints:
 
 | Method | Endpoint                                 | Available in local node | Purpose                                                              |
 |--------|------------------------------------------|-------------------------|----------------------------------------------------------------------|
@@ -67,6 +67,9 @@ Acton local development node currently supports 17 TonCenter v3 endpoints:
 | `GET`  | `/api/v3/metadata`                       | ✅                       | Returns locally indexed jetton and NFT metadata.                     |
 | `GET`  | `/api/v3/masterchainInfo`                | ✅                       | Returns the first and latest local masterchain blocks.               |
 | `GET`  | `/api/v3/transactions`                   | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
+| `GET`  | `/api/v3/messages`                       | ✅                       | Returns messages with TonCenter v3 filters.                          |
+| `GET`  | `/api/v3/adjacentTransactions`           | ✅                       | Returns transactions connected by inbound or outbound messages.      |
+| `GET`  | `/api/v3/walletStates`                   | ✅                       | Returns wallet projections for existing account states.              |
 | `GET`  | `/api/v3/transactionsByMasterchainBlock` | ✅                       | Returns transactions included in a masterchain block.                |
 | `GET`  | `/api/v3/transactionsByMessage`          | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
 | `GET`  | `/api/v3/pendingTransactions`            | ✅                       | Returns pending transactions filtered by account and trace id.       |

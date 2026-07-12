@@ -9,6 +9,7 @@ pub(crate) struct StandardWalletState {
     pub version: WalletVersion,
     pub seqno: u32,
     pub wallet_id: Option<i32>,
+    pub is_signature_allowed: Option<bool>,
 }
 
 pub(crate) fn read_standard_wallet_state(
@@ -24,7 +25,7 @@ pub(crate) fn read_standard_wallet_state(
     let data = account.data.as_ref().context("Account state has no data")?;
     let data = TonCell::from_boc(data.0.clone()).context("Failed to decode wallet data")?;
 
-    let (seqno, wallet_id) = match version {
+    let (seqno, wallet_id, is_signature_allowed) = match version {
         WalletVersion::V1R1
         | WalletVersion::V1R2
         | WalletVersion::V1R3
@@ -32,19 +33,19 @@ pub(crate) fn read_standard_wallet_state(
         | WalletVersion::V2R2 => {
             let data =
                 WalletV1V2Data::from_cell(&data).context("Failed to parse wallet V1/V2 data")?;
-            (data.seqno, None)
+            (data.seqno, None, None)
         }
         WalletVersion::V3R1 | WalletVersion::V3R2 => {
             let data = WalletV3Data::from_cell(&data).context("Failed to parse wallet V3 data")?;
-            (data.seqno, Some(data.wallet_id))
+            (data.seqno, Some(data.wallet_id), None)
         }
         WalletVersion::V4R1 | WalletVersion::V4R2 => {
             let data = WalletV4Data::from_cell(&data).context("Failed to parse wallet V4 data")?;
-            (data.seqno, Some(data.wallet_id))
+            (data.seqno, Some(data.wallet_id), None)
         }
         WalletVersion::V5R1 => {
             let data = WalletV5Data::from_cell(&data).context("Failed to parse wallet V5 data")?;
-            (data.seqno, Some(data.wallet_id))
+            (data.seqno, Some(data.wallet_id), Some(data.sign_allowed))
         }
         _ => anyhow::bail!("Unsupported wallet type: {version:?}"),
     };
@@ -53,5 +54,6 @@ pub(crate) fn read_standard_wallet_state(
         version,
         seqno,
         wallet_id,
+        is_signature_allowed,
     })
 }

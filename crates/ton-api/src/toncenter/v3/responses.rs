@@ -73,6 +73,50 @@ pub struct TransactionsResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MessagesResponse {
+    pub messages: Vec<Message>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletStatesResponse {
+    pub wallets: Vec<WalletState>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletState {
+    pub address: String,
+    pub is_wallet: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet_id: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub balance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extra_currencies: Option<HashMap<String, String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_signature_allowed: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_hash: Option<String>,
+    #[serde(default)]
+    pub last_transaction_hash: Option<String>,
+    #[serde(default)]
+    pub last_transaction_lt: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockId {
     pub workchain: i32,
     pub shard: String,

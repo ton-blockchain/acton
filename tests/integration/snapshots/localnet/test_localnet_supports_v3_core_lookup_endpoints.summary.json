@@ -16,6 +16,10 @@
       "error": "Invalid `sort`: invalid. Supported values: asc, desc",
       "status": 400
     },
+    "messages_invalid_direction": {
+      "error": "Invalid `direction`: sideways. Supported values: in, out",
+      "status": 400
+    },
     "metadata_empty": {
       "error": "at least 1 address required",
       "status": 400
@@ -23,12 +27,22 @@
     "negative_seqno": {
       "error": "`seqno` must not be negative",
       "status": 400
+    },
+    "wallet_states_empty": {
+      "error": "address of account is required",
+      "status": 400
     }
   },
   "masterchain_info": {
     "first_workchain": -1,
     "last_workchain": -1,
     "seqno_ordered": true
+  },
+  "messages": {
+    "address_book_present": true,
+    "contains_expected": true,
+    "count": 1,
+    "links_both_transactions": false
   },
   "metadata": {
     "is_empty_for_plain_wallets": true
@@ -45,5 +59,11 @@
     "missing_wallet_fields_omitted": true,
     "status": "active",
     "wallet_type": "wallet v4 r2"
+  },
+  "wallet_states": {
+    "address_book_matches_returned_states": true,
+    "contains_funded_non_wallet": true,
+    "contains_wallet": true,
+    "omits_missing_account": true
   }
 }

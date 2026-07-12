@@ -342,6 +342,33 @@ type transactionsResponseV3 struct {
 	AddressBook  map[string]addressBookRowV3 `json:"address_book"`
 }
 
+type messagesResponseV3 struct {
+	Messages    []messageV3                  `json:"messages"`
+	AddressBook map[string]addressBookRowV3  `json:"address_book"`
+	Metadata    map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type walletStateV3 struct {
+	Address             string            `json:"address"`
+	IsWallet            bool              `json:"is_wallet"`
+	WalletType          *string           `json:"wallet_type"`
+	Seqno               *uint32           `json:"seqno"`
+	WalletID            *int32            `json:"wallet_id"`
+	Balance             *string           `json:"balance"`
+	ExtraCurrencies     map[string]string `json:"extra_currencies"`
+	IsSignatureAllowed  *bool             `json:"is_signature_allowed"`
+	Status              *string           `json:"status"`
+	CodeHash            *string           `json:"code_hash"`
+	LastTransactionHash *string           `json:"last_transaction_hash"`
+	LastTransactionLT   *string           `json:"last_transaction_lt"`
+}
+
+type walletStatesResponseV3 struct {
+	Wallets     []walletStateV3              `json:"wallets"`
+	AddressBook map[string]addressBookRowV3  `json:"address_book"`
+	Metadata    map[string]addressMetadataV3 `json:"metadata"`
+}
+
 type blocksResponseV3 struct {
 	Blocks []blockV3 `json:"blocks"`
 }

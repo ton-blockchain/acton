@@ -123,6 +123,136 @@ fn transactions_by_masterchain_block_query_covers_pagination_and_sorting() -> Re
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn messages_query_covers_hash_addresses_ranges_directions_and_externals() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let transaction = &fixture(&live)?.transaction;
+    let (message, direction) = if let Some(message) = &transaction.in_msg {
+        (message, "in")
+    } else {
+        let Some(message) = transaction.out_msgs.first() else {
+            return Ok(());
+        };
+        (message, "out")
+    };
+    let opcode = message.opcode.as_ref().map(|value| match value {
+        v3::StringOrNumber::String(value) => value.clone(),
+        v3::StringOrNumber::Number(value) => value.to_string(),
+        v3::StringOrNumber::Unsigned(value) => value.to_string(),
+    });
+
+    let response: v3::MessagesResponse = live.get(
+        &live.v3_url,
+        "/messages",
+        &v3::MessagesQuery {
+            msg_hash: vec![message.hash.clone()],
+            body_hash: message
+                .message_content
+                .as_ref()
+                .and_then(|content| content.hash.clone()),
+            source: message.source.clone(),
+            destination: message.destination.clone(),
+            opcode,
+            start_utime: Some(i32::try_from(transaction.now.saturating_sub(1))?),
+            end_utime: Some(i32::try_from(transaction.now.saturating_add(1))?),
+            start_lt: message.created_lt.as_deref().map(str::parse).transpose()?,
+            end_lt: message.created_lt.as_deref().map(str::parse).transpose()?,
+            direction: Some(direction.to_owned()),
+            limit: Some(2),
+            offset: Some(0),
+            sort: Some("asc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    assert!(!response.messages.is_empty());
+
+    let _: v3::MessagesResponse = live.get(
+        &live.v3_url,
+        "/messages",
+        &v3::MessagesQuery {
+            source: Some("null".to_owned()),
+            only_externals: Some(true),
+            limit: Some(1),
+            ..Default::default()
+        },
+    )?;
+    let _: v3::MessagesResponse = live.get(
+        &live.v3_url,
+        "/messages",
+        &v3::MessagesQuery {
+            exclude_externals: Some(true),
+            limit: Some(1),
+            sort: Some("desc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn adjacent_transactions_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let transaction = &fixture(&live)?.transaction;
+    let Some(in_message) = &transaction.in_msg else {
+        return Ok(());
+    };
+    let messages: v3::MessagesResponse = live.get(
+        &live.v3_url,
+        "/messages",
+        &v3::MessagesQuery {
+            msg_hash: vec![in_message.hash.clone()],
+            limit: Some(1),
+            ..Default::default()
+        },
+    )?;
+    let Some(message) = messages.messages.first() else {
+        return Ok(());
+    };
+    let Some(hash) = message.in_msg_tx_hash.clone() else {
+        return Ok(());
+    };
+
+    for direction in [None, Some("in".to_owned()), Some("out".to_owned())] {
+        let _: TypedResponse<v3::TransactionsResponse, v3::RequestError> = live.get_either(
+            &live.v3_url,
+            "/adjacentTransactions",
+            &v3::AdjacentTransactionsQuery {
+                hash: hash.clone(),
+                direction,
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn wallet_states_query_covers_wallet_contract_and_no_state_account() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let response: v3::WalletStatesResponse = live.get(
+        &live.v3_url,
+        "/walletStates",
+        &v3::WalletStatesQuery {
+            address: vec![
+                WALLET_ADDRESS.to_owned(),
+                USDT_MASTER.to_owned(),
+                NO_STATE_ADDRESS.to_owned(),
+            ],
+        },
+    )?;
+    assert!(response.wallets.iter().any(|wallet| wallet.is_wallet));
+    assert!(response.wallets.iter().any(|wallet| !wallet.is_wallet));
+    assert!(
+        response
+            .wallets
+            .iter()
+            .all(|wallet| wallet.address != NO_STATE_ADDRESS)
+    );
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;

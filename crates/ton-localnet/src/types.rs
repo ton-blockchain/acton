@@ -102,6 +102,11 @@ pub struct Hash256(pub [u8; 32]);
 
 impl Hash256 {
     #[must_use]
+    pub fn is_zero(&self) -> bool {
+        self.0 == [0; 32]
+    }
+
+    #[must_use]
     pub fn to_hex(&self) -> String {
         hex::encode(self.0)
     }

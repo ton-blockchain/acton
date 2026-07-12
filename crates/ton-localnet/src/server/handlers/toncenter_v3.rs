@@ -1,9 +1,11 @@
 use super::toncenter_enrichment::{
-    build_metadata_for_addresses, load_address_infos, map_address_book_row, map_address_info,
+    build_extra_data_for_addresses, build_metadata_for_addresses, load_address_infos,
+    map_address_book_row, map_address_info,
 };
 use crate::api::{toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
+use crate::localnet;
 use crate::localnet::{Localnet, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction};
-use crate::storage::{JettonMasterMeta, TraceNode};
+use crate::storage::{AccountStatus, JettonMasterMeta, TraceNode};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
@@ -20,13 +22,13 @@ use std::future::Future;
 use std::sync::Arc;
 use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
-    AccountStatesQuery, AddressInformationQuery, AddressesQuery, BlocksQuery, JettonMastersQuery,
-    JettonWalletsQuery, NftItemsQuery, PendingTransactionsQuery, RunGetMethodRequest,
-    SendMessageRequest, StackEntry, TracesQuery, TransactionsByMasterchainBlockQuery,
-    TransactionsByMessageQuery, TransactionsQuery, WalletInformationQuery,
+    AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
+    BlocksQuery, JettonMastersQuery, JettonWalletsQuery, MessagesQuery, NftItemsQuery,
+    PendingTransactionsQuery, RunGetMethodRequest, SendMessageRequest, StackEntry, TracesQuery,
+    TransactionsByMasterchainBlockQuery, TransactionsByMessageQuery, TransactionsQuery,
+    WalletInformationQuery, WalletStatesQuery,
 };
 use toncenter_v3 as v3;
-use tycho_types::models::{StdAddr, StdAddrFormat};
 
 const BLOCK_WORKCHAIN: i32 = 0;
 const BLOCK_SHARD: i64 = i64::MIN;
@@ -70,7 +72,7 @@ async fn collect_v3_traces(
     let end_utime = parse_non_negative_u32("end_utime", payload.end_utime)?;
 
     let tx_hashes = if let Some(account) = payload.account {
-        let account = parse_std_addr(&account)?;
+        let account = Addr::parse(&account)?;
         node.get_all_transactions()
             .await?
             .into_iter()
@@ -379,6 +381,100 @@ pub async fn get_transactions_by_masterchain_block_v3(
     .await
 }
 
+pub async fn get_messages_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<MessagesQuery>(raw_query.as_deref()));
+    let parsed = parse!(parse_messages_v3_query(payload));
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let (messages, addresses) = collect_messages_v3(&transactions, &parsed);
+    let (address_book, metadata) =
+        match build_extra_data_for_addresses(node.as_ref(), addresses, true, true).await {
+            Ok(extra) => extra,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+
+    (
+        StatusCode::OK,
+        Json(v3_types::MessagesResponse {
+            messages,
+            address_book: address_book.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+        }),
+    )
+        .into_response()
+}
+
+pub async fn get_adjacent_transactions_v3(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<AdjacentTransactionsQuery>,
+) -> impl IntoResponse {
+    let hash = parse!(parse_hash_any(&payload.hash));
+    let direction = parse!(parse_message_direction(payload.direction.as_deref()));
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let adjacent = collect_adjacent_transactions_v3(&transactions, hash, direction);
+    if adjacent.is_empty() {
+        return request_error(StatusCode::NOT_FOUND, "adjacent transactions not found");
+    }
+
+    (
+        StatusCode::OK,
+        Json(v3::map_transactions_response(&adjacent)),
+    )
+        .into_response()
+}
+
+pub async fn get_wallet_states_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<WalletStatesQuery>(raw_query.as_deref()));
+    let addresses = parse!(parse_required_addresses(payload.address));
+    let states = match node.get_account_states(addresses, None).await {
+        Ok(states) => states,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    let mut wallet_states = Vec::with_capacity(states.len());
+    let mut existing_addresses = Vec::with_capacity(states.len());
+    for item in states {
+        if item.state.state == AccountStatus::Nonexist {
+            continue;
+        }
+        let wallet_type = v2::wallet_type_name_from_code_hash(item.state.code_hash.as_ref());
+        let wallet = toncenter_wallet::read_standard_wallet_state(&item.state).ok();
+        existing_addresses.push(item.state.address);
+        wallet_states.push(v3::map_wallet_state_v3(
+            &item.state,
+            wallet_type,
+            wallet.as_ref(),
+        ));
+    }
+
+    let (address_book, metadata) =
+        match build_extra_data_for_addresses(node.as_ref(), existing_addresses, true, true).await {
+            Ok(extra) => extra,
+            Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+        };
+
+    (
+        StatusCode::OK,
+        Json(v3_types::WalletStatesResponse {
+            wallets: wallet_states,
+            address_book: address_book.unwrap_or_default(),
+            metadata: metadata.unwrap_or_default(),
+        }),
+    )
+        .into_response()
+}
+
 pub async fn get_pending_transactions_v3(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
@@ -557,7 +653,7 @@ enum SortOrder {
     Desc,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum MessageDirection {
     In,
     Out,
@@ -611,6 +707,38 @@ struct ParsedTransactionsByMessageV3Query {
     direction: Option<MessageDirection>,
     limit: usize,
     offset: usize,
+}
+
+struct ParsedMessagesV3Query {
+    msg_hashes: Option<HashSet<Hash256>>,
+    body_hash: Option<Hash256>,
+    source: Option<NullableAddressFilter>,
+    destination: Option<NullableAddressFilter>,
+    opcode: Option<u32>,
+    start_utime: Option<u32>,
+    end_utime: Option<u32>,
+    start_lt: Option<u64>,
+    end_lt: Option<u64>,
+    direction: Option<MessageDirection>,
+    exclude_externals: bool,
+    only_externals: bool,
+    limit: usize,
+    offset: usize,
+    sort: SortOrder,
+}
+
+#[derive(Clone, Copy)]
+enum NullableAddressFilter {
+    Null,
+    Address(Addr),
+}
+
+struct CollectedMessage {
+    message: v3_types::Message,
+    source: Option<Addr>,
+    destination: Option<Addr>,
+    created_lt: u64,
+    hash: Hash256,
 }
 
 struct ParsedPendingTransactionsV3Query {
@@ -703,12 +831,7 @@ fn parse_transactions_by_message_v3_query(
     payload: TransactionsByMessageQuery,
 ) -> anyhow::Result<ParsedTransactionsByMessageV3Query> {
     let (limit, offset) = parse_limit_offset(payload.limit, payload.offset)?;
-    let direction = match payload.direction.as_deref() {
-        None => None,
-        Some("in") => Some(MessageDirection::In),
-        Some("out") => Some(MessageDirection::Out),
-        Some(other) => anyhow::bail!("Invalid `direction`: {other}. Supported values: in, out"),
-    };
+    let direction = parse_message_direction(payload.direction.as_deref())?;
 
     Ok(ParsedTransactionsByMessageV3Query {
         msg_hash: payload
@@ -725,6 +848,39 @@ fn parse_transactions_by_message_v3_query(
         direction,
         limit,
         offset,
+    })
+}
+
+fn parse_messages_v3_query(payload: MessagesQuery) -> anyhow::Result<ParsedMessagesV3Query> {
+    let (limit, offset) = parse_limit_offset(payload.limit, payload.offset)?;
+    Ok(ParsedMessagesV3Query {
+        msg_hashes: parse_hashes(payload.msg_hash)?,
+        body_hash: payload
+            .body_hash
+            .as_deref()
+            .map(parse_hash_any)
+            .transpose()?,
+        source: payload
+            .source
+            .as_deref()
+            .map(parse_nullable_address_filter)
+            .transpose()?,
+        destination: payload
+            .destination
+            .as_deref()
+            .map(parse_nullable_address_filter)
+            .transpose()?,
+        opcode: payload.opcode.as_deref().map(parse_opcode).transpose()?,
+        start_utime: parse_non_negative_u32("start_utime", payload.start_utime)?,
+        end_utime: parse_non_negative_u32("end_utime", payload.end_utime)?,
+        start_lt: payload.start_lt,
+        end_lt: payload.end_lt,
+        direction: parse_message_direction(payload.direction.as_deref())?,
+        exclude_externals: payload.exclude_externals.unwrap_or(false),
+        only_externals: payload.only_externals.unwrap_or(false),
+        limit,
+        offset,
+        sort: parse_sort(payload.sort)?,
     })
 }
 
@@ -751,7 +907,7 @@ fn parse_account_states_v3_query(
     Ok(ParsedAccountStatesV3Query {
         addresses: addresses
             .into_iter()
-            .map(|address| parse_std_addr(&address))
+            .map(|address| Addr::parse(&address))
             .collect::<anyhow::Result<Vec<_>>>()?,
         include_boc: payload.include_boc.unwrap_or(true),
     })
@@ -978,7 +1134,7 @@ fn filter_transactions_by_message_v3(
 
             messages
                 .into_iter()
-                .filter(|msg| msg.hash.0 != [0; 32])
+                .filter(|msg| !msg.hash.is_zero())
                 .any(|msg| {
                     if let Some(msg_hash) = query.msg_hash
                         && msg.hash != msg_hash
@@ -1008,6 +1164,195 @@ fn filter_transactions_by_message_v3(
         .skip(query.offset)
         .take(query.limit)
         .collect()
+}
+
+fn collect_messages_v3(
+    transactions: &[LocalnetTransaction],
+    query: &ParsedMessagesV3Query,
+) -> (Vec<v3_types::Message>, Vec<Addr>) {
+    let mut collected = Vec::<CollectedMessage>::new();
+    let mut indexes = HashMap::<Hash256, usize>::new();
+
+    for transaction in transactions {
+        let messages = std::iter::once((&transaction.in_msg, MessageDirection::In)).chain(
+            transaction
+                .out_msgs
+                .iter()
+                .map(|message| (message, MessageDirection::Out)),
+        );
+        for (message, direction) in messages {
+            if message.hash.is_zero()
+                || !message_matches_v3(message, transaction.utime, direction, query)
+            {
+                continue;
+            }
+
+            if let Some(index) = indexes.get(&message.hash).copied() {
+                let transaction_hash = transaction.hash.to_base64();
+                match direction {
+                    MessageDirection::In => {
+                        collected[index].message.in_msg_tx_hash = Some(transaction_hash);
+                    }
+                    MessageDirection::Out => {
+                        collected[index].message.out_msg_tx_hash = Some(transaction_hash);
+                    }
+                }
+                continue;
+            }
+
+            let index = collected.len();
+            indexes.insert(message.hash, index);
+            collected.push(CollectedMessage {
+                message: v3::map_v3_message(
+                    message,
+                    &transaction.hash,
+                    transaction.utime,
+                    matches!(direction, MessageDirection::In),
+                ),
+                source: message.source,
+                destination: message.destination,
+                created_lt: message.created_lt,
+                hash: message.hash,
+            });
+        }
+    }
+
+    collected.sort_by(|a, b| {
+        a.created_lt
+            .cmp(&b.created_lt)
+            .then_with(|| a.hash.cmp(&b.hash))
+    });
+    if matches!(query.sort, SortOrder::Desc) {
+        collected.reverse();
+    }
+
+    let selected = collected
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .collect::<Vec<_>>();
+    let addresses = selected
+        .iter()
+        .flat_map(|item| [item.source, item.destination])
+        .flatten()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect();
+    let messages = selected.into_iter().map(|item| item.message).collect();
+    (messages, addresses)
+}
+
+fn message_matches_v3(
+    message: &localnet::LocalnetMessage,
+    utime: u32,
+    direction: MessageDirection,
+    query: &ParsedMessagesV3Query,
+) -> bool {
+    if query
+        .direction
+        .is_some_and(|expected| expected != direction)
+    {
+        return false;
+    }
+    if let Some(hashes) = &query.msg_hashes
+        && !hashes.contains(&message.hash)
+        && message.hash_norm.is_none_or(|hash| !hashes.contains(&hash))
+    {
+        return false;
+    }
+    if query
+        .body_hash
+        .is_some_and(|hash| hash != message.body_hash)
+    {
+        return false;
+    }
+    if !nullable_address_matches(query.source, message.source)
+        || !nullable_address_matches(query.destination, message.destination)
+    {
+        return false;
+    }
+    if query
+        .opcode
+        .is_some_and(|opcode| message.opcode != Some(opcode))
+    {
+        return false;
+    }
+    if query.start_utime.is_some_and(|start| utime < start)
+        || query.end_utime.is_some_and(|end| utime > end)
+    {
+        return false;
+    }
+
+    let is_external = message.source.is_none();
+    if (query.exclude_externals && is_external) || (query.only_externals && !is_external) {
+        return false;
+    }
+    if (query.start_lt.is_some() || query.end_lt.is_some()) && is_external {
+        return false;
+    }
+    if query
+        .start_lt
+        .is_some_and(|start| message.created_lt < start)
+        || query.end_lt.is_some_and(|end| message.created_lt > end)
+    {
+        return false;
+    }
+    true
+}
+
+fn nullable_address_matches(filter: Option<NullableAddressFilter>, address: Option<Addr>) -> bool {
+    match filter {
+        None => true,
+        Some(NullableAddressFilter::Null) => address.is_none(),
+        Some(NullableAddressFilter::Address(expected)) => address == Some(expected),
+    }
+}
+
+fn collect_adjacent_transactions_v3(
+    transactions: &[LocalnetTransaction],
+    hash: Hash256,
+    direction: Option<MessageDirection>,
+) -> Vec<LocalnetTransaction> {
+    let Some(transaction) = transactions
+        .iter()
+        .find(|transaction| transaction.hash == hash)
+    else {
+        return Vec::new();
+    };
+
+    let mut adjacent_hashes = HashSet::new();
+    if !matches!(direction, Some(MessageDirection::Out)) && !transaction.in_msg.hash.is_zero() {
+        for candidate in transactions {
+            if candidate
+                .out_msgs
+                .iter()
+                .any(|message| message.hash == transaction.in_msg.hash)
+            {
+                adjacent_hashes.insert(candidate.hash);
+            }
+        }
+    }
+
+    if !matches!(direction, Some(MessageDirection::In)) {
+        let out_hashes = transaction
+            .out_msgs
+            .iter()
+            .map(|message| message.hash)
+            .collect::<HashSet<_>>();
+        for candidate in transactions {
+            if out_hashes.contains(&candidate.in_msg.hash) {
+                adjacent_hashes.insert(candidate.hash);
+            }
+        }
+    }
+
+    let mut adjacent = transactions
+        .iter()
+        .filter(|transaction| adjacent_hashes.contains(&transaction.hash))
+        .cloned()
+        .collect::<Vec<_>>();
+    sort_transactions(&mut adjacent, SortOrder::Asc);
+    adjacent
 }
 
 fn filter_pending_transactions_v3(
@@ -1094,6 +1439,36 @@ fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
     }
 }
 
+fn parse_message_direction(value: Option<&str>) -> anyhow::Result<Option<MessageDirection>> {
+    match value {
+        None => Ok(None),
+        Some("in") => Ok(Some(MessageDirection::In)),
+        Some("out") => Ok(Some(MessageDirection::Out)),
+        Some(other) => anyhow::bail!("Invalid `direction`: {other}. Supported values: in, out"),
+    }
+}
+
+fn parse_nullable_address_filter(value: &str) -> anyhow::Result<NullableAddressFilter> {
+    if value == "null" {
+        Ok(NullableAddressFilter::Null)
+    } else {
+        Addr::parse(value).map(NullableAddressFilter::Address)
+    }
+}
+
+fn parse_required_addresses(values: Vec<String>) -> anyhow::Result<Vec<Addr>> {
+    if values.is_empty() {
+        anyhow::bail!("address of account is required");
+    }
+    if values.len() > 1000 {
+        anyhow::bail!("Maximum 1000 addresses allowed");
+    }
+    values
+        .into_iter()
+        .map(|address| Addr::parse(&address))
+        .collect()
+}
+
 fn parse_requested_addresses(values: Vec<String>) -> anyhow::Result<Vec<(String, Addr)>> {
     if values.is_empty() {
         anyhow::bail!("at least 1 address required");
@@ -1121,22 +1496,13 @@ fn parse_opcode(opcode: &str) -> anyhow::Result<u32> {
     Ok(signed as u32)
 }
 
-fn parse_std_addr(address: &str) -> anyhow::Result<Addr> {
-    let (std_addr, _) = StdAddr::from_str_ext(address, StdAddrFormat::any())
-        .map_err(|e| anyhow::anyhow!("Invalid address format `{address}`: {e}"))?;
-    Ok(Addr {
-        workchain: i32::from(std_addr.workchain),
-        addr: std_addr.address.0,
-    })
-}
-
 fn parse_addresses(values: Vec<String>) -> anyhow::Result<Option<HashSet<Addr>>> {
     if values.is_empty() {
         return Ok(None);
     }
     values
         .into_iter()
-        .map(|address| parse_std_addr(&address))
+        .map(|address| Addr::parse(&address))
         .collect::<anyhow::Result<HashSet<_>>>()
         .map(Some)
 }
