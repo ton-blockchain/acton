@@ -273,6 +273,7 @@ pub(crate) fn toncenter_v2_run_get_method_ok_response(
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "smc.runResult",
                 "gas_used": "0",
@@ -307,6 +308,7 @@ pub(crate) fn toncenter_v2_account_info_ok_response(
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "raw.fullAccountState",
                 "balance": balance.to_string(),
@@ -328,7 +330,8 @@ pub(crate) fn toncenter_v2_account_info_ok_response(
                     "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
                 },
-                "sync_utime": 0
+                "sync_utime": 0,
+                "suspended": false
             }
         })
         .to_string(),
@@ -348,6 +351,7 @@ pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "raw.fullAccountState",
                 "balance": balance.to_string(),
@@ -369,7 +373,8 @@ pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
                     "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
                 },
-                "sync_utime": 0
+                "sync_utime": 0,
+                "suspended": false
             }
         })
         .to_string(),
@@ -381,6 +386,7 @@ pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> Toncenter
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "blocks.masterchainInfo",
                 "last": {
@@ -413,6 +419,7 @@ pub(crate) fn toncenter_v2_shard_account_cell_ok_response(
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "tvm.cell",
                 "bytes": Boc::encode_base64(to_cell(shard_account))
@@ -573,7 +580,8 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": i32::from(status)
+            "code": i32::from(status),
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -582,7 +590,12 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
 pub(crate) fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
-        body: "{}".to_string(),
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {"@type": "ok"}
+        })
+        .to_string(),
     }
 }
 
@@ -592,7 +605,8 @@ pub(crate) fn toncenter_v2_send_boc_error_response(error: &str) -> ToncenterV2Mo
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": 500
+            "code": 500,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -604,7 +618,8 @@ pub(crate) fn toncenter_v2_send_boc_client_error_response(error: &str) -> Toncen
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": 400
+            "code": 400,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -615,6 +630,7 @@ pub(crate) fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2M
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "smc.libraryResult",
                 "result": [{
@@ -638,6 +654,7 @@ pub(crate) fn toncenter_v3_account_states_ok_response(
         body: serde_json::json!({
             "accounts": [{
                 "address": address,
+                "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                 "balance": "0",
                 "code_boc": code_boc,
                 "status": status

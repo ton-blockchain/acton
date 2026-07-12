@@ -399,13 +399,13 @@ fn toncenter_v2_get_config_all_ok_response(config_boc64: &str) -> ToncenterV2Moc
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "mocked-live-shape",
             "result": {
                 "@type": "configInfo",
                 "config": {
                     "@type": "tvm.cell",
                     "bytes": config_boc64
-                },
-                "@extra": "mocked-live-shape"
+                }
             }
         })
         .to_string(),

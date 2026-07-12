@@ -1,3 +1,4 @@
+use crate::error::LocalnetError;
 use base64::Engine;
 use rusqlite::types::{FromSql, FromSqlError, FromSqlResult, ToSql, ToSqlOutput, ValueRef};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -171,7 +172,9 @@ pub struct Addr {
 impl Addr {
     pub fn parse(s: &str) -> anyhow::Result<Self> {
         let (address, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
-            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
+            LocalnetError::invalid_request(
+                "Invalid address, only standard internal address is allowed",
+            )
         })?;
         Ok(Self {
             workchain: i32::from(address.workchain),

@@ -662,7 +662,7 @@ fn localnet_no_mining_mines_only_on_request() {
     let after_faucet_mine =
         wait_for_address_balance_at_least(&node, target, 1_000_000_000, Duration::from_secs(3));
 
-    let mut invalid_zero = node.post_json("/acton_mine", &json!({ "blocks": 0 }));
+    let mut invalid_zero = node.post_json_error("/acton_mine", &json!({ "blocks": 0 }));
     normalize_extra_for_snapshot(&mut invalid_zero);
 
     let snapshot = json!({
@@ -773,12 +773,13 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
         .expect("mine response must expose last_block_seqno") as u32;
     let set_time_block_gen_utime = block_header_gen_utime(&node, set_time_seqno);
 
-    let mut invalid_backwards = node.post_json(
+    let mut invalid_backwards = node.post_json_error(
         "/acton_setNextBlockTimestamp",
         &json!({ "timestamp": set_time_block_gen_utime - 1 }),
     );
     normalize_extra_for_snapshot(&mut invalid_backwards);
-    let mut invalid_zero_increase = node.post_json("/acton_increaseTime", &json!({ "seconds": 0 }));
+    let mut invalid_zero_increase =
+        node.post_json_error("/acton_increaseTime", &json!({ "seconds": 0 }));
     normalize_extra_for_snapshot(&mut invalid_zero_increase);
 
     let snapshot = json!({
@@ -890,9 +891,11 @@ fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
     let target_after_empty_mine =
         node.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
 
-    let mut invalid_revert_same = node.post_json("/acton_revert", &json!({ "name": "current" }));
+    let mut invalid_revert_same =
+        node.post_json_error("/acton_revert", &json!({ "name": "current" }));
     normalize_extra_for_snapshot(&mut invalid_revert_same);
-    let mut invalid_revert_newer = node.post_json("/acton_revert", &json!({ "name": "newer" }));
+    let mut invalid_revert_newer =
+        node.post_json_error("/acton_revert", &json!({ "name": "newer" }));
     normalize_extra_for_snapshot(&mut invalid_revert_newer);
 
     let list_after_revert = node.post_json("/acton_listSnapshots", &json!({}));
@@ -916,8 +919,8 @@ fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
     let restarted_seqno = latest_masterchain_seqno(&restarted);
     let restarted_target =
         restarted.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-    let restarted_block_2 =
-        restarted.get_json("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno=2");
+    let restarted_block_2 = restarted
+        .get_json_error("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno=2");
 
     let snapshot = json!({
         "create": {
@@ -2142,7 +2145,7 @@ fn localnet_admin_set_shard_account_updates_selected_account() {
     );
     let target_shard_boc = shard_account_cell_boc64(&target_shard_response).to_owned();
 
-    let invalid = node.post_json(
+    let invalid = node.post_json_error(
         "/acton_setShardAccount",
         &json!({
             "address": target,
@@ -2271,7 +2274,7 @@ fn localnet_admin_change_account_state_updates_selected_account() {
         Duration::from_secs(5),
     );
 
-    let invalid_current_balance = node.post_json(
+    let invalid_current_balance = node.post_json_error(
         "/acton_changeAccountState",
         &json!({
             "address": active,
@@ -2318,7 +2321,7 @@ fn localnet_admin_change_account_state_current_freeze_rejects_non_active_account
     let uninit = "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
     let explicit_frozen = "0:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
 
-    let freeze_nonexist = node.post_json(
+    let freeze_nonexist = node.post_json_error(
         "/acton_changeAccountState",
         &json!({
             "address": nonexist,
@@ -2339,7 +2342,7 @@ fn localnet_admin_change_account_state_current_freeze_rejects_non_active_account
             },
         }),
     );
-    let freeze_uninit = node.post_json(
+    let freeze_uninit = node.post_json_error(
         "/acton_changeAccountState",
         &json!({
             "address": uninit,
@@ -2366,7 +2369,7 @@ fn localnet_admin_change_account_state_current_freeze_rejects_non_active_account
             },
         }),
     );
-    let freeze_already_frozen = node.post_json(
+    let freeze_already_frozen = node.post_json_error(
         "/acton_changeAccountState",
         &json!({
             "address": explicit_frozen,
@@ -2478,7 +2481,7 @@ fn localnet_admin_change_account_state_can_defer_current_freeze_until_manual_min
     let freeze_tx = &txs[0];
     let previous_tx = &txs[1];
 
-    let invalid_deferred_uninit = node.post_json(
+    let invalid_deferred_uninit = node.post_json_error(
         "/acton_changeAccountState",
         &json!({
             "address": "0:7777777777777777777777777777777777777777777777777777777777777777",
@@ -2946,7 +2949,8 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         serde_json::to_string_pretty(&empty_libraries_response).unwrap_or_default()
     );
 
-    let invalid_libraries_response = node.get_json("/api/v2/getLibraries?libraries=not-a-hash");
+    let invalid_libraries_response =
+        node.get_json_error("/api/v2/getLibraries?libraries=not-a-hash");
     assert_eq!(invalid_libraries_response["ok"].as_bool(), Some(false));
     assert!(
         invalid_libraries_response["error"]

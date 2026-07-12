@@ -3379,9 +3379,26 @@ fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
             "result": {
+                "@type": "smc.runResult",
+                "gas_used": "0",
                 "stack": [["num", "0x0"]],
-                "exit_code": 0
+                "exit_code": 0,
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": "0",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
             }
         })
         .to_string(),
@@ -3393,6 +3410,7 @@ fn toncenter_v2_get_libraries_not_found_response() -> ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "smc.libraryResult",
                 "result": []
@@ -3405,7 +3423,12 @@ fn toncenter_v2_get_libraries_not_found_response() -> ToncenterV2MockResponse {
 fn toncenter_v2_send_boc_ok_response() -> ToncenterV2MockResponse {
     ToncenterV2MockResponse {
         status: 200,
-        body: "{}".to_string(),
+        body: serde_json::json!({
+            "ok": true,
+            "@extra": "0",
+            "result": {"@type": "ok"}
+        })
+        .to_string(),
     }
 }
 
@@ -3415,7 +3438,8 @@ fn toncenter_v2_send_boc_error_response(error: &str) -> ToncenterV2MockResponse 
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": 500
+            "code": 500,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -3427,7 +3451,8 @@ fn toncenter_v2_get_libraries_error_response(error: &str) -> ToncenterV2MockResp
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": 500
+            "code": 500,
+            "@extra": "0"
         })
         .to_string(),
     }
@@ -3438,6 +3463,7 @@ fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2MockResponse
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": {
                 "@type": "smc.libraryResult",
                 "result": [{
@@ -3456,6 +3482,7 @@ fn toncenter_v2_balance_ok_response(balance: &str) -> ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
             "ok": true,
+            "@extra": "0",
             "result": balance
         })
         .to_string(),
@@ -3468,7 +3495,8 @@ fn toncenter_v2_balance_error_response(error: &str) -> ToncenterV2MockResponse {
         body: serde_json::json!({
             "ok": false,
             "error": error,
-            "code": 500
+            "code": 500,
+            "@extra": "0"
         })
         .to_string(),
     }

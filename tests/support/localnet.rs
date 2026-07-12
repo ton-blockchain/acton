@@ -247,6 +247,12 @@ impl LocalnetHandle {
         (status, json)
     }
 
+    pub(crate) fn get_json_error(&self, path: &str) -> Value {
+        let (status, json) = self.get_json_with_status(path);
+        assert!(status >= 400, "GET {path} unexpectedly succeeded: {json}");
+        json
+    }
+
     pub(crate) fn post_json(&self, path: &str, payload: &Value) -> Value {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
@@ -278,6 +284,12 @@ impl LocalnetHandle {
         let json = serde_json::from_str(&body)
             .unwrap_or_else(|e| panic!("POST {url} returned invalid JSON: {e}\n{body}"));
         (status, json)
+    }
+
+    pub(crate) fn post_json_error(&self, path: &str, payload: &Value) -> Value {
+        let (status, json) = self.post_json_with_status(path, payload);
+        assert!(status >= 400, "POST {path} unexpectedly succeeded: {json}");
+        json
     }
 
     pub(crate) fn stop(mut self) {

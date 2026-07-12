@@ -1202,6 +1202,7 @@ fn test_rpc_call_parses_toncenter_mixed_list_stack() {
             status: 200,
             body: serde_json::json!({
                 "ok": true,
+                "@extra": "0",
                 "result": {
                     "@type": "smc.runResult",
                     "gas_used": "0",

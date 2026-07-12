@@ -1246,6 +1246,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "0",
                     "code_boc": Value::Null,
                     "status": "uninit",
@@ -1258,6 +1259,7 @@ fn test_wallet_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1352,6 +1354,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1364,6 +1367,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2200000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -1376,6 +1380,7 @@ fn test_wallet_airdrop_waits_for_balance_increase_when_wallet_already_has_funds(
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "3400000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2590,6 +2595,7 @@ fn test_wallet_new_prompted_airdrop_yes_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "2500000000",
                     "code_boc": Value::Null,
                     "status": "active",
@@ -2687,6 +2693,7 @@ fn test_wallet_new_airdrop_interactive_waits_for_balance_confirmation() {
             body: serde_json::json!({
                 "accounts": [{
                     "address": "test-address",
+                    "account_state_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "balance": "1500000000",
                     "code_boc": Value::Null,
                     "status": "active",
