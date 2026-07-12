@@ -275,6 +275,8 @@ pub struct LocalnetBlockHeader {
 pub struct LocalnetBlockTransactions {
     pub id: LocalnetBlockId,
     pub transactions: Vec<LocalnetTransaction>,
+    pub requested_count: usize,
+    pub incomplete: bool,
     pub msg_hash: Option<Hash256>,
     #[serde(default)]
     pub msg_hash_norm: Option<Hash256>,
@@ -3106,6 +3108,8 @@ fn handle_get_block_transactions(
 
     Ok(LocalnetBlockTransactions {
         id: block_id,
+        requested_count: result.len(),
+        incomplete: false,
         transactions: result,
         msg_hash: None,
         msg_hash_norm: None,

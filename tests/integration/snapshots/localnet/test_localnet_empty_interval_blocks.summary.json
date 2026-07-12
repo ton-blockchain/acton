@@ -1,7 +1,7 @@
 {
   "empty_block": {
     "incomplete": false,
-    "req_count": 0,
+    "req_count": 40,
     "transaction_count": 0,
     "type": "blocks.transactionsExt"
   },

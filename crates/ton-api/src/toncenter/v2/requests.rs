@@ -60,6 +60,7 @@ pub struct DetectHashRequest {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibrariesRequest {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub libraries: Vec<String>,
 }
 

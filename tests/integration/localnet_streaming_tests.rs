@@ -28,7 +28,6 @@ fn localnet_supports_streaming_v2_sse() {
         let mut response = client
             .post(url)
             .json(&json!({
-                "id": "sse-1",
                 "addresses": [STREAMING_TEST_ACCOUNT_A],
                 "types": ["transactions", "account_state_change"],
                 "min_finality": "confirmed",
@@ -82,14 +81,12 @@ fn localnet_streaming_v2_sse_validates_subscription_shape() {
     let missing_types = node.post_json_with_status(
         "/api/streaming/v2/sse",
         &json!({
-            "id": "missing-types",
             "addresses": [STREAMING_TEST_ACCOUNT_A]
         }),
     );
     let missing_trace_hash = node.post_json_with_status(
         "/api/streaming/v2/sse",
         &json!({
-            "id": "missing-trace",
             "types": ["trace"],
             "addresses": [STREAMING_TEST_ACCOUNT_A]
         }),
@@ -97,7 +94,6 @@ fn localnet_streaming_v2_sse_validates_subscription_shape() {
     let invalid_event_type = node.post_json_with_status(
         "/api/streaming/v2/sse",
         &json!({
-            "id": "invalid-type",
             "addresses": [STREAMING_TEST_ACCOUNT_A],
             "types": ["trace_invalidated"]
         }),
@@ -430,7 +426,6 @@ fn summarize_streaming_event(event: &Value) -> Value {
     if event.get("status").is_some() {
         return json!({
             "event": event["_event"],
-            "id": event["id"],
             "status": event["status"],
         });
     }
@@ -470,7 +465,6 @@ fn summarize_streaming_event(event: &Value) -> Value {
 fn summarize_error_response((status, response): (u16, Value)) -> Value {
     json!({
         "status": status,
-        "id": response.get("id").cloned().unwrap_or(Value::Null),
         "error": response.get("error").cloned().unwrap_or(Value::Null),
     })
 }

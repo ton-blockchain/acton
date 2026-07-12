@@ -1,11 +1,11 @@
 use super::toncenter_v2::{
-    parse_config_param, parse_seqno, parse_transactions_request, token_wallet_code_hash,
+    parse_config_param, parse_libraries_request, parse_seqno, parse_transactions_request,
+    resolve_block_header, resolve_block_transactions, token_wallet_code_hash,
 };
 use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
-use crate::server::toncenter_adapters::BlockQueryAdapter;
 use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
 use axum::extract::OriginalUri;
@@ -17,9 +17,10 @@ use serde_json::Value;
 use std::sync::Arc;
 use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::requests::{
-    AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
-    DetectHashRequest, JsonRpcRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
-    SendBocRequest, TransactionsRequest, TryLocateTxRequest,
+    AddressInformationRequest, AddressRequest, BlockHeaderRequest, BlockTransactionsRequest,
+    ConfigAllRequest, ConfigParamRequest, DetectHashRequest, JsonRpcRequest, LibrariesRequest,
+    LookupBlockRequest, RunGetMethodRequest, SendBocRequest, SeqnoRequest, TransactionsRequest,
+    TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
@@ -180,7 +181,7 @@ async fn json_rpc_router(
         }
         "getLibraries" => {
             let req: LibrariesRequest = parse_params(params, method)?;
-            let hashes = parse_libraries(&req.libraries)?;
+            let hashes = parse_libraries_request(&req.libraries)?;
             wire::JsonRpcResult::Libraries(Box::new(
                 node.get_libraries(hashes)
                     .await
@@ -299,25 +300,25 @@ async fn json_rpc_router(
             ))
         }
         "getBlockHeader" => {
-            let req: BlockQueryAdapter = parse_params(params, method)?;
+            let req: BlockHeaderRequest = parse_params(params, method)?;
             wire::JsonRpcResult::BlockHeader(Box::new(
-                node.get_block_header(req.seqno as u32)
+                resolve_block_header(&node, &req)
                     .await
                     .map(|r| v2::map_block_header(&r))?,
             ))
         }
         "getBlockTransactions" => {
-            let req: BlockQueryAdapter = parse_params(params, method)?;
+            let req: BlockTransactionsRequest = parse_params(params, method)?;
             wire::JsonRpcResult::BlockTransactions(Box::new(
-                node.get_block_transactions(req.seqno as u32)
+                resolve_block_transactions(&node, &req)
                     .await
                     .map(|r| v2::map_block_transactions(&r))?,
             ))
         }
         "getBlockTransactionsExt" => {
-            let req: BlockQueryAdapter = parse_params(params, method)?;
+            let req: BlockTransactionsRequest = parse_params(params, method)?;
             wire::JsonRpcResult::BlockTransactionsExt(Box::new(
-                node.get_block_transactions(req.seqno as u32)
+                resolve_block_transactions(&node, &req)
                     .await
                     .map(|r| v2::map_block_transactions_ext(&r))?,
             ))
@@ -338,11 +339,11 @@ async fn json_rpc_router(
                 .map(|r| v2::map_out_msg_queue_sizes(&r))?,
         )),
         "shards" => {
-            let req: BlockQueryAdapter = parse_params(params, method)?;
+            let req: SeqnoRequest = parse_params(params, method)?;
+            let seqno = req.seqno.to_u32()?;
+            anyhow::ensure!(seqno > 0, "`seqno` must be positive");
             wire::JsonRpcResult::Shards(Box::new(
-                node.get_shards(req.seqno as u32)
-                    .await
-                    .map(|r| v2::map_shards(&r))?,
+                node.get_shards(seqno).await.map(|r| v2::map_shards(&r))?,
             ))
         }
         "lookupBlock" => {
@@ -447,52 +448,4 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
     }
 
     anyhow::bail!("Invalid hash format")
-}
-
-fn parse_libraries(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
-    let hashes = raw
-        .iter()
-        .map(String::as_str)
-        .map(parse_hash_any)
-        .collect::<anyhow::Result<Vec<_>>>()?;
-
-    if hashes.is_empty() {
-        anyhow::bail!("`libraries` query parameter is required");
-    }
-
-    Ok(hashes)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_libraries_rejects_empty_input() {
-        let err = parse_libraries(&[]).expect_err("empty list must be rejected");
-        assert!(
-            err.to_string()
-                .contains("`libraries` query parameter is required"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn parse_libraries_rejects_invalid_hash() {
-        let err =
-            parse_libraries(&["bad-hash".to_owned()]).expect_err("invalid hash must be rejected");
-        assert!(
-            err.to_string().contains("Invalid hash format"),
-            "unexpected error: {err}"
-        );
-    }
-
-    #[test]
-    fn parse_libraries_accepts_multiple_hashes() {
-        let hash_a = "aa".repeat(32);
-        let hash_b = "bb".repeat(32);
-
-        let parsed = parse_libraries(&[hash_a, hash_b]).expect("valid list must parse");
-        assert_eq!(parsed, vec![Hash256([0xAA; 32]), Hash256([0xBB; 32])]);
-    }
 }

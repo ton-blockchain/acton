@@ -7,7 +7,7 @@ use acton_source_trace::{
     build_source_trace_response as build_source_trace_from_source_map, validate_bundle,
 };
 use anyhow::Context;
-use axum::Json;
+use axum::{Json, response::Response};
 use serde_json::Value;
 use std::collections::BTreeMap;
 use std::fs;
@@ -27,7 +27,7 @@ impl Drop for SourceTraceTempDir {
     }
 }
 
-pub async fn build_source_trace(Json(payload): Json<BuildSourceTraceRequest>) -> Json<Value> {
+pub async fn build_source_trace(Json(payload): Json<BuildSourceTraceRequest>) -> Response {
     handle_result(
         async move {
             tokio::task::spawn_blocking(move || build_source_trace_response(payload))

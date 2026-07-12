@@ -423,8 +423,8 @@ pub fn map_block_transactions(block: &LocalnetBlockTransactions) -> response::Bl
     response::BlockTransactions {
         type_field: "blocks.transactions".to_owned(),
         id: map_block_id(&block.id),
-        req_count: block.transactions.len(),
-        incomplete: false,
+        req_count: block.requested_count,
+        incomplete: block.incomplete,
         transactions: block
             .transactions
             .iter()
@@ -452,8 +452,8 @@ pub fn map_block_transactions_ext(
     response::BlockTransactionsExt {
         type_field: "blocks.transactionsExt".to_owned(),
         id: map_block_id(&bt.id),
-        req_count: bt.transactions.len(),
-        incomplete: false,
+        req_count: bt.requested_count,
+        incomplete: bt.incomplete,
         transactions: bt.transactions.iter().map(map_transaction).collect(),
     }
 }

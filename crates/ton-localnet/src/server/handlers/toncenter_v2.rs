@@ -1,11 +1,12 @@
-use super::utils::{get_extra, handle_tonlib_result as handle_result, parse_method_name};
+use super::utils::{get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
-use crate::localnet::{Localnet, LocalnetAddressInfo};
-use crate::server::toncenter_adapters::{BlockQueryAdapter, LibrariesRestQuery};
+use crate::localnet::{
+    Localnet, LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockTransactions,
+};
 use crate::types::Hash256;
 use axum::{
     Json,
-    extract::{Query, State},
+    extract::{Query, RawQuery, State},
     response::{IntoResponse, Response},
 };
 use base64::Engine;
@@ -13,9 +14,10 @@ use std::sync::Arc;
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
-    DetectHashRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest,
-    TransactionsRequest, TryLocateTxRequest,
+    DetectHashRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest,
+    SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
+use ton_api::toncenter::v2::requests::{BlockHeaderRequest, BlockTransactionsRequest};
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
 macro_rules! parse {
@@ -197,16 +199,13 @@ pub(super) async fn token_wallet_code_hash(
 
 pub async fn get_libraries(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<LibrariesRestQuery>,
+    RawQuery(raw_query): RawQuery,
 ) -> Response {
-    handle_result(
-        async move {
-            let hashes = parse_libraries_query(&payload.libraries)?;
-            node.get_libraries(hashes).await
-        },
-        |res| v2::map_libraries(res),
-    )
-    .await
+    let payload = parse!(serde_html_form::from_str::<LibrariesRequest>(
+        raw_query.as_deref().unwrap_or_default()
+    ));
+    let hashes = parse!(parse_libraries_request(&payload.libraries));
+    handle_result(node.get_libraries(hashes), |res| v2::map_libraries(res)).await
 }
 
 pub async fn get_transactions(
@@ -346,21 +345,17 @@ pub async fn unpack_address(Query(payload): Query<AddressRequest>) -> Response {
 
 pub async fn get_block_header(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlockQueryAdapter>,
+    Query(payload): Query<BlockHeaderRequest>,
 ) -> Response {
-    handle_result(
-        node.get_block_header(payload.seqno as u32),
-        v2::map_block_header,
-    )
-    .await
+    handle_result(resolve_block_header(&node, &payload), v2::map_block_header).await
 }
 
 pub async fn get_block_transactions_ext_post(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<BlockQueryAdapter>,
+    Json(payload): Json<BlockTransactionsRequest>,
 ) -> Response {
     handle_result(
-        node.get_block_transactions(payload.seqno as u32),
+        resolve_block_transactions(&node, &payload),
         v2::map_block_transactions_ext,
     )
     .await
@@ -375,10 +370,10 @@ pub async fn send_boc_return_hash(
 
 pub async fn get_block_transactions(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlockQueryAdapter>,
+    Query(payload): Query<BlockTransactionsRequest>,
 ) -> Response {
     handle_result(
-        node.get_block_transactions(payload.seqno as u32),
+        resolve_block_transactions(&node, &payload),
         v2::map_block_transactions,
     )
     .await
@@ -386,10 +381,10 @@ pub async fn get_block_transactions(
 
 pub async fn get_block_transactions_ext(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlockQueryAdapter>,
+    Query(payload): Query<BlockTransactionsRequest>,
 ) -> Response {
     handle_result(
-        node.get_block_transactions(payload.seqno as u32),
+        resolve_block_transactions(&node, &payload),
         v2::map_block_transactions_ext,
     )
     .await
@@ -409,12 +404,13 @@ pub async fn get_out_msg_queue_size(State(node): State<Arc<Localnet>>) -> Respon
 
 pub async fn get_shards(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<BlockQueryAdapter>,
+    Query(payload): Query<SeqnoRequest>,
 ) -> Response {
-    handle_result(node.get_shards(payload.seqno as u32), |shards| {
-        v2::map_shards(shards)
-    })
-    .await
+    let seqno = parse!(payload.seqno.to_u32());
+    if seqno == 0 {
+        return v2_bad_request("`seqno` must be positive");
+    }
+    handle_result(node.get_shards(seqno), |shards| v2::map_shards(shards)).await
 }
 
 pub async fn lookup_block(
@@ -499,19 +495,163 @@ pub(super) fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result
         .map_err(|_| anyhow::anyhow!("Config param must be a non-negative 32-bit integer"))
 }
 
-fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
-    let hashes = raw
-        .split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
-        .map(parse_hash_any)
-        .collect::<anyhow::Result<Vec<_>>>()?;
+pub(super) fn parse_libraries_request(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
+    raw.iter().map(String::as_str).map(parse_hash_any).collect()
+}
 
-    if hashes.is_empty() {
-        anyhow::bail!("`libraries` query parameter is required");
+#[derive(Debug)]
+struct BlockSelector {
+    workchain: i32,
+    shard: i64,
+    seqno: u32,
+    root_hash: Option<Hash256>,
+    file_hash: Option<Hash256>,
+}
+
+fn parse_block_selector(
+    workchain: &StringOrNumber,
+    shard: &StringOrNumber,
+    seqno: &StringOrNumber,
+    root_hash: Option<&String>,
+    file_hash: Option<&String>,
+) -> anyhow::Result<BlockSelector> {
+    let workchain = workchain.to_i32()?;
+    if !matches!(workchain, -1 | 0) {
+        anyhow::bail!("`workchain` must be -1 or 0");
+    }
+    let shard = shard.to_i64()?;
+    if shard != i64::MIN {
+        anyhow::bail!("localnet supports only shard {:#x}", i64::MIN);
+    }
+    let seqno = seqno.to_u32()?;
+    if seqno == 0 {
+        anyhow::bail!("`seqno` must be positive");
     }
 
-    Ok(hashes)
+    Ok(BlockSelector {
+        workchain,
+        shard,
+        seqno,
+        root_hash: root_hash.map(|hash| parse_hash_any(hash)).transpose()?,
+        file_hash: file_hash.map(|hash| parse_hash_any(hash)).transpose()?,
+    })
+}
+
+pub(super) async fn resolve_block_header(
+    node: &Localnet,
+    payload: &BlockHeaderRequest,
+) -> anyhow::Result<LocalnetBlockHeader> {
+    let selector = parse_block_selector(
+        &payload.workchain,
+        &payload.shard,
+        &payload.seqno,
+        payload.root_hash.as_ref(),
+        payload.file_hash.as_ref(),
+    )?;
+    let block = if selector.workchain == -1 {
+        node.get_masterchain_block_header(selector.seqno).await?
+    } else {
+        node.get_block_header(selector.seqno).await?
+    };
+    validate_block_id(&block.id, &selector)?;
+    Ok(block)
+}
+
+pub(super) async fn resolve_block_transactions(
+    node: &Localnet,
+    payload: &BlockTransactionsRequest,
+) -> anyhow::Result<LocalnetBlockTransactions> {
+    let selector = parse_block_selector(
+        &payload.workchain,
+        &payload.shard,
+        &payload.seqno,
+        payload.root_hash.as_ref(),
+        payload.file_hash.as_ref(),
+    )?;
+    let mut block = if selector.workchain == -1 {
+        let header = node.get_masterchain_block_header(selector.seqno).await?;
+        LocalnetBlockTransactions {
+            id: header.id,
+            transactions: Vec::new(),
+            requested_count: 0,
+            incomplete: false,
+            msg_hash: None,
+            msg_hash_norm: None,
+        }
+    } else {
+        node.get_block_transactions(selector.seqno).await?
+    };
+    validate_block_id(&block.id, &selector)?;
+    paginate_block_transactions(&mut block, payload)?;
+    Ok(block)
+}
+
+fn validate_block_id(
+    block_id: &crate::localnet::LocalnetBlockId,
+    selector: &BlockSelector,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        block_id.workchain == selector.workchain,
+        "workchain mismatch"
+    );
+    anyhow::ensure!(block_id.shard == selector.shard, "shard mismatch");
+    anyhow::ensure!(block_id.seqno == selector.seqno, "seqno mismatch");
+    if let Some(root_hash) = selector.root_hash {
+        anyhow::ensure!(block_id.root_hash == root_hash, "root_hash mismatch");
+    }
+    if let Some(file_hash) = selector.file_hash {
+        anyhow::ensure!(block_id.file_hash == file_hash, "file_hash mismatch");
+    }
+    Ok(())
+}
+
+fn paginate_block_transactions(
+    block: &mut LocalnetBlockTransactions,
+    payload: &BlockTransactionsRequest,
+) -> anyhow::Result<()> {
+    let count = payload
+        .count
+        .as_ref()
+        .map(StringOrNumber::to_usize)
+        .transpose()?
+        .unwrap_or(40);
+    if !(1..=10_000).contains(&count) {
+        anyhow::bail!("`count` must be between 1 and 10000");
+    }
+
+    let after_lt = payload
+        .after_lt
+        .as_ref()
+        .map(StringOrNumber::to_u64)
+        .transpose()?;
+    let after_hash = payload
+        .after_hash
+        .as_ref()
+        .filter(|hash| !hash.is_empty())
+        .map(|hash| parse_hash_any(hash))
+        .transpose()?;
+    if after_lt.is_some() != after_hash.is_some() {
+        anyhow::bail!("`after_lt` and `after_hash` must be used together");
+    }
+
+    let start = if let (Some(after_lt), Some(after_hash)) = (after_lt, after_hash) {
+        block
+            .transactions
+            .iter()
+            .position(|transaction| {
+                transaction.transaction_id.lt == after_lt
+                    && transaction.address.addr == after_hash.0
+            })
+            .map_or(block.transactions.len(), |index| index + 1)
+    } else {
+        0
+    };
+    let mut transactions = block.transactions.split_off(start);
+    block.incomplete = transactions.len() > count;
+    transactions.truncate(count);
+    block.transactions = transactions;
+    block.requested_count = count;
+    Ok(())
 }
 
 pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Option<u32>> {
@@ -556,18 +696,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_libraries_query_rejects_empty_input() {
-        let err = parse_libraries_query(" , , ").expect_err("empty list must be rejected");
-        assert!(
-            err.to_string()
-                .contains("`libraries` query parameter is required"),
-            "unexpected error: {err}"
-        );
+    fn parse_libraries_query_accepts_empty_input() {
+        assert!(parse_libraries_request(&[]).unwrap().is_empty());
     }
 
     #[test]
     fn parse_libraries_query_rejects_invalid_hash() {
-        let err = parse_libraries_query("not-a-hash").expect_err("invalid hash must be rejected");
+        let err = parse_libraries_request(&["not-a-hash".to_owned()])
+            .expect_err("invalid hash must be rejected");
         assert!(
             err.to_string().contains("Invalid hash format"),
             "unexpected error: {err}"
@@ -575,12 +711,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_libraries_query_accepts_multiple_hashes_and_skips_blanks() {
+    fn parse_libraries_query_accepts_repeated_hashes() {
         let hash_a = "11".repeat(32);
         let hash_b = "22".repeat(32);
 
-        let parsed = parse_libraries_query(&format!("{hash_a}, ,{hash_b},"))
-            .expect("valid list with blanks must parse");
+        let parsed =
+            parse_libraries_request(&[hash_a, hash_b]).expect("valid repeated hashes must parse");
         assert_eq!(parsed, vec![Hash256([0x11; 32]), Hash256([0x22; 32])]);
     }
 }

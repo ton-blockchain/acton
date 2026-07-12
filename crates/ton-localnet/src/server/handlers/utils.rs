@@ -19,7 +19,7 @@ pub fn parse_method_name(method: &StringOrNumber) -> anyhow::Result<String> {
     }
 }
 
-pub async fn handle_tonlib_result<T, F, M>(
+pub async fn handle_result<T, F, M>(
     result: impl Future<Output = anyhow::Result<T>>,
     mapper: F,
 ) -> Response
@@ -43,28 +43,6 @@ where
             id: None,
         })
         .into_response(),
-    }
-}
-
-pub async fn handle_result<T, F>(
-    result: impl Future<Output = anyhow::Result<T>>,
-    mapper: F,
-) -> Json<Value>
-where
-    F: FnOnce(&T) -> Value,
-{
-    match result.await {
-        Ok(res) => Json(serde_json::json!({
-            "ok": true,
-            "result": mapper(&res),
-            "@extra": get_extra()
-        })),
-        Err(e) => Json(serde_json::json!({
-            "ok": false,
-            "error": e.to_string(),
-            "code": 500,
-            "@extra": get_extra()
-        })),
     }
 }
 

@@ -1,7 +1,6 @@
 [
   {
     "event": "connected",
-    "id": "sse-1",
     "status": "subscribed"
   },
   {

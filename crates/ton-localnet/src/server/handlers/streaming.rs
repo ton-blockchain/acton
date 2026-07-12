@@ -1,6 +1,5 @@
 use crate::localnet::Localnet;
 use crate::server::ShutdownSignal;
-use crate::server::toncenter_adapters::StreamingSseSubscriptionAdapter;
 use crate::streaming::{
     StreamingSubscription, notifications_for_commit, validate_unsubscribe_request,
 };
@@ -27,13 +26,13 @@ pub async fn streaming_sse(
     State(shutdown): State<ShutdownSignal>,
     body: Bytes,
 ) -> Response {
-    let payload = match serde_json::from_slice::<StreamingSseSubscriptionAdapter>(&body) {
+    let payload = match serde_json::from_slice::<streaming::Subscription>(&body) {
         Ok(payload) => payload,
         Err(e) => return streaming_bad_request(None, format!("invalid subscription request: {e}")),
     };
-    let subscription = match StreamingSubscription::from_subscribe_request(&payload.subscription) {
+    let subscription = match StreamingSubscription::from_subscribe_request(&payload) {
         Ok(subscription) => subscription,
-        Err(e) => return streaming_bad_request(payload.id, e.to_string()),
+        Err(e) => return streaming_bad_request(None, e.to_string()),
     };
 
     let (tx, rx) = mpsc::channel::<Result<Event, Infallible>>(32);
@@ -41,7 +40,7 @@ pub async fn streaming_sse(
         .send(Ok(sse_json_event(
             "connected",
             &streaming::StatusResponse {
-                id: payload.id,
+                id: None,
                 status: streaming::Status::Subscribed,
             },
         )))

@@ -547,7 +547,9 @@ fn localnet_mines_empty_blocks_on_interval_without_transactions() {
 
     let block = wait_for_ok_response(
         &node,
-        &format!("/api/v2/getBlockTransactionsExt?seqno={empty_block_seqno}"),
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={empty_block_seqno}"
+        ),
         Duration::from_secs(5),
     );
     let block_payload = response_payload(&block);
@@ -875,7 +877,8 @@ fn localnet_runtime_recovery_points_revert_state_and_persistent_db() {
     let restarted_seqno = latest_masterchain_seqno(&restarted);
     let restarted_target =
         restarted.get_json(&format!("/api/v2/getAddressInformation?address={target}"));
-    let restarted_block_2 = restarted.get_json("/api/v2/getBlockHeader?seqno=2");
+    let restarted_block_2 =
+        restarted.get_json("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno=2");
 
     let snapshot = json!({
         "create": {
@@ -2863,7 +2866,8 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         format!("0{}", &library_hash[1..])
     };
 
-    let mixed_query = format!("/api/v2/getLibraries?libraries={missing_hash},,{library_hash}");
+    let mixed_query =
+        format!("/api/v2/getLibraries?libraries={missing_hash}&libraries={library_hash}");
     let mixed_response = node.get_json(&mixed_query);
     assert_eq!(mixed_response["ok"].as_bool(), Some(true));
     let mixed_items = mixed_response
@@ -2889,14 +2893,14 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
         Some(library_code_b64.as_str())
     );
 
-    let empty_libraries_response = node.get_json("/api/v2/getLibraries?libraries=,,");
-    assert_eq!(empty_libraries_response["ok"].as_bool(), Some(false));
+    let empty_libraries_response = node.get_json("/api/v2/getLibraries");
+    assert_eq!(empty_libraries_response["ok"].as_bool(), Some(true));
     assert!(
-        empty_libraries_response["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains("`libraries` query parameter is required"),
-        "Unexpected error for empty libraries query: {}",
+        empty_libraries_response
+            .pointer("/result/result")
+            .and_then(Value::as_array)
+            .is_some_and(Vec::is_empty),
+        "Expected empty libraries result: {}",
         serde_json::to_string_pretty(&empty_libraries_response).unwrap_or_default()
     );
 
@@ -4493,13 +4497,49 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
         .expect("second transaction mc_block_seqno must be integer");
     let block = wait_for_ok_response(
         &node,
-        &format!("/api/v2/getBlockTransactionsExt?seqno={first_seqno}"),
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}"
+        ),
         Duration::from_secs(5),
     );
     let block_payload = response_payload(&block);
     let block_transactions = block_payload["transactions"]
         .as_array()
         .expect("getBlockTransactionsExt must return transactions array");
+    let first_page = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}&count=1"
+        ),
+        Duration::from_secs(5),
+    );
+    let first_page_payload = response_payload(&first_page);
+    let first_page_transactions = first_page_payload["transactions"]
+        .as_array()
+        .expect("first block transaction page must be an array");
+    let cursor_transaction = first_page_transactions
+        .first()
+        .expect("first block transaction page must not be empty");
+    let cursor_lt = cursor_transaction
+        .pointer("/transaction_id/lt")
+        .and_then(Value::as_str)
+        .expect("cursor transaction lt must be present");
+    let cursor_account_hash = cursor_transaction["account"]
+        .as_str()
+        .and_then(|account| account.split_once(':'))
+        .map(|(_, hash)| hash)
+        .expect("cursor transaction account must be raw address");
+    let second_page = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactionsExt?workchain=0&shard=-9223372036854775808&seqno={first_seqno}&count=1&after_lt={cursor_lt}&after_hash={cursor_account_hash}"
+        ),
+        Duration::from_secs(5),
+    );
+    let second_page_payload = response_payload(&second_page);
+    let second_page_transactions = second_page_payload["transactions"]
+        .as_array()
+        .expect("second block transaction page must be an array");
 
     let snapshot = json!({
         "faucet": {
@@ -4515,6 +4555,14 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
             "req_count": block_payload["req_count"].as_u64(),
             "transaction_count": block_transactions.len(),
             "has_at_least_two_transactions": block_transactions.len() >= 2,
+            "pagination": {
+                "first_req_count": first_page_payload["req_count"].as_u64(),
+                "first_incomplete": first_page_payload["incomplete"].as_bool(),
+                "first_count": first_page_transactions.len(),
+                "second_count": second_page_transactions.len(),
+                "cursor_moves_window": first_page_transactions.first().zip(second_page_transactions.first())
+                    .is_some_and(|(first, second)| first["transaction_id"] != second["transaction_id"]),
+            },
         }
     });
 
@@ -5660,7 +5708,7 @@ fn latest_masterchain_seqno(node: &crate::support::localnet::LocalnetHandle) -> 
 fn block_header_gen_utime(node: &crate::support::localnet::LocalnetHandle, seqno: u32) -> u32 {
     let response = wait_for_ok_response(
         node,
-        &format!("/api/v2/getBlockHeader?seqno={seqno}"),
+        &format!("/api/v2/getBlockHeader?workchain=0&shard=-9223372036854775808&seqno={seqno}"),
         Duration::from_secs(5),
     );
     response_payload(&response)["gen_utime"]
