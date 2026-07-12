@@ -253,6 +253,66 @@ fn wallet_states_query_covers_wallet_contract_and_no_state_account() -> Result<(
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn top_accounts_by_balance_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let accounts: Vec<v3::AccountBalance> = live.get(
+        &live.v3_url,
+        "/topAccountsByBalance",
+        &v3::TopAccountsByBalanceQuery {
+            limit: Some(2),
+            offset: Some(0),
+        },
+    )?;
+    assert!(!accounts.is_empty());
+    for pair in accounts.windows(2) {
+        assert!(pair[0].balance.parse::<u128>()? >= pair[1].balance.parse::<u128>()?);
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn estimate_fee_request_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let messages: v3::MessagesResponse = live.get(
+        &live.v3_url,
+        "/messages",
+        &v3::MessagesQuery {
+            source: Some("null".to_owned()),
+            only_externals: Some(true),
+            limit: Some(20),
+            sort: Some("desc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    let Some((address, body)) = messages.messages.iter().find_map(|message| {
+        Some((
+            message.destination.clone()?,
+            message.message_content.as_ref()?.body.clone()?,
+        ))
+    }) else {
+        return Ok(());
+    };
+
+    for ignore_chksig in [None, Some(false), Some(true)] {
+        let response: v3::EstimateFeeResult = live.post(
+            &live.v3_url,
+            "/estimateFee",
+            &v3::EstimateFeeRequest {
+                address: address.clone(),
+                body: body.clone(),
+                init_code: None,
+                init_data: None,
+                ignore_chksig,
+            },
+        )?;
+        assert!(response.source_fees.in_fwd_fee > 0);
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let fixture = fixture(&live)?;

@@ -31,6 +31,19 @@ impl BocBytes {
     }
 }
 
+impl FromStr for BocBytes {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let hex = s.strip_prefix("0x").unwrap_or(s);
+        if hex.len().is_multiple_of(2) && hex.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+            return Ok(Self(hex::decode(hex)?));
+        }
+
+        Ok(Self(base64::engine::general_purpose::STANDARD.decode(s)?))
+    }
+}
+
 impl From<Vec<u8>> for BocBytes {
     fn from(value: Vec<u8>) -> Self {
         Self(value)
@@ -78,7 +91,7 @@ impl<'de> Deserialize<'de> for BocBytes {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        BocBytes::from_base64(&value).map_err(serde::de::Error::custom)
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -329,6 +342,18 @@ mod tests {
     #[test]
     fn boc_bytes_deserializes_from_base64_string() {
         let parsed: BocBytes = serde_json::from_str("\"AAECAw==\"").expect("deserialize boc bytes");
+        assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
+    }
+
+    #[test]
+    fn boc_bytes_deserializes_from_hex_string() {
+        let parsed: BocBytes = serde_json::from_str("\"00010203\"").expect("deserialize boc bytes");
+        assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
+    }
+
+    #[test]
+    fn boc_bytes_parses_prefixed_hex_string() {
+        let parsed = "0x00010203".parse::<BocBytes>().expect("parse boc bytes");
         assert_eq!(parsed, BocBytes(vec![0_u8, 1_u8, 2_u8, 3_u8]));
     }
 

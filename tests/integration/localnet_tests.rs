@@ -3986,6 +3986,96 @@ fn localnet_supports_emulate_v1_emulate_ton_connect() {
 }
 
 #[test]
+fn localnet_supports_v3_estimate_fee_and_top_accounts() {
+    let project = ProjectBuilder::new("localnet-v3-estimate-fee-and-top-accounts").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v4", "--no-mining"])
+        .start();
+
+    let startup_wallets = node.get_json("/acton_getStartupWallets");
+    let wallet = response_payload(&startup_wallets)
+        .as_array()
+        .and_then(|wallets| wallets.first())
+        .expect("startup wallet must be present");
+    let address = wallet["address"]
+        .as_str()
+        .expect("startup wallet must expose address");
+    let ton_connect = node.post_json(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": address,
+            "messages": [{"address": address, "amount": "1"}]
+        }),
+    );
+    let emulated: EmulateTraceResponse = serde_json::from_value(ton_connect)
+        .expect("emulateTonConnect response must match typed contract");
+    let body = emulated
+        .trace
+        .transaction
+        .as_ref()
+        .and_then(|transaction| transaction.in_msg.as_ref())
+        .and_then(|message| message.message_content.as_ref())
+        .and_then(|content| content.body.as_ref())
+        .expect("emulated wallet message must contain body BOC");
+    let body_hex = hex::encode(
+        base64::engine::general_purpose::STANDARD
+            .decode(body)
+            .expect("body must be base64"),
+    );
+
+    let estimate_request = |body: &str| {
+        json!({
+            "address": address,
+            "body": body,
+            "ignore_chksig": true
+        })
+    };
+    let (base64_status, base64_response) =
+        node.post_json_with_status("/api/v3/estimateFee", &estimate_request(body));
+    let (hex_status, hex_response) =
+        node.post_json_with_status("/api/v3/estimateFee", &estimate_request(&body_hex));
+    let estimate: toncenter_v3::EstimateFeeResult = serde_json::from_value(base64_response.clone())
+        .expect("estimateFee response must match typed contract");
+
+    let top_accounts: Vec<toncenter_v3::AccountBalance> =
+        serde_json::from_value(node.get_json("/api/v3/topAccountsByBalance?limit=3&offset=0"))
+            .expect("topAccountsByBalance response must match typed contract");
+    let balances = top_accounts
+        .iter()
+        .map(|account| account.balance.parse::<u128>().expect("valid balance"))
+        .collect::<Vec<_>>();
+
+    let snapshot = json!({
+        "estimate_fee": {
+            "base64_status": base64_status,
+            "hex_status": hex_status,
+            "encodings_match": base64_response == hex_response,
+            "in_fwd_fee_positive": estimate.source_fees.in_fwd_fee > 0,
+            "gas_fee_positive": estimate.source_fees.gas_fee > 0,
+            "destination_fees_empty": estimate.destination_fees.is_empty(),
+        },
+        "top_accounts": {
+            "count": top_accounts.len(),
+            "sorted_descending": balances.windows(2).all(|pair| pair[0] >= pair[1]),
+        }
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_estimate_fee_and_top_accounts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
 #[ignore = "optional live TonCenter fork contract test"]
 fn localnet_fork_supports_emulate_v1_emulate_ton_connect() {
     let raw_request = std::env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON")

@@ -1,11 +1,12 @@
 use crate::api::toncenter_wallet;
 use crate::localnet::LocalnetAccountState;
-use crate::types::BocBytes;
+use crate::types::{Addr, BocBytes};
 use anyhow::Context;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
 use ton::ton_wallet::WalletVersion;
 use ton_api::toncenter::emulate::v1::{TonConnectEmulateRequest, TonConnectMessage};
+use ton_api::toncenter::v3::EstimateFeeRequest;
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellSliceParts};
 use tycho_types::models::{
@@ -97,9 +98,46 @@ pub(crate) fn compose_ton_connect_message(
     Ok(BocRepr::encode(message)?.into())
 }
 
+pub(crate) fn compose_estimate_fee_message(
+    request: &EstimateFeeRequest,
+) -> anyhow::Result<BocBytes> {
+    let destination = StdAddr::from(Addr::parse(&request.address)?);
+    let body = decode_cell(&request.body, "body")?;
+    let code = request
+        .init_code
+        .as_deref()
+        .map(|value| decode_cell(value, "init_code"))
+        .transpose()?;
+    let data = request
+        .init_data
+        .as_deref()
+        .map(|value| decode_cell(value, "init_data"))
+        .transpose()?;
+    let init = (code.is_some() || data.is_some()).then(|| StateInit {
+        split_depth: None,
+        special: None,
+        code,
+        data,
+        libraries: Default::default(),
+    });
+
+    let message = OwnedMessage {
+        info: MsgInfo::ExtIn(ExtInMsgInfo {
+            src: None,
+            dst: IntAddr::Std(destination),
+            import_fee: Tokens::ZERO,
+        }),
+        init,
+        body: CellSliceParts::from(body),
+        layout: None,
+    };
+    Ok(BocRepr::encode(message)?.into())
+}
+
 fn validate_optional_boc(value: Option<&str>, field: &str, index: usize) -> anyhow::Result<()> {
     if let Some(value) = value {
-        BocBytes::from_base64(value)
+        value
+            .parse::<BocBytes>()
             .with_context(|| format!("invalid message {field} at index {index}"))?;
     }
     Ok(())
@@ -182,10 +220,17 @@ fn build_internal_message(
 fn decode_optional_cell(value: Option<&str>) -> anyhow::Result<Option<Cell>> {
     value
         .map(|value| {
-            let boc = BocBytes::from_base64(value)?;
+            let boc = value.parse::<BocBytes>()?;
             Boc::decode(&boc.0).context("Failed to decode cell BOC")
         })
         .transpose()
+}
+
+fn decode_cell(value: &str, field: &str) -> anyhow::Result<Cell> {
+    let boc = value
+        .parse::<BocBytes>()
+        .with_context(|| format!("invalid {field}"))?;
+    Boc::decode(&boc.0).with_context(|| format!("failed to decode {field} BOC"))
 }
 
 fn add_dummy_signature(version: WalletVersion, body: TonCell) -> anyhow::Result<TonCell> {
@@ -320,6 +365,34 @@ mod tests {
                 .to_string(),
             "messages array cannot contain more than 4 messages"
         );
+    }
+
+    #[test]
+    fn estimate_fee_accepts_base64_and_hex_bocs() -> anyhow::Result<()> {
+        let body = CellBuilder::build_from(0xdead_beef_u32)?;
+        let code = CellBuilder::build_from(0xcafe_babe_u32)?;
+        let data = CellBuilder::build_from(0x1234_5678_u32)?;
+        let address = format!("0:{}", "11".repeat(32));
+        let base64 = EstimateFeeRequest {
+            address: address.clone(),
+            body: Boc::encode_base64(&body),
+            init_code: Some(Boc::encode_base64(&code)),
+            init_data: Some(Boc::encode_base64(&data)),
+            ignore_chksig: None,
+        };
+        let hex = EstimateFeeRequest {
+            address,
+            body: Boc::encode_hex(&body),
+            init_code: Some(Boc::encode_hex(&code)),
+            init_data: Some(Boc::encode_hex(&data)),
+            ignore_chksig: None,
+        };
+
+        assert_eq!(
+            compose_estimate_fee_message(&base64)?,
+            compose_estimate_fee_message(&hex)?
+        );
+        Ok(())
     }
 
     fn ton_connect_request(valid_until: Option<u64>) -> TonConnectEmulateRequest {

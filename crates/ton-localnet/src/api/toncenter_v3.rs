@@ -8,8 +8,9 @@
 
 use crate::api::toncenter_wallet::StandardWalletState;
 use crate::localnet::{
-    LocalnetAcceptedExternalMessage, LocalnetAccountState, LocalnetBlock, LocalnetMessage,
-    LocalnetRunGetMethodResult, LocalnetTransaction, convert_to_message_struct,
+    LocalnetAcceptedExternalMessage, LocalnetAccountBalance, LocalnetAccountState, LocalnetBlock,
+    LocalnetEstimateFeeResult, LocalnetEstimatedFee, LocalnetMessage, LocalnetRunGetMethodResult,
+    LocalnetTransaction, convert_to_message_struct,
 };
 use crate::storage::{
     AccountStateSnapshot, AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta,
@@ -28,6 +29,39 @@ use tycho_types::cell::HashBytes;
 use tycho_types::models::{
     AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
 };
+
+#[must_use]
+pub fn map_account_balances(accounts: &[LocalnetAccountBalance]) -> Vec<response::AccountBalance> {
+    accounts
+        .iter()
+        .map(|account| response::AccountBalance {
+            account: account.account.to_string(),
+            balance: account.balance.to_string(),
+        })
+        .collect()
+}
+
+#[must_use]
+pub fn map_estimate_fee(result: &LocalnetEstimateFeeResult) -> response::EstimateFeeResult {
+    response::EstimateFeeResult {
+        source_fees: map_estimated_fee(result.source_fees),
+        destination_fees: result
+            .destination_fees
+            .iter()
+            .copied()
+            .map(map_estimated_fee)
+            .collect(),
+    }
+}
+
+fn map_estimated_fee(fee: LocalnetEstimatedFee) -> response::EstimatedFee {
+    response::EstimatedFee {
+        in_fwd_fee: fee.in_fwd_fee,
+        storage_fee: fee.storage_fee,
+        gas_fee: fee.gas_fee,
+        fwd_fee: fee.fwd_fee,
+    }
+}
 
 trait AddressBookExt {
     fn insert_address(&mut self, address: Addr, interfaces: &[&str]);

@@ -395,6 +395,240 @@
         }
       }
     },
+    "/api/v3/messages": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get messages by specified filters.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get messages",
+        "operationId": "api_v3_get_messages",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Message hash. Acceptable in hex, base64 and base64url forms.",
+            "name": "msg_hash",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Hash of message body.",
+            "name": "body_hash",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "The source account address. Use value `null` to get external messages.",
+            "name": "source",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "The destination account address. Use value `null` to get log messages.",
+            "name": "destination",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Opcode in hex or signed 32-bit decimal form.",
+            "name": "opcode",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "enum": ["in", "out"],
+            "type": "string",
+            "name": "direction",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "name": "exclude_externals",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "name": "only_externals",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/MessagesResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/adjacentTransactions": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get parent and/or children for specified transaction.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get Adjacent Transactions",
+        "operationId": "api_v3_get_adjacent_transactions",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Transaction hash.",
+            "name": "hash",
+            "in": "query",
+            "required": true
+          },
+          {
+            "enum": ["in", "out"],
+            "type": "string",
+            "name": "direction",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/TransactionsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          },
+          "404": {
+            "description": "Adjacent transactions not found",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/walletStates": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Query wallet information.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["accounts"],
+        "summary": "Get Wallet States",
+        "operationId": "api_v3_get_wallet_states",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "List of addresses in any form. Maximum 1000 addresses allowed.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/WalletStatesResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
     "/api/v3/transactions": {
       "get": {
         "security": [
@@ -1043,7 +1277,14 @@
     },
     "/api/v3/addressBook": {
       "get": {
-        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
         "description": "Query address book",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -1053,7 +1294,9 @@
         "parameters": [
           {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+              "type": "string"
+            },
             "collectionFormat": "multi",
             "description": "List of addresses in any form to get address book. Max: 1024.",
             "name": "address",
@@ -1064,18 +1307,29 @@
         "responses": {
           "200": {
             "description": "OK",
-            "schema": {"$ref": "#/definitions/AddressBook"}
+            "schema": {
+              "$ref": "#/definitions/AddressBook"
+            }
           },
           "400": {
             "description": "Bad Request",
-            "schema": {"$ref": "#/definitions/RequestError"}
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
           }
         }
       }
     },
     "/api/v3/masterchainInfo": {
       "get": {
-        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
         "description": "Get first and last indexed block",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -1085,18 +1339,29 @@
         "responses": {
           "200": {
             "description": "OK",
-            "schema": {"$ref": "#/definitions/MasterchainInfo"}
+            "schema": {
+              "$ref": "#/definitions/MasterchainInfo"
+            }
           },
           "400": {
             "description": "Bad Request",
-            "schema": {"$ref": "#/definitions/RequestError"}
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
           }
         }
       }
     },
     "/api/v3/metadata": {
       "get": {
-        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
         "description": "Query address metadata",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -1106,7 +1371,9 @@
         "parameters": [
           {
             "type": "array",
-            "items": {"type": "string"},
+            "items": {
+              "type": "string"
+            },
             "collectionFormat": "multi",
             "description": "List of addresses in any form to get address metadata. Max: 1024.",
             "name": "address",
@@ -1117,18 +1384,29 @@
         "responses": {
           "200": {
             "description": "OK",
-            "schema": {"$ref": "#/definitions/Metadata"}
+            "schema": {
+              "$ref": "#/definitions/Metadata"
+            }
           },
           "400": {
             "description": "Bad Request",
-            "schema": {"$ref": "#/definitions/RequestError"}
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
           }
         }
       }
     },
     "/api/v3/transactionsByMasterchainBlock": {
       "get": {
-        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
         "description": "Returns transactions from masterchain block and from all shards.",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -1175,18 +1453,29 @@
         "responses": {
           "200": {
             "description": "OK",
-            "schema": {"$ref": "#/definitions/TransactionsResponse"}
+            "schema": {
+              "$ref": "#/definitions/TransactionsResponse"
+            }
           },
           "400": {
             "description": "Bad Request",
-            "schema": {"$ref": "#/definitions/RequestError"}
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
           }
         }
       }
     },
     "/api/v3/walletInformation": {
       "get": {
-        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
         "description": "Get wallet smart contract information.",
         "consumes": ["application/json"],
         "produces": ["application/json"],
@@ -1212,11 +1501,114 @@
         "responses": {
           "200": {
             "description": "OK",
-            "schema": {"$ref": "#/definitions/V2WalletInformation"}
+            "schema": {
+              "$ref": "#/definitions/V2WalletInformation"
+            }
           },
           "400": {
             "description": "Bad Request",
-            "schema": {"$ref": "#/definitions/RequestError"}
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/topAccountsByBalance": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get list of accounts sorted descending by balance.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["stats"],
+        "summary": "Get Top Accounts By Balance",
+        "operationId": "api_v3_get_top_accounts_by_balance",
+        "parameters": [
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/AccountBalance"
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/estimateFee": {
+      "post": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Estimate fees required for query processing. Fields body, init-code and init-data accept serialized BOCs encoded as base64 or hex.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["api/v2"],
+        "summary": "Estimate Fee",
+        "operationId": "api_v3_post_v2_estimate_fee",
+        "parameters": [
+          {
+            "description": "Estimate fee request.",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/V2EstimateFeeRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/V2EstimateFeeResult"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
           }
         }
       }

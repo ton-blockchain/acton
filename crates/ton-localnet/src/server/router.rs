@@ -2,15 +2,16 @@ use super::handlers::utils::get_extra;
 use super::handlers::{
     change_account_state, create_recovery_point, delete_compiler_abi, delete_verified_source,
     detect_address, detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1,
-    export_recovery_point, faucet, get_account_states_v3, get_address_balance, get_address_book_v3,
-    get_address_information, get_address_information_v3, get_address_name, get_address_state,
-    get_adjacent_transactions_v3, get_api_calls, get_block_header, get_block_transactions,
-    get_block_transactions_ext, get_blocks_v3, get_compiler_abi, get_config_all, get_config_param,
-    get_consensus_block, get_extended_address_information, get_jetton_masters, get_jetton_wallets,
-    get_libraries, get_masterchain_info, get_masterchain_info_v3, get_messages_v3, get_metadata_v3,
-    get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
-    get_registered_verified_source, get_shard_account_cell, get_shards, get_startup_wallets,
-    get_status, get_token_data, get_traces, get_transactions,
+    estimate_fee_v3, export_recovery_point, faucet, get_account_states_v3, get_address_balance,
+    get_address_book_v3, get_address_information, get_address_information_v3, get_address_name,
+    get_address_state, get_adjacent_transactions_v3, get_api_calls, get_block_header,
+    get_block_transactions, get_block_transactions_ext, get_blocks_v3, get_compiler_abi,
+    get_config_all, get_config_param, get_consensus_block, get_extended_address_information,
+    get_jetton_masters, get_jetton_wallets, get_libraries, get_masterchain_info,
+    get_masterchain_info_v3, get_messages_v3, get_metadata_v3, get_nft_items,
+    get_out_msg_queue_size, get_pending_transactions_v3, get_registered_verified_source,
+    get_shard_account_cell, get_shards, get_startup_wallets, get_status, get_token_data,
+    get_top_accounts_by_balance_v3, get_traces, get_transactions,
     get_transactions_by_masterchain_block_v3, get_transactions_by_message_v3, get_transactions_std,
     get_transactions_v3, get_verified_source, get_wallet_information, get_wallet_information_v3,
     get_wallet_states_v3, import_recovery_point, increase_time, json_rpc, list_compiler_abis,
@@ -113,6 +114,10 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
             get(get_adjacent_transactions_v3),
         )
         .route("/v3/walletStates", get(get_wallet_states_v3))
+        .route(
+            "/v3/topAccountsByBalance",
+            get(get_top_accounts_by_balance_v3),
+        )
         .route("/v3/blocks", get(get_blocks_v3))
         .route(
             "/v3/transactionsByMasterchainBlock",
@@ -124,6 +129,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         )
         .route("/v3/pendingTransactions", get(get_pending_transactions_v3))
         .route("/v3/message", post(send_message_v3))
+        .route("/v3/estimateFee", post(estimate_fee_v3))
         .route("/v3/runGetMethod", post(run_get_method_v3))
         .route("/v3/jetton/masters", get(get_jetton_masters))
         .route("/v3/jetton/wallets", get(get_jetton_wallets))

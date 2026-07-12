@@ -117,6 +117,26 @@ pub struct WalletState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AccountBalance {
+    pub account: String,
+    pub balance: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstimateFeeResult {
+    pub source_fees: EstimatedFee,
+    pub destination_fees: Vec<EstimatedFee>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct EstimatedFee {
+    pub in_fwd_fee: u64,
+    pub storage_fee: u64,
+    pub gas_fee: u64,
+    pub fwd_fee: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockId {
     pub workchain: i32,
     pub shard: String,

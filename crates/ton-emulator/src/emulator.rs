@@ -533,11 +533,20 @@ impl Emulator {
         Ok(message_cell)
     }
 
-    pub(crate) fn compute_in_msg_fwd_fee(
+    pub fn compute_in_msg_fwd_fee(
         config: Arc<Dict<u32, Cell>>,
         message: &RelaxedMessage<'_>,
         is_masterchain: bool,
     ) -> anyhow::Result<Tokens> {
+        let (total, first_part) = Self::compute_message_fwd_fee(config, message, is_masterchain)?;
+        Ok(total.saturating_sub(first_part))
+    }
+
+    pub fn compute_message_fwd_fee<T: Store + ?Sized>(
+        config: Arc<Dict<u32, Cell>>,
+        message: &T,
+        is_masterchain: bool,
+    ) -> anyhow::Result<(Tokens, Tokens)> {
         let message_cell = to_cell(message)?;
         let root_bits = u64::from(message_cell.bit_len());
         let mut stats = message_cell
@@ -561,7 +570,7 @@ impl Emulator {
         // Then GETORIGINALFWDFEE restores total from that value.
         let total = prices.compute_fwd_fee(stats);
         let first_part = prices.get_first_part(total);
-        Ok(total.saturating_sub(first_part))
+        Ok((total, first_part))
     }
 
     fn get_address_code_cell(account: &ShardAccount) -> Option<Cell> {
@@ -656,7 +665,7 @@ impl Emulator {
     }
 }
 
-fn is_external_not_accepted_error(error: &str) -> bool {
+pub fn is_external_not_accepted_error(error: &str) -> bool {
     error.contains("external_not_accepted")
         || error.contains("External message not accepted")
         || error.contains("inbound external message rejected")

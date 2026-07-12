@@ -54,7 +54,7 @@ local development flows that need to inject a raw internal message.
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 20 TonCenter v3 endpoints:
+The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI specification.
 
 | Method | Endpoint                                 | Available in local node | Purpose                                                              |
 |--------|------------------------------------------|-------------------------|----------------------------------------------------------------------|
@@ -70,19 +70,35 @@ Acton local development node currently supports 20 TonCenter v3 endpoints:
 | `GET`  | `/api/v3/messages`                       | ✅                       | Returns messages with TonCenter v3 filters.                          |
 | `GET`  | `/api/v3/adjacentTransactions`           | ✅                       | Returns transactions connected by inbound or outbound messages.      |
 | `GET`  | `/api/v3/walletStates`                   | ✅                       | Returns wallet projections for existing account states.              |
+| `GET`  | `/api/v3/topAccountsByBalance`           | ✅                       | Returns accounts sorted by balance.                                  |
 | `GET`  | `/api/v3/transactionsByMasterchainBlock` | ✅                       | Returns transactions included in a masterchain block.                |
 | `GET`  | `/api/v3/transactionsByMessage`          | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
 | `GET`  | `/api/v3/pendingTransactions`            | ✅                       | Returns pending transactions filtered by account and trace id.       |
 | `POST` | `/api/v3/message`                        | ✅                       | Sends an external message in BOC and returns message hash fields.    |
+| `POST` | `/api/v3/estimateFee`                    | ✅                       | Estimates fees without committing a transaction.                     |
 | `POST` | `/api/v3/runGetMethod`                   | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
 | `GET`  | `/api/v3/jetton/masters`                 | ✅                       | Returns jetton master metadata with optional filters and pagination. |
 | `GET`  | `/api/v3/jetton/wallets`                 | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
 | `GET`  | `/api/v3/nft/items`                      | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
+| `GET`  | `/api/v3/actions`                        | ❌                       | Returns classified actions.                                          |
+| `GET`  | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
+| `POST` | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
+| `GET`  | `/api/v3/dns/records`                    | ❌                       | Returns DNS records.                                                 |
+| `GET`  | `/api/v3/jetton/burns`                   | ❌                       | Returns jetton burns.                                                |
+| `GET`  | `/api/v3/jetton/transfers`               | ❌                       | Returns jetton transfers.                                            |
+| `GET`  | `/api/v3/masterchainBlockShardState`     | ❌                       | Returns shard state for a masterchain block.                         |
+| `GET`  | `/api/v3/masterchainBlockShards`         | ❌                       | Returns shards referenced by a masterchain block.                    |
+| `GET`  | `/api/v3/multisig/orders`                | ❌                       | Returns multisig orders.                                             |
+| `GET`  | `/api/v3/multisig/wallets`               | ❌                       | Returns multisig wallets.                                            |
+| `GET`  | `/api/v3/nft/collections`                | ❌                       | Returns NFT collections.                                             |
+| `GET`  | `/api/v3/nft/sales`                      | ❌                       | Returns NFT sales.                                                   |
+| `GET`  | `/api/v3/nft/transfers`                  | ❌                       | Returns NFT transfers.                                               |
+| `GET`  | `/api/v3/pendingActions`                 | ❌                       | Returns pending classified actions.                                  |
+| `GET`  | `/api/v3/pendingTraces`                  | ❌                       | Returns pending traces.                                              |
+| `GET`  | `/api/v3/vesting`                        | ❌                       | Returns vesting contract state.                                      |
 
 `/api/v3/message` accepts external-in messages only. Use
 `/acton_sendInternalMessage` to inject a raw internal message in local tooling.
-
-No other v3 endpoints are exposed by the local development node at the moment.
 
 ## Streaming API v2
 

@@ -5450,6 +5450,7 @@ dependencies = [
  "tolk-compiler",
  "ton",
  "ton-api",
+ "ton-emulator",
  "ton-executor",
  "ton-indexer",
  "ton-liteapi",

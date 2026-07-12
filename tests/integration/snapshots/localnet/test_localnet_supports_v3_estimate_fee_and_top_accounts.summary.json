@@ -1,0 +1,14 @@
+{
+  "estimate_fee": {
+    "base64_status": 200,
+    "destination_fees_empty": true,
+    "encodings_match": true,
+    "gas_fee_positive": true,
+    "hex_status": 200,
+    "in_fwd_fee_positive": true
+  },
+  "top_accounts": {
+    "count": 2,
+    "sorted_descending": true
+  }
+}

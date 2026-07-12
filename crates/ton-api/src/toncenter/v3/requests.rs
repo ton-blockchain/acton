@@ -139,6 +139,21 @@ pub struct WalletStatesQuery {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TopAccountsByBalanceQuery {
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EstimateFeeRequest {
+    pub address: String,
+    pub body: String,
+    pub init_code: Option<String>,
+    pub init_data: Option<String>,
+    pub ignore_chksig: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PendingTransactionsQuery {
     /// `TonCenter` currently requires at least one account even though its Swagger marks it optional.
     #[serde(default)]

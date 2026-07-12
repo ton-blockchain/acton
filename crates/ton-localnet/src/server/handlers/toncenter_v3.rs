@@ -2,7 +2,7 @@ use super::toncenter_enrichment::{
     build_extra_data_for_addresses, build_metadata_for_addresses, load_address_infos,
     map_address_book_row, map_address_info,
 };
-use crate::api::{toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
+use crate::api::{toncenter_emulate, toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
 use crate::localnet;
 use crate::localnet::{Localnet, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction};
 use crate::storage::{AccountStatus, JettonMasterMeta, TraceNode};
@@ -23,10 +23,10 @@ use std::sync::Arc;
 use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
-    BlocksQuery, JettonMastersQuery, JettonWalletsQuery, MessagesQuery, NftItemsQuery,
-    PendingTransactionsQuery, RunGetMethodRequest, SendMessageRequest, StackEntry, TracesQuery,
-    TransactionsByMasterchainBlockQuery, TransactionsByMessageQuery, TransactionsQuery,
-    WalletInformationQuery, WalletStatesQuery,
+    BlocksQuery, EstimateFeeRequest, JettonMastersQuery, JettonWalletsQuery, MessagesQuery,
+    NftItemsQuery, PendingTransactionsQuery, RunGetMethodRequest, SendMessageRequest, StackEntry,
+    TopAccountsByBalanceQuery, TracesQuery, TransactionsByMasterchainBlockQuery,
+    TransactionsByMessageQuery, TransactionsQuery, WalletInformationQuery, WalletStatesQuery,
 };
 use toncenter_v3 as v3;
 
@@ -588,6 +588,29 @@ pub async fn send_message_v3(
     Json(payload): Json<SendMessageRequest>,
 ) -> impl IntoResponse {
     handle_v3_result(node.send_boc(payload.boc), toncenter_v3::map_send_message).await
+}
+
+pub async fn get_top_accounts_by_balance_v3(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<TopAccountsByBalanceQuery>,
+) -> impl IntoResponse {
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    handle_v3_result(node.get_top_account_balances(limit, offset), |accounts| {
+        v3::map_account_balances(accounts)
+    })
+    .await
+}
+
+pub async fn estimate_fee_v3(
+    State(node): State<Arc<Localnet>>,
+    Json(payload): Json<EstimateFeeRequest>,
+) -> impl IntoResponse {
+    let boc = parse!(toncenter_emulate::compose_estimate_fee_message(&payload));
+    handle_v3_result(
+        node.estimate_fees(boc, payload.ignore_chksig.unwrap_or(true)),
+        v3::map_estimate_fee,
+    )
+    .await
 }
 
 pub async fn run_get_method_v3(

@@ -56,7 +56,9 @@ pub mod world_state;
 
 mod tests;
 
-pub use crate::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
+pub use crate::emulator::{
+    Emulator, SendMessageResult, SendMessageResultSuccess, is_external_not_accepted_error,
+};
 pub use crate::world_state::{
     AccountsState, LocalAccountsState, RemoteAccountState, WorldState, WorldStateAccountSnapshot,
     WorldStateSnapshot,

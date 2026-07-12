@@ -191,6 +191,26 @@ pub struct LocalnetTransaction {
     pub other_fees: u128,
 }
 
+#[derive(Debug, Clone)]
+pub struct LocalnetAccountBalance {
+    pub account: Addr,
+    pub balance: u128,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct LocalnetEstimatedFee {
+    pub in_fwd_fee: u64,
+    pub storage_fee: u64,
+    pub gas_fee: u64,
+    pub fwd_fee: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct LocalnetEstimateFeeResult {
+    pub source_fees: LocalnetEstimatedFee,
+    pub destination_fees: Vec<LocalnetEstimatedFee>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
@@ -483,6 +503,16 @@ pub(crate) enum Request {
         ignore_chksig: bool,
         mc_block_seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<storage::EmulateTraceResult>>,
+    },
+    EstimateFees {
+        boc: BocBytes,
+        ignore_chksig: bool,
+        resp: oneshot::Sender<anyhow::Result<LocalnetEstimateFeeResult>>,
+    },
+    GetTopAccountBalances {
+        limit: usize,
+        offset: usize,
+        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAccountBalance>>>,
     },
     GetJettonMasters {
         addresses: HashSet<Addr>,
@@ -1332,6 +1362,38 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn estimate_fees(
+        &self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::EstimateFees {
+                boc,
+                ignore_chksig,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
+    pub async fn get_top_account_balances(
+        &self,
+        limit: usize,
+        offset: usize,
+    ) -> anyhow::Result<Vec<LocalnetAccountBalance>> {
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::GetTopAccountBalances {
+                limit,
+                offset,
+                resp,
+            })
+            .await?;
+        rx.await?
+    }
+
     pub async fn get_jetton_masters(
         &self,
         addresses: Vec<String>,
@@ -2040,6 +2102,22 @@ fn process_loop_request(
             resp,
         } => {
             let res = node.emulate_trace_by_external_message(boc, ignore_chksig, mc_block_seqno);
+            let _ = resp.send(res);
+        }
+        Request::EstimateFees {
+            boc,
+            ignore_chksig,
+            resp,
+        } => {
+            let res = node.estimate_fees_by_external_message(boc, ignore_chksig);
+            let _ = resp.send(res);
+        }
+        Request::GetTopAccountBalances {
+            limit,
+            offset,
+            resp,
+        } => {
+            let res = Ok(node.top_account_balances(limit, offset));
             let _ = resp.send(res);
         }
         Request::GetJettonMasters {

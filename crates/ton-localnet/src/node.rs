@@ -7,9 +7,10 @@ use crate::block::{
         MasterchainBlockBuildContext,
     },
 };
-use crate::executor::{ExecContext, TvmExecutor};
+use crate::executor::{ExecContext, FeeEstimationExecution, TvmExecutor};
 use crate::localnet::{
-    LocalnetAccountStateChange, LocalnetBlockId, compute_normalized_ext_in_hash,
+    LocalnetAccountBalance, LocalnetAccountStateChange, LocalnetBlockId, LocalnetEstimateFeeResult,
+    LocalnetEstimatedFee, compute_normalized_ext_in_hash,
 };
 use crate::node_persistence::NodePersistence;
 use crate::remote::{
@@ -27,21 +28,27 @@ use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
+use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet, VecDeque};
+use std::sync::Arc;
 use tokio::sync::broadcast;
+use ton_emulator::Emulator;
 use ton_executor::message::{PrevBlockId, PrevBlocksInfo};
 use tycho_types::boc::Boc;
 use tycho_types::boc::BocRepr;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Lazy, Store};
+use tycho_types::dict::Dict;
+use tycho_types::models::config::BlockchainConfigParams;
 use tycho_types::models::transaction::{
     ComputePhase, ComputePhaseSkipReason, HashUpdate, OrdinaryTxInfo, SkippedComputePhase,
     Transaction,
 };
 use tycho_types::models::{
     Account, AccountState, AccountStatusChange, CurrencyCollection, IntAddr, IntMsgInfo, LibDescr,
-    Message, MsgInfo, OptionalAccount, OwnedMessage, ShardAccount, StdAddr, StoragePhase, TxInfo,
+    Message, MsgInfo, OptionalAccount, OutAction, OutActionsRevIter, OwnedMessage, RelaxedMsgInfo,
+    ShardAccount, StdAddr, StoragePhase, TxInfo,
 };
 use tycho_types::prelude::HashBytes;
 
@@ -910,7 +917,7 @@ impl Node {
             return Ok(self.global_libs_boc.clone());
         }
 
-        let mut libs = tycho_types::dict::Dict::<HashBytes, LibDescr>::new();
+        let mut libs = Dict::<HashBytes, LibDescr>::new();
         for (hash, entry) in &self.global_libraries {
             if entry.publishers.is_empty() {
                 continue;
@@ -928,7 +935,7 @@ impl Node {
                 );
             }
 
-            let mut publishers = tycho_types::dict::Dict::<HashBytes, ()>::new();
+            let mut publishers = Dict::<HashBytes, ()>::new();
             for publisher in &entry.publishers {
                 publishers
                     .add(HashBytes(publisher.addr), ())
@@ -2355,6 +2362,125 @@ impl Node {
         })
     }
 
+    pub fn estimate_fees_by_external_message(
+        &mut self,
+        boc: BocBytes,
+        ignore_chksig: bool,
+    ) -> anyhow::Result<LocalnetEstimateFeeResult> {
+        let message_cell = Boc::decode(&boc).context("Failed to decode external message BOC")?;
+        let message = message_cell
+            .parse::<Message<'_>>()
+            .context("Failed to parse external message")?;
+        let destination = match &message.info {
+            MsgInfo::ExtIn(info) => Addr::from(&info.dst),
+            _ => anyhow::bail!("estimateFee accepts only external-in messages"),
+        };
+        let is_masterchain = destination.workchain == -1;
+
+        let mut config_slice = self.config_cell.as_slice_allow_exotic();
+        let config =
+            Dict::<u32, Cell>::load_from_root_ext(&mut config_slice, Cell::empty_context())
+                .context("Failed to parse blockchain config dictionary")?;
+        let config_root = config
+            .root()
+            .clone()
+            .context("Blockchain config is empty")?;
+        let config_params = BlockchainConfigParams::from_raw(config_root);
+        let (in_fwd_fee, _) =
+            Emulator::compute_message_fwd_fee(Arc::new(config.clone()), &message, is_masterchain)?;
+
+        let shard_account_boc = self.get_shard_account_for_emulation(&destination, None)?;
+        let shard_account_cell =
+            Boc::decode(&shard_account_boc).context("Failed to decode source ShardAccount BOC")?;
+        let shard_account = shard_account_cell
+            .parse::<ShardAccount>()
+            .context("Failed to parse source ShardAccount")?;
+        let account = shard_account
+            .load_account()
+            .context("Failed to load source account")?;
+        let (lt, gen_utime, block_seqno) = self.emulation_context(None)?;
+        let storage_fee =
+            estimate_storage_fee(&config_params, account.as_ref(), &destination, gen_utime)?;
+
+        let config_boc = self
+            .cas
+            .get(&self.globals.config_boc_hash)
+            .context("Config missing")?;
+        let vm_global_libs = self.build_vm_global_libs_boc()?;
+        let ctx = ExecContext {
+            lt,
+            gen_utime,
+            rand_seed: None,
+            ignore_chksig,
+            prev_blocks_info: self.prev_blocks_info_at(block_seqno),
+        };
+        let execution = self.executor.execute_for_fee_estimation(
+            &shard_account_boc,
+            &boc,
+            &ctx,
+            &config_boc,
+            vm_global_libs.as_ref(),
+        )?;
+        let (gas_fee, fwd_fee) = match execution {
+            FeeEstimationExecution::ExternalNotAccepted => (0, 0),
+            FeeEstimationExecution::Executed(result) => {
+                let tx_info = result
+                    .tx
+                    .info
+                    .load()
+                    .context("Failed to load transaction info")?;
+                let TxInfo::Ordinary(tx_info) = tx_info else {
+                    anyhow::bail!("estimateFee requires an ordinary transaction");
+                };
+                let (gas_fee, success) = match &tx_info.compute_phase {
+                    ComputePhase::Executed(phase) => (u128::from(phase.gas_fees), phase.success),
+                    ComputePhase::Skipped(_) => (0, false),
+                };
+                let fwd_fee = if success {
+                    estimate_action_forward_fees(
+                        Arc::new(config),
+                        result.actions.as_ref(),
+                        is_masterchain,
+                    )?
+                } else {
+                    0
+                };
+                (gas_fee, fwd_fee)
+            }
+        };
+
+        Ok(LocalnetEstimateFeeResult {
+            source_fees: LocalnetEstimatedFee {
+                in_fwd_fee: u64::try_from(u128::from(in_fwd_fee))
+                    .context("input forwarding fee does not fit u64")?,
+                storage_fee,
+                gas_fee: u64::try_from(gas_fee).context("gas fee does not fit u64")?,
+                fwd_fee: u64::try_from(fwd_fee).context("forwarding fee does not fit u64")?,
+            },
+            destination_fees: Vec::new(),
+        })
+    }
+
+    #[must_use]
+    pub fn top_account_balances(&self, limit: usize, offset: usize) -> Vec<LocalnetAccountBalance> {
+        let mut accounts = self
+            .latest
+            .accounts
+            .iter()
+            .map(|(account, meta)| LocalnetAccountBalance {
+                account: *account,
+                balance: meta.balance,
+            })
+            .collect::<Vec<_>>();
+        accounts.sort_unstable_by(|left, right| {
+            right
+                .balance
+                .cmp(&left.balance)
+                .then_with(|| left.account.cmp(&right.account))
+        });
+        accounts.into_iter().skip(offset).take(limit).collect()
+    }
+
     fn get_shard_account_for_emulation(
         &mut self,
         addr: &Addr,
@@ -2556,6 +2682,108 @@ impl Node {
 
         self.send_internal_boc(BocRepr::encode(message)?.into())
     }
+}
+
+fn estimate_storage_fee(
+    config: &BlockchainConfigParams,
+    account: Option<&Account>,
+    address: &Addr,
+    now: u32,
+) -> anyhow::Result<u64> {
+    let Some(account) = account else {
+        return Ok(0);
+    };
+    let last_paid = account.storage_stat.last_paid;
+    let is_masterchain = address.workchain == -1;
+    let is_special = is_masterchain
+        && config
+            .get_fundamental_addresses()
+            .context("Failed to load fundamental addresses")?
+            .contains_key(HashBytes(address.addr))
+            .context("Failed to check fundamental address")?;
+
+    let mut all_prices = config
+        .get_storage_prices()
+        .context("Failed to load storage prices")?
+        .iter()
+        .map(|entry| entry.map(|(_, prices)| prices))
+        .collect::<Result<Vec<_>, _>>()?;
+    all_prices.sort_unstable_by_key(|prices| prices.utime_since);
+    if now <= last_paid
+        || last_paid == 0
+        || is_special
+        || all_prices.is_empty()
+        || now <= all_prices[0].utime_since
+    {
+        return Ok(0);
+    }
+
+    let mut index = all_prices.len();
+    while index > 0 && all_prices[index - 1].utime_since > last_paid {
+        index -= 1;
+    }
+    index = index.saturating_sub(1);
+
+    let cells = u64::from(account.storage_stat.used.cells);
+    let bits = u64::from(account.storage_stat.used.bits);
+    let mut upto = last_paid.max(all_prices[0].utime_since);
+    let mut total = BigUint::default();
+    for (position, prices) in all_prices.iter().enumerate().skip(index) {
+        if upto >= now {
+            break;
+        }
+        let valid_until = all_prices
+            .get(position + 1)
+            .map_or(now, |next| now.min(next.utime_since));
+        if upto < valid_until {
+            let (cell_price, bit_price) = if is_masterchain {
+                (prices.mc_cell_price_ps, prices.mc_bit_price_ps)
+            } else {
+                (prices.cell_price_ps, prices.bit_price_ps)
+            };
+            let rate = BigUint::from(cells) * cell_price + BigUint::from(bits) * bit_price;
+            total += rate * (valid_until - upto);
+        }
+        upto = valid_until;
+    }
+
+    let rounded = (total + BigUint::from(u16::MAX)) >> 16_usize;
+    u64::try_from(rounded).context("storage fee does not fit u64")
+}
+
+fn estimate_action_forward_fees(
+    config: Arc<Dict<u32, Cell>>,
+    actions: Option<&BocBytes>,
+    source_is_masterchain: bool,
+) -> anyhow::Result<u128> {
+    let Some(actions) = actions else {
+        return Ok(0);
+    };
+    let actions = Boc::decode(actions).context("Failed to decode output actions BOC")?;
+    let actions = actions
+        .as_slice()
+        .context("Failed to read output actions cell")?;
+    let mut total = 0_u128;
+    for action in OutActionsRevIter::new(actions) {
+        let OutAction::SendMsg { out_msg, .. } = action.context("Failed to parse output action")?
+        else {
+            continue;
+        };
+        let message = out_msg.load().context("Failed to load output message")?;
+        let destination_is_masterchain = match &message.info {
+            RelaxedMsgInfo::Int(info) => info.dst.is_masterchain(),
+            RelaxedMsgInfo::ExtOut(_) => false,
+        };
+        let (fee, _) = Emulator::compute_message_fwd_fee(
+            Arc::clone(&config),
+            &message,
+            source_is_masterchain || destination_is_masterchain,
+        )?;
+        total = total
+            .checked_add(u128::from(fee))
+            .context("forwarding fee overflow")?;
+    }
+    Ok(total)
 }
 
 fn store_account_state_cell_from_shard_account_boc(
@@ -2881,6 +3109,7 @@ mod tests {
                 tx_boc: BocRepr::encode(tx)?.into(),
                 new_account_boc,
                 out_msg_cells: Vec::new(),
+                actions: None,
             })
         }
     }
