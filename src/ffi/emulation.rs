@@ -37,9 +37,7 @@ use tolk_compiler::SourceMap;
 use tolk_compiler::abi::ContractABI;
 use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
-use ton_api::{
-    Network, TonApiClient, V3MessageSummary, V3Trace, V3TransactionSummary, V3TxDescription,
-};
+use ton_api::{Network, TonApiClient, toncenter::v3};
 use ton_emulator::emulator::{Emulator, SendMessageResult, SendMessageResultSuccess};
 use ton_emulator::world_state::WorldState;
 use ton_emulator::{extension, register_ext_methods};
@@ -884,7 +882,7 @@ fn tx_cell_to_send_result_tuple(
 
 pub(crate) struct V3TraceTransaction {
     pub(crate) hash: String,
-    pub(crate) summary: V3TransactionSummary,
+    pub(crate) summary: v3::Transaction,
     pub(crate) tx_cell: Cell,
     pub(crate) transaction: Transaction,
     pub(crate) parent_lt: Option<u64>,
@@ -907,7 +905,9 @@ pub(crate) enum V3TraceTransactions {
     Pending { tx_hash: String },
 }
 
-pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3TraceTransactions> {
+pub(crate) fn build_v3_trace_transactions(
+    trace: &v3::Trace,
+) -> anyhow::Result<V3TraceTransactions> {
     let mut transactions = Vec::with_capacity(trace.transactions_order.len());
     for tx_hash in &trace.transactions_order {
         let Some(summary) = trace.transactions.get(tx_hash) else {
@@ -972,7 +972,7 @@ pub(crate) fn build_v3_trace_transactions(trace: &V3Trace) -> anyhow::Result<V3T
     Ok(V3TraceTransactions::Ready(transactions))
 }
 
-pub(crate) fn v3_message_hash(message: &V3MessageSummary) -> Option<&str> {
+pub(crate) fn v3_message_hash(message: &v3::Message) -> Option<&str> {
     message.hash.as_deref().filter(|hash| !hash.is_empty())
 }
 
@@ -4068,13 +4068,6 @@ mod tests {
     #[test]
     fn synthesize_tx_cell_from_v3_reproduces_on_chain_hash() {
         use expect_test::expect_file;
-        use ton_api::V3Trace;
-
-        #[derive(serde::Deserialize)]
-        struct TraceEnvelope {
-            traces: Vec<V3Trace>,
-        }
-
         let fixtures = [
             (
                 include_str!("testdata/v3_trace_fixture.json"),
@@ -4087,7 +4080,7 @@ mod tests {
         ];
 
         for (idx, (fixture, expected)) in fixtures.into_iter().enumerate() {
-            let envelope: TraceEnvelope = serde_json::from_str(fixture)
+            let envelope: v3::TracesResponse = serde_json::from_str(fixture)
                 .unwrap_or_else(|e| panic!("fixture {idx} must deserialize: {e:#}"));
             let trace = envelope
                 .traces
@@ -4096,7 +4089,7 @@ mod tests {
                 .unwrap_or_else(|| panic!("fixture {idx} has no traces"));
 
             // Iterate in indexer-reported order so the snapshot is stable —
-            // `V3Trace.transactions` is a HashMap and has no natural ordering.
+            // `v3::Trace.transactions` is a HashMap and has no natural ordering.
             let mut actual = String::new();
             for tx_hash_b64 in &trace.transactions_order {
                 let summary = trace
@@ -4341,7 +4334,7 @@ fn has_unmatched_internal_out_messages(transactions: &[V3TraceTransaction]) -> b
 /// cell had a non-addr_none src, a non-zero `import_fee`, or an init), the original
 /// external-in data is lost and the reconstructed tx hash won't match.
 pub(crate) fn synthesize_tx_cell_from_v3(
-    summary: &V3TransactionSummary,
+    summary: &v3::Transaction,
 ) -> anyhow::Result<(Cell, Transaction)> {
     let account = parse_account_hash(&summary.account)
         .with_context(|| format!("Unsupported account address format: {}", summary.account))?;
@@ -4433,7 +4426,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
 /// every combination and pick the one whose `repr_hash` matches the summary's `hash`.
 /// Without this the synthesized tx's `repr_hash` can disagree with the on-chain hash on any
 /// transaction whose messages happened to be laid out differently than our fixed guess.
-fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
+fn build_message_cell_from_v3(m: &v3::Message) -> anyhow::Result<Cell> {
     let body_cell = match m
         .message_content
         .as_ref()
@@ -4524,7 +4517,7 @@ fn build_message_cell_from_v3(m: &V3MessageSummary) -> anyhow::Result<Cell> {
 ///
 /// Classify by the address pair: `source=None` → external-in, `destination=None` →
 /// external-out, both present → internal.
-fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
+fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
     let src_str = m.source.as_deref().filter(|s| !s.is_empty());
     let dst_str = m.destination.as_deref().filter(|s| !s.is_empty());
 
@@ -4597,7 +4590,7 @@ fn infer_msg_info_from_v3(m: &V3MessageSummary) -> anyhow::Result<MsgInfo> {
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
-fn build_tx_info_from_v3(desc: Option<&V3TxDescription>) -> TxInfo {
+fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
     let Some(desc) = desc else {
         return TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: false,

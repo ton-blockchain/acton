@@ -1,3 +1,13 @@
+//! Localnet-to-`TonCenter` v3 response adapters.
+//!
+//! Known `OpenAPI` deviations:
+//! - address-book and metadata objects contain only data derivable by localnet and may be empty;
+//! - jetton and NFT metadata is a local projection and omits fields unavailable in local state;
+//! - `map_run_get_method_v3` emits the observed result shape (`gas_used`, `exit_code`, `stack`,
+//!   local `vm_log`); upstream v3 `OpenAPI` 1.2.6 incorrectly declares the request type as the
+//!   successful response schema;
+//! - emulation responses belong to `TonCenter`'s separate emulate API, not `/api/v3/doc.json`.
+
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAccountState, LocalnetBlock, LocalnetMessage,
     LocalnetRunGetMethodResult, LocalnetTransaction, convert_to_message_struct,
@@ -7,8 +17,10 @@ use crate::storage::{
     MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
 };
 use crate::types::{Addr, BocBytes, Hash256};
+use anyhow::Context;
 use serde_json::value::Value;
 use std::collections::HashMap;
+use ton_api::toncenter::emulate::v1 as emulate;
 use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -679,7 +691,7 @@ pub fn map_emulate_trace_response(
     include_code_data: bool,
     address_book: Option<Value>,
     metadata: Option<Value>,
-) -> Value {
+) -> anyhow::Result<emulate::EmulateTraceResponse> {
     let tn = &emulation.trace;
     let mapped = map_traces_with_emulated(tn, true);
     let trace_entry = mapped
@@ -750,7 +762,8 @@ pub fn map_emulate_trace_response(
             .unwrap_or(Value::Bool(false)),
     );
 
-    Value::Object(response)
+    serde_json::from_value(Value::Object(response))
+        .context("localnet emulation response does not match `TonCenter` Emulate v1")
 }
 
 fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> Value {

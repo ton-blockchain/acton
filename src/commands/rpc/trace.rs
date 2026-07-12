@@ -19,10 +19,7 @@ use std::collections::BTreeSet;
 use std::str::FromStr;
 use std::sync::Arc;
 use tolk_compiler::SourceMap;
-use ton_api::{
-    AccountState as TonApiAccountState, Network, TonApiClient, V3MessageSummary, V3Trace,
-    V3TransactionSummary,
-};
+use ton_api::{Network, TonApiClient, toncenter::v3};
 use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{HashBytes, Lazy};
@@ -118,7 +115,7 @@ fn rpc_trace_formatter(
     Ok(formatter)
 }
 
-fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
+fn print_rpc_trace_summary(query_hash: &str, trace: &v3::Trace) {
     print_kv("Query Hash", format_trace_hash(query_hash));
     print_kv("Trace ID", format_trace_hash(&trace.trace_id));
     print_kv("Time", format_trace_time_range(trace));
@@ -134,7 +131,7 @@ fn print_rpc_trace_summary(query_hash: &str, trace: &V3Trace) {
     );
 }
 
-fn trace_message_count(trace: &V3Trace) -> usize {
+fn trace_message_count(trace: &v3::Trace) -> usize {
     let mut unique = BTreeSet::new();
 
     for tx_hash in &trace.transactions_order {
@@ -240,7 +237,7 @@ fn format_child_lts(child_lts: &[u64]) -> String {
     )
 }
 
-fn trace_tx_success(tx: &V3TransactionSummary) -> bool {
+fn trace_tx_success(tx: &v3::Transaction) -> bool {
     let Some(description) = &tx.description else {
         return false;
     };
@@ -260,7 +257,7 @@ fn trace_tx_success(tx: &V3TransactionSummary) -> bool {
     true
 }
 
-fn format_compute_exit_code(tx: &V3TransactionSummary) -> String {
+fn format_compute_exit_code(tx: &v3::Transaction) -> String {
     tx.description
         .as_ref()
         .and_then(|description| description.compute_ph.as_ref())
@@ -268,7 +265,7 @@ fn format_compute_exit_code(tx: &V3TransactionSummary) -> String {
         .map_or_else(format_trace_null, format_trace_code)
 }
 
-fn format_action_result_code(tx: &V3TransactionSummary) -> String {
+fn format_action_result_code(tx: &v3::Transaction) -> String {
     tx.description
         .as_ref()
         .and_then(|description| description.action.as_ref())
@@ -277,8 +274,8 @@ fn format_action_result_code(tx: &V3TransactionSummary) -> String {
 }
 
 fn trace_branch_kind(
-    tx: &V3TransactionSummary,
-    message: &V3MessageSummary,
+    tx: &v3::Transaction,
+    message: &v3::Message,
     message_name: Option<&str>,
 ) -> &'static str {
     if message.bounced.unwrap_or(false) {
@@ -297,7 +294,7 @@ fn trace_branch_kind(
     "message"
 }
 
-fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>) -> String {
+fn format_message_opcode(message: &v3::Message, message_name: Option<&str>) -> String {
     let opcode = extract_message_opcode(message);
     let opcode_text = if opcode == 0 {
         "0x00000000".to_owned()
@@ -311,7 +308,7 @@ fn format_message_opcode(message: &V3MessageSummary, message_name: Option<&str>)
     }
 }
 
-fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
+fn extract_message_opcode(message: &v3::Message) -> u32 {
     let Some(body_boc64) = message
         .message_content
         .as_ref()
@@ -330,7 +327,7 @@ fn extract_message_opcode(message: &V3MessageSummary) -> u32 {
     parser.load_u32().unwrap_or(0)
 }
 
-fn format_message_value(message: &V3MessageSummary) -> String {
+fn format_message_value(message: &v3::Message) -> String {
     let Some(value) = message.value.as_deref() else {
         return format_trace_none();
     };
@@ -357,7 +354,7 @@ fn format_trace_hash(hash: &str) -> String {
     hash.yellow().to_string()
 }
 
-fn format_trace_time_range(trace: &V3Trace) -> String {
+fn format_trace_time_range(trace: &v3::Trace) -> String {
     let timestamps = trace
         .transactions_order
         .iter()
@@ -382,7 +379,7 @@ fn format_trace_time(timestamp: u64) -> String {
         .to_string()
 }
 
-fn format_trace_block_range(trace: &V3Trace) -> String {
+fn format_trace_block_range(trace: &v3::Trace) -> String {
     let blocks = trace
         .transactions_order
         .iter()
@@ -489,7 +486,7 @@ fn collect_trace_address(address: &str, addresses: &mut BTreeSet<String>) {
 }
 
 fn shard_account_from_ton_api_state(
-    state: &TonApiAccountState,
+    state: &v3::AccountStateFull,
 ) -> anyhow::Result<Option<(StdAddr, ShardAccount)>> {
     let (address, _) =
         StdAddr::from_str_ext(&state.address, StdAddrFormat::any()).map_err(|_| {

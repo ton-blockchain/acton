@@ -1,3 +1,12 @@
+//! Localnet-to-`TonCenter` v2 response adapters.
+//!
+//! Known `OpenAPI` deviations:
+//! - `map_run_get_method` adds local `vm_log` to `RunGetMethodResult`;
+//! - `map_block_transactions` returns the generic `ok` object instead of
+//!   `BlockTransactions` because the localnet method does not currently expose short tx ids;
+//! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
+//!   operations.
+
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
     LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,

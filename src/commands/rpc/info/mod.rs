@@ -13,7 +13,7 @@ use num_bigint::BigInt;
 use serde::Serialize;
 use serde_json::{Value, json};
 use std::collections::HashSet;
-use ton_api::{Network, TonApiClient, TonCenterAccountInfoResult};
+use ton_api::{Network, TonApiClient, toncenter::v2};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
 use tycho_types::dict::Dict;
@@ -316,7 +316,7 @@ pub(super) struct JsonReportInput<'a> {
     pub(super) network: &'a Network,
     pub(super) address: &'a StdAddr,
     pub(super) block_number: Option<u64>,
-    pub(super) remote: &'a TonCenterAccountInfoResult,
+    pub(super) remote: &'a v2::AddressInformation,
     pub(super) balance: &'a BigInt,
     pub(super) code: Option<&'a Cell>,
     pub(super) data: Option<&'a Cell>,

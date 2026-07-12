@@ -1,8 +1,7 @@
 use anyhow::{Context, anyhow};
-use num_bigint::{BigInt, ToBigInt};
+use num_bigint::BigInt;
 use reqwest::blocking::Response;
 use reqwest::header::USER_AGENT;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::env;
 use std::ffi::OsStr;
@@ -10,11 +9,13 @@ use std::fmt;
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 pub use ton_networks::{CustomNetworkUrls, Network};
+use toncenter::{v2, v3};
 use toncenter_keys::api_key as toncenter_api_key;
-use tvm_ffi::json_stack::{json_to_legacy_stack, json_to_stack};
 use tvm_ffi::stack::TupleItem;
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, HashBytes};
+
+pub mod toncenter;
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [1000, 2000, 3000];
@@ -239,7 +240,7 @@ impl TonApiClient {
     }
 
     /// Get account state from `TonCenter`
-    pub fn get_account_state(&self, address: &str) -> anyhow::Result<AccountState> {
+    pub fn get_account_state(&self, address: &str) -> anyhow::Result<v3::AccountStateFull> {
         let accounts = self.get_account_states(&[address])?;
         accounts
             .into_iter()
@@ -248,7 +249,10 @@ impl TonApiClient {
     }
 
     /// Get multiple account states from `TonCenter`
-    pub fn get_account_states(&self, addresses: &[&str]) -> anyhow::Result<Vec<AccountState>> {
+    pub fn get_account_states(
+        &self,
+        addresses: &[&str],
+    ) -> anyhow::Result<Vec<v3::AccountStateFull>> {
         if addresses.is_empty() {
             return Ok(vec![]);
         }
@@ -271,18 +275,10 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterResponse {
-            accounts: Vec<AccountState>,
-        }
-
-        let data: TonCenterResponse = response
+        let data: v3::AccountStatesResponse = response
             .json()
             .context("Failed to parse TonCenter response")?;
 
@@ -294,7 +290,7 @@ impl TonApiClient {
         let state = self.get_account_state(address)?;
 
         if state.status != "active" {
-            return Err(anyhow!("Contract is not active (status: {})", state.status));
+            anyhow::bail!("Contract is not active (status: {})", state.status);
         }
 
         state
@@ -308,7 +304,7 @@ impl TonApiClient {
         address: &str,
         method: &str,
         stack: &[serde_json::Value],
-    ) -> anyhow::Result<GetMethodResult> {
+    ) -> anyhow::Result<v2::RunGetMethodResult> {
         self.run_get_method_at_block(address, method, stack, None)
     }
 
@@ -319,27 +315,26 @@ impl TonApiClient {
         method: &str,
         stack: &[serde_json::Value],
         seqno: Option<u64>,
-    ) -> anyhow::Result<GetMethodResult> {
+    ) -> anyhow::Result<v2::RunGetMethodResult> {
         let url = format!(
             "{}/jsonRPC",
             self.network.toncenter_v2_url(&self.custom_networks)?
         );
 
-        let mut params = serde_json::json!({
-            "address": address,
-            "method": method,
-            "stack": stack
-        });
-        if let Some(seqno) = seqno {
-            params["seqno"] = serde_json::json!(seqno);
-        }
-
-        let json = serde_json::json!({
-            "id": "1",
-            "jsonrpc": "2.0",
-            "method": "runGetMethod",
-            "params": params
-        });
+        let seqno = seqno
+            .map(u32::try_from)
+            .transpose()
+            .context("Masterchain seqno does not fit TonCenter v2 request")?;
+        let json = v2::JsonRpcRequest::new(
+            "1",
+            "runGetMethod",
+            v2::RunGetMethodRequest {
+                address: address.to_owned(),
+                method: serde_json::Value::String(method.to_owned()),
+                stack: stack.to_vec(),
+                seqno,
+            },
+        );
 
         let response = self.send_with_retry(
             || self.build_post_request(&url).json(&json),
@@ -353,16 +348,11 @@ impl TonApiClient {
             anyhow::bail!("Run get method failed: {error_text}");
         }
 
-        #[derive(Deserialize)]
-        struct JsonRpcResponse {
-            result: GetMethodResult,
-        }
-
-        let result: JsonRpcResponse = response
+        let result: v2::JsonRpcResponse<v2::RunGetMethodResult> = response
             .json()
             .context("Failed to parse runGetMethod response")?;
 
-        Ok(result.result)
+        Ok(result.into_result())
     }
 
     /// Get wallet seqno
@@ -405,7 +395,9 @@ impl TonApiClient {
             .map_err(|err| SendBocError::new(SendBocErrorKind::Other, format!("{err:#}")))?;
         let url = format!("{base_url}/sendBoc");
 
-        let json = serde_json::json!({ "boc": boc });
+        let json = v2::SendBocRequest {
+            boc: boc.to_owned(),
+        };
 
         let response = self
             .send_with_retry(
@@ -423,7 +415,7 @@ impl TonApiClient {
         Ok(())
     }
 
-    fn get_masterchain_info_response(&self) -> anyhow::Result<Response> {
+    pub fn get_masterchain_info(&self) -> anyhow::Result<v2::TonlibResponse<v2::MasterchainInfo>> {
         let url = format!(
             "{}/getMasterchainInfo",
             self.network.toncenter_v2_url(&self.custom_networks)?
@@ -438,44 +430,20 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        Ok(response)
-    }
-
-    pub fn get_masterchain_info(&self) -> anyhow::Result<serde_json::Value> {
-        self.get_masterchain_info_response()?
+        response
             .json()
             .context("Failed to parse TonCenter response")
     }
 
     pub fn get_last_block_seqno(&self) -> anyhow::Result<u64> {
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoResponse {
-            result: TonCenterMasterchainInfoResult,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoResult {
-            last: TonCenterMasterchainInfoLastBlock,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterMasterchainInfoLastBlock {
-            seqno: u64,
-        }
-
-        let data: TonCenterMasterchainInfoResponse =
-            self.get_masterchain_info_response()?
-                .json()
-                .context("Failed to parse TonCenter response")?;
-
-        Ok(data.result.last.seqno)
+        Ok(self.get_masterchain_info()?.result.last.seqno)
     }
 
     pub fn get_account_info(
         &self,
         seqno: Option<u64>,
         address: &str,
-    ) -> anyhow::Result<TonCenterAccountInfoResult> {
+    ) -> anyhow::Result<v2::AddressInformation> {
         let url = format!(
             "{}/getAddressInformation?address={}{}",
             self.network.toncenter_v2_url(&self.custom_networks)?,
@@ -494,12 +462,7 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize, Debug)]
-        struct TonCenterAccountInfoResponse {
-            pub result: TonCenterAccountInfoResult,
-        }
-
-        let data: TonCenterAccountInfoResponse = response
+        let data: v2::TonlibResponse<v2::AddressInformation> = response
             .json()
             .context("Failed to parse TonCenter response")?;
 
@@ -529,34 +492,11 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterShardAccountCellResponse {
-            ok: bool,
-            result: Option<TonCenterTvmCell>,
-            error: Option<String>,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterTvmCell {
-            bytes: String,
-        }
-
-        let data: TonCenterShardAccountCellResponse = response
+        let data: v2::TonlibResponse<v2::TvmCell> = response
             .json()
             .context("Failed to parse getShardAccountCell response")?;
 
-        if !data.ok {
-            anyhow::bail!(
-                "{}",
-                data.error
-                    .unwrap_or_else(|| "TonCenter returned ok=false for getShardAccountCell".into())
-            );
-        }
-
-        let cell_boc = data
-            .result
-            .ok_or_else(|| anyhow!("TonCenter getShardAccountCell response has no result"))?
-            .bytes;
+        let cell_boc = data.result.bytes;
 
         Boc::decode_base64(&cell_boc).context("Failed to decode shard account cell BOC data")
     }
@@ -580,37 +520,15 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterLibrariesResponse {
-            ok: bool,
-            result: TonCenterLibrariesResult,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterLibrariesResult {
-            result: Vec<TonCenterLibraryData>,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterLibraryData {
-            found: Option<bool>,
-            data: Option<String>,
-        }
-
-        let data: TonCenterLibrariesResponse = response
+        let data: v2::TonlibResponse<v2::LibraryResult> = response
             .json()
             .context("Failed to parse TonCenter libraries response")?;
 
-        if !data.ok || data.result.result.is_empty() {
-            anyhow::bail!("Library with hash {hash_hex} not found");
-        }
-        let first = &data.result.result[0];
-        if first.found == Some(false) {
-            anyhow::bail!("Library with hash {hash_hex} not found");
-        }
-        let boc_data = first
-            .data
-            .as_deref()
+        let boc_data = data
+            .result
+            .result
+            .first()
+            .map(|entry| entry.data.as_str())
             .ok_or_else(|| anyhow::anyhow!("Library with hash {hash_hex} not found"))?;
 
         Boc::decode_base64(boc_data).context("Failed to decode library BOC data")
@@ -631,29 +549,9 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterConfigAllResponse {
-            ok: bool,
-            result: TonCenterConfigInfo,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigInfo {
-            config: TonCenterConfigCell,
-        }
-
-        #[derive(Deserialize)]
-        struct TonCenterConfigCell {
-            bytes: String,
-        }
-
-        let data: TonCenterConfigAllResponse = response
+        let data: v2::TonlibResponse<v2::ConfigInfo> = response
             .json()
             .context("Failed to parse TonCenter getConfigAll response")?;
-
-        if !data.ok {
-            anyhow::bail!("TonCenter returned ok=false for getConfigAll");
-        }
 
         Boc::decode_base64(&data.result.config.bytes)
             .context("Failed to decode blockchain config BOC data")
@@ -672,7 +570,7 @@ impl TonApiClient {
         limit: Option<u32>,
         lt: Option<String>,
         hash: Option<String>,
-    ) -> anyhow::Result<Vec<TonCenterTransaction>> {
+    ) -> anyhow::Result<Vec<v2::Transaction>> {
         let url = format!(
             "{}/getTransactions",
             self.network.toncenter_v2_url(&self.custom_networks)?
@@ -695,18 +593,10 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter API returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter API returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterTransactionsResponse {
-            result: Vec<TonCenterTransaction>,
-        }
-
-        let data: TonCenterTransactionsResponse = response
+        let data: v2::TonlibResponse<Vec<v2::Transaction>> = response
             .json()
             .context("Failed to parse getTransactions response")?;
 
@@ -729,26 +619,16 @@ impl TonApiClient {
             return Err(Self::handle_fail(response));
         }
 
-        #[derive(Deserialize)]
-        struct TonCenterBalanceResponse {
-            ok: bool,
-            result: String,
-        }
-
-        let data: TonCenterBalanceResponse = response
+        let data: v2::TonlibResponse<v2::StringOrNumber> = response
             .json()
             .context("Failed to parse getAddressBalance response")?;
 
-        if !data.ok {
-            anyhow::bail!("TonCenter returned ok=false for getAddressBalance");
-        }
-
-        data.result.parse::<BigInt>().map_err(Into::into)
+        data.result.to_bigint()
     }
 
     fn handle_fail(response: Response) -> anyhow::Error {
         let status = response.status();
-        let Ok(data) = response.json::<TonCenterErrorResponse>() else {
+        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
             return anyhow!("TonCenter API returned status: {status}");
         };
 
@@ -766,7 +646,7 @@ impl TonApiClient {
 
     fn handle_send_boc_fail(response: Response) -> SendBocError {
         let status = response.status();
-        let Ok(data) = response.json::<TonCenterErrorResponse>() else {
+        let Ok(data) = response.json::<v2::TonlibErrorResponse>() else {
             return SendBocError::new(
                 SendBocErrorKind::Other,
                 format!("TonCenter API returned status: {status}"),
@@ -838,335 +718,6 @@ fn normalize_toncenter_error_message(raw_msg: &str) -> Option<&'static str> {
     None
 }
 
-#[derive(Deserialize, Clone)]
-pub struct AccountState {
-    pub address: String,
-    pub balance: Option<String>,
-    pub code_boc: Option<String>,
-    pub status: String,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct GetMethodResult {
-    pub stack: Vec<serde_json::Value>,
-    pub exit_code: i32,
-}
-
-impl GetMethodResult {
-    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvm_ffi::stack::Tuple> {
-        match json_to_legacy_stack(self.stack.clone()) {
-            Ok(tuple) => Ok(tuple),
-            Err(legacy_err) => json_to_stack(self.stack.clone()).with_context(|| {
-                format!(
-                    "Failed to parse stack as legacy and std formats. Legacy error: {legacy_err}"
-                )
-            }),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug)]
-pub struct TonCenterAccountInfoResult {
-    pub balance: StringOrNumber,
-    pub code: String,
-    pub data: String,
-    pub state: String,
-    pub frozen_hash: String,
-    pub last_transaction_id: TonCenterAccountInfoLastTransactionId,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct TonCenterAccountInfoLastTransactionId {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-pub enum StringOrNumber {
-    Str(String),
-    Num(i64),
-}
-
-impl StringOrNumber {
-    pub fn to_bigint(&self) -> anyhow::Result<BigInt> {
-        match self {
-            StringOrNumber::Str(str) => str.parse::<BigInt>().map_err(Into::into),
-            StringOrNumber::Num(num) => num
-                .to_bigint()
-                .ok_or_else(|| anyhow!("cannot convert {num} to bigint")),
-        }
-    }
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterTransaction {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub utime: u64,
-    pub data: String,
-    pub transaction_id: TonCenterTransactionId,
-    pub fee: String,
-    pub storage_fee: String,
-    pub other_fee: String,
-    pub in_msg: Option<TonCenterMessage>,
-    pub out_msgs: Vec<TonCenterMessage>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterTransactionId {
-    pub lt: String,
-    pub hash: String,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct TonCenterMessage {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub source: Option<String>,
-    pub destination: Option<String>,
-    pub value: String,
-    pub fwd_fee: Option<String>,
-    pub ihr_fee: Option<String>,
-    pub created_lt: Option<String>,
-    pub hash: Option<String>,
-    pub body_hash: Option<String>,
-    pub message: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct TonCenterErrorResponse {
-    #[allow(dead_code)]
-    ok: bool,
-    error: String,
-}
-
-/// `TonCenter` v3 transaction summary returned by `/api/v3/transactionsByMessage` and
-/// embedded inside `/api/v3/traces` responses.
-///
-/// `/traces` does not ship the raw Transaction `BoC` — callers reconstruct a synthetic
-/// `Transaction` cell from the structured fields below.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3TransactionSummary {
-    pub account: String,
-    pub hash: String,
-    pub lt: String,
-    #[serde(default)]
-    pub now: u32,
-    #[serde(default)]
-    pub mc_block_seqno: Option<u32>,
-    #[serde(default)]
-    pub prev_trans_hash: Option<String>,
-    #[serde(default)]
-    pub prev_trans_lt: Option<String>,
-    #[serde(default)]
-    pub orig_status: Option<String>,
-    #[serde(default)]
-    pub end_status: Option<String>,
-    #[serde(default)]
-    pub total_fees: Option<String>,
-    #[serde(default)]
-    pub total_fees_extra_currencies: HashMap<String, String>,
-    #[serde(default)]
-    pub description: Option<V3TxDescription>,
-    #[serde(default)]
-    pub in_msg: Option<V3MessageSummary>,
-    #[serde(default)]
-    pub out_msgs: Vec<V3MessageSummary>,
-    #[serde(default)]
-    pub account_state_before: Option<V3AccountStateRef>,
-    #[serde(default)]
-    pub account_state_after: Option<V3AccountStateRef>,
-}
-
-/// Opaque pointer to the account state before/after the transaction executed. Only the
-/// `hash` is used today — it feeds `state_update` so synthesized tx cells match their
-/// on-chain `repr_hash`.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3AccountStateRef {
-    #[serde(default)]
-    pub hash: Option<String>,
-}
-
-/// v3 transaction description. Only the subset of fields consumed during synthesis is
-/// deserialized; everything else is skipped so unknown flags from future toncenter
-/// versions don't break us.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3TxDescription {
-    #[serde(default, rename = "type")]
-    pub ty: Option<String>,
-    #[serde(default)]
-    pub aborted: Option<bool>,
-    #[serde(default)]
-    pub destroyed: Option<bool>,
-    #[serde(default)]
-    pub credit_first: Option<bool>,
-    #[serde(default)]
-    pub compute_ph: Option<V3ComputePhase>,
-    #[serde(default)]
-    pub action: Option<V3ActionPhase>,
-    #[serde(default)]
-    pub storage_ph: Option<V3StoragePhase>,
-    #[serde(default)]
-    pub credit_ph: Option<V3CreditPhase>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3CreditPhase {
-    #[serde(default)]
-    pub due_fees_collected: Option<String>,
-    #[serde(default)]
-    pub credit: Option<String>,
-    #[serde(default)]
-    pub credit_extra_currencies: HashMap<String, String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3ComputePhase {
-    #[serde(default)]
-    pub skipped: Option<bool>,
-    #[serde(default)]
-    pub success: Option<bool>,
-    #[serde(default)]
-    pub msg_state_used: Option<bool>,
-    #[serde(default)]
-    pub account_activated: Option<bool>,
-    #[serde(default)]
-    pub gas_fees: Option<String>,
-    #[serde(default)]
-    pub gas_used: Option<String>,
-    #[serde(default)]
-    pub gas_limit: Option<String>,
-    #[serde(default)]
-    pub gas_credit: Option<String>,
-    #[serde(default)]
-    pub mode: Option<i8>,
-    #[serde(default)]
-    pub exit_code: Option<i32>,
-    #[serde(default)]
-    pub exit_arg: Option<i32>,
-    #[serde(default)]
-    pub vm_steps: Option<u32>,
-    #[serde(default)]
-    pub vm_init_state_hash: Option<String>,
-    #[serde(default)]
-    pub vm_final_state_hash: Option<String>,
-    #[serde(default)]
-    pub reason: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3ActionPhase {
-    #[serde(default)]
-    pub success: Option<bool>,
-    #[serde(default)]
-    pub valid: Option<bool>,
-    #[serde(default)]
-    pub no_funds: Option<bool>,
-    #[serde(default)]
-    pub status_change: Option<String>,
-    #[serde(default)]
-    pub result_code: Option<i32>,
-    #[serde(default)]
-    pub result_arg: Option<i32>,
-    // `tot_actions` is the on-wire name; `total_actions` is accepted as a fallback so old
-    // fixtures and forks that never shortened the key still deserialize.
-    #[serde(default, alias = "total_actions")]
-    pub tot_actions: Option<u16>,
-    #[serde(default)]
-    pub spec_actions: Option<u16>,
-    #[serde(default)]
-    pub skipped_actions: Option<u16>,
-    #[serde(default)]
-    pub msgs_created: Option<u16>,
-    #[serde(default)]
-    pub total_fwd_fees: Option<String>,
-    #[serde(default)]
-    pub total_action_fees: Option<String>,
-    #[serde(default)]
-    pub action_list_hash: Option<String>,
-    #[serde(default)]
-    pub tot_msg_size: Option<V3StorageUsedShort>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3StorageUsedShort {
-    #[serde(default)]
-    pub cells: Option<String>,
-    #[serde(default)]
-    pub bits: Option<String>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3StoragePhase {
-    #[serde(default)]
-    pub storage_fees_collected: Option<String>,
-    #[serde(default)]
-    pub storage_fees_due: Option<String>,
-    #[serde(default)]
-    pub status_change: Option<String>,
-}
-
-/// v3 message summary (embedded in `in_msg` / `out_msgs` of each transaction). Contains
-/// enough to reconstruct a full `Message` cell without querying raw `BoCs`.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3MessageSummary {
-    #[serde(default)]
-    pub hash: Option<String>,
-    #[serde(default)]
-    pub source: Option<String>,
-    #[serde(default)]
-    pub destination: Option<String>,
-    #[serde(default)]
-    pub value: Option<String>,
-    #[serde(default)]
-    pub value_extra_currencies: Option<HashMap<String, String>>,
-    #[serde(default)]
-    pub fwd_fee: Option<String>,
-    #[serde(default)]
-    pub ihr_fee: Option<String>,
-    #[serde(default)]
-    pub created_lt: Option<String>,
-    #[serde(default)]
-    pub created_at: Option<String>,
-    #[serde(default)]
-    pub ihr_disabled: Option<bool>,
-    #[serde(default)]
-    pub bounce: Option<bool>,
-    #[serde(default)]
-    pub bounced: Option<bool>,
-    #[serde(default)]
-    pub import_fee: Option<String>,
-    #[serde(default)]
-    pub message_content: Option<V3MessageContent>,
-    #[serde(default)]
-    pub init_state: Option<V3MessageContent>,
-}
-
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3MessageContent {
-    #[serde(default)]
-    pub hash: Option<String>,
-    #[serde(default)]
-    pub body: Option<String>,
-}
-
-/// `TonCenter` v3 trace envelope returned by `/api/v3/traces`.
-///
-/// Only the fields actually used by acton are deserialized. `transactions_order` lists
-/// transactions in their natural parent-first order; each entry keys into `transactions`.
-#[derive(Deserialize, Debug, Clone)]
-pub struct V3Trace {
-    pub trace_id: String,
-    pub transactions_order: Vec<String>,
-    pub transactions: HashMap<String, V3TransactionSummary>,
-    /// Set by the indexer when the trace exceeds its `MaxTraceTransactions` threshold —
-    /// in that case `transactions`/`transactions_order` are truncated and retries won't
-    /// help, so callers should bail rather than return a partial `SendResultList`.
-    #[serde(default)]
-    pub is_incomplete: bool,
-}
-
 impl TonApiClient {
     /// Fetch traces that include a message with the given hash using toncenter v3.
     ///
@@ -1178,12 +729,16 @@ impl TonApiClient {
         &self,
         msg_hash: &str,
         limit: u32,
-    ) -> anyhow::Result<Vec<V3Trace>> {
+    ) -> anyhow::Result<Vec<v3::Trace>> {
         self.get_traces_by_hash_param("msg_hash", msg_hash, limit)
     }
 
     /// Fetch a trace by its root transaction hash using toncenter v3.
-    pub fn get_traces_by_tx_hash(&self, tx_hash: &str, limit: u32) -> anyhow::Result<Vec<V3Trace>> {
+    pub fn get_traces_by_tx_hash(
+        &self,
+        tx_hash: &str,
+        limit: u32,
+    ) -> anyhow::Result<Vec<v3::Trace>> {
         self.get_traces_by_hash_param("tx_hash", tx_hash, limit)
     }
 
@@ -1192,7 +747,7 @@ impl TonApiClient {
         hash_param: &str,
         hash: &str,
         limit: u32,
-    ) -> anyhow::Result<Vec<V3Trace>> {
+    ) -> anyhow::Result<Vec<v3::Trace>> {
         let url = format!(
             "{}/traces",
             self.network.toncenter_v3_url(&self.custom_networks)?
@@ -1207,18 +762,11 @@ impl TonApiClient {
         )?;
 
         if !response.status().is_success() {
-            return Err(anyhow!(
-                "TonCenter v3 traces returned status: {}",
-                response.status()
-            ));
+            anyhow::bail!("TonCenter v3 traces returned status: {}", response.status());
         }
 
-        #[derive(Deserialize)]
-        struct Resp {
-            traces: Vec<V3Trace>,
-        }
-
-        let data: Resp = response.json().context("Failed to parse traces response")?;
+        let data: v3::TracesResponse =
+            response.json().context("Failed to parse traces response")?;
         Ok(data.traces)
     }
 }

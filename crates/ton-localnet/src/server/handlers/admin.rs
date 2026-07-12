@@ -6,7 +6,7 @@ use crate::server::models::{
     CreateRecoveryPointRequest, ExportRecoveryPointRequest, FaucetRequest, GetApiCallsRequest,
     GetVerifiedSourceRequest, ImportRecoveryPointRequest, IncreaseTimeRequest, MineBlocksRequest,
     RegisterCompilerAbisRequest, RegisterVerifiedSourcesRequest, RevertRecoveryPointRequest,
-    SendBocRequest, SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
+    SetAddressNameRequest, SetMiningModeRequest, SetNetworkConditionsRequest,
     SetNextBlockTimestampRequest, SetShardAccountRequest, SetTimeRequest, StatePathRequest,
 };
 use crate::server::{
@@ -25,6 +25,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
+use ton_api::toncenter::v2::requests::SendBocRequest;
 
 const VERIFIER_SOURCE_URL: &str = "https://verifier.acton.monster/api/v1/verification/source";
 const VERIFIER_ABI_URL: &str = "https://verifier.acton.monster/api/v1/abi";

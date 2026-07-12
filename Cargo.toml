@@ -23,6 +23,9 @@ exclude = [
   "crates/acton-shared-ui",
   "crates/acton-localnet-ui",
   "crates/acton-explorer-ui",
+  "crates/ton-language-server-core",
+  "crates/ton-language-server-native",
+  "crates/ton-language-server-wasm",
 ]
 
 [workspace.package]
@@ -135,6 +138,7 @@ reqwest = { version = "0.12", default-features = false, features = [
   "multipart",
   "default-tls",
 ] }
+tungstenite = { version = "0.28", features = ["native-tls"] }
 urlencoding = "2.1"
 base64 = "0.22.1"
 rand = "0.8"

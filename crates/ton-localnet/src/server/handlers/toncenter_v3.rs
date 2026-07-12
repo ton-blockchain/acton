@@ -1,11 +1,8 @@
-use super::utils::parse_method_name;
 use crate::api::toncenter_v3;
 use crate::localnet::{Localnet, LocalnetAddressInfo, LocalnetBlock, LocalnetTransaction};
-use crate::server::models::{
-    EmulateTraceRequest, GetAccountStatesV3Request, GetAddressInformationV3Request,
-    GetBlocksV3Query, GetJettonMastersRequest, GetJettonWalletsRequest, GetNftItemsRequest,
-    GetPendingTransactionsV3Query, GetTracesQuery, GetTransactionsByMessageV3Query,
-    GetTransactionsV3Query, RunGetMethodRequest, SendBocRequest,
+use crate::server::toncenter_adapters::{
+    JettonMastersQueryAdapter, JettonWalletsQueryAdapter, NftItemsQueryAdapter,
+    PendingTransactionsQueryAdapter, TracesQueryAdapter, TransactionsQueryAdapter,
 };
 use crate::storage::{JettonMasterMeta, TraceNode};
 use crate::types::{Addr, BocBytes, Hash256};
@@ -22,6 +19,11 @@ use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
+use ton_api::toncenter::emulate::v1 as emulate;
+use ton_api::toncenter::v3::requests::{
+    AccountStatesQuery, AddressInformationQuery, BlocksQuery, RunGetMethodRequest,
+    SendMessageRequest, TransactionsByMessageQuery,
+};
 use ton_indexer::categorize_wallet;
 use toncenter_v3 as v3;
 use tycho_types::cell::HashBytes as CellHashBytes;
@@ -34,7 +36,7 @@ const BLOCK_SHARD: i64 = i64::MIN;
 
 pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetTracesQuery>,
+    Query(payload): Query<TracesQueryAdapter>,
 ) -> impl IntoResponse {
     let tx_hash = match payload.tx_hash.as_deref().map(parse_hash_any).transpose() {
         Ok(hash) => hash,
@@ -56,7 +58,7 @@ pub async fn get_traces(
 
 pub async fn get_address_information_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetAddressInformationV3Request>,
+    Query(payload): Query<AddressInformationQuery>,
 ) -> impl IntoResponse {
     let _use_v2 = payload.use_v2.unwrap_or(true);
 
@@ -114,7 +116,7 @@ pub async fn get_account_states_v3(
 
 pub async fn get_transactions_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetTransactionsV3Query>,
+    Query(payload): Query<TransactionsQueryAdapter>,
 ) -> impl IntoResponse {
     let parsed = match parse_transactions_v3_query(payload) {
         Ok(parsed) => parsed,
@@ -153,7 +155,7 @@ pub async fn get_transactions_v3(
 
 pub async fn get_blocks_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetBlocksV3Query>,
+    Query(payload): Query<BlocksQuery>,
 ) -> impl IntoResponse {
     let parsed = match parse_blocks_v3_query(payload) {
         Ok(parsed) => parsed,
@@ -169,7 +171,7 @@ pub async fn get_blocks_v3(
 
 pub async fn get_transactions_by_message_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetTransactionsByMessageV3Query>,
+    Query(payload): Query<TransactionsByMessageQuery>,
 ) -> impl IntoResponse {
     let parsed = match parse_transactions_by_message_v3_query(payload) {
         Ok(parsed) => parsed,
@@ -185,7 +187,7 @@ pub async fn get_transactions_by_message_v3(
 
 pub async fn get_pending_transactions_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetPendingTransactionsV3Query>,
+    Query(payload): Query<PendingTransactionsQueryAdapter>,
 ) -> impl IntoResponse {
     let parsed = match parse_pending_transactions_v3_query(payload) {
         Ok(parsed) => parsed,
@@ -199,8 +201,8 @@ pub async fn get_pending_transactions_v3(
     .await
 }
 
-pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> impl IntoResponse {
-    let payload: EmulateTraceRequest = match serde_json::from_slice(&body) {
+pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
+    let payload: emulate::EmulateRequest = match serde_json::from_slice(&body) {
         Ok(payload) => payload,
         Err(e) => return emulate_bad_request(format!("invalid request: {e}")),
     };
@@ -236,14 +238,17 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
                 Err(e) => return emulate_internal_error(e.to_string()),
             };
 
-            let response = v3::map_emulate_trace_response(
+            let response = match v3::map_emulate_trace_response(
                 &trace,
                 with_actions,
                 include_code_data,
                 address_book,
                 metadata,
-            );
-            (StatusCode::OK, Json(response))
+            ) {
+                Ok(response) => response,
+                Err(e) => return emulate_internal_error(e.to_string()),
+            };
+            (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => emulate_internal_error(e.to_string()),
     }
@@ -251,7 +256,7 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
 
 pub async fn get_jetton_masters(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetJettonMastersRequest>,
+    Query(payload): Query<JettonMastersQueryAdapter>,
 ) -> impl IntoResponse {
     handle_v3_result(
         node.get_jetton_masters(
@@ -267,7 +272,7 @@ pub async fn get_jetton_masters(
 
 pub async fn get_jetton_wallets(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetJettonWalletsRequest>,
+    Query(payload): Query<JettonWalletsQueryAdapter>,
 ) -> impl IntoResponse {
     let wallets = match node
         .get_jetton_wallets(
@@ -310,7 +315,7 @@ pub async fn get_jetton_wallets(
 
 pub async fn get_nft_items(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<GetNftItemsRequest>,
+    Query(payload): Query<NftItemsQueryAdapter>,
 ) -> impl IntoResponse {
     handle_v3_result(
         node.get_nft_items(
@@ -329,7 +334,7 @@ pub async fn get_nft_items(
 
 pub async fn send_message_v3(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<SendBocRequest>,
+    Json(payload): Json<SendMessageRequest>,
 ) -> impl IntoResponse {
     handle_v3_result(node.send_boc(payload.boc), toncenter_v3::map_send_message).await
 }
@@ -338,18 +343,13 @@ pub async fn run_get_method_v3(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RunGetMethodRequest>,
 ) -> impl IntoResponse {
-    let method_str = match parse_method_name(&payload.method) {
-        Ok(s) => s,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-
     let stack = match normalize_v3_stack(payload.stack) {
         Ok(stack) => stack,
         Err(e) => return v3_bad_request(e.to_string()),
     };
 
     handle_v3_result(
-        node.run_get_method(payload.address, method_str, stack, payload.seqno),
+        node.run_get_method(payload.address, payload.method, stack, None),
         toncenter_v3::map_run_get_method_v3,
     )
     .await
@@ -474,7 +474,7 @@ struct ParsedAccountStatesV3Query {
 }
 
 fn parse_transactions_v3_query(
-    payload: GetTransactionsV3Query,
+    payload: TransactionsQueryAdapter,
 ) -> anyhow::Result<ParsedTransactionsV3Query> {
     if payload.shard.is_some() && payload.workchain.is_none() {
         anyhow::bail!("`shard` requires `workchain`");
@@ -509,7 +509,7 @@ fn parse_transactions_v3_query(
     })
 }
 
-fn parse_blocks_v3_query(payload: GetBlocksV3Query) -> anyhow::Result<ParsedBlocksV3Query> {
+fn parse_blocks_v3_query(payload: BlocksQuery) -> anyhow::Result<ParsedBlocksV3Query> {
     if payload.shard.is_some() && payload.workchain.is_none() {
         anyhow::bail!("`shard` requires `workchain`");
     }
@@ -550,7 +550,7 @@ fn parse_blocks_v3_query(payload: GetBlocksV3Query) -> anyhow::Result<ParsedBloc
 }
 
 fn parse_transactions_by_message_v3_query(
-    payload: GetTransactionsByMessageV3Query,
+    payload: TransactionsByMessageQuery,
 ) -> anyhow::Result<ParsedTransactionsByMessageV3Query> {
     let (limit, offset) = parse_limit_offset(payload.limit, payload.offset)?;
     let direction = match payload.direction.as_deref() {
@@ -579,7 +579,7 @@ fn parse_transactions_by_message_v3_query(
 }
 
 fn parse_pending_transactions_v3_query(
-    payload: GetPendingTransactionsV3Query,
+    payload: PendingTransactionsQueryAdapter,
 ) -> anyhow::Result<ParsedPendingTransactionsV3Query> {
     Ok(ParsedPendingTransactionsV3Query {
         account: parse_optional_address(payload.account)?,
@@ -588,11 +588,9 @@ fn parse_pending_transactions_v3_query(
 }
 
 fn parse_account_states_v3_query(
-    payload: GetAccountStatesV3Request,
+    payload: AccountStatesQuery,
 ) -> anyhow::Result<ParsedAccountStatesV3Query> {
-    let addresses = payload
-        .address
-        .ok_or_else(|| anyhow::anyhow!("`address` is required"))?;
+    let addresses = payload.address;
     if addresses.is_empty() {
         anyhow::bail!("`address` must not be empty");
     }
@@ -609,9 +607,7 @@ fn parse_account_states_v3_query(
     })
 }
 
-fn parse_account_states_request(
-    raw_query: Option<&str>,
-) -> anyhow::Result<GetAccountStatesV3Request> {
+fn parse_account_states_request(raw_query: Option<&str>) -> anyhow::Result<AccountStatesQuery> {
     let mut address = Vec::new();
     let mut include_boc = None;
 
@@ -631,8 +627,8 @@ fn parse_account_states_request(
         }
     }
 
-    Ok(GetAccountStatesV3Request {
-        address: (!address.is_empty()).then_some(address),
+    Ok(AccountStatesQuery {
+        address,
         include_boc,
     })
 }
@@ -1221,19 +1217,22 @@ fn parse_shard_query(shard: &str) -> anyhow::Result<i64> {
     anyhow::bail!("Invalid shard format: {shard}")
 }
 
-fn emulate_bad_request(error: impl Into<String>) -> (StatusCode, Json<Value>) {
+fn emulate_bad_request(error: impl Into<String>) -> Response {
     emulate_error_response(StatusCode::BAD_REQUEST, error)
 }
 
-fn emulate_internal_error(error: impl Into<String>) -> (StatusCode, Json<Value>) {
+fn emulate_internal_error(error: impl Into<String>) -> Response {
     emulate_error_response(StatusCode::INTERNAL_SERVER_ERROR, error)
 }
 
-fn emulate_error_response(
-    status: StatusCode,
-    error: impl Into<String>,
-) -> (StatusCode, Json<Value>) {
-    (status, Json(json!({ "error": error.into() })))
+fn emulate_error_response(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(emulate::ErrorResponse {
+            error: error.into(),
+        }),
+    )
+        .into_response()
 }
 
 async fn handle_v3_result<T, F>(

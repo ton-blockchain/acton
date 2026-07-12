@@ -456,7 +456,7 @@ fn summarize_streaming_event(event: &Value) -> Value {
                 "type": event["type"],
                 "finality": event["finality"],
                 "account": event["account"],
-                "state_status": event["state"]["status"],
+                "state_status": event["state"]["account_status"],
                 "balance_nonzero": event["state"]["balance"].as_str().is_some_and(|balance| balance != "0"),
             })
         }

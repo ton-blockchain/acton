@@ -3,11 +3,7 @@ use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
-use crate::server::models::{
-    AddressRequest, DetectHashRequest, GetAddressInformationRequest, GetBlockRequest,
-    GetConfigAllRequest, GetConfigParamRequest, GetLibrariesRequest, GetTransactionsRequest,
-    JsonRpcRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest, TryLocateTxRequest,
-};
+use crate::server::toncenter_adapters::BlockQueryAdapter;
 use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
 use axum::extract::OriginalUri;
@@ -16,13 +12,18 @@ use axum::{Json, extract::State, http::StatusCode};
 use base64::Engine;
 use serde_json::Value;
 use std::sync::Arc;
+use ton_api::toncenter::v2::requests::{
+    AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
+    DetectHashRequest, JsonRpcRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
+    SendBocRequest, TransactionsRequest, TryLocateTxRequest,
+};
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
 pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
     State(api_calls): State<ApiCallLog>,
     OriginalUri(original_uri): OriginalUri,
-    Json(payload): Json<JsonRpcRequest>,
+    Json(payload): Json<JsonRpcRequest<Value>>,
 ) -> impl IntoResponse {
     tracing::debug!(
         "JSON-RPC request: method={}, id={:?}",
@@ -33,13 +34,8 @@ pub async fn json_rpc(
     let start = ApiCallLog::start();
     let method = payload.method.clone();
     let call_type = classify_json_rpc_call(&method);
-    let request_id = payload.id.clone();
-    let id_str = match &payload.id {
-        Value::String(s) => s.clone(),
-        Value::Number(n) => n.to_string(),
-        Value::Null => "null".to_string(),
-        v => v.to_string(),
-    };
+    let request_id = Value::String(payload.id.clone());
+    let id_str = payload.id.clone();
 
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
 
@@ -83,15 +79,13 @@ fn classify_json_rpc_call(method: &str) -> ApiCallType {
     }
 }
 
-async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow::Result<Response> {
+async fn json_rpc_router(
+    node: Arc<Localnet>,
+    payload: JsonRpcRequest<Value>,
+) -> anyhow::Result<Response> {
     let params = payload.params;
     let method = payload.method.as_str();
-    let id_str = match &payload.id {
-        Value::String(s) => s.clone(),
-        Value::Number(n) => n.to_string(),
-        Value::Null => "null".to_string(),
-        v => v.to_string(),
-    };
+    let id_str = payload.id;
 
     let res: Value = match method {
         "sendBoc" => {
@@ -140,44 +134,44 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
             v2::map_unpack_address(&addr)
         }
         "getAddressInformation" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             node.get_address_information(req.address, req.seqno)
                 .await
                 .map(|r| v2::map_account_state(&r))?
         }
         "getShardAccountCell" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             node.get_shard_account_cell(req.address, req.seqno)
                 .await
                 .map(|r| v2::map_shard_account_cell(&r))?
         }
         "getAddressBalance" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             node.get_address_balance(req.address, req.seqno)
                 .await
                 .map(|r| r.to_string().into())?
         }
         "getAddressState" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             node.get_address_state(req.address, req.seqno)
                 .await
                 .map(|r| r.to_string().into())?
         }
         "getLibraries" => {
-            let req: GetLibrariesRequest = parse_params(params, method)?;
-            let hashes = parse_libraries_query(&req.libraries)?;
+            let req: LibrariesRequest = parse_params(params, method)?;
+            let hashes = parse_libraries(&req.libraries)?;
             node.get_libraries(hashes)
                 .await
                 .map(|r| v2::map_libraries(&r))?
         }
         "getExtendedAddressInformation" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             node.get_address_information(req.address, req.seqno)
                 .await
                 .map(|r| v2::map_extended_account_state(&r))?
         }
         "getWalletInformation" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             let info = node
                 .get_address_information(req.address.clone(), req.seqno)
                 .await?;
@@ -192,7 +186,7 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
             v2::map_wallet_information(&info, seqno)
         }
         "getTokenData" => {
-            let req: GetAddressInformationRequest = parse_params(params, method)?;
+            let req: AddressInformationRequest = parse_params(params, method)?;
             let address = Localnet::parse_addr(&req.address)?;
             let mut infos = node.get_address_infos(vec![address]).await?;
             let info = infos
@@ -209,13 +203,13 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
             })?
         }
         "getTransactions" => {
-            let req: GetTransactionsRequest = parse_params(params, method)?;
+            let req: TransactionsRequest = parse_params(params, method)?;
             node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
                 .await
                 .map(|r| v2::map_transactions(&r))?
         }
         "getTransactionsStd" => {
-            let req: GetTransactionsRequest = parse_params(params, method)?;
+            let req: TransactionsRequest = parse_params(params, method)?;
             let page_limit = req.limit;
             let fetch_limit = page_limit.saturating_add(1);
             node.get_transactions(req.address, fetch_limit, req.lt, req.hash, req.to_lt)
@@ -223,7 +217,7 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
                 .map(|r| v2::map_transactions_std(&r, page_limit))?
         }
         "getConfigParam" => {
-            let req: GetConfigParamRequest = parse_params(params, method)?;
+            let req: ConfigParamRequest = parse_params(params, method)?;
             let param = parse_config_param(&req)?;
             let seqno = parse_seqno(req.seqno)?;
             node.get_config_param(param, seqno)
@@ -231,7 +225,7 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
                 .map(|r| v2::map_config_info(&r))?
         }
         "getConfigAll" => {
-            let req: GetConfigAllRequest = parse_params(params, method)?;
+            let req: ConfigAllRequest = parse_params(params, method)?;
             let seqno = parse_seqno(req.seqno)?;
             node.get_config_all(seqno)
                 .await
@@ -256,19 +250,19 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
                 .map(|r| v2::map_transaction(&r))?
         }
         "getBlockHeader" => {
-            let req: GetBlockRequest = parse_params(params, method)?;
+            let req: BlockQueryAdapter = parse_params(params, method)?;
             node.get_block_header(req.seqno as u32)
                 .await
                 .map(|r| v2::map_block_header(&r))?
         }
         "getBlockTransactions" => {
-            let req: GetBlockRequest = parse_params(params, method)?;
+            let req: BlockQueryAdapter = parse_params(params, method)?;
             node.get_block_transactions(req.seqno as u32)
                 .await
                 .map(|r| v2::map_block_transactions(&r))?
         }
         "getBlockTransactionsExt" => {
-            let req: GetBlockRequest = parse_params(params, method)?;
+            let req: BlockQueryAdapter = parse_params(params, method)?;
             node.get_block_transactions(req.seqno as u32)
                 .await
                 .map(|r| v2::map_block_transactions_ext(&r))?
@@ -286,7 +280,7 @@ async fn json_rpc_router(node: Arc<Localnet>, payload: JsonRpcRequest) -> anyhow
             .await
             .map(|r| v2::map_out_msg_queue_sizes(&r))?,
         "shards" => {
-            let req: GetBlockRequest = parse_params(params, method)?;
+            let req: BlockQueryAdapter = parse_params(params, method)?;
             node.get_shards(req.seqno as u32)
                 .await
                 .map(|r| v2::map_shards(&r))?
@@ -376,7 +370,7 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
     anyhow::bail!("Invalid hash format")
 }
 
-fn parse_config_param(payload: &GetConfigParamRequest) -> anyhow::Result<u32> {
+fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
     let raw = payload
         .param
         .or(payload.config_id)
@@ -387,11 +381,10 @@ fn parse_config_param(payload: &GetConfigParamRequest) -> anyhow::Result<u32> {
     Ok(raw as u32)
 }
 
-fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
+fn parse_libraries(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
     let hashes = raw
-        .split(',')
-        .map(str::trim)
-        .filter(|part| !part.is_empty())
+        .iter()
+        .map(String::as_str)
         .map(parse_hash_any)
         .collect::<anyhow::Result<Vec<_>>>()?;
 
@@ -415,8 +408,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_libraries_query_rejects_empty_input() {
-        let err = parse_libraries_query(" , ").expect_err("empty list must be rejected");
+    fn parse_libraries_rejects_empty_input() {
+        let err = parse_libraries(&[]).expect_err("empty list must be rejected");
         assert!(
             err.to_string()
                 .contains("`libraries` query parameter is required"),
@@ -425,8 +418,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_libraries_query_rejects_invalid_hash() {
-        let err = parse_libraries_query("bad-hash").expect_err("invalid hash must be rejected");
+    fn parse_libraries_rejects_invalid_hash() {
+        let err =
+            parse_libraries(&["bad-hash".to_owned()]).expect_err("invalid hash must be rejected");
         assert!(
             err.to_string().contains("Invalid hash format"),
             "unexpected error: {err}"
@@ -434,12 +428,11 @@ mod tests {
     }
 
     #[test]
-    fn parse_libraries_query_accepts_multiple_hashes_and_skips_blanks() {
+    fn parse_libraries_accepts_multiple_hashes() {
         let hash_a = "aa".repeat(32);
         let hash_b = "bb".repeat(32);
 
-        let parsed = parse_libraries_query(&format!("{hash_a},,{hash_b}, "))
-            .expect("valid list with blanks must parse");
+        let parsed = parse_libraries(&[hash_a, hash_b]).expect("valid list must parse");
         assert_eq!(parsed, vec![Hash256([0xAA; 32]), Hash256([0xBB; 32])]);
     }
 }

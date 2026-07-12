@@ -1,6 +1,7 @@
 pub mod handlers;
 pub mod models;
 pub mod router;
+mod toncenter_adapters;
 
 use crate::liteapi;
 use crate::localnet::Localnet;
