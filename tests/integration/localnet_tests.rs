@@ -4540,6 +4540,17 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
     let block_transactions = block_payload["transactions"]
         .as_array()
         .expect("getBlockTransactionsExt must return transactions array");
+    let short_block = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v2/getBlockTransactions?workchain=0&shard=-9223372036854775808&seqno={first_seqno}"
+        ),
+        Duration::from_secs(5),
+    );
+    let short_block_payload = response_payload(&short_block);
+    let short_block_transactions = short_block_payload["transactions"]
+        .as_array()
+        .expect("getBlockTransactions must return short transaction ids");
     let first_page = wait_for_ok_response(
         &node,
         &format!(
@@ -4589,6 +4600,20 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
             "req_count": block_payload["req_count"].as_u64(),
             "transaction_count": block_transactions.len(),
             "has_at_least_two_transactions": block_transactions.len() >= 2,
+            "short_transactions": {
+                "type": short_block_payload["@type"].as_str(),
+                "count": short_block_transactions.len(),
+                "all_modes_are_seven": short_block_transactions
+                    .iter()
+                    .all(|transaction| transaction["mode"] == 7),
+                "match_extended": short_block_transactions.iter().zip(block_transactions).all(
+                    |(short, full)| {
+                        short["account"] == full["account"]
+                            && short["lt"] == full["transaction_id"]["lt"]
+                            && short["hash"] == full["transaction_id"]["hash"]
+                    },
+                ),
+            },
             "pagination": {
                 "first_req_count": first_page_payload["req_count"].as_u64(),
                 "first_incomplete": first_page_payload["incomplete"].as_bool(),

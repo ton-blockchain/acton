@@ -2,12 +2,13 @@ use crate::api::toncenter_v3;
 use crate::localnet::{
     Localnet, LocalnetJettonWalletsQuery, LocalnetTransaction, convert_to_tx_struct,
 };
+use crate::storage;
 use crate::storage::TraceNode;
 use crate::types::{Addr, Hash256};
 use anyhow::Context;
 use std::collections::{BTreeSet, HashMap};
 use ton_api::toncenter::streaming::v2 as streaming;
-use ton_api::toncenter::v3 as v3_types;
+use ton_api::toncenter::v3;
 use ton_indexer::categorize_wallet;
 use tycho_types::prelude::HashBytes;
 
@@ -49,7 +50,7 @@ impl StreamingSubscription {
 
         let addresses = normalize_addresses(&req.addresses)?;
         let trace_external_hash_norms =
-            normalize_trace_external_hash_norms(&req.trace_external_hash_norms)?;
+            validate_trace_external_hash_norms(&req.trace_external_hash_norms)?;
         validate_subscription_shape(&req.types, &addresses, &trace_external_hash_norms)?;
 
         let supported_action_types = if req.supported_action_types.is_empty() {
@@ -72,7 +73,7 @@ impl StreamingSubscription {
 
     pub fn unsubscribe(&mut self, req: &streaming::UnsubscribeRequest) -> anyhow::Result<()> {
         let addresses = normalize_addresses(&req.addresses)?;
-        let traces = normalize_trace_external_hash_norms(&req.trace_external_hash_norms)?;
+        let traces = validate_trace_external_hash_norms(&req.trace_external_hash_norms)?;
 
         for address in addresses {
             self.addresses.remove(&address);
@@ -123,7 +124,7 @@ pub async fn notifications_for_commit(
     commit: StreamingCommitEvent,
 ) -> anyhow::Result<Vec<streaming::Notification>> {
     let trace = node.get_traces(commit.tx_hash).await?;
-    let trace_external_hash_norm = trace_external_hash_norm(&trace);
+    let trace_external_hash_norm = trace.effective_external_hash_norm().to_base64();
     let transactions = collect_trace_transactions(&trace)?;
     let event_addresses = collect_transaction_addresses(&transactions);
     let current_account = transactions
@@ -238,13 +239,13 @@ fn normalize_addresses(addresses: &[String]) -> anyhow::Result<BTreeSet<Addr>> {
     addresses
         .iter()
         .map(|address| {
-            Localnet::parse_addr(address)
+            Addr::parse(address)
                 .with_context(|| format!("invalid address in subscription: {address}"))
         })
         .collect()
 }
 
-fn normalize_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTreeSet<String>> {
+fn validate_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTreeSet<String>> {
     let mut normalized = BTreeSet::new();
     for trace in traces {
         let trace = trace.trim();
@@ -254,13 +255,6 @@ fn normalize_trace_external_hash_norms(traces: &[String]) -> anyhow::Result<BTre
         normalized.insert(trace.to_string());
     }
     Ok(normalized)
-}
-
-fn trace_external_hash_norm(trace: &TraceNode) -> String {
-    trace
-        .external_hash
-        .unwrap_or(trace.transaction.meta.tx_hash)
-        .to_base64()
 }
 
 fn collect_trace_transactions(trace: &TraceNode) -> anyhow::Result<Vec<LocalnetTransaction>> {
@@ -395,6 +389,7 @@ async fn trace_notification(
         &collect_transaction_addresses(&transactions),
     )
     .await?;
+
     Ok(Some(streaming::Notification::Trace {
         finality,
         trace_external_hash_norm: trace_external_hash_norm.to_owned(),
@@ -425,6 +420,7 @@ async fn account_state_notification(
         .get_address_information(account.to_string(), None)
         .await?;
     let state = map_account_state(&state);
+
     Ok(Some(streaming::Notification::AccountStateChange {
         finality,
         account: account.to_string(),
@@ -471,6 +467,7 @@ async fn jettons_notification(
         &BTreeSet::from([wallet.address, wallet.owner_address, wallet.jetton_address]),
     )
     .await?;
+
     Ok(Some(streaming::Notification::JettonsChange {
         finality,
         jetton: toncenter_v3::map_jetton_wallet(&wallet),
@@ -479,16 +476,16 @@ async fn jettons_notification(
     }))
 }
 
-fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> v3_types::AccountState {
-    v3_types::AccountState {
+fn map_account_state(state: &crate::localnet::LocalnetAccountState) -> v3::AccountState {
+    v3::AccountState {
         hash: state.account_state_hash.to_base64(),
         balance: Some(state.balance.to_string()),
         account_status: Some(
             match state.state {
-                crate::storage::AccountStatus::Active => "active",
-                crate::storage::AccountStatus::Uninit => "uninit",
-                crate::storage::AccountStatus::Frozen => "frozen",
-                crate::storage::AccountStatus::Nonexist => "nonexist",
+                storage::AccountStatus::Active => "active",
+                storage::AccountStatus::Uninit => "uninit",
+                storage::AccountStatus::Frozen => "frozen",
+                storage::AccountStatus::Nonexist => "nonexist",
             }
             .to_owned(),
         ),
@@ -505,12 +502,12 @@ async fn build_extra_data(
     node: &Localnet,
     subscription: &StreamingSubscription,
     addresses: &BTreeSet<Addr>,
-) -> anyhow::Result<(Option<v3_types::AddressBook>, Option<v3_types::Metadata>)> {
+) -> anyhow::Result<(Option<v3::AddressBook>, Option<v3::Metadata>)> {
     if !subscription.include_address_book && !subscription.include_metadata {
         return Ok((None, None));
     }
-    let mut address_book = v3_types::AddressBook::new();
-    let mut metadata = v3_types::Metadata::new();
+    let mut address_book = v3::AddressBook::new();
+    let mut metadata = v3::Metadata::new();
     let mut extra_jetton_masters = BTreeSet::new();
 
     for address in addresses {
@@ -520,7 +517,7 @@ async fn build_extra_data(
         if subscription.include_address_book {
             address_book.insert(
                 address.to_string(),
-                v3_types::AddressBookRow {
+                v3::AddressBookRow {
                     user_friendly: Some(address.as_user_friendly()),
                     domain: None,
                     interfaces: Some(info.interfaces.into_iter().collect()),
@@ -531,7 +528,7 @@ async fn build_extra_data(
         if subscription.include_metadata && !info.token_info.is_empty() {
             metadata.insert(
                 address.to_string(),
-                v3_types::AddressMetadata {
+                v3::AddressMetadata {
                     is_indexed: true,
                     token_info: info.token_info,
                 },
@@ -549,7 +546,7 @@ async fn build_extra_data(
             if !info.token_info.is_empty() {
                 metadata.insert(
                     key,
-                    v3_types::AddressMetadata {
+                    v3::AddressMetadata {
                         is_indexed: true,
                         token_info: info.token_info,
                     },
@@ -567,7 +564,7 @@ async fn build_extra_data(
 #[derive(Default)]
 struct AddressInfo {
     interfaces: BTreeSet<String>,
-    token_info: Vec<v3_types::TokenInfo>,
+    token_info: Vec<v3::TokenInfo>,
     extra_jetton_masters: BTreeSet<Addr>,
 }
 

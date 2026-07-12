@@ -9,6 +9,12 @@
       "second_count": 1
     },
     "req_count": 40,
+    "short_transactions": {
+      "all_modes_are_seven": true,
+      "count": 2,
+      "match_extended": true,
+      "type": "blocks.transactions"
+    },
     "transaction_count": 2
   },
   "faucet": {

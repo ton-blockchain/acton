@@ -354,6 +354,8 @@ pub struct TxMeta {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct MsgMeta {
     pub msg_hash: Hash256,
+    #[serde(default)]
+    pub hash_norm: Option<Hash256>,
     pub msg_boc_hash: Hash256,
     pub src: Option<Addr>,
     pub dst: Option<Addr>,
@@ -384,6 +386,7 @@ pub struct TraceNode {
     pub transaction: TransactionInfo,
     pub children: Vec<TraceNode>,
     pub external_hash: Option<Hash256>,
+    pub external_hash_norm: Option<Hash256>,
 }
 
 #[derive(Clone, Debug)]
@@ -420,6 +423,13 @@ fn cell_hash(cell: &Cell) -> Hash256 {
 }
 
 impl TraceNode {
+    #[must_use]
+    pub fn effective_external_hash_norm(&self) -> Hash256 {
+        self.external_hash_norm
+            .or(self.external_hash)
+            .unwrap_or(self.transaction.meta.tx_hash)
+    }
+
     #[must_use]
     pub fn max_lt(&self) -> u64 {
         let mut max = self.transaction.meta.lt;

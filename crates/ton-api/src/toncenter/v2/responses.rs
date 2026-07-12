@@ -8,8 +8,8 @@ use tvm_ffi::json_stack::{json_to_legacy_stack, json_to_stack};
 pub struct TonlibResponse<T> {
     pub ok: bool,
     pub result: T,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "@extra")]
-    pub extra: Option<String>,
+    #[serde(rename = "@extra")]
+    pub extra: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -266,7 +266,6 @@ pub enum Message {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessageFull {
     pub hash: String,
-    pub opcode: Option<String>,
     pub source: String,
     pub destination: String,
     pub value: String,
@@ -427,8 +426,7 @@ pub struct AddressInformation {
     pub last_transaction_id: InternalTransactionId,
     pub block_id: TonBlockIdExt,
     pub sync_utime: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub suspended: Option<bool>,
+    pub suspended: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -495,8 +493,8 @@ pub struct TonlibErrorResponse {
     pub ok: bool,
     pub error: String,
     pub code: i32,
-    #[serde(default, rename = "@extra", skip_serializing_if = "Option::is_none")]
-    pub extra: Option<String>,
+    #[serde(rename = "@extra")]
+    pub extra: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub jsonrpc: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -1793,12 +1793,12 @@ impl Node {
         }
 
         // 2. Build trace tree starting from root_hash (traverse DOWN)
-        let external_hash = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
+        let external_hashes = self.history.tx_by_hash.get(&root_hash).and_then(|tx| {
             tx.in_msg_hash.and_then(|h| {
                 self.history
                     .msg_by_hash
                     .get(&h)
-                    .and_then(|msg| if msg.src.is_none() { Some(h) } else { None })
+                    .and_then(|msg| (msg.src.is_none()).then_some((h, msg.hash_norm)))
             })
         });
 
@@ -1807,7 +1807,10 @@ impl Node {
         let mut trace = self
             .build_trace_node(&root_hash, &mut visited_down, &mut account_state_cache)
             .ok_or_else(|| anyhow::anyhow!("Root transaction not found"))?;
-        trace.external_hash = external_hash;
+        if let Some((external_hash, external_hash_norm)) = external_hashes {
+            trace.external_hash = Some(external_hash);
+            trace.external_hash_norm = external_hash_norm;
+        }
         Ok(trace)
     }
 
@@ -1865,6 +1868,7 @@ impl Node {
             transaction: tx_info,
             children,
             external_hash: None,
+            external_hash_norm: None,
         })
     }
 
@@ -2254,6 +2258,7 @@ impl Node {
     ) -> anyhow::Result<storage::EmulateTraceResult> {
         let msg_hash = boc.hash()?;
         let msg_meta = parse_msg_meta(&boc, msg_hash)?;
+        let external_hash_norm = msg_meta.hash_norm;
         let dst = msg_meta
             .dst
             .ok_or_else(|| anyhow::anyhow!("Msg has no dst"))?;
@@ -2345,6 +2350,7 @@ impl Node {
                 },
                 children: Vec::new(),
                 external_hash: Some(msg_hash),
+                external_hash_norm,
             },
             code_cells,
             data_cells,
@@ -2714,6 +2720,9 @@ fn parse_msg_meta_with_kind_from_cell(
 ) -> anyhow::Result<(MsgMeta, MessageKind)> {
     let msg = cell.parse::<Message<'_>>()?;
 
+    let hash_norm = matches!(&msg.info, MsgInfo::ExtIn(_))
+        .then(|| compute_normalized_ext_in_hash(&msg))
+        .transpose()?;
     let (kind, src, dst, value, bounce, created_lt, created_at) = match msg.info {
         MsgInfo::Int(info) => (
             MessageKind::Internal,
@@ -2747,6 +2756,7 @@ fn parse_msg_meta_with_kind_from_cell(
     Ok((
         MsgMeta {
             msg_hash: hash,
+            hash_norm,
             msg_boc_hash: hash,
             src,
             dst,
@@ -3098,6 +3108,7 @@ mod tests {
         let account = test_addr(0x42);
         let tx_hash = Hash256([0x10; 32]);
         let in_msg_hash = Hash256([0x11; 32]);
+        let in_msg_hash_norm = Hash256([0x21; 32]);
         let out_msg_hash = Hash256([0x12; 32]);
         let block_hash = Hash256([0x13; 32]);
         let dummy_boc = BocBytes::from(Boc::encode(Cell::default()));
@@ -3107,6 +3118,7 @@ mod tests {
             in_msg_hash,
             MsgMeta {
                 msg_hash: in_msg_hash,
+                hash_norm: Some(in_msg_hash_norm),
                 msg_boc_hash: in_msg_hash,
                 src: None,
                 dst: Some(account),
@@ -3120,6 +3132,7 @@ mod tests {
             out_msg_hash,
             MsgMeta {
                 msg_hash: out_msg_hash,
+                hash_norm: None,
                 msg_boc_hash: out_msg_hash,
                 src: Some(account),
                 dst: Some(test_addr(0x43)),
@@ -3186,7 +3199,12 @@ mod tests {
         assert_eq!(txs[0].tx_hash, tx_meta.tx_hash);
         assert_eq!(txs[0].in_msg_hash, tx_meta.in_msg_hash);
         assert_eq!(txs[0].out_msg_hashes, tx_meta.out_msg_hashes);
-        assert!(reopened.get_message_info(&in_msg_hash).is_some());
+        assert_eq!(
+            reopened
+                .get_message_info(&in_msg_hash)
+                .map(|message| message.meta.hash_norm),
+            Some(Some(in_msg_hash_norm))
+        );
         assert!(reopened.get_message_info(&out_msg_hash).is_some());
         assert_eq!(reopened.history.msg_to_tx.get(&in_msg_hash), Some(&tx_hash));
         assert_eq!(
@@ -3798,6 +3816,7 @@ mod tests {
         let parent_account = test_addr(0x61);
         let child_account = test_addr(0x62);
         let external_msg_hash = Hash256([0x63; 32]);
+        let external_msg_hash_norm = Hash256([0x68; 32]);
         let internal_msg_hash = Hash256([0x64; 32]);
         let parent_tx_hash = Hash256([0x65; 32]);
         let child_tx_hash = Hash256([0x66; 32]);
@@ -3816,6 +3835,7 @@ mod tests {
             external_msg_hash,
             MsgMeta {
                 msg_hash: external_msg_hash,
+                hash_norm: Some(external_msg_hash_norm),
                 msg_boc_hash: external_msg_hash,
                 src: None,
                 dst: Some(parent_account),
@@ -3829,6 +3849,7 @@ mod tests {
             internal_msg_hash,
             MsgMeta {
                 msg_hash: internal_msg_hash,
+                hash_norm: None,
                 msg_boc_hash: internal_msg_hash,
                 src: Some(parent_account),
                 dst: Some(child_account),
@@ -3901,6 +3922,8 @@ mod tests {
             .expect("child transaction trace must resolve to root");
         assert_eq!(trace.transaction.meta.tx_hash, parent_tx_hash);
         assert_eq!(trace.external_hash, Some(external_msg_hash));
+        assert_eq!(trace.external_hash_norm, Some(external_msg_hash_norm));
+        assert_eq!(trace.effective_external_hash_norm(), external_msg_hash_norm);
         assert_eq!(trace.children.len(), 1);
         assert_eq!(trace.children[0].transaction.meta.tx_hash, child_tx_hash);
     }

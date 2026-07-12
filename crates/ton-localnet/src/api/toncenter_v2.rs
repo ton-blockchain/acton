@@ -2,8 +2,6 @@
 //!
 //! Known `OpenAPI` deviations:
 //! - `map_run_get_method` adds local `vm_log` to `RunGetMethodResult`;
-//! - `map_block_transactions` returns the generic `ok` object instead of
-//!   `BlockTransactions` because the localnet method does not currently expose short tx ids;
 //! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
 //!   operations.
 
@@ -100,7 +98,6 @@ pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::M
     }
     Some(response::Message::Full(Box::new(response::MessageFull {
         hash: msg.hash.to_base64(),
-        opcode: msg.opcode.map(|op| format!("0x{op:08x}")),
         source: msg
             .source
             .as_ref()
@@ -162,7 +159,7 @@ pub fn map_account_state(s: &LocalnetAccountState) -> response::AddressInformati
             AccountStatus::Frozen => "frozen",
         }
         .to_owned(),
-        suspended: None,
+        suspended: false,
     }
 }
 

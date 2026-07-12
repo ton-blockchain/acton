@@ -3,7 +3,7 @@ use crate::api::toncenter_v2 as v2;
 use crate::localnet::{
     Localnet, LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockTransactions,
 };
-use crate::types::Hash256;
+use crate::types::{Addr, Hash256};
 use axum::{
     Json,
     extract::{Query, RawQuery, State},
@@ -144,7 +144,7 @@ pub async fn get_token_data(
 ) -> Response {
     handle_result(
         async move {
-            let address = Localnet::parse_addr(&payload.address)?;
+            let address = Addr::parse(&payload.address)?;
             let mut infos = node.get_address_infos(vec![address]).await?;
             let info = infos
                 .pop()
@@ -434,7 +434,7 @@ fn v2_bad_request(error: impl std::fmt::Display) -> Response {
         ok: false,
         error: error.to_string(),
         code: 400,
-        extra: Some(get_extra()),
+        extra: get_extra(),
         jsonrpc: None,
         id: None,
     })

@@ -7,7 +7,7 @@ use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
 use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
-use crate::types::Hash256;
+use crate::types::{Addr, Hash256};
 use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
@@ -217,7 +217,7 @@ async fn json_rpc_router(
         }
         "getTokenData" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let address = Localnet::parse_addr(&req.address)?;
+            let address = Addr::parse(&req.address)?;
             let mut infos = node.get_address_infos(vec![address]).await?;
             let info = infos
                 .pop()
@@ -380,7 +380,7 @@ fn json_rpc_success<T: Serialize>(id: wire::StringOrNumber, result: T) -> Respon
             response: wire::TonlibResponse {
                 ok: true,
                 result,
-                extra: Some(get_extra()),
+                extra: get_extra(),
             },
         }),
     )
@@ -398,7 +398,7 @@ fn json_rpc_error(
             ok: false,
             error: error.into(),
             code: i32::from(status.as_u16()),
-            extra: Some(get_extra()),
+            extra: get_extra(),
             jsonrpc: Some("2.0".to_owned()),
             id: Some(id),
         }),

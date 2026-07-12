@@ -31,14 +31,14 @@ where
         Ok(res) => Json(ton_api::toncenter::v2::TonlibResponse {
             ok: true,
             result: mapper(&res),
-            extra: Some(get_extra()),
+            extra: get_extra(),
         })
         .into_response(),
         Err(e) => Json(ton_api::toncenter::v2::TonlibErrorResponse {
             ok: false,
             error: e.to_string(),
             code: 500,
-            extra: Some(get_extra()),
+            extra: get_extra(),
             jsonrpc: None,
             id: None,
         })

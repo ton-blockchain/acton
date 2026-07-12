@@ -5,7 +5,9 @@ use std::fmt::Display;
 use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
-use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr};
+use tycho_types::models::{
+    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
+};
 use tycho_types::prelude::HashBytes;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, Default)]
@@ -167,6 +169,16 @@ pub struct Addr {
 }
 
 impl Addr {
+    pub fn parse(s: &str) -> anyhow::Result<Self> {
+        let (address, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
+            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
+        })?;
+        Ok(Self {
+            workchain: i32::from(address.workchain),
+            addr: address.address.0,
+        })
+    }
+
     #[must_use]
     pub fn as_user_friendly(self) -> String {
         DisplayBase64StdAddr {
@@ -200,19 +212,7 @@ impl FromStr for Addr {
     type Err = anyhow::Error;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let Some((workchain, addr_hex)) = s.split_once(':') else {
-            anyhow::bail!("Invalid address format: expected '<workchain>:<64-hex-bytes>'");
-        };
-
-        let workchain = workchain.parse::<i32>()?;
-        let bytes = hex::decode(addr_hex)?;
-        if bytes.len() != 32 {
-            anyhow::bail!("Invalid address length");
-        }
-
-        let mut addr = [0u8; 32];
-        addr.copy_from_slice(&bytes);
-        Ok(Self { workchain, addr })
+        Self::parse(s)
     }
 }
 

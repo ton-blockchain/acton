@@ -1,13 +1,10 @@
 //! Localnet-to-`TonCenter` v3 typed response mappers.
 //!
 //! Mapping notes:
-//! - address books include every address referenced by a response, with user-friendly forms and
-//!   interfaces derivable from the local index;
 //! - jetton and NFT metadata is a local projection and omits fields unavailable in local state;
 //! - `map_run_get_method_v3` emits the observed result shape (`gas_used`, `exit_code`, `stack`,
 //!   local `vm_log`); upstream v3 `OpenAPI` 1.2.6 incorrectly declares the request type as the
 //!   successful response schema;
-//! - emulation responses belong to `TonCenter`'s separate emulate API, not `/api/v3/doc.json`.
 
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAccountState, LocalnetBlock, LocalnetMessage,
@@ -735,10 +732,7 @@ fn map_trace(
     let transaction_count = transactions.len();
     response::Trace {
         trace_id: tn.transaction.meta.tx_hash.to_base64(),
-        external_hash: Some(tn.external_hash.as_ref().map_or_else(
-            || tn.transaction.meta.tx_hash.to_base64(),
-            Hash256::to_base64,
-        )),
+        external_hash: tn.external_hash.as_ref().map(Hash256::to_base64),
         mc_seqno_start: tn.transaction.meta.block_seqno.to_string(),
         mc_seqno_end: tn.transaction.meta.block_seqno.to_string(),
         start_lt: tn.transaction.meta.lt.to_string(),

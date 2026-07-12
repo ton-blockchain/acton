@@ -24,7 +24,7 @@ use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo, StdAddr, StdAddrFormat};
+use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo};
 use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
@@ -814,7 +814,7 @@ impl Localnet {
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetAccountState> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetAddressInformation {
@@ -864,7 +864,7 @@ impl Localnet {
         address_str: String,
         seqno: Option<u32>,
     ) -> anyhow::Result<BocBytes> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetShardAccountCell {
@@ -881,7 +881,7 @@ impl Localnet {
         address_str: String,
         shard_account: String,
     ) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let shard_account =
             BocBytes::from_base64(&shard_account).context("Invalid shard_account base64")?;
         let (resp, rx) = oneshot::channel();
@@ -901,7 +901,7 @@ impl Localnet {
         change: LocalnetAccountStateChange,
         mine: bool,
     ) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::ChangeAccountState {
@@ -922,7 +922,7 @@ impl Localnet {
         hash_str: Option<String>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let hash = if let Some(h) = hash_str {
             Some(Hash256::from_base64(&h)?)
         } else {
@@ -1024,8 +1024,8 @@ impl Localnet {
         destination_str: String,
         created_lt: u64,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
+        let source = Addr::parse(&source_str)?;
+        let destination = Addr::parse(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::TryLocateTx {
@@ -1044,8 +1044,8 @@ impl Localnet {
         destination_str: String,
         created_lt: u64,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
+        let source = Addr::parse(&source_str)?;
+        let destination = Addr::parse(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::TryLocateResultTx {
@@ -1064,8 +1064,8 @@ impl Localnet {
         destination_str: String,
         created_lt: u64,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Self::parse_addr(&source_str)?;
-        let destination = Self::parse_addr(&destination_str)?;
+        let source = Addr::parse(&source_str)?;
+        let destination = Addr::parse(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::TryLocateSourceTx {
@@ -1085,7 +1085,7 @@ impl Localnet {
         stack_json: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetRunGetMethodResult> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let method_id = if let Ok(id) = method.parse::<i32>() {
             id
         } else {
@@ -1284,7 +1284,7 @@ impl Localnet {
         address_str: String,
         amount: u128,
     ) -> anyhow::Result<LocalnetAcceptedInternalMessage> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::Faucet {
@@ -1408,7 +1408,7 @@ impl Localnet {
     }
 
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
-        let address = Self::parse_addr(&address_str)?;
+        let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::SetAddressName {
@@ -1426,7 +1426,7 @@ impl Localnet {
     ) -> anyhow::Result<Vec<(String, Option<String>)>> {
         let addresses = address_strs
             .iter()
-            .map(|address| Self::parse_addr(address))
+            .map(|address| Addr::parse(address))
             .collect::<anyhow::Result<Vec<_>>>()?;
         let (resp, rx) = oneshot::channel();
         self.tx
@@ -1512,7 +1512,7 @@ impl Localnet {
         address_str: Option<String>,
         code_hash_str: Option<String>,
     ) -> anyhow::Result<Option<Value>> {
-        let address = address_str.as_deref().map(Self::parse_addr).transpose()?;
+        let address = address_str.as_deref().map(Addr::parse).transpose()?;
         let code_hash = code_hash_str
             .as_deref()
             .map(|code_hash| {
@@ -1671,20 +1671,10 @@ impl Localnet {
         rx.await?
     }
 
-    pub(crate) fn parse_addr(s: &str) -> anyhow::Result<Addr> {
-        let (int_addr, _) = StdAddr::from_str_ext(s, StdAddrFormat::any()).map_err(|_| {
-            anyhow::anyhow!("Invalid address, only standard internal address is allowed")
-        })?;
-        Ok(Addr {
-            workchain: i32::from(int_addr.workchain),
-            addr: int_addr.address.0,
-        })
-    }
-
     fn parse_addresses(values: Vec<String>) -> anyhow::Result<HashSet<Addr>> {
         values
             .into_iter()
-            .map(|value| Self::parse_addr(&value))
+            .map(|value| Addr::parse(&value))
             .collect()
     }
 }
@@ -3309,7 +3299,7 @@ mod tests {
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use tycho_types::boc::BocRepr;
     use tycho_types::cell::{CellSliceParts, HashBytes};
-    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage};
+    use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
 
     const REGULAR_OPCODE: u32 = 0x178d_4519;
     const BOUNCE_PREFIX: u32 = 0xffff_ffff;
@@ -3423,6 +3413,7 @@ mod tests {
     fn message_meta(hash: Hash256) -> MsgMeta {
         MsgMeta {
             msg_hash: hash,
+            hash_norm: None,
             msg_boc_hash: hash,
             src: Some(test_addr(0x11)),
             dst: Some(test_addr(0x22)),
