@@ -4394,6 +4394,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         .transpose()?
         .unwrap_or_default();
 
+    let tx_info = build_tx_info_from_v3(summary.description.as_ref())?;
     let tx = Transaction {
         account,
         lt,
@@ -4411,8 +4412,7 @@ pub(crate) fn synthesize_tx_cell_from_v3(
             new: state_update_new,
         })
         .context("Failed to build synthetic state_update")?,
-        info: Lazy::new(&build_tx_info_from_v3(summary.description.as_ref()))
-            .context("Failed to build synthetic tx info")?,
+        info: Lazy::new(&tx_info).context("Failed to build synthetic tx info")?,
     };
 
     let cell = to_cell(&tx);
@@ -4590,9 +4590,9 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
 /// empty; storage, compute and action phases preserve their fees / success / gas /
 /// exit-code / result-code values so `SearchParams { success, actionExitCode, ... }` and
 /// `toHave(All)SuccessfulTx` continue to evaluate correctly on traced results.
-fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
+fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> anyhow::Result<TxInfo> {
     let Some(desc) = desc else {
-        return TxInfo::Ordinary(OrdinaryTxInfo {
+        return Ok(TxInfo::Ordinary(OrdinaryTxInfo {
             credit_first: false,
             storage_phase: None,
             credit_phase: None,
@@ -4603,7 +4603,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
             aborted: true,
             bounce_phase: None,
             destroyed: false,
-        });
+        }));
     };
 
     let compute_phase = match desc.compute_ph.as_ref() {
@@ -4668,54 +4668,64 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
         status_change: parse_account_status_change(sp.status_change.as_deref()),
     });
 
-    let action_phase = desc.action.as_ref().map(|ap| ActionPhase {
-        success: ap.success.unwrap_or(false),
-        valid: ap.valid.unwrap_or(false),
-        no_funds: ap.no_funds.unwrap_or(false),
-        status_change: parse_account_status_change(ap.status_change.as_deref()),
-        total_fwd_fees: ap
-            .total_fwd_fees
-            .as_deref()
-            .and_then(|s| s.parse::<u128>().ok())
-            .map(Tokens::new),
-        total_action_fees: ap
-            .total_action_fees
-            .as_deref()
-            .and_then(|s| s.parse::<u128>().ok())
-            .map(Tokens::new),
-        result_code: ap.result_code.unwrap_or(0),
-        result_arg: ap.result_arg,
-        total_actions: ap.tot_actions.unwrap_or(0),
-        special_actions: ap.spec_actions.unwrap_or(0),
-        skipped_actions: ap.skipped_actions.unwrap_or(0),
-        messages_created: ap.msgs_created.unwrap_or(0),
-        action_list_hash: ap
-            .action_list_hash
-            .as_deref()
-            .map(parse_hash_bytes)
-            .transpose()
-            .ok()
-            .flatten()
-            .unwrap_or_default(),
-        total_message_size: ap
-            .tot_msg_size
-            .as_ref()
-            .map(|s| StorageUsedShort {
-                cells: s
-                    .cells
+    let action_phase = desc
+        .action
+        .as_ref()
+        .map(|ap| {
+            Ok::<_, anyhow::Error>(ActionPhase {
+                success: ap.success.unwrap_or(false),
+                valid: ap.valid.unwrap_or(false),
+                no_funds: ap.no_funds.unwrap_or(false),
+                status_change: parse_account_status_change(ap.status_change.as_deref()),
+                total_fwd_fees: ap
+                    .total_fwd_fees
                     .as_deref()
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                    .and_then(|s| s.parse::<u128>().ok())
+                    .map(Tokens::new),
+                total_action_fees: ap
+                    .total_action_fees
+                    .as_deref()
+                    .and_then(|s| s.parse::<u128>().ok())
+                    .map(Tokens::new),
+                result_code: ap.result_code.unwrap_or(0),
+                result_arg: ap.result_arg,
+                total_actions: u16::try_from(ap.tot_actions.unwrap_or_default())
+                    .context("TonCenter action count does not fit TVM ActionPhase")?,
+                special_actions: u16::try_from(ap.spec_actions.unwrap_or_default())
+                    .context("TonCenter special action count does not fit TVM ActionPhase")?,
+                skipped_actions: u16::try_from(ap.skipped_actions.unwrap_or_default())
+                    .context("TonCenter skipped action count does not fit TVM ActionPhase")?,
+                messages_created: u16::try_from(ap.msgs_created.unwrap_or_default())
+                    .context("TonCenter message count does not fit TVM ActionPhase")?,
+                action_list_hash: ap
+                    .action_list_hash
+                    .as_deref()
+                    .map(parse_hash_bytes)
+                    .transpose()
+                    .ok()
+                    .flatten()
                     .unwrap_or_default(),
-                bits: s
-                    .bits
-                    .as_deref()
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .map(tycho_types::num::VarUint56::new)
+                total_message_size: ap
+                    .tot_msg_size
+                    .as_ref()
+                    .map(|s| StorageUsedShort {
+                        cells: s
+                            .cells
+                            .as_deref()
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .map(tycho_types::num::VarUint56::new)
+                            .unwrap_or_default(),
+                        bits: s
+                            .bits
+                            .as_deref()
+                            .and_then(|v| v.parse::<u64>().ok())
+                            .map(tycho_types::num::VarUint56::new)
+                            .unwrap_or_default(),
+                    })
                     .unwrap_or_default(),
             })
-            .unwrap_or_default(),
-    });
+        })
+        .transpose()?;
 
     let credit_phase = desc
         .credit_ph
@@ -4732,7 +4742,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
             },
         });
 
-    TxInfo::Ordinary(OrdinaryTxInfo {
+    Ok(TxInfo::Ordinary(OrdinaryTxInfo {
         credit_first: desc.credit_first.unwrap_or(false),
         storage_phase,
         credit_phase,
@@ -4741,7 +4751,7 @@ fn build_tx_info_from_v3(desc: Option<&v3::TransactionDescr>) -> TxInfo {
         aborted: desc.aborted.unwrap_or(false),
         bounce_phase: None,
         destroyed: desc.destroyed.unwrap_or(false),
-    })
+    }))
 }
 
 fn parse_compute_phase_skip_reason(s: Option<&str>) -> ComputePhaseSkipReason {

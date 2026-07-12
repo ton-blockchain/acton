@@ -9,7 +9,7 @@
   },
   "empty_json_rpc": {
     "@extra": "[EXTRA]",
-    "id": "1",
+    "id": 1,
     "jsonrpc": "2.0",
     "ok": true,
     "result": {

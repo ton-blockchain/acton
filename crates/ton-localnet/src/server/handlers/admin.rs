@@ -1,4 +1,4 @@
-use super::utils::handle_result;
+use super::utils::{handle_result, handle_tonlib_result};
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAccountStateChange, LocalnetMiningMode};
 use crate::server::models::{
@@ -19,6 +19,7 @@ use axum::{
     body::Bytes,
     extract::Query,
     extract::{RawQuery, State},
+    response::Response,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -34,8 +35,8 @@ const VERIFIER_REQUEST_TIMEOUT: Duration = Duration::from_secs(8);
 pub async fn faucet(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<FaucetRequest>,
-) -> Json<Value> {
-    handle_result(
+) -> Response {
+    handle_tonlib_result(
         node.faucet(payload.address, payload.amount),
         v2::map_send_internal_message,
     )
@@ -267,8 +268,8 @@ pub async fn change_account_state(
 pub async fn send_internal_message(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SendBocRequest>,
-) -> Json<Value> {
-    handle_result(
+) -> Response {
+    handle_tonlib_result(
         node.send_internal_boc(payload.boc),
         v2::map_send_internal_message,
     )

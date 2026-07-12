@@ -1,4 +1,6 @@
 use axum::Json;
+use axum::response::{IntoResponse, Response};
+use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::future::Future;
@@ -13,6 +15,33 @@ pub fn parse_method_name(method: &Value) -> anyhow::Result<String> {
         Value::String(s) => Ok(s.clone()),
         Value::Number(n) => Ok(n.to_string()),
         _ => anyhow::bail!("Invalid method format"),
+    }
+}
+
+pub async fn handle_tonlib_result<T, F, M>(
+    result: impl Future<Output = anyhow::Result<T>>,
+    mapper: F,
+) -> Response
+where
+    F: FnOnce(&T) -> M,
+    M: Serialize,
+{
+    match result.await {
+        Ok(res) => Json(ton_api::toncenter::v2::TonlibResponse {
+            ok: true,
+            result: mapper(&res),
+            extra: Some(get_extra()),
+        })
+        .into_response(),
+        Err(e) => Json(ton_api::toncenter::v2::TonlibErrorResponse {
+            ok: false,
+            error: e.to_string(),
+            code: 500,
+            extra: Some(get_extra()),
+            jsonrpc: None,
+            id: None,
+        })
+        .into_response(),
     }
 }
 

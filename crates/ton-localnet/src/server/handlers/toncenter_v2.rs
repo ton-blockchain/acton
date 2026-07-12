@@ -1,4 +1,4 @@
-use super::utils::{get_extra, handle_result, parse_method_name};
+use super::utils::{get_extra, handle_tonlib_result as handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
 use crate::localnet::{Localnet, LocalnetAddressInfo};
 use crate::server::toncenter_adapters::{BlockQueryAdapter, LibrariesRestQuery};
@@ -6,9 +6,9 @@ use crate::types::Hash256;
 use axum::{
     Json,
     extract::{Query, State},
+    response::{IntoResponse, Response},
 };
 use base64::Engine;
-use serde_json::Value;
 use std::sync::Arc;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
@@ -20,24 +20,17 @@ use tycho_types::models::{StdAddr, StdAddrFormat};
 pub async fn send_boc(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SendBocRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.send_boc(payload.boc), v2::map_send_boc).await
 }
 
 pub async fn run_get_method(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RunGetMethodRequest>,
-) -> Json<Value> {
+) -> Response {
     let method_str = match parse_method_name(&payload.method) {
         Ok(s) => s,
-        Err(e) => {
-            return Json(serde_json::json!({
-                "ok": false,
-                "error": e.to_string(),
-                "code": 400,
-                "@extra": get_extra()
-            }));
-        }
+        Err(e) => return v2_bad_request(e),
     };
 
     handle_result(
@@ -50,17 +43,10 @@ pub async fn run_get_method(
 pub async fn run_get_method_std(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RunGetMethodRequest>,
-) -> Json<Value> {
+) -> Response {
     let method_str = match parse_method_name(&payload.method) {
         Ok(s) => s,
-        Err(e) => {
-            return Json(serde_json::json!({
-                "ok": false,
-                "error": e.to_string(),
-                "code": 400,
-                "@extra": get_extra()
-            }));
-        }
+        Err(e) => return v2_bad_request(e),
     };
 
     handle_result(
@@ -73,7 +59,7 @@ pub async fn run_get_method_std(
 pub async fn get_address_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_address_information(payload.address, payload.seqno),
         v2::map_account_state,
@@ -84,10 +70,10 @@ pub async fn get_address_information(
 pub async fn get_address_balance(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_address_balance(payload.address, payload.seqno),
-        |res| res.to_string().into(),
+        ToString::to_string,
     )
     .await
 }
@@ -95,10 +81,10 @@ pub async fn get_address_balance(
 pub async fn get_address_state(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_address_state(payload.address, payload.seqno),
-        |res| res.to_string().into(),
+        ToString::to_string,
     )
     .await
 }
@@ -106,7 +92,7 @@ pub async fn get_address_state(
 pub async fn get_extended_address_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_address_information(payload.address, payload.seqno),
         v2::map_extended_account_state,
@@ -117,7 +103,7 @@ pub async fn get_extended_address_information(
 pub async fn get_wallet_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let info = node
@@ -139,7 +125,7 @@ pub async fn get_wallet_information(
 
             Ok(v2::map_wallet_information(&info, seqno))
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
@@ -147,7 +133,7 @@ pub async fn get_wallet_information(
 pub async fn get_token_data(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let address = Localnet::parse_addr(&payload.address)?;
@@ -165,7 +151,7 @@ pub async fn get_token_data(
                 anyhow::anyhow!("Smart contract {} is not Jetton or NFT", payload.address)
             })
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
@@ -173,7 +159,7 @@ pub async fn get_token_data(
 pub async fn get_shard_account_cell(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_shard_account_cell(payload.address, payload.seqno),
         v2::map_shard_account_cell,
@@ -205,7 +191,7 @@ pub(super) async fn token_wallet_code_hash(
 pub async fn get_libraries(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<LibrariesRestQuery>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let hashes = parse_libraries_query(&payload.libraries)?;
@@ -219,7 +205,7 @@ pub async fn get_libraries(
 pub async fn get_transactions(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_transactions(
             payload.address,
@@ -228,7 +214,7 @@ pub async fn get_transactions(
             payload.hash,
             payload.to_lt,
         ),
-        v2::map_transactions,
+        |transactions| v2::map_transactions(transactions),
     )
     .await
 }
@@ -236,7 +222,7 @@ pub async fn get_transactions(
 pub async fn get_transactions_std(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
-) -> Json<Value> {
+) -> Response {
     let page_limit = payload.limit;
     let fetch_limit = page_limit.saturating_add(1);
     handle_result(
@@ -255,7 +241,7 @@ pub async fn get_transactions_std(
 pub async fn try_locate_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.try_locate_tx(payload.source, payload.destination, payload.created_lt),
         v2::map_transaction,
@@ -266,7 +252,7 @@ pub async fn try_locate_tx(
 pub async fn try_locate_result_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.try_locate_result_tx(payload.source, payload.destination, payload.created_lt),
         v2::map_transaction,
@@ -277,7 +263,7 @@ pub async fn try_locate_result_tx(
 pub async fn try_locate_source_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.try_locate_source_tx(payload.source, payload.destination, payload.created_lt),
         v2::map_transaction,
@@ -288,7 +274,7 @@ pub async fn try_locate_source_tx(
 pub async fn get_config_param(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<ConfigParamRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let param = parse_config_param(&payload)?;
@@ -303,7 +289,7 @@ pub async fn get_config_param(
 pub async fn get_config_all(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<ConfigAllRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         async move {
             let seqno = parse_seqno(payload.seqno)?;
@@ -314,47 +300,47 @@ pub async fn get_config_all(
     .await
 }
 
-pub async fn detect_address(Query(payload): Query<AddressRequest>) -> Json<Value> {
+pub async fn detect_address(Query(payload): Query<AddressRequest>) -> Response {
     handle_result(
         async move {
             let (addr, flags) = parse_std_addr(&payload.address)?;
             let given_type = detect_given_type(&payload.address, flags.bounceable);
             Ok(v2::map_detect_address(&addr, flags, given_type))
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
 
-pub async fn detect_hash(Query(payload): Query<DetectHashRequest>) -> Json<Value> {
+pub async fn detect_hash(Query(payload): Query<DetectHashRequest>) -> Response {
     handle_result(
         async move {
             let hash = parse_hash_any(&payload.hash)?;
             Ok(v2::map_detect_hash(&hash))
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
 
-pub async fn pack_address(Query(payload): Query<AddressRequest>) -> Json<Value> {
+pub async fn pack_address(Query(payload): Query<AddressRequest>) -> Response {
     handle_result(
         async move {
             let (addr, flags) = parse_std_addr(&payload.address)?;
             Ok(v2::map_pack_address(&addr, flags.testnet))
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
 
-pub async fn unpack_address(Query(payload): Query<AddressRequest>) -> Json<Value> {
+pub async fn unpack_address(Query(payload): Query<AddressRequest>) -> Response {
     handle_result(
         async move {
             let (addr, _) = parse_std_addr(&payload.address)?;
             Ok(v2::map_unpack_address(&addr))
         },
-        Value::clone,
+        Clone::clone,
     )
     .await
 }
@@ -362,7 +348,7 @@ pub async fn unpack_address(Query(payload): Query<AddressRequest>) -> Json<Value
 pub async fn get_block_header(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockQueryAdapter>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_block_header(payload.seqno as u32),
         v2::map_block_header,
@@ -373,7 +359,7 @@ pub async fn get_block_header(
 pub async fn get_block_transactions_ext_post(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<BlockQueryAdapter>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_block_transactions(payload.seqno as u32),
         v2::map_block_transactions_ext,
@@ -384,14 +370,14 @@ pub async fn get_block_transactions_ext_post(
 pub async fn send_boc_return_hash(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<SendBocRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(node.send_boc(payload.boc), v2::map_send_boc_return_hash).await
 }
 
 pub async fn get_block_transactions(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockQueryAdapter>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_block_transactions(payload.seqno as u32),
         v2::map_block_transactions,
@@ -402,7 +388,7 @@ pub async fn get_block_transactions(
 pub async fn get_block_transactions_ext(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockQueryAdapter>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.get_block_transactions(payload.seqno as u32),
         v2::map_block_transactions_ext,
@@ -410,29 +396,32 @@ pub async fn get_block_transactions_ext(
     .await
 }
 
-pub async fn get_masterchain_info(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn get_masterchain_info(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.get_masterchain_info(), v2::map_masterchain_info).await
 }
 
-pub async fn get_consensus_block(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn get_consensus_block(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.get_consensus_block(), v2::map_consensus_block).await
 }
 
-pub async fn get_out_msg_queue_size(State(node): State<Arc<Localnet>>) -> Json<Value> {
+pub async fn get_out_msg_queue_size(State(node): State<Arc<Localnet>>) -> Response {
     handle_result(node.get_masterchain_info(), v2::map_out_msg_queue_sizes).await
 }
 
 pub async fn get_shards(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockQueryAdapter>,
-) -> Json<Value> {
-    handle_result(node.get_shards(payload.seqno as u32), v2::map_shards).await
+) -> Response {
+    handle_result(node.get_shards(payload.seqno as u32), |shards| {
+        v2::map_shards(shards)
+    })
+    .await
 }
 
 pub async fn lookup_block(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<LookupBlockRequest>,
-) -> Json<Value> {
+) -> Response {
     handle_result(
         node.lookup_block(
             payload.workchain,
@@ -444,6 +433,18 @@ pub async fn lookup_block(
         v2::map_lookup_block,
     )
     .await
+}
+
+fn v2_bad_request(error: impl std::fmt::Display) -> Response {
+    Json(ton_api::toncenter::v2::TonlibErrorResponse {
+        ok: false,
+        error: error.to_string(),
+        code: 400,
+        extra: Some(get_extra()),
+        jsonrpc: None,
+        id: None,
+    })
+    .into_response()
 }
 
 fn parse_std_addr(

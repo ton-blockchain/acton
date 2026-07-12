@@ -17,10 +17,10 @@ use crate::storage::{
     MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
 };
 use crate::types::{Addr, BocBytes, Hash256};
-use anyhow::Context;
 use serde_json::value::Value;
 use std::collections::HashMap;
 use ton_api::toncenter::emulate::v1 as emulate;
+use ton_api::toncenter::v3 as response;
 use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
@@ -29,51 +29,49 @@ use tycho_types::models::{
     AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
 };
 
-#[allow(clippy::ptr_arg)]
-pub fn map_jetton_masters(masters: &Vec<JettonMasterMeta>) -> Value {
-    let mut metadata = serde_json::Map::new();
+pub fn map_jetton_masters(masters: &[JettonMasterMeta]) -> response::JettonMastersResponse {
+    let mut metadata = response::Metadata::new();
     for master in masters {
         metadata.insert(
             master.address.to_string(),
-            serde_json::json!({
-                "is_indexed": true,
-                "token_info": [map_jetton_master_token_info(master)],
-            }),
+            response::AddressMetadata {
+                is_indexed: Some(true),
+                token_info: vec![map_jetton_master_token_info(master)],
+            },
         );
     }
 
-    serde_json::json!({
-        "address_book": {},
-        "metadata": metadata,
-        "jetton_masters": masters.iter().map(map_jetton_master).collect::<Vec<_>>()
-    })
+    response::JettonMastersResponse {
+        address_book: response::AddressBook::new(),
+        metadata,
+        jetton_masters: masters.iter().map(map_jetton_master).collect(),
+    }
 }
 
-fn map_jetton_master(m: &JettonMasterMeta) -> Value {
-    serde_json::json!({
-        "address": m.address.to_string(),
-        "admin_address": m.admin_address.map(|address| address.to_string()),
-        "code_hash": m.code_hash.to_base64(),
-        "data_hash": m.data_hash.to_base64(),
-        "jetton_content": m.jetton_content,
-        "jetton_wallet_code_hash": m.jetton_wallet_code_hash.to_base64(),
-        "last_transaction_lt": m.last_transaction_lt.to_string(),
-        "mintable": m.mintable,
-        "total_supply": m.total_supply.to_string(),
-    })
+fn map_jetton_master(m: &JettonMasterMeta) -> response::JettonMaster {
+    response::JettonMaster {
+        address: m.address.to_string(),
+        admin_address: m.admin_address.map(|address| address.to_string()),
+        code_hash: Some(m.code_hash.to_base64()),
+        data_hash: Some(m.data_hash.to_base64()),
+        jetton_content: object_fields(&m.jetton_content),
+        jetton_wallet_code_hash: Some(m.jetton_wallet_code_hash.to_base64()),
+        last_transaction_lt: Some(m.last_transaction_lt.to_string()),
+        mintable: Some(m.mintable),
+        total_supply: Some(m.total_supply.to_string()),
+    }
 }
 
-#[allow(clippy::ptr_arg)]
 #[must_use]
-pub fn map_jetton_wallets(wallets: &Vec<JettonWalletMeta>) -> Value {
+pub fn map_jetton_wallets(wallets: &[JettonWalletMeta]) -> response::JettonWalletsResponse {
     map_jetton_wallets_with_metadata(wallets, &HashMap::new())
 }
 
 pub fn map_jetton_wallets_with_metadata(
-    wallets: &Vec<JettonWalletMeta>,
+    wallets: &[JettonWalletMeta],
     masters_by_jetton: &HashMap<Addr, JettonMasterMeta>,
-) -> Value {
-    let mut token_info_by_address: HashMap<String, Vec<Value>> = HashMap::new();
+) -> response::JettonWalletsResponse {
+    let mut token_info_by_address: HashMap<String, Vec<response::TokenInfo>> = HashMap::new();
     let mut master_info_added = std::collections::HashSet::new();
 
     for wallet in wallets {
@@ -92,32 +90,31 @@ pub fn map_jetton_wallets_with_metadata(
         }
     }
 
-    let mut metadata = serde_json::Map::new();
+    let mut metadata = response::Metadata::new();
     for (address, token_info) in token_info_by_address {
         metadata.insert(
             address,
-            serde_json::json!({
-                "is_indexed": true,
-                "token_info": token_info,
-            }),
+            response::AddressMetadata {
+                is_indexed: Some(true),
+                token_info,
+            },
         );
     }
 
-    serde_json::json!({
-        "address_book": {},
-        "metadata": metadata,
-        "jetton_wallets": wallets.iter().map(map_jetton_wallet).collect::<Vec<_>>()
-    })
+    response::JettonWalletsResponse {
+        address_book: response::AddressBook::new(),
+        metadata,
+        jetton_wallets: wallets.iter().map(map_jetton_wallet).collect(),
+    }
 }
 
-#[allow(clippy::ptr_arg)]
 #[must_use]
-pub fn map_nft_items(items: &Vec<NftItemMeta>) -> Value {
+pub fn map_nft_items(items: &[NftItemMeta]) -> response::NftItemsResponse {
     map_nft_items_with_metadata(items)
 }
 
-pub fn map_nft_items_with_metadata(items: &Vec<NftItemMeta>) -> Value {
-    let mut token_info_by_address: HashMap<String, Vec<Value>> = HashMap::new();
+pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsResponse {
+    let mut token_info_by_address: HashMap<String, Vec<response::TokenInfo>> = HashMap::new();
     let mut collection_info_added = std::collections::HashSet::new();
 
     for item in items {
@@ -136,27 +133,27 @@ pub fn map_nft_items_with_metadata(items: &Vec<NftItemMeta>) -> Value {
         }
     }
 
-    let mut metadata = serde_json::Map::new();
+    let mut metadata = response::Metadata::new();
     for (address, token_info) in token_info_by_address {
         metadata.insert(
             address,
-            serde_json::json!({
-                "is_indexed": true,
-                "token_info": token_info,
-            }),
+            response::AddressMetadata {
+                is_indexed: Some(true),
+                token_info,
+            },
         );
     }
 
-    serde_json::json!({
-        "address_book": {},
-        "metadata": metadata,
-        "nft_items": items.iter().map(map_nft_item).collect::<Vec<_>>()
-    })
+    response::NftItemsResponse {
+        address_book: response::AddressBook::new(),
+        metadata,
+        nft_items: items.iter().map(map_nft_item).collect(),
+    }
 }
 
 pub struct AccountStateContext {
     pub interfaces: Vec<String>,
-    pub token_info: Vec<Value>,
+    pub token_info: Vec<response::TokenInfo>,
     pub user_friendly: String,
 }
 
@@ -165,9 +162,9 @@ pub fn map_account_states(
     states: &[LocalnetAccountState],
     context_by_address: &HashMap<Addr, AccountStateContext>,
     include_boc: bool,
-) -> Value {
-    let mut address_book = serde_json::Map::new();
-    let mut metadata = serde_json::Map::new();
+) -> response::AccountStatesResponse {
+    let mut address_book = response::AddressBook::new();
+    let mut metadata = response::Metadata::new();
 
     for state in states {
         let default_user_friendly = state.address.to_string();
@@ -178,12 +175,13 @@ pub fn map_account_states(
 
         address_book.insert(
             state.address.to_string(),
-            serde_json::json!({
-                "user_friendly": context
-                    .map_or(default_user_friendly, |ctx| ctx.user_friendly.clone()),
-                "domain": Value::Null,
-                "interfaces": interfaces,
-            }),
+            response::AddressBookRow {
+                user_friendly: Some(
+                    context.map_or(default_user_friendly, |ctx| ctx.user_friendly.clone()),
+                ),
+                domain: None,
+                interfaces: Some(interfaces),
+            },
         );
 
         if let Some(ctx) = context
@@ -191,115 +189,130 @@ pub fn map_account_states(
         {
             metadata.insert(
                 state.address.to_string(),
-                serde_json::json!({
-                    "is_indexed": true,
-                    "token_info": ctx.token_info.clone(),
-                }),
+                response::AddressMetadata {
+                    is_indexed: Some(true),
+                    token_info: ctx.token_info.clone(),
+                },
             );
         }
     }
 
-    serde_json::json!({
-        "accounts": states
+    response::AccountStatesResponse {
+        accounts: states
             .iter()
-            .map(|state| map_account_state_full(state, context_by_address.get(&state.address), include_boc))
-            .collect::<Vec<_>>(),
-        "address_book": address_book,
-        "metadata": metadata,
-    })
+            .map(|state| {
+                map_account_state_full(state, context_by_address.get(&state.address), include_boc)
+            })
+            .collect(),
+        address_book,
+        metadata,
+    }
 }
 
 #[must_use]
-pub fn map_address_information(state: &LocalnetAccountState) -> Value {
-    serde_json::json!({
-        "balance": state.balance.to_string(),
-        "code": encode_optional_boc(state.code.as_ref()),
-        "data": encode_optional_boc(state.data.as_ref()),
-        "frozen_hash": state.frozen_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
-        "last_transaction_hash": state.last_transaction_id.hash.to_base64(),
-        "last_transaction_lt": state.last_transaction_id.lt.to_string(),
-        "status": map_address_information_status(&state.state),
-    })
+pub fn map_address_information(state: &LocalnetAccountState) -> response::V2AddressInformation {
+    response::V2AddressInformation {
+        balance: state.balance.to_string(),
+        code: Some(
+            state
+                .code
+                .as_ref()
+                .map(BocBytes::to_base64)
+                .unwrap_or_default(),
+        ),
+        data: Some(
+            state
+                .data
+                .as_ref()
+                .map(BocBytes::to_base64)
+                .unwrap_or_default(),
+        ),
+        frozen_hash: Some(
+            state
+                .frozen_hash
+                .as_ref()
+                .map(Hash256::to_base64)
+                .unwrap_or_default(),
+        ),
+        last_transaction_hash: Some(state.last_transaction_id.hash.to_base64()),
+        last_transaction_lt: Some(state.last_transaction_id.lt.to_string()),
+        status: map_address_information_status(&state.state).to_owned(),
+    }
 }
 
 #[must_use]
-pub fn map_send_message(message: &LocalnetAcceptedExternalMessage) -> Value {
-    let message_hash = message.msg_hash.to_base64();
-    serde_json::json!({
-        "message_hash": message_hash,
-        "message_hash_norm": message.msg_hash_norm.to_base64(),
-    })
+pub fn map_send_message(message: &LocalnetAcceptedExternalMessage) -> response::SendMessageResult {
+    response::SendMessageResult {
+        message_hash: message.msg_hash.to_base64(),
+        message_hash_norm: message.msg_hash_norm.to_base64(),
+    }
 }
 
-pub fn map_transactions_response(transactions: &[LocalnetTransaction]) -> Value {
-    serde_json::json!({
-        "address_book": {},
-        "transactions": transactions.iter().map(map_v3_transaction).collect::<Vec<_>>()
-    })
+pub fn map_transactions_response(
+    transactions: &[LocalnetTransaction],
+) -> response::TransactionsResponse {
+    response::TransactionsResponse {
+        address_book: response::AddressBook::new(),
+        transactions: transactions.iter().map(map_v3_transaction).collect(),
+    }
 }
 
-pub fn map_blocks_response(blocks: &[LocalnetBlock]) -> Value {
-    serde_json::json!({
-        "blocks": blocks.iter().map(map_v3_block).collect::<Vec<_>>()
-    })
+pub fn map_blocks_response(blocks: &[LocalnetBlock]) -> response::BlocksResponse {
+    response::BlocksResponse {
+        blocks: blocks.iter().map(map_v3_block).collect(),
+    }
 }
 
-fn map_v3_block(block: &LocalnetBlock) -> Value {
-    let masterchain_block_ref = block
-        .masterchain_block_ref
-        .as_ref()
-        .map_or(Value::Null, map_v3_block_id);
-    let master_ref_seqno = block
-        .masterchain_block_ref
-        .as_ref()
-        .map_or(Value::Null, |block_id| serde_json::json!(block_id.seqno));
-
-    serde_json::json!({
-        "workchain": block.workchain,
-        "shard": format_v3_shard_id(block.shard),
-        "seqno": block.seqno,
-        "root_hash": block.root_hash.to_base64(),
-        "file_hash": block.file_hash.to_base64(),
-        "start_lt": block.start_lt.to_string(),
-        "end_lt": block.end_lt.to_string(),
-        "gen_utime": block.gen_utime.to_string(),
-        "tx_count": block.tx_count,
-        "prev_blocks": block.prev_blocks.iter().map(map_v3_block_id).collect::<Vec<_>>(),
-        "masterchain_block_ref": masterchain_block_ref,
-        "master_ref_seqno": master_ref_seqno,
-        "after_merge": false,
-        "after_split": false,
-        "before_split": false,
-        "created_by": zero_hash_base64(),
-        "flags": 0,
-        "gen_catchain_seqno": 0,
-        "global_id": 0,
-        "key_block": false,
-        "min_ref_mc_seqno": 0,
-        "prev_key_block_seqno": 0,
-        "rand_seed": zero_hash_base64(),
-        "validator_list_hash_short": 0,
-        "version": 0,
-        "vert_seqno": 0,
-        "vert_seqno_incr": false,
-        "want_merge": false,
-        "want_split": false,
-    })
+fn map_v3_block(block: &LocalnetBlock) -> response::Block {
+    response::Block {
+        workchain: block.workchain,
+        shard: format_v3_shard_id(block.shard),
+        seqno: block.seqno,
+        root_hash: block.root_hash.to_base64(),
+        file_hash: block.file_hash.to_base64(),
+        start_lt: block.start_lt.to_string(),
+        end_lt: block.end_lt.to_string(),
+        gen_utime: response::StringOrNumber::String(block.gen_utime.to_string()),
+        tx_count: Some(block.tx_count as i32),
+        prev_blocks: block.prev_blocks.iter().map(map_v3_block_id).collect(),
+        masterchain_block_ref: block.masterchain_block_ref.as_ref().map(map_v3_block_id),
+        master_ref_seqno: block
+            .masterchain_block_ref
+            .as_ref()
+            .map(|block_id| block_id.seqno as i32),
+        after_merge: Some(false),
+        after_split: Some(false),
+        before_split: Some(false),
+        created_by: Some(zero_hash_base64()),
+        flags: Some(0),
+        gen_catchain_seqno: Some(0),
+        global_id: Some(0),
+        key_block: Some(false),
+        min_ref_mc_seqno: Some(0),
+        prev_key_block_seqno: Some(0),
+        rand_seed: Some(zero_hash_base64()),
+        validator_list_hash_short: Some(0),
+        version: Some(0),
+        vert_seqno: Some(0),
+        vert_seqno_incr: Some(false),
+        want_merge: Some(false),
+        want_split: Some(false),
+    }
 }
 
-fn map_v3_block_id(block: &crate::localnet::LocalnetBlockId) -> Value {
-    serde_json::json!({
-        "workchain": block.workchain,
-        "shard": format_v3_shard_id(block.shard),
-        "seqno": block.seqno,
-    })
+fn map_v3_block_id(block: &crate::localnet::LocalnetBlockId) -> response::BlockId {
+    response::BlockId {
+        workchain: block.workchain,
+        shard: format_v3_shard_id(block.shard),
+        seqno: block.seqno,
+    }
 }
 
 fn format_v3_shard_id(shard: i64) -> String {
     format!("{:X}", shard as u64)
 }
 
-fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
+fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
     let tx_details = transaction_details(&tx.data);
     let trace_external_hash = tx
         .in_msg
@@ -307,69 +320,63 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> Value {
         .as_ref()
         .unwrap_or(&tx.in_msg.hash)
         .to_base64();
-    let in_msg = if tx.in_msg.hash.0 == [0; 32] {
-        Value::Null
-    } else {
-        map_v3_message(&tx.in_msg, &tx.hash, tx.utime, true)
-    };
+    let in_msg =
+        (tx.in_msg.hash.0 != [0; 32]).then(|| map_v3_message(&tx.in_msg, &tx.hash, tx.utime, true));
     let out_msgs = tx
         .out_msgs
         .iter()
         .filter(|msg| msg.hash.0 != [0; 32])
         .map(|msg| map_v3_message(msg, &tx.hash, tx.utime, false))
         .collect::<Vec<_>>();
-    let fallback_action_result_code = if tx.success { 0 } else { tx.exit_code };
-
-    serde_json::json!({
-        "account": tx.address.to_string(),
-        "hash": tx.hash.to_base64(),
-        "lt": tx.transaction_id.lt.to_string(),
-        "now": tx.utime,
-        "orig_status": tx_details.orig_status,
-        "end_status": tx_details.end_status,
-        "total_fees": tx.total_fees.to_string(),
-        "total_fees_extra_currencies": {},
-        "prev_trans_hash": tx_details.prev_trans_hash,
-        "prev_trans_lt": tx_details.prev_trans_lt,
-        "description": {
-            "type": "ord",
-            "aborted": tx_details.aborted.unwrap_or(!tx.success),
-            "destroyed": tx_details.destroyed.unwrap_or(false),
-            "credit_first": tx_details.credit_first.unwrap_or(false),
-            "is_tock": false,
-            "installed": false,
-            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
-                default_storage_phase(tx.storage_fees)
-            }),
-            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
-                default_compute_phase(false, tx.success, tx.exit_code)
-            }),
-            "action": tx_details.action_phase.unwrap_or_else(|| {
-                default_action_phase(tx.success, fallback_action_result_code, tx.out_msgs.len())
-            })
-        },
-        "in_msg": in_msg,
-        "out_msgs": out_msgs,
-        "account_state_before": map_transaction_account_state(
+    response::Transaction {
+        account: tx.address.to_string(),
+        hash: tx.hash.to_base64(),
+        lt: tx.transaction_id.lt.to_string(),
+        now: tx.utime,
+        orig_status: Some(tx_details.orig_status.to_owned()),
+        end_status: Some(tx_details.end_status.to_owned()),
+        total_fees: Some(tx.total_fees.to_string()),
+        total_fees_extra_currencies: HashMap::new(),
+        prev_trans_hash: Some(tx_details.prev_trans_hash),
+        prev_trans_lt: Some(tx_details.prev_trans_lt),
+        description: Some(response::TransactionDescr {
+            kind: Some("ord".to_owned()),
+            aborted: Some(tx_details.aborted.unwrap_or(!tx.success)),
+            destroyed: Some(tx_details.destroyed.unwrap_or(false)),
+            credit_first: Some(tx_details.credit_first.unwrap_or(false)),
+            is_tock: Some(false),
+            installed: Some(false),
+            storage_ph: tx_details.storage_phase,
+            compute_ph: tx_details.compute_phase,
+            action: tx_details.action_phase,
+            credit_ph: None,
+            bounce: None,
+            split_info: None,
+        }),
+        in_msg,
+        out_msgs,
+        account_state_before: Some(map_transaction_account_state(
             None,
             &tx_details.account_state_before_hash,
             tx_details.orig_status,
-        ),
-        "account_state_after": map_transaction_account_state(
+        )),
+        account_state_after: Some(map_transaction_account_state(
             None,
             &tx_details.account_state_after_hash,
             tx_details.end_status,
-        ),
-        "block_ref": {
-            "workchain": 0,
-            "shard": format_v3_shard_id(i64::MIN),
-            "seqno": tx.mc_block_seqno,
-        },
-        "mc_block_seqno": tx.mc_block_seqno,
-        "emulated": false,
-        "trace_id": tx.hash.to_base64(),
-        "trace_external_hash": trace_external_hash,
-    })
+        )),
+        block_ref: Some(response::BlockId {
+            workchain: 0,
+            shard: format_v3_shard_id(i64::MIN),
+            seqno: tx.mc_block_seqno,
+        }),
+        mc_block_seqno: Some(tx.mc_block_seqno),
+        emulated: Some(false),
+        trace_id: Some(tx.hash.to_base64()),
+        trace_external_hash: Some(trace_external_hash),
+        finality: None,
+        child_transactions: Vec::new(),
+    }
 }
 
 fn map_v3_message(
@@ -377,66 +384,40 @@ fn map_v3_message(
     tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
-) -> Value {
-    let mut mapped = serde_json::json!({
-        "hash": msg.hash.to_base64(),
-        "source": msg.source.as_ref().map(ToString::to_string),
-        "destination": msg.destination.as_ref().map(ToString::to_string),
-        "value": msg.value.to_string(),
-        "value_extra_currencies": {},
-        "fwd_fee": msg.fwd_fee.to_string(),
-        "ihr_fee": msg.ihr_fee.to_string(),
-        "import_fee": "0",
-        "created_lt": msg.created_lt.to_string(),
-        "created_at": tx_utime.to_string(),
-        "bounce": msg.bounce,
-        "bounced": msg.bounced,
-        "ihr_disabled": true,
-        "message_content": {
-            "hash": msg.body_hash.to_base64(),
-            "body": msg.body.to_base64(),
-        },
-    });
-
-    if let Some(opcode) = msg.opcode
-        && let Some(root) = mapped.as_object_mut()
-    {
-        root.insert("opcode".to_string(), Value::from(i64::from(opcode)));
+) -> response::Message {
+    response::Message {
+        hash: Some(msg.hash.to_base64()),
+        hash_norm: msg.hash_norm.as_ref().map(Hash256::to_base64),
+        source: msg.source.as_ref().map(ToString::to_string),
+        destination: msg.destination.as_ref().map(ToString::to_string),
+        value: Some(msg.value.to_string()),
+        value_extra_currencies: Some(HashMap::new()),
+        fwd_fee: Some(msg.fwd_fee.to_string()),
+        ihr_fee: Some(msg.ihr_fee.to_string()),
+        import_fee: Some("0".to_owned()),
+        created_lt: Some(msg.created_lt.to_string()),
+        created_at: Some(tx_utime.to_string()),
+        decoded_opcode: None,
+        extra_flags: None,
+        ihr_disabled: Some(true),
+        bounce: Some(msg.bounce),
+        bounced: Some(msg.bounced),
+        in_msg_tx_hash: is_in_msg.then(|| tx_hash.to_base64()),
+        out_msg_tx_hash: (!is_in_msg).then(|| tx_hash.to_base64()),
+        opcode: msg
+            .opcode
+            .map(|opcode| response::StringOrNumber::Number(i64::from(opcode))),
+        message_content: Some(response::MessageContent {
+            hash: Some(msg.body_hash.to_base64()),
+            body: Some(msg.body.to_base64()),
+            decoded: None,
+        }),
+        init_state: (!msg.init_state.is_empty()).then(|| response::MessageContent {
+            hash: hash_boc_base64(&msg.init_state),
+            body: Some(msg.init_state.to_base64()),
+            decoded: None,
+        }),
     }
-
-    if let Some(hash_norm) = msg.hash_norm.as_ref().map(Hash256::to_base64)
-        && let Some(root) = mapped.as_object_mut()
-    {
-        root.insert("hash_norm".to_string(), Value::String(hash_norm));
-    }
-
-    if !msg.init_state.is_empty()
-        && let Some(root) = mapped.as_object_mut()
-    {
-        root.insert(
-            "init_state".to_string(),
-            serde_json::json!({
-                "hash": hash_boc_base64(&msg.init_state).unwrap_or_default(),
-                "body": msg.init_state.to_base64(),
-            }),
-        );
-    }
-
-    if let Some(root) = mapped.as_object_mut() {
-        if is_in_msg {
-            root.insert(
-                "in_msg_tx_hash".to_string(),
-                Value::String(tx_hash.to_base64()),
-            );
-        } else {
-            root.insert(
-                "out_msg_tx_hash".to_string(),
-                Value::String(tx_hash.to_base64()),
-            );
-        }
-    }
-
-    mapped
 }
 
 fn hash_boc_base64(boc: &BocBytes) -> Option<String> {
@@ -444,218 +425,138 @@ fn hash_boc_base64(boc: &BocBytes) -> Option<String> {
     Some(Hash256::from(cell.repr_hash()).to_base64())
 }
 
-fn map_jetton_wallet(w: &JettonWalletMeta) -> Value {
-    serde_json::json!({
-        "address": w.address.to_string(),
-        "balance": w.balance.to_string(),
-        "code_hash": w.code_hash.to_base64(),
-        "data_hash": w.data_hash.to_base64(),
-        "jetton": w.jetton_address.to_string(),
-        "last_transaction_lt": w.last_transaction_lt.to_string(),
-        "owner": w.owner_address.to_string(),
-    })
+pub(crate) fn map_jetton_wallet(w: &JettonWalletMeta) -> response::JettonWallet {
+    response::JettonWallet {
+        address: w.address.to_string(),
+        balance: w.balance.to_string(),
+        code_hash: Some(w.code_hash.to_base64()),
+        data_hash: Some(w.data_hash.to_base64()),
+        jetton: w.jetton_address.to_string(),
+        last_transaction_lt: w.last_transaction_lt.to_string(),
+        mintless_info: None,
+        owner: w.owner_address.to_string(),
+    }
 }
 
-pub(crate) fn map_jetton_wallet_token_info(wallet: &JettonWalletMeta) -> Value {
-    serde_json::json!({
-        "valid": true,
-        "type": "jetton_wallets",
-        "extra": {
-            "owner": wallet.owner_address.to_string(),
-            "jetton": wallet.jetton_address.to_string(),
-            "balance": wallet.balance.to_string(),
-        }
-    })
+pub(crate) fn map_jetton_wallet_token_info(wallet: &JettonWalletMeta) -> response::TokenInfo {
+    response::TokenInfo {
+        valid: Some(true),
+        kind: Some("jetton_wallets".to_owned()),
+        extra: HashMap::from([
+            (
+                "owner".to_owned(),
+                Value::String(wallet.owner_address.to_string()),
+            ),
+            (
+                "jetton".to_owned(),
+                Value::String(wallet.jetton_address.to_string()),
+            ),
+            (
+                "balance".to_owned(),
+                Value::String(wallet.balance.to_string()),
+            ),
+        ]),
+        ..Default::default()
+    }
 }
 
-pub(crate) fn map_jetton_master_token_info(master: &JettonMasterMeta) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert("valid".to_string(), Value::Bool(true));
-    mapped.insert(
-        "type".to_string(),
-        Value::String("jetton_masters".to_string()),
-    );
-
-    if let Some(name) = master
-        .jetton_content
-        .get("name")
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-    {
-        mapped.insert("name".to_string(), Value::String(name));
+pub(crate) fn map_jetton_master_token_info(master: &JettonMasterMeta) -> response::TokenInfo {
+    response::TokenInfo {
+        valid: Some(true),
+        kind: Some("jetton_masters".to_owned()),
+        name: content_string(&master.jetton_content, "name"),
+        symbol: content_string(&master.jetton_content, "symbol"),
+        description: content_string(&master.jetton_content, "description"),
+        image: content_string(&master.jetton_content, "image"),
+        extra: object_fields(&master.jetton_content),
+        ..Default::default()
     }
-    if let Some(symbol) = master
-        .jetton_content
-        .get("symbol")
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-    {
-        mapped.insert("symbol".to_string(), Value::String(symbol));
-    }
-    if let Some(description) = master
-        .jetton_content
-        .get("description")
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-    {
-        mapped.insert("description".to_string(), Value::String(description));
-    }
-    if let Some(image) = master
-        .jetton_content
-        .get("image")
-        .and_then(Value::as_str)
-        .map(ToString::to_string)
-    {
-        mapped.insert("image".to_string(), Value::String(image));
-    }
-
-    mapped.insert("extra".to_string(), master.jetton_content.clone());
-    Value::Object(mapped)
 }
 
-fn map_nft_item(item: &NftItemMeta) -> Value {
-    let collection = item
-        .collection_address
-        .as_ref()
-        .map_or(Value::Null, |address| {
-            serde_json::json!({
-                "address": address.to_string(),
-            })
-        });
-
-    serde_json::json!({
-        "address": item.address.to_string(),
-        "auction_contract_address": Value::Null,
-        "code_hash": item.code_hash.to_base64(),
-        "collection": collection,
-        "collection_address": item.collection_address.as_ref().map(ToString::to_string),
-        "content": item.content,
-        "data_hash": item.data_hash.to_base64(),
-        "index": item.index,
-        "init": item.init,
-        "last_transaction_lt": item.last_transaction_lt.to_string(),
-        "on_sale": false,
-        "owner_address": item.owner_address.as_ref().map(ToString::to_string),
-        "real_owner": item.owner_address.as_ref().map(ToString::to_string),
-        "sale_contract_address": Value::Null,
-    })
+fn map_nft_item(item: &NftItemMeta) -> response::NftItem {
+    response::NftItem {
+        address: item.address.to_string(),
+        auction_contract_address: None,
+        code_hash: Some(item.code_hash.to_base64()),
+        collection: item
+            .collection_address
+            .as_ref()
+            .map(|address| response::NftCollectionRef {
+                address: address.to_string(),
+            }),
+        collection_address: item.collection_address.as_ref().map(ToString::to_string),
+        content: object_fields(&item.content),
+        data_hash: Some(item.data_hash.to_base64()),
+        index: Some(item.index.clone()),
+        init: Some(item.init),
+        last_transaction_lt: Some(item.last_transaction_lt.to_string()),
+        on_sale: Some(false),
+        owner_address: item.owner_address.as_ref().map(ToString::to_string),
+        real_owner: item.owner_address.as_ref().map(ToString::to_string),
+        sale_contract_address: None,
+    }
 }
 
-pub(crate) fn map_nft_item_token_info(item: &NftItemMeta) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert("valid".to_string(), Value::Bool(true));
-    mapped.insert("type".to_string(), Value::String("nft_items".to_string()));
-    mapped.insert("nft_index".to_string(), Value::String(item.index.clone()));
-
-    if let Some(name) = content_string(&item.content, "name") {
-        mapped.insert("name".to_string(), Value::String(name));
+pub(crate) fn map_nft_item_token_info(item: &NftItemMeta) -> response::TokenInfo {
+    response::TokenInfo {
+        valid: Some(true),
+        kind: Some("nft_items".to_owned()),
+        name: content_string(&item.content, "name"),
+        symbol: content_string(&item.content, "symbol"),
+        description: content_string(&item.content, "description"),
+        image: content_string(&item.content, "image"),
+        nft_index: Some(item.index.clone()),
+        extra: object_fields(&item.content),
     }
-    if let Some(symbol) = content_string(&item.content, "symbol") {
-        mapped.insert("symbol".to_string(), Value::String(symbol));
-    }
-    if let Some(description) = content_string(&item.content, "description") {
-        mapped.insert("description".to_string(), Value::String(description));
-    }
-    if let Some(image) = content_string(&item.content, "image") {
-        mapped.insert("image".to_string(), Value::String(image));
-    }
-
-    mapped.insert("extra".to_string(), item.content.clone());
-    Value::Object(mapped)
 }
 
-pub(crate) fn map_nft_collection_token_info(item: &NftItemMeta) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert("valid".to_string(), Value::Bool(true));
-    mapped.insert(
-        "type".to_string(),
-        Value::String("nft_collections".to_string()),
-    );
-
-    if let Some(name) = content_string(&item.content, "collection_name") {
-        mapped.insert("name".to_string(), Value::String(name));
+pub(crate) fn map_nft_collection_token_info(item: &NftItemMeta) -> response::TokenInfo {
+    response::TokenInfo {
+        valid: Some(true),
+        kind: Some("nft_collections".to_owned()),
+        name: content_string(&item.content, "collection_name"),
+        description: content_string(&item.content, "collection_description"),
+        image: content_string(&item.content, "collection_image"),
+        ..Default::default()
     }
-    if let Some(description) = content_string(&item.content, "collection_description") {
-        mapped.insert("description".to_string(), Value::String(description));
-    }
-    if let Some(image) = content_string(&item.content, "collection_image") {
-        mapped.insert("image".to_string(), Value::String(image));
-    }
-
-    mapped.insert("extra".to_string(), serde_json::json!({}));
-    Value::Object(mapped)
 }
 
 fn map_account_state_full(
     state: &LocalnetAccountState,
     context: Option<&AccountStateContext>,
     include_boc: bool,
-) -> Value {
-    let mut mapped = serde_json::Map::new();
-    mapped.insert(
-        "account_state_hash".to_string(),
-        Value::String(state.account_state_hash.to_base64()),
-    );
-    mapped.insert(
-        "address".to_string(),
-        Value::String(state.address.to_string()),
-    );
-    mapped.insert(
-        "balance".to_string(),
-        Value::String(state.balance.to_string()),
-    );
-    mapped.insert("contract_methods".to_string(), serde_json::json!([]));
-    mapped.insert("extra_currencies".to_string(), serde_json::json!({}));
-    mapped.insert(
-        "interfaces".to_string(),
-        serde_json::json!(
+) -> response::AccountStateFull {
+    response::AccountStateFull {
+        address: state.address.to_string(),
+        account_state_hash: Some(state.account_state_hash.to_base64()),
+        balance: Some(state.balance.to_string()),
+        code_boc: include_boc
+            .then(|| state.code.as_ref().map(BocBytes::to_base64))
+            .flatten(),
+        code_hash: state.code_hash.as_ref().map(Hash256::to_base64),
+        contract_methods: Vec::new(),
+        data_boc: include_boc
+            .then(|| state.data.as_ref().map(BocBytes::to_base64))
+            .flatten(),
+        data_hash: state.data_hash.as_ref().map(Hash256::to_base64),
+        extra_currencies: Some(HashMap::new()),
+        frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
+        interfaces: Some(
             context
                 .map(|ctx| ctx.interfaces.clone())
-                .unwrap_or_default()
+                .unwrap_or_default(),
         ),
-    );
-    mapped.insert(
-        "last_transaction_hash".to_string(),
-        Value::String(state.last_transaction_id.hash.to_base64()),
-    );
-    mapped.insert(
-        "last_transaction_lt".to_string(),
-        Value::String(state.last_transaction_id.lt.to_string()),
-    );
-    mapped.insert(
-        "status".to_string(),
-        Value::String(map_account_state_status(&state.state).to_string()),
-    );
+        last_transaction_hash: Some(state.last_transaction_id.hash.to_base64()),
+        last_transaction_lt: Some(state.last_transaction_id.lt.to_string()),
+        status: map_account_state_status(&state.state).to_owned(),
+    }
+}
 
-    if include_boc {
-        if let Some(code) = state.code.as_ref() {
-            mapped.insert("code_boc".to_string(), Value::String(code.to_base64()));
-        }
-        if let Some(data) = state.data.as_ref() {
-            mapped.insert("data_boc".to_string(), Value::String(data.to_base64()));
-        }
-    }
-
-    if let Some(code_hash) = state.code_hash.as_ref() {
-        mapped.insert(
-            "code_hash".to_string(),
-            Value::String(code_hash.to_base64()),
-        );
-    }
-    if let Some(data_hash) = state.data_hash.as_ref() {
-        mapped.insert(
-            "data_hash".to_string(),
-            Value::String(data_hash.to_base64()),
-        );
-    }
-    if let Some(frozen_hash) = state.frozen_hash.as_ref() {
-        mapped.insert(
-            "frozen_hash".to_string(),
-            Value::String(frozen_hash.to_base64()),
-        );
-    }
-
-    Value::Object(mapped)
+fn object_fields(value: &Value) -> HashMap<String, Value> {
+    value
+        .as_object()
+        .map(|fields| fields.clone().into_iter().collect())
+        .unwrap_or_default()
 }
 
 fn content_string(content: &Value, key: &str) -> Option<String> {
@@ -667,121 +568,56 @@ fn content_string(content: &Value, key: &str) -> Option<String> {
 }
 
 #[must_use]
-pub fn map_traces(tn: &TraceNode) -> Value {
+pub fn map_traces(tn: &TraceNode) -> response::TracesResponse {
     map_traces_with_emulated(tn, false)
 }
 
-fn map_traces_with_emulated(tn: &TraceNode, emulated: bool) -> Value {
+fn map_traces_with_emulated(tn: &TraceNode, emulated: bool) -> response::TracesResponse {
     let mut transactions = HashMap::new();
     let mut transactions_order = Vec::new();
     collect_transactions(tn, &mut transactions, &mut transactions_order, emulated);
 
-    serde_json::json!({
-        "address_book": {},
-        "metadata": {},
-        "traces": [
-            map_trace(tn, &transactions, &transactions_order, emulated)
-        ]
-    })
+    response::TracesResponse {
+        address_book: response::AddressBook::new(),
+        metadata: response::Metadata::new(),
+        traces: vec![map_trace(tn, transactions, transactions_order, emulated)],
+    }
 }
 
 pub fn map_emulate_trace_response(
     emulation: &EmulateTraceResult,
     with_actions: bool,
     include_code_data: bool,
-    address_book: Option<Value>,
-    metadata: Option<Value>,
-) -> anyhow::Result<emulate::EmulateTraceResponse> {
+    address_book: Option<response::AddressBook>,
+    metadata: Option<response::Metadata>,
+) -> emulate::EmulateTraceResponse {
     let tn = &emulation.trace;
-    let mapped = map_traces_with_emulated(tn, true);
-    let trace_entry = mapped
-        .get("traces")
-        .and_then(Value::as_array)
-        .and_then(|items| items.first())
-        .cloned()
-        .unwrap_or_else(|| serde_json::json!({}));
+    let mut transactions = HashMap::new();
+    let mut transactions_order = Vec::new();
+    collect_transactions(tn, &mut transactions, &mut transactions_order, true);
 
-    let mut response = serde_json::Map::new();
-    response.insert(
-        "mc_block_seqno".to_string(),
-        serde_json::json!(tn.transaction.meta.block_seqno),
-    );
-    response.insert(
-        "trace".to_string(),
-        trace_entry
-            .get("trace")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({})),
-    );
-    response.insert(
-        "transactions".to_string(),
-        trace_entry
-            .get("transactions")
-            .cloned()
-            .unwrap_or_else(|| serde_json::json!({})),
-    );
-
-    if with_actions {
-        response.insert(
-            "actions".to_string(),
-            trace_entry
-                .get("actions")
-                .cloned()
-                .unwrap_or_else(|| serde_json::json!([])),
-        );
+    emulate::EmulateTraceResponse {
+        mc_block_seqno: tn.transaction.meta.block_seqno,
+        trace: map_trace_node(tn, true),
+        transactions,
+        actions: with_actions.then(Vec::new),
+        code_cells: include_code_data.then(|| map_cells_by_hash_base64(&emulation.code_cells)),
+        data_cells: include_code_data.then(|| map_cells_by_hash_base64(&emulation.data_cells)),
+        address_book,
+        metadata,
+        rand_seed: zero_hash_base64(),
+        is_incomplete: false,
     }
-
-    if include_code_data {
-        response.insert(
-            "code_cells".to_string(),
-            map_cells_by_hash_base64(&emulation.code_cells),
-        );
-        response.insert(
-            "data_cells".to_string(),
-            map_cells_by_hash_base64(&emulation.data_cells),
-        );
-    }
-
-    if let Some(address_book) = address_book {
-        response.insert("address_book".to_string(), address_book);
-    }
-
-    if let Some(metadata) = metadata {
-        response.insert("metadata".to_string(), metadata);
-    }
-
-    response.insert(
-        "rand_seed".to_string(),
-        serde_json::json!(zero_hash_base64()),
-    );
-    response.insert(
-        "is_incomplete".to_string(),
-        trace_entry
-            .get("is_incomplete")
-            .cloned()
-            .unwrap_or(Value::Bool(false)),
-    );
-
-    serde_json::from_value(Value::Object(response))
-        .context("localnet emulation response does not match `TonCenter` Emulate v1")
 }
 
-fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> Value {
-    let mut entries = cells
+fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> HashMap<String, String> {
+    cells
         .iter()
         .map(|(hash, boc)| (hash.to_base64(), boc.to_base64()))
-        .collect::<Vec<_>>();
-    entries.sort_unstable_by(|a, b| a.0.cmp(&b.0));
-
-    let mut mapped = serde_json::Map::new();
-    for (hash, boc) in entries {
-        mapped.insert(hash, Value::String(boc));
-    }
-
-    Value::Object(mapped)
+        .collect()
 }
 
-pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> Value {
+pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> response::RunGetMethodResult {
     let stack_cell = Boc::decode(&result.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
     let stack = stack_to_json(&stack_tuple)
@@ -790,38 +626,29 @@ pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> Value {
         .map(map_stack_entry)
         .collect::<Vec<_>>();
 
-    serde_json::json!({
-        "gas_used": result.gas_used,
-        "exit_code": result.exit_code,
-        "stack": stack,
-        "vm_log": result.vm_log,
-    })
+    response::RunGetMethodResult {
+        gas_used: response::StringOrNumber::String(result.gas_used.to_string()),
+        exit_code: result.exit_code,
+        stack,
+        vm_log: Some(result.vm_log.to_string()),
+    }
 }
 
 fn collect_transactions(
     tn: &TraceNode,
-    transactions: &mut HashMap<String, Value>,
+    transactions: &mut HashMap<String, response::Transaction>,
     order: &mut Vec<String>,
     emulated: bool,
 ) {
     let tx_hash = tn.transaction.meta.tx_hash.to_base64();
     if !transactions.contains_key(&tx_hash) {
-        let mut tx_val = map_transaction(&tn.transaction, emulated);
-
-        let child_lts: Vec<String> = tn
+        let mut transaction = map_transaction(&tn.transaction, emulated);
+        transaction.child_transactions = tn
             .children
             .iter()
             .map(|c| c.transaction.meta.lt.to_string())
             .collect();
-
-        if let Some(obj) = tx_val.as_object_mut() {
-            obj.insert(
-                "child_transactions".to_string(),
-                serde_json::json!(child_lts),
-            );
-        }
-
-        transactions.insert(tx_hash.clone(), tx_val);
+        transactions.insert(tx_hash.clone(), transaction);
         order.push(tx_hash);
     }
     for child in &tn.children {
@@ -831,116 +658,132 @@ fn collect_transactions(
 
 fn map_trace(
     tn: &TraceNode,
-    transactions: &HashMap<String, Value>,
-    transactions_order: &[String],
+    transactions: HashMap<String, response::Transaction>,
+    transactions_order: Vec<String>,
     emulated: bool,
-) -> Value {
-    serde_json::json!({
-        "trace_id": tn.transaction.meta.tx_hash.to_base64(),
-        "external_hash": tn.external_hash.as_ref().map_or_else(|| tn.transaction.meta.tx_hash.to_base64(), Hash256::to_base64),
-        "mc_seqno_start": "0",
-        "mc_seqno_end": "0",
-        "start_lt": tn.transaction.meta.lt.to_string(),
-        "start_utime": tn.transaction.meta.now,
-        "end_lt": tn.max_lt().to_string(),
-        "end_utime": tn.max_utime(),
-        "is_incomplete": false,
-        "trace": map_trace_node(tn, emulated),
-        "transactions": transactions,
-        "transactions_order": transactions_order,
-        "actions": [],
-        "trace_info": {
-            "transactions": transactions.len(),
-            "messages": transactions.len().saturating_sub(1) + tn.children.len(), // Approximation
-            "pending_messages": 0,
-            "trace_state": "complete",
-            "classification_state": "classified"
-        }
-    })
-}
-
-fn map_trace_node(tn: &TraceNode, emulated: bool) -> Value {
-    serde_json::json!({
-        "tx_hash": tn.transaction.meta.tx_hash.to_base64(),
-        "in_msg_hash": tn.transaction.meta.in_msg_hash.as_ref().map(Hash256::to_base64).unwrap_or_default(),
-        "in_msg": tn.transaction.in_msg.as_ref().map(|m| {
-            map_trace_message_info(m, &tn.transaction.meta.tx_hash, tn.transaction.meta.now, true)
+) -> response::Trace {
+    let transaction_count = transactions.len();
+    response::Trace {
+        trace_id: tn.transaction.meta.tx_hash.to_base64(),
+        external_hash: Some(tn.external_hash.as_ref().map_or_else(
+            || tn.transaction.meta.tx_hash.to_base64(),
+            Hash256::to_base64,
+        )),
+        mc_seqno_start: Some("0".to_owned()),
+        mc_seqno_end: Some("0".to_owned()),
+        start_lt: Some(tn.transaction.meta.lt.to_string()),
+        start_utime: Some(tn.transaction.meta.now),
+        end_lt: Some(tn.max_lt().to_string()),
+        end_utime: Some(tn.max_utime()),
+        is_incomplete: false,
+        trace: Some(map_trace_node(tn, emulated)),
+        transactions,
+        transactions_order,
+        actions: Vec::new(),
+        trace_info: Some(response::TraceInfo {
+            transactions: transaction_count,
+            messages: transaction_count.saturating_sub(1) + tn.children.len(),
+            pending_messages: 0,
+            trace_state: "complete".to_owned(),
+            classification_state: "classified".to_owned(),
         }),
-        "transaction": map_transaction(&tn.transaction, emulated),
-        "children": tn.children.iter().map(|child| map_trace_node(child, emulated)).collect::<Vec<_>>(),
-    })
+        warning: None,
+    }
 }
 
-fn map_transaction(tx: &TransactionInfo, emulated: bool) -> Value {
+fn map_trace_node(tn: &TraceNode, emulated: bool) -> response::TraceNode {
+    response::TraceNode {
+        tx_hash: Some(tn.transaction.meta.tx_hash.to_base64()),
+        in_msg_hash: tn
+            .transaction
+            .meta
+            .in_msg_hash
+            .as_ref()
+            .map(Hash256::to_base64),
+        in_msg: tn.transaction.in_msg.as_ref().map(|m| {
+            map_trace_message_info(
+                m,
+                &tn.transaction.meta.tx_hash,
+                tn.transaction.meta.now,
+                true,
+            )
+        }),
+        transaction: Some(map_transaction(&tn.transaction, emulated)),
+        children: tn
+            .children
+            .iter()
+            .map(|child| map_trace_node(child, emulated))
+            .collect(),
+    }
+}
+
+fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transaction {
     let tx_details = transaction_details(&tx.tx_boc);
     let trace_external_hash = tx.meta.in_msg_hash.unwrap_or(tx.meta.tx_hash).to_base64();
-    let compute_phase_skipped = tx.meta.compute_exit_code.is_none();
-    let compute_phase_success = tx.meta.compute_exit_code == Some(0);
-    let action_phase_success = tx.meta.action_result_code == Some(0);
-
-    serde_json::json!({
-        "account": tx.meta.account.to_string(),
-        "hash": tx.meta.tx_hash.to_base64(),
-        "lt": tx.meta.lt.to_string(),
-        "now": tx.meta.now,
-        "orig_status": tx_details.orig_status,
-        "end_status": tx_details.end_status,
-        "total_fees": tx.meta.total_fees.to_string(),
-        "total_fees_extra_currencies": {},
-        "prev_trans_hash": tx_details.prev_trans_hash,
-        "prev_trans_lt": tx_details.prev_trans_lt,
-        "description": {
-            "type": "ord",
-            "aborted": tx_details.aborted.unwrap_or(!tx.meta.success),
-            "destroyed": tx_details.destroyed.unwrap_or(false),
-            "credit_first": tx_details.credit_first.unwrap_or(false),
-            "is_tock": false,
-            "installed": false,
-            "storage_ph": tx_details.storage_phase.unwrap_or_else(|| {
-                default_storage_phase(tx.meta.storage_fees)
+    response::Transaction {
+        account: tx.meta.account.to_string(),
+        hash: tx.meta.tx_hash.to_base64(),
+        lt: tx.meta.lt.to_string(),
+        now: tx.meta.now,
+        orig_status: Some(tx_details.orig_status.to_owned()),
+        end_status: Some(tx_details.end_status.to_owned()),
+        total_fees: Some(tx.meta.total_fees.to_string()),
+        total_fees_extra_currencies: HashMap::new(),
+        prev_trans_hash: Some(tx_details.prev_trans_hash),
+        prev_trans_lt: Some(tx_details.prev_trans_lt),
+        description: Some(response::TransactionDescr {
+            kind: Some("ord".to_owned()),
+            aborted: Some(tx_details.aborted.unwrap_or(!tx.meta.success)),
+            destroyed: Some(tx_details.destroyed.unwrap_or(false)),
+            credit_first: Some(tx_details.credit_first.unwrap_or(false)),
+            is_tock: Some(false),
+            installed: Some(false),
+            storage_ph: tx_details.storage_phase,
+            compute_ph: tx_details.compute_phase.or_else(|| {
+                tx.meta
+                    .compute_exit_code
+                    .map(|exit_code| default_compute_phase(false, exit_code == 0, exit_code))
             }),
-            "compute_ph": tx_details.compute_phase.unwrap_or_else(|| {
-                default_compute_phase(
-                    compute_phase_skipped,
-                    compute_phase_success,
-                    tx.meta.compute_exit_code.unwrap_or(0),
-                )
+            action: tx_details.action_phase.or_else(|| {
+                tx.meta.action_result_code.map(|result_code| {
+                    default_action_phase(result_code == 0, result_code, tx.out_msgs.len())
+                })
             }),
-            "action": tx_details.action_phase.unwrap_or_else(|| {
-                default_action_phase(
-                    action_phase_success,
-                    tx.meta.action_result_code.unwrap_or(0),
-                    tx.out_msgs.len(),
-                )
-            })
-        },
-        "in_msg": tx.in_msg.as_ref().map(|m| {
-            map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, true)
+            credit_ph: None,
+            bounce: None,
+            split_info: None,
         }),
-        "out_msgs": tx.out_msgs.iter().map(|m| {
-            map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false)
-        }).collect::<Vec<_>>(),
-        "account_state_before": map_transaction_account_state(
+        in_msg: tx
+            .in_msg
+            .as_ref()
+            .map(|m| map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, true)),
+        out_msgs: tx
+            .out_msgs
+            .iter()
+            .map(|m| map_trace_message_info(m, &tx.meta.tx_hash, tx.meta.now, false))
+            .collect(),
+        account_state_before: Some(map_transaction_account_state(
             tx.account_state_before.as_ref(),
             &tx_details.account_state_before_hash,
             tx_details.orig_status,
-        ),
-        "account_state_after": map_transaction_account_state(
+        )),
+        account_state_after: Some(map_transaction_account_state(
             tx.account_state_after.as_ref(),
             &tx_details.account_state_after_hash,
             tx_details.end_status,
-        ),
-        "block_ref": {
-            "workchain": 0,
-            "shard": format_v3_shard_id(i64::MIN),
-            "seqno": tx.meta.block_seqno
-        },
-        "mc_block_seqno": tx.meta.block_seqno,
-        "child_transactions": [],
-        "emulated": emulated,
-        "trace_id": tx.meta.tx_hash.to_base64(),
-        "trace_external_hash": trace_external_hash,
-    })
+        )),
+        block_ref: Some(response::BlockId {
+            workchain: 0,
+            shard: format_v3_shard_id(i64::MIN),
+            seqno: tx.meta.block_seqno,
+        }),
+        mc_block_seqno: Some(tx.meta.block_seqno),
+        child_transactions: Vec::new(),
+        emulated: Some(emulated),
+        trace_id: Some(tx.meta.tx_hash.to_base64()),
+        trace_external_hash: Some(trace_external_hash),
+        finality: None,
+    }
 }
 
 struct TransactionDetails {
@@ -953,9 +796,9 @@ struct TransactionDetails {
     aborted: Option<bool>,
     destroyed: Option<bool>,
     credit_first: Option<bool>,
-    storage_phase: Option<Value>,
-    compute_phase: Option<Value>,
-    action_phase: Option<Value>,
+    storage_phase: Option<response::StoragePhase>,
+    compute_phase: Option<response::ComputePhase>,
+    action_phase: Option<response::ActionPhase>,
 }
 
 impl Default for TransactionDetails {
@@ -1008,7 +851,8 @@ fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
         credit_first: ordinary_info.as_ref().map(|info| info.credit_first),
         storage_phase: ordinary_info
             .as_ref()
-            .map(|info| map_storage_phase(info.storage_phase.as_ref())),
+            .and_then(|info| info.storage_phase.as_ref())
+            .map(map_storage_phase),
         compute_phase: ordinary_info
             .as_ref()
             .map(|info| map_compute_phase(&info.compute_phase)),
@@ -1019,152 +863,117 @@ fn transaction_details(tx_boc: &BocBytes) -> TransactionDetails {
     }
 }
 
-fn default_storage_phase(storage_fees_collected: u128) -> Value {
-    serde_json::json!({
-        "storage_fees_collected": storage_fees_collected.to_string(),
-        "status_change": "unchanged",
-    })
-}
-
-fn map_storage_phase(phase: Option<&tycho_types::models::StoragePhase>) -> Value {
-    let Some(phase) = phase else {
-        return default_storage_phase(0);
-    };
-
-    let mut value = serde_json::json!({
-        "storage_fees_collected": u128::from(phase.storage_fees_collected).to_string(),
-        "status_change": map_account_status_change(phase.status_change),
-    });
-
-    if let Some(storage_fees_due) = phase.storage_fees_due
-        && let Some(root) = value.as_object_mut()
-    {
-        root.insert(
-            "storage_fees_due".to_string(),
-            Value::String(u128::from(storage_fees_due).to_string()),
-        );
+fn map_storage_phase(phase: &tycho_types::models::StoragePhase) -> response::StoragePhase {
+    response::StoragePhase {
+        storage_fees_collected: Some(u128::from(phase.storage_fees_collected).to_string()),
+        storage_fees_due: phase
+            .storage_fees_due
+            .map(|value| u128::from(value).to_string()),
+        status_change: Some(map_account_status_change(phase.status_change).to_owned()),
     }
-
-    value
 }
 
-fn default_compute_phase(skipped: bool, success: bool, exit_code: i32) -> Value {
-    serde_json::json!({
-        "skipped": skipped,
-        "success": success,
-        "msg_state_used": false,
-        "account_activated": false,
-        "gas_fees": "0",
-        "gas_used": "0",
-        "gas_limit": "0",
-        "mode": 0,
-        "exit_code": exit_code,
-        "vm_steps": 0,
-        "vm_init_state_hash": zero_hash_base64(),
-        "vm_final_state_hash": zero_hash_base64(),
-    })
+fn default_compute_phase(skipped: bool, success: bool, exit_code: i32) -> response::ComputePhase {
+    response::ComputePhase {
+        skipped: Some(skipped),
+        success: Some(success),
+        msg_state_used: Some(false),
+        account_activated: Some(false),
+        gas_fees: Some("0".to_owned()),
+        gas_used: Some("0".to_owned()),
+        gas_limit: Some("0".to_owned()),
+        gas_credit: None,
+        mode: Some(0),
+        exit_code: Some(exit_code),
+        exit_arg: None,
+        vm_steps: Some(0),
+        vm_init_state_hash: Some(zero_hash_base64()),
+        vm_final_state_hash: Some(zero_hash_base64()),
+        reason: None,
+    }
 }
 
-fn map_compute_phase(phase: &ComputePhase) -> Value {
+fn map_compute_phase(phase: &ComputePhase) -> response::ComputePhase {
     match phase {
-        ComputePhase::Skipped(phase) => serde_json::json!({
-            "skipped": true,
-            "success": false,
-            "reason": map_compute_skip_reason(phase.reason),
-            "exit_code": 0,
+        ComputePhase::Skipped(phase) => response::ComputePhase {
+            skipped: Some(true),
+            success: Some(false),
+            exit_code: Some(0),
+            reason: Some(map_compute_skip_reason(phase.reason).to_owned()),
+            ..default_compute_phase(true, false, 0)
+        },
+        ComputePhase::Executed(phase) => response::ComputePhase {
+            skipped: Some(false),
+            success: Some(phase.success),
+            msg_state_used: Some(phase.msg_state_used),
+            account_activated: Some(phase.account_activated),
+            gas_fees: Some(u128::from(phase.gas_fees).to_string()),
+            gas_used: Some(u64::from(phase.gas_used).to_string()),
+            gas_limit: Some(u64::from(phase.gas_limit).to_string()),
+            gas_credit: phase.gas_credit.map(|credit| u32::from(credit).to_string()),
+            mode: Some(phase.mode),
+            exit_code: Some(phase.exit_code),
+            exit_arg: phase.exit_arg,
+            vm_steps: Some(phase.vm_steps),
+            vm_init_state_hash: Some(hash_bytes_base64(&phase.vm_init_state_hash)),
+            vm_final_state_hash: Some(hash_bytes_base64(&phase.vm_final_state_hash)),
+            reason: None,
+        },
+    }
+}
+
+fn default_action_phase(
+    success: bool,
+    result_code: i32,
+    out_msgs_len: usize,
+) -> response::ActionPhase {
+    let out_msgs_len =
+        u32::try_from(out_msgs_len).expect("TON transaction message count must fit into u32");
+    response::ActionPhase {
+        success: Some(success),
+        valid: Some(true),
+        no_funds: Some(false),
+        status_change: Some("unchanged".to_owned()),
+        result_code: Some(result_code),
+        result_arg: None,
+        tot_actions: Some(out_msgs_len),
+        spec_actions: Some(0),
+        skipped_actions: Some(0),
+        msgs_created: Some(out_msgs_len),
+        total_fwd_fees: None,
+        total_action_fees: None,
+        action_list_hash: Some(zero_hash_base64()),
+        tot_msg_size: Some(response::MsgSize {
+            cells: Some("0".to_owned()),
+            bits: Some("0".to_owned()),
         }),
-        ComputePhase::Executed(phase) => {
-            let mut value = serde_json::json!({
-                "skipped": false,
-                "success": phase.success,
-                "msg_state_used": phase.msg_state_used,
-                "account_activated": phase.account_activated,
-                "gas_fees": u128::from(phase.gas_fees).to_string(),
-                "gas_used": u64::from(phase.gas_used).to_string(),
-                "gas_limit": u64::from(phase.gas_limit).to_string(),
-                "mode": phase.mode,
-                "exit_code": phase.exit_code,
-                "vm_steps": phase.vm_steps,
-                "vm_init_state_hash": hash_bytes_base64(&phase.vm_init_state_hash),
-                "vm_final_state_hash": hash_bytes_base64(&phase.vm_final_state_hash),
-            });
-
-            if let Some(root) = value.as_object_mut() {
-                if let Some(gas_credit) = phase.gas_credit {
-                    root.insert(
-                        "gas_credit".to_string(),
-                        Value::String(u32::from(gas_credit).to_string()),
-                    );
-                }
-
-                if let Some(exit_arg) = phase.exit_arg {
-                    root.insert("exit_arg".to_string(), Value::from(exit_arg));
-                }
-            }
-
-            value
-        }
     }
 }
 
-fn default_action_phase(success: bool, result_code: i32, out_msgs_len: usize) -> Value {
-    serde_json::json!({
-        "success": success,
-        "valid": true,
-        "no_funds": false,
-        "status_change": "unchanged",
-        "result_code": result_code,
-        "tot_actions": out_msgs_len,
-        "spec_actions": 0,
-        "skipped_actions": 0,
-        "msgs_created": out_msgs_len,
-        "action_list_hash": zero_hash_base64(),
-        "tot_msg_size": {
-            "cells": "0",
-            "bits": "0",
-        },
-    })
-}
-
-fn map_action_phase(phase: &ActionPhase) -> Value {
-    let mut value = serde_json::json!({
-        "success": phase.success,
-        "valid": phase.valid,
-        "no_funds": phase.no_funds,
-        "status_change": map_account_status_change(phase.status_change),
-        "result_code": phase.result_code,
-        "tot_actions": phase.total_actions,
-        "spec_actions": phase.special_actions,
-        "skipped_actions": phase.skipped_actions,
-        "msgs_created": phase.messages_created,
-        "action_list_hash": hash_bytes_base64(&phase.action_list_hash),
-        "tot_msg_size": {
-            "cells": u64::from(phase.total_message_size.cells).to_string(),
-            "bits": u64::from(phase.total_message_size.bits).to_string(),
-        },
-    });
-
-    if let Some(root) = value.as_object_mut() {
-        if let Some(total_fwd_fees) = phase.total_fwd_fees {
-            root.insert(
-                "total_fwd_fees".to_string(),
-                Value::String(u128::from(total_fwd_fees).to_string()),
-            );
-        }
-
-        if let Some(total_action_fees) = phase.total_action_fees {
-            root.insert(
-                "total_action_fees".to_string(),
-                Value::String(u128::from(total_action_fees).to_string()),
-            );
-        }
-
-        if let Some(result_arg) = phase.result_arg {
-            root.insert("result_arg".to_string(), Value::from(result_arg));
-        }
+fn map_action_phase(phase: &ActionPhase) -> response::ActionPhase {
+    response::ActionPhase {
+        success: Some(phase.success),
+        valid: Some(phase.valid),
+        no_funds: Some(phase.no_funds),
+        status_change: Some(map_account_status_change(phase.status_change).to_owned()),
+        result_code: Some(phase.result_code),
+        result_arg: phase.result_arg,
+        tot_actions: Some(u32::from(phase.total_actions)),
+        spec_actions: Some(u32::from(phase.special_actions)),
+        skipped_actions: Some(u32::from(phase.skipped_actions)),
+        msgs_created: Some(u32::from(phase.messages_created)),
+        total_fwd_fees: phase
+            .total_fwd_fees
+            .map(|value| u128::from(value).to_string()),
+        total_action_fees: phase
+            .total_action_fees
+            .map(|value| u128::from(value).to_string()),
+        action_list_hash: Some(hash_bytes_base64(&phase.action_list_hash)),
+        tot_msg_size: Some(response::MsgSize {
+            cells: Some(u64::from(phase.total_message_size.cells).to_string()),
+            bits: Some(u64::from(phase.total_message_size.bits).to_string()),
+        }),
     }
-
-    value
 }
 
 const fn map_account_status_change(change: AccountStatusChange) -> &'static str {
@@ -1188,42 +997,24 @@ fn map_transaction_account_state(
     snapshot: Option<&AccountStateSnapshot>,
     fallback_hash: &str,
     fallback_status: &str,
-) -> Value {
+) -> response::AccountState {
     if let Some(snapshot) = snapshot {
         let data_hash = snapshot.data_hash();
         let code_hash = snapshot.code_hash();
-        let mut value = map_emulation_account_state(
-            fallback_hash,
-            &snapshot.balance.to_string(),
-            map_account_state_status(&snapshot.status),
-            snapshot.frozen_hash.as_ref(),
-            data_hash.as_ref(),
-            code_hash.as_ref(),
-        );
-        insert_account_state_bocs(&mut value, snapshot);
-        return value;
+        return response::AccountState {
+            hash: Some(fallback_hash.to_owned()),
+            account_status: Some(map_account_state_status(&snapshot.status).to_owned()),
+            balance: Some(snapshot.balance.to_string()),
+            code_boc: snapshot.code.as_ref().map(Boc::encode_base64),
+            code_hash: code_hash.as_ref().map(Hash256::to_base64),
+            data_boc: snapshot.data.as_ref().map(Boc::encode_base64),
+            data_hash: data_hash.as_ref().map(Hash256::to_base64),
+            extra_currencies: Some(HashMap::new()),
+            frozen_hash: snapshot.frozen_hash.as_ref().map(Hash256::to_base64),
+        };
     }
 
     map_emulation_account_state(fallback_hash, "0", fallback_status, None, None, None)
-}
-
-fn insert_account_state_bocs(value: &mut Value, snapshot: &AccountStateSnapshot) {
-    let Some(mapped) = value.as_object_mut() else {
-        return;
-    };
-
-    if let Some(code) = &snapshot.code {
-        mapped.insert(
-            "code_boc".to_string(),
-            Value::String(Boc::encode_base64(code)),
-        );
-    }
-    if let Some(data) = &snapshot.data {
-        mapped.insert(
-            "data_boc".to_string(),
-            Value::String(Boc::encode_base64(data)),
-        );
-    }
 }
 
 fn map_emulation_account_state(
@@ -1233,16 +1024,18 @@ fn map_emulation_account_state(
     frozen_hash: Option<&Hash256>,
     data_hash: Option<&Hash256>,
     code_hash: Option<&Hash256>,
-) -> Value {
-    serde_json::json!({
-        "hash": hash,
-        "balance": balance,
-        "extra_currencies": {},
-        "account_status": account_status,
-        "frozen_hash": frozen_hash.map(Hash256::to_base64),
-        "data_hash": data_hash.map(Hash256::to_base64),
-        "code_hash": code_hash.map(Hash256::to_base64),
-    })
+) -> response::AccountState {
+    response::AccountState {
+        hash: Some(hash.to_owned()),
+        account_status: Some(account_status.to_owned()),
+        balance: Some(balance.to_owned()),
+        code_boc: None,
+        code_hash: code_hash.map(Hash256::to_base64),
+        data_boc: None,
+        data_hash: data_hash.map(Hash256::to_base64),
+        extra_currencies: Some(HashMap::new()),
+        frozen_hash: frozen_hash.map(Hash256::to_base64),
+    }
 }
 
 fn hash_bytes_base64(hash: &HashBytes) -> String {
@@ -1263,62 +1056,77 @@ fn map_trace_message_info(
     tx_hash: &Hash256,
     tx_utime: u32,
     is_in_msg: bool,
-) -> Value {
+) -> response::Message {
     convert_to_message_struct(&msg.meta, &msg.boc).map_or_else(
         |_| map_message(&msg.meta),
         |message| map_v3_message(&message, tx_hash, tx_utime, is_in_msg),
     )
 }
 
-fn map_message(msg: &MsgMeta) -> Value {
-    serde_json::json!({
-        "hash": msg.msg_hash.to_base64(),
-        "source": msg.src.as_ref().map(ToString::to_string),
-        "destination": msg.dst.as_ref().map(ToString::to_string),
-        "value": msg.value.unwrap_or(0).to_string(),
-        "fwd_fee": "0",
-        "ihr_fee": "0",
-        "import_fee": "0",
-        "created_lt": msg.created_lt.unwrap_or(0).to_string(),
-        "created_at": msg.created_at.unwrap_or(0).to_string(),
-        "bounce": msg.bounce.unwrap_or(false),
-        "bounced": false,
-        "message_content": {
-            "hash": msg.msg_boc_hash.to_base64(),
-            "body": "", // We don't have BOC here easily
-        }
-    })
+fn map_message(msg: &MsgMeta) -> response::Message {
+    response::Message {
+        hash: Some(msg.msg_hash.to_base64()),
+        hash_norm: None,
+        source: msg.src.as_ref().map(ToString::to_string),
+        destination: msg.dst.as_ref().map(ToString::to_string),
+        value: Some(msg.value.unwrap_or(0).to_string()),
+        value_extra_currencies: Some(HashMap::new()),
+        fwd_fee: Some("0".to_owned()),
+        ihr_fee: Some("0".to_owned()),
+        created_lt: Some(msg.created_lt.unwrap_or(0).to_string()),
+        created_at: Some(msg.created_at.unwrap_or(0).to_string()),
+        decoded_opcode: None,
+        extra_flags: None,
+        ihr_disabled: None,
+        bounce: Some(msg.bounce.unwrap_or(false)),
+        bounced: Some(false),
+        import_fee: Some("0".to_owned()),
+        in_msg_tx_hash: None,
+        opcode: None,
+        out_msg_tx_hash: None,
+        message_content: Some(response::MessageContent {
+            hash: Some(msg.msg_boc_hash.to_base64()),
+            body: Some(String::new()),
+            decoded: None,
+        }),
+        init_state: None,
+    }
 }
 
-fn map_stack_entry(entry: Value) -> Value {
+fn map_stack_entry(entry: Value) -> response::StackEntity {
     let Some(entry_type) = entry.get("@type").and_then(Value::as_str) else {
-        return entry;
+        return response::StackEntity {
+            kind: "unknown".to_owned(),
+            value: response::StackValue::Json(entry),
+        };
     };
 
     match entry_type {
-        "tvm.stackEntryNull" => serde_json::json!({
-            "type": "null",
-            "value": Value::Null
-        }),
-        "tvm.stackEntryNumber" => serde_json::json!({
-            "type": "num",
-            "value": entry
-                .pointer("/number/number")
-                .cloned()
-                .unwrap_or(Value::Null)
-        }),
-        "tvm.stackEntryCell" => serde_json::json!({
-            "type": "cell",
-            "value": entry.get("cell").cloned().unwrap_or(Value::Null)
-        }),
-        "tvm.stackEntrySlice" => serde_json::json!({
-            "type": "slice",
-            "value": entry.get("slice").cloned().unwrap_or(Value::Null)
-        }),
-        "tvm.stackEntryBuilder" => serde_json::json!({
-            "type": "builder",
-            "value": entry.get("builder").cloned().unwrap_or(Value::Null)
-        }),
+        "tvm.stackEntryNull" => response::StackEntity {
+            kind: "null".to_owned(),
+            value: response::StackValue::Json(Value::Null),
+        },
+        "tvm.stackEntryNumber" => response::StackEntity {
+            kind: "num".to_owned(),
+            value: response::StackValue::Json(
+                entry
+                    .pointer("/number/number")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            ),
+        },
+        "tvm.stackEntryCell" => response::StackEntity {
+            kind: "cell".to_owned(),
+            value: response::StackValue::Json(entry.get("cell").cloned().unwrap_or(Value::Null)),
+        },
+        "tvm.stackEntrySlice" => response::StackEntity {
+            kind: "slice".to_owned(),
+            value: response::StackValue::Json(entry.get("slice").cloned().unwrap_or(Value::Null)),
+        },
+        "tvm.stackEntryBuilder" => response::StackEntity {
+            kind: "builder".to_owned(),
+            value: response::StackValue::Json(entry.get("builder").cloned().unwrap_or(Value::Null)),
+        },
         "tvm.stackEntryTuple" => {
             let elements = entry
                 .pointer("/tuple/elements")
@@ -1331,17 +1139,16 @@ fn map_stack_entry(entry: Value) -> Value {
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            serde_json::json!({
-                "type": "tuple",
-                "value": elements
-            })
+            response::StackEntity {
+                kind: "tuple".to_owned(),
+                value: response::StackValue::Entries(elements),
+            }
         }
-        _ => entry,
+        _ => response::StackEntity {
+            kind: entry_type.to_owned(),
+            value: response::StackValue::Json(entry),
+        },
     }
-}
-
-fn encode_optional_boc(data: Option<&BocBytes>) -> String {
-    data.map(BocBytes::to_base64).unwrap_or_default()
 }
 
 fn zero_hash_base64() -> String {
@@ -1438,37 +1245,35 @@ mod tests {
     fn jetton_masters_response_includes_token_metadata() {
         let master = sample_jetton_master();
         let address = master.address.to_string();
-        let response = map_jetton_masters(&vec![master]);
-        let token_info = &response["metadata"][&address]["token_info"][0];
+        let mapped = map_jetton_masters(&[master]);
+        let metadata = mapped.metadata.get(&address).expect("master metadata");
+        let token_info = &metadata.token_info[0];
 
-        assert_eq!(
-            response["metadata"][&address]["is_indexed"].as_bool(),
-            Some(true)
-        );
-        assert_eq!(token_info["type"].as_str(), Some("jetton_masters"));
-        assert_eq!(token_info["name"].as_str(), Some("UTYA"));
-        assert_eq!(token_info["symbol"].as_str(), Some("UTYA"));
-        assert_eq!(token_info["description"].as_str(), Some("Duck token"));
-        assert_eq!(token_info["extra"]["decimals"].as_str(), Some("9"));
+        assert_eq!(metadata.is_indexed, Some(true));
+        assert_eq!(token_info.kind.as_deref(), Some("jetton_masters"));
+        assert_eq!(token_info.name.as_deref(), Some("UTYA"));
+        assert_eq!(token_info.symbol.as_deref(), Some("UTYA"));
+        assert_eq!(token_info.description.as_deref(), Some("Duck token"));
+        assert_eq!(token_info.extra["decimals"].as_str(), Some("9"));
     }
 
     #[test]
     fn nft_item_token_info_uses_nft_items_type() {
         let token_info = map_nft_item_token_info(&sample_nft_item());
 
-        assert_eq!(token_info["type"].as_str(), Some("nft_items"));
-        assert_eq!(token_info["nft_index"].as_str(), Some("7"));
-        assert_eq!(token_info["name"].as_str(), Some("Sample NFT"));
+        assert_eq!(token_info.kind.as_deref(), Some("nft_items"));
+        assert_eq!(token_info.nft_index.as_deref(), Some("7"));
+        assert_eq!(token_info.name.as_deref(), Some("Sample NFT"));
     }
 
     #[test]
     fn nft_collection_token_info_uses_nft_collections_type() {
         let token_info = map_nft_collection_token_info(&sample_nft_item());
 
-        assert_eq!(token_info["type"].as_str(), Some("nft_collections"));
-        assert_eq!(token_info["name"].as_str(), Some("Sample Collection"));
+        assert_eq!(token_info.kind.as_deref(), Some("nft_collections"));
+        assert_eq!(token_info.name.as_deref(), Some("Sample Collection"));
         assert_eq!(
-            token_info["description"].as_str(),
+            token_info.description.as_deref(),
             Some("Collection description")
         );
     }
@@ -1503,16 +1308,17 @@ mod tests {
             masterchain_block_ref: Some(masterchain_block_ref),
         }]);
 
-        let block = &response["blocks"][0];
+        let block = &response.blocks[0];
         assert_eq!(format_v3_shard_id(i64::MIN), "8000000000000000");
-        assert_eq!(block["shard"].as_str(), Some("8000000000000000"));
+        assert_eq!(block.shard, "8000000000000000");
+        assert_eq!(block.prev_blocks[0].shard, "8000000000000000");
         assert_eq!(
-            block["prev_blocks"][0]["shard"].as_str(),
-            Some("8000000000000000")
-        );
-        assert_eq!(
-            block["masterchain_block_ref"]["shard"].as_str(),
-            Some("8000000000000000")
+            block
+                .masterchain_block_ref
+                .as_ref()
+                .expect("masterchain block ref")
+                .shard,
+            "8000000000000000"
         );
     }
 }

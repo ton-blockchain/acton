@@ -21,7 +21,27 @@ pub struct AddressMetadata {
     #[serde(default)]
     pub is_indexed: Option<bool>,
     #[serde(default)]
-    pub token_info: Vec<Value>,
+    pub token_info: Vec<TokenInfo>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct TokenInfo {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub valid: Option<bool>,
+    #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub symbol: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_index: Option<String>,
+    #[serde(default)]
+    pub extra: HashMap<String, Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -162,7 +182,7 @@ pub struct NftItem {
     #[serde(default)]
     pub code_hash: Option<String>,
     #[serde(default)]
-    pub collection: Option<Value>,
+    pub collection: Option<NftCollectionRef>,
     #[serde(default)]
     pub collection_address: Option<String>,
     #[serde(default)]
@@ -186,6 +206,11 @@ pub struct NftItem {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftCollectionRef {
+    pub address: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NftItemsResponse {
     pub nft_items: Vec<NftItem>,
     #[serde(default)]
@@ -204,18 +229,37 @@ pub struct SendMessageResult {
 pub struct RunGetMethodResult {
     pub gas_used: StringOrNumber,
     pub exit_code: i32,
-    pub stack: Vec<Value>,
+    pub stack: Vec<StackEntity>,
     #[serde(default)]
     pub vm_log: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackEntity {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub value: StackValue,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum StackValue {
+    Entries(Vec<StackEntity>),
+    Json(Value),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct V2AddressInformation {
     pub balance: String,
+    #[serde(default)]
     pub code: Option<String>,
+    #[serde(default)]
     pub data: Option<String>,
+    #[serde(default)]
     pub frozen_hash: Option<String>,
+    #[serde(default)]
     pub last_transaction_hash: Option<String>,
+    #[serde(default)]
     pub last_transaction_lt: Option<String>,
     pub status: String,
 }
@@ -223,7 +267,7 @@ pub struct V2AddressInformation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RequestError {
     /// Present for API errors, but omitted by request-body validation errors (HTTP 422).
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code: Option<i32>,
     pub error: String,
 }
@@ -302,19 +346,21 @@ pub struct AccountStateFull {
     pub address: String,
     #[serde(default)]
     pub account_state_hash: Option<String>,
-    pub balance: Option<String>,
-    pub code_boc: Option<String>,
     #[serde(default)]
+    pub balance: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_boc: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_hash: Option<String>,
     #[serde(default)]
     pub contract_methods: Vec<i32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_boc: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_hash: Option<String>,
     #[serde(default)]
     pub extra_currencies: Option<HashMap<String, String>>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frozen_hash: Option<String>,
     #[serde(default)]
     pub interfaces: Option<Vec<String>>,
@@ -332,7 +378,7 @@ pub struct Transaction {
     pub hash: String,
     pub lt: String,
     #[serde(default)]
-    pub block_ref: Option<Value>,
+    pub block_ref: Option<BlockId>,
     #[serde(default)]
     pub now: u32,
     #[serde(default)]
@@ -358,6 +404,8 @@ pub struct Transaction {
     #[serde(default)]
     pub trace_id: Option<String>,
     #[serde(default)]
+    pub child_transactions: Vec<String>,
+    #[serde(default)]
     pub description: Option<TransactionDescr>,
     #[serde(default)]
     pub in_msg: Option<Message>,
@@ -377,11 +425,11 @@ pub struct AccountState {
     pub account_status: Option<String>,
     #[serde(default)]
     pub balance: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub code_boc: Option<String>,
     #[serde(default)]
     pub code_hash: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_boc: Option<String>,
     #[serde(default)]
     pub data_hash: Option<String>,
@@ -401,29 +449,29 @@ pub struct TransactionDescr {
     pub destroyed: Option<bool>,
     #[serde(default)]
     pub credit_first: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub compute_ph: Option<ComputePhase>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action: Option<ActionPhase>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_ph: Option<StoragePhase>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credit_ph: Option<CreditPhase>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bounce: Option<Value>,
     #[serde(default)]
     pub installed: Option<bool>,
     #[serde(default)]
     pub is_tock: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub split_info: Option<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CreditPhase {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub due_fees_collected: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credit: Option<String>,
     #[serde(default)]
     pub credit_extra_currencies: HashMap<String, String>,
@@ -431,67 +479,71 @@ pub struct CreditPhase {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComputePhase {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skipped: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub success: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub msg_state_used: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account_activated: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_fees: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_used: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_limit: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub gas_credit: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mode: Option<i8>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_code: Option<i32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub exit_arg: Option<i32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_steps: Option<u32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_init_state_hash: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub vm_final_state_hash: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ActionPhase {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub success: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub valid: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub no_funds: Option<bool>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status_change: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_code: Option<i32>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub result_arg: Option<i32>,
-    #[serde(default, alias = "total_actions")]
-    pub tot_actions: Option<u16>,
-    #[serde(default)]
-    pub spec_actions: Option<u16>,
-    #[serde(default)]
-    pub skipped_actions: Option<u16>,
-    #[serde(default)]
-    pub msgs_created: Option<u16>,
-    #[serde(default)]
+    #[serde(
+        default,
+        alias = "total_actions",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub tot_actions: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spec_actions: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skipped_actions: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub msgs_created: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_fwd_fees: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub total_action_fees: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub action_list_hash: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tot_msg_size: Option<MsgSize>,
 }
 
@@ -505,11 +557,11 @@ pub struct MsgSize {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoragePhase {
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_fees_collected: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage_fees_due: Option<String>,
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status_change: Option<String>,
 }
 
@@ -577,7 +629,7 @@ pub struct Trace {
     #[serde(default)]
     pub is_incomplete: bool,
     #[serde(default)]
-    pub actions: Vec<Value>,
+    pub actions: Vec<Action>,
     #[serde(default)]
     pub end_lt: Option<String>,
     #[serde(default)]
@@ -593,11 +645,20 @@ pub struct Trace {
     #[serde(default)]
     pub start_utime: Option<u32>,
     #[serde(default)]
-    pub trace: Option<Value>,
+    pub trace: Option<TraceNode>,
     #[serde(default)]
-    pub trace_info: Option<Value>,
+    pub trace_info: Option<TraceInfo>,
     #[serde(default)]
     pub warning: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TraceInfo {
+    pub transactions: usize,
+    pub messages: usize,
+    pub pending_messages: usize,
+    pub trace_state: String,
+    pub classification_state: String,
 }
 
 #[cfg(test)]

@@ -2918,7 +2918,7 @@ fn localnet_supports_library_publish_and_get_libraries_endpoint() {
             "id": 1,
             "method": "getLibraries",
             "params": {
-                "libraries": format!("{missing_hash},{library_hash}")
+                "libraries": [missing_hash, library_hash]
             }
         }),
     );

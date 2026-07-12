@@ -4,13 +4,15 @@ use serde::{
 };
 use serde_json::Value;
 
+use super::StringOrNumber;
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EmptyRequest {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JsonRpcRequest<T> {
     pub jsonrpc: String,
-    pub id: String,
+    pub id: StringOrNumber,
     pub method: String,
     pub params: T,
 }
@@ -19,7 +21,7 @@ impl<T> JsonRpcRequest<T> {
     pub fn new(id: impl Into<String>, method: impl Into<String>, params: T) -> Self {
         Self {
             jsonrpc: "2.0".to_owned(),
-            id: id.into(),
+            id: StringOrNumber::String(id.into()),
             method: method.into(),
             params,
         }

@@ -258,12 +258,8 @@ async fn send_ws_json<T: serde::Serialize + Sync>(
     socket: &mut WebSocket,
     value: &T,
 ) -> Result<(), axum::Error> {
-    let text = serde_json::to_string(value).unwrap_or_else(|e| {
-        serde_json::json!({
-            "error": format!("failed to serialize websocket response: {e}")
-        })
-        .to_string()
-    });
+    let text =
+        serde_json::to_string(value).expect("typed streaming WebSocket responses must serialize");
     socket.send(Message::Text(text.into())).await
 }
 
@@ -276,11 +272,6 @@ fn streaming_bad_request(id: Option<String>, error: String) -> Response {
 }
 
 fn sse_json_event<T: serde::Serialize>(event: &'static str, value: &T) -> Event {
-    let data = serde_json::to_string(value).unwrap_or_else(|e| {
-        serde_json::json!({
-            "error": format!("failed to serialize event: {e}")
-        })
-        .to_string()
-    });
+    let data = serde_json::to_string(value).expect("typed streaming SSE responses must serialize");
     Event::default().event(event).data(data)
 }

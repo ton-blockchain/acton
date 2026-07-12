@@ -10,8 +10,10 @@ use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
 use base64::Engine;
+use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
+use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
     DetectHashRequest, JsonRpcRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
@@ -34,25 +36,17 @@ pub async fn json_rpc(
     let start = ApiCallLog::start();
     let method = payload.method.clone();
     let call_type = classify_json_rpc_call(&method);
-    let request_id = Value::String(payload.id.clone());
+    let request_id = match &payload.id {
+        wire::StringOrNumber::String(value) => Value::String(value.clone()),
+        wire::StringOrNumber::Number(value) => Value::Number((*value).into()),
+    };
     let id_str = payload.id.clone();
 
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
 
     let mut response = match result {
         Ok(resp) => resp,
-        Err(e) => (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(serde_json::json!({
-                "jsonrpc": "2.0",
-                "id": id_str,
-                "ok": false,
-                "error": e.to_string(),
-                "code": 500,
-                "@extra": get_extra()
-            })),
-        )
-            .into_response(),
+        Err(e) => json_rpc_error(StatusCode::INTERNAL_SERVER_ERROR, id_str, e.to_string()),
     };
 
     api_calls.record(
@@ -87,88 +81,110 @@ async fn json_rpc_router(
     let method = payload.method.as_str();
     let id_str = payload.id;
 
-    let res: Value = match method {
+    let result: wire::JsonRpcResult = match method {
         "sendBoc" => {
             let req: SendBocRequest = parse_params(params, method)?;
-            node.send_boc(req.boc).await.map(|r| v2::map_send_boc(&r))?
+            wire::JsonRpcResult::Ok(Box::new(
+                node.send_boc(req.boc).await.map(|r| v2::map_send_boc(&r))?,
+            ))
         }
         "sendBocReturnHash" => {
             let req: SendBocRequest = parse_params(params, method)?;
-            node.send_boc(req.boc)
-                .await
-                .map(|r| v2::map_send_boc_return_hash(&r))?
+            wire::JsonRpcResult::ExternalMessage(Box::new(
+                node.send_boc(req.boc)
+                    .await
+                    .map(|r| v2::map_send_boc_return_hash(&r))?,
+            ))
         }
         "runGetMethod" => {
             let req: RunGetMethodRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
-            node.run_get_method(req.address, method_str, req.stack, req.seqno)
-                .await
-                .map(|r| v2::map_run_get_method(&r, true))?
+            wire::JsonRpcResult::RunGetMethod(Box::new(
+                node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                    .await
+                    .map(|r| v2::map_run_get_method(&r, true))?,
+            ))
         }
         "runGetMethodStd" => {
             let req: RunGetMethodRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
-            node.run_get_method(req.address, method_str, req.stack, req.seqno)
-                .await
-                .map(|r| v2::map_run_get_method(&r, false))?
+            wire::JsonRpcResult::RunGetMethod(Box::new(
+                node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                    .await
+                    .map(|r| v2::map_run_get_method(&r, false))?,
+            ))
         }
         "detectAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
             let (addr, flags) = parse_std_addr(&req.address)?;
             let given_type = detect_given_type(&req.address, flags.bounceable);
-            map_detect_address(&addr, flags, given_type)
+            wire::JsonRpcResult::DetectAddress(Box::new(map_detect_address(
+                &addr, flags, given_type,
+            )))
         }
         "detectHash" => {
             let req: DetectHashRequest = parse_params(params, method)?;
             let hash = parse_hash_any(&req.hash)?;
-            v2::map_detect_hash(&hash)
+            wire::JsonRpcResult::DetectHash(Box::new(v2::map_detect_hash(&hash)))
         }
         "packAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
             let (addr, flags) = parse_std_addr(&req.address)?;
-            v2::map_pack_address(&addr, flags.testnet)
+            wire::JsonRpcResult::String(v2::map_pack_address(&addr, flags.testnet))
         }
         "unpackAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
             let (addr, _) = parse_std_addr(&req.address)?;
-            v2::map_unpack_address(&addr)
+            wire::JsonRpcResult::String(v2::map_unpack_address(&addr))
         }
         "getAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            node.get_address_information(req.address, req.seqno)
-                .await
-                .map(|r| v2::map_account_state(&r))?
+            wire::JsonRpcResult::AddressInformation(Box::new(
+                node.get_address_information(req.address, req.seqno)
+                    .await
+                    .map(|r| v2::map_account_state(&r))?,
+            ))
         }
         "getShardAccountCell" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            node.get_shard_account_cell(req.address, req.seqno)
-                .await
-                .map(|r| v2::map_shard_account_cell(&r))?
+            wire::JsonRpcResult::ShardAccountCell(Box::new(
+                node.get_shard_account_cell(req.address, req.seqno)
+                    .await
+                    .map(|r| v2::map_shard_account_cell(&r))?,
+            ))
         }
         "getAddressBalance" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            node.get_address_balance(req.address, req.seqno)
-                .await
-                .map(|r| r.to_string().into())?
+            wire::JsonRpcResult::String(
+                node.get_address_balance(req.address, req.seqno)
+                    .await?
+                    .to_string(),
+            )
         }
         "getAddressState" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            node.get_address_state(req.address, req.seqno)
-                .await
-                .map(|r| r.to_string().into())?
+            wire::JsonRpcResult::String(
+                node.get_address_state(req.address, req.seqno)
+                    .await?
+                    .to_string(),
+            )
         }
         "getLibraries" => {
             let req: LibrariesRequest = parse_params(params, method)?;
             let hashes = parse_libraries(&req.libraries)?;
-            node.get_libraries(hashes)
-                .await
-                .map(|r| v2::map_libraries(&r))?
+            wire::JsonRpcResult::Libraries(Box::new(
+                node.get_libraries(hashes)
+                    .await
+                    .map(|r| v2::map_libraries(&r))?,
+            ))
         }
         "getExtendedAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            node.get_address_information(req.address, req.seqno)
-                .await
-                .map(|r| v2::map_extended_account_state(&r))?
+            wire::JsonRpcResult::ExtendedAddressInformation(Box::new(
+                node.get_address_information(req.address, req.seqno)
+                    .await
+                    .map(|r| v2::map_extended_account_state(&r))?,
+            ))
         }
         "getWalletInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
@@ -183,7 +199,9 @@ async fn json_rpc_router(
             } else {
                 None
             };
-            v2::map_wallet_information(&info, seqno)
+            wire::JsonRpcResult::WalletInformation(Box::new(v2::map_wallet_information(
+                &info, seqno,
+            )))
         }
         "getTokenData" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
@@ -198,132 +216,179 @@ async fn json_rpc_router(
                 None => None,
             };
 
-            v2::map_token_data(&info, jetton_wallet_code.as_ref(), None).ok_or_else(|| {
-                anyhow::anyhow!("Smart contract {} is not Jetton or NFT", req.address)
-            })?
+            wire::JsonRpcResult::TokenData(Box::new(
+                v2::map_token_data(&info, jetton_wallet_code.as_ref(), None).ok_or_else(|| {
+                    anyhow::anyhow!("Smart contract {} is not Jetton or NFT", req.address)
+                })?,
+            ))
         }
         "getTransactions" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
-                .await
-                .map(|r| v2::map_transactions(&r))?
+            wire::JsonRpcResult::Transactions(
+                node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
+                    .await
+                    .map(|r| v2::map_transactions(&r))?,
+            )
         }
         "getTransactionsStd" => {
             let req: TransactionsRequest = parse_params(params, method)?;
             let page_limit = req.limit;
             let fetch_limit = page_limit.saturating_add(1);
-            node.get_transactions(req.address, fetch_limit, req.lt, req.hash, req.to_lt)
-                .await
-                .map(|r| v2::map_transactions_std(&r, page_limit))?
+            wire::JsonRpcResult::RawTransactions(Box::new(
+                node.get_transactions(req.address, fetch_limit, req.lt, req.hash, req.to_lt)
+                    .await
+                    .map(|r| v2::map_transactions_std(&r, page_limit))?,
+            ))
         }
         "getConfigParam" => {
             let req: ConfigParamRequest = parse_params(params, method)?;
             let param = parse_config_param(&req)?;
             let seqno = parse_seqno(req.seqno)?;
-            node.get_config_param(param, seqno)
-                .await
-                .map(|r| v2::map_config_info(&r))?
+            wire::JsonRpcResult::ConfigInfo(Box::new(
+                node.get_config_param(param, seqno)
+                    .await
+                    .map(|r| v2::map_config_info(&r))?,
+            ))
         }
         "getConfigAll" => {
             let req: ConfigAllRequest = parse_params(params, method)?;
             let seqno = parse_seqno(req.seqno)?;
-            node.get_config_all(seqno)
-                .await
-                .map(|r| v2::map_config_info(&r))?
+            wire::JsonRpcResult::ConfigInfo(Box::new(
+                node.get_config_all(seqno)
+                    .await
+                    .map(|r| v2::map_config_info(&r))?,
+            ))
         }
         "tryLocateTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            node.try_locate_tx(req.source, req.destination, req.created_lt)
-                .await
-                .map(|r| v2::map_transaction(&r))?
+            wire::JsonRpcResult::Transaction(Box::new(
+                node.try_locate_tx(req.source, req.destination, req.created_lt)
+                    .await
+                    .map(|r| v2::map_transaction(&r))?,
+            ))
         }
         "tryLocateResultTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            node.try_locate_result_tx(req.source, req.destination, req.created_lt)
-                .await
-                .map(|r| v2::map_transaction(&r))?
+            wire::JsonRpcResult::Transaction(Box::new(
+                node.try_locate_result_tx(req.source, req.destination, req.created_lt)
+                    .await
+                    .map(|r| v2::map_transaction(&r))?,
+            ))
         }
         "tryLocateSourceTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            node.try_locate_source_tx(req.source, req.destination, req.created_lt)
-                .await
-                .map(|r| v2::map_transaction(&r))?
+            wire::JsonRpcResult::Transaction(Box::new(
+                node.try_locate_source_tx(req.source, req.destination, req.created_lt)
+                    .await
+                    .map(|r| v2::map_transaction(&r))?,
+            ))
         }
         "getBlockHeader" => {
             let req: BlockQueryAdapter = parse_params(params, method)?;
-            node.get_block_header(req.seqno as u32)
-                .await
-                .map(|r| v2::map_block_header(&r))?
+            wire::JsonRpcResult::BlockHeader(Box::new(
+                node.get_block_header(req.seqno as u32)
+                    .await
+                    .map(|r| v2::map_block_header(&r))?,
+            ))
         }
         "getBlockTransactions" => {
             let req: BlockQueryAdapter = parse_params(params, method)?;
-            node.get_block_transactions(req.seqno as u32)
-                .await
-                .map(|r| v2::map_block_transactions(&r))?
+            wire::JsonRpcResult::Ok(Box::new(
+                node.get_block_transactions(req.seqno as u32)
+                    .await
+                    .map(|r| v2::map_block_transactions(&r))?,
+            ))
         }
         "getBlockTransactionsExt" => {
             let req: BlockQueryAdapter = parse_params(params, method)?;
-            node.get_block_transactions(req.seqno as u32)
-                .await
-                .map(|r| v2::map_block_transactions_ext(&r))?
+            wire::JsonRpcResult::BlockTransactionsExt(Box::new(
+                node.get_block_transactions(req.seqno as u32)
+                    .await
+                    .map(|r| v2::map_block_transactions_ext(&r))?,
+            ))
         }
-        "getMasterchainInfo" => node
-            .get_masterchain_info()
-            .await
-            .map(|r| v2::map_masterchain_info(&r))?,
-        "getConsensusBlock" => node
-            .get_consensus_block()
-            .await
-            .map(|r| v2::map_consensus_block(&r))?,
-        "getOutMsgQueueSize" => node
-            .get_masterchain_info()
-            .await
-            .map(|r| v2::map_out_msg_queue_sizes(&r))?,
+        "getMasterchainInfo" => wire::JsonRpcResult::MasterchainInfo(Box::new(
+            node.get_masterchain_info()
+                .await
+                .map(|r| v2::map_masterchain_info(&r))?,
+        )),
+        "getConsensusBlock" => wire::JsonRpcResult::ConsensusBlock(Box::new(
+            node.get_consensus_block()
+                .await
+                .map(|r| v2::map_consensus_block(&r))?,
+        )),
+        "getOutMsgQueueSize" => wire::JsonRpcResult::OutMsgQueueSizes(Box::new(
+            node.get_masterchain_info()
+                .await
+                .map(|r| v2::map_out_msg_queue_sizes(&r))?,
+        )),
         "shards" => {
             let req: BlockQueryAdapter = parse_params(params, method)?;
-            node.get_shards(req.seqno as u32)
-                .await
-                .map(|r| v2::map_shards(&r))?
+            wire::JsonRpcResult::Shards(Box::new(
+                node.get_shards(req.seqno as u32)
+                    .await
+                    .map(|r| v2::map_shards(&r))?,
+            ))
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;
-            node.lookup_block(
-                req.workchain,
-                req.shard,
-                req.seqno.map(|x| x as u32),
-                req.lt,
-                req.unixtime,
-            )
-            .await
-            .map(|r| v2::map_lookup_block(&r))?
+            wire::JsonRpcResult::BlockId(Box::new(
+                node.lookup_block(
+                    req.workchain,
+                    req.shard,
+                    req.seqno.map(|x| x as u32),
+                    req.lt,
+                    req.unixtime,
+                )
+                .await
+                .map(|r| v2::map_lookup_block(&r))?,
+            ))
         }
         _ => {
-            return Ok((
+            return Ok(json_rpc_error(
                 StatusCode::NOT_FOUND,
-                Json(serde_json::json!({
-                    "jsonrpc": "2.0",
-                    "id": id_str,
-                    "ok": false,
-                    "error": "Method not found",
-                    "code": 404,
-                    "@extra": get_extra()
-                })),
-            )
-                .into_response());
+                id_str,
+                "Method not found",
+            ));
         }
     };
 
-    Ok((
+    Ok(json_rpc_success(id_str, result))
+}
+
+fn json_rpc_success<T: Serialize>(id: wire::StringOrNumber, result: T) -> Response {
+    (
         StatusCode::OK,
-        Json(serde_json::json!({
-            "jsonrpc": "2.0",
-            "id": id_str,
-            "ok": true,
-            "result": res,
-            "@extra": get_extra()
-        })),
+        Json(wire::JsonRpcResponse {
+            jsonrpc: Some("2.0".to_owned()),
+            id: Some(id),
+            response: wire::TonlibResponse {
+                ok: true,
+                result,
+                extra: Some(get_extra()),
+            },
+        }),
     )
-        .into_response())
+        .into_response()
+}
+
+fn json_rpc_error(
+    status: StatusCode,
+    id: wire::StringOrNumber,
+    error: impl Into<String>,
+) -> Response {
+    (
+        status,
+        Json(wire::TonlibErrorResponse {
+            ok: false,
+            error: error.into(),
+            code: i32::from(status.as_u16()),
+            extra: Some(get_extra()),
+            jsonrpc: Some("2.0".to_owned()),
+            id: Some(id),
+        }),
+    )
+        .into_response()
 }
 
 fn parse_std_addr(

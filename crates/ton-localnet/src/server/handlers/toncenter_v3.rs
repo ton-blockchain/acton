@@ -14,12 +14,14 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::Engine;
+use serde::Serialize;
 use serde_json::Value;
 use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
 use ton_api::toncenter::emulate::v1 as emulate;
+use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, BlocksQuery, RunGetMethodRequest,
     SendMessageRequest, TransactionsByMessageQuery,
@@ -238,16 +240,13 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
                 Err(e) => return emulate_internal_error(e.to_string()),
             };
 
-            let response = match v3::map_emulate_trace_response(
+            let response = v3::map_emulate_trace_response(
                 &trace,
                 with_actions,
                 include_code_data,
                 address_book,
                 metadata,
-            ) {
-                Ok(response) => response,
-                Err(e) => return emulate_internal_error(e.to_string()),
-            };
+            );
             (StatusCode::OK, Json(response)).into_response()
         }
         Err(e) => emulate_internal_error(e.to_string()),
@@ -265,7 +264,7 @@ pub async fn get_jetton_masters(
             payload.limit,
             payload.offset,
         ),
-        v3::map_jetton_masters,
+        |masters| v3::map_jetton_masters(masters),
     )
     .await
 }
@@ -327,7 +326,7 @@ pub async fn get_nft_items(
             payload.limit,
             payload.offset,
         ),
-        v3::map_nft_items,
+        |items| v3::map_nft_items(items),
     )
     .await
 }
@@ -968,7 +967,7 @@ fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
 #[derive(Default)]
 struct AddressInfo {
     interfaces: BTreeSet<String>,
-    token_info: Vec<Value>,
+    token_info: Vec<v3_types::TokenInfo>,
     extra_jetton_masters: BTreeSet<Addr>,
 }
 
@@ -977,7 +976,7 @@ async fn build_emulate_v1_extra_data(
     trace: &TraceNode,
     include_address_book: bool,
     include_metadata: bool,
-) -> anyhow::Result<(Option<Value>, Option<Value>)> {
+) -> anyhow::Result<(Option<v3_types::AddressBook>, Option<v3_types::Metadata>)> {
     if !include_address_book && !include_metadata {
         return Ok((None, None));
     }
@@ -985,8 +984,8 @@ async fn build_emulate_v1_extra_data(
     let mut addresses = BTreeSet::new();
     collect_trace_addresses(trace, &mut addresses);
 
-    let mut address_book = serde_json::Map::new();
-    let mut metadata = serde_json::Map::new();
+    let mut address_book = v3_types::AddressBook::new();
+    let mut metadata = v3_types::Metadata::new();
     let mut pending_jetton_masters = BTreeSet::new();
 
     let infos = node
@@ -1000,21 +999,21 @@ async fn build_emulate_v1_extra_data(
         if include_address_book {
             address_book.insert(
                 address.to_string(),
-                json!({
-                    "user_friendly": as_user_friendly(address),
-                    "domain": Value::Null,
-                    "interfaces": info.interfaces.into_iter().collect::<Vec<_>>(),
-                }),
+                v3_types::AddressBookRow {
+                    user_friendly: Some(as_user_friendly(address)),
+                    domain: None,
+                    interfaces: Some(info.interfaces.into_iter().collect()),
+                },
             );
         }
 
         if include_metadata && !info.token_info.is_empty() {
             metadata.insert(
                 address.to_string(),
-                json!({
-                    "is_indexed": true,
-                    "token_info": info.token_info,
-                }),
+                v3_types::AddressMetadata {
+                    is_indexed: Some(true),
+                    token_info: info.token_info,
+                },
             );
         }
     }
@@ -1033,16 +1032,16 @@ async fn build_emulate_v1_extra_data(
             }
             metadata.insert(
                 key,
-                json!({
-                    "is_indexed": true,
-                    "token_info": info.token_info,
-                }),
+                v3_types::AddressMetadata {
+                    is_indexed: Some(true),
+                    token_info: info.token_info,
+                },
             );
         }
     }
 
-    let address_book = include_address_book.then_some(Value::Object(address_book));
-    let metadata = include_metadata.then_some(Value::Object(metadata));
+    let address_book = include_address_book.then_some(address_book);
+    let metadata = include_metadata.then_some(metadata);
 
     Ok((address_book, metadata))
 }
@@ -1235,12 +1234,13 @@ fn emulate_error_response(status: StatusCode, error: impl Into<String>) -> Respo
         .into_response()
 }
 
-async fn handle_v3_result<T, F>(
+async fn handle_v3_result<T, F, M>(
     result: impl Future<Output = anyhow::Result<T>>,
     mapper: F,
 ) -> Response
 where
-    F: FnOnce(&T) -> Value,
+    F: FnOnce(&T) -> M,
+    M: Serialize,
 {
     match result.await {
         Ok(res) => (StatusCode::OK, Json(mapper(&res))).into_response(),
@@ -1255,11 +1255,11 @@ async fn handle_v3_traces_result(
         Ok(trace) => (StatusCode::OK, Json(v3::map_traces(&trace))).into_response(),
         Err(e) if is_trace_not_found_error(&e) => (
             StatusCode::OK,
-            Json(json!({
-                "address_book": {},
-                "metadata": {},
-                "traces": [],
-            })),
+            Json(v3_types::TracesResponse {
+                traces: Vec::new(),
+                address_book: v3_types::AddressBook::new(),
+                metadata: v3_types::Metadata::new(),
+            }),
         )
             .into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -1278,10 +1278,10 @@ fn v3_bad_request(error: impl Into<String>) -> Response {
 fn request_error(status: StatusCode, error: impl Into<String>) -> Response {
     (
         status,
-        Json(json!({
-            "error": error.into(),
-            "code": status.as_u16(),
-        })),
+        Json(v3_types::RequestError {
+            error: error.into(),
+            code: Some(i32::from(status.as_u16())),
+        }),
     )
         .into_response()
 }

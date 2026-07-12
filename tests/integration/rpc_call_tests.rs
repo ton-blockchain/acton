@@ -1201,9 +1201,25 @@ fn test_rpc_call_parses_toncenter_mixed_list_stack() {
         ToncenterV2MockResponse {
             status: 200,
             body: serde_json::json!({
+                "ok": true,
                 "result": {
+                    "@type": "smc.runResult",
+                    "gas_used": "0",
                     "stack": mixed_list_stack,
-                    "exit_code": 0
+                    "exit_code": 0,
+                    "block_id": {
+                        "@type": "ton.blockIdExt",
+                        "workchain": -1,
+                        "shard": "-9223372036854775808",
+                        "seqno": 0,
+                        "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                        "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                    },
+                    "last_transaction_id": {
+                        "@type": "internal.transactionId",
+                        "lt": "0",
+                        "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                    }
                 }
             })
             .to_string(),

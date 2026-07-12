@@ -281,9 +281,25 @@ pub(crate) fn toncenter_v2_run_get_method_ok_response(
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
             "result": {
+                "@type": "smc.runResult",
+                "gas_used": "0",
                 "stack": legacy_stack_to_json(&Tuple(stack)).expect("stack must serialize to legacy json"),
-                "exit_code": exit_code
+                "exit_code": exit_code,
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": "0",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
             }
         })
         .to_string(),
@@ -299,16 +315,29 @@ pub(crate) fn toncenter_v2_account_info_ok_response(
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
             "result": {
+                "@type": "raw.fullAccountState",
                 "balance": balance.to_string(),
+                "extra_currencies": [],
                 "code": "",
                 "data": "",
                 "state": state,
                 "frozen_hash": "",
                 "last_transaction_id": {
+                    "@type": "internal.transactionId",
                     "lt": lt.to_string(),
                     "hash": hash,
-                }
+                },
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "sync_utime": 0
             }
         })
         .to_string(),
@@ -327,16 +356,29 @@ pub(crate) fn toncenter_v2_account_info_with_code_ok_response(
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
             "result": {
+                "@type": "raw.fullAccountState",
                 "balance": balance.to_string(),
+                "extra_currencies": [],
                 "code": code_boc64,
                 "data": data_boc64,
                 "state": state,
                 "frozen_hash": frozen_hash,
                 "last_transaction_id": {
+                    "@type": "internal.transactionId",
                     "lt": lt,
                     "hash": hash,
-                }
+                },
+                "block_id": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "sync_utime": 0
             }
         })
         .to_string(),
@@ -347,12 +389,23 @@ pub(crate) fn toncenter_v2_masterchain_info_ok_response(seqno: u64) -> Toncenter
     ToncenterV2MockResponse {
         status: 200,
         body: serde_json::json!({
+            "ok": true,
             "result": {
+                "@type": "blocks.masterchainInfo",
                 "last": {
                     "@type": "ton.blockIdExt",
                     "workchain": -1,
                     "shard": "-9223372036854775808",
                     "seqno": seqno,
+                    "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                    "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "state_root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+                "init": {
+                    "@type": "ton.blockIdExt",
+                    "workchain": -1,
+                    "shard": "-9223372036854775808",
+                    "seqno": 0,
                     "root_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "file_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
                 }
@@ -527,7 +580,8 @@ pub(crate) fn toncenter_v2_error_response(status: u16, error: &str) -> Toncenter
         status,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": i32::from(status)
         })
         .to_string(),
     }
@@ -545,7 +599,8 @@ pub(crate) fn toncenter_v2_send_boc_error_response(error: &str) -> ToncenterV2Mo
         status: 500,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": 500
         })
         .to_string(),
     }
@@ -556,7 +611,8 @@ pub(crate) fn toncenter_v2_send_boc_client_error_response(error: &str) -> Toncen
         status: 400,
         body: serde_json::json!({
             "ok": false,
-            "error": error
+            "error": error,
+            "code": 400
         })
         .to_string(),
     }
@@ -568,8 +624,10 @@ pub(crate) fn toncenter_v2_get_libraries_ok_response(data: &str) -> ToncenterV2M
         body: serde_json::json!({
             "ok": true,
             "result": {
+                "@type": "smc.libraryResult",
                 "result": [{
-                    "found": true,
+                    "@type": "smc.libraryEntry",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
                     "data": data
                 }]
             }
