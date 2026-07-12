@@ -1,4 +1,4 @@
-use crate::api::toncenter_v3;
+use crate::api::{toncenter_emulate, toncenter_v3};
 use crate::localnet::{
     Localnet, LocalnetAddressInfo, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction,
 };
@@ -324,21 +324,86 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
         return emulate_bad_request(format!("invalid request: invalid boc: {e}"));
     }
 
-    let include_code_data = payload.include_code_data;
-    let include_address_book = payload.include_address_book;
-    let include_metadata = payload.include_metadata;
-    let with_actions = payload.with_actions;
+    emulate_boc_v1(
+        node.as_ref(),
+        boc,
+        payload.ignore_chksig,
+        payload.mc_block_seqno,
+        EmulateResponseOptions {
+            include_code_data: payload.include_code_data,
+            include_address_book: payload.include_address_book,
+            include_metadata: payload.include_metadata,
+            with_actions: payload.with_actions,
+        },
+    )
+    .await
+}
 
+pub async fn emulate_ton_connect_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
+    let payload: emulate::TonConnectEmulateRequest = match serde_json::from_slice(&body) {
+        Ok(payload) => payload,
+        Err(e) => return emulate_bad_request(format!("invalid request: {e}")),
+    };
+    if let Err(e) = toncenter_emulate::validate_ton_connect_request(&payload) {
+        return emulate_bad_request(format!("invalid request: {e}"));
+    }
+
+    let account = match node
+        .get_address_information(payload.from.clone(), payload.mc_block_seqno)
+        .await
+    {
+        Ok(account) => account,
+        Err(e) => return emulate_internal_error(e.to_string()),
+    };
+    let now = match node.clock_info().await {
+        Ok(clock) => clock.current_unix_time,
+        Err(e) => return emulate_internal_error(e.to_string()),
+    };
+    let boc = match toncenter_emulate::compose_ton_connect_message(&payload, &account, now) {
+        Ok(boc) => boc.to_base64(),
+        Err(e) => return emulate_internal_error(e.to_string()),
+    };
+
+    emulate_boc_v1(
+        node.as_ref(),
+        boc,
+        true,
+        payload.mc_block_seqno,
+        EmulateResponseOptions {
+            include_code_data: payload.include_code_data,
+            include_address_book: payload.include_address_book,
+            include_metadata: payload.include_metadata,
+            with_actions: payload.with_actions,
+        },
+    )
+    .await
+}
+
+#[derive(Clone, Copy)]
+struct EmulateResponseOptions {
+    include_code_data: bool,
+    include_address_book: bool,
+    include_metadata: bool,
+    with_actions: bool,
+}
+
+async fn emulate_boc_v1(
+    node: &Localnet,
+    boc: String,
+    ignore_chksig: bool,
+    mc_block_seqno: Option<u32>,
+    options: EmulateResponseOptions,
+) -> Response {
     match node
-        .emulate_trace(boc, Some(payload.ignore_chksig), payload.mc_block_seqno)
+        .emulate_trace(boc, Some(ignore_chksig), mc_block_seqno)
         .await
     {
         Ok(trace) => {
             let (address_book, metadata) = match build_emulate_v1_extra_data(
-                node.as_ref(),
+                node,
                 &trace.trace,
-                include_address_book,
-                include_metadata,
+                options.include_address_book,
+                options.include_metadata,
             )
             .await
             {
@@ -348,8 +413,8 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
 
             let response = v3::map_emulate_trace_response(
                 &trace,
-                with_actions,
-                include_code_data,
+                options.with_actions,
+                options.include_code_data,
                 address_book,
                 metadata,
             );

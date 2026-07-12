@@ -6,11 +6,10 @@ description: >-
 
 
   These routes are intended for local development tooling and should not be
-  exposed publicly. They are unauthenticated by default, and --require-auth
-  protects them together with other localnet HTTP routes. Rate limiting applies
-  only to /api routes, and response delay applies only to TonCenter-compatible
-  API routes; control routes remain available when --rate-limit or
-  --response-delay-ms is enabled.
+  exposed publicly. When localnet is started with --require-auth, these routes
+  require the localnet API token. Rate limiting applies only to /api routes, and
+  response delay applies only to TonCenter-compatible API routes; control routes
+  remain available when --rate-limit or --response-delay-ms is enabled.
 full: true
 sidebarTitle: Control API
 _openapi:
@@ -280,6 +279,6 @@ _openapi:
 
 Acton-only control routes for local state, wallets, address names, compiler ABI metadata, simulated network conditions, and raw local message injection.
 
-These routes are intended for local development tooling and should not be exposed publicly. They are unauthenticated by default, and --require-auth protects them together with other localnet HTTP routes. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
+These routes are intended for local development tooling and should not be exposed publicly. When localnet is started with --require-auth, these routes require the localnet API token. Rate limiting applies only to /api routes, and response delay applies only to TonCenter-compatible API routes; control routes remain available when --rate-limit or --response-delay-ms is enabled.
 
 <APIPage document={"./public/openapi/acton-localnet-control.openapi.json"} webhooks={[]} operations={[{"path":"/acton_fundAccount","method":"post"},{"path":"/acton_getAddressName","method":"get"},{"path":"/acton_setAddressName","method":"post"},{"path":"/acton_getCompilerAbi","method":"get"},{"path":"/acton_listCompilerAbis","method":"get"},{"path":"/acton_deleteCompilerAbi","method":"post"},{"path":"/acton_getVerifiedSource","method":"get"},{"path":"/acton_getRegisteredVerifiedSource","method":"get"},{"path":"/acton_listVerifiedSources","method":"get"},{"path":"/acton_deleteVerifiedSource","method":"post"},{"path":"/acton_registerCompilerAbis","method":"post"},{"path":"/acton_registerVerifiedSources","method":"post"},{"path":"/acton_dumpState","method":"post"},{"path":"/acton_loadState","method":"post"},{"path":"/acton_snapshot","method":"post"},{"path":"/acton_listSnapshots","method":"post"},{"path":"/acton_revert","method":"post"},{"path":"/acton_exportSnapshot","method":"post"},{"path":"/acton_importSnapshot","method":"post"},{"path":"/acton_setShardAccount","method":"post"},{"path":"/acton_changeAccountState","method":"post"},{"path":"/acton_sendInternalMessage","method":"post"},{"path":"/acton_getStartupWallets","method":"get"},{"path":"/acton_mine","method":"post"},{"path":"/acton_increaseTime","method":"post"},{"path":"/acton_setTime","method":"post"},{"path":"/acton_setNextBlockTimestamp","method":"post"},{"path":"/acton_setNetworkConditions","method":"post"},{"path":"/acton_nodeInfo","method":"get"}]} showTitle />

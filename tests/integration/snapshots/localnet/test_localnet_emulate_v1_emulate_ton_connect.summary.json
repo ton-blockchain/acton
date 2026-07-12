@@ -1,0 +1,65 @@
+{
+  "state": {
+    "transaction_count_unchanged": true
+  },
+  "validation": {
+    "empty_messages": {
+      "error": "invalid request: messages array cannot be empty",
+      "status": 400
+    },
+    "invalid_amount": {
+      "error": "invalid request: invalid amount in message at index 0",
+      "status": 400
+    }
+  },
+  "wallets": [
+    {
+      "aborted": false,
+      "action_success": true,
+      "actions_included": true,
+      "address_book_contains_wallet": true,
+      "code_or_data_cells_non_empty": true,
+      "complete": true,
+      "compute_exit_code": 0,
+      "compute_success": true,
+      "metadata_included": true,
+      "out_message_count": 1,
+      "status": 200,
+      "trace_present": true,
+      "transaction_count": 1,
+      "version": "v3r2"
+    },
+    {
+      "aborted": false,
+      "action_success": true,
+      "actions_included": true,
+      "address_book_contains_wallet": true,
+      "code_or_data_cells_non_empty": true,
+      "complete": true,
+      "compute_exit_code": 0,
+      "compute_success": true,
+      "metadata_included": true,
+      "out_message_count": 1,
+      "status": 200,
+      "trace_present": true,
+      "transaction_count": 1,
+      "version": "v4r2"
+    },
+    {
+      "aborted": false,
+      "action_success": true,
+      "actions_included": true,
+      "address_book_contains_wallet": true,
+      "code_or_data_cells_non_empty": true,
+      "complete": true,
+      "compute_exit_code": 0,
+      "compute_success": true,
+      "metadata_included": true,
+      "out_message_count": 2,
+      "status": 200,
+      "trace_present": true,
+      "transaction_count": 1,
+      "version": "v5r1"
+    }
+  ]
+}

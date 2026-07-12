@@ -1,11 +1,11 @@
 use super::handlers::utils::get_extra;
 use super::handlers::{
     change_account_state, create_recovery_point, delete_compiler_abi, delete_verified_source,
-    detect_address, detect_hash, dump_state, emulate_trace_v1, export_recovery_point, faucet,
-    get_account_states_v3, get_address_balance, get_address_information,
-    get_address_information_v3, get_address_name, get_address_state, get_api_calls,
-    get_block_header, get_block_transactions, get_block_transactions_ext, get_blocks_v3,
-    get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
+    detect_address, detect_hash, dump_state, emulate_ton_connect_v1, emulate_trace_v1,
+    export_recovery_point, faucet, get_account_states_v3, get_address_balance,
+    get_address_information, get_address_information_v3, get_address_name, get_address_state,
+    get_api_calls, get_block_header, get_block_transactions, get_block_transactions_ext,
+    get_blocks_v3, get_compiler_abi, get_config_all, get_config_param, get_consensus_block,
     get_extended_address_information, get_jetton_masters, get_jetton_wallets, get_libraries,
     get_masterchain_info, get_nft_items, get_out_msg_queue_size, get_pending_transactions_v3,
     get_registered_verified_source, get_shard_account_cell, get_shards, get_startup_wallets,
@@ -113,8 +113,12 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/v3/jetton/wallets", get(get_jetton_wallets))
         .route("/v3/nft/items", get(get_nft_items));
 
-    let mut emulate_router =
-        Router::new().route("/emulate/v1/emulateTrace", post(emulate_trace_v1));
+    let mut emulate_router = Router::new()
+        .route("/emulate/v1/emulateTrace", post(emulate_trace_v1))
+        .route(
+            "/emulate/v1/emulateTonConnect",
+            post(emulate_ton_connect_v1),
+        );
     let streaming_router = Router::new()
         .route("/streaming/v2/sse", post(streaming_sse))
         .route("/streaming/v2/ws", get(streaming_ws));

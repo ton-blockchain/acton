@@ -18,12 +18,13 @@ use ton::ton_core::traits::tlb::TLB;
 use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
-use ton_localnet::types::Hash256;
+use ton_api::toncenter::emulate::v1::EmulateTraceResponse;
+use ton_localnet::types::{Addr, Hash256};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
 use tycho_types::models::{
     AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo,
-    OwnedMessage, ShardAccount, StdAddr,
+    OwnedMessage, ShardAccount, StateInit, StdAddr,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -147,6 +148,21 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
+const TON_CONNECT_WALLETS_CONFIG: &str = r#"[wallets.wallet_v3]
+kind = "v3r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v4]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v5]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
 const CATALOG_WALLET_V4R2_CODE_HASH: &str =
     "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 
@@ -3766,6 +3782,204 @@ fn localnet_supports_emulate_v1_emulate_trace() {
         with_extras["metadata"].is_object(),
         "`metadata` must be an object:\n{}",
         serde_json::to_string_pretty(&with_extras).unwrap_or_default()
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_supports_emulate_v1_emulate_ton_connect() {
+    let project = ProjectBuilder::new("localnet-emulate-v1-emulate-ton-connect").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v3,wallet_v4,wallet_v5", "--no-mining"])
+        .start();
+
+    let startup_wallets = node.get_json("/acton_getStartupWallets");
+    let wallets = response_payload(&startup_wallets)
+        .as_array()
+        .expect("startup wallets response must contain an array");
+    let transactions_before = node.get_json("/api/v3/transactions?limit=100");
+    let tx_count_before = v3_transactions_from_response(&transactions_before).len();
+    let mut wallet_results = Vec::new();
+
+    for wallet in wallets {
+        let address = wallet["address"]
+            .as_str()
+            .expect("startup wallet must expose address");
+        let mut messages = vec![json!({
+            "address": address,
+            "amount": "1000000"
+        })];
+        if wallet["version"] == "v4r2" {
+            let state_init =
+                CellBuilder::build_from(StateInit::default()).expect("empty state init must build");
+            messages[0]["payload"] = json!(Boc::encode_base64(Cell::default()));
+            messages[0]["stateInit"] = json!(Boc::encode_base64(&state_init));
+        } else if wallet["version"] == "v5r1" {
+            messages.push(json!({
+                "address": address,
+                "amount": "2000000"
+            }));
+        }
+        let (status, response) = node.post_json_with_status(
+            "/api/emulate/v1/emulateTonConnect",
+            &json!({
+                "from": address,
+                "messages": messages,
+                "with_actions": true,
+                "include_code_data": true,
+                "include_address_book": true,
+                "include_metadata": true
+            }),
+        );
+        let typed: EmulateTraceResponse =
+            serde_json::from_value(response.clone()).unwrap_or_else(|error| {
+                panic!("Invalid emulateTonConnect response: {error}\n{response:#}")
+            });
+        let root_transaction = typed
+            .trace
+            .transaction
+            .as_ref()
+            .expect("emulateTonConnect trace must contain root transaction");
+        let raw_address = Addr::parse(address)
+            .expect("startup wallet address must parse")
+            .to_string();
+        let address_book_contains_wallet = typed
+            .address_book
+            .as_ref()
+            .is_some_and(|book| book.contains_key(&raw_address));
+        wallet_results.push(json!({
+            "version": wallet["version"],
+            "status": status,
+            "trace_present": typed.trace.tx_hash.is_some(),
+            "transaction_count": typed.transactions.len(),
+            "compute_success": root_transaction
+                .description
+                .compute_ph
+                .as_ref()
+                .and_then(|phase| phase.success),
+            "compute_exit_code": root_transaction
+                .description
+                .compute_ph
+                .as_ref()
+                .and_then(|phase| phase.exit_code),
+            "action_success": root_transaction
+                .description
+                .action
+                .as_ref()
+                .and_then(|phase| phase.success),
+            "aborted": root_transaction.description.aborted,
+            "out_message_count": root_transaction.out_msgs.len(),
+            "actions_included": typed.actions.is_some(),
+            "code_or_data_cells_non_empty": typed
+                .code_cells
+                .as_ref()
+                .is_some_and(|cells| !cells.is_empty())
+                || typed
+                    .data_cells
+                    .as_ref()
+                    .is_some_and(|cells| !cells.is_empty()),
+            "address_book_contains_wallet": address_book_contains_wallet,
+            "metadata_included": typed.metadata.is_some(),
+            "complete": !typed.is_incomplete,
+        }));
+    }
+
+    let (empty_status, empty_response) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": wallets[0]["address"],
+            "messages": []
+        }),
+    );
+    let (amount_status, amount_response) = node.post_json_with_status(
+        "/api/emulate/v1/emulateTonConnect",
+        &json!({
+            "from": wallets[0]["address"],
+            "messages": [{
+                "address": wallets[0]["address"],
+                "amount": "not-a-number"
+            }]
+        }),
+    );
+    let transactions_after = node.get_json("/api/v3/transactions?limit=100");
+    let snapshot = json!({
+        "wallets": wallet_results,
+        "validation": {
+            "empty_messages": {
+                "status": empty_status,
+                "error": empty_response["error"],
+            },
+            "invalid_amount": {
+                "status": amount_status,
+                "error": amount_response["error"],
+            },
+        },
+        "state": {
+            "transaction_count_unchanged": v3_transactions_from_response(&transactions_after).len()
+                == tx_count_before,
+        }
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_emulate_v1_emulate_ton_connect.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+#[test]
+#[ignore = "optional live TonCenter fork contract test"]
+fn localnet_fork_supports_emulate_v1_emulate_ton_connect() {
+    let raw_request = std::env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON")
+        .expect("ACTON_TONCENTER_LIVE_TONCONNECT_JSON is required");
+    let request: Value = serde_json::from_str(&raw_request)
+        .expect("ACTON_TONCENTER_LIVE_TONCONNECT_JSON must be valid JSON");
+    let project = ProjectBuilder::new("localnet-fork-emulate-v1-emulate-ton-connect").build();
+    let node = project
+        .localnet()
+        .args(["--fork-net", "mainnet", "--no-mining"])
+        .ready_timeout(Duration::from_secs(30))
+        .start();
+
+    let (status, response) =
+        node.post_json_with_status("/api/emulate/v1/emulateTonConnect", &request);
+    let typed: EmulateTraceResponse =
+        serde_json::from_value(response.clone()).unwrap_or_else(|error| {
+            panic!("Invalid fork emulateTonConnect response: {error}\n{response:#}")
+        });
+    let root = typed
+        .trace
+        .transaction
+        .as_ref()
+        .expect("fork emulateTonConnect trace must contain root transaction");
+    let snapshot = json!({
+        "status": status,
+        "trace_present": typed.trace.tx_hash.is_some(),
+        "transaction_count_nonzero": !typed.transactions.is_empty(),
+        "compute_exit_code": root
+            .description
+            .compute_ph
+            .as_ref()
+            .and_then(|phase| phase.exit_code),
+        "emulated": root.emulated,
+        "complete": !typed.is_incomplete,
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_fork_emulate_v1_emulate_ton_connect.summary.json"
+        ),
     );
 
     node.stop();

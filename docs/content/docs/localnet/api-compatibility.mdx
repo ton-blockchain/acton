@@ -94,9 +94,10 @@ used for local indexing.
 
 ## Emulate API Coverage Matrix
 
-| Method | Endpoint                       | Available in local node | Purpose                                                                      |
-|--------|--------------------------------|-------------------------|------------------------------------------------------------------------------|
-| `POST` | `/api/emulate/v1/emulateTrace` | ✅                       | Emulates external message execution trace against current state (no commit). |
+| Method | Endpoint                            | Available in local node | Purpose                                                                      |
+|--------|-------------------------------------|-------------------------|------------------------------------------------------------------------------|
+| `POST` | `/api/emulate/v1/emulateTrace`      | ✅                       | Emulates external message execution trace against current state (no commit). |
+| `POST` | `/api/emulate/v1/emulateTonConnect` | ✅                       | Emulates a TON Connect transaction request against the sender wallet state.  |
 
 `include_address_book=true` enriches the response with every address referenced by the trace.
 `include_metadata=true` adds locally indexed jetton and NFT metadata, including referenced jetton
