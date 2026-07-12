@@ -39,6 +39,8 @@ type tokenInfoV3 struct {
 	Description *string        `json:"description"`
 	Image       *string        `json:"image"`
 	NFTIndex    *string        `json:"nft_index"`
+	IsNSFW      *bool          `json:"is_nsfw"`
+	IsScam      *bool          `json:"is_scam"`
 	Extra       map[string]any `json:"extra"`
 }
 
@@ -342,6 +344,21 @@ type transactionsResponseV3 struct {
 
 type blocksResponseV3 struct {
 	Blocks []blockV3 `json:"blocks"`
+}
+
+type masterchainInfoV3 struct {
+	First blockV3 `json:"first"`
+	Last  blockV3 `json:"last"`
+}
+
+type walletInformationV3 struct {
+	Balance             string  `json:"balance"`
+	WalletType          *string `json:"wallet_type"`
+	Seqno               *uint32 `json:"seqno"`
+	WalletID            *int32  `json:"wallet_id"`
+	LastTransactionLT   string  `json:"last_transaction_lt"`
+	LastTransactionHash string  `json:"last_transaction_hash"`
+	Status              string  `json:"status"`
 }
 
 type accountStatesResponseV3 struct {

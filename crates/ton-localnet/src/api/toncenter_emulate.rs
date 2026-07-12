@@ -1,9 +1,10 @@
+use crate::api::toncenter_wallet;
 use crate::localnet::LocalnetAccountState;
 use crate::types::BocBytes;
 use anyhow::Context;
-use ton::ton_core::cell::{TonCell, TonHash};
+use ton::ton_core::cell::TonCell;
 use ton::ton_core::traits::tlb::TLB;
-use ton::ton_wallet::{WalletV3Data, WalletV4Data, WalletV5Data, WalletVersion};
+use ton::ton_wallet::WalletVersion;
 use ton_api::toncenter::emulate::v1::{TonConnectEmulateRequest, TonConnectMessage};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellSliceParts};
@@ -56,8 +57,19 @@ pub(crate) fn compose_ton_connect_message(
 ) -> anyhow::Result<BocBytes> {
     let (from, _) = StdAddr::from_str_ext(&request.from, StdAddrFormat::any())
         .context("Invalid from address format")?;
-    let version = detect_wallet_version(account)?;
-    let (seqno, wallet_id) = read_wallet_state(version, account)?;
+    let wallet = toncenter_wallet::read_standard_wallet_state(account)?;
+    let version = wallet.version;
+    if !matches!(
+        version,
+        WalletVersion::V3R1
+            | WalletVersion::V3R2
+            | WalletVersion::V4R1
+            | WalletVersion::V4R2
+            | WalletVersion::V5R1
+    ) {
+        anyhow::bail!("Unsupported wallet type: {version:?}");
+    }
+    let wallet_id = wallet.wallet_id.context("Wallet state has no wallet id")?;
     let valid_until = wallet_valid_until(version, request.valid_until, now)?;
 
     let messages = request
@@ -65,8 +77,9 @@ pub(crate) fn compose_ton_connect_message(
         .iter()
         .map(|message| build_internal_message(&from, message, now))
         .collect::<anyhow::Result<Vec<_>>>()?;
-    let body = WalletVersion::build_ext_in_body(version, valid_until, seqno, wallet_id, messages)
-        .context("Failed to build wallet external message body")?;
+    let body =
+        WalletVersion::build_ext_in_body(version, valid_until, wallet.seqno, wallet_id, messages)
+            .context("Failed to build wallet external message body")?;
     let signed_body = add_dummy_signature(version, body)?;
     let body = Boc::decode(signed_body.to_boc()?)
         .context("Failed to convert wallet body to local cell")?;
@@ -90,47 +103,6 @@ fn validate_optional_boc(value: Option<&str>, field: &str, index: usize) -> anyh
             .with_context(|| format!("invalid message {field} at index {index}"))?;
     }
     Ok(())
-}
-
-fn detect_wallet_version(account: &LocalnetAccountState) -> anyhow::Result<WalletVersion> {
-    let code_hash = account
-        .code_hash
-        .as_ref()
-        .context("Account state has no code")?;
-    let code_hash = TonHash::from_vec(code_hash.0.to_vec())?;
-    let version =
-        WalletVersion::get_version_by_code(code_hash).context("Account is not a known wallet")?;
-    match version {
-        WalletVersion::V3R1
-        | WalletVersion::V3R2
-        | WalletVersion::V4R1
-        | WalletVersion::V4R2
-        | WalletVersion::V5R1 => Ok(version),
-        _ => anyhow::bail!("Unsupported wallet type: {version:?}"),
-    }
-}
-
-fn read_wallet_state(
-    version: WalletVersion,
-    account: &LocalnetAccountState,
-) -> anyhow::Result<(u32, i32)> {
-    let data = account.data.as_ref().context("Account state has no data")?;
-    let data = TonCell::from_boc(data.0.clone()).context("Failed to decode wallet data")?;
-    match version {
-        WalletVersion::V3R1 | WalletVersion::V3R2 => {
-            let data = WalletV3Data::from_cell(&data).context("Failed to parse wallet V3 data")?;
-            Ok((data.seqno, data.wallet_id))
-        }
-        WalletVersion::V4R1 | WalletVersion::V4R2 => {
-            let data = WalletV4Data::from_cell(&data).context("Failed to parse wallet V4 data")?;
-            Ok((data.seqno, data.wallet_id))
-        }
-        WalletVersion::V5R1 => {
-            let data = WalletV5Data::from_cell(&data).context("Failed to parse wallet V5 data")?;
-            Ok((data.seqno, data.wallet_id))
-        }
-        _ => anyhow::bail!("Unsupported wallet type: {version:?}"),
-    }
 }
 
 fn wallet_valid_until(
@@ -236,8 +208,10 @@ mod tests {
     use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
     use crate::storage::AccountStatus;
     use crate::types::{Addr, Hash256};
+    use ton::ton_core::cell::TonHash;
     use ton::ton_wallet::{
-        WalletV1V2Data, WalletV3ExtMsgBody, WalletV4ExtMsgBody, WalletV5ExtMsgBody,
+        WalletV1V2Data, WalletV3Data, WalletV3ExtMsgBody, WalletV4Data, WalletV4ExtMsgBody,
+        WalletV5Data, WalletV5ExtMsgBody,
     };
     use tycho_types::cell::CellBuilder;
     use tycho_types::models::Message;

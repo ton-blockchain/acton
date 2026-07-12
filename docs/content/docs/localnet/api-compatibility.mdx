@@ -54,22 +54,27 @@ local development flows that need to inject a raw internal message.
 
 ## TonCenter v3 Coverage Matrix
 
-Acton local development node currently supports 12 TonCenter v3 endpoints:
+Acton local development node currently supports 17 TonCenter v3 endpoints:
 
-| Method | Endpoint                        | Available in local node | Purpose                                                              |
-|--------|---------------------------------|-------------------------|----------------------------------------------------------------------|
-| `GET`  | `/api/v3/traces`                | ✅                       | Returns transaction trace tree for a transaction hash.               |
-| `GET`  | `/api/v3/blocks`                | ✅                       | Returns block metadata with TonCenter v3 blockchain filters.         |
-| `GET`  | `/api/v3/accountStates`         | ✅                       | Returns account states with `interfaces` and token metadata.         |
-| `GET`  | `/api/v3/addressInformation`    | ✅                       | Returns account state in `V2AddressInformation` shape.               |
-| `GET`  | `/api/v3/transactions`          | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
-| `GET`  | `/api/v3/transactionsByMessage` | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
-| `GET`  | `/api/v3/pendingTransactions`   | ✅                       | Returns pending transactions filtered by account and trace id.       |
-| `POST` | `/api/v3/message`               | ✅                       | Sends an external message in BOC and returns message hash fields.    |
-| `POST` | `/api/v3/runGetMethod`          | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
-| `GET`  | `/api/v3/jetton/masters`        | ✅                       | Returns jetton master metadata with optional filters and pagination. |
-| `GET`  | `/api/v3/jetton/wallets`        | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
-| `GET`  | `/api/v3/nft/items`             | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
+| Method | Endpoint                                 | Available in local node | Purpose                                                              |
+|--------|------------------------------------------|-------------------------|----------------------------------------------------------------------|
+| `GET`  | `/api/v3/traces`                         | ✅                       | Returns transaction trace tree for a transaction hash.               |
+| `GET`  | `/api/v3/blocks`                         | ✅                       | Returns block metadata with TonCenter v3 blockchain filters.         |
+| `GET`  | `/api/v3/accountStates`                  | ✅                       | Returns account states with `interfaces` and token metadata.         |
+| `GET`  | `/api/v3/addressInformation`             | ✅                       | Returns account state in `V2AddressInformation` shape.               |
+| `GET`  | `/api/v3/walletInformation`              | ✅                       | Returns wallet type, state, seqno, and wallet id when available.     |
+| `GET`  | `/api/v3/addressBook`                    | ✅                       | Returns address forms and locally detected interfaces.               |
+| `GET`  | `/api/v3/metadata`                       | ✅                       | Returns locally indexed jetton and NFT metadata.                     |
+| `GET`  | `/api/v3/masterchainInfo`                | ✅                       | Returns the first and latest local masterchain blocks.               |
+| `GET`  | `/api/v3/transactions`                   | ✅                       | Returns transactions with TonCenter v3 blockchain filters.           |
+| `GET`  | `/api/v3/transactionsByMasterchainBlock` | ✅                       | Returns transactions included in a masterchain block.                |
+| `GET`  | `/api/v3/transactionsByMessage`          | ✅                       | Returns transactions filtered by message hash/body hash/opcode.      |
+| `GET`  | `/api/v3/pendingTransactions`            | ✅                       | Returns pending transactions filtered by account and trace id.       |
+| `POST` | `/api/v3/message`                        | ✅                       | Sends an external message in BOC and returns message hash fields.    |
+| `POST` | `/api/v3/runGetMethod`                   | ✅                       | Runs a get method of a smart contract with an explicit stack.        |
+| `GET`  | `/api/v3/jetton/masters`                 | ✅                       | Returns jetton master metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/jetton/wallets`                 | ✅                       | Returns jetton wallet metadata with optional filters and pagination. |
+| `GET`  | `/api/v3/nft/items`                      | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
 
 `/api/v3/message` accepts external-in messages only. Use
 `/acton_sendInternalMessage` to inject a raw internal message in local tooling.

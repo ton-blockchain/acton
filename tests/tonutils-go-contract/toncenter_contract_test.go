@@ -354,6 +354,7 @@ func TestTonutilsV3TypedClientAgainstForkLocalnet(t *testing.T) {
 func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 	client, ctx := clientForTest(t)
 	v3 := client.V3()
+	mineBlockForSelectors(t, ctx)
 
 	// Prime fork history explicitly; V3 then validates the same imported transactions
 	// through the index-shaped API instead of depending on Go test execution order.
@@ -382,6 +383,63 @@ func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 			t.Fatal(err)
 		}
 		_ = result.Blocks
+	})
+	t.Run("masterchain info", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[masterchainInfoV3](ctx, v3, "masterchainInfo", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if result.First.Workchain != -1 || result.Last.Workchain != -1 {
+			t.Fatalf("unexpected masterchain blocks: first=%d last=%d", result.First.Workchain, result.Last.Workchain)
+		}
+	})
+	t.Run("wallet information with and without state", func(t *testing.T) {
+		for _, account := range []string{mainnetWallet, noStateAccount} {
+			result, err := toncenter.V3GetCall[walletInformationV3](ctx, v3, "walletInformation", url.Values{
+				"address": {account},
+				"use_v2":  {"true"},
+			})
+			if err != nil {
+				t.Fatalf("account %s: %v", account, err)
+			}
+			if result.Status == "" || result.Balance == "" || result.LastTransactionHash == "" {
+				t.Fatalf("account %s returned incomplete wallet information", account)
+			}
+		}
+	})
+	t.Run("address book with repeated addresses", func(t *testing.T) {
+		result, err := toncenter.V3GetCall[map[string]addressBookRowV3](ctx, v3, "addressBook", url.Values{
+			"address": {mainnetWallet, noStateAccount},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := (*result)[mainnetWallet]; !ok {
+			t.Fatalf("address book omitted %s", mainnetWallet)
+		}
+		if _, ok := (*result)[noStateAccount]; !ok {
+			t.Fatalf("address book omitted %s", noStateAccount)
+		}
+	})
+	t.Run("metadata with repeated addresses", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[map[string]addressMetadataV3](ctx, v3, "metadata", url.Values{
+			"address": {mainnetWallet, noStateAccount},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("transactions by masterchain block", func(t *testing.T) {
+		info, err := toncenter.V3GetCall[masterchainInfoV3](ctx, v3, "masterchainInfo", nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := toncenter.V3GetCall[transactionsResponseV3](ctx, v3, "transactionsByMasterchainBlock", url.Values{
+			"seqno": {fmt.Sprint(info.Last.Seqno)},
+			"limit": {"10"},
+			"sort":  {"desc"},
+		}); err != nil {
+			t.Fatal(err)
+		}
 	})
 	t.Run("account states with and without state", func(t *testing.T) {
 		result, err := toncenter.V3GetCall[accountStatesResponseV3](ctx, v3, "accountStates", url.Values{

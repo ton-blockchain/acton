@@ -19,6 +19,7 @@ use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
 use ton_api::toncenter::emulate::v1::EmulateTraceResponse;
+use ton_api::toncenter::v3 as toncenter_v3;
 use ton_localnet::types::{Addr, Hash256};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
@@ -4098,6 +4099,163 @@ fn localnet_supports_v3_address_information_endpoint() {
             "missing account {field} must be null"
         );
     }
+
+    node.stop();
+}
+
+#[test]
+fn localnet_supports_v3_core_lookup_endpoints() {
+    let project = ProjectBuilder::new("localnet-v3-core-lookups").build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+    let node = project.localnet().args(["--accounts", "deployer"]).start();
+
+    let startup_wallets = node.get_json("/acton_getStartupWallets");
+    let wallet_address = response_payload(&startup_wallets)[0]["address"]
+        .as_str()
+        .expect("startup wallet must expose address")
+        .to_owned();
+    let missing_address = "0:1111111111111111111111111111111111111111111111111111111111111111";
+
+    let faucet = node.post_json(
+        "/acton_fundAccount",
+        &json!({
+            "address": V3_TRANSACTIONS_TEST_ACCOUNT_A,
+            "amount": 250_000_000u128
+        }),
+    );
+    assert_eq!(faucet["ok"].as_bool(), Some(true));
+    let transactions = wait_for_v3_transactions_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=100&sort=desc"
+        ),
+        Duration::from_secs(12),
+    );
+    let expected_tx = v3_transactions_from_response(&transactions)
+        .iter()
+        .find(|tx| tx["account"].as_str() == Some(V3_TRANSACTIONS_TEST_ACCOUNT_A))
+        .expect("funded account transaction must be indexed");
+    let expected_hash = expected_tx["hash"]
+        .as_str()
+        .expect("transaction hash must be a string");
+    let mc_seqno = expected_tx["mc_block_seqno"]
+        .as_u64()
+        .expect("transaction mc seqno must be an integer");
+
+    let wallet_response = node.get_json(&format!(
+        "/api/v3/walletInformation?address={wallet_address}&use_v2=true"
+    ));
+    let wallet: toncenter_v3::V2WalletInformation =
+        serde_json::from_value(response_payload(&wallet_response).clone())
+            .expect("walletInformation must match its typed response");
+    let missing_wallet_response = node.get_json(&format!(
+        "/api/v3/walletInformation?address={missing_address}"
+    ));
+    let missing_wallet: toncenter_v3::V2WalletInformation =
+        serde_json::from_value(response_payload(&missing_wallet_response).clone())
+            .expect("missing walletInformation must match its typed response");
+
+    let masterchain_response = node.get_json("/api/v3/masterchainInfo");
+    let masterchain: toncenter_v3::MasterchainInfo =
+        serde_json::from_value(response_payload(&masterchain_response).clone())
+            .expect("masterchainInfo must match its typed response");
+
+    let address_book_response = node.get_json(&format!(
+        "/api/v3/addressBook?address={wallet_address}&address={missing_address}"
+    ));
+    let address_book: toncenter_v3::AddressBook =
+        serde_json::from_value(response_payload(&address_book_response).clone())
+            .expect("addressBook must match its typed response");
+
+    let metadata_response = node.get_json(&format!(
+        "/api/v3/metadata?address={wallet_address}&address={missing_address}"
+    ));
+    let metadata: toncenter_v3::Metadata =
+        serde_json::from_value(response_payload(&metadata_response).clone())
+            .expect("metadata must match its typed response");
+
+    let by_masterchain_response = node.get_json(&format!(
+        "/api/v3/transactionsByMasterchainBlock?seqno={mc_seqno}&limit=100&offset=0&sort=desc"
+    ));
+    let by_masterchain: toncenter_v3::TransactionsResponse =
+        serde_json::from_value(response_payload(&by_masterchain_response).clone())
+            .expect("transactionsByMasterchainBlock must match its typed response");
+
+    let (address_book_empty_status, address_book_empty) =
+        node.get_json_with_status("/api/v3/addressBook");
+    let (metadata_empty_status, metadata_empty) = node.get_json_with_status("/api/v3/metadata");
+    let (negative_seqno_status, negative_seqno) =
+        node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=-1");
+    let (invalid_sort_status, invalid_sort) =
+        node.get_json_with_status("/api/v3/transactionsByMasterchainBlock?seqno=1&sort=invalid");
+
+    let summary = json!({
+        "wallet_information": {
+            "status": wallet.status,
+            "wallet_type": wallet.wallet_type,
+            "has_seqno": wallet.seqno.is_some(),
+            "has_wallet_id": wallet.wallet_id.is_some(),
+            "missing_status": missing_wallet.status,
+            "missing_wallet_fields_omitted": missing_wallet.wallet_type.is_none()
+                && missing_wallet.seqno.is_none()
+                && missing_wallet.wallet_id.is_none(),
+        },
+        "masterchain_info": {
+            "first_workchain": masterchain.first.workchain,
+            "last_workchain": masterchain.last.workchain,
+            "seqno_ordered": masterchain.first.seqno <= masterchain.last.seqno,
+        },
+        "address_book": {
+            "preserves_wallet_key": address_book.contains_key(&wallet_address),
+            "preserves_missing_key": address_book.contains_key(missing_address),
+            "wallet_interfaces": address_book
+                .get(&wallet_address)
+                .and_then(|row| row.interfaces.clone()),
+            "missing_interfaces_are_null": address_book
+                .get(missing_address)
+                .is_some_and(|row| row.interfaces.is_none()),
+        },
+        "metadata": {
+            "is_empty_for_plain_wallets": metadata.is_empty(),
+        },
+        "transactions_by_masterchain_block": {
+            "contains_expected": by_masterchain
+                .transactions
+                .iter()
+                .any(|tx| tx.hash == expected_hash),
+            "all_match_mc_seqno": by_masterchain
+                .transactions
+                .iter()
+                .all(|tx| u64::from(tx.mc_block_seqno) == mc_seqno),
+            "address_book_present": !by_masterchain.address_book.is_empty(),
+        },
+        "bad_requests": {
+            "address_book_empty": {
+                "status": address_book_empty_status,
+                "error": address_book_empty["error"],
+            },
+            "metadata_empty": {
+                "status": metadata_empty_status,
+                "error": metadata_empty["error"],
+            },
+            "negative_seqno": {
+                "status": negative_seqno_status,
+                "error": negative_seqno["error"],
+            },
+            "invalid_sort": {
+                "status": invalid_sort_status,
+                "error": invalid_sort["error"],
+            },
+        },
+    });
+
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&summary, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_core_lookup_endpoints.summary.json"
+        ),
+    );
 
     node.stop();
 }

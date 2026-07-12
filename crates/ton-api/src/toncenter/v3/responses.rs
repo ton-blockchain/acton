@@ -39,6 +39,10 @@ pub struct TokenInfo {
     pub image: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub nft_index: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_nsfw: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_scam: Option<bool>,
     #[serde(default)]
     pub extra: HashMap<String, Value>,
 }
@@ -112,6 +116,12 @@ pub struct Block {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlocksResponse {
     pub blocks: Vec<Block>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterchainInfo {
+    pub first: Block,
+    pub last: Block,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -228,6 +238,20 @@ pub struct V2AddressInformation {
     pub last_transaction_hash: Option<String>,
     #[serde(default)]
     pub last_transaction_lt: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct V2WalletInformation {
+    pub balance: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet_type: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet_id: Option<i32>,
+    pub last_transaction_lt: String,
+    pub last_transaction_hash: String,
     pub status: String,
 }
 

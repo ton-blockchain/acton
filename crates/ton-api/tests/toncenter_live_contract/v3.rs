@@ -3,6 +3,9 @@ use anyhow::Result;
 use ton_api::toncenter::v3;
 
 const ELECTOR_ADDRESS: &str = "-1:3333333333333333333333333333333333333333333333333333333333333333";
+const WALLET_ADDRESS: &str = "0:5A488AA94CF819D3F7F86DA09C349C6E29CF018082D30B8B040A06F26929B284";
+const NO_STATE_ADDRESS: &str = "0:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+const USDT_MASTER: &str = "EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs";
 
 fn live() -> Result<Option<Live>> {
     Live::from_env()
@@ -24,6 +27,97 @@ fn address_information_query_covers_v2_switch() -> Result<()> {
             },
         )?;
     }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn wallet_information_query_covers_wallet_and_no_state_account() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+
+    for address in [WALLET_ADDRESS, NO_STATE_ADDRESS] {
+        for use_v2 in [None, Some(false), Some(true)] {
+            let _: v3::V2WalletInformation = live.get(
+                &live.v3_url,
+                "/walletInformation",
+                &v3::WalletInformationQuery {
+                    address: address.to_owned(),
+                    use_v2,
+                },
+            )?;
+        }
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn masterchain_info_response_matches_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let response: v3::MasterchainInfo = live.get(
+        &live.v3_url,
+        "/masterchainInfo",
+        &v3::MasterchainInfoQuery::default(),
+    )?;
+    assert!(response.first.seqno <= response.last.seqno);
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn address_book_query_covers_repeated_addresses() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let response: v3::AddressBook = live.get(
+        &live.v3_url,
+        "/addressBook",
+        &v3::AddressesQuery {
+            address: vec![WALLET_ADDRESS.to_owned(), NO_STATE_ADDRESS.to_owned()],
+        },
+    )?;
+    assert!(response.contains_key(WALLET_ADDRESS));
+    assert!(response.contains_key(NO_STATE_ADDRESS));
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn metadata_query_covers_token_and_plain_account() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let response: v3::Metadata = live.get(
+        &live.v3_url,
+        "/metadata",
+        &v3::AddressesQuery {
+            address: vec![USDT_MASTER.to_owned(), WALLET_ADDRESS.to_owned()],
+        },
+    )?;
+    assert!(response.values().any(|metadata| {
+        metadata
+            .token_info
+            .iter()
+            .any(|token| token.is_nsfw.is_some() && token.is_scam.is_some())
+    }));
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn transactions_by_masterchain_block_query_covers_pagination_and_sorting() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let info: v3::MasterchainInfo = live.get(
+        &live.v3_url,
+        "/masterchainInfo",
+        &v3::MasterchainInfoQuery::default(),
+    )?;
+    let _: v3::TransactionsResponse = live.get(
+        &live.v3_url,
+        "/transactionsByMasterchainBlock",
+        &v3::TransactionsByMasterchainBlockQuery {
+            seqno: i32::try_from(info.last.seqno.saturating_sub(10))?,
+            limit: Some(2),
+            offset: Some(0),
+            sort: Some("desc".to_owned()),
+        },
+    )?;
     Ok(())
 }
 

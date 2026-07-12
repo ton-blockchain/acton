@@ -1040,6 +1040,186 @@
           }
         }
       }
+    },
+    "/api/v3/addressBook": {
+      "get": {
+        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "description": "Query address book",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["accounts"],
+        "summary": "Address Book",
+        "operationId": "api_v3_get_address_book",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {"type": "string"},
+            "collectionFormat": "multi",
+            "description": "List of addresses in any form to get address book. Max: 1024.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {"$ref": "#/definitions/AddressBook"}
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {"$ref": "#/definitions/RequestError"}
+          }
+        }
+      }
+    },
+    "/api/v3/masterchainInfo": {
+      "get": {
+        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "description": "Get first and last indexed block",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get Masterchain Info",
+        "operationId": "api_v3_get_masterchain_info",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {"$ref": "#/definitions/MasterchainInfo"}
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {"$ref": "#/definitions/RequestError"}
+          }
+        }
+      }
+    },
+    "/api/v3/metadata": {
+      "get": {
+        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "description": "Query address metadata",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["accounts"],
+        "summary": "Metadata",
+        "operationId": "api_v3_get_metadata",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {"type": "string"},
+            "collectionFormat": "multi",
+            "description": "List of addresses in any form to get address metadata. Max: 1024.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {"$ref": "#/definitions/Metadata"}
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {"$ref": "#/definitions/RequestError"}
+          }
+        }
+      }
+    },
+    "/api/v3/transactionsByMasterchainBlock": {
+      "get": {
+        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "description": "Returns transactions from masterchain block and from all shards.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get transactions by Masterchain block",
+        "operationId": "api_v3_get_transactions_by_masterchain_block",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Masterchain block seqno.",
+            "name": "seqno",
+            "in": "query",
+            "required": true
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort transactions by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {"$ref": "#/definitions/TransactionsResponse"}
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {"$ref": "#/definitions/RequestError"}
+          }
+        }
+      }
+    },
+    "/api/v3/walletInformation": {
+      "get": {
+        "security": [{"APIKeyHeader": []}, {"APIKeyQuery": []}],
+        "description": "Get wallet smart contract information.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["api/v2"],
+        "summary": "Get Wallet Information",
+        "operationId": "api_v3_get_wallet_information",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Account address in any form.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "Use method from api/v2. Not recommended",
+            "name": "use_v2",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {"$ref": "#/definitions/V2WalletInformation"}
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {"$ref": "#/definitions/RequestError"}
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -2439,6 +2619,12 @@
         },
         "image": {
           "type": "string"
+        },
+        "is_nsfw": {
+          "type": "boolean"
+        },
+        "is_scam": {
+          "type": "boolean"
         },
         "name": {
           "type": "string"

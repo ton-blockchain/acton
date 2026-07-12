@@ -1,8 +1,23 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MasterchainInfoQuery {}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressInformationQuery {
+    pub address: String,
+    pub use_v2: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct AddressesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WalletInformationQuery {
     pub address: String,
     pub use_v2: Option<bool>,
 }
@@ -81,6 +96,14 @@ pub struct TransactionsByMessageQuery {
     pub direction: Option<String>,
     pub limit: Option<i32>,
     pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactionsByMasterchainBlockQuery {
+    pub seqno: i32,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

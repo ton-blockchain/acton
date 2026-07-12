@@ -1,0 +1,49 @@
+{
+  "address_book": {
+    "missing_interfaces_are_null": true,
+    "preserves_missing_key": true,
+    "preserves_wallet_key": true,
+    "wallet_interfaces": [
+      "wallet_v4r2"
+    ]
+  },
+  "bad_requests": {
+    "address_book_empty": {
+      "error": "at least 1 address required",
+      "status": 400
+    },
+    "invalid_sort": {
+      "error": "Invalid `sort`: invalid. Supported values: asc, desc",
+      "status": 400
+    },
+    "metadata_empty": {
+      "error": "at least 1 address required",
+      "status": 400
+    },
+    "negative_seqno": {
+      "error": "`seqno` must not be negative",
+      "status": 400
+    }
+  },
+  "masterchain_info": {
+    "first_workchain": -1,
+    "last_workchain": -1,
+    "seqno_ordered": true
+  },
+  "metadata": {
+    "is_empty_for_plain_wallets": true
+  },
+  "transactions_by_masterchain_block": {
+    "address_book_present": true,
+    "all_match_mc_seqno": true,
+    "contains_expected": true
+  },
+  "wallet_information": {
+    "has_seqno": true,
+    "has_wallet_id": true,
+    "missing_status": "uninit",
+    "missing_wallet_fields_omitted": true,
+    "status": "active",
+    "wallet_type": "wallet v4 r2"
+  }
+}

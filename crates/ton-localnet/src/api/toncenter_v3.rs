@@ -323,6 +323,39 @@ pub fn map_blocks_response(blocks: &[LocalnetBlock]) -> response::BlocksResponse
     }
 }
 
+pub fn map_masterchain_info_v3(blocks: &[LocalnetBlock]) -> Option<response::MasterchainInfo> {
+    let first = blocks
+        .iter()
+        .filter(|block| block.workchain == -1)
+        .min_by_key(|block| block.seqno)?;
+    let last = blocks
+        .iter()
+        .filter(|block| block.workchain == -1)
+        .max_by_key(|block| block.seqno)?;
+
+    Some(response::MasterchainInfo {
+        first: map_v3_block(first),
+        last: map_v3_block(last),
+    })
+}
+
+pub(crate) fn map_wallet_information_v3(
+    state: &LocalnetAccountState,
+    wallet_type: Option<&str>,
+    seqno: Option<u32>,
+    wallet_id: Option<i32>,
+) -> response::V2WalletInformation {
+    response::V2WalletInformation {
+        balance: state.balance.to_string(),
+        wallet_type: wallet_type.map(ToOwned::to_owned),
+        seqno: wallet_type.and(seqno),
+        wallet_id: wallet_type.and(wallet_id),
+        last_transaction_lt: state.last_transaction_id.lt.to_string(),
+        last_transaction_hash: state.last_transaction_id.hash.to_base64(),
+        status: map_wallet_information_status(&state.state).to_owned(),
+    }
+}
+
 fn map_v3_block(block: &LocalnetBlock) -> response::Block {
     response::Block {
         workchain: block.workchain,
@@ -572,6 +605,7 @@ pub(crate) fn map_nft_item_token_info(item: &NftItemMeta) -> response::TokenInfo
         image: content_string(&item.content, "image"),
         nft_index: Some(item.index.clone()),
         extra: object_fields(&item.content),
+        ..Default::default()
     }
 }
 
@@ -1246,6 +1280,14 @@ const fn map_address_information_status(status: &AccountStatus) -> &'static str 
     match status {
         AccountStatus::Active => "active",
         AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
+        AccountStatus::Frozen => "frozen",
+    }
+}
+
+const fn map_wallet_information_status(status: &AccountStatus) -> &'static str {
+    match status {
+        AccountStatus::Active => "active",
+        AccountStatus::Uninit | AccountStatus::Nonexist => "uninit",
         AccountStatus::Frozen => "frozen",
     }
 }

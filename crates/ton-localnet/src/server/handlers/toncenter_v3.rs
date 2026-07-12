@@ -1,12 +1,12 @@
-use crate::api::{toncenter_emulate, toncenter_v3};
-use crate::localnet::{
-    Localnet, LocalnetAddressInfo, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction,
+use super::toncenter_enrichment::{
+    build_metadata_for_addresses, load_address_infos, map_address_book_row, map_address_info,
 };
+use crate::api::{toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
+use crate::localnet::{Localnet, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction};
 use crate::storage::{JettonMasterMeta, TraceNode};
-use crate::types::{Addr, BocBytes, Hash256};
+use crate::types::{Addr, Hash256};
 use axum::{
     Json,
-    body::Bytes,
     extract::{Query, RawQuery, State},
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -18,29 +18,33 @@ use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::future::Future;
 use std::sync::Arc;
-use ton_api::toncenter::emulate::v1 as emulate;
 use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
-    AccountStatesQuery, AddressInformationQuery, BlocksQuery, JettonMastersQuery,
+    AccountStatesQuery, AddressInformationQuery, AddressesQuery, BlocksQuery, JettonMastersQuery,
     JettonWalletsQuery, NftItemsQuery, PendingTransactionsQuery, RunGetMethodRequest,
-    SendMessageRequest, StackEntry, TracesQuery, TransactionsByMessageQuery, TransactionsQuery,
+    SendMessageRequest, StackEntry, TracesQuery, TransactionsByMasterchainBlockQuery,
+    TransactionsByMessageQuery, TransactionsQuery, WalletInformationQuery,
 };
-use ton_indexer::categorize_wallet;
 use toncenter_v3 as v3;
-use tycho_types::cell::HashBytes as CellHashBytes;
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
 const BLOCK_WORKCHAIN: i32 = 0;
 const BLOCK_SHARD: i64 = i64::MIN;
 
+macro_rules! parse {
+    ($expression:expr) => {
+        match $expression {
+            Ok(value) => value,
+            Err(error) => return v3_bad_request(error.to_string()),
+        }
+    };
+}
+
 pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<TracesQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<TracesQuery>(raw_query.as_deref()));
     match collect_v3_traces(node.as_ref(), payload).await {
         Ok(response) => (StatusCode::OK, Json(response)).into_response(),
         Err(e) => v3_bad_request(e.to_string()),
@@ -169,18 +173,101 @@ pub async fn get_address_information_v3(
     .await
 }
 
+pub async fn get_wallet_information_v3(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<WalletInformationQuery>,
+) -> impl IntoResponse {
+    let _use_v2 = payload.use_v2.unwrap_or(true);
+
+    handle_v3_result(
+        async move {
+            let state = node
+                .get_address_information(payload.address.clone(), None)
+                .await?;
+            let wallet_type = v2::wallet_type_name_from_code_hash(state.code_hash.as_ref());
+            let parsed_wallet = toncenter_wallet::read_standard_wallet_state(&state).ok();
+            let seqno = if let Some(wallet) = parsed_wallet {
+                Some(wallet.seqno)
+            } else if wallet_type.is_some() {
+                node.run_get_method(payload.address, "seqno".to_owned(), Vec::new(), None)
+                    .await
+                    .ok()
+                    .and_then(|result| v2::map_wallet_seqno(&result))
+            } else {
+                None
+            };
+            let wallet_id = parsed_wallet.and_then(|wallet| wallet.wallet_id);
+
+            Ok(v3::map_wallet_information_v3(
+                &state,
+                wallet_type,
+                seqno,
+                wallet_id,
+            ))
+        },
+        Clone::clone,
+    )
+    .await
+}
+
+pub async fn get_masterchain_info_v3(State(node): State<Arc<Localnet>>) -> impl IntoResponse {
+    handle_v3_result(
+        async move {
+            let blocks = node.get_blocks().await?;
+            v3::map_masterchain_info_v3(&blocks)
+                .ok_or_else(|| anyhow::anyhow!("Masterchain has no blocks"))
+        },
+        Clone::clone,
+    )
+    .await
+}
+
+pub async fn get_address_book_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
+    let addresses = parse!(parse_requested_addresses(payload.address));
+    let infos = match load_address_infos(
+        node.as_ref(),
+        addresses.iter().map(|(_, address)| *address).collect(),
+    )
+    .await
+    {
+        Ok(infos) => infos,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    let address_book = addresses
+        .into_iter()
+        .map(|(requested, address)| {
+            let info = infos.get(&address).cloned().unwrap_or_default();
+            (requested, map_address_book_row(address, &info))
+        })
+        .collect::<v3_types::AddressBook>();
+
+    (StatusCode::OK, Json(address_book)).into_response()
+}
+
+pub async fn get_metadata_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
+    let addresses = parse!(parse_requested_addresses(payload.address));
+    let addresses = addresses.into_iter().map(|(_, address)| address).collect();
+    match build_metadata_for_addresses(node.as_ref(), addresses).await {
+        Ok(metadata) => (StatusCode::OK, Json(metadata)).into_response(),
+        Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
 pub async fn get_account_states_v3(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_account_states_request(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let parsed = match parse_account_states_v3_query(payload) {
-        Ok(parsed) => parsed,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_account_states_request(raw_query.as_deref()));
+    let parsed = parse!(parse_account_states_v3_query(payload));
 
     let states_with_info = match node.get_account_states(parsed.addresses, None).await {
         Ok(states) => states,
@@ -218,14 +305,8 @@ pub async fn get_transactions_v3(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<TransactionsQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let parsed = match parse_transactions_v3_query(payload) {
-        Ok(parsed) => parsed,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<TransactionsQuery>(raw_query.as_deref()));
+    let parsed = parse!(parse_transactions_v3_query(payload));
 
     match transactions_fast_path(&parsed) {
         Some(TransactionsFastPath::Empty) => {
@@ -261,10 +342,7 @@ pub async fn get_blocks_v3(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlocksQuery>,
 ) -> impl IntoResponse {
-    let parsed = match parse_blocks_v3_query(payload) {
-        Ok(parsed) => parsed,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let parsed = parse!(parse_blocks_v3_query(payload));
 
     handle_v3_result(node.get_blocks(), move |blocks| {
         let filtered = filter_blocks_v3(blocks, &parsed);
@@ -277,10 +355,7 @@ pub async fn get_transactions_by_message_v3(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsByMessageQuery>,
 ) -> impl IntoResponse {
-    let parsed = match parse_transactions_by_message_v3_query(payload) {
-        Ok(parsed) => parsed,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let parsed = parse!(parse_transactions_by_message_v3_query(payload));
 
     handle_v3_result(node.get_all_transactions(), move |txs| {
         let filtered = filter_transactions_by_message_v3(txs, &parsed);
@@ -289,18 +364,29 @@ pub async fn get_transactions_by_message_v3(
     .await
 }
 
+pub async fn get_transactions_by_masterchain_block_v3(
+    State(node): State<Arc<Localnet>>,
+    Query(payload): Query<TransactionsByMasterchainBlockQuery>,
+) -> impl IntoResponse {
+    let seqno = parse!(parse_required_non_negative_u32("seqno", payload.seqno));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let sort = parse!(parse_sort(payload.sort));
+
+    handle_v3_result(
+        node.get_block_transactions_page(seqno, limit, offset, matches!(sort, SortOrder::Desc)),
+        |txs| v3::map_transactions_response(txs),
+    )
+    .await
+}
+
 pub async fn get_pending_transactions_v3(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<PendingTransactionsQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let parsed = match parse_pending_transactions_v3_query(payload) {
-        Ok(parsed) => parsed,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<PendingTransactionsQuery>(
+        raw_query.as_deref()
+    ));
+    let parsed = parse!(parse_pending_transactions_v3_query(payload));
 
     handle_v3_result(node.get_pending_transactions(), move |txs| {
         let filtered = filter_pending_transactions_v3(txs, &parsed);
@@ -309,133 +395,12 @@ pub async fn get_pending_transactions_v3(
     .await
 }
 
-pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
-    let payload: emulate::EmulateRequest = match serde_json::from_slice(&body) {
-        Ok(payload) => payload,
-        Err(e) => return emulate_bad_request(format!("invalid request: {e}")),
-    };
-
-    let boc = payload.boc;
-    if boc.is_empty() {
-        return emulate_bad_request("invalid request: boc is required");
-    }
-
-    if let Err(e) = BocBytes::from_base64(&boc) {
-        return emulate_bad_request(format!("invalid request: invalid boc: {e}"));
-    }
-
-    emulate_boc_v1(
-        node.as_ref(),
-        boc,
-        payload.ignore_chksig,
-        payload.mc_block_seqno,
-        EmulateResponseOptions {
-            include_code_data: payload.include_code_data,
-            include_address_book: payload.include_address_book,
-            include_metadata: payload.include_metadata,
-            with_actions: payload.with_actions,
-        },
-    )
-    .await
-}
-
-pub async fn emulate_ton_connect_v1(State(node): State<Arc<Localnet>>, body: Bytes) -> Response {
-    let payload: emulate::TonConnectEmulateRequest = match serde_json::from_slice(&body) {
-        Ok(payload) => payload,
-        Err(e) => return emulate_bad_request(format!("invalid request: {e}")),
-    };
-    if let Err(e) = toncenter_emulate::validate_ton_connect_request(&payload) {
-        return emulate_bad_request(format!("invalid request: {e}"));
-    }
-
-    let account = match node
-        .get_address_information(payload.from.clone(), payload.mc_block_seqno)
-        .await
-    {
-        Ok(account) => account,
-        Err(e) => return emulate_internal_error(e.to_string()),
-    };
-    let now = match node.clock_info().await {
-        Ok(clock) => clock.current_unix_time,
-        Err(e) => return emulate_internal_error(e.to_string()),
-    };
-    let boc = match toncenter_emulate::compose_ton_connect_message(&payload, &account, now) {
-        Ok(boc) => boc.to_base64(),
-        Err(e) => return emulate_internal_error(e.to_string()),
-    };
-
-    emulate_boc_v1(
-        node.as_ref(),
-        boc,
-        true,
-        payload.mc_block_seqno,
-        EmulateResponseOptions {
-            include_code_data: payload.include_code_data,
-            include_address_book: payload.include_address_book,
-            include_metadata: payload.include_metadata,
-            with_actions: payload.with_actions,
-        },
-    )
-    .await
-}
-
-#[derive(Clone, Copy)]
-struct EmulateResponseOptions {
-    include_code_data: bool,
-    include_address_book: bool,
-    include_metadata: bool,
-    with_actions: bool,
-}
-
-async fn emulate_boc_v1(
-    node: &Localnet,
-    boc: String,
-    ignore_chksig: bool,
-    mc_block_seqno: Option<u32>,
-    options: EmulateResponseOptions,
-) -> Response {
-    match node
-        .emulate_trace(boc, Some(ignore_chksig), mc_block_seqno)
-        .await
-    {
-        Ok(trace) => {
-            let (address_book, metadata) = match build_emulate_v1_extra_data(
-                node,
-                &trace.trace,
-                options.include_address_book,
-                options.include_metadata,
-            )
-            .await
-            {
-                Ok(extra) => extra,
-                Err(e) => return emulate_internal_error(e.to_string()),
-            };
-
-            let response = v3::map_emulate_trace_response(
-                &trace,
-                options.with_actions,
-                options.include_code_data,
-                address_book,
-                metadata,
-            );
-            (StatusCode::OK, Json(response)).into_response()
-        }
-        Err(e) => emulate_internal_error(e.to_string()),
-    }
-}
-
 pub async fn get_jetton_masters(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<JettonMastersQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
-        Ok(values) => values,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<JettonMastersQuery>(raw_query.as_deref()));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
     handle_v3_result(
         node.get_jetton_masters(
             payload.address,
@@ -452,18 +417,9 @@ pub async fn get_jetton_wallets(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
-        Ok(values) => values,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let sort = match parse_sort(payload.sort) {
-        Ok(sort) => sort,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let sort = parse!(parse_sort(payload.sort));
     let wallets = match node
         .get_jetton_wallets(LocalnetJettonWalletsQuery {
             addresses: payload.address,
@@ -513,14 +469,9 @@ pub async fn get_nft_items(
     State(node): State<Arc<Localnet>>,
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let payload = match parse_v3_query::<NftItemsQuery>(raw_query.as_deref()) {
-        Ok(payload) => payload,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
-        Ok(values) => values,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
+    let payload = parse!(parse_v3_query::<NftItemsQuery>(raw_query.as_deref()));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+
     handle_v3_result(
         node.get_nft_items(
             payload.address,
@@ -1143,146 +1094,14 @@ fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
     }
 }
 
-#[derive(Default)]
-struct AddressInfo {
-    interfaces: BTreeSet<String>,
-    token_info: Vec<v3_types::TokenInfo>,
-    extra_jetton_masters: BTreeSet<Addr>,
-}
-
-async fn build_emulate_v1_extra_data(
-    node: &Localnet,
-    trace: &TraceNode,
-    include_address_book: bool,
-    include_metadata: bool,
-) -> anyhow::Result<(Option<v3_types::AddressBook>, Option<v3_types::Metadata>)> {
-    if !include_address_book && !include_metadata {
-        return Ok((None, None));
+fn parse_requested_addresses(values: Vec<String>) -> anyhow::Result<Vec<(String, Addr)>> {
+    if values.is_empty() {
+        anyhow::bail!("at least 1 address required");
     }
-
-    let mut addresses = BTreeSet::new();
-    collect_trace_addresses(trace, &mut addresses);
-
-    let mut address_book = v3_types::AddressBook::new();
-    let mut metadata = v3_types::Metadata::new();
-    let mut pending_jetton_masters = BTreeSet::new();
-
-    let infos = node
-        .get_address_infos(addresses.iter().copied().collect())
-        .await?;
-    for raw_info in infos {
-        let address = raw_info.address;
-        let info = map_address_info(raw_info);
-        pending_jetton_masters.extend(info.extra_jetton_masters.iter().copied());
-
-        if include_address_book {
-            address_book.insert(
-                address.to_string(),
-                v3_types::AddressBookRow {
-                    user_friendly: Some(address.as_user_friendly()),
-                    domain: None,
-                    interfaces: Some(info.interfaces.into_iter().collect()),
-                },
-            );
-        }
-
-        if include_metadata && !info.token_info.is_empty() {
-            metadata.insert(
-                address.to_string(),
-                v3_types::AddressMetadata {
-                    is_indexed: true,
-                    token_info: info.token_info,
-                },
-            );
-        }
-    }
-
-    if include_metadata {
-        let missing_master_addresses = pending_jetton_masters
-            .into_iter()
-            .filter(|address| !metadata.contains_key(&address.to_string()))
-            .collect::<Vec<_>>();
-        let infos = node.get_address_infos(missing_master_addresses).await?;
-        for raw_info in infos {
-            let key = raw_info.address.to_string();
-            let info = map_address_info(raw_info);
-            if info.token_info.is_empty() {
-                continue;
-            }
-            metadata.insert(
-                key,
-                v3_types::AddressMetadata {
-                    is_indexed: true,
-                    token_info: info.token_info,
-                },
-            );
-        }
-    }
-
-    let address_book = include_address_book.then_some(address_book);
-    let metadata = include_metadata.then_some(metadata);
-
-    Ok((address_book, metadata))
-}
-
-fn collect_trace_addresses(trace: &TraceNode, out: &mut BTreeSet<Addr>) {
-    out.insert(trace.transaction.meta.account);
-    if let Some(in_msg) = &trace.transaction.in_msg {
-        if let Some(src) = in_msg.meta.src {
-            out.insert(src);
-        }
-        if let Some(dst) = in_msg.meta.dst {
-            out.insert(dst);
-        }
-    }
-    for out_msg in &trace.transaction.out_msgs {
-        if let Some(src) = out_msg.meta.src {
-            out.insert(src);
-        }
-        if let Some(dst) = out_msg.meta.dst {
-            out.insert(dst);
-        }
-    }
-    for child in &trace.children {
-        collect_trace_addresses(child, out);
-    }
-}
-
-fn map_address_info(info: LocalnetAddressInfo) -> AddressInfo {
-    let mut out = AddressInfo::default();
-
-    if let Some(code_hash) = info.code_hash {
-        let wallet_type = categorize_wallet(CellHashBytes(code_hash.0));
-        if let Some(interface_name) = wallet_type.interface_name() {
-            out.interfaces.insert(interface_name.to_string());
-        }
-    }
-
-    if let Some(wallet) = info.jetton_wallet {
-        out.interfaces.insert("jetton_wallet".to_string());
-        out.token_info
-            .push(v3::map_jetton_wallet_token_info(&wallet));
-        out.extra_jetton_masters.insert(wallet.jetton_address);
-    }
-
-    if let Some(master) = info.jetton_master {
-        out.interfaces.insert("jetton_master".to_string());
-        out.token_info
-            .push(v3::map_jetton_master_token_info(&master));
-    }
-
-    if let Some(item) = info.nft_item {
-        out.interfaces.insert("nft_item".to_string());
-        out.token_info.push(v3::map_nft_item_token_info(&item));
-    }
-
-    if let Some(item) = info.nft_collection_item {
-        out.interfaces.insert("nft_collection".to_string());
-        out.token_info
-            .push(v3::map_nft_collection_token_info(&item));
-    }
-
-    out
+    values
+        .into_iter()
+        .map(|value| Addr::parse(&value).map(|address| (value, address)))
+        .collect()
 }
 
 fn parse_opcode(opcode: &str) -> anyhow::Result<u32> {
@@ -1341,6 +1160,10 @@ fn parse_non_negative_u32(name: &str, value: Option<i32>) -> anyhow::Result<Opti
         .transpose()
 }
 
+fn parse_required_non_negative_u32(name: &str, value: i32) -> anyhow::Result<u32> {
+    u32::try_from(value).map_err(|_| anyhow::anyhow!("`{name}` must not be negative"))
+}
+
 fn parse_v3_query<T: DeserializeOwned>(raw_query: Option<&str>) -> anyhow::Result<T> {
     serde_html_form::from_str(raw_query.unwrap_or_default())
         .map_err(|e| anyhow::anyhow!("Invalid query: {e}"))
@@ -1396,24 +1219,6 @@ fn parse_shard_query(shard: &str) -> anyhow::Result<i64> {
     }
 
     anyhow::bail!("Invalid shard format: {shard}")
-}
-
-fn emulate_bad_request(error: impl Into<String>) -> Response {
-    emulate_error_response(StatusCode::BAD_REQUEST, error)
-}
-
-fn emulate_internal_error(error: impl Into<String>) -> Response {
-    emulate_error_response(StatusCode::INTERNAL_SERVER_ERROR, error)
-}
-
-fn emulate_error_response(status: StatusCode, error: impl Into<String>) -> Response {
-    (
-        status,
-        Json(emulate::ErrorResponse {
-            error: error.into(),
-        }),
-    )
-        .into_response()
 }
 
 async fn handle_v3_result<T, F, M>(
