@@ -100,7 +100,7 @@ pub fn map_jetton_masters(masters: &[JettonMasterMeta]) -> response::JettonMaste
         metadata.insert(
             master.address.to_string(),
             response::AddressMetadata {
-                is_indexed: Some(true),
+                is_indexed: true,
                 token_info: vec![map_jetton_master_token_info(master)],
             },
         );
@@ -117,13 +117,13 @@ fn map_jetton_master(m: &JettonMasterMeta) -> response::JettonMaster {
     response::JettonMaster {
         address: m.address.to_string(),
         admin_address: m.admin_address.map(|address| address.to_string()),
-        code_hash: Some(m.code_hash.to_base64()),
-        data_hash: Some(m.data_hash.to_base64()),
+        code_hash: m.code_hash.to_base64(),
+        data_hash: m.data_hash.to_base64(),
         jetton_content: object_fields(&m.jetton_content),
-        jetton_wallet_code_hash: Some(m.jetton_wallet_code_hash.to_base64()),
-        last_transaction_lt: Some(m.last_transaction_lt.to_string()),
-        mintable: Some(m.mintable),
-        total_supply: Some(m.total_supply.to_string()),
+        jetton_wallet_code_hash: m.jetton_wallet_code_hash.to_base64(),
+        last_transaction_lt: m.last_transaction_lt.to_string(),
+        mintable: m.mintable,
+        total_supply: m.total_supply.to_string(),
     }
 }
 
@@ -164,7 +164,7 @@ pub fn map_jetton_wallets_with_metadata(
         metadata.insert(
             address,
             response::AddressMetadata {
-                is_indexed: Some(true),
+                is_indexed: true,
                 token_info,
             },
         );
@@ -214,7 +214,7 @@ pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsR
         metadata.insert(
             address,
             response::AddressMetadata {
-                is_indexed: Some(true),
+                is_indexed: true,
                 token_info,
             },
         );
@@ -266,7 +266,7 @@ pub fn map_account_states(
             metadata.insert(
                 state.address.to_string(),
                 response::AddressMetadata {
-                    is_indexed: Some(true),
+                    is_indexed: true,
                     token_info: ctx.token_info.clone(),
                 },
             );
@@ -336,30 +336,37 @@ fn map_v3_block(block: &LocalnetBlock) -> response::Block {
         start_lt: block.start_lt.to_string(),
         end_lt: block.end_lt.to_string(),
         gen_utime: response::StringOrNumber::String(block.gen_utime.to_string()),
-        tx_count: Some(block.tx_count as i32),
+        tx_count: block.tx_count as i64,
         prev_blocks: block.prev_blocks.iter().map(map_v3_block_id).collect(),
-        masterchain_block_ref: block.masterchain_block_ref.as_ref().map(map_v3_block_id),
+        masterchain_block_ref: block.masterchain_block_ref.as_ref().map_or_else(
+            || response::BlockId {
+                workchain: block.workchain,
+                shard: format_v3_shard_id(block.shard),
+                seqno: block.seqno,
+            },
+            map_v3_block_id,
+        ),
         master_ref_seqno: block
             .masterchain_block_ref
             .as_ref()
-            .map(|block_id| block_id.seqno as i32),
-        after_merge: Some(false),
-        after_split: Some(false),
-        before_split: Some(false),
-        created_by: Some(zero_hash_base64()),
-        flags: Some(0),
-        gen_catchain_seqno: Some(0),
-        global_id: Some(0),
-        key_block: Some(false),
-        min_ref_mc_seqno: Some(0),
-        prev_key_block_seqno: Some(0),
-        rand_seed: Some(zero_hash_base64()),
-        validator_list_hash_short: Some(0),
-        version: Some(0),
-        vert_seqno: Some(0),
-        vert_seqno_incr: Some(false),
-        want_merge: Some(false),
-        want_split: Some(false),
+            .map_or(0, |block_id| block_id.seqno as i32),
+        after_merge: false,
+        after_split: false,
+        before_split: false,
+        created_by: zero_hash_base64(),
+        flags: 0,
+        gen_catchain_seqno: 0,
+        global_id: 0,
+        key_block: false,
+        min_ref_mc_seqno: 0,
+        prev_key_block_seqno: 0,
+        rand_seed: zero_hash_base64(),
+        validator_list_hash_short: 0,
+        version: 0,
+        vert_seqno: 0,
+        vert_seqno_incr: false,
+        want_merge: false,
+        want_split: false,
     }
 }
 
@@ -396,14 +403,14 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
         hash: tx.hash.to_base64(),
         lt: tx.transaction_id.lt.to_string(),
         now: tx.utime,
-        orig_status: Some(tx_details.orig_status.to_owned()),
-        end_status: Some(tx_details.end_status.to_owned()),
-        total_fees: Some(tx.total_fees.to_string()),
+        orig_status: tx_details.orig_status.to_owned(),
+        end_status: tx_details.end_status.to_owned(),
+        total_fees: tx.total_fees.to_string(),
         total_fees_extra_currencies: HashMap::new(),
-        prev_trans_hash: Some(tx_details.prev_trans_hash),
-        prev_trans_lt: Some(tx_details.prev_trans_lt),
-        description: Some(response::TransactionDescr {
-            kind: Some("ord".to_owned()),
+        prev_trans_hash: tx_details.prev_trans_hash,
+        prev_trans_lt: tx_details.prev_trans_lt,
+        description: response::TransactionDescr {
+            kind: "ord".to_owned(),
             aborted: Some(tx_details.aborted.unwrap_or(!tx.success)),
             destroyed: Some(tx_details.destroyed.unwrap_or(false)),
             credit_first: Some(tx_details.credit_first.unwrap_or(false)),
@@ -415,7 +422,7 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
             credit_ph: None,
             bounce: None,
             split_info: None,
-        }),
+        },
         in_msg,
         out_msgs,
         account_state_before: map_transaction_account_state(
@@ -426,16 +433,16 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
             None,
             &tx_details.account_state_after_hash,
         ),
-        block_ref: Some(response::BlockId {
+        block_ref: response::BlockId {
             workchain: 0,
             shard: format_v3_shard_id(i64::MIN),
             seqno: tx.mc_block_seqno,
-        }),
-        mc_block_seqno: Some(tx.mc_block_seqno),
-        emulated: Some(false),
+        },
+        mc_block_seqno: tx.mc_block_seqno,
+        emulated: false,
         trace_id: Some(tx.hash.to_base64()),
         trace_external_hash: Some(trace_external_hash),
-        finality: None,
+        finality: "finalized".to_owned(),
         child_transactions: Vec::new(),
     }
 }
@@ -447,7 +454,7 @@ fn map_v3_message(
     is_in_msg: bool,
 ) -> response::Message {
     response::Message {
-        hash: Some(msg.hash.to_base64()),
+        hash: msg.hash.to_base64(),
         hash_norm: msg.hash_norm.as_ref().map(Hash256::to_base64),
         source: msg.source.as_ref().map(ToString::to_string),
         destination: msg.destination.as_ref().map(ToString::to_string),
@@ -538,7 +545,7 @@ fn map_nft_item(item: &NftItemMeta) -> response::NftItem {
     response::NftItem {
         address: item.address.to_string(),
         auction_contract_address: None,
-        code_hash: Some(item.code_hash.to_base64()),
+        code_hash: item.code_hash.to_base64(),
         collection: item
             .collection_address
             .as_ref()
@@ -547,11 +554,11 @@ fn map_nft_item(item: &NftItemMeta) -> response::NftItem {
             }),
         collection_address: item.collection_address.as_ref().map(ToString::to_string),
         content: object_fields(&item.content),
-        data_hash: Some(item.data_hash.to_base64()),
-        index: Some(item.index.clone()),
-        init: Some(item.init),
-        last_transaction_lt: Some(item.last_transaction_lt.to_string()),
-        on_sale: Some(false),
+        data_hash: item.data_hash.to_base64(),
+        index: item.index.clone(),
+        init: item.init,
+        last_transaction_lt: item.last_transaction_lt.to_string(),
+        on_sale: false,
         owner_address: item.owner_address.as_ref().map(ToString::to_string),
         real_owner: item.owner_address.as_ref().map(ToString::to_string),
         sale_contract_address: None,
@@ -589,7 +596,7 @@ fn map_account_state_full(
 ) -> response::AccountStateFull {
     response::AccountStateFull {
         address: state.address.to_string(),
-        account_state_hash: Some(state.account_state_hash.to_base64()),
+        account_state_hash: state.account_state_hash.to_base64(),
         balance: Some(state.balance.to_string()),
         code_boc: include_boc
             .then(|| state.code.as_ref().map(BocBytes::to_base64))
@@ -600,7 +607,7 @@ fn map_account_state_full(
             .then(|| state.data.as_ref().map(BocBytes::to_base64))
             .flatten(),
         data_hash: state.data_hash.as_ref().map(Hash256::to_base64),
-        extra_currencies: Some(HashMap::new()),
+        extra_currencies: HashMap::new(),
         frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
         interfaces: Some(
             context
@@ -732,10 +739,10 @@ fn map_trace(
             || tn.transaction.meta.tx_hash.to_base64(),
             Hash256::to_base64,
         )),
-        mc_seqno_start: Some(tn.transaction.meta.block_seqno.to_string()),
-        mc_seqno_end: Some(tn.transaction.meta.block_seqno.to_string()),
-        start_lt: Some(tn.transaction.meta.lt.to_string()),
-        start_utime: Some(tn.transaction.meta.now),
+        mc_seqno_start: tn.transaction.meta.block_seqno.to_string(),
+        mc_seqno_end: tn.transaction.meta.block_seqno.to_string(),
+        start_lt: tn.transaction.meta.lt.to_string(),
+        start_utime: tn.transaction.meta.now,
         end_lt: Some(tn.max_lt().to_string()),
         end_utime: Some(tn.max_utime()),
         is_incomplete: false,
@@ -743,13 +750,13 @@ fn map_trace(
         transactions,
         transactions_order,
         actions: Vec::new(),
-        trace_info: Some(response::TraceInfo {
+        trace_info: response::TraceInfo {
             transactions: transaction_count,
             messages: transaction_count.saturating_sub(1) + tn.children.len(),
             pending_messages: 0,
             trace_state: "complete".to_owned(),
             classification_state: "classified".to_owned(),
-        }),
+        },
         warning: None,
     }
 }
@@ -788,14 +795,14 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transactio
         hash: tx.meta.tx_hash.to_base64(),
         lt: tx.meta.lt.to_string(),
         now: tx.meta.now,
-        orig_status: Some(tx_details.orig_status.to_owned()),
-        end_status: Some(tx_details.end_status.to_owned()),
-        total_fees: Some(tx.meta.total_fees.to_string()),
+        orig_status: tx_details.orig_status.to_owned(),
+        end_status: tx_details.end_status.to_owned(),
+        total_fees: tx.meta.total_fees.to_string(),
         total_fees_extra_currencies: HashMap::new(),
-        prev_trans_hash: Some(tx_details.prev_trans_hash),
-        prev_trans_lt: Some(tx_details.prev_trans_lt),
-        description: Some(response::TransactionDescr {
-            kind: Some("ord".to_owned()),
+        prev_trans_hash: tx_details.prev_trans_hash,
+        prev_trans_lt: tx_details.prev_trans_lt,
+        description: response::TransactionDescr {
+            kind: "ord".to_owned(),
             aborted: Some(tx_details.aborted.unwrap_or(!tx.meta.success)),
             destroyed: Some(tx_details.destroyed.unwrap_or(false)),
             credit_first: Some(tx_details.credit_first.unwrap_or(false)),
@@ -815,7 +822,7 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transactio
             credit_ph: None,
             bounce: None,
             split_info: None,
-        }),
+        },
         in_msg: tx
             .in_msg
             .as_ref()
@@ -833,17 +840,17 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transactio
             tx.account_state_after.as_ref(),
             &tx_details.account_state_after_hash,
         ),
-        block_ref: Some(response::BlockId {
+        block_ref: response::BlockId {
             workchain: 0,
             shard: format_v3_shard_id(i64::MIN),
             seqno: tx.meta.block_seqno,
-        }),
-        mc_block_seqno: Some(tx.meta.block_seqno),
+        },
+        mc_block_seqno: tx.meta.block_seqno,
         child_transactions: Vec::new(),
-        emulated: Some(emulated),
+        emulated,
         trace_id: Some(tx.meta.tx_hash.to_base64()),
         trace_external_hash: Some(trace_external_hash),
-        finality: None,
+        finality: if emulated { "pending" } else { "finalized" }.to_owned(),
     }
 }
 
@@ -1114,7 +1121,7 @@ fn map_trace_message_info(
 
 fn map_message(msg: &MsgMeta) -> response::Message {
     response::Message {
-        hash: Some(msg.msg_hash.to_base64()),
+        hash: msg.msg_hash.to_base64(),
         hash_norm: None,
         source: msg.src.as_ref().map(ToString::to_string),
         destination: msg.dst.as_ref().map(ToString::to_string),
@@ -1348,7 +1355,7 @@ mod tests {
         );
         assert!(mapped.address_book.contains_key(&admin_address));
 
-        assert_eq!(metadata.is_indexed, Some(true));
+        assert!(metadata.is_indexed);
         assert_eq!(token_info.kind.as_deref(), Some("jetton_masters"));
         assert_eq!(token_info.name.as_deref(), Some("UTYA"));
         assert_eq!(token_info.symbol.as_deref(), Some("UTYA"));
@@ -1499,13 +1506,6 @@ mod tests {
         assert_eq!(format_v3_shard_id(i64::MIN), "8000000000000000");
         assert_eq!(block.shard, "8000000000000000");
         assert_eq!(block.prev_blocks[0].shard, "8000000000000000");
-        assert_eq!(
-            block
-                .masterchain_block_ref
-                .as_ref()
-                .expect("masterchain block ref")
-                .shard,
-            "8000000000000000"
-        );
+        assert_eq!(block.masterchain_block_ref.shard, "8000000000000000");
     }
 }

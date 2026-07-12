@@ -973,7 +973,7 @@ pub(crate) fn build_v3_trace_transactions(
 }
 
 pub(crate) fn v3_message_hash(message: &v3::Message) -> Option<&str> {
-    message.hash.as_deref().filter(|hash| !hash.is_empty())
+    (!message.hash.is_empty()).then_some(message.hash.as_str())
 }
 
 /// Compute the TEP-467 normalized hash of an external-in message as specified in the
@@ -4342,17 +4342,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         .lt
         .parse()
         .with_context(|| format!("Invalid lt '{}' in v3 tx summary", summary.lt))?;
-    let prev_trans_lt: u64 = summary
-        .prev_trans_lt
-        .as_deref()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(0);
-    let prev_trans_hash = summary
-        .prev_trans_hash
-        .as_deref()
-        .map(parse_hash_bytes)
-        .transpose()?
-        .unwrap_or_default();
+    let prev_trans_lt: u64 = summary.prev_trans_lt.parse().ok().unwrap_or(0);
+    let prev_trans_hash = parse_hash_bytes(&summary.prev_trans_hash)?;
 
     let in_msg = summary
         .in_msg
@@ -4375,14 +4366,14 @@ pub(crate) fn synthesize_tx_cell_from_v3(
     let out_msg_count = Uint15::new(summary.out_msgs.len() as u16);
 
     let total_fees = CurrencyCollection {
-        tokens: parse_tokens_opt(summary.total_fees.as_deref()),
+        tokens: parse_tokens_opt(Some(&summary.total_fees)),
         other: ExtraCurrencyCollection::new(),
     };
 
     let state_update_old = parse_hash_bytes(&summary.account_state_before.hash)?;
     let state_update_new = parse_hash_bytes(&summary.account_state_after.hash)?;
 
-    let tx_info = build_tx_info_from_v3(summary.description.as_ref())?;
+    let tx_info = build_tx_info_from_v3(Some(&summary.description))?;
     let tx = Transaction {
         account,
         lt,
@@ -4390,8 +4381,8 @@ pub(crate) fn synthesize_tx_cell_from_v3(
         prev_trans_lt,
         now: summary.now,
         out_msg_count,
-        orig_status: parse_account_status(summary.orig_status.as_deref()),
-        end_status: parse_account_status(summary.end_status.as_deref()),
+        orig_status: parse_account_status(&summary.orig_status),
+        end_status: parse_account_status(&summary.end_status),
         in_msg,
         out_msgs,
         total_fees,
@@ -4435,7 +4426,7 @@ fn build_message_cell_from_v3(m: &v3::Message) -> anyhow::Result<Cell> {
     };
 
     let info = infer_msg_info_from_v3(m)?;
-    let expected_hash = m.hash.as_deref().and_then(|h| parse_hash_bytes(h).ok());
+    let expected_hash = parse_hash_bytes(&m.hash).ok();
 
     let try_layout = |init_as_ref: bool, body_as_ref: bool| -> anyhow::Result<Cell> {
         let ctx = Cell::empty_context();
@@ -4510,18 +4501,16 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
     let dst_str = m.destination.as_deref().filter(|s| !s.is_empty());
 
     match (src_str, dst_str) {
-        (None, Some(_)) => {
-            let dst = parse_int_addr(dst_str)?
-                .context("External-in message missing destination address")?;
+        (None, Some(dst_str)) => {
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::ExtIn(ExtInMsgInfo {
                 src: None,
                 dst,
                 import_fee: parse_tokens_opt(m.import_fee.as_deref()),
             }))
         }
-        (Some(_), None) => {
-            let src =
-                parse_int_addr(src_str)?.context("External-out message missing source address")?;
+        (Some(src_str), None) => {
+            let src = parse_int_addr(src_str)?;
             // External-out destinations are opaque ExtAddr; we leave dst = None.
             Ok(MsgInfo::ExtOut(ExtOutMsgInfo {
                 src,
@@ -4538,11 +4527,9 @@ fn infer_msg_info_from_v3(m: &v3::Message) -> anyhow::Result<MsgInfo> {
                     .unwrap_or(0),
             }))
         }
-        (Some(_), Some(_)) => {
-            let src = parse_int_addr(src_str)?
-                .context("Internal message summary missing source address")?;
-            let dst = parse_int_addr(dst_str)?
-                .context("Internal message summary missing destination address")?;
+        (Some(src_str), Some(dst_str)) => {
+            let src = parse_int_addr(src_str)?;
+            let dst = parse_int_addr(dst_str)?;
             Ok(MsgInfo::Int(IntMsgInfo {
                 ihr_disabled: m.ihr_disabled.unwrap_or(true),
                 bounce: m.bounce.unwrap_or(false),
@@ -4784,13 +4771,8 @@ fn parse_hash_bytes(h: &str) -> anyhow::Result<HashBytes> {
     Ok(HashBytes(out))
 }
 
-fn parse_int_addr(s: Option<&str>) -> anyhow::Result<Option<IntAddr>> {
-    match s {
-        None | Some("") => Ok(None),
-        Some(a) => IntAddr::from_str(a)
-            .map(Some)
-            .map_err(|e| anyhow!("Failed to parse address '{a}': {e:?}")),
-    }
+fn parse_int_addr(address: &str) -> anyhow::Result<IntAddr> {
+    IntAddr::from_str(address).map_err(|e| anyhow!("Failed to parse address '{address}': {e:?}"))
 }
 
 fn parse_tokens_opt(s: Option<&str>) -> Tokens {
@@ -4799,11 +4781,11 @@ fn parse_tokens_opt(s: Option<&str>) -> Tokens {
         .unwrap_or_default()
 }
 
-fn parse_account_status(s: Option<&str>) -> AccountStatus {
+fn parse_account_status(s: &str) -> AccountStatus {
     match s {
-        Some("active") => AccountStatus::Active,
-        Some("frozen") => AccountStatus::Frozen,
-        Some("nonexist") => AccountStatus::NotExists,
+        "active" => AccountStatus::Active,
+        "frozen" => AccountStatus::Frozen,
+        "nonexist" => AccountStatus::NotExists,
         _ => AccountStatus::Uninit,
     }
 }

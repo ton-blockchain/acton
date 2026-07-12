@@ -532,7 +532,7 @@ async fn build_extra_data(
             metadata.insert(
                 address.to_string(),
                 v3_types::AddressMetadata {
-                    is_indexed: Some(true),
+                    is_indexed: true,
                     token_info: info.token_info,
                 },
             );
@@ -550,7 +550,7 @@ async fn build_extra_data(
                 metadata.insert(
                     key,
                     v3_types::AddressMetadata {
-                        is_indexed: Some(true),
+                        is_indexed: true,
                         token_info: info.token_info,
                     },
                 );

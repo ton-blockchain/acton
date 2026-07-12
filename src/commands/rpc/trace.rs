@@ -238,9 +238,7 @@ fn format_child_lts(child_lts: &[u64]) -> String {
 }
 
 fn trace_tx_success(tx: &v3::Transaction) -> bool {
-    let Some(description) = &tx.description else {
-        return false;
-    };
+    let description = &tx.description;
     if description.aborted.unwrap_or(false) {
         return false;
     }
@@ -259,16 +257,16 @@ fn trace_tx_success(tx: &v3::Transaction) -> bool {
 
 fn format_compute_exit_code(tx: &v3::Transaction) -> String {
     tx.description
+        .compute_ph
         .as_ref()
-        .and_then(|description| description.compute_ph.as_ref())
         .and_then(|compute| compute.exit_code)
         .map_or_else(format_trace_null, format_trace_code)
 }
 
 fn format_action_result_code(tx: &v3::Transaction) -> String {
     tx.description
+        .action
         .as_ref()
-        .and_then(|description| description.action.as_ref())
         .and_then(|action| action.result_code)
         .map_or_else(format_trace_null, format_trace_code)
 }
@@ -282,9 +280,9 @@ fn trace_branch_kind(
         return "bounce";
     }
     if matches!(
-        tx.orig_status.as_deref(),
-        Some("nonexist" | "uninit" | "uninitialized")
-    ) && tx.end_status.as_deref() == Some("active")
+        tx.orig_status.as_str(),
+        "nonexist" | "uninit" | "uninitialized"
+    ) && tx.end_status == "active"
     {
         return "deploy";
     }
@@ -384,7 +382,7 @@ fn format_trace_block_range(trace: &v3::Trace) -> String {
         .transactions_order
         .iter()
         .filter_map(|tx_hash| trace.transactions.get(tx_hash))
-        .filter_map(|tx| tx.mc_block_seqno.map(u64::from));
+        .map(|tx| u64::from(tx.mc_block_seqno));
     let range = trace_u64_range(blocks);
 
     match range {

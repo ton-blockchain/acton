@@ -110,15 +110,14 @@ async fn collect_v3_traces(
 
     traces.retain(|trace| {
         mc_seqno.is_none_or(|seqno| {
-            trace.mc_seqno_start.as_deref() == Some(&seqno.to_string())
-                || trace.mc_seqno_end.as_deref() == Some(&seqno.to_string())
-        }) && start_utime.is_none_or(|start| trace.start_utime.is_some_and(|value| value >= start))
+            trace.mc_seqno_start == seqno.to_string() || trace.mc_seqno_end == seqno.to_string()
+        }) && start_utime.is_none_or(|start| trace.start_utime >= start)
             && end_utime.is_none_or(|end| trace.end_utime.is_some_and(|value| value <= end))
             && payload.start_lt.is_none_or(|start| {
                 trace
                     .start_lt
-                    .as_deref()
-                    .and_then(|value| value.parse::<u64>().ok())
+                    .parse::<u64>()
+                    .ok()
                     .is_some_and(|value| value >= start)
             })
             && payload.end_lt.is_none_or(|end| {
@@ -129,13 +128,7 @@ async fn collect_v3_traces(
                     .is_some_and(|value| value <= end)
             })
     });
-    traces.sort_by_key(|trace| {
-        trace
-            .start_lt
-            .as_deref()
-            .and_then(|value| value.parse::<u64>().ok())
-            .unwrap_or_default()
-    });
+    traces.sort_by_key(|trace| trace.start_lt.parse::<u64>().ok().unwrap_or_default());
     if matches!(sort, SortOrder::Desc) {
         traces.reverse();
     }
@@ -322,7 +315,7 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
         Err(e) => return emulate_bad_request(format!("invalid request: {e}")),
     };
 
-    let boc = payload.boc.unwrap_or_default();
+    let boc = payload.boc;
     if boc.is_empty() {
         return emulate_bad_request("invalid request: boc is required");
     }
@@ -331,13 +324,13 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
         return emulate_bad_request(format!("invalid request: invalid boc: {e}"));
     }
 
-    let include_code_data = payload.include_code_data.unwrap_or(false);
-    let include_address_book = payload.include_address_book.unwrap_or(false);
-    let include_metadata = payload.include_metadata.unwrap_or(false);
-    let with_actions = payload.with_actions.unwrap_or(false);
+    let include_code_data = payload.include_code_data;
+    let include_address_book = payload.include_address_book;
+    let include_metadata = payload.include_metadata;
+    let with_actions = payload.with_actions;
 
     match node
-        .emulate_trace(boc, payload.ignore_chksig, payload.mc_block_seqno)
+        .emulate_trace(boc, Some(payload.ignore_chksig), payload.mc_block_seqno)
         .await
     {
         Ok(trace) => {
@@ -1132,7 +1125,7 @@ async fn build_emulate_v1_extra_data(
             metadata.insert(
                 address.to_string(),
                 v3_types::AddressMetadata {
-                    is_indexed: Some(true),
+                    is_indexed: true,
                     token_info: info.token_info,
                 },
             );
@@ -1154,7 +1147,7 @@ async fn build_emulate_v1_extra_data(
             metadata.insert(
                 key,
                 v3_types::AddressMetadata {
-                    is_indexed: Some(true),
+                    is_indexed: true,
                     token_info: info.token_info,
                 },
             );

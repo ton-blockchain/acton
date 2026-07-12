@@ -57,7 +57,7 @@ fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
     let now = i32::try_from(transaction.now)?;
-    let mc_seqno = transaction.mc_block_seqno.map(i32::try_from).transpose()?;
+    let mc_seqno = Some(i32::try_from(transaction.mc_block_seqno)?);
 
     let mut requests = vec![
         v3::TracesQuery {
@@ -85,7 +85,7 @@ fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
     if let Some(hash) = transaction
         .in_msg
         .as_ref()
-        .and_then(|message| message.hash.clone())
+        .map(|message| message.hash.clone())
     {
         requests.push(v3::TracesQuery {
             msg_hash: vec![hash],
@@ -108,7 +108,7 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
     let transaction = &fixture.transaction;
     let block = &fixture.block;
     let now = i32::try_from(transaction.now)?;
-    let mc_seqno = transaction.mc_block_seqno.map(i32::try_from).transpose()?;
+    let mc_seqno = Some(i32::try_from(transaction.mc_block_seqno)?);
 
     for request in [
         v3::TransactionsQuery {
@@ -193,19 +193,17 @@ fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Resu
         (message, "out")
     };
 
-    if let Some(hash) = &message.hash {
-        let _: v3::TransactionsResponse = live.get(
-            &live.v3_url,
-            "/transactionsByMessage",
-            &v3::TransactionsByMessageQuery {
-                msg_hash: Some(hash.clone()),
-                direction: Some(direction.to_owned()),
-                limit: Some(2),
-                offset: Some(0),
-                ..Default::default()
-            },
-        )?;
-    }
+    let _: v3::TransactionsResponse = live.get(
+        &live.v3_url,
+        "/transactionsByMessage",
+        &v3::TransactionsByMessageQuery {
+            msg_hash: Some(message.hash.clone()),
+            direction: Some(direction.to_owned()),
+            limit: Some(2),
+            offset: Some(0),
+            ..Default::default()
+        },
+    )?;
     if let Some(content) = &message.message_content {
         let _: v3::TransactionsResponse = live.get(
             &live.v3_url,
@@ -346,7 +344,7 @@ fn nft_items_query_covers_filters_sale_and_sorting() -> Result<()> {
                 address: vec![item.address.clone()],
                 owner_address: item.owner_address.clone().into_iter().collect(),
                 collection_address: item.collection_address.clone().into_iter().collect(),
-                index: item.index.clone().into_iter().collect(),
+                index: vec![item.index.clone()],
                 include_on_sale: Some(false),
                 sort_by_last_transaction_lt: Some(false),
                 limit: Some(2),

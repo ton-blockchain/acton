@@ -2,32 +2,45 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmulateRequest {
-    pub boc: Option<String>,
-    pub ignore_chksig: Option<bool>,
-    pub include_code_data: Option<bool>,
-    pub include_address_book: Option<bool>,
-    pub include_metadata: Option<bool>,
-    pub with_actions: Option<bool>,
+    #[serde(default)]
+    pub boc: String,
+    #[serde(default)]
+    pub ignore_chksig: bool,
+    #[serde(default)]
+    pub include_code_data: bool,
+    #[serde(default)]
+    pub include_address_book: bool,
+    #[serde(default)]
+    pub include_metadata: bool,
+    #[serde(default)]
+    pub with_actions: bool,
     pub mc_block_seqno: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TonConnectEmulateRequest {
-    pub from: Option<String>,
+    #[serde(default)]
+    pub from: String,
     #[serde(default)]
     pub messages: Vec<TonConnectMessage>,
-    pub valid_until: Option<u32>,
-    pub include_code_data: Option<bool>,
-    pub include_address_book: Option<bool>,
-    pub include_metadata: Option<bool>,
-    pub with_actions: Option<bool>,
+    pub valid_until: Option<u64>,
+    #[serde(default)]
+    pub include_code_data: bool,
+    #[serde(default)]
+    pub include_address_book: bool,
+    #[serde(default)]
+    pub include_metadata: bool,
+    #[serde(default)]
+    pub with_actions: bool,
     pub mc_block_seqno: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TonConnectMessage {
-    pub address: Option<String>,
-    pub amount: Option<String>,
+    #[serde(default)]
+    pub address: String,
+    #[serde(default)]
+    pub amount: String,
     pub payload: Option<String>,
     #[serde(rename = "stateInit")]
     pub state_init: Option<String>,

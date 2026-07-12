@@ -18,8 +18,7 @@ pub struct AddressBookRow {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressMetadata {
-    #[serde(default)]
-    pub is_indexed: Option<bool>,
+    pub is_indexed: bool,
     #[serde(default)]
     pub token_info: Vec<TokenInfo>,
 }
@@ -86,48 +85,28 @@ pub struct Block {
     pub start_lt: String,
     pub end_lt: String,
     pub gen_utime: StringOrNumber,
-    #[serde(default)]
-    pub masterchain_block_ref: Option<BlockId>,
+    pub masterchain_block_ref: BlockId,
     #[serde(default)]
     pub prev_blocks: Vec<BlockId>,
-    #[serde(default)]
-    pub after_merge: Option<bool>,
-    #[serde(default)]
-    pub after_split: Option<bool>,
-    #[serde(default)]
-    pub before_split: Option<bool>,
-    #[serde(default)]
-    pub created_by: Option<String>,
-    #[serde(default)]
-    pub flags: Option<i32>,
-    #[serde(default)]
-    pub gen_catchain_seqno: Option<i32>,
-    #[serde(default)]
-    pub global_id: Option<i32>,
-    #[serde(default)]
-    pub key_block: Option<bool>,
-    #[serde(default)]
-    pub master_ref_seqno: Option<i32>,
-    #[serde(default)]
-    pub min_ref_mc_seqno: Option<i32>,
-    #[serde(default)]
-    pub prev_key_block_seqno: Option<i32>,
-    #[serde(default)]
-    pub rand_seed: Option<String>,
-    #[serde(default)]
-    pub tx_count: Option<i32>,
-    #[serde(default)]
-    pub validator_list_hash_short: Option<i32>,
-    #[serde(default)]
-    pub version: Option<i32>,
-    #[serde(default)]
-    pub vert_seqno: Option<i32>,
-    #[serde(default)]
-    pub vert_seqno_incr: Option<bool>,
-    #[serde(default)]
-    pub want_merge: Option<bool>,
-    #[serde(default)]
-    pub want_split: Option<bool>,
+    pub after_merge: bool,
+    pub after_split: bool,
+    pub before_split: bool,
+    pub created_by: String,
+    pub flags: i32,
+    pub gen_catchain_seqno: i32,
+    pub global_id: i32,
+    pub key_block: bool,
+    pub master_ref_seqno: i32,
+    pub min_ref_mc_seqno: i32,
+    pub prev_key_block_seqno: i32,
+    pub rand_seed: String,
+    pub tx_count: i64,
+    pub validator_list_hash_short: i32,
+    pub version: i64,
+    pub vert_seqno: i32,
+    pub vert_seqno_incr: bool,
+    pub want_merge: bool,
+    pub want_split: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,20 +119,14 @@ pub struct JettonMaster {
     pub address: String,
     #[serde(default)]
     pub admin_address: Option<String>,
-    #[serde(default)]
-    pub code_hash: Option<String>,
-    #[serde(default)]
-    pub data_hash: Option<String>,
+    pub code_hash: String,
+    pub data_hash: String,
     #[serde(default)]
     pub jetton_content: HashMap<String, Value>,
-    #[serde(default)]
-    pub jetton_wallet_code_hash: Option<String>,
-    #[serde(default)]
-    pub last_transaction_lt: Option<String>,
-    #[serde(default)]
-    pub mintable: Option<bool>,
-    #[serde(default)]
-    pub total_supply: Option<String>,
+    pub jetton_wallet_code_hash: String,
+    pub last_transaction_lt: String,
+    pub mintable: bool,
+    pub total_supply: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -179,24 +152,18 @@ pub struct NftItem {
     pub address: String,
     #[serde(default)]
     pub auction_contract_address: Option<String>,
-    #[serde(default)]
-    pub code_hash: Option<String>,
+    pub code_hash: String,
     #[serde(default)]
     pub collection: Option<NftCollectionRef>,
     #[serde(default)]
     pub collection_address: Option<String>,
     #[serde(default)]
     pub content: HashMap<String, Value>,
-    #[serde(default)]
-    pub data_hash: Option<String>,
-    #[serde(default)]
-    pub index: Option<String>,
-    #[serde(default)]
-    pub init: Option<bool>,
-    #[serde(default)]
-    pub last_transaction_lt: Option<String>,
-    #[serde(default)]
-    pub on_sale: Option<bool>,
+    pub data_hash: String,
+    pub index: String,
+    pub init: bool,
+    pub last_transaction_lt: String,
+    pub on_sale: bool,
     #[serde(default)]
     pub owner_address: Option<String>,
     #[serde(default)]
@@ -290,40 +257,30 @@ pub struct TraceNode {
 pub struct Action {
     #[serde(default)]
     pub accounts: Vec<String>,
-    #[serde(default)]
-    pub action_id: Option<String>,
-    #[serde(default)]
-    pub details: Option<Value>,
-    #[serde(default)]
-    pub end_lt: Option<String>,
-    #[serde(default)]
-    pub end_utime: Option<u32>,
-    #[serde(default)]
-    pub finality: Option<String>,
-    #[serde(default)]
-    pub start_lt: Option<String>,
-    #[serde(default)]
-    pub start_utime: Option<u32>,
+    pub action_id: String,
+    pub details: Value,
+    pub end_lt: String,
+    pub end_utime: u32,
+    pub finality: String,
+    pub start_lt: String,
+    pub start_utime: u32,
     #[serde(default)]
     pub success: Option<bool>,
-    #[serde(default)]
-    pub trace_end_lt: Option<String>,
-    #[serde(default)]
-    pub trace_end_utime: Option<u32>,
+    pub trace_end_lt: String,
+    pub trace_end_utime: u32,
     #[serde(default)]
     pub trace_external_hash: Option<String>,
     #[serde(default)]
     pub trace_external_hash_norm: Option<String>,
     #[serde(default)]
     pub trace_id: Option<String>,
-    #[serde(default)]
-    pub trace_mc_seqno_end: Option<u32>,
+    pub trace_mc_seqno_end: u32,
     #[serde(default)]
     pub transactions: Vec<String>,
     #[serde(default)]
     pub transactions_full: Vec<Transaction>,
-    #[serde(default, rename = "type")]
-    pub kind: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -344,8 +301,7 @@ pub struct JettonWallet {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AccountStateFull {
     pub address: String,
-    #[serde(default)]
-    pub account_state_hash: Option<String>,
+    pub account_state_hash: String,
     #[serde(default)]
     pub balance: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -359,7 +315,7 @@ pub struct AccountStateFull {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub data_hash: Option<String>,
     #[serde(default)]
-    pub extra_currencies: Option<HashMap<String, String>>,
+    pub extra_currencies: HashMap<String, String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub frozen_hash: Option<String>,
     #[serde(default)]
@@ -377,26 +333,17 @@ pub struct Transaction {
     pub account: String,
     pub hash: String,
     pub lt: String,
-    #[serde(default)]
-    pub block_ref: Option<BlockId>,
+    pub block_ref: BlockId,
     #[serde(default)]
     pub now: u32,
-    #[serde(default)]
-    pub mc_block_seqno: Option<u32>,
-    #[serde(default)]
-    pub emulated: Option<bool>,
-    #[serde(default)]
-    pub finality: Option<String>,
-    #[serde(default)]
-    pub prev_trans_hash: Option<String>,
-    #[serde(default)]
-    pub prev_trans_lt: Option<String>,
-    #[serde(default)]
-    pub orig_status: Option<String>,
-    #[serde(default)]
-    pub end_status: Option<String>,
-    #[serde(default)]
-    pub total_fees: Option<String>,
+    pub mc_block_seqno: u32,
+    pub emulated: bool,
+    pub finality: String,
+    pub prev_trans_hash: String,
+    pub prev_trans_lt: String,
+    pub orig_status: String,
+    pub end_status: String,
+    pub total_fees: String,
     #[serde(default)]
     pub total_fees_extra_currencies: HashMap<String, String>,
     #[serde(default)]
@@ -405,8 +352,7 @@ pub struct Transaction {
     pub trace_id: Option<String>,
     #[serde(default)]
     pub child_transactions: Vec<String>,
-    #[serde(default)]
-    pub description: Option<TransactionDescr>,
+    pub description: TransactionDescr,
     #[serde(default)]
     pub in_msg: Option<Message>,
     #[serde(default)]
@@ -438,8 +384,8 @@ pub struct AccountState {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionDescr {
-    #[serde(default, rename = "type")]
-    pub kind: Option<String>,
+    #[serde(rename = "type")]
+    pub kind: String,
     #[serde(default)]
     pub aborted: Option<bool>,
     #[serde(default)]
@@ -564,8 +510,7 @@ pub struct StoragePhase {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Message {
-    #[serde(default)]
-    pub hash: Option<String>,
+    pub hash: String,
     #[serde(default)]
     pub hash_norm: Option<String>,
     #[serde(default)]
@@ -633,18 +578,13 @@ pub struct Trace {
     pub end_utime: Option<u32>,
     #[serde(default)]
     pub external_hash: Option<String>,
-    #[serde(default)]
-    pub mc_seqno_end: Option<String>,
-    #[serde(default)]
-    pub mc_seqno_start: Option<String>,
-    #[serde(default)]
-    pub start_lt: Option<String>,
-    #[serde(default)]
-    pub start_utime: Option<u32>,
+    pub mc_seqno_end: String,
+    pub mc_seqno_start: String,
+    pub start_lt: String,
+    pub start_utime: u32,
     #[serde(default)]
     pub trace: Option<TraceNode>,
-    #[serde(default)]
-    pub trace_info: Option<TraceInfo>,
+    pub trace_info: TraceInfo,
     #[serde(default)]
     pub warning: Option<String>,
 }
@@ -669,6 +609,17 @@ mod tests {
             "transactions_order": [],
             "transactions": {},
             "is_incomplete": false,
+            "mc_seqno_start": "1",
+            "mc_seqno_end": "1",
+            "start_lt": "1",
+            "start_utime": 1,
+            "trace_info": {
+                "transactions": 0,
+                "messages": 0,
+                "pending_messages": 0,
+                "trace_state": "complete",
+                "classification_state": "unclassified"
+            },
             "warning": "upstream field not consumed by this response projection"
         }))
         .expect("v3 trace response must accept the full upstream envelope");
