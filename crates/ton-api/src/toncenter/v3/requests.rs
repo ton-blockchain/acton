@@ -15,24 +15,23 @@ pub struct AccountStatesQuery {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TracesQuery {
-    #[serde(default)]
-    pub account: Vec<String>,
+    pub account: Option<String>,
     #[serde(default)]
     pub trace_id: Vec<String>,
     #[serde(default)]
     pub tx_hash: Vec<String>,
     #[serde(default)]
     pub msg_hash: Vec<String>,
-    pub mc_seqno: Option<u32>,
-    pub start_utime: Option<u32>,
-    pub end_utime: Option<u32>,
+    pub mc_seqno: Option<i32>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
     pub start_lt: Option<u64>,
     pub end_lt: Option<u64>,
     pub include_actions: Option<bool>,
     #[serde(default)]
     pub supported_action_types: Vec<String>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
     pub sort: Option<String>,
 }
 
@@ -40,20 +39,20 @@ pub struct TracesQuery {
 pub struct TransactionsQuery {
     pub workchain: Option<i32>,
     pub shard: Option<String>,
-    pub seqno: Option<u32>,
-    pub mc_seqno: Option<u32>,
+    pub seqno: Option<i32>,
+    pub mc_seqno: Option<i32>,
     #[serde(default)]
     pub account: Vec<String>,
     #[serde(default)]
     pub exclude_account: Vec<String>,
     pub hash: Option<String>,
     pub lt: Option<u64>,
-    pub start_utime: Option<u32>,
-    pub end_utime: Option<u32>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
     pub start_lt: Option<u64>,
     pub end_lt: Option<u64>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
     pub sort: Option<String>,
 }
 
@@ -61,16 +60,16 @@ pub struct TransactionsQuery {
 pub struct BlocksQuery {
     pub workchain: Option<i32>,
     pub shard: Option<String>,
-    pub seqno: Option<u32>,
+    pub seqno: Option<i32>,
     pub root_hash: Option<String>,
     pub file_hash: Option<String>,
-    pub mc_seqno: Option<u32>,
-    pub start_utime: Option<u32>,
-    pub end_utime: Option<u32>,
+    pub mc_seqno: Option<i32>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
     pub start_lt: Option<u64>,
     pub end_lt: Option<u64>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
     pub sort: Option<String>,
 }
 
@@ -80,8 +79,8 @@ pub struct TransactionsByMessageQuery {
     pub body_hash: Option<String>,
     pub opcode: Option<String>,
     pub direction: Option<String>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -99,8 +98,8 @@ pub struct JettonMastersQuery {
     pub address: Vec<String>,
     #[serde(default)]
     pub admin_address: Vec<String>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -112,8 +111,8 @@ pub struct JettonWalletsQuery {
     #[serde(default)]
     pub jetton_address: Vec<String>,
     pub exclude_zero_balance: Option<bool>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
     pub sort: Option<String>,
 }
 
@@ -129,8 +128,8 @@ pub struct NftItemsQuery {
     pub index: Vec<String>,
     pub include_on_sale: Option<bool>,
     pub sort_by_last_transaction_lt: Option<bool>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -142,5 +141,12 @@ pub struct SendMessageRequest {
 pub struct RunGetMethodRequest {
     pub address: String,
     pub method: String,
-    pub stack: Vec<Value>,
+    pub stack: Vec<StackEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StackEntry {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub value: Value,
 }

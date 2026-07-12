@@ -5,16 +5,17 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::future::Future;
 use std::time::{SystemTime, UNIX_EPOCH};
+use ton_api::toncenter::v2::StringOrNumber;
 
 pub fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow::Result<T> {
     serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {method}"))
 }
 
-pub fn parse_method_name(method: &Value) -> anyhow::Result<String> {
+pub fn parse_method_name(method: &StringOrNumber) -> anyhow::Result<String> {
     match method {
-        Value::String(s) => Ok(s.clone()),
-        Value::Number(n) => Ok(n.to_string()),
-        _ => anyhow::bail!("Invalid method format"),
+        StringOrNumber::String(value) => Ok(value.clone()),
+        StringOrNumber::Number(value) => Ok(value.to_string()),
+        StringOrNumber::Unsigned(value) => Ok(value.to_string()),
     }
 }
 

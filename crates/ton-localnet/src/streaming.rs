@@ -1,5 +1,7 @@
 use crate::api::toncenter_v3;
-use crate::localnet::{Localnet, LocalnetTransaction, convert_to_tx_struct};
+use crate::localnet::{
+    Localnet, LocalnetJettonWalletsQuery, LocalnetTransaction, convert_to_tx_struct,
+};
 use crate::storage::TraceNode;
 use crate::types::{Addr, Hash256};
 use anyhow::Context;
@@ -445,14 +447,15 @@ async fn jettons_notification(
     }
 
     let Some(wallet) = node
-        .get_jetton_wallets(
-            Some(account.to_string()),
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses: vec![account.to_string()],
+            owner_addresses: Vec::new(),
+            jetton_addresses: Vec::new(),
+            exclude_zero_balance: Some(false),
+            descending: true,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?
         .into_iter()
         .next()
@@ -588,14 +591,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let wallets = node
-        .get_jetton_wallets(
-            Some(address_str.clone()),
-            None,
-            None,
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses: vec![address_str.clone()],
+            owner_addresses: Vec::new(),
+            jetton_addresses: Vec::new(),
+            exclude_zero_balance: Some(false),
+            descending: true,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(wallet) = wallets.first() {
         info.interfaces.insert("jetton_wallet".to_string());
@@ -605,7 +609,7 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let masters = node
-        .get_jetton_masters(Some(address_str.clone()), None, Some(1), Some(0))
+        .get_jetton_masters(vec![address_str.clone()], Vec::new(), Some(1), Some(0))
         .await?;
     if let Some(master) = masters.first() {
         info.interfaces.insert("jetton_master".to_string());
@@ -615,10 +619,10 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
 
     let items = node
         .get_nft_items(
-            Some(address_str.clone()),
-            None,
-            None,
-            None,
+            vec![address_str.clone()],
+            Vec::new(),
+            Vec::new(),
+            Vec::new(),
             Some(false),
             Some(1),
             Some(0),
@@ -632,10 +636,10 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
 
     let collections = node
         .get_nft_items(
-            None,
-            None,
-            Some(address_str),
-            None,
+            Vec::new(),
+            Vec::new(),
+            vec![address_str],
+            Vec::new(),
             Some(false),
             Some(1),
             Some(0),

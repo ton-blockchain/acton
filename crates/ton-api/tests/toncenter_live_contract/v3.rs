@@ -56,6 +56,8 @@ fn account_states_query_covers_repeated_addresses_and_boc() -> Result<()> {
 fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;
+    let now = i32::try_from(transaction.now)?;
+    let mc_seqno = transaction.mc_block_seqno.map(i32::try_from).transpose()?;
 
     let mut requests = vec![
         v3::TracesQuery {
@@ -66,10 +68,10 @@ fn traces_query_covers_hash_account_ranges_actions_and_sorting() -> Result<()> {
             ..Default::default()
         },
         v3::TracesQuery {
-            account: vec![transaction.account.clone()],
-            mc_seqno: transaction.mc_block_seqno,
-            start_utime: Some(transaction.now.saturating_sub(60)),
-            end_utime: Some(transaction.now.saturating_add(60)),
+            account: Some(transaction.account.clone()),
+            mc_seqno,
+            start_utime: Some(now.saturating_sub(60)),
+            end_utime: Some(now.saturating_add(60)),
             start_lt: Some(transaction.lt.parse()?),
             end_lt: Some(transaction.lt.parse()?),
             include_actions: Some(false),
@@ -105,6 +107,8 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
     let fixture = fixture(&live)?;
     let transaction = &fixture.transaction;
     let block = &fixture.block;
+    let now = i32::try_from(transaction.now)?;
+    let mc_seqno = transaction.mc_block_seqno.map(i32::try_from).transpose()?;
 
     for request in [
         v3::TransactionsQuery {
@@ -115,8 +119,8 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
         },
         v3::TransactionsQuery {
             account: vec![transaction.account.clone()],
-            start_utime: Some(transaction.now.saturating_sub(60)),
-            end_utime: Some(transaction.now.saturating_add(60)),
+            start_utime: Some(now.saturating_sub(60)),
+            end_utime: Some(now.saturating_add(60)),
             start_lt: Some(transaction.lt.parse()?),
             end_lt: Some(transaction.lt.parse()?),
             limit: Some(2),
@@ -127,8 +131,8 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
         v3::TransactionsQuery {
             workchain: Some(block.workchain),
             shard: Some(block.shard.clone()),
-            seqno: Some(block.seqno),
-            mc_seqno: transaction.mc_block_seqno,
+            seqno: Some(i32::try_from(block.seqno)?),
+            mc_seqno,
             exclude_account: vec![ELECTOR_ADDRESS.to_owned()],
             limit: Some(2),
             sort: Some("desc".to_owned()),
@@ -153,7 +157,7 @@ fn blocks_query_covers_hash_block_ranges_and_sorting() -> Result<()> {
         v3::BlocksQuery {
             workchain: Some(block.workchain),
             shard: Some(block.shard.clone()),
-            seqno: Some(block.seqno),
+            seqno: Some(i32::try_from(block.seqno)?),
             root_hash: Some(block.root_hash.clone()),
             file_hash: Some(block.file_hash.clone()),
             limit: Some(2),
@@ -211,6 +215,7 @@ fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Resu
                 opcode: message.opcode.as_ref().map(|value| match value {
                     v3::StringOrNumber::String(value) => value.clone(),
                     v3::StringOrNumber::Number(value) => value.to_string(),
+                    v3::StringOrNumber::Unsigned(value) => value.to_string(),
                 }),
                 limit: Some(2),
                 ..Default::default()

@@ -49,6 +49,7 @@ pub enum JsonRpcResult {
     ConfigInfo(Box<ConfigInfo>),
     Transaction(Box<Transaction>),
     BlockHeader(Box<BlockHeader>),
+    BlockTransactions(Box<BlockTransactions>),
     BlockTransactionsExt(Box<BlockTransactionsExt>),
     MasterchainInfo(Box<MasterchainInfo>),
     ConsensusBlock(Box<ConsensusBlock>),
@@ -316,6 +317,26 @@ pub struct BlockTransactionsExt {
     pub req_count: usize,
     pub incomplete: bool,
     pub transactions: Vec<Transaction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockTransactions {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub id: TonBlockIdExt,
+    pub req_count: usize,
+    pub incomplete: bool,
+    pub transactions: Vec<ShortTxId>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShortTxId {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub mode: i32,
+    pub account: String,
+    pub lt: String,
+    pub hash: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

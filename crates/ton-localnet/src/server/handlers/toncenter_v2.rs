@@ -10,12 +10,22 @@ use axum::{
 };
 use base64::Engine;
 use std::sync::Arc;
+use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
     DetectHashRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest,
     TransactionsRequest, TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
+
+macro_rules! parse {
+    ($expression:expr) => {
+        match $expression {
+            Ok(value) => value,
+            Err(error) => return v2_bad_request(error),
+        }
+    };
+}
 
 pub async fn send_boc(
     State(node): State<Arc<Localnet>>,
@@ -28,13 +38,11 @@ pub async fn run_get_method(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RunGetMethodRequest>,
 ) -> Response {
-    let method_str = match parse_method_name(&payload.method) {
-        Ok(s) => s,
-        Err(e) => return v2_bad_request(e),
-    };
+    let method_str = parse!(parse_method_name(&payload.method));
+    let seqno = parse!(parse_seqno(payload.seqno));
 
     handle_result(
-        node.run_get_method(payload.address, method_str, payload.stack, payload.seqno),
+        node.run_get_method(payload.address, method_str, payload.stack, seqno),
         |res| v2::map_run_get_method(res, true),
     )
     .await
@@ -44,13 +52,11 @@ pub async fn run_get_method_std(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<RunGetMethodRequest>,
 ) -> Response {
-    let method_str = match parse_method_name(&payload.method) {
-        Ok(s) => s,
-        Err(e) => return v2_bad_request(e),
-    };
+    let method_str = parse!(parse_method_name(&payload.method));
+    let seqno = parse!(parse_seqno(payload.seqno));
 
     handle_result(
-        node.run_get_method(payload.address, method_str, payload.stack, payload.seqno),
+        node.run_get_method(payload.address, method_str, payload.stack, seqno),
         |res| v2::map_run_get_method(res, false),
     )
     .await
@@ -60,8 +66,9 @@ pub async fn get_address_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
+    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_address_information(payload.address, payload.seqno),
+        node.get_address_information(payload.address, seqno),
         v2::map_account_state,
     )
     .await
@@ -71,8 +78,9 @@ pub async fn get_address_balance(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
+    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_address_balance(payload.address, payload.seqno),
+        node.get_address_balance(payload.address, seqno),
         ToString::to_string,
     )
     .await
@@ -82,8 +90,9 @@ pub async fn get_address_state(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
+    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_address_state(payload.address, payload.seqno),
+        node.get_address_state(payload.address, seqno),
         ToString::to_string,
     )
     .await
@@ -93,8 +102,9 @@ pub async fn get_extended_address_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
+    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_address_information(payload.address, payload.seqno),
+        node.get_address_information(payload.address, seqno),
         v2::map_extended_account_state,
     )
     .await
@@ -106,19 +116,15 @@ pub async fn get_wallet_information(
 ) -> Response {
     handle_result(
         async move {
+            let seqno = parse_seqno(payload.seqno)?;
             let info = node
-                .get_address_information(payload.address.clone(), payload.seqno)
+                .get_address_information(payload.address.clone(), seqno)
                 .await?;
             let seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
-                node.run_get_method(
-                    payload.address,
-                    "seqno".to_string(),
-                    Vec::new(),
-                    payload.seqno,
-                )
-                .await
-                .ok()
-                .and_then(|result| v2::map_wallet_seqno(&result))
+                node.run_get_method(payload.address, "seqno".to_string(), Vec::new(), seqno)
+                    .await
+                    .ok()
+                    .and_then(|result| v2::map_wallet_seqno(&result))
             } else {
                 None
             };
@@ -160,8 +166,9 @@ pub async fn get_shard_account_cell(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
+    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_shard_account_cell(payload.address, payload.seqno),
+        node.get_shard_account_cell(payload.address, seqno),
         v2::map_shard_account_cell,
     )
     .await
@@ -177,8 +184,8 @@ pub(super) async fn token_wallet_code_hash(
 
     let wallet = info.jetton_wallet.as_ref()?;
     node.get_jetton_masters(
-        Some(wallet.jetton_address.to_string()),
-        None,
+        vec![wallet.jetton_address.to_string()],
+        Vec::new(),
         Some(1),
         Some(0),
     )
@@ -206,14 +213,9 @@ pub async fn get_transactions(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
 ) -> Response {
+    let (limit, lt, to_lt) = parse!(parse_transactions_request(&payload));
     handle_result(
-        node.get_transactions(
-            payload.address,
-            payload.limit,
-            payload.lt,
-            payload.hash,
-            payload.to_lt,
-        ),
+        node.get_transactions(payload.address, limit, lt, payload.hash, to_lt),
         |transactions| v2::map_transactions(transactions),
     )
     .await
@@ -223,16 +225,10 @@ pub async fn get_transactions_std(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
 ) -> Response {
-    let page_limit = payload.limit;
+    let (page_limit, lt, to_lt) = parse!(parse_transactions_request(&payload));
     let fetch_limit = page_limit.saturating_add(1);
     handle_result(
-        node.get_transactions(
-            payload.address,
-            fetch_limit,
-            payload.lt,
-            payload.hash,
-            payload.to_lt,
-        ),
+        node.get_transactions(payload.address, fetch_limit, lt, payload.hash, to_lt),
         |res| v2::map_transactions_std(res, page_limit),
     )
     .await
@@ -242,8 +238,9 @@ pub async fn try_locate_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
+    let created_lt = parse!(payload.created_lt.to_u64());
     handle_result(
-        node.try_locate_tx(payload.source, payload.destination, payload.created_lt),
+        node.try_locate_tx(payload.source, payload.destination, created_lt),
         v2::map_transaction,
     )
     .await
@@ -253,8 +250,9 @@ pub async fn try_locate_result_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
+    let created_lt = parse!(payload.created_lt.to_u64());
     handle_result(
-        node.try_locate_result_tx(payload.source, payload.destination, payload.created_lt),
+        node.try_locate_result_tx(payload.source, payload.destination, created_lt),
         v2::map_transaction,
     )
     .await
@@ -264,8 +262,9 @@ pub async fn try_locate_source_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
+    let created_lt = parse!(payload.created_lt.to_u64());
     handle_result(
-        node.try_locate_source_tx(payload.source, payload.destination, payload.created_lt),
+        node.try_locate_source_tx(payload.source, payload.destination, created_lt),
         v2::map_transaction,
     )
     .await
@@ -422,14 +421,13 @@ pub async fn lookup_block(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<LookupBlockRequest>,
 ) -> Response {
+    let workchain = parse!(payload.workchain.to_i32());
+    let shard = parse!(payload.shard.to_i64());
+    let seqno = parse!(parse_seqno(payload.seqno));
+    let lt = parse!(payload.lt.map(|value| value.to_u64()).transpose());
+    let unixtime = parse!(payload.unixtime.map(|value| value.to_u32()).transpose());
     handle_result(
-        node.lookup_block(
-            payload.workchain,
-            payload.shard,
-            payload.seqno.map(|x| x as u32),
-            payload.lt,
-            payload.unixtime,
-        ),
+        node.lookup_block(workchain, shard.to_string(), seqno, lt, unixtime),
         v2::map_lookup_block,
     )
     .await
@@ -491,15 +489,14 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
     anyhow::bail!("Invalid hash format")
 }
 
-fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
+pub(super) fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
     let raw = payload
         .param
-        .or(payload.config_id)
+        .as_ref()
+        .or(payload.config_id.as_ref())
         .ok_or_else(|| anyhow::anyhow!("`param` is required"))?;
-    if raw < 0 {
-        anyhow::bail!("Config param must be a non-negative integer");
-    }
-    Ok(raw as u32)
+    raw.to_u32()
+        .map_err(|_| anyhow::anyhow!("Config param must be a non-negative 32-bit integer"))
 }
 
 fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
@@ -517,12 +514,41 @@ fn parse_libraries_query(raw: &str) -> anyhow::Result<Vec<Hash256>> {
     Ok(hashes)
 }
 
-fn parse_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {
-    match seqno {
-        Some(value) if value < 0 => anyhow::bail!("`seqno` must be a non-negative integer"),
-        Some(value) => Ok(Some(value as u32)),
-        None => Ok(None),
+pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Option<u32>> {
+    seqno
+        .map(|value| value.to_u32())
+        .transpose()
+        .map_err(|_| anyhow::anyhow!("`seqno` must be a non-negative 32-bit integer"))
+}
+
+pub(super) fn parse_transactions_request(
+    payload: &TransactionsRequest,
+) -> anyhow::Result<(usize, Option<u64>, Option<u64>)> {
+    let limit = payload
+        .limit
+        .as_ref()
+        .map(StringOrNumber::to_usize)
+        .transpose()?
+        .unwrap_or(10);
+    if !(1..=1000).contains(&limit) {
+        anyhow::bail!("`limit` must be between 1 and 1000");
     }
+    let lt = payload
+        .lt
+        .as_ref()
+        .map(StringOrNumber::to_u64)
+        .transpose()?;
+    let to_lt = payload
+        .to_lt
+        .as_ref()
+        .map(StringOrNumber::to_u64)
+        .transpose()?;
+    let has_lt = lt.is_some_and(|value| value != 0);
+    let has_hash = payload.hash.as_ref().is_some_and(|hash| !hash.is_empty());
+    if has_lt != has_hash {
+        anyhow::bail!("`lt` and `hash` must be used together");
+    }
+    Ok((limit, lt.filter(|value| *value != 0), to_lt))
 }
 
 #[cfg(test)]

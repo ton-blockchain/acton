@@ -1507,7 +1507,7 @@ fn localnet_supports_pre_start_commands_and_get_out_msg_queue_size() {
     let traces = wait_for_ok_response(
         &node,
         &format!(
-            "/api/v3/traces?hash={}",
+            "/api/v3/traces?tx_hash={}",
             encode_query_component(parent_tx_hash)
         ),
         Duration::from_secs(12),
@@ -4913,7 +4913,7 @@ fn localnet_supports_v3_run_get_method() {
     let payload = response_payload(&response);
     assert_eq!(payload["exit_code"].as_i64(), Some(0));
     assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
-    assert_eq!(payload["stack"][0]["value"].as_str(), Some("17"));
+    assert_eq!(payload["stack"][0]["value"].as_str(), Some("0x11"));
 
     node.stop();
 }
@@ -5375,11 +5375,13 @@ fn run_v3_get_num_at_seqno(
     let payload = response_payload(&response);
     assert_eq!(payload["exit_code"].as_i64(), Some(0));
     assert_eq!(payload["stack"][0]["type"].as_str(), Some("num"));
-    payload["stack"][0]["value"]
+    let value = payload["stack"][0]["value"]
         .as_str()
-        .expect("numeric get-method result must be a string")
-        .parse::<i64>()
-        .expect("numeric get-method result must parse")
+        .expect("numeric get-method result must be a string");
+    let digits = value
+        .strip_prefix("0x")
+        .expect("v3 numeric get-method result must use hexadecimal format");
+    i64::from_str_radix(digits, 16).expect("numeric get-method result must parse")
 }
 
 fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> String {

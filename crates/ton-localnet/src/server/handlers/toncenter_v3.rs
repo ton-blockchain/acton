@@ -1,8 +1,6 @@
 use crate::api::toncenter_v3;
-use crate::localnet::{Localnet, LocalnetAddressInfo, LocalnetBlock, LocalnetTransaction};
-use crate::server::toncenter_adapters::{
-    JettonMastersQueryAdapter, JettonWalletsQueryAdapter, NftItemsQueryAdapter,
-    PendingTransactionsQueryAdapter, TracesQueryAdapter, TransactionsQueryAdapter,
+use crate::localnet::{
+    Localnet, LocalnetAddressInfo, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction,
 };
 use crate::storage::{JettonMasterMeta, TraceNode};
 use crate::types::{Addr, BocBytes, Hash256};
@@ -14,7 +12,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::Engine;
-use serde::Serialize;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use serde_json::json;
 use std::collections::{BTreeSet, HashMap, HashSet};
@@ -23,39 +21,147 @@ use std::sync::Arc;
 use ton_api::toncenter::emulate::v1 as emulate;
 use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
-    AccountStatesQuery, AddressInformationQuery, BlocksQuery, RunGetMethodRequest,
-    SendMessageRequest, TransactionsByMessageQuery,
+    AccountStatesQuery, AddressInformationQuery, BlocksQuery, JettonMastersQuery,
+    JettonWalletsQuery, NftItemsQuery, PendingTransactionsQuery, RunGetMethodRequest,
+    SendMessageRequest, StackEntry, TracesQuery, TransactionsByMessageQuery, TransactionsQuery,
 };
 use ton_indexer::categorize_wallet;
 use toncenter_v3 as v3;
 use tycho_types::cell::HashBytes as CellHashBytes;
 use tycho_types::models::{Base64StdAddrFlags, DisplayBase64StdAddr, StdAddr, StdAddrFormat};
 use tycho_types::prelude::HashBytes;
-use url::form_urlencoded;
 
 const BLOCK_WORKCHAIN: i32 = 0;
 const BLOCK_SHARD: i64 = i64::MIN;
 
 pub async fn get_traces(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<TracesQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
-    let tx_hash = match payload.tx_hash.as_deref().map(parse_hash_any).transpose() {
-        Ok(hash) => hash,
+    let payload = match parse_v3_query::<TracesQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
         Err(e) => return v3_bad_request(e.to_string()),
     };
-    let msg_hash = match payload.msg_hash.as_deref().map(parse_hash_any).transpose() {
-        Ok(hash) => hash,
-        Err(e) => return v3_bad_request(e.to_string()),
-    };
-
-    if let Some(msg_hash) = msg_hash {
-        handle_v3_traces_result(node.get_traces_by_message_hash(msg_hash)).await
-    } else if let Some(tx_hash) = tx_hash {
-        handle_v3_traces_result(node.get_traces(tx_hash)).await
-    } else {
-        v3_bad_request("Either `msg_hash` or `tx_hash` is required")
+    match collect_v3_traces(node.as_ref(), payload).await {
+        Ok(response) => (StatusCode::OK, Json(response)).into_response(),
+        Err(e) => v3_bad_request(e.to_string()),
     }
+}
+
+async fn collect_v3_traces(
+    node: &Localnet,
+    payload: TracesQuery,
+) -> anyhow::Result<v3_types::TracesResponse> {
+    let filter_count = usize::from(payload.account.is_some())
+        + usize::from(!payload.trace_id.is_empty())
+        + usize::from(!payload.tx_hash.is_empty())
+        + usize::from(!payload.msg_hash.is_empty());
+    if filter_count != 1 {
+        anyhow::bail!("Exactly one of `account`, `trace_id`, `tx_hash`, or `msg_hash` is required");
+    }
+
+    let (limit, offset) = parse_limit_offset(payload.limit, payload.offset)?;
+    let sort = parse_sort(payload.sort)?;
+    let mc_seqno = parse_non_negative_u32("mc_seqno", payload.mc_seqno)?;
+    let start_utime = parse_non_negative_u32("start_utime", payload.start_utime)?;
+    let end_utime = parse_non_negative_u32("end_utime", payload.end_utime)?;
+
+    let tx_hashes = if let Some(account) = payload.account {
+        let account = parse_std_addr(&account)?;
+        node.get_all_transactions()
+            .await?
+            .into_iter()
+            .filter(|tx| tx.address == account)
+            .map(|tx| tx.hash)
+            .collect::<HashSet<_>>()
+    } else {
+        payload
+            .trace_id
+            .into_iter()
+            .chain(payload.tx_hash)
+            .map(|hash| parse_hash_any(&hash))
+            .collect::<anyhow::Result<HashSet<_>>>()?
+    };
+    let msg_hashes = payload
+        .msg_hash
+        .into_iter()
+        .map(|hash| parse_hash_any(&hash))
+        .collect::<anyhow::Result<HashSet<_>>>()?;
+
+    let mut traces = Vec::new();
+    let mut seen = HashSet::new();
+    let mut address_book = v3_types::AddressBook::new();
+    let mut metadata = v3_types::Metadata::new();
+    for result in futures_for_trace_hashes(node, tx_hashes, msg_hashes).await {
+        let trace = match result {
+            Ok(trace) => trace,
+            Err(e) if is_trace_not_found_error(&e) => continue,
+            Err(e) => return Err(e),
+        };
+        let mapped = v3::map_traces(&trace);
+        address_book.extend(mapped.address_book);
+        metadata.extend(mapped.metadata);
+        traces.extend(
+            mapped
+                .traces
+                .into_iter()
+                .filter(|trace| seen.insert(trace.trace_id.clone())),
+        );
+    }
+
+    traces.retain(|trace| {
+        mc_seqno.is_none_or(|seqno| {
+            trace.mc_seqno_start.as_deref() == Some(&seqno.to_string())
+                || trace.mc_seqno_end.as_deref() == Some(&seqno.to_string())
+        }) && start_utime.is_none_or(|start| trace.start_utime.is_some_and(|value| value >= start))
+            && end_utime.is_none_or(|end| trace.end_utime.is_some_and(|value| value <= end))
+            && payload.start_lt.is_none_or(|start| {
+                trace
+                    .start_lt
+                    .as_deref()
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .is_some_and(|value| value >= start)
+            })
+            && payload.end_lt.is_none_or(|end| {
+                trace
+                    .end_lt
+                    .as_deref()
+                    .and_then(|value| value.parse::<u64>().ok())
+                    .is_some_and(|value| value <= end)
+            })
+    });
+    traces.sort_by_key(|trace| {
+        trace
+            .start_lt
+            .as_deref()
+            .and_then(|value| value.parse::<u64>().ok())
+            .unwrap_or_default()
+    });
+    if matches!(sort, SortOrder::Desc) {
+        traces.reverse();
+    }
+    traces = traces.into_iter().skip(offset).take(limit).collect();
+
+    Ok(v3_types::TracesResponse {
+        traces,
+        address_book,
+        metadata,
+    })
+}
+
+async fn futures_for_trace_hashes(
+    node: &Localnet,
+    tx_hashes: HashSet<Hash256>,
+    msg_hashes: HashSet<Hash256>,
+) -> Vec<anyhow::Result<TraceNode>> {
+    let mut results = Vec::with_capacity(tx_hashes.len() + msg_hashes.len());
+    for hash in tx_hashes {
+        results.push(node.get_traces(hash).await);
+    }
+    for hash in msg_hashes {
+        results.push(node.get_traces_by_message_hash(hash).await);
+    }
+    results
 }
 
 pub async fn get_address_information_v3(
@@ -118,8 +224,12 @@ pub async fn get_account_states_v3(
 
 pub async fn get_transactions_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<TransactionsQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = match parse_v3_query::<TransactionsQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
     let parsed = match parse_transactions_v3_query(payload) {
         Ok(parsed) => parsed,
         Err(e) => return v3_bad_request(e.to_string()),
@@ -189,8 +299,12 @@ pub async fn get_transactions_by_message_v3(
 
 pub async fn get_pending_transactions_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<PendingTransactionsQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = match parse_v3_query::<PendingTransactionsQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
     let parsed = match parse_pending_transactions_v3_query(payload) {
         Ok(parsed) => parsed,
         Err(e) => return v3_bad_request(e.to_string()),
@@ -255,14 +369,22 @@ pub async fn emulate_trace_v1(State(node): State<Arc<Localnet>>, body: Bytes) ->
 
 pub async fn get_jetton_masters(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<JettonMastersQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = match parse_v3_query::<JettonMastersQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
+        Ok(values) => values,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
     handle_v3_result(
         node.get_jetton_masters(
             payload.address,
             payload.admin_address,
-            payload.limit,
-            payload.offset,
+            Some(limit),
+            Some(offset),
         ),
         |masters| v3::map_jetton_masters(masters),
     )
@@ -271,17 +393,30 @@ pub async fn get_jetton_masters(
 
 pub async fn get_jetton_wallets(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<JettonWalletsQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = match parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
+        Ok(values) => values,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let sort = match parse_sort(payload.sort) {
+        Ok(sort) => sort,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
     let wallets = match node
-        .get_jetton_wallets(
-            payload.address,
-            payload.owner_address,
-            payload.jetton_address,
-            payload.exclude_zero_balance,
-            payload.limit,
-            payload.offset,
-        )
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses: payload.address,
+            owner_addresses: payload.owner_address,
+            jetton_addresses: payload.jetton_address,
+            exclude_zero_balance: payload.exclude_zero_balance,
+            descending: matches!(sort, SortOrder::Desc),
+            limit: Some(limit),
+            offset: Some(offset),
+        })
         .await
     {
         Ok(wallets) => wallets,
@@ -293,7 +428,12 @@ pub async fn get_jetton_wallets(
         wallets.iter().map(|wallet| wallet.jetton_address).collect();
     for jetton_address in unique_jettons {
         let lookup_result = node
-            .get_jetton_masters(Some(jetton_address.to_string()), None, Some(1), Some(0))
+            .get_jetton_masters(
+                vec![jetton_address.to_string()],
+                Vec::new(),
+                Some(1),
+                Some(0),
+            )
             .await;
         if let Ok(mut masters) = lookup_result
             && let Some(master) = masters.pop()
@@ -314,8 +454,16 @@ pub async fn get_jetton_wallets(
 
 pub async fn get_nft_items(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<NftItemsQueryAdapter>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = match parse_v3_query::<NftItemsQuery>(raw_query.as_deref()) {
+        Ok(payload) => payload,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
+    let (limit, offset) = match parse_limit_offset(payload.limit, payload.offset) {
+        Ok(values) => values,
+        Err(e) => return v3_bad_request(e.to_string()),
+    };
     handle_v3_result(
         node.get_nft_items(
             payload.address,
@@ -323,8 +471,8 @@ pub async fn get_nft_items(
             payload.collection_address,
             payload.index,
             payload.sort_by_last_transaction_lt,
-            payload.limit,
-            payload.offset,
+            Some(limit),
+            Some(offset),
         ),
         |items| v3::map_nft_items(items),
     )
@@ -354,39 +502,34 @@ pub async fn run_get_method_v3(
     .await
 }
 
-fn normalize_v3_stack(stack: Vec<Value>) -> anyhow::Result<Vec<Value>> {
+fn normalize_v3_stack(stack: Vec<StackEntry>) -> anyhow::Result<Vec<Value>> {
     stack.into_iter().map(normalize_v3_stack_item).collect()
 }
 
-fn normalize_v3_stack_item(item: Value) -> anyhow::Result<Value> {
-    if item.is_array() {
-        return Ok(item);
-    }
-
-    let stack_type = item
-        .get("type")
-        .and_then(Value::as_str)
-        .ok_or_else(|| anyhow::anyhow!("v3 stack entry must contain string `type`"))?;
-    let value = item.get("value").cloned().unwrap_or(Value::Null);
-
-    match stack_type {
+fn normalize_v3_stack_item(item: StackEntry) -> anyhow::Result<Value> {
+    match item.kind.as_str() {
         "null" => Ok(json!(["null", Value::Null])),
-        "num" => Ok(json!(["num", value])),
+        "num" => Ok(json!(["num", item.value])),
         "cell" | "slice" | "builder" => {
-            let bytes = extract_stack_bytes(&value, stack_type)?;
-            Ok(json!([stack_type, { "bytes": bytes }]))
+            let bytes = extract_stack_bytes(&item.value, &item.kind)?;
+            Ok(json!([item.kind, { "bytes": bytes }]))
         }
         "tuple" | "list" => {
-            let elements = value
+            let elements = item
+                .value
                 .as_array()
-                .ok_or_else(|| anyhow::anyhow!("{stack_type} stack value must be an array"))?
+                .ok_or_else(|| anyhow::anyhow!("{} stack value must be an array", item.kind))?
                 .iter()
                 .cloned()
-                .map(normalize_v3_stack_item)
+                .map(serde_json::from_value::<StackEntry>)
+                .map(|item| {
+                    item.map_err(anyhow::Error::from)
+                        .and_then(normalize_v3_stack_item)
+                })
                 .collect::<anyhow::Result<Vec<_>>>()?;
-            Ok(json!([stack_type, { "elements": elements }]))
+            Ok(json!([item.kind, { "elements": elements }]))
         }
-        _ => anyhow::bail!("Unsupported v3 stack entry type: {stack_type}"),
+        _ => anyhow::bail!("Unsupported v3 stack entry type: {}", item.kind),
     }
 }
 
@@ -473,7 +616,7 @@ struct ParsedAccountStatesV3Query {
 }
 
 fn parse_transactions_v3_query(
-    payload: TransactionsQueryAdapter,
+    payload: TransactionsQuery,
 ) -> anyhow::Result<ParsedTransactionsV3Query> {
     if payload.shard.is_some() && payload.workchain.is_none() {
         anyhow::bail!("`shard` requires `workchain`");
@@ -492,14 +635,14 @@ fn parse_transactions_v3_query(
             .as_deref()
             .map(parse_shard_query)
             .transpose()?,
-        seqno: payload.seqno,
-        mc_seqno: payload.mc_seqno,
-        account: parse_optional_address(payload.account)?,
-        exclude_account: parse_optional_address(payload.exclude_account)?,
+        seqno: parse_non_negative_u32("seqno", payload.seqno)?,
+        mc_seqno: parse_non_negative_u32("mc_seqno", payload.mc_seqno)?,
+        account: parse_addresses(payload.account)?,
+        exclude_account: parse_addresses(payload.exclude_account)?,
         hash: payload.hash.as_deref().map(parse_hash_any).transpose()?,
         lt: payload.lt,
-        start_utime: payload.start_utime,
-        end_utime: payload.end_utime,
+        start_utime: parse_non_negative_u32("start_utime", payload.start_utime)?,
+        end_utime: parse_non_negative_u32("end_utime", payload.end_utime)?,
         start_lt: payload.start_lt,
         end_lt: payload.end_lt,
         limit,
@@ -526,7 +669,7 @@ fn parse_blocks_v3_query(payload: BlocksQuery) -> anyhow::Result<ParsedBlocksV3Q
             .as_deref()
             .map(parse_shard_query)
             .transpose()?,
-        seqno: payload.seqno,
+        seqno: parse_non_negative_u32("seqno", payload.seqno)?,
         root_hash: payload
             .root_hash
             .as_deref()
@@ -537,9 +680,9 @@ fn parse_blocks_v3_query(payload: BlocksQuery) -> anyhow::Result<ParsedBlocksV3Q
             .as_deref()
             .map(parse_hash_any)
             .transpose()?,
-        mc_seqno: payload.mc_seqno,
-        start_utime: payload.start_utime,
-        end_utime: payload.end_utime,
+        mc_seqno: parse_non_negative_u32("mc_seqno", payload.mc_seqno)?,
+        start_utime: parse_non_negative_u32("start_utime", payload.start_utime)?,
+        end_utime: parse_non_negative_u32("end_utime", payload.end_utime)?,
         start_lt: payload.start_lt,
         end_lt: payload.end_lt,
         limit,
@@ -578,11 +721,11 @@ fn parse_transactions_by_message_v3_query(
 }
 
 fn parse_pending_transactions_v3_query(
-    payload: PendingTransactionsQueryAdapter,
+    payload: PendingTransactionsQuery,
 ) -> anyhow::Result<ParsedPendingTransactionsV3Query> {
     Ok(ParsedPendingTransactionsV3Query {
-        account: parse_optional_address(payload.account)?,
-        trace_ids: parse_optional_hash(payload.trace_id)?,
+        account: parse_addresses(payload.account)?,
+        trace_ids: parse_hashes(payload.trace_id)?,
     })
 }
 
@@ -607,29 +750,7 @@ fn parse_account_states_v3_query(
 }
 
 fn parse_account_states_request(raw_query: Option<&str>) -> anyhow::Result<AccountStatesQuery> {
-    let mut address = Vec::new();
-    let mut include_boc = None;
-
-    if let Some(raw_query) = raw_query {
-        for (key, value) in form_urlencoded::parse(raw_query.as_bytes()) {
-            match key.as_ref() {
-                "address" => address.push(value.into_owned()),
-                "include_boc" => {
-                    include_boc = Some(value.parse::<bool>().map_err(|_| {
-                        anyhow::anyhow!(
-                            "Invalid `include_boc`: {value}. Supported values: true, false"
-                        )
-                    })?);
-                }
-                _ => {}
-            }
-        }
-    }
-
-    Ok(AccountStatesQuery {
-        address,
-        include_boc,
-    })
+    parse_v3_query(raw_query)
 }
 
 fn filter_transactions_v3(
@@ -945,15 +1066,16 @@ fn sort_blocks(blocks: &mut [LocalnetBlock], order: SortOrder) {
     }
 }
 
-fn parse_limit_offset(
-    limit: Option<usize>,
-    offset: Option<usize>,
-) -> anyhow::Result<(usize, usize)> {
+fn parse_limit_offset(limit: Option<i32>, offset: Option<i32>) -> anyhow::Result<(usize, usize)> {
     let limit = limit.unwrap_or(10);
     if !(1..=1000).contains(&limit) {
         anyhow::bail!("`limit` must be between 1 and 1000");
     }
-    Ok((limit, offset.unwrap_or(0)))
+    let offset = offset.unwrap_or(0);
+    if offset < 0 {
+        anyhow::bail!("`offset` must not be negative");
+    }
+    Ok((limit as usize, offset as usize))
 }
 
 fn parse_sort(sort: Option<String>) -> anyhow::Result<SortOrder> {
@@ -1146,22 +1268,39 @@ fn parse_std_addr(address: &str) -> anyhow::Result<Addr> {
     })
 }
 
-fn parse_optional_address(value: Option<String>) -> anyhow::Result<Option<HashSet<Addr>>> {
-    let Some(address) = value else {
+fn parse_addresses(values: Vec<String>) -> anyhow::Result<Option<HashSet<Addr>>> {
+    if values.is_empty() {
         return Ok(None);
-    };
-    let mut parsed = HashSet::new();
-    parsed.insert(parse_std_addr(&address)?);
-    Ok(Some(parsed))
+    }
+    values
+        .into_iter()
+        .map(|address| parse_std_addr(&address))
+        .collect::<anyhow::Result<HashSet<_>>>()
+        .map(Some)
 }
 
-fn parse_optional_hash(value: Option<String>) -> anyhow::Result<Option<HashSet<Hash256>>> {
-    let Some(hash) = value else {
+fn parse_hashes(values: Vec<String>) -> anyhow::Result<Option<HashSet<Hash256>>> {
+    if values.is_empty() {
         return Ok(None);
-    };
-    let mut parsed = HashSet::new();
-    parsed.insert(parse_hash_any(&hash)?);
-    Ok(Some(parsed))
+    }
+    values
+        .into_iter()
+        .map(|hash| parse_hash_any(&hash))
+        .collect::<anyhow::Result<HashSet<_>>>()
+        .map(Some)
+}
+
+fn parse_non_negative_u32(name: &str, value: Option<i32>) -> anyhow::Result<Option<u32>> {
+    value
+        .map(|value| {
+            u32::try_from(value).map_err(|_| anyhow::anyhow!("`{name}` must not be negative"))
+        })
+        .transpose()
+}
+
+fn parse_v3_query<T: DeserializeOwned>(raw_query: Option<&str>) -> anyhow::Result<T> {
+    serde_html_form::from_str(raw_query.unwrap_or_default())
+        .map_err(|e| anyhow::anyhow!("Invalid query: {e}"))
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
@@ -1244,24 +1383,6 @@ where
 {
     match result.await {
         Ok(res) => (StatusCode::OK, Json(mapper(&res))).into_response(),
-        Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-    }
-}
-
-async fn handle_v3_traces_result(
-    result: impl Future<Output = anyhow::Result<TraceNode>>,
-) -> Response {
-    match result.await {
-        Ok(trace) => (StatusCode::OK, Json(v3::map_traces(&trace))).into_response(),
-        Err(e) if is_trace_not_found_error(&e) => (
-            StatusCode::OK,
-            Json(v3_types::TracesResponse {
-                traces: Vec::new(),
-                address_book: v3_types::AddressBook::new(),
-                metadata: v3_types::Metadata::new(),
-            }),
-        )
-            .into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

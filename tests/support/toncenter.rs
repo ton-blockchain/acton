@@ -262,16 +262,7 @@ api = {{ v2 = "{v2_url}" }}
 }
 
 pub(crate) fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {
-    ToncenterV2MockResponse {
-        status: 200,
-        body: serde_json::json!({
-            "result": {
-                "stack": [["num", "0x0"]],
-                "exit_code": 0
-            }
-        })
-        .to_string(),
-    }
+    toncenter_v2_run_get_method_ok_response(vec![TupleItem::Int(0.into())], 0)
 }
 
 pub(crate) fn toncenter_v2_run_get_method_ok_response(
@@ -423,6 +414,7 @@ pub(crate) fn toncenter_v2_shard_account_cell_ok_response(
         body: serde_json::json!({
             "ok": true,
             "result": {
+                "@type": "tvm.cell",
                 "bytes": Boc::encode_base64(to_cell(shard_account))
             }
         })

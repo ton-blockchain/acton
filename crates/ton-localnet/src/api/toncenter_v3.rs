@@ -17,6 +17,7 @@ use crate::storage::{
     MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
 };
 use crate::types::{Addr, BocBytes, Hash256};
+use num_bigint::BigInt;
 use serde_json::value::Value;
 use std::collections::HashMap;
 use ton_api::toncenter::emulate::v1 as emulate;
@@ -627,7 +628,7 @@ pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> response::R
         .collect::<Vec<_>>();
 
     response::RunGetMethodResult {
-        gas_used: response::StringOrNumber::String(result.gas_used.to_string()),
+        gas_used: response::StringOrNumber::Unsigned(result.gas_used),
         exit_code: result.exit_code,
         stack,
         vm_log: Some(result.vm_log.to_string()),
@@ -669,8 +670,8 @@ fn map_trace(
             || tn.transaction.meta.tx_hash.to_base64(),
             Hash256::to_base64,
         )),
-        mc_seqno_start: Some("0".to_owned()),
-        mc_seqno_end: Some("0".to_owned()),
+        mc_seqno_start: Some(tn.transaction.meta.block_seqno.to_string()),
+        mc_seqno_end: Some(tn.transaction.meta.block_seqno.to_string()),
         start_lt: Some(tn.transaction.meta.lt.to_string()),
         start_utime: Some(tn.transaction.meta.now),
         end_lt: Some(tn.max_lt().to_string()),
@@ -1103,29 +1104,36 @@ fn map_stack_entry(entry: Value) -> response::StackEntity {
 
     match entry_type {
         "tvm.stackEntryNull" => response::StackEntity {
-            kind: "null".to_owned(),
-            value: response::StackValue::Json(Value::Null),
+            kind: "list".to_owned(),
+            value: response::StackValue::Entries(Vec::new()),
         },
         "tvm.stackEntryNumber" => response::StackEntity {
             kind: "num".to_owned(),
+            value: response::StackValue::Json(map_v3_stack_number(entry.pointer("/number/number"))),
+        },
+        "tvm.stackEntryCell" => response::StackEntity {
+            kind: "cell".to_owned(),
+            value: response::StackValue::Json(
+                entry.pointer("/cell/bytes").cloned().unwrap_or(Value::Null),
+            ),
+        },
+        "tvm.stackEntrySlice" => response::StackEntity {
+            kind: "slice".to_owned(),
             value: response::StackValue::Json(
                 entry
-                    .pointer("/number/number")
+                    .pointer("/slice/bytes")
                     .cloned()
                     .unwrap_or(Value::Null),
             ),
         },
-        "tvm.stackEntryCell" => response::StackEntity {
-            kind: "cell".to_owned(),
-            value: response::StackValue::Json(entry.get("cell").cloned().unwrap_or(Value::Null)),
-        },
-        "tvm.stackEntrySlice" => response::StackEntity {
-            kind: "slice".to_owned(),
-            value: response::StackValue::Json(entry.get("slice").cloned().unwrap_or(Value::Null)),
-        },
         "tvm.stackEntryBuilder" => response::StackEntity {
             kind: "builder".to_owned(),
-            value: response::StackValue::Json(entry.get("builder").cloned().unwrap_or(Value::Null)),
+            value: response::StackValue::Json(
+                entry
+                    .pointer("/builder/bytes")
+                    .cloned()
+                    .unwrap_or(Value::Null),
+            ),
         },
         "tvm.stackEntryTuple" => {
             let elements = entry
@@ -1144,11 +1152,41 @@ fn map_stack_entry(entry: Value) -> response::StackEntity {
                 value: response::StackValue::Entries(elements),
             }
         }
+        "tvm.stackEntryList" => {
+            let elements = entry
+                .pointer("/list/elements")
+                .and_then(Value::as_array)
+                .map(|items| {
+                    items
+                        .iter()
+                        .cloned()
+                        .map(map_stack_entry)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            response::StackEntity {
+                kind: "list".to_owned(),
+                value: response::StackValue::Entries(elements),
+            }
+        }
         _ => response::StackEntity {
             kind: entry_type.to_owned(),
             value: response::StackValue::Json(entry),
         },
     }
+}
+
+fn map_v3_stack_number(value: Option<&Value>) -> Value {
+    let Some(value) = value.and_then(Value::as_str) else {
+        return Value::Null;
+    };
+    if value.starts_with("0x") {
+        return Value::String(value.to_owned());
+    }
+
+    BigInt::parse_bytes(value.as_bytes(), 10).map_or(Value::Null, |value| {
+        Value::String(format!("0x{}", value.to_str_radix(16)))
+    })
 }
 
 fn zero_hash_base64() -> String {

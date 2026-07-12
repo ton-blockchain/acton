@@ -29,9 +29,11 @@ base64 = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_html_form = { workspace = true }
 serde_json = { workspace = true }
 reqwest = { workspace = true }
 indexmap = { workspace = true }
+num-bigint = { workspace = true }
 tolk-compiler = { workspace = true }
 axum = { workspace = true }
 tower-http = { workspace = true, features = ["compression-gzip", "cors", "trace", "fs"] }

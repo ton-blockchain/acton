@@ -1,4 +1,6 @@
-use super::toncenter_v2::token_wallet_code_hash;
+use super::toncenter_v2::{
+    parse_config_param, parse_seqno, parse_transactions_request, token_wallet_code_hash,
+};
 use super::utils::{get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
@@ -39,6 +41,7 @@ pub async fn json_rpc(
     let request_id = match &payload.id {
         wire::StringOrNumber::String(value) => Value::String(value.clone()),
         wire::StringOrNumber::Number(value) => Value::Number((*value).into()),
+        wire::StringOrNumber::Unsigned(value) => Value::Number((*value).into()),
     };
     let id_str = payload.id.clone();
 
@@ -99,8 +102,9 @@ async fn json_rpc_router(
         "runGetMethod" => {
             let req: RunGetMethodRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::RunGetMethod(Box::new(
-                node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                node.run_get_method(req.address, method_str, req.stack, seqno)
                     .await
                     .map(|r| v2::map_run_get_method(&r, true))?,
             ))
@@ -108,8 +112,9 @@ async fn json_rpc_router(
         "runGetMethodStd" => {
             let req: RunGetMethodRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::RunGetMethod(Box::new(
-                node.run_get_method(req.address, method_str, req.stack, req.seqno)
+                node.run_get_method(req.address, method_str, req.stack, seqno)
                     .await
                     .map(|r| v2::map_run_get_method(&r, false))?,
             ))
@@ -139,32 +144,36 @@ async fn json_rpc_router(
         }
         "getAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::AddressInformation(Box::new(
-                node.get_address_information(req.address, req.seqno)
+                node.get_address_information(req.address, seqno)
                     .await
                     .map(|r| v2::map_account_state(&r))?,
             ))
         }
         "getShardAccountCell" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::ShardAccountCell(Box::new(
-                node.get_shard_account_cell(req.address, req.seqno)
+                node.get_shard_account_cell(req.address, seqno)
                     .await
                     .map(|r| v2::map_shard_account_cell(&r))?,
             ))
         }
         "getAddressBalance" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::String(
-                node.get_address_balance(req.address, req.seqno)
+                node.get_address_balance(req.address, seqno)
                     .await?
                     .to_string(),
             )
         }
         "getAddressState" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::String(
-                node.get_address_state(req.address, req.seqno)
+                node.get_address_state(req.address, seqno)
                     .await?
                     .to_string(),
             )
@@ -180,19 +189,21 @@ async fn json_rpc_router(
         }
         "getExtendedAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let seqno = parse_seqno(req.seqno)?;
             wire::JsonRpcResult::ExtendedAddressInformation(Box::new(
-                node.get_address_information(req.address, req.seqno)
+                node.get_address_information(req.address, seqno)
                     .await
                     .map(|r| v2::map_extended_account_state(&r))?,
             ))
         }
         "getWalletInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
+            let request_seqno = parse_seqno(req.seqno)?;
             let info = node
-                .get_address_information(req.address.clone(), req.seqno)
+                .get_address_information(req.address.clone(), request_seqno)
                 .await?;
             let seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
-                node.run_get_method(req.address, "seqno".to_string(), Vec::new(), req.seqno)
+                node.run_get_method(req.address, "seqno".to_string(), Vec::new(), request_seqno)
                     .await
                     .ok()
                     .and_then(|result| v2::map_wallet_seqno(&result))
@@ -224,18 +235,19 @@ async fn json_rpc_router(
         }
         "getTransactions" => {
             let req: TransactionsRequest = parse_params(params, method)?;
+            let (limit, lt, to_lt) = parse_transactions_request(&req)?;
             wire::JsonRpcResult::Transactions(
-                node.get_transactions(req.address, req.limit, req.lt, req.hash, req.to_lt)
+                node.get_transactions(req.address, limit, lt, req.hash, to_lt)
                     .await
                     .map(|r| v2::map_transactions(&r))?,
             )
         }
         "getTransactionsStd" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            let page_limit = req.limit;
+            let (page_limit, lt, to_lt) = parse_transactions_request(&req)?;
             let fetch_limit = page_limit.saturating_add(1);
             wire::JsonRpcResult::RawTransactions(Box::new(
-                node.get_transactions(req.address, fetch_limit, req.lt, req.hash, req.to_lt)
+                node.get_transactions(req.address, fetch_limit, lt, req.hash, to_lt)
                     .await
                     .map(|r| v2::map_transactions_std(&r, page_limit))?,
             ))
@@ -261,24 +273,27 @@ async fn json_rpc_router(
         }
         "tryLocateTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
+            let created_lt = req.created_lt.to_u64()?;
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_tx(req.source, req.destination, req.created_lt)
+                node.try_locate_tx(req.source, req.destination, created_lt)
                     .await
                     .map(|r| v2::map_transaction(&r))?,
             ))
         }
         "tryLocateResultTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
+            let created_lt = req.created_lt.to_u64()?;
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_result_tx(req.source, req.destination, req.created_lt)
+                node.try_locate_result_tx(req.source, req.destination, created_lt)
                     .await
                     .map(|r| v2::map_transaction(&r))?,
             ))
         }
         "tryLocateSourceTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
+            let created_lt = req.created_lt.to_u64()?;
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_source_tx(req.source, req.destination, req.created_lt)
+                node.try_locate_source_tx(req.source, req.destination, created_lt)
                     .await
                     .map(|r| v2::map_transaction(&r))?,
             ))
@@ -293,7 +308,7 @@ async fn json_rpc_router(
         }
         "getBlockTransactions" => {
             let req: BlockQueryAdapter = parse_params(params, method)?;
-            wire::JsonRpcResult::Ok(Box::new(
+            wire::JsonRpcResult::BlockTransactions(Box::new(
                 node.get_block_transactions(req.seqno as u32)
                     .await
                     .map(|r| v2::map_block_transactions(&r))?,
@@ -332,16 +347,15 @@ async fn json_rpc_router(
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;
+            let workchain = req.workchain.to_i32()?;
+            let shard = req.shard.to_i64()?.to_string();
+            let seqno = parse_seqno(req.seqno)?;
+            let lt = req.lt.map(|value| value.to_u64()).transpose()?;
+            let unixtime = req.unixtime.map(|value| value.to_u32()).transpose()?;
             wire::JsonRpcResult::BlockId(Box::new(
-                node.lookup_block(
-                    req.workchain,
-                    req.shard,
-                    req.seqno.map(|x| x as u32),
-                    req.lt,
-                    req.unixtime,
-                )
-                .await
-                .map(|r| v2::map_lookup_block(&r))?,
+                node.lookup_block(workchain, shard, seqno, lt, unixtime)
+                    .await
+                    .map(|r| v2::map_lookup_block(&r))?,
             ))
         }
         _ => {
@@ -435,17 +449,6 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
     anyhow::bail!("Invalid hash format")
 }
 
-fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
-    let raw = payload
-        .param
-        .or(payload.config_id)
-        .ok_or_else(|| anyhow::anyhow!("`param` is required"))?;
-    if raw < 0 {
-        anyhow::bail!("Config param must be a non-negative integer");
-    }
-    Ok(raw as u32)
-}
-
 fn parse_libraries(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
     let hashes = raw
         .iter()
@@ -458,14 +461,6 @@ fn parse_libraries(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
     }
 
     Ok(hashes)
-}
-
-fn parse_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {
-    match seqno {
-        Some(value) if value < 0 => anyhow::bail!("`seqno` must be a non-negative integer"),
-        Some(value) => Ok(Some(value as u32)),
-        None => Ok(None),
-    }
 }
 
 #[cfg(test)]

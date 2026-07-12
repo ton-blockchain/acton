@@ -330,9 +330,9 @@ impl TonApiClient {
             "runGetMethod",
             v2::RunGetMethodRequest {
                 address: address.to_owned(),
-                method: serde_json::Value::String(method.to_owned()),
+                method: v2::StringOrNumber::String(method.to_owned()),
                 stack: stack.to_vec(),
-                seqno,
+                seqno: seqno.map(Into::into),
             },
         );
 

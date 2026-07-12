@@ -13,7 +13,7 @@
 //! classification is not implemented, so an `actions` subscription currently emits an empty list
 //! only when `action_types` is omitted.
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use ton_api::toncenter::streaming::v2 as streaming;
 
 /// Localnet accepts an optional correlation `id` in the SSE body and echoes it in status/error
@@ -28,9 +28,6 @@ pub(super) struct StreamingSseSubscriptionAdapter {
 
 /// REST encodes all hashes in one comma-separated string; `OpenAPI` `LibrariesRequest` uses an
 /// array of hash strings.
-/// Localnet supports one `tx_hash` or `msg_hash` and the non-standard `hash` alias.
-/// `OpenAPI` `TracesQuery` accepts repeated `account`, `trace_id`, `tx_hash`, and `msg_hash`
-/// values plus range, action, pagination, and sorting filters.
 #[derive(Deserialize)]
 pub struct LibrariesRestQuery {
     pub libraries: String,
@@ -46,76 +43,4 @@ pub struct BlockQueryAdapter {
     #[allow(dead_code)]
     pub shard: Option<String>,
     pub seqno: i32,
-}
-
-/// Localnet accepts at most one `account` and `exclude_account` value.
-/// `OpenAPI` `TransactionsQuery` models both fields as repeated arrays; all other fields match.
-#[derive(Deserialize)]
-pub struct TracesQueryAdapter {
-    #[serde(alias = "hash")]
-    pub tx_hash: Option<String>,
-    pub msg_hash: Option<String>,
-}
-
-/// Localnet accepts at most one account and trace id.
-/// `OpenAPI` `PendingTransactionsQuery` models both fields as repeated arrays.
-#[derive(Deserialize)]
-pub struct TransactionsQueryAdapter {
-    pub workchain: Option<i32>,
-    pub shard: Option<String>,
-    pub seqno: Option<u32>,
-    pub mc_seqno: Option<u32>,
-    pub account: Option<String>,
-    pub exclude_account: Option<String>,
-    pub hash: Option<String>,
-    pub lt: Option<u64>,
-    pub start_utime: Option<u32>,
-    pub end_utime: Option<u32>,
-    pub start_lt: Option<u64>,
-    pub end_lt: Option<u64>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-    pub sort: Option<String>,
-}
-
-/// Localnet accepts at most one address and admin address.
-/// `OpenAPI` `JettonMastersQuery` models both filters as repeated arrays.
-#[derive(Deserialize)]
-pub struct PendingTransactionsQueryAdapter {
-    pub account: Option<String>,
-    pub trace_id: Option<String>,
-}
-
-#[derive(Deserialize)]
-pub struct JettonMastersQueryAdapter {
-    pub address: Option<String>,
-    pub admin_address: Option<String>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-}
-
-/// Localnet accepts one value for each address filter and does not expose `OpenAPI`'s `sort`.
-/// `OpenAPI` `JettonWalletsQuery` models the three address filters as repeated arrays.
-#[derive(Deserialize, Serialize)]
-pub struct JettonWalletsQueryAdapter {
-    pub address: Option<String>,
-    pub owner_address: Option<String>,
-    pub jetton_address: Option<String>,
-    pub exclude_zero_balance: Option<bool>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
-}
-
-/// Localnet accepts one value for each address/index filter.
-/// `OpenAPI` `NftItemsQuery` models those four filters as repeated arrays.
-#[derive(Deserialize, Serialize)]
-pub struct NftItemsQueryAdapter {
-    pub address: Option<String>,
-    pub owner_address: Option<String>,
-    pub collection_address: Option<String>,
-    pub index: Option<String>,
-    pub include_on_sale: Option<bool>,
-    pub sort_by_last_transaction_lt: Option<bool>,
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
 }

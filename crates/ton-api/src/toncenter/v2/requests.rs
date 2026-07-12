@@ -1,7 +1,4 @@
-use serde::{
-    Deserialize, Deserializer, Serialize,
-    de::{self, Error as _},
-};
+use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
 use super::StringOrNumber;
@@ -37,16 +34,18 @@ pub struct SendBocRequest {
 pub struct RunGetMethodRequest {
     pub address: String,
     /// A method name or signed 32-bit method id.
-    pub method: Value,
+    pub method: StringOrNumber,
     pub stack: Vec<Value>,
     /// Historical masterchain seqno supported by `TonCenter` v2 and Acton localnet.
-    pub seqno: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<StringOrNumber>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressInformationRequest {
     pub address: String,
-    pub seqno: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<StringOrNumber>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,99 +66,88 @@ pub struct LibrariesRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionsRequest {
     pub address: String,
-    #[serde(default = "default_limit")]
-    #[serde(deserialize_with = "deserialize_usize_from_string_or_number")]
-    pub limit: usize,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_optional_u64_from_string_or_number")]
-    pub lt: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limit: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lt: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hash: Option<String>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_optional_u64_from_string_or_number")]
-    pub to_lt: Option<u64>,
-    #[serde(default)]
-    #[serde(deserialize_with = "deserialize_optional_bool_from_wire")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_lt: Option<StringOrNumber>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_bool_from_wire"
+    )]
     pub archival: Option<bool>,
-}
-
-#[must_use]
-pub const fn default_limit() -> usize {
-    10
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TryLocateTxRequest {
     pub source: String,
     pub destination: String,
-    pub created_lt: u64,
+    pub created_lt: StringOrNumber,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigParamRequest {
-    pub param: Option<i32>,
-    pub config_id: Option<i32>,
-    pub seqno: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub param: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_id: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<StringOrNumber>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigAllRequest {
-    pub seqno: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<StringOrNumber>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockHeaderRequest {
-    pub workchain: i32,
-    pub shard: String,
-    pub seqno: i32,
+    pub workchain: StringOrNumber,
+    pub shard: StringOrNumber,
+    pub seqno: StringOrNumber,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub root_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub file_hash: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BlockTransactionsRequest {
+    pub workchain: StringOrNumber,
+    pub shard: StringOrNumber,
+    pub seqno: StringOrNumber,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub root_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub file_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_lt: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub after_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub count: Option<StringOrNumber>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeqnoRequest {
+    pub seqno: StringOrNumber,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LookupBlockRequest {
-    pub workchain: i32,
-    pub shard: String,
-    pub seqno: Option<i32>,
-    pub lt: Option<u64>,
-    pub unixtime: Option<u32>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(untagged)]
-enum NumberParam {
-    Number(u64),
-    String(String),
-}
-
-fn deserialize_optional_u64_from_string_or_number<'de, D>(
-    deserializer: D,
-) -> Result<Option<u64>, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    Option::<NumberParam>::deserialize(deserializer)?
-        .map(parse_number_param)
-        .transpose()
-}
-
-fn deserialize_usize_from_string_or_number<'de, D>(deserializer: D) -> Result<usize, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let value = parse_number_param(NumberParam::deserialize(deserializer)?)?;
-    usize::try_from(value).map_err(|_| D::Error::custom("value does not fit into usize"))
-}
-
-fn parse_number_param<E>(param: NumberParam) -> Result<u64, E>
-where
-    E: de::Error,
-{
-    match param {
-        NumberParam::Number(value) => Ok(value),
-        NumberParam::String(value) => value
-            .parse()
-            .map_err(|_| E::custom(format!("expected unsigned integer string, got `{value}`"))),
-    }
+    pub workchain: StringOrNumber,
+    pub shard: StringOrNumber,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lt: Option<StringOrNumber>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unixtime: Option<StringOrNumber>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -218,9 +206,9 @@ mod tests {
             let request: TransactionsRequest =
                 serde_json::from_value(value).expect("OpenAPI scalar forms must parse");
 
-            assert_eq!(request.limit, 1);
-            assert_eq!(request.lt, Some(8));
-            assert_eq!(request.to_lt, Some(2));
+            assert_eq!(request.limit.as_ref().unwrap().to_usize().unwrap(), 1);
+            assert_eq!(request.lt.as_ref().unwrap().to_u64().unwrap(), 8);
+            assert_eq!(request.to_lt.as_ref().unwrap().to_u64().unwrap(), 2);
             assert_eq!(request.archival, Some(true));
         }
     }
@@ -232,7 +220,7 @@ mod tests {
         }))
         .expect("request without explicit limit must parse");
 
-        assert_eq!(request.limit, default_limit());
+        assert!(request.limit.is_none());
     }
 
     #[test]

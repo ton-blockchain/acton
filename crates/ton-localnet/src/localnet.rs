@@ -120,6 +120,28 @@ pub struct LocalnetAccountStateWithInfo {
 }
 
 #[derive(Debug, Clone)]
+pub struct LocalnetJettonWalletsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub jetton_addresses: Vec<String>,
+    pub exclude_zero_balance: Option<bool>,
+    pub descending: bool,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedJettonWalletsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    jetton_addresses: HashSet<Addr>,
+    exclude_zero_balance: bool,
+    descending: bool,
+    limit: usize,
+    offset: usize,
+}
+
+#[derive(Debug, Clone)]
 pub enum LocalnetAccountStateChange {
     Nonexist,
     Uninit { balance: u128 },
@@ -461,26 +483,21 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<storage::EmulateTraceResult>>,
     },
     GetJettonMasters {
-        address: Option<Addr>,
-        admin_address: Option<Addr>,
+        addresses: HashSet<Addr>,
+        admin_addresses: HashSet<Addr>,
         limit: usize,
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonMasterMeta>>>,
     },
     GetJettonWallets {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        jetton_address: Option<Addr>,
-        exclude_zero_balance: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedJettonWalletsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
     GetNftItems {
-        address: Option<Addr>,
-        owner_address: Option<Addr>,
-        collection_address: Option<Addr>,
-        index: Option<String>,
+        addresses: HashSet<Addr>,
+        owner_addresses: HashSet<Addr>,
+        collection_addresses: HashSet<Addr>,
+        indexes: HashSet<String>,
         sort_by_last_transaction_lt: bool,
         limit: usize,
         offset: usize,
@@ -1315,19 +1332,19 @@ impl Localnet {
 
     pub async fn get_jetton_masters(
         &self,
-        address: Option<String>,
-        admin_address: Option<String>,
+        addresses: Vec<String>,
+        admin_addresses: Vec<String>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let admin_address = admin_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let addresses = Self::parse_addresses(addresses)?;
+        let admin_addresses = Self::parse_addresses(admin_addresses)?;
 
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetJettonMasters {
-                address,
-                admin_address,
+                addresses,
+                admin_addresses,
                 limit: limit.unwrap_or(10),
                 offset: offset.unwrap_or(0),
                 resp,
@@ -1338,28 +1355,21 @@ impl Localnet {
 
     pub async fn get_jetton_wallets(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        jetton_address: Option<String>,
-        exclude_zero_balance: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetJettonWalletsQuery,
     ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let jetton_address = jetton_address.map(|s| Self::parse_addr(&s)).transpose()?;
+        let query = ParsedJettonWalletsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            jetton_addresses: Self::parse_addresses(query.jetton_addresses)?,
+            exclude_zero_balance: query.exclude_zero_balance.unwrap_or(false),
+            descending: query.descending,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetJettonWallets {
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance: exclude_zero_balance.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
+            .send(Request::GetJettonWallets { query, resp })
             .await?;
         rx.await?
     }
@@ -1367,27 +1377,25 @@ impl Localnet {
     #[allow(clippy::too_many_arguments)]
     pub async fn get_nft_items(
         &self,
-        address: Option<String>,
-        owner_address: Option<String>,
-        collection_address: Option<String>,
-        index: Option<String>,
+        addresses: Vec<String>,
+        owner_addresses: Vec<String>,
+        collection_addresses: Vec<String>,
+        indexes: Vec<String>,
         sort_by_last_transaction_lt: Option<bool>,
         limit: Option<usize>,
         offset: Option<usize>,
     ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-        let address = address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let owner_address = owner_address.map(|s| Self::parse_addr(&s)).transpose()?;
-        let collection_address = collection_address
-            .map(|s| Self::parse_addr(&s))
-            .transpose()?;
+        let addresses = Self::parse_addresses(addresses)?;
+        let owner_addresses = Self::parse_addresses(owner_addresses)?;
+        let collection_addresses = Self::parse_addresses(collection_addresses)?;
 
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetNftItems {
-                address,
-                owner_address,
-                collection_address,
-                index,
+                addresses,
+                owner_addresses,
+                collection_addresses,
+                indexes: indexes.into_iter().collect(),
                 sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
                 limit: limit.unwrap_or(10),
                 offset: offset.unwrap_or(0),
@@ -1669,6 +1677,13 @@ impl Localnet {
             workchain: i32::from(int_addr.workchain),
             addr: int_addr.address.0,
         })
+    }
+
+    fn parse_addresses(values: Vec<String>) -> anyhow::Result<HashSet<Addr>> {
+        values
+            .into_iter()
+            .map(|value| Self::parse_addr(&value))
+            .collect()
     }
 }
 
@@ -2036,40 +2051,24 @@ fn process_loop_request(
             let _ = resp.send(res);
         }
         Request::GetJettonMasters {
-            address,
-            admin_address,
+            addresses,
+            admin_addresses,
             limit,
             offset,
             resp,
         } => {
-            let res = handle_get_jetton_masters(node, address, admin_address, limit, offset);
+            let res = handle_get_jetton_masters(node, addresses, admin_addresses, limit, offset);
             let _ = resp.send(res);
         }
-        Request::GetJettonWallets {
-            address,
-            owner_address,
-            jetton_address,
-            exclude_zero_balance,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = handle_get_jetton_wallets(
-                node,
-                address,
-                owner_address,
-                jetton_address,
-                exclude_zero_balance,
-                limit,
-                offset,
-            );
+        Request::GetJettonWallets { query, resp } => {
+            let res = handle_get_jetton_wallets(node, query);
             let _ = resp.send(res);
         }
         Request::GetNftItems {
-            address,
-            owner_address,
-            collection_address,
-            index,
+            addresses,
+            owner_addresses,
+            collection_addresses,
+            indexes,
             sort_by_last_transaction_lt,
             limit,
             offset,
@@ -2077,10 +2076,10 @@ fn process_loop_request(
         } => {
             let res = handle_get_nft_items(
                 node,
-                address,
-                owner_address,
-                collection_address,
-                index,
+                addresses,
+                owner_addresses,
+                collection_addresses,
+                indexes,
                 sort_by_last_transaction_lt,
                 limit,
                 offset,
@@ -2389,25 +2388,25 @@ fn block_id_for_query_seqno(node: &Node, seqno: Seqno) -> anyhow::Result<Localne
 
 fn handle_get_jetton_masters(
     node: &mut Node,
-    address: Option<Addr>,
-    admin_address: Option<Addr>,
+    addresses: HashSet<Addr>,
+    admin_addresses: HashSet<Addr>,
     limit: usize,
     offset: usize,
 ) -> anyhow::Result<Vec<storage::JettonMasterMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
     Ok(node
         .iter_jetton_masters()
         .filter(|master| {
-            if let Some(addr) = address
-                && master.address != addr
-            {
+            if !addresses.is_empty() && !addresses.contains(&master.address) {
                 return false;
             }
-            if let Some(addr) = admin_address
-                && master.admin_address != Some(addr)
+            if !admin_addresses.is_empty()
+                && !master
+                    .admin_address
+                    .is_some_and(|address| admin_addresses.contains(&address))
             {
                 return false;
             }
@@ -2421,80 +2420,84 @@ fn handle_get_jetton_masters(
 
 fn handle_get_jetton_wallets(
     node: &mut Node,
-    address: Option<Addr>,
-    owner_address: Option<Addr>,
-    jetton_address: Option<Addr>,
-    exclude_zero_balance: bool,
-    limit: usize,
-    offset: usize,
+    query: ParsedJettonWalletsQuery,
 ) -> anyhow::Result<Vec<storage::JettonWalletMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &query.addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
-    Ok(node
+    let mut wallets = node
         .iter_jetton_wallets()
         .filter(|wallet| {
-            if let Some(addr) = address
-                && wallet.address != addr
+            if !query.addresses.is_empty() && !query.addresses.contains(&wallet.address) {
+                return false;
+            }
+            if !query.owner_addresses.is_empty()
+                && !query.owner_addresses.contains(&wallet.owner_address)
             {
                 return false;
             }
-            if let Some(addr) = owner_address
-                && wallet.owner_address != addr
+            if !query.jetton_addresses.is_empty()
+                && !query.jetton_addresses.contains(&wallet.jetton_address)
             {
                 return false;
             }
-            if let Some(addr) = jetton_address
-                && wallet.jetton_address != addr
-            {
-                return false;
-            }
-            if exclude_zero_balance && wallet.balance == 0 {
+            if query.exclude_zero_balance && wallet.balance == 0 {
                 return false;
             }
             true
         })
-        .skip(offset)
-        .take(limit)
         .cloned()
+        .collect::<Vec<_>>();
+    wallets.sort_by(|a, b| {
+        a.last_transaction_lt
+            .cmp(&b.last_transaction_lt)
+            .then_with(|| a.address.cmp(&b.address))
+    });
+    if query.descending {
+        wallets.reverse();
+    }
+    Ok(wallets
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
         .collect())
 }
 
 #[allow(clippy::too_many_arguments)]
 fn handle_get_nft_items(
     node: &mut Node,
-    address: Option<Addr>,
-    owner_address: Option<Addr>,
-    collection_address: Option<Addr>,
-    index: Option<String>,
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    collection_addresses: HashSet<Addr>,
+    indexes: HashSet<String>,
     sort_by_last_transaction_lt: bool,
     limit: usize,
     offset: usize,
 ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-    if let Some(addr) = address {
-        node.ensure_detected_assets_for_address(&addr)?;
+    for addr in &addresses {
+        node.ensure_detected_assets_for_address(addr)?;
     }
 
     let items = node.iter_nft_items().filter(|item| {
-        if let Some(addr) = address
-            && item.address != addr
+        if !addresses.is_empty() && !addresses.contains(&item.address) {
+            return false;
+        }
+        if !owner_addresses.is_empty()
+            && !item
+                .owner_address
+                .is_some_and(|address| owner_addresses.contains(&address))
         {
             return false;
         }
-        if let Some(addr) = owner_address
-            && item.owner_address != Some(addr)
+        if !collection_addresses.is_empty()
+            && !item
+                .collection_address
+                .is_some_and(|address| collection_addresses.contains(&address))
         {
             return false;
         }
-        if let Some(addr) = collection_address
-            && item.collection_address != Some(addr)
-        {
-            return false;
-        }
-        if let Some(expected_index) = &index
-            && &item.index != expected_index
-        {
+        if !indexes.is_empty() && !indexes.contains(&item.index) {
             return false;
         }
         true

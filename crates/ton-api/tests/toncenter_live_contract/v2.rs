@@ -1,6 +1,5 @@
 use super::support::{Live, TypedResponse, fixture, invalid_boc};
 use anyhow::{Context, Result};
-use serde_json::Value;
 use ton_api::toncenter::v2;
 
 const ELECTOR_ADDRESS: &str = "-1:3333333333333333333333333333333333333333333333333333333333333333";
@@ -28,7 +27,7 @@ fn address_information_request_and_response_variants() -> Result<()> {
             "/getAddressInformation",
             &v2::AddressInformationRequest {
                 address: fixture.transaction.account.clone(),
-                seqno,
+                seqno: seqno.map(Into::into),
             },
         )?;
     }
@@ -121,7 +120,7 @@ fn transactions_request_covers_limit_cursor_and_archival() -> Result<()> {
         "/getTransactions",
         &v2::TransactionsRequest {
             address: fixture.transaction.account.clone(),
-            limit: 2,
+            limit: Some(2.into()),
             lt: None,
             hash: None,
             to_lt: None,
@@ -133,10 +132,10 @@ fn transactions_request_covers_limit_cursor_and_archival() -> Result<()> {
         "/getTransactions",
         &v2::TransactionsRequest {
             address: fixture.transaction.account.clone(),
-            limit: 2,
-            lt: Some(fixture.transaction.lt.parse()?),
+            limit: Some(2.into()),
+            lt: Some(v2::StringOrNumber::String(fixture.transaction.lt.clone())),
             hash: Some(fixture.transaction.hash.clone()),
-            to_lt: Some(0),
+            to_lt: Some(0.into()),
             archival: Some(true),
         },
     )?;
@@ -171,11 +170,12 @@ fn try_locate_tx_request_and_transaction_response() -> Result<()> {
                 .destination
                 .clone()
                 .context("destination disappeared")?,
-            created_lt: message
-                .created_lt
-                .as_deref()
-                .context("created_lt disappeared")?
-                .parse()?,
+            created_lt: v2::StringOrNumber::String(
+                message
+                    .created_lt
+                    .clone()
+                    .context("created_lt disappeared")?,
+            ),
         },
     )?;
     Ok(())
@@ -189,14 +189,14 @@ fn config_param_request_covers_param_alias_and_seqno() -> Result<()> {
 
     for request in [
         v2::ConfigParamRequest {
-            param: Some(0),
+            param: Some(0.into()),
             config_id: None,
             seqno: None,
         },
         v2::ConfigParamRequest {
             param: None,
-            config_id: Some(0),
-            seqno: Some(seqno),
+            config_id: Some(0.into()),
+            seqno: Some(seqno.into()),
         },
     ] {
         let _: v2::TonlibResponse<v2::ConfigInfo> =
@@ -211,7 +211,7 @@ fn config_all_request_covers_latest_and_explicit_seqno() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let seqno = i32::try_from(masterchain_info(&live)?.last.seqno)?;
 
-    for seqno in [None, Some(seqno)] {
+    for seqno in [None, Some(seqno.into())] {
         let _: v2::TonlibResponse<v2::ConfigInfo> = live.get(
             &live.v2_url,
             "/getConfigAll",
@@ -232,9 +232,9 @@ fn block_header_request_covers_id_and_hashes() -> Result<()> {
             &live.v2_url,
             "/getBlockHeader",
             &v2::BlockHeaderRequest {
-                workchain: block.workchain,
-                shard: block.shard.clone(),
-                seqno: i32::try_from(block.seqno)?,
+                workchain: block.workchain.into(),
+                shard: v2::StringOrNumber::String(block.shard.clone()),
+                seqno: i32::try_from(block.seqno)?.into(),
                 root_hash: include_hashes.then(|| block.root_hash.clone()),
                 file_hash: include_hashes.then(|| block.file_hash.clone()),
             },
@@ -248,26 +248,26 @@ fn block_header_request_covers_id_and_hashes() -> Result<()> {
 fn lookup_block_request_covers_seqno_lt_and_unixtime() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let block = &fixture(&live)?.block;
-    let gen_utime = block.gen_utime.to_bigint()?.to_string().parse()?;
+    let gen_utime = v2::StringOrNumber::String(block.gen_utime.to_bigint()?.to_string());
 
     for request in [
         v2::LookupBlockRequest {
-            workchain: block.workchain,
-            shard: block.shard.clone(),
-            seqno: Some(i32::try_from(block.seqno)?),
+            workchain: block.workchain.into(),
+            shard: v2::StringOrNumber::String(block.shard.clone()),
+            seqno: Some(i32::try_from(block.seqno)?.into()),
             lt: None,
             unixtime: None,
         },
         v2::LookupBlockRequest {
-            workchain: block.workchain,
-            shard: block.shard.clone(),
+            workchain: block.workchain.into(),
+            shard: v2::StringOrNumber::String(block.shard.clone()),
             seqno: None,
-            lt: Some(block.start_lt.parse()?),
+            lt: Some(v2::StringOrNumber::String(block.start_lt.clone())),
             unixtime: None,
         },
         v2::LookupBlockRequest {
-            workchain: block.workchain,
-            shard: block.shard.clone(),
+            workchain: block.workchain.into(),
+            shard: v2::StringOrNumber::String(block.shard.clone()),
             seqno: None,
             lt: None,
             unixtime: Some(gen_utime),
@@ -291,9 +291,9 @@ fn run_get_method_request_covers_latest_and_historical_state() -> Result<()> {
             "/runGetMethod",
             &v2::RunGetMethodRequest {
                 address: ELECTOR_ADDRESS.to_owned(),
-                method: Value::String("participant_list_extended".to_owned()),
+                method: v2::StringOrNumber::String("participant_list_extended".to_owned()),
                 stack: Vec::new(),
-                seqno,
+                seqno: seqno.map(Into::into),
             },
         )?;
     }

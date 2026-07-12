@@ -409,7 +409,7 @@ pub fn map_run_get_method(
 
     response::RunGetMethodResult {
         type_field: "smc.runResult".to_owned(),
-        gas_used: response::StringOrNumber::String(r.gas_used.to_string()),
+        gas_used: response::StringOrNumber::Unsigned(r.gas_used),
         stack,
         exit_code: r.exit_code,
         block_id: map_block_id(&r.block_id),
@@ -419,9 +419,23 @@ pub fn map_run_get_method(
 }
 
 #[must_use]
-pub fn map_block_transactions(_: &LocalnetBlockTransactions) -> response::ResultOk {
-    response::ResultOk {
-        type_field: "ok".to_owned(),
+pub fn map_block_transactions(block: &LocalnetBlockTransactions) -> response::BlockTransactions {
+    response::BlockTransactions {
+        type_field: "blocks.transactions".to_owned(),
+        id: map_block_id(&block.id),
+        req_count: block.transactions.len(),
+        incomplete: false,
+        transactions: block
+            .transactions
+            .iter()
+            .map(|transaction| response::ShortTxId {
+                type_field: "blocks.shortTxId".to_owned(),
+                mode: 7,
+                account: transaction.address.to_string(),
+                lt: transaction.transaction_id.lt.to_string(),
+                hash: transaction.hash.to_base64(),
+            })
+            .collect(),
     }
 }
 
