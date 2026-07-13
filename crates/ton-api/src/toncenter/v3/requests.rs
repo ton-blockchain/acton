@@ -198,7 +198,8 @@ pub struct TransactionsQuery {
     pub account: Vec<String>,
     #[serde(default)]
     pub exclude_account: Vec<String>,
-    pub hash: Option<String>,
+    #[serde(default)]
+    pub hash: Vec<String>,
     pub lt: Option<u64>,
     pub start_utime: Option<i32>,
     pub end_utime: Option<i32>,

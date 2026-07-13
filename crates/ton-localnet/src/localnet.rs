@@ -2666,7 +2666,11 @@ fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransa
         .values()
         .cloned()
         .collect::<Vec<_>>();
-    metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+    metas.sort_by(|a, b| {
+        b.lt.cmp(&a.lt)
+            .then_with(|| a.account.cmp(&b.account))
+            .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+    });
 
     let mut result = Vec::with_capacity(metas.len());
     for meta in metas {
@@ -2690,9 +2694,17 @@ fn handle_get_all_transactions_page(
         .cloned()
         .collect::<Vec<_>>();
     if descending {
-        metas.sort_by(|a, b| b.lt.cmp(&a.lt).then_with(|| b.tx_hash.cmp(&a.tx_hash)));
+        metas.sort_by(|a, b| {
+            b.lt.cmp(&a.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
     } else {
-        metas.sort_by(|a, b| a.lt.cmp(&b.lt).then_with(|| a.tx_hash.cmp(&b.tx_hash)));
+        metas.sort_by(|a, b| {
+            a.lt.cmp(&b.lt)
+                .then_with(|| a.account.cmp(&b.account))
+                .then_with(|| a.tx_hash.cmp(&b.tx_hash))
+        });
     }
 
     let mut result = Vec::with_capacity(limit.min(metas.len().saturating_sub(offset)));

@@ -441,7 +441,7 @@ fn transactions_query_covers_hash_block_account_ranges_and_exclusion() -> Result
 
     for request in [
         v3::TransactionsQuery {
-            hash: Some(transaction.hash.clone()),
+            hash: vec![transaction.hash.clone(), block.root_hash.clone()],
             lt: Some(transaction.lt.parse()?),
             limit: Some(2),
             ..Default::default()

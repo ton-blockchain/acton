@@ -1589,7 +1589,7 @@ struct ParsedTransactionsV3Query {
     mc_seqno: Option<u32>,
     account: Option<HashSet<Addr>>,
     exclude_account: Option<HashSet<Addr>>,
-    hash: Option<Hash256>,
+    hashes: Option<HashSet<Hash256>>,
     lt: Option<u64>,
     start_utime: Option<u32>,
     end_utime: Option<u32>,
@@ -1691,7 +1691,7 @@ fn parse_transactions_v3_query(
         mc_seqno: parse_non_negative_u32("mc_seqno", payload.mc_seqno)?,
         account: parse_addresses(payload.account)?,
         exclude_account: parse_addresses(payload.exclude_account)?,
-        hash: payload.hash.as_deref().map(parse_hash_any).transpose()?,
+        hashes: parse_hashes(payload.hash)?,
         lt: payload.lt,
         start_utime: parse_non_negative_u32("start_utime", payload.start_utime)?,
         end_utime: parse_non_negative_u32("end_utime", payload.end_utime)?,
@@ -1866,8 +1866,8 @@ fn filter_transactions_v3(
             {
                 return false;
             }
-            if let Some(hash) = query.hash
-                && tx.hash != hash
+            if let Some(hashes) = &query.hashes
+                && !hashes.contains(&tx.hash)
             {
                 return false;
             }
@@ -1877,12 +1877,12 @@ fn filter_transactions_v3(
                 return false;
             }
             if let Some(start_utime) = query.start_utime
-                && tx.utime <= start_utime
+                && tx.utime < start_utime
             {
                 return false;
             }
             if let Some(end_utime) = query.end_utime
-                && tx.utime >= end_utime
+                && tx.utime > end_utime
             {
                 return false;
             }
@@ -1901,7 +1901,11 @@ fn filter_transactions_v3(
         .cloned()
         .collect::<Vec<_>>();
 
-    sort_transactions(&mut filtered, query.sort);
+    if query.start_utime.is_some() || query.end_utime.is_some() {
+        sort_transactions_by_time(&mut filtered, query.sort);
+    } else {
+        sort_transactions(&mut filtered, query.sort);
+    }
     filtered
         .into_iter()
         .skip(query.offset)
@@ -1912,7 +1916,7 @@ fn filter_transactions_v3(
 const fn transactions_fast_path(query: &ParsedTransactionsV3Query) -> Option<TransactionsFastPath> {
     let has_expensive_filters = query.account.is_some()
         || query.exclude_account.is_some()
-        || query.hash.is_some()
+        || query.hashes.is_some()
         || query.lt.is_some()
         || query.start_utime.is_some()
         || query.end_utime.is_some()
@@ -2296,6 +2300,7 @@ fn sort_transactions(transactions: &mut [LocalnetTransaction], order: SortOrder)
                 a.transaction_id
                     .lt
                     .cmp(&b.transaction_id.lt)
+                    .then_with(|| a.address.cmp(&b.address))
                     .then_with(|| a.hash.cmp(&b.hash))
             });
         }
@@ -2304,9 +2309,29 @@ fn sort_transactions(transactions: &mut [LocalnetTransaction], order: SortOrder)
                 b.transaction_id
                     .lt
                     .cmp(&a.transaction_id.lt)
-                    .then_with(|| b.hash.cmp(&a.hash))
+                    .then_with(|| a.address.cmp(&b.address))
+                    .then_with(|| a.hash.cmp(&b.hash))
             });
         }
+    }
+}
+
+fn sort_transactions_by_time(transactions: &mut [LocalnetTransaction], order: SortOrder) {
+    match order {
+        SortOrder::Asc => transactions.sort_by(|a, b| {
+            a.utime
+                .cmp(&b.utime)
+                .then_with(|| a.transaction_id.lt.cmp(&b.transaction_id.lt))
+                .then_with(|| a.address.cmp(&b.address))
+                .then_with(|| a.hash.cmp(&b.hash))
+        }),
+        SortOrder::Desc => transactions.sort_by(|a, b| {
+            b.utime
+                .cmp(&a.utime)
+                .then_with(|| b.transaction_id.lt.cmp(&a.transaction_id.lt))
+                .then_with(|| a.address.cmp(&b.address))
+                .then_with(|| a.hash.cmp(&b.hash))
+        }),
     }
 }
 
@@ -2570,6 +2595,18 @@ mod tests {
         }
     }
 
+    fn transaction_at(hash_byte: u8, address_byte: u8, lt: u64, utime: u32) -> LocalnetTransaction {
+        let mut transaction = transaction_with_message_opcodes(7, 9);
+        transaction.hash = Hash256([hash_byte; 32]);
+        transaction.address.addr = [address_byte; 32];
+        transaction.utime = utime;
+        transaction.transaction_id = LocalnetTransactionId {
+            lt,
+            hash: transaction.hash,
+        };
+        transaction
+    }
+
     fn transactions_query() -> ParsedTransactionsV3Query {
         ParsedTransactionsV3Query {
             workchain: None,
@@ -2578,7 +2615,7 @@ mod tests {
             mc_seqno: None,
             account: None,
             exclude_account: None,
-            hash: None,
+            hashes: None,
             lt: None,
             start_utime: None,
             end_utime: None,
@@ -2667,5 +2704,44 @@ mod tests {
             filter_transactions_by_message_v3(&transactions, &query).len(),
             1
         );
+    }
+
+    #[test]
+    fn transaction_time_ranges_are_inclusive_and_control_ordering() {
+        let transactions = [
+            transaction_at(1, 2, 30, 10),
+            transaction_at(2, 2, 20, 20),
+            transaction_at(3, 1, 20, 20),
+        ];
+        let mut query = transactions_query();
+        query.start_utime = Some(10);
+        query.end_utime = Some(20);
+        query.sort = SortOrder::Asc;
+        query.limit = 10;
+
+        let asc = filter_transactions_v3(&transactions, &query)
+            .into_iter()
+            .map(|transaction| {
+                (
+                    transaction.utime,
+                    transaction.transaction_id.lt,
+                    transaction.address.addr[0],
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(asc, [(10, 30, 2), (20, 20, 1), (20, 20, 2)]);
+
+        query.sort = SortOrder::Desc;
+        let desc = filter_transactions_v3(&transactions, &query)
+            .into_iter()
+            .map(|transaction| {
+                (
+                    transaction.utime,
+                    transaction.transaction_id.lt,
+                    transaction.address.addr[0],
+                )
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(desc, [(20, 20, 1), (20, 20, 2), (10, 30, 2)]);
     }
 }

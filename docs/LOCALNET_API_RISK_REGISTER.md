@@ -62,6 +62,7 @@ still defects because they violate schemas even under those limitations.
 | V2-25 Std zero cursor | Fixed | `getTransactions` treats `lt=0` as absent, while `getTransactionsStd` preserves it as a supplied cursor and returns the canonical empty page for any paired hash. |
 | V2-26 archival | Accepted | Localnet retains its complete local account history, so selecting an archival worker has no local meaning. Both flag values follow the same typed and snapshot-covered path. |
 | V2-27 transaction lookup | Fixed | All three locate routes share typed address/LT parsing, return the upstream 404 for a miss, deterministically select duplicate tuples, and use the existing outgoing-message index. Real incoming/source transactions plus REST/JSON-RPC errors and boundaries are snapshot-covered. |
+| V3-01 transaction ranges/order | Fixed | Transaction hashes are repeatable, time and LT bounds are inclusive, time-filtered requests order by time/LT/account, and other requests use LT/account ordering. Synthetic tie cases and real endpoint boundaries are covered. |
 | V3-05 transactions by message | Fixed | The request DTO accepts repeated message hashes, at least one message filter is required with upstream 422, and opcode matching is restricted to inbound messages. Query validation is snapshot-covered and input-only opcode filtering has a focused regression test. |
 | V3-06 pending transactions | Partial | Empty and trace-only requests now return upstream 422 because an account filter is required. Account-plus-trace behavior and trace identity remain open. |
 | V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
@@ -109,7 +110,7 @@ These are the highest-value targets for the next differential test pass:
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
 | P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope. |
-| P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
+| P0 | V3 traces and transactions | Trace identity, trace ranges/ordering, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | Pending account-plus-trace behavior and inherited trace identity remain incompatible. |
 | P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs, abort filtering, ordering, and parser failure handling are wrong. |
 | P0 | Emulation | Only the root transaction is emulated; downstream cascade, states, cells, address book, and metadata are omitted. |
@@ -315,9 +316,9 @@ coverage is high.
 
 ### Confirmed V3 findings
 
-1. **V3-01, transaction ranges/order:** local time bounds are exclusive and sorting is always by
-   LT/hash. Upstream bounds are inclusive and time-filtered requests sort by time, LT, account.
-   Repeated `hash` parameters are not represented locally.
+1. **V3-01, transaction ranges/order (fixed):** time and LT bounds are inclusive, repeated hashes
+   use OR semantics, time-filtered requests sort by time/LT/account, and other requests sort by
+   LT/account.
 2. **V3-02, trace filters/order:** local requires an identity filter, applies lower ranges to
    `start_*`, matches either start or end mc seqno, and sorts by `start_lt`. Upstream permits no
    identity filter, uses `end_*`, requires completed `mc_seqno_end`, and selects sort keys by range.

@@ -5584,6 +5584,21 @@ fn localnet_supports_v3_transactions_endpoints() {
     assert_eq!(by_hash_txs.len(), 1);
     assert_eq!(by_hash_txs[0]["hash"].as_str(), Some(tx_hash.as_str()));
 
+    let by_repeated_hash = wait_for_ok_response(
+        &node,
+        &format!(
+            "/api/v3/transactions?hash={}&hash={tx_hash_query}&limit=10",
+            "00".repeat(32)
+        ),
+        Duration::from_secs(12),
+    );
+    let repeated_hash_matches =
+        contains_tx_hash(v3_transactions_from_response(&by_repeated_hash), &tx_hash);
+    assert!(
+        repeated_hash_matches,
+        "repeated hash filters must use OR semantics"
+    );
+
     let by_lt = wait_for_ok_response(
         &node,
         &format!("/api/v3/transactions?lt={tx_lt}&limit=10"),
@@ -5670,26 +5685,34 @@ fn localnet_supports_v3_transactions_endpoints() {
         serde_json::to_string_pretty(&by_wrong_workchain).unwrap_or_default()
     );
 
-    let start_utime_strict = wait_for_ok_response(
+    let start_utime_inclusive = wait_for_ok_response(
         &node,
         &format!("/api/v3/transactions?hash={tx_hash_query}&start_utime={tx_now}&limit=10"),
         Duration::from_secs(12),
     );
+    let start_utime_includes_boundary = contains_tx_hash(
+        v3_transactions_from_response(&start_utime_inclusive),
+        &tx_hash,
+    );
     assert!(
-        v3_transactions_from_response(&start_utime_strict).is_empty(),
-        "start_utime must be strict (after):\n{}",
-        serde_json::to_string_pretty(&start_utime_strict).unwrap_or_default()
+        start_utime_includes_boundary,
+        "start_utime must be inclusive:\n{}",
+        serde_json::to_string_pretty(&start_utime_inclusive).unwrap_or_default()
     );
 
-    let end_utime_strict = wait_for_ok_response(
+    let end_utime_inclusive = wait_for_ok_response(
         &node,
         &format!("/api/v3/transactions?hash={tx_hash_query}&end_utime={tx_now}&limit=10"),
         Duration::from_secs(12),
     );
+    let end_utime_includes_boundary = contains_tx_hash(
+        v3_transactions_from_response(&end_utime_inclusive),
+        &tx_hash,
+    );
     assert!(
-        v3_transactions_from_response(&end_utime_strict).is_empty(),
-        "end_utime must be strict (before):\n{}",
-        serde_json::to_string_pretty(&end_utime_strict).unwrap_or_default()
+        end_utime_includes_boundary,
+        "end_utime must be inclusive:\n{}",
+        serde_json::to_string_pretty(&end_utime_inclusive).unwrap_or_default()
     );
 
     let start_lt_inclusive = wait_for_ok_response(
@@ -5918,6 +5941,21 @@ fn localnet_supports_v3_transactions_endpoints() {
     let (status, response) =
         node.get_json_with_status("/api/v3/pendingTransactions?trace_id=bad-hash");
     assert_v3_bad_request(status, &response, "Invalid hash format");
+
+    let fixed_semantics = json!({
+        "end_utime_includes_boundary": end_utime_includes_boundary,
+        "repeated_hash_uses_or": repeated_hash_matches,
+        "start_utime_includes_boundary": start_utime_includes_boundary,
+    });
+    assertion().eq(
+        format!(
+            "{}\n",
+            pretty_json_for_snapshot(&fixed_semantics, project.path())
+        ),
+        snapbox::file!(
+            "snapshots/localnet/test_localnet_supports_v3_transactions_endpoints.fixed-semantics.json"
+        ),
+    );
 
     node.stop();
 }
