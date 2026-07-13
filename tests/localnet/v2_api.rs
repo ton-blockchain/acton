@@ -4,6 +4,8 @@ use crate::support::project::ProjectBuilder;
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::{requests, responses};
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 const ZERO_ADDRESS: &str = "0:0000000000000000000000000000000000000000000000000000000000000000";
 const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
@@ -327,6 +329,128 @@ fn json_rpc_returns_typed_errors_for_invalid_requests() {
     assertion().eq(
         pretty_json_for_snapshot(&summary, project.path()),
         snapbox::file!("snapshots/v2_json_rpc_errors.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn run_get_method_std_uses_canonical_stack_contract() {
+    let project = ProjectBuilder::new("localnet-v2-run-get-method-std").build();
+    let node = project.localnet().start();
+    let empty_cell = Boc::encode_base64(Cell::default());
+    let request_json = json!({
+        "address": ZERO_ADDRESS,
+        "method": 1,
+        "stack": [
+            {
+                "@type": "tvm.stackEntryNumber",
+                "number": {"@type": "tvm.numberDecimal", "number": "7"}
+            },
+            {
+                "@type": "tvm.stackEntryCell",
+                "cell": {"@type": "tvm.cell", "bytes": empty_cell}
+            },
+            {
+                "@type": "tvm.stackEntrySlice",
+                "slice": {"@type": "tvm.slice", "bytes": empty_cell}
+            },
+            {
+                "@type": "tvm.stackEntryTuple",
+                "tuple": {
+                    "@type": "tvm.tuple",
+                    "elements": [{
+                        "@type": "tvm.stackEntryNumber",
+                        "number": {"@type": "tvm.numberDecimal", "number": "8"}
+                    }]
+                }
+            },
+            {
+                "@type": "tvm.stackEntryList",
+                "list": {
+                    "@type": "tvm.list",
+                    "elements": [{
+                        "@type": "tvm.stackEntryNumber",
+                        "number": {"@type": "tvm.numberDecimal", "number": "9"}
+                    }]
+                }
+            }
+        ]
+    });
+    let request: requests::RunGetMethodStdRequest = serde_json::from_value(request_json.clone())
+        .expect("canonical Std request must deserialize");
+
+    let (rest_status, rest_json) =
+        node.post_json_with_status("/api/v2/runGetMethodStd", &request_json);
+    let rest: responses::TonlibResponse<responses::RunGetMethodStdResult> =
+        serde_json::from_value(rest_json.clone()).expect("Std REST response must be typed");
+    let rpc: responses::JsonRpcResponse<responses::RunGetMethodStdResult> = node.post_v2_json_rpc(
+        "/api/v2",
+        StringOrNumber::String("std".to_owned()),
+        "runGetMethodStd",
+        request,
+    );
+    let (legacy_status, _) = node.post_json_raw_with_status(
+        "/api/v2/runGetMethodStd",
+        &json!({
+            "address": ZERO_ADDRESS,
+            "method": 1,
+            "stack": [["num", "7"]]
+        }),
+    );
+    let mut invalid_marker_request = request_json.clone();
+    invalid_marker_request["stack"][0]["number"]["@type"] = json!("wrong");
+    let (invalid_marker_status, _) =
+        node.post_json_raw_with_status("/api/v2/runGetMethodStd", &invalid_marker_request);
+    let mut unsupported_request = request_json.clone();
+    unsupported_request["stack"] = json!([{"@type": "tvm.stackEntryUnsupported"}]);
+    let (unsupported_status, _) =
+        node.post_json_raw_with_status("/api/v2/runGetMethodStd", &unsupported_request);
+    let mut negative_seqno_request = request_json.clone();
+    negative_seqno_request["seqno"] = json!(-1);
+    let (negative_seqno_status, _) =
+        node.post_json_raw_with_status("/api/v2/runGetMethodStd", &negative_seqno_request);
+    let mut unknown_field_request = request_json.clone();
+    unknown_field_request["unexpected"] = json!(true);
+    let (unknown_field_status, _) =
+        node.post_json_raw_with_status("/api/v2/runGetMethodStd", &unknown_field_request);
+    let mut out_of_range_method_request = request_json.clone();
+    out_of_range_method_request["method"] = json!(i64::from(i32::MAX) + 1);
+    let (out_of_range_method_status, _) =
+        node.post_json_raw_with_status("/api/v2/runGetMethodStd", &out_of_range_method_request);
+    let (rpc_invalid_marker_status, _) = node.post_json_raw_with_status(
+        "/api/v2",
+        &json!({
+            "jsonrpc": "2.0",
+            "id": "invalid-marker",
+            "method": "runGetMethodStd",
+            "params": invalid_marker_request,
+        }),
+    );
+
+    let summary = json!({
+        "rest_status": rest_status,
+        "rest_type": rest.result.type_field,
+        "rest_exit_code": rest.result.exit_code,
+        "rest_stack_len": rest.result.stack.len(),
+        "rpc_type": rpc.response.result.type_field,
+        "rpc_exit_code": rpc.response.result.exit_code,
+        "rpc_stack_len": rpc.response.result.stack.len(),
+        "std_shape_omits_legacy_context": rest_json["result"].get("block_id").is_none()
+            && rest_json["result"].get("last_transaction_id").is_none()
+            && rest_json["result"].get("vm_log").is_none(),
+        "legacy_stack_rejected": legacy_status,
+        "invalid_nested_marker_rejected": invalid_marker_status >= 400,
+        "unsupported_entry_rejected": unsupported_status >= 400,
+        "negative_seqno_rejected": negative_seqno_status >= 400,
+        "unknown_field_rejected": unknown_field_status >= 400,
+        "out_of_range_numeric_method_rejected": out_of_range_method_status >= 400,
+        "json_rpc_invalid_marker_rejected": rpc_invalid_marker_status >= 400,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v2_run_get_method_std.json"),
     );
 
     node.stop();

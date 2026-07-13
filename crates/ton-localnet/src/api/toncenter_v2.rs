@@ -1,7 +1,7 @@
 //! Localnet-to-`TonCenter` v2 response adapters.
 //!
 //! Known `OpenAPI` deviations:
-//! - `map_run_get_method` adds local `vm_log` to `RunGetMethodResult`;
+//! - `map_run_get_method` adds local `vm_log` to the legacy `RunGetMethodResult`;
 //! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
 //!   operations.
 
@@ -16,7 +16,7 @@ use crate::types::{Addr, BocBytes, Hash256};
 use base64::Engine;
 use serde_json::value::Value;
 use ton_api::toncenter::v2 as response;
-use tvm_ffi::json_stack::{legacy_stack_to_json, stack_to_json};
+use tvm_ffi::json_stack::{legacy_stack_to_json, std_stack_from_tuple};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::HashBytes as CellHashBytes;
@@ -402,33 +402,72 @@ pub fn map_shard_account_cell(boc: &BocBytes) -> response::TvmCell {
     }
 }
 
-#[must_use]
+pub const MAX_RUN_GET_METHOD_STACK_DEPTH: usize = 100;
+
+#[derive(Debug, thiserror::Error)]
+#[error("Result stack depth >= {MAX_RUN_GET_METHOD_STACK_DEPTH}")]
+pub struct RunGetMethodStackDepthError;
+
 pub fn map_run_get_method(
     r: &LocalnetRunGetMethodResult,
-    is_legacy: bool,
-) -> response::RunGetMethodResult {
-    let stack_cell = Boc::decode(&r.stack).unwrap_or_default();
-    let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
-    let stack_json: Value = if is_legacy {
-        Value::Array(legacy_stack_to_json(&stack_tuple).unwrap_or_default())
-    } else {
-        Value::Array(stack_to_json(&stack_tuple).unwrap_or_default())
-    };
+) -> anyhow::Result<response::RunGetMethodResult> {
+    let stack = decode_run_get_method_stack(r)?;
+    ensure_legacy_stack_depth(&stack)?;
 
-    let stack = match stack_json {
-        Value::Array(a) => a,
-        v => vec![v],
-    };
-
-    response::RunGetMethodResult {
+    Ok(response::RunGetMethodResult {
         type_field: "smc.runResult".to_owned(),
         gas_used: response::StringOrNumber::Unsigned(r.gas_used),
-        stack,
+        stack: legacy_stack_to_json(&stack)?,
         exit_code: r.exit_code,
         block_id: map_block_id(&r.block_id),
         last_transaction_id: map_internal_transaction_id(&r.last_transaction_id),
         vm_log: Some(r.vm_log.to_string()),
+    })
+}
+
+pub fn map_run_get_method_std(
+    r: &LocalnetRunGetMethodResult,
+) -> anyhow::Result<response::RunGetMethodStdResult> {
+    let stack = decode_run_get_method_stack(r)?;
+    ensure_std_stack_depth(&stack)?;
+
+    Ok(response::RunGetMethodStdResult {
+        type_field: "smc.runResult".to_owned(),
+        gas_used: i64::try_from(r.gas_used)?,
+        stack: std_stack_from_tuple(&stack),
+        exit_code: r.exit_code,
+    })
+}
+
+fn decode_run_get_method_stack(r: &LocalnetRunGetMethodResult) -> anyhow::Result<Tuple> {
+    let stack_cell = Boc::decode(&r.stack)?;
+    Ok(Tuple::deserialize(&stack_cell)?)
+}
+
+fn ensure_std_stack_depth(stack: &Tuple) -> anyhow::Result<()> {
+    ensure_stack_depth(stack.0.iter().map(|item| (item, 1)))
+}
+
+fn ensure_legacy_stack_depth(stack: &Tuple) -> anyhow::Result<()> {
+    ensure_stack_depth(stack.0.iter().flat_map(|item| match item {
+        TupleItem::Tuple(tuple) => tuple.0.iter().map(|item| (item, 1)).collect(),
+        _ => Vec::new(),
+    }))
+}
+
+fn ensure_stack_depth<'a>(
+    entries: impl IntoIterator<Item = (&'a TupleItem, usize)>,
+) -> anyhow::Result<()> {
+    let mut pending = entries.into_iter().collect::<Vec<_>>();
+    while let Some((entry, depth)) = pending.pop() {
+        if depth >= MAX_RUN_GET_METHOD_STACK_DEPTH {
+            return Err(RunGetMethodStackDepthError.into());
+        }
+        if let TupleItem::Tuple(tuple) = entry {
+            pending.extend(tuple.0.iter().map(|item| (item, depth + 1)));
+        }
     }
+    Ok(())
 }
 
 #[must_use]
@@ -715,6 +754,7 @@ mod tests {
     use super::*;
     use crate::storage::JettonMasterMeta;
     use serde_json::json;
+    use tycho_types::cell::Cell;
 
     fn addr(hex_byte: u8) -> Addr {
         format!("0:{}", format!("{hex_byte:02x}").repeat(32))
@@ -739,6 +779,26 @@ mod tests {
             state: AccountStatus::Active,
             sync_utime: 0,
             frozen_hash: None,
+        }
+    }
+
+    fn run_get_method_result(stack: Tuple) -> LocalnetRunGetMethodResult {
+        let stack = stack.serialize().expect("stack must serialize");
+        LocalnetRunGetMethodResult {
+            gas_used: 17,
+            stack: BocBytes::from(Boc::encode(stack)),
+            exit_code: 0,
+            vm_log: "vm log".into(),
+            block_id: LocalnetBlockId::first(),
+            last_transaction_id: LocalnetTransactionId::default(),
+        }
+    }
+
+    fn nested_tuple_item(depth: usize) -> TupleItem {
+        if depth == 1 {
+            TupleItem::Int(1.into())
+        } else {
+            TupleItem::Tuple(Tuple(vec![nested_tuple_item(depth - 1)]))
         }
     }
 
@@ -767,19 +827,71 @@ mod tests {
 
     #[test]
     fn wallet_seqno_parses_success_stack() {
-        let stack = Tuple(vec![TupleItem::Int(9.into())])
-            .serialize()
-            .expect("stack must serialize");
-        let result = LocalnetRunGetMethodResult {
-            gas_used: 0,
-            stack: BocBytes::from(Boc::encode(stack)),
-            exit_code: 0,
-            vm_log: "".into(),
-            block_id: LocalnetBlockId::first(),
-            last_transaction_id: LocalnetTransactionId::default(),
-        };
+        let result = run_get_method_result(Tuple(vec![TupleItem::Int(9.into())]));
 
         assert_eq!(map_wallet_seqno(&result), Some(9));
+    }
+
+    #[test]
+    fn run_get_method_std_maps_canonical_response() {
+        let cell = Cell::default();
+        let result = run_get_method_result(Tuple(vec![
+            TupleItem::Int((-7).into()),
+            TupleItem::Cell(cell.clone()),
+            TupleItem::Slice(cell),
+            TupleItem::Tuple(Tuple(vec![TupleItem::Int(9.into())])),
+        ]));
+
+        let mapped = map_run_get_method_std(&result).unwrap();
+
+        assert_eq!(mapped.gas_used, 17);
+        assert_eq!(mapped.exit_code, 0);
+        assert_eq!(mapped.stack.len(), 4);
+        assert_eq!(
+            serde_json::to_value(&mapped.stack[0]).unwrap(),
+            json!({
+                "@type": "tvm.stackEntryNumber",
+                "number": {"@type": "tvm.numberDecimal", "number": "-7"}
+            })
+        );
+        assert!(
+            serde_json::to_value(mapped)
+                .unwrap()
+                .get("block_id")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn run_get_method_mappers_reject_invalid_stack_boc() {
+        let mut result = run_get_method_result(Tuple::default());
+        result.stack = BocBytes(vec![1, 2, 3]);
+
+        assert!(map_run_get_method(&result).is_err());
+        assert!(map_run_get_method_std(&result).is_err());
+    }
+
+    #[test]
+    fn run_get_method_mappers_enforce_upstream_depth_limit() {
+        let std_allowed = run_get_method_result(Tuple(vec![nested_tuple_item(99)]));
+        let std_rejected = run_get_method_result(Tuple(vec![nested_tuple_item(100)]));
+        let legacy_allowed = run_get_method_result(Tuple(vec![nested_tuple_item(100)]));
+        let legacy_rejected = run_get_method_result(Tuple(vec![nested_tuple_item(101)]));
+
+        assert!(map_run_get_method_std(&std_allowed).is_ok());
+        assert!(
+            map_run_get_method_std(&std_rejected)
+                .unwrap_err()
+                .downcast_ref::<RunGetMethodStackDepthError>()
+                .is_some()
+        );
+        assert!(map_run_get_method(&legacy_allowed).is_ok());
+        assert!(
+            map_run_get_method(&legacy_rejected)
+                .unwrap_err()
+                .downcast_ref::<RunGetMethodStackDepthError>()
+                .is_some()
+        );
     }
 
     #[test]

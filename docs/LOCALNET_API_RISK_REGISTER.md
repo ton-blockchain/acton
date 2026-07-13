@@ -1,6 +1,6 @@
 # Localnet API risk register
 
-Status: initial static audit, 2026-07-13.
+Status: active remediation of the initial static audit, 2026-07-13.
 
 This document ranks the compatibility risk and semantic test coverage of every HTTP route exposed
 by `ton-localnet`. It is a bug-finding register, not an API availability matrix. Availability is
@@ -34,6 +34,14 @@ Known and accepted product limitations are not counted as new defects:
 
 The invalid V3 value `classification_state="classified"` and protocol validation differences are
 still defects because they violate schemas even under those limitations.
+
+## Remediation status
+
+| Finding | Status | Evidence |
+|---|---|---|
+| V2-01 `runGetMethodStd` | Fixed | Shared `tvm-ffi` Tonlib stack DTOs, separate Std request/result types, local REST/JSON-RPC snapshot, and a live non-empty TonCenter stack test. |
+| V2-22 numeric ranges | Partial | Numeric get-method IDs and `runGetMethodStd.seqno` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
+| V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 
 ## Rating model
 
@@ -76,7 +84,6 @@ These are the highest-value targets for the next differential test pass:
 
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
-| P0 | V2 `runGetMethodStd` | Canonical object-shaped Std stack entries are decoded as legacy pairs, and the response uses the wrong DTO. |
 | P0 | V2 JSON-RPC aliases | The request envelope is stricter than upstream proxy behavior; `getShards` is missing; REST and RPC statuses/results diverge. |
 | P0 | V2 historical reads | `getTokenData` ignores `seqno`; config reads return current config; `seqno=0` is accepted as latest. |
 | P0 | V2 block APIs | Block headers contain many hardcoded fields; block transaction cursors and masterchain transactions are wrong; `lookupBlock` selector rules differ. |
@@ -142,7 +149,7 @@ coverage is high.
 | `POST /api/v2/sendBoc` | High | B | Empty/malformed/multi-root BOC, replay, duplicate scheduling, canonical 422. |
 | `POST /api/v2/sendBocReturnHash` | High | B | Same plus raw hash versus normalized hash and duplicate message behavior. |
 | `POST /api/v2/runGetMethod` | High | B | Every stack kind, deep tuple/list, integer boundaries, historical state/libraries, corrupt result stack. |
-| `POST /api/v2/runGetMethodStd` | Critical | C | Any non-empty canonical request stack, nested tuple/list, depth 99/100, and exact Std response schema. |
+| `POST /api/v2/runGetMethodStd` | Critical | B | Non-empty canonical Number/Cell/Slice/Tuple/List stacks, invalid shapes and ranges, depth 99/100, exact Std response schema, and live TonCenter DTO coverage. |
 | `GET /api/v2/detectAddress` | Low | B | Invalid checksum, testnet/non-bounceable forms, and error status. |
 | `GET /api/v2/detectHash` | Medium | B | Padding, wrong length, hex/base64/base64url equivalence, and 422 versus 500. |
 | `GET /api/v2/packAddress` | Low | C | Testnet/non-bounceable flags and checksum failures. |
@@ -174,7 +181,7 @@ coverage is high.
 
 ### V2 findings and accepted deviations
 
-1. **V2-01, `runGetMethodStd`:** local REST and JSON-RPC use `RunGetMethodRequest` and the legacy
+1. **V2-01, `runGetMethodStd` (fixed):** local REST and JSON-RPC used `RunGetMethodRequest` and the legacy
    `[type, value]` decoder. Upstream `RunGetMethodStdHandler` accepts `@type`-discriminated object
    entries and returns the smaller `RunGetMethodStdResult`. The current empty-stack test cannot
    detect either mismatch.
@@ -218,11 +225,12 @@ coverage is high.
     C++ returns current server time.
 21. **V2-21, historical account fields:** `sync_utime` remains current node time and `suspended` is
     always false.
-22. **V2-22, numeric ranges:** local unsigned request fields accept values that cannot be
-    represented by upstream signed schema types.
-23. **V2-23, getter result stack:** upstream rejects result stack depth 100 or more with code 533;
-    localnet has no equivalent limit. Legacy result mapping also hides BOC, tuple, and JSON
-    conversion failures with `unwrap_or_default()` and can return a successful empty stack.
+22. **V2-22, numeric ranges (partially fixed):** numeric get-method IDs and the Std getter seqno now
+    use upstream signed ranges. Other local unsigned request fields can still accept values that
+    cannot be represented by upstream signed schema types.
+23. **V2-23, getter result stack (fixed):** both result formats now reject depth 100 or more with
+    code 533 and propagate BOC, tuple, and wire-conversion failures instead of returning a
+    successful empty stack.
 24. **V2-24, config parameter aliases:** upstream requires exactly one of `param` and `config_id`;
     local handling does not enforce the same XOR contract.
 25. **V2-25, Std transaction cursor:** upstream treats `lt=0` plus a hash as a supplied cursor;

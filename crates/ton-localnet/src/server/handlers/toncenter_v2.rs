@@ -14,8 +14,8 @@ use std::sync::Arc;
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, ConfigAllRequest, ConfigParamRequest,
-    DetectHashRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest, SendBocRequest,
-    SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
+    DetectHashRequest, LibrariesRequest, LookupBlockRequest, RunGetMethodRequest,
+    RunGetMethodStdRequest, SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
 use ton_api::toncenter::v2::requests::{BlockHeaderRequest, BlockTransactionsRequest};
 use tycho_types::models::{StdAddr, StdAddrFormat};
@@ -44,22 +44,32 @@ pub async fn run_get_method(
     let seqno = parse!(parse_seqno(payload.seqno));
 
     handle_result(
-        node.run_get_method(payload.address, method_str, payload.stack, seqno),
-        |res| v2::map_run_get_method(res, true),
+        async move {
+            let result = node
+                .run_get_method(payload.address, method_str, payload.stack, seqno)
+                .await?;
+            v2::map_run_get_method(&result)
+        },
+        Clone::clone,
     )
     .await
 }
 
 pub async fn run_get_method_std(
     State(node): State<Arc<Localnet>>,
-    Json(payload): Json<RunGetMethodRequest>,
+    Json(payload): Json<RunGetMethodStdRequest>,
 ) -> Response {
     let method_str = parse!(parse_method_name(&payload.method));
-    let seqno = parse!(parse_seqno(payload.seqno));
+    let seqno = parse!(parse_i32_seqno(payload.seqno));
 
     handle_result(
-        node.run_get_method(payload.address, method_str, payload.stack, seqno),
-        |res| v2::map_run_get_method(res, false),
+        async move {
+            let result = node
+                .run_get_method_std(payload.address, method_str, payload.stack, seqno)
+                .await?;
+            v2::map_run_get_method_std(&result)
+        },
+        Clone::clone,
     )
     .await
 }
@@ -664,6 +674,10 @@ pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Optio
         .map(|value| value.to_u32())
         .transpose()
         .map_err(|_| anyhow::anyhow!("`seqno` must be a non-negative 32-bit integer"))
+}
+
+pub(super) fn parse_i32_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {
+    parse_seqno(seqno.map(Into::into))
 }
 
 pub(super) fn parse_transactions_request(

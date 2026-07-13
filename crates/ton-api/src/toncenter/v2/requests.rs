@@ -1,7 +1,7 @@
 use serde::{Deserialize, Deserializer, Serialize, de::Error as _};
 use serde_json::Value;
 
-use super::StringOrNumber;
+use super::{StringOrNumber, TvmStackEntry};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct EmptyRequest {}
@@ -39,6 +39,17 @@ pub struct RunGetMethodRequest {
     /// Historical masterchain seqno supported by `TonCenter` v2 and Acton localnet.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub seqno: Option<StringOrNumber>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RunGetMethodStdRequest {
+    pub address: String,
+    /// A method name or signed 32-bit method id.
+    pub method: StringOrNumber,
+    pub stack: Vec<TvmStackEntry>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<i32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

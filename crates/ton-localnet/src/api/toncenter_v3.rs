@@ -24,8 +24,7 @@ use serde_json::value::Value;
 use std::collections::HashMap;
 use ton_api::toncenter::emulate::v1 as emulate;
 use ton_api::toncenter::v3 as response;
-use tvm_ffi::json_stack::stack_to_json;
-use tvm_ffi::stack::Tuple;
+use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
 use tycho_types::dict::Dict;
@@ -1287,11 +1286,7 @@ fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> HashMap<Strin
 pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> response::RunGetMethodResult {
     let stack_cell = Boc::decode(&result.stack).unwrap_or_default();
     let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
-    let stack = stack_to_json(&stack_tuple)
-        .unwrap_or_default()
-        .into_iter()
-        .map(map_stack_entry)
-        .collect::<Vec<_>>();
+    let stack = stack_tuple.0.iter().map(map_stack_entry).collect();
 
     response::RunGetMethodResult {
         gas_used: response::StringOrNumber::Unsigned(result.gas_used),
@@ -1743,99 +1738,52 @@ fn map_message(msg: &MsgMeta) -> response::Message {
     }
 }
 
-fn map_stack_entry(entry: Value) -> response::StackEntity {
-    let Some(entry_type) = entry.get("@type").and_then(Value::as_str) else {
-        return response::StackEntity {
-            kind: "unknown".to_owned(),
-            value: response::StackValue::Json(entry),
-        };
-    };
-
-    match entry_type {
-        "tvm.stackEntryNull" => response::StackEntity {
+fn map_stack_entry(entry: &TupleItem) -> response::StackEntity {
+    match entry {
+        TupleItem::Null => response::StackEntity {
             kind: "list".to_owned(),
             value: response::StackValue::Entries(Vec::new()),
         },
-        "tvm.stackEntryNumber" => response::StackEntity {
+        TupleItem::Int(value) => response::StackEntity {
             kind: "num".to_owned(),
-            value: response::StackValue::Json(map_v3_stack_number(entry.pointer("/number/number"))),
+            value: response::StackValue::Json(map_v3_stack_number(value)),
         },
-        "tvm.stackEntryCell" => response::StackEntity {
+        TupleItem::Nan => response::StackEntity {
+            kind: "num".to_owned(),
+            value: response::StackValue::Json(Value::String("NaN".to_owned())),
+        },
+        TupleItem::Cell(cell) => response::StackEntity {
             kind: "cell".to_owned(),
-            value: response::StackValue::Json(
-                entry.pointer("/cell/bytes").cloned().unwrap_or(Value::Null),
-            ),
+            value: response::StackValue::Json(Value::String(Boc::encode_base64(cell))),
         },
-        "tvm.stackEntrySlice" => response::StackEntity {
+        TupleItem::Slice(cell) => response::StackEntity {
             kind: "slice".to_owned(),
-            value: response::StackValue::Json(
-                entry
-                    .pointer("/slice/bytes")
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            ),
+            value: response::StackValue::Json(Value::String(Boc::encode_base64(cell))),
         },
-        "tvm.stackEntryBuilder" => response::StackEntity {
+        TupleItem::Cont(continuation) => response::StackEntity {
+            kind: "slice".to_owned(),
+            value: response::StackValue::Json(Value::String(Boc::encode_base64(
+                &continuation.code,
+            ))),
+        },
+        TupleItem::Builder(cell) => response::StackEntity {
             kind: "builder".to_owned(),
-            value: response::StackValue::Json(
-                entry
-                    .pointer("/builder/bytes")
-                    .cloned()
-                    .unwrap_or(Value::Null),
-            ),
+            value: response::StackValue::Json(Value::String(Boc::encode_base64(cell))),
         },
-        "tvm.stackEntryTuple" => {
-            let elements = entry
-                .pointer("/tuple/elements")
-                .and_then(Value::as_array)
-                .map(|items| {
-                    items
-                        .iter()
-                        .cloned()
-                        .map(map_stack_entry)
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            response::StackEntity {
-                kind: "tuple".to_owned(),
-                value: response::StackValue::Entries(elements),
-            }
-        }
-        "tvm.stackEntryList" => {
-            let elements = entry
-                .pointer("/list/elements")
-                .and_then(Value::as_array)
-                .map(|items| {
-                    items
-                        .iter()
-                        .cloned()
-                        .map(map_stack_entry)
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default();
-            response::StackEntity {
-                kind: "list".to_owned(),
-                value: response::StackValue::Entries(elements),
-            }
-        }
-        _ => response::StackEntity {
-            kind: entry_type.to_owned(),
-            value: response::StackValue::Json(entry),
+        TupleItem::Tuple(tuple) => response::StackEntity {
+            kind: "tuple".to_owned(),
+            value: response::StackValue::Entries(tuple.0.iter().map(map_stack_entry).collect()),
         },
     }
 }
 
-fn map_v3_stack_number(value: Option<&Value>) -> Value {
-    let Some(value) = value.and_then(Value::as_str) else {
-        return Value::Null;
+fn map_v3_stack_number(value: &BigInt) -> Value {
+    let encoded = if value < &BigInt::from(0) {
+        format!("-0x{}", (-value).to_str_radix(16))
+    } else {
+        format!("0x{}", value.to_str_radix(16))
     };
-    if value.starts_with("0x") {
-        return Value::String(value.to_owned());
-    }
-
-    BigInt::parse_bytes(value.as_bytes(), 10).map_or(Value::Null, |value| {
-        Value::String(format!("0x{}", value.to_str_radix(16)))
-    })
+    Value::String(encoded)
 }
 
 fn zero_hash_base64() -> String {
@@ -1872,12 +1820,16 @@ mod tests {
     use super::{
         format_v3_shard_id, map_address_information, map_blocks_response, map_jetton_masters,
         map_jetton_wallets, map_nft_collection_token_info, map_nft_item_token_info, map_nft_items,
-        map_transaction_account_state,
+        map_stack_entry, map_transaction_account_state,
     };
     use crate::localnet::{LocalnetAccountState, LocalnetBlock, LocalnetBlockId};
     use crate::storage::{JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use crate::types::Hash256;
+    use num_bigint::BigInt;
     use serde_json::json;
+    use tvm_ffi::stack::{Tuple, TupleItem};
+    use tycho_types::boc::Boc;
+    use tycho_types::cell::Cell;
 
     fn sample_jetton_master() -> JettonMasterMeta {
         JettonMasterMeta {
@@ -1935,6 +1887,34 @@ mod tests {
             init: true,
             last_transaction_lt: 42,
         }
+    }
+
+    #[test]
+    fn run_get_method_stack_maps_directly_from_tvm_values() {
+        let cell = Cell::default();
+        let boc = Boc::encode_base64(&cell);
+        let stack = [
+            TupleItem::Int(BigInt::from(-7)),
+            TupleItem::Cell(cell.clone()),
+            TupleItem::Slice(cell.clone()),
+            TupleItem::Builder(cell),
+            TupleItem::Tuple(Tuple(vec![TupleItem::Int(BigInt::from(9))])),
+            TupleItem::Null,
+            TupleItem::Nan,
+        ];
+
+        assert_eq!(
+            serde_json::to_value(stack.iter().map(map_stack_entry).collect::<Vec<_>>()).unwrap(),
+            json!([
+                {"type": "num", "value": "-0x7"},
+                {"type": "cell", "value": boc},
+                {"type": "slice", "value": boc},
+                {"type": "builder", "value": boc},
+                {"type": "tuple", "value": [{"type": "num", "value": "0x9"}]},
+                {"type": "list", "value": []},
+                {"type": "num", "value": "NaN"}
+            ])
+        );
     }
 
     #[test]

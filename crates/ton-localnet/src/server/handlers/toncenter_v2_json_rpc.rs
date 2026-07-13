@@ -1,6 +1,7 @@
 use super::toncenter_v2::{
-    parse_config_param, parse_libraries_request, parse_seqno, parse_transactions_request,
-    resolve_block_header, resolve_block_transactions, token_wallet_code_hash,
+    parse_config_param, parse_i32_seqno, parse_libraries_request, parse_seqno,
+    parse_transactions_request, resolve_block_header, resolve_block_transactions,
+    token_wallet_code_hash,
 };
 use super::utils::{error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -19,8 +20,8 @@ use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, BlockHeaderRequest, BlockTransactionsRequest,
     ConfigAllRequest, ConfigParamRequest, DetectHashRequest, JsonRpcRequest, LibrariesRequest,
-    LookupBlockRequest, RunGetMethodRequest, SendBocRequest, SeqnoRequest, TransactionsRequest,
-    TryLocateTxRequest,
+    LookupBlockRequest, RunGetMethodRequest, RunGetMethodStdRequest, SendBocRequest, SeqnoRequest,
+    TransactionsRequest, TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
@@ -98,21 +99,19 @@ async fn json_rpc_router(
             let req: RunGetMethodRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
             let seqno = parse_seqno(req.seqno)?;
-            wire::JsonRpcResult::RunGetMethod(Box::new(
-                node.run_get_method(req.address, method_str, req.stack, seqno)
-                    .await
-                    .map(|r| v2::map_run_get_method(&r, true))?,
-            ))
+            let result = node
+                .run_get_method(req.address, method_str, req.stack, seqno)
+                .await?;
+            wire::JsonRpcResult::RunGetMethod(Box::new(v2::map_run_get_method(&result)?))
         }
         "runGetMethodStd" => {
-            let req: RunGetMethodRequest = parse_params(params, method)?;
+            let req: RunGetMethodStdRequest = parse_params(params, method)?;
             let method_str = parse_method_name(&req.method)?;
-            let seqno = parse_seqno(req.seqno)?;
-            wire::JsonRpcResult::RunGetMethod(Box::new(
-                node.run_get_method(req.address, method_str, req.stack, seqno)
-                    .await
-                    .map(|r| v2::map_run_get_method(&r, false))?,
-            ))
+            let seqno = parse_i32_seqno(req.seqno)?;
+            let result = node
+                .run_get_method_std(req.address, method_str, req.stack, seqno)
+                .await?;
+            wire::JsonRpcResult::RunGetMethodStd(Box::new(v2::map_run_get_method_std(&result)?))
         }
         "detectAddress" => {
             let req: AddressRequest = parse_params(params, method)?;

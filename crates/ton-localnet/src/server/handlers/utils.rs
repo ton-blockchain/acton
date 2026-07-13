@@ -28,6 +28,12 @@ impl ToncenterHttpError {
 
 #[must_use]
 pub fn error_status(error: &anyhow::Error) -> StatusCode {
+    if error
+        .downcast_ref::<crate::api::toncenter_v2::RunGetMethodStackDepthError>()
+        .is_some()
+    {
+        return StatusCode::from_u16(533).expect("533 is a valid extension status");
+    }
     if let Some(error) = error.downcast_ref::<ToncenterHttpError>() {
         return error.status;
     }
@@ -52,8 +58,10 @@ pub fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow:
 pub fn parse_method_name(method: &StringOrNumber) -> anyhow::Result<String> {
     match method {
         StringOrNumber::String(value) => Ok(value.clone()),
-        StringOrNumber::Number(value) => Ok(value.to_string()),
-        StringOrNumber::Unsigned(value) => Ok(value.to_string()),
+        StringOrNumber::Number(_) | StringOrNumber::Unsigned(_) => method
+            .to_i32()
+            .map(|value| value.to_string())
+            .map_err(|_| anyhow::anyhow!("numeric `method` must be a signed 32-bit integer")),
     }
 }
 
@@ -95,4 +103,34 @@ pub fn get_extra() -> String {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_or_else(|_| "0".to_string(), |d| d.as_millis().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::toncenter_v2::RunGetMethodStackDepthError;
+
+    #[test]
+    fn stack_depth_error_uses_upstream_status() {
+        let error = anyhow::Error::new(RunGetMethodStackDepthError);
+        assert_eq!(error_status(&error).as_u16(), 533);
+    }
+
+    #[test]
+    fn numeric_method_name_must_fit_openapi_int32() {
+        assert_eq!(
+            parse_method_name(&StringOrNumber::Number(i64::from(i32::MIN))).unwrap(),
+            i32::MIN.to_string()
+        );
+        assert_eq!(
+            parse_method_name(&StringOrNumber::Unsigned(i32::MAX as u64)).unwrap(),
+            i32::MAX.to_string()
+        );
+        assert!(parse_method_name(&StringOrNumber::Number(i64::from(i32::MAX) + 1)).is_err());
+        assert!(parse_method_name(&StringOrNumber::Unsigned(i32::MAX as u64 + 1)).is_err());
+        assert_eq!(
+            parse_method_name(&StringOrNumber::String("2147483648".to_owned())).unwrap(),
+            "2147483648"
+        );
+    }
 }

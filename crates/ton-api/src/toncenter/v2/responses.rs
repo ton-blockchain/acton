@@ -1,8 +1,7 @@
-use super::StringOrNumber;
-use anyhow::Context as _;
+use super::{StringOrNumber, TvmCell, TvmStackEntry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tvm_ffi::json_stack::{json_to_legacy_stack, json_to_stack};
+use tvm_ffi::json_stack::{json_to_legacy_stack, std_stack_into_tuple};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TonlibResponse<T> {
@@ -35,6 +34,7 @@ pub enum JsonRpcResult {
     Ok(Box<ResultOk>),
     ExternalMessage(Box<ExtMessageInfo>),
     RunGetMethod(Box<RunGetMethodResult>),
+    RunGetMethodStd(Box<RunGetMethodStdResult>),
     DetectAddress(Box<DetectAddress>),
     DetectHash(Box<DetectHash>),
     String(String),
@@ -401,13 +401,6 @@ pub struct ExtMessageInfo {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TvmCell {
-    #[serde(rename = "@type")]
-    pub type_field: String,
-    pub bytes: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConfigInfo {
     #[serde(rename = "@type")]
     pub type_field: String,
@@ -474,16 +467,24 @@ pub struct RunGetMethodResult {
     pub vm_log: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RunGetMethodStdResult {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub gas_used: i64,
+    pub stack: Vec<TvmStackEntry>,
+    pub exit_code: i32,
+}
+
 impl RunGetMethodResult {
     pub fn parse_stack_tuple(&self) -> anyhow::Result<tvm_ffi::stack::Tuple> {
-        match json_to_legacy_stack(self.stack.clone()) {
-            Ok(tuple) => Ok(tuple),
-            Err(legacy_err) => json_to_stack(self.stack.clone()).with_context(|| {
-                format!(
-                    "Failed to parse stack as legacy and std formats. Legacy error: {legacy_err}"
-                )
-            }),
-        }
+        json_to_legacy_stack(self.stack.clone())
+    }
+}
+
+impl RunGetMethodStdResult {
+    pub fn parse_stack_tuple(&self) -> anyhow::Result<tvm_ffi::stack::Tuple> {
+        std_stack_into_tuple(self.stack.clone())
     }
 }
 

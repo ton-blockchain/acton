@@ -310,6 +310,16 @@ impl LocalnetHandle {
         T: DeserializeOwned,
         P: Serialize + ?Sized,
     {
+        let (status, body) = self.post_json_raw_with_status(path, payload);
+        let url = format!("{}{}", self.base_url(), normalize_path(path));
+        let json = parse_json_body("POST", &url, &body);
+        (status, json)
+    }
+
+    pub(crate) fn post_json_raw_with_status<P>(&self, path: &str, payload: &P) -> (u16, String)
+    where
+        P: Serialize + ?Sized,
+    {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
             .with_auth(self.client.post(&url).json(payload))
@@ -319,8 +329,7 @@ impl LocalnetHandle {
         let body = response
             .text()
             .unwrap_or_else(|e| panic!("Failed to read POST {url} response body: {e}"));
-        let json = parse_json_body("POST", &url, &body);
-        (status, json)
+        (status, body)
     }
 
     pub(crate) fn post_json_error<P>(&self, path: &str, payload: &P) -> Value

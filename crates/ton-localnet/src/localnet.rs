@@ -19,7 +19,7 @@ use ton_executor::DEFAULT_CONFIG;
 use ton_executor::ExecutorVerbosity;
 use ton_executor::get::{GetExecutor, GetMethodResult, RunGetMethodArgs};
 use ton_executor::message::PrevBlockId;
-use tvm_ffi::json_stack::json_to_legacy_item;
+use tvm_ffi::json_stack::{TvmStackEntry, json_to_legacy_stack, std_stack_into_tuple};
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
@@ -1129,6 +1129,29 @@ impl Localnet {
         stack_json: Vec<Value>,
         seqno: Option<u32>,
     ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        let stack = json_to_legacy_stack(stack_json)?;
+        self.run_get_method_with_stack(address_str, method, stack, seqno)
+            .await
+    }
+
+    pub async fn run_get_method_std(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Vec<TvmStackEntry>,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
+        self.run_get_method_with_stack(address_str, method, std_stack_into_tuple(stack)?, seqno)
+            .await
+    }
+
+    async fn run_get_method_with_stack(
+        &self,
+        address_str: String,
+        method: String,
+        stack: Tuple,
+        seqno: Option<u32>,
+    ) -> anyhow::Result<LocalnetRunGetMethodResult> {
         let address = Addr::parse(&address_str)?;
         let method_id = if let Ok(id) = method.parse::<i32>() {
             id
@@ -1136,13 +1159,6 @@ impl Localnet {
             let crc = CRC16.checksum(method.as_bytes());
             (i32::from(crc) & 0xffff) | 0x10000
         };
-
-        let stack = Tuple(
-            stack_json
-                .into_iter()
-                .map(json_to_legacy_item)
-                .collect::<anyhow::Result<Vec<_>>>()?,
-        );
 
         self.run_get_method_by_id(address, method_id, stack, seqno)
             .await

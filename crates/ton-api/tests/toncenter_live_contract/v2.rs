@@ -1,6 +1,8 @@
 use super::support::{Live, TypedResponse, fixture, invalid_boc};
 use anyhow::{Context, Result};
 use ton_api::toncenter::v2;
+use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
 
 const ELECTOR_ADDRESS: &str = "-1:3333333333333333333333333333333333333333333333333333333333333333";
 
@@ -355,7 +357,36 @@ fn run_get_method_request_covers_latest_and_historical_state() -> Result<()> {
                 seqno: seqno.map(Into::into),
             },
         )?;
+
+        let _: v2::TonlibResponse<v2::RunGetMethodStdResult> = live.post(
+            &live.v2_url,
+            "/runGetMethodStd",
+            &v2::RunGetMethodStdRequest {
+                address: ELECTOR_ADDRESS.to_owned(),
+                method: v2::StringOrNumber::String("participant_list_extended".to_owned()),
+                stack: Vec::new(),
+                seqno: seqno.map(|value| value as i32),
+            },
+        )?;
     }
+
+    let boc = Boc::encode_base64(Cell::default());
+    let _: v2::TonlibResponse<v2::RunGetMethodStdResult> = live.post(
+        &live.v2_url,
+        "/runGetMethodStd",
+        &v2::RunGetMethodStdRequest {
+            address: ELECTOR_ADDRESS.to_owned(),
+            method: v2::StringOrNumber::Number(1),
+            stack: vec![
+                v2::TvmStackEntry::number(7),
+                v2::TvmStackEntry::cell(boc.clone()),
+                v2::TvmStackEntry::slice(boc),
+                v2::TvmStackEntry::tuple(Vec::new()),
+                v2::TvmStackEntry::list(Vec::new()),
+            ],
+            seqno: None,
+        },
+    )?;
     Ok(())
 }
 

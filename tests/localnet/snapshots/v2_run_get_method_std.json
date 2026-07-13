@@ -1,0 +1,17 @@
+{
+  "invalid_nested_marker_rejected": true,
+  "json_rpc_invalid_marker_rejected": true,
+  "legacy_stack_rejected": 422,
+  "negative_seqno_rejected": true,
+  "out_of_range_numeric_method_rejected": true,
+  "rest_exit_code": -13,
+  "rest_stack_len": 1,
+  "rest_status": 200,
+  "rest_type": "smc.runResult",
+  "rpc_exit_code": -13,
+  "rpc_stack_len": 1,
+  "rpc_type": "smc.runResult",
+  "std_shape_omits_legacy_context": true,
+  "unknown_field_rejected": true,
+  "unsupported_entry_rejected": true
+}
