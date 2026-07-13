@@ -1,19 +1,23 @@
 {
   "filters": {
-    "after_offset_count": 0,
-    "conflicting_filter_error": {
-      "code": 400,
-      "error": "Only one of `contract_address` or `wallet_address` should be specified"
-    },
-    "conflicting_filter_status": 400,
-    "missing_filter_error": {
-      "code": 400,
-      "error": "At least one of `contract_address` or `wallet_address` should be specified"
-    },
-    "missing_filter_status": 400,
-    "owner_match_count": 1,
+    "after_offset_count": 1,
+    "all_contract_addresses": [
+      "0:979bfe05b5e922ee43fbb563ec3c1e6e0e97ac9a9b4459b571c9f83545b68d65",
+      "0:6ab7940930d47266ef9a6da2dbfeadddf93700a068486656b2aeaf7510efe7ca"
+    ],
+    "combined_match_count": 1,
+    "combined_mismatch_count": 0,
+    "combined_whitelist_match_count": 1,
+    "expected_deployment_order": [
+      "0:979bfe05b5e922ee43fbb563ec3c1e6e0e97ac9a9b4459b571c9f83545b68d65",
+      "0:6ab7940930d47266ef9a6da2dbfeadddf93700a068486656b2aeaf7510efe7ca"
+    ],
+    "first_page_address": "0:979bfe05b5e922ee43fbb563ec3c1e6e0e97ac9a9b4459b571c9f83545b68d65",
+    "owner_match_count": 2,
     "repeated_contract_count": 1,
-    "sender_match_count": 1,
+    "second_page_address": "0:6ab7940930d47266ef9a6da2dbfeadddf93700a068486656b2aeaf7510efe7ca",
+    "sender_match_count": 2,
+    "unfiltered_order_is_stable": true,
     "whitelist_with_check_count": 1,
     "whitelist_without_check_count": 0
   },

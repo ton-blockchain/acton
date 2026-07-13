@@ -339,6 +339,7 @@ pub struct MultisigMeta {
 #[derive(Clone, Debug)]
 pub struct VestingMeta {
     pub address: Addr,
+    pub first_transaction_lt: Lt,
     pub start_time: i64,
     pub total_duration: i64,
     pub unlock_period: i64,

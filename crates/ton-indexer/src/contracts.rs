@@ -498,7 +498,7 @@ pub struct VestingData {
     pub total_amount: BigInt,
     pub sender_address: IntAddr,
     pub owner_address: IntAddr,
-    pub whitelist: Cell,
+    pub whitelist: Option<Cell>,
 }
 
 #[must_use]
@@ -511,7 +511,7 @@ pub fn get_vesting_data(
     run_get_method(address, code, data, libs, "get_vesting_data").ok()
 }
 
-pub fn parse_vesting_whitelist(cell: &Cell) -> anyhow::Result<Vec<IntAddr>> {
+pub fn parse_vesting_whitelist(cell: Option<&Cell>) -> anyhow::Result<Vec<IntAddr>> {
     #[derive(Clone, Eq, Ord, PartialEq, PartialOrd)]
     struct Bits264([u8; 33]);
 
@@ -525,7 +525,7 @@ pub fn parse_vesting_whitelist(cell: &Cell) -> anyhow::Result<Vec<IntAddr>> {
         }
     }
 
-    let dict = Dict::<Bits264, ()>::from_raw(Some(cell.clone()));
+    let dict = Dict::<Bits264, ()>::from_raw(cell.cloned());
     let mut result = Vec::new();
     for entry in dict.iter() {
         let (key, ()) = entry?;

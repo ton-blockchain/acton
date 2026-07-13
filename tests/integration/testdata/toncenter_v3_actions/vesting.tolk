@@ -18,22 +18,31 @@ fun main() {
     val deployer = scripts.wallet("deployer");
     val owner = address(OWNER);
     val whitelisted = address(WHITELISTED);
+    val vestingParameters = WalletVestingParameters {
+        vestingStartTime: 1700000000,
+        vestingTotalDuration: 31536000,
+        unlockPeriod: 2592000,
+        cliffDuration: 5184000,
+        vestingTotalAmount: ton("10"),
+        vestingSenderAddress: deployer.address,
+        ownerAddress: owner,
+    }.toCell();
     val vesting = WalletVesting.fromStorage({
         seqno: 0,
         subwalletId: 123,
         publicKey: 0,
         whitelist: [],
-        vesting: WalletVestingParameters {
-            vestingStartTime: 1700000000,
-            vestingTotalDuration: 31536000,
-            unlockPeriod: 2592000,
-            cliffDuration: 5184000,
-            vestingTotalAmount: ton("10"),
-            vestingSenderAddress: deployer.address,
-            ownerAddress: owner,
-        }.toCell(),
+        vesting: vestingParameters,
+    });
+    val vestingSecond = WalletVesting.fromStorage({
+        seqno: 0,
+        subwalletId: 124,
+        publicKey: 0,
+        whitelist: [],
+        vesting: vestingParameters,
     });
     waitForTransaction(vesting.deploy(deployer.address, { value: ton("11"), bounce: false }));
+    waitForTransaction(vestingSecond.deploy(deployer.address, { value: ton("11"), bounce: false }));
     waitForTransaction(vesting.sendWalletVestingAddWhitelist(
         deployer.address,
         400,
@@ -45,4 +54,5 @@ fun main() {
     println("SENDER={}", deployer.address);
     println("WHITELISTED={}", whitelisted);
     println("VESTING={}", vesting.address);
+    println("VESTING_SECOND={}", vestingSecond.address);
 }

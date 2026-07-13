@@ -5009,31 +5009,81 @@ fn localnet_v3_indexes_real_vesting_actions() {
     let sender = extract_canonical_addr_marker(&script_output, "SENDER=");
     let whitelisted = extract_canonical_addr_marker(&script_output, "WHITELISTED=");
     let vesting_address = extract_canonical_addr_marker(&script_output, "VESTING=");
+    let second_vesting_address = extract_canonical_addr_marker(&script_output, "VESTING_SECOND=");
 
     let deadline = Instant::now() + Duration::from_secs(12);
-    let contracts = loop {
+    let discovered_contracts = loop {
         let response: toncenter_v3::VestingContractsResponse =
-            serde_json::from_value(node.get_json(&format!(
-                "/api/v3/vesting?contract_address={}&check_whitelist=true",
-                encode_query_component(&vesting_address)
-            )))
-            .expect("vesting response must match typed contract");
-        if response
+            serde_json::from_value(node.get_json("/api/v3/vesting?check_whitelist=true"))
+                .expect("unfiltered vesting response must match typed contract");
+        let first_is_updated = response.vesting_contracts.iter().any(|contract| {
+            contract.address.as_deref() == Some(vesting_address.as_str())
+                && contract.whitelist.contains(&whitelisted)
+        });
+        let second_is_deployed = response
             .vesting_contracts
-            .first()
-            .is_some_and(|contract| contract.whitelist.contains(&whitelisted))
-            || Instant::now() >= deadline
-        {
+            .iter()
+            .any(|contract| contract.address.as_deref() == Some(second_vesting_address.as_str()));
+        if (first_is_updated && second_is_deployed) || Instant::now() >= deadline {
             break response;
         }
         thread::sleep(Duration::from_millis(200));
     };
+    let discovered_addresses = discovered_contracts
+        .vesting_contracts
+        .iter()
+        .map(|contract| contract.address.as_deref())
+        .collect::<Vec<_>>();
+    let expected_addresses = [
+        Some(vesting_address.as_str()),
+        Some(second_vesting_address.as_str()),
+    ];
+    if discovered_addresses != expected_addresses {
+        let second_account = node.get_json(&format!(
+            "/api/v3/accountStates?address={}",
+            encode_query_component(&second_vesting_address)
+        ));
+        let second_vesting = node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}",
+            encode_query_component(&second_vesting_address)
+        ));
+        let top_accounts = node.get_json("/api/v3/topAccountsByBalance?limit=100");
+        let second_vesting_data = node.post_json(
+            "/api/v3/runGetMethod",
+            &json!({
+                "address": second_vesting_address,
+                "method": "get_vesting_data",
+                "stack": [],
+            }),
+        );
+        panic!(
+            "both vesting contracts must be indexed in deployment order\n\
+             discovered: {discovered_addresses:#?}\n\
+             expected: {expected_addresses:#?}\n\
+             second account: {second_account:#}\n\
+             second vesting: {second_vesting:#}\n\
+             top accounts: {top_accounts:#}\n\
+             get_vesting_data: {second_vesting_data:#}"
+        );
+    }
+    let contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&check_whitelist=true",
+            encode_query_component(&vesting_address)
+        )))
+        .expect("vesting response must match typed contract");
     let by_owner: toncenter_v3::VestingContractsResponse =
         serde_json::from_value(node.get_json(&format!(
             "/api/v3/vesting?wallet_address={}",
             encode_query_component(&owner)
         )))
         .expect("vesting owner lookup must match typed contract");
+    let all_contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting"))
+            .expect("unfiltered vesting response must match typed contract");
+    let all_contracts_repeated: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting"))
+            .expect("repeated unfiltered vesting response must match typed contract");
     let by_whitelist_without_check: toncenter_v3::VestingContractsResponse =
         serde_json::from_value(node.get_json(&format!(
             "/api/v3/vesting?wallet_address={}",
@@ -5065,14 +5115,33 @@ fn localnet_v3_indexes_real_vesting_actions() {
             encode_query_component(&owner)
         )))
         .expect("vesting pagination must match typed contract");
-    let (missing_filter_status, missing_filter_error) =
-        node.get_json_with_status("/api/v3/vesting");
-    let (conflicting_filter_status, conflicting_filter_error) =
-        node.get_json_with_status(&format!(
+    let combined_match: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
             "/api/v3/vesting?contract_address={}&wallet_address={}",
             encode_query_component(&vesting_address),
             encode_query_component(&owner)
-        ));
+        )))
+        .expect("combined vesting filters must match typed contract");
+    let combined_mismatch: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("mismatched combined vesting filters must match typed contract");
+    let combined_whitelist_match: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}&check_whitelist=true",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("combined vesting whitelist filters must match typed contract");
+    let first_page: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting?limit=1"))
+            .expect("first vesting page must match typed contract");
+    let second_page: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json("/api/v3/vesting?limit=1&offset=1"))
+            .expect("second vesting page must match typed contract");
 
     let vesting = contracts
         .vesting_contracts
@@ -5095,16 +5164,20 @@ fn localnet_v3_indexes_real_vesting_actions() {
             "address_book_has_whitelisted": contracts.address_book.contains_key(&whitelisted),
         },
         "filters": {
+            "all_contract_addresses": all_contracts.vesting_contracts.iter().map(|contract| &contract.address).collect::<Vec<_>>(),
+            "unfiltered_order_is_stable": all_contracts.vesting_contracts.iter().map(|contract| &contract.address).eq(all_contracts_repeated.vesting_contracts.iter().map(|contract| &contract.address)),
             "owner_match_count": by_owner.vesting_contracts.len(),
             "sender_match_count": by_sender.vesting_contracts.len(),
             "whitelist_without_check_count": by_whitelist_without_check.vesting_contracts.len(),
             "whitelist_with_check_count": by_whitelist_with_check.vesting_contracts.len(),
             "repeated_contract_count": repeated_contracts.vesting_contracts.len(),
             "after_offset_count": after_offset.vesting_contracts.len(),
-            "missing_filter_status": missing_filter_status,
-            "missing_filter_error": missing_filter_error,
-            "conflicting_filter_status": conflicting_filter_status,
-            "conflicting_filter_error": conflicting_filter_error,
+            "combined_match_count": combined_match.vesting_contracts.len(),
+            "combined_mismatch_count": combined_mismatch.vesting_contracts.len(),
+            "combined_whitelist_match_count": combined_whitelist_match.vesting_contracts.len(),
+            "first_page_address": first_page.vesting_contracts.first().map(|contract| &contract.address),
+            "second_page_address": second_page.vesting_contracts.first().map(|contract| &contract.address),
+            "expected_deployment_order": [&vesting_address, &second_vesting_address],
         },
     });
     assertion().eq(

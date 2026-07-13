@@ -1276,16 +1276,6 @@ pub async fn get_vesting(
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<VestingQuery>(raw_query.as_deref()));
-    if payload.contract_address.is_empty() && payload.wallet_address.is_empty() {
-        return v3_bad_request(
-            "At least one of `contract_address` or `wallet_address` should be specified",
-        );
-    }
-    if !payload.contract_address.is_empty() && !payload.wallet_address.is_empty() {
-        return v3_bad_request(
-            "Only one of `contract_address` or `wallet_address` should be specified",
-        );
-    }
     parse!(validate_filter_len(
         "contract_address",
         payload.contract_address.len(),
@@ -1303,14 +1293,14 @@ pub async fn get_vesting(
     let data = match discover_contract_data(
         node.as_ref(),
         &contracts.iter().copied().collect::<Vec<_>>(),
-        !wallets.is_empty(),
+        contracts.is_empty(),
     )
     .await
     {
         Ok(data) => data,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let vesting = data
+    let mut vesting = data
         .into_iter()
         .filter_map(|data| data.vesting)
         .filter(|vesting| {
@@ -1324,6 +1314,10 @@ pub async fn get_vesting(
                             .iter()
                             .any(|address| wallets.contains(address))))
         })
+        .collect::<Vec<_>>();
+    vesting.sort_by_key(|vesting| (vesting.first_transaction_lt, vesting.address));
+    let vesting = vesting
+        .into_iter()
         .skip(offset)
         .take(limit)
         .collect::<Vec<_>>();
@@ -1552,7 +1546,7 @@ impl EventBounds {
             && self.end_lt.is_none_or(|end| lt <= end)
     }
 
-    fn has_time_bound(self) -> bool {
+    const fn has_time_bound(self) -> bool {
         self.start_utime.is_some() || self.end_utime.is_some()
     }
 }

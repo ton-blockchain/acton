@@ -148,7 +148,7 @@ fn action_result_code_from_tx_info(tx_info: Option<&TxInfo>) -> Option<i32> {
     info.action_phase.as_ref().map(|phase| phase.result_code)
 }
 
-fn transaction_aborted_from_tx_info(tx_info: Option<&TxInfo>) -> bool {
+const fn transaction_aborted_from_tx_info(tx_info: Option<&TxInfo>) -> bool {
     matches!(tx_info, Some(TxInfo::Ordinary(info)) if info.aborted)
 }
 

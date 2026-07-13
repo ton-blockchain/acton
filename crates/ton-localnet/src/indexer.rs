@@ -82,6 +82,12 @@ impl Node {
             libs,
             last_transaction_lt,
         } = state;
+        let first_transaction_lt = self
+            .indexes
+            .tx_by_account
+            .get(addr)
+            .and_then(|transactions| transactions.last_key_value())
+            .map_or(last_transaction_lt, |(key, _)| key.0.0);
         let address = addr.to_string();
 
         let nft_sale = ton_indexer::contracts::get_fixed_price_sale_v4_data(
@@ -302,10 +308,12 @@ impl Node {
         let vesting =
             ton_indexer::contracts::get_vesting_data(address, code, data, libs.as_deref())
                 .map(|vesting| {
-                    let whitelist =
-                        ton_indexer::contracts::parse_vesting_whitelist(&vesting.whitelist)?;
+                    let whitelist = ton_indexer::contracts::parse_vesting_whitelist(
+                        vesting.whitelist.as_ref(),
+                    )?;
                     Ok::<_, anyhow::Error>(storage::VestingMeta {
                         address: *addr,
+                        first_transaction_lt,
                         start_time: vesting.start_time.to_string().parse().unwrap_or_default(),
                         total_duration: vesting
                             .total_duration

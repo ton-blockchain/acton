@@ -43,10 +43,10 @@ open until their normative contract is chosen.
 
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
-| Critical | 10 | 5 | 9 |
+| Critical | 11 | 5 | 8 |
 | High | 10 | 5 | 22 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **20** | **11** | **34** |
+| **Total** | **21** | **11** | **33** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -78,6 +78,7 @@ open until their normative contract is chosen.
 | V3-06 pending transactions | Partial | Empty and trace-only requests now return upstream 422 because an account filter is required. Account-plus-trace behavior and trace identity remain open. |
 | V3-11 jetton wallet sorting | Partial | Explicit balance sorting and filter-dependent ordering follow upstream precedence. Local insertion order approximates database ID order; unclaimed mintless amounts remain unavailable. |
 | V3-13 event DTO/order | Partial | Jetton transfer filtering uses the transaction's explicit TL-B `aborted` flag and excludes aborted transfers while retaining aborted burns. All three event routes switch from LT to time ordering when a time bound is present. Trace IDs remain open. |
+| V3-14 vesting | Fixed | Empty and combined filters follow upstream AND semantics, including optional whitelist matching. Results are ordered before pagination by first local transaction LT and address. A two-contract stateful test covers empty and non-empty TVM dictionaries, repeated unfiltered reads, combined matches/misses, and page boundaries. |
 | V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
@@ -135,7 +136,7 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
 The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
-endpoint-test depth is 9 at grade A, 51 at B, 34 at C, 4 at D, and 7 with no endpoint test. The
+endpoint-test depth is 10 at grade A, 50 at B, 34 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -326,7 +327,7 @@ coverage is high.
 | `GET /api/v3/dns/records` | High | D | Real DNS contracts/categories, deterministic length/domain order, expired/deleted records. |
 | `GET /api/v3/multisig/orders` | High | B | ID versus LT ordering, malformed actions, expiry, threshold corners and multiple wallets. |
 | `GET /api/v3/multisig/wallets` | High | B | Stable pagination, multiple wallets/orders, include-orders behavior and malformed config. |
-| `GET /api/v3/vesting` | Critical | B | Empty/combined filters, deterministic pagination, multiple contracts and boundary unlock schedules. |
+| `GET /api/v3/vesting` | Critical | A | Two real contracts with empty/non-empty whitelists, empty/combined filters, stable ordering, and pagination boundaries; unlock-schedule arithmetic boundaries remain untested. |
 
 ### Confirmed V3 findings
 
@@ -367,8 +368,9 @@ coverage is high.
     them, matching upstream. Jetton transfer/burn and NFT transfer routes now order by transaction
     time whenever either time bound is supplied, and by LT otherwise. Their responses still omit
     `trace_id`.
-14. **V3-14, vesting:** local requires exactly one contract/wallet filter; upstream permits none or
-    both. Pagination traverses an unordered set instead of upstream ID order.
+14. **V3-14, vesting (fixed):** requests permit no filter or both filters with upstream AND and
+    optional whitelist semantics. Empty TVM dictionary values decode as an absent cell, and results
+    are deterministically ordered before pagination by first local transaction LT and address.
 15. **V3-15, NFT items:** default pagination follows map iteration and multi-collection validation
     is absent.
 16. **V3-16, DNS:** default result order is unstable; upstream orders by domain length and name.
@@ -516,8 +518,9 @@ coverage is high.
 
 1. Create at least two jetton wallets with different balances/LTs and multiple masters/owners;
    assert upstream validation and sort order.
-2. Create multiple vesting, DNS, NFT, jetton-master, collection, and multisig records; request every
-   page repeatedly and after unrelated map insertions to detect duplicates, gaps, and unstable order.
+2. Create multiple DNS, NFT, jetton-master, collection, and multisig records; request every page
+   repeatedly and after unrelated map insertions to detect duplicates, gaps, and unstable order.
+   Two real vesting contracts, including an empty whitelist, are covered.
 3. Cover rare NFT sale implementations: completed/destroyed fixed-price sales, auctions, telemint,
    and items whose owner/collection changes after their indexed events.
 4. Publish one multi-transaction commit and assert exactly one logical streaming notification;
