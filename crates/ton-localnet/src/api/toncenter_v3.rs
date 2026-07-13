@@ -17,7 +17,7 @@ use crate::storage::{
     JettonWalletMeta, MessageInfo, MsgMeta, MultisigMeta, MultisigOrderMeta, NftCollectionMeta,
     NftItemMeta, NftSaleMeta, TraceNode, TransactionInfo, VestingMeta,
 };
-use crate::types::{Addr, BocBytes, Hash256};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use crate::v3_events::{JettonBurnEvent, JettonTransferEvent, NftTransferEvent};
 use num_bigint::BigInt;
 use serde_json::value::Value;
@@ -1051,12 +1051,7 @@ pub(crate) fn map_v3_message(
         source: msg.source.as_ref().map(ToString::to_string),
         destination: msg.destination.as_ref().map(ToString::to_string),
         value: is_internal.then(|| msg.value.to_string()),
-        value_extra_currencies: is_internal.then(|| {
-            msg.extra_currencies
-                .iter()
-                .map(|currency| (currency.id.to_string(), currency.amount.to_string()))
-                .collect()
-        }),
+        value_extra_currencies: is_internal.then(|| map_extra_currencies(&msg.extra_currencies)),
         fwd_fee: is_internal.then(|| msg.fwd_fee.to_string()),
         ihr_fee: is_internal.then(|| msg.ihr_fee.to_string()),
         import_fee: is_external_in.then(|| "0".to_owned()),
@@ -1088,6 +1083,13 @@ pub(crate) fn map_v3_message(
 fn hash_boc_base64(boc: &BocBytes) -> Option<String> {
     let cell = Boc::decode(boc).ok()?;
     Some(Hash256::from(cell.repr_hash()).to_base64())
+}
+
+fn map_extra_currencies(currencies: &[ExtraCurrency]) -> HashMap<String, String> {
+    currencies
+        .iter()
+        .map(|currency| (currency.id.to_string(), currency.amount.to_string()))
+        .collect()
 }
 
 pub(crate) fn map_jetton_wallet(w: &JettonWalletMeta) -> response::JettonWallet {
@@ -1221,7 +1223,7 @@ fn map_account_state_full(
             .then(|| state.data.as_ref().map(BocBytes::to_base64))
             .flatten(),
         data_hash: state.data_hash.as_ref().map(Hash256::to_base64),
-        extra_currencies: HashMap::new(),
+        extra_currencies: map_extra_currencies(&state.extra_currencies),
         frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
         interfaces: Some(
             context

@@ -1,5 +1,5 @@
 use crate::storage::{AccountMeta, AccountStatus, CellStore};
-use crate::types::{Addr, BocBytes, Hash256};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use acton_config::config;
 use anyhow::Context;
 use serde::{Deserialize, Serialize};
@@ -82,6 +82,7 @@ pub(crate) fn account_meta_from_shard_account(
             account_hash,
             status: AccountStatus::Nonexist,
             balance: 0,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(shard_account.last_trans_lt),
             last_trans_hash: Some(Hash256::from(&shard_account.last_trans_hash)),
             code_hash: None,
@@ -91,6 +92,7 @@ pub(crate) fn account_meta_from_shard_account(
     };
 
     let balance = account.balance.tokens.into();
+    let extra_currencies = ExtraCurrency::from_collection(&account.balance.other)?;
     let mut code_hash = None;
     let mut data_hash = None;
     let mut frozen_hash = None;
@@ -111,6 +113,7 @@ pub(crate) fn account_meta_from_shard_account(
         account_hash,
         status,
         balance,
+        extra_currencies,
         last_trans_lt: Some(shard_account.last_trans_lt),
         last_trans_hash: Some(Hash256::from(&shard_account.last_trans_hash)),
         code_hash,

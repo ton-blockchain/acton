@@ -149,11 +149,16 @@ pub struct WalletInformation {
     pub type_field: String,
     pub wallet: bool,
     pub balance: String,
-    pub extra_currencies: Vec<ExtraCurrencyBalance>,
     pub account_state: String,
     pub last_transaction_id: InternalTransactionId,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wallet_type: Option<String>,
-    pub seqno: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seqno: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet_id: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_signature_allowed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -173,13 +178,109 @@ pub struct ExtendedAddressInformation {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "@type")]
 pub enum AccountStateKind {
-    #[serde(rename = "uninited.accountState")]
-    Uninited { frozen_hash: String },
     #[serde(rename = "raw.accountState")]
     Raw {
         code: String,
         data: String,
         frozen_hash: String,
+    },
+    #[serde(rename = "wallet.v3.accountState")]
+    WalletV3 { wallet_id: i64, seqno: i32 },
+    #[serde(rename = "wallet.v4.accountState")]
+    WalletV4 { wallet_id: i64, seqno: i32 },
+    #[serde(rename = "wallet.highload.v1.accountState")]
+    WalletHighloadV1 { wallet_id: i64, seqno: i32 },
+    #[serde(rename = "wallet.highload.v2.accountState")]
+    WalletHighloadV2 { wallet_id: i64 },
+    #[serde(rename = "dns.accountState")]
+    Dns { wallet_id: i64 },
+    #[serde(rename = "rwallet.accountState")]
+    RWallet {
+        wallet_id: i64,
+        seqno: i32,
+        unlocked_balance: i64,
+        config: RWalletConfig,
+    },
+    #[serde(rename = "pchan.accountState")]
+    PChan {
+        config: PChanConfig,
+        state: PChanState,
+        description: String,
+    },
+    #[serde(rename = "uninited.accountState")]
+    Uninited { frozen_hash: String },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RWalletLimit {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub seconds: i32,
+    pub value: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RWalletConfig {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub start_at: i64,
+    pub limits: Vec<RWalletLimit>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PChanConfig {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub alice_public_key: String,
+    pub alice_address: AccountAddress,
+    pub bob_public_key: String,
+    pub bob_address: AccountAddress,
+    pub init_timeout: i32,
+    pub close_timeout: i32,
+    pub channel_id: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "@type")]
+pub enum PChanState {
+    #[serde(rename = "pchan.stateInit")]
+    Init {
+        #[serde(rename = "signed_A")]
+        signed_a: bool,
+        #[serde(rename = "signed_B")]
+        signed_b: bool,
+        #[serde(rename = "min_A")]
+        min_a: i64,
+        #[serde(rename = "min_B")]
+        min_b: i64,
+        expire_at: i64,
+        #[serde(rename = "A")]
+        a: i64,
+        #[serde(rename = "B")]
+        b: i64,
+    },
+    #[serde(rename = "pchan.stateClose")]
+    Close {
+        #[serde(rename = "signed_A")]
+        signed_a: bool,
+        #[serde(rename = "signed_B")]
+        signed_b: bool,
+        #[serde(rename = "min_A")]
+        min_a: i64,
+        #[serde(rename = "min_B")]
+        min_b: i64,
+        expire_at: i64,
+        #[serde(rename = "A")]
+        a: i64,
+        #[serde(rename = "B")]
+        b: i64,
+    },
+    #[serde(rename = "pchan.statePayout")]
+    Payout {
+        #[serde(rename = "A")]
+        a: i64,
+        #[serde(rename = "B")]
+        b: i64,
     },
 }
 
@@ -668,6 +769,150 @@ mod tests {
                 serde_json::from_value(fixture.clone()).expect("message data must deserialize");
             assert_eq!(
                 serde_json::to_value(parsed).expect("message data must serialize"),
+                fixture
+            );
+        }
+    }
+
+    #[test]
+    fn wallet_information_deserializes_upstream_optional_fields() {
+        let fixtures = [
+            serde_json::json!({
+                "@type": "ext.accounts.walletInformation",
+                "wallet": false,
+                "balance": "0",
+                "account_state": "uninitialized",
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": "0",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                }
+            }),
+            serde_json::json!({
+                "@type": "ext.accounts.walletInformation",
+                "wallet": true,
+                "balance": "1000000000",
+                "account_state": "active",
+                "last_transaction_id": {
+                    "@type": "internal.transactionId",
+                    "lt": "7",
+                    "hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+                },
+                "wallet_type": "wallet v5 r1",
+                "seqno": -2147483648_i64,
+                "wallet_id": -3,
+                "is_signature_allowed": false
+            }),
+        ];
+
+        for fixture in fixtures {
+            let parsed: WalletInformation = serde_json::from_value(fixture.clone())
+                .expect("wallet information must deserialize");
+            assert_eq!(
+                serde_json::to_value(parsed).expect("wallet information must serialize"),
+                fixture
+            );
+        }
+    }
+
+    #[test]
+    fn account_state_kind_round_trips_all_openapi_variants() {
+        let account = serde_json::json!({
+            "@type": "accountAddress",
+            "account_address": "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
+        });
+        let config = serde_json::json!({
+            "@type": "pchan.config",
+            "alice_public_key": "alice",
+            "alice_address": account,
+            "bob_public_key": "bob",
+            "bob_address": account,
+            "init_timeout": 10,
+            "close_timeout": 20,
+            "channel_id": 30
+        });
+        let fixtures = [
+            serde_json::json!({
+                "@type": "raw.accountState",
+                "code": "",
+                "data": "",
+                "frozen_hash": ""
+            }),
+            serde_json::json!({
+                "@type": "wallet.v3.accountState",
+                "wallet_id": 1,
+                "seqno": -1
+            }),
+            serde_json::json!({
+                "@type": "wallet.v4.accountState",
+                "wallet_id": 2,
+                "seqno": 3
+            }),
+            serde_json::json!({
+                "@type": "wallet.highload.v1.accountState",
+                "wallet_id": 4,
+                "seqno": 5
+            }),
+            serde_json::json!({
+                "@type": "wallet.highload.v2.accountState",
+                "wallet_id": 6
+            }),
+            serde_json::json!({"@type": "dns.accountState", "wallet_id": 7}),
+            serde_json::json!({
+                "@type": "rwallet.accountState",
+                "wallet_id": 8,
+                "seqno": 9,
+                "unlocked_balance": 10,
+                "config": {
+                    "@type": "rwallet.config",
+                    "start_at": 11,
+                    "limits": [{"@type": "rwallet.limit", "seconds": 12, "value": 13}]
+                }
+            }),
+            serde_json::json!({
+                "@type": "pchan.accountState",
+                "config": config,
+                "state": {
+                    "@type": "pchan.stateInit",
+                    "signed_A": true,
+                    "signed_B": false,
+                    "min_A": 1,
+                    "min_B": 2,
+                    "expire_at": 3,
+                    "A": 4,
+                    "B": 5
+                },
+                "description": "init"
+            }),
+            serde_json::json!({
+                "@type": "pchan.accountState",
+                "config": config,
+                "state": {
+                    "@type": "pchan.stateClose",
+                    "signed_A": false,
+                    "signed_B": true,
+                    "min_A": 6,
+                    "min_B": 7,
+                    "expire_at": 8,
+                    "A": 9,
+                    "B": 10
+                },
+                "description": "close"
+            }),
+            serde_json::json!({
+                "@type": "pchan.accountState",
+                "config": config,
+                "state": {"@type": "pchan.statePayout", "A": 11, "B": 12},
+                "description": "payout"
+            }),
+            serde_json::json!({"@type": "uninited.accountState", "frozen_hash": ""}),
+        ];
+
+        for fixture in fixtures {
+            let parsed: AccountStateKind =
+                serde_json::from_value(fixture.clone()).expect("account state must deserialize");
+            assert_eq!(
+                serde_json::to_value(parsed).expect("account state must serialize"),
                 fixture
             );
         }

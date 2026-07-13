@@ -7,9 +7,32 @@ use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use tycho_types::boc::Boc;
 use tycho_types::models::{
-    Base64StdAddrFlags, DisplayBase64StdAddr, IntAddr, StdAddr, StdAddrFormat,
+    Base64StdAddrFlags, DisplayBase64StdAddr, ExtraCurrencyCollection, IntAddr, StdAddr,
+    StdAddrFormat,
 };
+use tycho_types::num::VarUint248;
 use tycho_types::prelude::HashBytes;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExtraCurrency {
+    pub id: u32,
+    pub amount: VarUint248,
+}
+
+impl ExtraCurrency {
+    pub fn from_collection(
+        collection: &ExtraCurrencyCollection,
+    ) -> Result<Vec<Self>, tycho_types::error::Error> {
+        collection
+            .as_dict()
+            .iter()
+            .map(|entry| {
+                let (id, amount) = entry?;
+                Ok(Self { id, amount })
+            })
+            .collect()
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug, PartialOrd, Ord, Default)]
 pub struct BocBytes(pub Vec<u8>);
@@ -230,13 +253,31 @@ impl Addr {
 
     #[must_use]
     pub fn as_user_friendly(self) -> String {
+        self.format_user_friendly(Base64StdAddrFlags {
+            testnet: false,
+            base64_url: true,
+            bounceable: true,
+        })
+    }
+
+    pub fn as_user_friendly_with_flags_from(self, source: &str) -> anyhow::Result<String> {
+        let (_, mut flags) = StdAddr::from_str_ext(source, StdAddrFormat::any()).map_err(|_| {
+            LocalnetError::invalid_request(
+                "Invalid address, only standard internal address is allowed",
+            )
+        })?;
+        if source.contains(':') {
+            flags.testnet = false;
+            flags.bounceable = true;
+        }
+        flags.base64_url = true;
+        Ok(self.format_user_friendly(flags))
+    }
+
+    fn format_user_friendly(self, flags: Base64StdAddrFlags) -> String {
         DisplayBase64StdAddr {
             addr: &StdAddr::from(self),
-            flags: Base64StdAddrFlags {
-                testnet: false,
-                base64_url: true,
-                bounceable: false,
-            },
+            flags,
         }
         .to_string()
     }
@@ -462,7 +503,7 @@ mod tests {
     }
 
     #[test]
-    fn addr_formats_as_non_bounceable_mainnet_address() {
+    fn addr_formats_as_bounceable_mainnet_address() {
         let address = Addr {
             workchain: 0,
             addr: [0; 32],
@@ -470,7 +511,29 @@ mod tests {
 
         assert_eq!(
             address.as_user_friendly(),
-            "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ"
+            "EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c"
+        );
+    }
+
+    #[test]
+    fn addr_preserves_friendly_address_flags() {
+        let address = Addr {
+            workchain: 0,
+            addr: [0; 32],
+        };
+        let non_bounceable = "UQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAJKZ";
+
+        assert_eq!(
+            address
+                .as_user_friendly_with_flags_from(non_bounceable)
+                .expect("friendly flags must parse"),
+            non_bounceable
+        );
+        assert_eq!(
+            address
+                .as_user_friendly_with_flags_from(&address.to_string())
+                .expect("raw address must parse"),
+            address.as_user_friendly()
         );
     }
 }

@@ -6,9 +6,10 @@ use crate::support::localnet::{
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use crate::support::toncenter::{
-    DEPLOYER_WALLET_CONFIG, append_localnet_with_base_url as append_localnet_network,
-    build_internal_message_boc, extract_canonical_addr_marker, jetton_v1_action_project,
-    nft_v1_action_project, run_localnet_action_project, test_std_addr, with_nft_v1_action_fixtures,
+    DEPLOYER_WALLET_CONFIG, TON_CONNECT_WALLETS_CONFIG,
+    append_localnet_with_base_url as append_localnet_network, build_internal_message_boc,
+    extract_canonical_addr_marker, jetton_v1_action_project, nft_v1_action_project,
+    run_localnet_action_project, test_std_addr, with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -153,21 +154,6 @@ fun main() {
 "#;
 
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
-const TON_CONNECT_WALLETS_CONFIG: &str = r#"[wallets.wallet_v3]
-kind = "v3r2"
-workchain = 0
-keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
-
-[wallets.wallet_v4]
-kind = "v4r2"
-workchain = 0
-keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
-
-[wallets.wallet_v5]
-kind = "v5r1"
-workchain = 0
-keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
-"#;
 const CATALOG_WALLET_V4R2_CODE_HASH: &str =
     "feb5ff6820e2ff0d9483e7e0d62c817d846789fb4ae580c878866d959dabd5c0";
 

@@ -49,10 +49,13 @@ still defects because they violate schemas even under those limitations.
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
 | V2-10/11 transaction history | Fixed | Account history excludes `to_lt`, requires an exact nonzero cursor, and accepts hex, standard base64, padded base64url, and unpadded base64url hashes. Real REST/JSON-RPC history and invalid cursors are snapshot-covered. |
 | V2-12 transaction DTO | Partial | Decoded endpoints recognize text comments across snake references and expose legacy decode fields, while Std/block-ext endpoints remain raw. V2 and V3 preserve uint32 currency IDs and full VarUint248 amounts. Encrypted/decrypted message classification remains open. |
+| V2-13 extended account state | Partial | Code-less uninit/frozen/active accounts and V3/V4 states, revision, raw/friendly address flags, historical `sync_utime`, and full-width extra currencies are typed and snapshot-covered. Recognized malformed wallet data is an error instead of a raw success. Highload, DNS, RWallet, and PChan state decoders remain open. |
+| V2-14 wallet DTO | Fixed | V1-V5 and the upstream V5-beta hash are detected from the decoded code BOC and read with the same storage prefixes as C++, with signed seqno, wallet ID, signature flag, and exact optional-field omission. Real V2-V5 startup wallets plus prefix-only/malformed data, stale hash, highload-negative, and no-state cases are covered; V1 shares the tested V1/V2 parser path. |
 | V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
 | V2-16 block headers | Fixed | The response is populated from the serialized block's `BlockInfo`, including the real global ID, key-block fields, and previous block IDs. Basechain/masterchain headers and single/both hash selectors are snapshot-covered. |
 | V2-17 block transactions | Fixed | Zero and unknown cursors start at the first transaction, exact cursors are exclusive, short transaction mode is 135, single block hashes are lookup hints, and validation is typed 422. Generated localnet masterchain blocks have no account blocks, so their empty result is faithful to the source block. |
 | V2-18 block lookup | Fixed | REST and JSON-RPC require exactly one signed-range selector; seqno, LT, time, zero values, missing selectors, and combined selectors are snapshot-covered. |
+| V2-21 historical account fields | Partial | Account responses use the selected block's generation time, including historical reads. The unsupported `suspended` account flag remains open. |
 | V2-22 numeric ranges | Partial | Get-method IDs, seqnos, account transaction fields, block transaction fields, lookup selectors, locate created LT, and shard seqnos now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 | V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
@@ -169,13 +172,13 @@ coverage is high.
 | `GET /api/v2/detectHash` | Medium | B | Padding, wrong length, hex/base64/base64url equivalence, and 422 versus 500. |
 | `GET /api/v2/packAddress` | Low | C | Testnet/non-bounceable flags and checksum failures. |
 | `GET /api/v2/unpackAddress` | Low | C | Invalid encodings and flags. |
-| `GET /api/v2/getAddressInformation` | High | B | Historical `seqno`/`sync_utime`, zero seqno, frozen state, extra currencies, suspended accounts. |
+| `GET /api/v2/getAddressInformation` | High | B | Historical `sync_utime` and full-width extra currencies are covered; suspended accounts and fork-history parity remain open. |
 | `GET /api/v2/getShardAccountCell` | Medium | A | Exact historical/fork BOC and seqno zero; this C++ checkout has no matching handler, so use a live oracle. |
 | `GET /api/v2/getAddressBalance` | Medium | B | Historical and zero seqno and not-found/error transport. |
 | `GET /api/v2/getAddressState` | High | C | Nonexistent REST/RPC mismatch, frozen/uninit states, historical and zero seqno. |
 | `GET /api/v2/getLibraries` | Low | A | Duplicate/order/large input behavior and a partially invalid list. |
-| `GET /api/v2/getExtendedAddressInformation` | High | C | Uninit/frozen, specialized wallet/DNS/RWallet/PChan states, revision, history, extra currencies. |
-| `GET /api/v2/getWalletInformation` | High | C | V3/V4 wallet ID, V5 signature flag, all revisions, malformed data, getter failure, historical state. |
+| `GET /api/v2/getExtendedAddressInformation` | Critical | B | Code-less states, V3/V4 revision, malformed recognized data, raw/friendly address flags, history, and extra currencies are covered; Highload/DNS/RWallet/PChan states remain raw. |
+| `GET /api/v2/getWalletInformation` | Critical | B | Typed real V2-V5 wallets, decoded-code classification, prefix-only/malformed data, stale-hash and highload/non-wallet negatives, exact optional fields, signed seqno, and V5 beta are covered; V1 shares the V1/V2 parser path, while fork-history differential coverage remains open. |
 | `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
 | `GET /api/v2/getTransactions` | High | A | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
 | `GET /api/v2/getTransactionsStd` | High | A | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality, raw message BOCs, and extra currencies. |
@@ -224,11 +227,13 @@ coverage is high.
     recognize text comments across snake references and expose the upstream legacy `message` and
     decode-error fields. Std/block-ext responses remain raw, and V2/V3 preserve uint32 currency IDs
     plus full VarUint248 amounts. Encrypted/decrypted message classification remains open.
-13. **V2-13, extended account state:** the absence of specialized wallet/DNS/RWallet/PChan states
-    is confirmed. The exact uninitialized/frozen variant mismatch remains high-confidence pending a
-    differential fixture.
-14. **V2-14, wallet DTO:** `wallet_id` and V5 `is_signature_allowed` are absent; getter errors are
-    swallowed into `seqno: null`.
+13. **V2-13, extended account state (partially fixed):** code-less states and standard V3/V4
+    states, revisions, raw/friendly address flags, historical time, and extra currencies now match
+    upstream. Recognized malformed wallet data fails instead of becoming a raw success.
+    Highload/DNS/RWallet/PChan states still fall back to raw.
+14. **V2-14, wallet DTO (fixed):** the handler classifies the decoded code BOC and reads the same
+    storage prefixes as C++ instead of calling a getter or trusting cached hashes. It emits the
+    upstream optional wallet ID/signature fields, signed seqno, and exact V5-beta hash.
 15. **V2-15, token DTOs (partially fixed):** mintless claim state and typed DNS NFT data are
     exposed, and NFT collection data is detected from the collection itself. NFT items with a
     collection still lack upstream parent-address verification and collection-derived content.
@@ -243,8 +248,8 @@ coverage is high.
     zero size/limit instead of per-shard data.
 20. **V2-20, consensus timestamp:** local returns the latest masterchain block generation time;
     C++ returns current server time.
-21. **V2-21, historical account fields:** `sync_utime` remains current node time and `suspended` is
-    always false.
+21. **V2-21, historical account fields (partially fixed):** `sync_utime` comes from the selected
+    block; `suspended` is still always false.
 22. **V2-22, numeric ranges (partially fixed):** get-method IDs, seqnos, account/block transaction
     fields, lookup selectors, locate created LT, and shard seqnos use upstream signed ranges. Other
     local unsigned request fields can still accept values that cannot be represented by upstream
@@ -463,8 +468,8 @@ coverage is high.
    nesting depths 99 and 100, and compare both request acceptance and response shape.
 2. Exercise raw V2 JSON-RPC with omitted/null envelope fields, empty array/object params,
    `getShards`, and failures that must match the corresponding REST status and envelope.
-3. Complete historical account coverage for `sync_utime` and suspended-state semantics, and add
-   real mintless and DNS contracts plus parent-verified NFT content to the token fixtures.
+3. Add suspended-state semantics and specialized Highload/DNS/RWallet/PChan extended-account
+   fixtures, plus parent-verified NFT content to the token fixtures.
 4. Extend the V2 transaction fixture with encrypted/decrypted bodies and malformed decode cases;
    text/raw bodies, legacy fields, full-width extra currencies, cursors, hash encodings, and LT
    boundaries are covered.

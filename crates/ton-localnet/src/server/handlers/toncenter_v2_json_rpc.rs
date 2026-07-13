@@ -3,7 +3,7 @@ use super::toncenter_v2::{
     parse_i32_seqno, parse_libraries_request, parse_lookup_block_request, parse_required_seqno,
     parse_seqno, parse_transactions_request, parse_transactions_std_request,
     parse_try_locate_tx_request, resolve_block_header, resolve_block_transactions,
-    resolve_token_data, resolve_wallet_information,
+    resolve_extended_address_information, resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -193,11 +193,8 @@ async fn json_rpc_router(
         }
         "getExtendedAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::ExtendedAddressInformation(Box::new(
-                node.get_address_information(req.address, seqno)
-                    .await
-                    .map(|r| v2::map_extended_account_state(&r))?,
+                resolve_extended_address_information(node.as_ref(), &req).await?,
             ))
         }
         "getWalletInformation" => {

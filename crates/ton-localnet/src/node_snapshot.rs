@@ -276,6 +276,7 @@ impl Node {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
                 balance: GIVER_BALANCE,
+                extra_currencies: Vec::new(),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,

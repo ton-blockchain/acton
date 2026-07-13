@@ -2,6 +2,7 @@ use crate::common::assertion;
 use crate::support::localnet::pretty_json_for_snapshot;
 use crate::support::toncenter::{
     find_v2_internal_message, jetton_v1_action_project, run_localnet_action_project,
+    same_std_address,
 };
 use serde_json::json;
 use ton_api::toncenter::v2::{StringOrNumber, requests, responses};
@@ -126,7 +127,7 @@ fn transaction_lookup_matches_upstream_contract() {
         "source_lookup": {
             "rest_and_rpc_match": source_rest.result.transaction_id.hash
                 == source_rpc.response.result.transaction_id.hash,
-            "belongs_to_source": source_rest.result.account == *source,
+            "belongs_to_source": same_std_address(&source_rest.result.account, source),
             "contains_located_message": source_contains_message,
         },
         "errors": errors,

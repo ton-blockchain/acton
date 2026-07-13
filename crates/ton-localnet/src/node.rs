@@ -24,7 +24,7 @@ use crate::storage::{
     PendingCommit, ReverseLtKey, TraceNode, TransactionInfo, TxMeta,
 };
 use crate::streaming::StreamingCommitEvent;
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use crate::virtual_clock::VirtualClock;
 use anyhow::Context;
 use core::cmp;
@@ -228,6 +228,7 @@ impl Node {
                 account_hash: Hash256([0; 32]),
                 status: AccountStatus::Active,
                 balance: GIVER_BALANCE,
+                extra_currencies: Vec::new(),
                 last_trans_lt: None,
                 last_trans_hash: None,
                 code_hash: None,
@@ -698,6 +699,7 @@ impl Node {
 
         let mut balance = 0;
         let mut status = AccountStatus::Nonexist;
+        let mut extra_currencies = Vec::new();
         let mut code_hash = None;
         let mut data_hash = None;
         let mut frozen_hash = None;
@@ -722,6 +724,7 @@ impl Node {
             .0
         {
             balance = acc.balance.tokens.into();
+            extra_currencies = ExtraCurrency::from_collection(&acc.balance.other)?;
             status = match acc.state {
                 AccountState::Uninit => AccountStatus::Uninit,
                 AccountState::Active(state) => {
@@ -784,6 +787,7 @@ impl Node {
             account_hash: new_account_hash,
             status,
             balance,
+            extra_currencies,
             last_trans_lt: Some(lt),
             last_trans_hash: Some(tx_hash),
             code_hash,
@@ -3464,6 +3468,7 @@ mod tests {
             account_hash: Hash256([0x41; 32]),
             status: AccountStatus::Active,
             balance: 7,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(10),
             last_trans_hash: Some(Hash256([0x42; 32])),
             code_hash: None,
@@ -3589,6 +3594,7 @@ mod tests {
             account_hash,
             status,
             balance: cached_balance,
+            extra_currencies: Vec::new(),
             last_trans_lt: Some(0),
             last_trans_hash: None,
             code_hash: None,
@@ -4532,6 +4538,7 @@ mod tests {
                 account_hash,
                 status: AccountStatus::Active,
                 balance: 1,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(23),
                 last_trans_hash: None,
                 code_hash: None,
@@ -4859,6 +4866,7 @@ mod tests {
                 account_hash,
                 status: AccountStatus::Active,
                 balance: 974_433,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(42),
                 last_trans_hash: None,
                 code_hash: Some(code_hash),
@@ -5215,6 +5223,7 @@ mod tests {
                 account_hash: high_account_hash,
                 status: AccountStatus::Active,
                 balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(100),
                 last_trans_hash: None,
                 code_hash: None,
@@ -5228,6 +5237,7 @@ mod tests {
                 account_hash: low_account_hash,
                 status: AccountStatus::Active,
                 balance: 0,
+                extra_currencies: Vec::new(),
                 last_trans_lt: Some(5),
                 last_trans_hash: None,
                 code_hash: None,

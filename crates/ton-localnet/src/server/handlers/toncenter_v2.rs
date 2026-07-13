@@ -1,5 +1,6 @@
 use super::utils::{ToncenterHttpError, get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
+use crate::api::toncenter_wallet::read_v2_wallet_state;
 use crate::localnet::{
     Localnet, LocalnetBlockHeader, LocalnetBlockTransactions, TransactionLookupKind,
 };
@@ -112,12 +113,22 @@ pub async fn get_extended_address_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
-    let seqno = parse!(parse_seqno(payload.seqno));
     handle_result(
-        node.get_address_information(payload.address, seqno),
-        v2::map_extended_account_state,
+        resolve_extended_address_information(&node, &payload),
+        Clone::clone,
     )
     .await
+}
+
+pub(super) async fn resolve_extended_address_information(
+    node: &Localnet,
+    payload: &AddressInformationRequest,
+) -> anyhow::Result<ton_api::toncenter::v2::responses::ExtendedAddressInformation> {
+    let seqno = parse_seqno(payload.seqno.clone())?;
+    let info = node
+        .get_address_information(payload.address.clone(), seqno)
+        .await?;
+    v2::map_extended_account_state(&info, &payload.address)
 }
 
 pub async fn get_wallet_information(
@@ -135,21 +146,9 @@ pub(super) async fn resolve_wallet_information(
     let info = node
         .get_address_information(payload.address.clone(), request_seqno)
         .await?;
-    let wallet_seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
-        node.run_get_method(
-            payload.address.clone(),
-            "seqno".to_owned(),
-            Vec::new(),
-            request_seqno,
-        )
-        .await
-        .ok()
-        .and_then(|result| v2::map_wallet_seqno(&result))
-    } else {
-        None
-    };
+    let wallet = read_v2_wallet_state(&info).ok().flatten();
 
-    Ok(v2::map_wallet_information(&info, wallet_seqno))
+    Ok(v2::map_wallet_information(&info, wallet.as_ref()))
 }
 
 pub async fn get_token_data(

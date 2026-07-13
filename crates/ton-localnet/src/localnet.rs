@@ -5,7 +5,7 @@ use crate::node_snapshot::{NodeStateSnapshot, read_snapshot_from_path, write_sna
 use crate::storage;
 use crate::storage::{AccountStatus, BlockMeta, MasterchainBlockMeta, MsgMeta, TransactionInfo};
 use crate::streaming::StreamingCommitEvent;
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use anyhow::Context;
 use crc::{CRC_16_XMODEM, Crc};
 use serde::{Deserialize, Serialize};
@@ -25,7 +25,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
-use tycho_types::num::{Tokens, VarUint248};
+use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -92,6 +92,7 @@ pub struct LocalnetAccountState {
     pub address: Addr,
     pub account_state_hash: Hash256,
     pub balance: u128,
+    pub extra_currencies: Vec<ExtraCurrency>,
     pub code: Option<BocBytes>,
     pub code_hash: Option<Hash256>,
     pub data: Option<BocBytes>,
@@ -170,6 +171,7 @@ impl LocalnetAccountState {
             address,
             account_state_hash: Hash256([0; 32]),
             balance: 0,
+            extra_currencies: Vec::new(),
             code: None,
             code_hash: None,
             data: None,
@@ -243,12 +245,6 @@ pub struct LocalnetContractData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct LocalnetExtraCurrency {
-    pub id: u32,
-    pub amount: VarUint248,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
     #[serde(default)]
@@ -266,7 +262,7 @@ pub struct LocalnetMessage {
     pub ihr_fee: u128,
     pub created_lt: u64,
     #[serde(default)]
-    pub extra_currencies: Vec<LocalnetExtraCurrency>,
+    pub extra_currencies: Vec<ExtraCurrency>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -2396,8 +2392,14 @@ fn handle_get_address_info(
 ) -> anyhow::Result<LocalnetAccountState> {
     let seqno = account_query_seqno(node, seqno);
     let meta = node.get_address_information_at_block(&address, seqno);
-    let block_id = block_id_for_query_seqno(node, seqno)?;
-    let sync_utime = u64::from(node.now_unix()?);
+    let (block_id, sync_utime) = if seqno == 0 {
+        (LocalnetBlockId::first(), u64::from(node.now_unix()?))
+    } else {
+        let block = node
+            .get_block_header(seqno)
+            .ok_or(LocalnetError::BlockNotFound { seqno })?;
+        (block.block_id(), u64::from(block.gen_utime))
+    };
 
     let Some(meta) = meta else {
         return Ok(LocalnetAccountState::empty(address, block_id, sync_utime));
@@ -2411,6 +2413,7 @@ fn handle_get_address_info(
         address,
         account_state_hash: meta.account_hash,
         balance: meta.balance,
+        extra_currencies: meta.extra_currencies,
         code,
         code_hash: meta.code_hash,
         data,
@@ -3083,16 +3086,7 @@ pub(crate) fn convert_to_message_struct(
 
     let (fwd_fee, ihr_fee, bounce, bounced, extra_currencies) = match &msg.info {
         MsgInfo::Int(info) => {
-            let extra_currencies = info
-                .value
-                .other
-                .as_dict()
-                .iter()
-                .map(|entry| {
-                    let (id, amount) = entry?;
-                    Ok(LocalnetExtraCurrency { id, amount })
-                })
-                .collect::<Result<Vec<_>, tycho_types::error::Error>>()?;
+            let extra_currencies = ExtraCurrency::from_collection(&info.value.other)?;
             (
                 info.fwd_fee.into(),
                 info.ihr_fee.into(),

@@ -5,15 +5,16 @@
 //! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
 //!   operations.
 
+use crate::api::toncenter_wallet::{V2WalletState, V2WalletVersion, read_v2_extended_wallet_state};
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
     LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
-    LocalnetConsensusBlock, LocalnetExtraCurrency, LocalnetLibrary, LocalnetMasterchainInfo,
-    LocalnetRunGetMethodResult, LocalnetTransaction, LocalnetTransactionId,
-    LocalnetTransactionsPage,
+    LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
+    LocalnetTransaction, LocalnetTransactionId, LocalnetTransactionsPage,
 };
 use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMeta};
-use crate::types::{Addr, BocBytes, Hash256};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
+use anyhow::Context;
 use base64::Engine;
 use serde_json::value::Value;
 use ton_api::toncenter::v2 as response;
@@ -149,7 +150,7 @@ pub fn map_account_state(s: &LocalnetAccountState) -> response::AddressInformati
     response::AddressInformation {
         type_field: "raw.fullAccountState".to_owned(),
         balance: response::StringOrNumber::String(s.balance.to_string()),
-        extra_currencies: Vec::new(),
+        extra_currencies: map_extra_currencies(&s.extra_currencies),
         last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
         block_id: map_block_id(&s.block_id),
         code: encode_optional_boc(s.code.as_ref()),
@@ -174,34 +175,72 @@ pub const fn map_account_status(status: &AccountStatus) -> &'static str {
     }
 }
 
-#[must_use]
 pub fn map_extended_account_state(
     s: &LocalnetAccountState,
-) -> response::ExtendedAddressInformation {
-    response::ExtendedAddressInformation {
+    requested_address: &str,
+) -> anyhow::Result<response::ExtendedAddressInformation> {
+    let (account_state, revision) = map_extended_account_state_kind(s)?;
+    Ok(response::ExtendedAddressInformation {
         type_field: "fullAccountState".to_owned(),
-        address: map_account_address(&s.address),
+        address: response::AccountAddress {
+            type_field: "accountAddress".to_owned(),
+            account_address: s
+                .address
+                .as_user_friendly_with_flags_from(requested_address)?,
+        },
         balance: s.balance.to_string(),
-        extra_currencies: Vec::new(),
+        extra_currencies: map_extra_currencies(&s.extra_currencies),
         last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
         block_id: map_block_id(&s.block_id),
         sync_utime: s.sync_utime,
-        account_state: match s.state {
-            AccountStatus::Nonexist => response::AccountStateKind::Uninited {
-                frozen_hash: String::new(),
-            },
-            _ => response::AccountStateKind::Raw {
-                code: encode_optional_boc(s.code.as_ref()),
-                data: encode_optional_boc(s.data.as_ref()),
-                frozen_hash: s
+        account_state,
+        revision,
+    })
+}
+
+fn map_extended_account_state_kind(
+    state: &LocalnetAccountState,
+) -> anyhow::Result<(response::AccountStateKind, i32)> {
+    if state.code.is_none() {
+        return Ok((
+            response::AccountStateKind::Uninited {
+                frozen_hash: state
                     .frozen_hash
                     .as_ref()
                     .map(Hash256::to_base64)
                     .unwrap_or_default(),
             },
-        },
-        revision: 0,
+            0,
+        ));
     }
+
+    if let Some(wallet) = read_v2_extended_wallet_state(state)? {
+        let seqno = i32::from_be_bytes(wallet.seqno.to_be_bytes());
+        let wallet_id = i64::from(
+            wallet
+                .wallet_id
+                .context("Specialized V2 wallet state has no wallet ID")?,
+        );
+        return Ok(match wallet.version {
+            V2WalletVersion::V3R1 => (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 1),
+            V2WalletVersion::V3R2 => (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 2),
+            V2WalletVersion::V4R2 => (response::AccountStateKind::WalletV4 { wallet_id, seqno }, 2),
+            version => anyhow::bail!("Unsupported specialized V2 wallet state: {version:?}"),
+        });
+    }
+
+    Ok((
+        response::AccountStateKind::Raw {
+            code: encode_optional_boc(state.code.as_ref()),
+            data: encode_optional_boc(state.data.as_ref()),
+            frozen_hash: state
+                .frozen_hash
+                .as_ref()
+                .map(Hash256::to_base64)
+                .unwrap_or_default(),
+        },
+        0,
+    ))
 }
 
 #[must_use]
@@ -250,20 +289,20 @@ pub fn map_wallet_seqno(result: &LocalnetRunGetMethodResult) -> Option<u32> {
 }
 
 #[must_use]
-pub fn map_wallet_information(
+pub(crate) fn map_wallet_information(
     s: &LocalnetAccountState,
-    seqno: Option<u32>,
+    wallet: Option<&V2WalletState>,
 ) -> response::WalletInformation {
-    let wallet_type = wallet_type_name_from_code_hash(s.code_hash.as_ref());
     response::WalletInformation {
         type_field: "ext.accounts.walletInformation".to_owned(),
-        wallet: wallet_type.is_some(),
+        wallet: wallet.is_some(),
         balance: s.balance.to_string(),
-        extra_currencies: Vec::new(),
         account_state: map_account_status(&s.state).to_owned(),
         last_transaction_id: map_internal_transaction_id(&s.last_transaction_id),
-        wallet_type: wallet_type.map(ToOwned::to_owned),
-        seqno: wallet_type.and(seqno),
+        wallet_type: wallet.map(|wallet| wallet.version.name().to_owned()),
+        seqno: wallet.map(|wallet| i64::from(i32::from_be_bytes(wallet.seqno.to_be_bytes()))),
+        wallet_id: wallet.and_then(|wallet| wallet.wallet_id),
+        is_signature_allowed: wallet.and_then(|wallet| wallet.is_signature_allowed),
     }
 }
 
@@ -732,14 +771,17 @@ fn map_internal_transaction_id(id: &LocalnetTransactionId) -> response::Internal
 fn map_account_address(addr: &Addr) -> response::AccountAddress {
     response::AccountAddress {
         type_field: "accountAddress".to_owned(),
-        account_address: addr.to_string(),
+        account_address: addr.as_user_friendly(),
     }
 }
 
 fn map_optional_account_address(addr: Option<&Addr>) -> response::AccountAddress {
     response::AccountAddress {
         type_field: "accountAddress".to_owned(),
-        account_address: addr.map(ToString::to_string).unwrap_or_default(),
+        account_address: addr
+            .copied()
+            .map(Addr::as_user_friendly)
+            .unwrap_or_default(),
     }
 }
 
@@ -799,9 +841,7 @@ fn legacy_message_body(msg: &crate::localnet::LocalnetMessage) -> anyhow::Result
     ))
 }
 
-fn map_extra_currencies(
-    currencies: &[LocalnetExtraCurrency],
-) -> Vec<response::ExtraCurrencyBalance> {
+fn map_extra_currencies(currencies: &[ExtraCurrency]) -> Vec<response::ExtraCurrencyBalance> {
     currencies
         .iter()
         .map(|currency| response::ExtraCurrencyBalance {
@@ -815,9 +855,15 @@ fn map_extra_currencies(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::api::toncenter_wallet::read_v2_wallet_state;
     use crate::storage::{DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use serde_json::json;
-    use tycho_types::cell::Cell;
+    use ton::ton_core::traits::tlb::TLB;
+    use ton::ton_wallet::WalletVersion;
+    use tycho_types::cell::{Cell, CellBuilder, CellFamily};
+
+    const V5_BETA_CODE_BOC: &str =
+        "te6cckEBAQEAIwAIQgLkzzsvTG1qYeoPK1RH0mZ4WyavNjfbLe7mvNGqgm80Eg3NjhE=";
 
     fn addr(hex_byte: u8) -> Addr {
         format!("0:{}", format!("{hex_byte:02x}").repeat(32))
@@ -830,6 +876,7 @@ mod tests {
             address: addr(0x11),
             account_state_hash: Hash256([0x22; 32]),
             balance: 123,
+            extra_currencies: Vec::new(),
             code: None,
             code_hash,
             data: None,
@@ -843,6 +890,17 @@ mod tests {
             sync_utime: 0,
             frozen_hash: None,
         }
+    }
+
+    fn set_wallet_code(account: &mut LocalnetAccountState, version: WalletVersion) {
+        let code = BocBytes::from(
+            WalletVersion::get_code(version)
+                .expect("wallet code must exist")
+                .to_boc()
+                .expect("wallet code must serialize"),
+        );
+        account.code_hash = Some(code.hash().expect("wallet code must hash"));
+        account.code = Some(code);
     }
 
     fn run_get_method_result(stack: Tuple) -> LocalnetRunGetMethodResult {
@@ -867,14 +925,19 @@ mod tests {
 
     #[test]
     fn wallet_information_maps_known_wallet_code_hash() {
-        let wallet_v4r2_hash = Hash256::from_base64("/rX/aCDi/w2Ug+fg1iyBfYRniftK5YDIeIZtlZ2r1cA=")
-            .expect("valid wallet hash");
-        let mapped = map_wallet_information(&account_state(Some(wallet_v4r2_hash)), Some(7));
+        let wallet = V2WalletState {
+            version: V2WalletVersion::V4R2,
+            seqno: u32::MAX,
+            wallet_id: Some(42),
+            is_signature_allowed: None,
+        };
+        let mapped = map_wallet_information(&account_state(None), Some(&wallet));
 
         assert_eq!(mapped.type_field, "ext.accounts.walletInformation");
         assert!(mapped.wallet);
         assert_eq!(mapped.wallet_type.as_deref(), Some("wallet v4 r2"));
-        assert_eq!(mapped.seqno, Some(7));
+        assert_eq!(mapped.seqno, Some(-1));
+        assert_eq!(mapped.wallet_id, Some(42));
         assert_eq!(mapped.balance, "123");
         assert_eq!(mapped.account_state, "active");
     }
@@ -886,6 +949,107 @@ mod tests {
         assert!(!mapped.wallet);
         assert!(mapped.wallet_type.is_none());
         assert!(mapped.seqno.is_none());
+    }
+
+    #[test]
+    fn wallet_information_parses_only_upstream_v5_beta_hash() {
+        let mut data = CellBuilder::new();
+        data.store_bit(false).expect("signature flag must store");
+        data.store_u32(u32::MAX).expect("seqno must store");
+        data.store_u32(u32::MAX).expect("wallet id must store");
+        let data = data.build().expect("wallet data must build");
+        let mut account = account_state(Some(Hash256([0x44; 32])));
+        account.code = Some(BocBytes::from(
+            base64::engine::general_purpose::STANDARD
+                .decode(V5_BETA_CODE_BOC)
+                .expect("V5 beta code BOC must decode"),
+        ));
+        account.data = Some(BocBytes::from(Boc::encode(data)));
+
+        let wallet = read_v2_wallet_state(&account)
+            .expect("V5 beta data must parse")
+            .expect("V5 beta code must be recognized");
+        let mapped = map_wallet_information(&account, Some(&wallet));
+        assert_eq!(wallet.version.name(), "wallet v5 beta");
+        assert_eq!(mapped.seqno, Some(-1));
+        assert_eq!(mapped.wallet_id, Some(-1));
+        assert_eq!(mapped.is_signature_allowed, Some(false));
+
+        account.code = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+        account.code_hash = Some(
+            Hash256::from_base64("89fKU0k97trCizgZhqhJQDy6w9LFhHea8IEGWvCsS5M=")
+                .expect("upstream V5 beta hash must parse"),
+        );
+        assert!(
+            read_v2_wallet_state(&account)
+                .expect("unknown code must not fail")
+                .is_none(),
+            "cached code hash must not classify a different code BOC"
+        );
+    }
+
+    #[test]
+    fn wallet_information_rejects_known_wallet_with_missing_data() {
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+
+        assert!(read_v2_wallet_state(&account).is_err());
+        assert!(!map_wallet_information(&account, None).wallet);
+
+        let mut highload = account_state(None);
+        set_wallet_code(&mut highload, WalletVersion::HLV2R2);
+        highload.data = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+        assert!(
+            read_v2_wallet_state(&highload)
+                .expect("highload wallet must be a supported negative case")
+                .is_none()
+        );
+        assert!(!map_wallet_information(&highload, None).wallet);
+    }
+
+    #[test]
+    fn wallet_information_accepts_upstream_prefix_only_data() {
+        let mut data = CellBuilder::new();
+        data.store_u32(u32::MAX).expect("seqno must store");
+        data.store_u32(u32::MAX).expect("wallet id must store");
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+        account.data = Some(BocBytes::from(Boc::encode(
+            data.build().expect("wallet prefix must build"),
+        )));
+
+        let wallet = read_v2_wallet_state(&account)
+            .expect("wallet prefix must parse")
+            .expect("V4 code must be recognized");
+        assert_eq!(wallet.seqno, u32::MAX);
+        assert_eq!(wallet.wallet_id, Some(-1));
+    }
+
+    #[test]
+    fn extended_account_state_rejects_malformed_recognized_wallet_data() {
+        let mut account = account_state(None);
+        set_wallet_code(&mut account, WalletVersion::V4R2);
+        account.data = Some(BocBytes::from(Boc::encode(Cell::empty_cell())));
+
+        let error = map_extended_account_state(&account, &account.address.to_string())
+            .expect_err("recognized wallet with malformed data must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("Failed to parse V4R2 wallet data")
+        );
+    }
+
+    #[test]
+    fn extended_account_state_uses_uninited_for_missing_code() {
+        let account = account_state(None);
+        let mapped = map_extended_account_state(&account, &account.address.to_string())
+            .expect("code-less account must map");
+
+        assert!(matches!(
+            mapped.account_state,
+            response::AccountStateKind::Uninited { .. }
+        ));
     }
 
     #[test]

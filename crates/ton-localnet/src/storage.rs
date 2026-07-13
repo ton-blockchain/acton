@@ -1,5 +1,5 @@
 use crate::localnet::{LocalnetBlockId, LocalnetTransactionId};
-use crate::types::{Addr, BocBytes, Hash256, Lt, Seqno};
+use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use dashmap::DashMap;
 use indexmap::IndexMap;
 use rusqlite::{Connection, params};
@@ -212,6 +212,8 @@ pub struct AccountMeta {
     pub status: AccountStatus,
     #[serde(default)]
     pub balance: u128,
+    #[serde(default)]
+    pub extra_currencies: Vec<ExtraCurrency>,
     pub last_trans_lt: Option<Lt>,
     pub last_trans_hash: Option<Hash256>,
     pub code_hash: Option<Hash256>,

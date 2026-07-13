@@ -1,6 +1,7 @@
 {
   "account": {
     "balance": "0",
+    "extended_address_uses_upstream_bounceable_form": true,
     "extended_type": "fullAccountState",
     "is_wallet": false,
     "state": "uninitialized",

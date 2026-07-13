@@ -52,8 +52,135 @@ workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
 
+pub(crate) const TON_CONNECT_WALLETS_CONFIG: &str = r#"[wallets.wallet_v1]
+kind = "v1r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v2]
+kind = "v2r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v3_r1]
+kind = "v3r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v3]
+kind = "v3r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v4_r1]
+kind = "v4r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v4]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+
+[wallets.wallet_v5]
+kind = "v5r1"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
+
 pub(crate) fn test_std_addr(byte: u8) -> StdAddr {
     StdAddr::new(0, HashBytes([byte; 32]))
+}
+
+pub(crate) fn same_std_address(left: &str, right: &str) -> bool {
+    Addr::parse(left)
+        .ok()
+        .zip(Addr::parse(right).ok())
+        .is_some_and(|(left, right)| left == right)
+}
+
+pub(crate) fn bounceable_user_friendly_address(address: &str) -> String {
+    Addr::parse(address)
+        .expect("test address must parse")
+        .as_user_friendly()
+}
+
+pub(crate) fn summarize_v2_account_state(state: &responses::AccountStateKind) -> serde_json::Value {
+    match state {
+        responses::AccountStateKind::Raw {
+            code,
+            data,
+            frozen_hash,
+        } => serde_json::json!({
+            "type": "raw.accountState",
+            "code_present": !code.is_empty(),
+            "data_present": !data.is_empty(),
+            "frozen_hash": frozen_hash,
+        }),
+        responses::AccountStateKind::WalletV3 { wallet_id, seqno } => serde_json::json!({
+            "type": "wallet.v3.accountState",
+            "wallet_id": wallet_id,
+            "seqno": seqno,
+        }),
+        responses::AccountStateKind::WalletV4 { wallet_id, seqno } => serde_json::json!({
+            "type": "wallet.v4.accountState",
+            "wallet_id": wallet_id,
+            "seqno": seqno,
+        }),
+        responses::AccountStateKind::WalletHighloadV1 { wallet_id, seqno } => {
+            serde_json::json!({
+                "type": "wallet.highload.v1.accountState",
+                "wallet_id": wallet_id,
+                "seqno": seqno,
+            })
+        }
+        responses::AccountStateKind::WalletHighloadV2 { wallet_id } => serde_json::json!({
+            "type": "wallet.highload.v2.accountState",
+            "wallet_id": wallet_id,
+        }),
+        responses::AccountStateKind::Dns { wallet_id } => serde_json::json!({
+            "type": "dns.accountState",
+            "wallet_id": wallet_id,
+        }),
+        responses::AccountStateKind::RWallet { .. } => {
+            let mut value = serde_json::to_value(state).expect("rwallet state must serialize");
+            value["type"] = value["@type"].take();
+            value
+                .as_object_mut()
+                .expect("state must be an object")
+                .remove("@type");
+            value
+        }
+        responses::AccountStateKind::PChan { .. } => {
+            let mut value = serde_json::to_value(state).expect("pchan state must serialize");
+            value["type"] = value["@type"].take();
+            value
+                .as_object_mut()
+                .expect("state must be an object")
+                .remove("@type");
+            value
+        }
+        responses::AccountStateKind::Uninited { frozen_hash } => serde_json::json!({
+            "type": "uninited.accountState",
+            "frozen_hash": frozen_hash,
+        }),
+    }
+}
+
+pub(crate) fn v2_extra_currencies(
+    currencies: &[responses::ExtraCurrencyBalance],
+) -> std::collections::BTreeMap<i32, String> {
+    currencies
+        .iter()
+        .map(|currency| {
+            let amount = match &currency.amount {
+                ton_api::toncenter::v2::StringOrNumber::String(value) => value.clone(),
+                ton_api::toncenter::v2::StringOrNumber::Number(value) => value.to_string(),
+                ton_api::toncenter::v2::StringOrNumber::Unsigned(value) => value.to_string(),
+            };
+            (currency.id, amount)
+        })
+        .collect()
 }
 
 pub(crate) fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {

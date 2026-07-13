@@ -1,6 +1,7 @@
 use crate::common::assertion;
 use crate::support::localnet::pretty_json_for_snapshot;
 use crate::support::project::ProjectBuilder;
+use crate::support::toncenter::bounceable_user_friendly_address;
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::{requests, responses};
@@ -170,6 +171,9 @@ fn json_rpc_deserializes_utility_and_account_responses() {
             "balance": balance.response.result,
             "state_endpoint": state.response.result,
             "extended_type": extended.response.result.type_field,
+            "extended_address_uses_upstream_bounceable_form":
+                extended.response.result.address.account_address
+                    == bounceable_user_friendly_address(ZERO_ADDRESS),
             "wallet_type": wallet.response.result.type_field,
             "is_wallet": wallet.response.result.wallet,
         },

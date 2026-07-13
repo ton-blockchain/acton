@@ -452,6 +452,7 @@ mod tests {
             },
             account_state_hash: Hash256([0x44; 32]),
             balance: 1_000_000_000,
+            extra_currencies: Vec::new(),
             code: Some(BocBytes(code.to_boc()?)),
             code_hash: Some(code_hash),
             data: Some(BocBytes(data)),
