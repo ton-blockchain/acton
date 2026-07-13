@@ -220,6 +220,11 @@ impl LocalnetAccountState {
             frozen_hash: None,
         }
     }
+
+    #[must_use]
+    pub(crate) fn is_missing(&self) -> bool {
+        self.account_state_hash == Hash256([0; 32])
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]

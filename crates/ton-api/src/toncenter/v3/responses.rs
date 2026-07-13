@@ -354,9 +354,9 @@ pub struct WalletState {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wallet_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seqno: Option<u32>,
+    pub seqno: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub wallet_id: Option<i32>,
+    pub wallet_id: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub balance: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -568,9 +568,9 @@ pub struct V2WalletInformation {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub wallet_type: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub seqno: Option<u32>,
+    pub seqno: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub wallet_id: Option<i32>,
+    pub wallet_id: Option<i64>,
     pub last_transaction_lt: String,
     pub last_transaction_hash: String,
     pub status: String,
@@ -946,6 +946,33 @@ pub struct TraceInfo {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn wallet_dtos_accept_signed_int64_identifiers() {
+        let information: V2WalletInformation = serde_json::from_value(serde_json::json!({
+            "balance": "1",
+            "seqno": -1,
+            "wallet_id": 4_294_967_295_i64,
+            "last_transaction_lt": "0",
+            "last_transaction_hash": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+            "status": "active"
+        }))
+        .expect("v3 wallet information uses upstream int64 fields");
+
+        assert_eq!(information.seqno, Some(-1));
+        assert_eq!(information.wallet_id, Some(4_294_967_295));
+
+        let state: WalletState = serde_json::from_value(serde_json::json!({
+            "address": "0:0000000000000000000000000000000000000000000000000000000000000000",
+            "is_wallet": true,
+            "seqno": -1,
+            "wallet_id": 4_294_967_295_i64
+        }))
+        .expect("v3 wallet state uses upstream int64 fields");
+
+        assert_eq!(state.seqno, Some(-1));
+        assert_eq!(state.wallet_id, Some(4_294_967_295));
+    }
 
     #[test]
     fn trace_accepts_additional_openapi_fields() {

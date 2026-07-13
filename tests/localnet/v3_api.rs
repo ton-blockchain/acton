@@ -9,6 +9,143 @@ use tycho_types::cell::Cell;
 const ZERO_ADDRESS: &str = "0:0000000000000000000000000000000000000000000000000000000000000000";
 
 #[test]
+fn information_endpoints_honor_use_v2_projection() {
+    let project = ProjectBuilder::new("localnet-v3-information-source").build();
+    let node = project.localnet().start();
+    let uninit = "0:1111111111111111111111111111111111111111111111111111111111111111";
+    let frozen = "0:2222222222222222222222222222222222222222222222222222222222222222";
+    let destroyed = "0:3333333333333333333333333333333333333333333333333333333333333333";
+    let active_address = test_std_addr(0x44);
+    let active = format!("0:{}", hex::encode(active_address.address.0));
+
+    node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": uninit,
+            "state": { "type": "uninit", "balance": "100" },
+        }),
+    );
+    node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": frozen,
+            "state": {
+                "type": "frozen",
+                "frozen_hash": hex::encode([0x77; 32]),
+                "balance": "200",
+            },
+        }),
+    );
+    node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": destroyed,
+            "state": { "type": "uninit", "balance": "300" },
+        }),
+    );
+    node.post_json(
+        "/acton_changeAccountState",
+        &json!({
+            "address": destroyed,
+            "state": { "type": "nonexist" },
+        }),
+    );
+    node.post_json(
+        "/acton_setShardAccount",
+        &json!({
+            "address": active,
+            "shard_account": active_shard_account_boc64(
+                active_address,
+                Cell::default(),
+                None,
+                400,
+            ),
+        }),
+    );
+
+    let mut address_information = Vec::new();
+    for (case, address) in [
+        ("missing", ZERO_ADDRESS),
+        ("uninit", uninit),
+        ("frozen", frozen),
+        ("destroyed", destroyed),
+    ] {
+        let indexed: responses::V2AddressInformation = node.get_json_as(&format!(
+            "/api/v3/addressInformation?address={address}&use_v2=false"
+        ));
+        let legacy: responses::V2AddressInformation = node.get_json_as(&format!(
+            "/api/v3/addressInformation?address={address}&use_v2=true"
+        ));
+        address_information.push(json!({
+            "case": case,
+            "indexed": {
+                "status": indexed.status,
+                "frozen_hash": indexed.frozen_hash,
+            },
+            "legacy": {
+                "status": legacy.status,
+                "frozen_hash": legacy.frozen_hash,
+            },
+        }));
+    }
+    let default_address: responses::V2AddressInformation = node.get_json_as(&format!(
+        "/api/v3/addressInformation?address={ZERO_ADDRESS}"
+    ));
+
+    let mut wallet_information = Vec::new();
+    for (case, address) in [
+        ("missing", ZERO_ADDRESS),
+        ("uninit", uninit),
+        ("frozen", frozen),
+        ("destroyed", destroyed),
+        ("active non-wallet", active.as_str()),
+    ] {
+        let mut projections = serde_json::Map::new();
+        for (projection, use_v2) in [("indexed", false), ("legacy", true)] {
+            let path = format!("/api/v3/walletInformation?address={address}&use_v2={use_v2}");
+            let (status, body): (u16, Value) = node.get_json_with_status_as(&path);
+            let body = if status == 200 {
+                let info: responses::V2WalletInformation =
+                    serde_json::from_value(body).expect("successful wallet response must be typed");
+                json!({ "status": info.status, "wallet_type": info.wallet_type })
+            } else {
+                let error: responses::RequestError =
+                    serde_json::from_value(body).expect("wallet error response must be typed");
+                json!({ "code": error.code, "error": error.error })
+            };
+            projections.insert(
+                projection.to_owned(),
+                json!({
+                    "http_status": status,
+                    "body": body,
+                }),
+            );
+        }
+        wallet_information.push(json!({
+            "case": case,
+            "projections": projections,
+        }));
+    }
+    let default_wallet: responses::V2WalletInformation =
+        node.get_json_as(&format!("/api/v3/walletInformation?address={ZERO_ADDRESS}"));
+
+    let summary = json!({
+        "default_projection": {
+            "address_status": default_address.status,
+            "wallet_status": default_wallet.status,
+        },
+        "address_information": address_information,
+        "wallet_information": wallet_information,
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v3_information_source.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn address_book_and_metadata_accept_mixed_address_batches() {
     let project = ProjectBuilder::new("localnet-v3-permissive-address-batches").build();
     let node = project.localnet().start();

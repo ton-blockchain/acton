@@ -1,0 +1,149 @@
+{
+  "address_information": [
+    {
+      "case": "missing",
+      "indexed": {
+        "frozen_hash": null,
+        "status": "uninit"
+      },
+      "legacy": {
+        "frozen_hash": null,
+        "status": "uninitialized"
+      }
+    },
+    {
+      "case": "uninit",
+      "indexed": {
+        "frozen_hash": null,
+        "status": "uninit"
+      },
+      "legacy": {
+        "frozen_hash": null,
+        "status": "uninitialized"
+      }
+    },
+    {
+      "case": "frozen",
+      "indexed": {
+        "frozen_hash": null,
+        "status": "frozen"
+      },
+      "legacy": {
+        "frozen_hash": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3c=",
+        "status": "frozen"
+      }
+    },
+    {
+      "case": "destroyed",
+      "indexed": {
+        "frozen_hash": null,
+        "status": "nonexist"
+      },
+      "legacy": {
+        "frozen_hash": null,
+        "status": "uninitialized"
+      }
+    }
+  ],
+  "default_projection": {
+    "address_status": "uninit",
+    "wallet_status": "uninit"
+  },
+  "wallet_information": [
+    {
+      "case": "missing",
+      "projections": {
+        "indexed": {
+          "body": {
+            "status": "uninit",
+            "wallet_type": null
+          },
+          "http_status": 200
+        },
+        "legacy": {
+          "body": {
+            "status": "uninitialized",
+            "wallet_type": null
+          },
+          "http_status": 200
+        }
+      }
+    },
+    {
+      "case": "uninit",
+      "projections": {
+        "indexed": {
+          "body": {
+            "status": "uninit",
+            "wallet_type": null
+          },
+          "http_status": 200
+        },
+        "legacy": {
+          "body": {
+            "status": "uninitialized",
+            "wallet_type": null
+          },
+          "http_status": 200
+        }
+      }
+    },
+    {
+      "case": "frozen",
+      "projections": {
+        "indexed": {
+          "body": {
+            "code": 409,
+            "error": "not a wallet"
+          },
+          "http_status": 409
+        },
+        "legacy": {
+          "body": {
+            "code": 409,
+            "error": "not a wallet"
+          },
+          "http_status": 409
+        }
+      }
+    },
+    {
+      "case": "destroyed",
+      "projections": {
+        "indexed": {
+          "body": {
+            "code": 409,
+            "error": "not a wallet"
+          },
+          "http_status": 409
+        },
+        "legacy": {
+          "body": {
+            "status": "uninitialized",
+            "wallet_type": null
+          },
+          "http_status": 200
+        }
+      }
+    },
+    {
+      "case": "active non-wallet",
+      "projections": {
+        "indexed": {
+          "body": {
+            "code": 409,
+            "error": "not a wallet"
+          },
+          "http_status": 409
+        },
+        "legacy": {
+          "body": {
+            "code": 409,
+            "error": "not a wallet"
+          },
+          "http_status": 409
+        }
+      }
+    }
+  ]
+}

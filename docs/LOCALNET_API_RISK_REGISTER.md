@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 11 | 5 | 8 |
-| High | 14 | 5 | 18 |
+| High | 15 | 4 | 18 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **25** | **11** | **29** |
+| **Total** | **26** | **10** | **29** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -80,7 +80,7 @@ open until their normative contract is chosen.
 | V3-13 event DTO/order | Partial | Jetton transfer filtering uses the transaction's explicit TL-B `aborted` flag and excludes aborted transfers while retaining aborted burns. All three event routes switch from LT to time ordering when a time bound is present. Trace IDs remain open. |
 | V3-14 vesting | Fixed | Empty and combined filters follow upstream AND semantics, including optional whitelist matching. Results are ordered before pagination by first local transaction LT and address. A two-contract stateful test covers empty and non-empty TVM dictionaries, repeated unfiltered reads, combined matches/misses, and page boundaries. |
 | V3-15 NFT items | Fixed | Query order follows upstream precedence: insertion/ID order by default, numeric index order for one collection, owner/collection/index order for owner filters, and LT descending when requested. Empty indexes are ignored and repeated collection filters retain multi-filter semantics. Synthetic numeric/null-order cases and two backfilled real items cover pagination. |
-| V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
+| V3-19 information source | Fixed | Both information routes default to the indexed projection and honor `use_v2`; the legacy wallet path reuses the V2 resolver. Missing, uninit, frozen, destroyed, and active non-wallet states are typed and snapshot-covered. Status vocabulary, legacy-only `frozen_hash`, projection-specific 409 behavior, and signed int64 wallet identifiers match upstream. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
 
@@ -298,15 +298,15 @@ coverage is high.
 | `GET /api/v3/accountStates` | High | B | Missing-row cardinality, contract methods, `code_hash`, frozen details, extra currencies. |
 | `GET /api/v3/addressBook` | Medium | C | Mixed valid/invalid batches preserve requested keys with the production null/empty row shape; add DNS names, friendly-address flag variants, and repeated spelling forms. |
 | `GET /api/v3/metadata` | High | C | Invalid addresses are ignored in mixed batches; add on/off-chain variants, merge precedence/completeness, and destroyed contracts. |
-| `GET /api/v3/addressInformation` | Medium | B | `use_v2`, frozen/nonexistent sources, status parity and historical behavior. |
-| `GET /api/v3/walletInformation` | High | B | Active non-wallet 409, all wallet versions, malformed data and optional fields. |
+| `GET /api/v3/addressInformation` | Medium | A | Both `use_v2` projections, their default, and missing/uninit/frozen/destroyed status and `frozen_hash` differences are covered; historical behavior remains. |
+| `GET /api/v3/walletInformation` | High | A | Both projections cover missing/uninit/frozen/destroyed and active non-wallet states; signed int64 seqno/wallet IDs are typed. Add every wallet version, malformed data, and optional fields. |
 | `GET /api/v3/masterchainInfo` | High | C | Exact block header fields, genesis/head zero and forked history. |
 | `GET /api/v3/masterchainBlockShardState` | High | B | Exact header/state values, missing block status, split/merge shard edge cases. |
 | `GET /api/v3/masterchainBlockShards` | High | B | Exact headers, empty page, stable ordering and split shard pagination. |
 | `GET /api/v3/transactions` | Critical | B | Inclusive boundaries, time-dependent ordering, repeated hash, complete states/phases, rare transaction kinds. |
 | `GET /api/v3/messages` | High | B | Header `created_at`, cross-block internal messages, merge direction, nullable external combinations. |
 | `GET /api/v3/adjacentTransactions` | High | B | Branch/fanout adjacency, invalid direction, missing result status and inherited transaction DTO. |
-| `GET /api/v3/walletStates` | High | B | Malformed wallet data, every version, extra currencies, non-wallet and frozen states. |
+| `GET /api/v3/walletStates` | High | B | Signed int64 seqno/wallet IDs are typed; add malformed wallet data, every version, extra currencies, non-wallet and frozen states. |
 | `GET /api/v3/topAccountsByBalance` | Medium | C | Ties, deterministic pagination, zero/nonexistent accounts, very large balances and state size. |
 | `GET /api/v3/blocks` | High | B | Real header fields, independent selectors, sort ties, split/merge/key blocks. |
 | `GET /api/v3/transactionsByMasterchainBlock` | High | B | Missing block status, multi-shard ordering, pagination and inherited transaction DTO. |
@@ -384,8 +384,11 @@ coverage is high.
 18. **V3-18, address book/metadata invalid input (fixed):** mixed batches retain every requested
     address-book key; invalid keys have null user-friendly/domain fields and empty interfaces,
     matching the production API. Metadata silently ignores invalid addresses.
-19. **V3-19, address/wallet information (partial):** both handlers still parse and ignore `use_v2`.
-    Active non-wallet accounts now return upstream 409.
+19. **V3-19, address/wallet information (fixed):** both handlers default to the indexed source and
+    honor `use_v2`, with the legacy wallet path reusing the V2 resolver. The two projections use
+    the upstream status vocabulary, expose `frozen_hash` only through the legacy address path,
+    apply the upstream non-wallet rules to missing, uninit, frozen, destroyed, and active accounts,
+    and preserve signed int64 wallet seqno and wallet IDs.
 20. **V3-20, errors:** backend errors collapse to 500 and parser errors generally use 400 instead
     of upstream 404/409/422 distinctions.
 21. **V3-21, trace extras:** address book and metadata are collected before filtering and

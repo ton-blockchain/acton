@@ -24,6 +24,8 @@ use num_bigint::BigInt;
 use serde_json::value::Value;
 use std::collections::HashMap;
 use ton_api::toncenter::emulate::v1 as emulate;
+use ton_api::toncenter::v2::StringOrNumber as V2StringOrNumber;
+use ton_api::toncenter::v2::responses as v2_response;
 use ton_api::toncenter::v3 as response;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -821,10 +823,27 @@ pub fn map_address_information(state: &LocalnetAccountState) -> response::V2Addr
         balance: state.balance.to_string(),
         code: state.code.as_ref().map(BocBytes::to_base64),
         data: state.data.as_ref().map(BocBytes::to_base64),
-        frozen_hash: state.frozen_hash.as_ref().map(Hash256::to_base64),
+        frozen_hash: None,
         last_transaction_hash: Some(state.last_transaction_id.hash.to_base64()),
         last_transaction_lt: Some(state.last_transaction_id.lt.to_string()),
-        status: map_address_information_status(&state.state).to_owned(),
+        status: map_indexed_information_status(state).to_owned(),
+    }
+}
+
+#[must_use]
+pub(crate) fn map_v2_address_information(
+    state: &v2_response::AddressInformation,
+) -> response::V2AddressInformation {
+    response::V2AddressInformation {
+        balance: string_or_number_to_string(&state.balance),
+        code: (!state.code.is_empty()).then(|| state.code.clone()),
+        data: (!state.data.is_empty()).then(|| state.data.clone()),
+        frozen_hash: (!state.frozen_hash.is_empty()).then(|| state.frozen_hash.clone()),
+        last_transaction_hash: (!state.last_transaction_id.hash.is_empty())
+            .then(|| state.last_transaction_id.hash.clone()),
+        last_transaction_lt: (!state.last_transaction_id.lt.is_empty())
+            .then(|| state.last_transaction_id.lt.clone()),
+        status: state.state.clone(),
     }
 }
 
@@ -873,7 +892,7 @@ pub fn map_masterchain_info_v3(blocks: &[LocalnetBlock]) -> Option<response::Mas
     })
 }
 
-pub(crate) fn map_wallet_information_v3(
+pub(crate) fn map_wallet_information(
     state: &LocalnetAccountState,
     wallet_type: Option<&str>,
     seqno: Option<u32>,
@@ -882,11 +901,26 @@ pub(crate) fn map_wallet_information_v3(
     response::V2WalletInformation {
         balance: state.balance.to_string(),
         wallet_type: wallet_type.map(ToOwned::to_owned),
-        seqno: wallet_type.and(seqno),
-        wallet_id: wallet_type.and(wallet_id),
+        seqno: wallet_type.and(seqno).map(i64::from),
+        wallet_id: wallet_type.and(wallet_id).map(i64::from),
         last_transaction_lt: state.last_transaction_id.lt.to_string(),
         last_transaction_hash: state.last_transaction_id.hash.to_base64(),
-        status: map_wallet_information_status(&state.state).to_owned(),
+        status: map_indexed_information_status(state).to_owned(),
+    }
+}
+
+#[must_use]
+pub(crate) fn map_v2_wallet_information(
+    state: &v2_response::WalletInformation,
+) -> response::V2WalletInformation {
+    response::V2WalletInformation {
+        balance: state.balance.clone(),
+        wallet_type: state.wallet_type.clone(),
+        seqno: state.seqno,
+        wallet_id: state.wallet_id.map(i64::from),
+        last_transaction_lt: state.last_transaction_id.lt.clone(),
+        last_transaction_hash: state.last_transaction_id.hash.clone(),
+        status: state.account_state.clone(),
     }
 }
 
@@ -902,8 +936,8 @@ pub(crate) fn map_wallet_state_v3(
         address: state.address.to_string(),
         is_wallet: wallet_type.is_some(),
         wallet_type: wallet_type.map(ToOwned::to_owned),
-        seqno: wallet.map(|wallet| wallet.seqno),
-        wallet_id: wallet.and_then(|wallet| wallet.wallet_id),
+        seqno: wallet.map(|wallet| i64::from(wallet.seqno)),
+        wallet_id: wallet.and_then(|wallet| wallet.wallet_id).map(i64::from),
         balance: Some(state.balance.to_string()),
         extra_currencies: None,
         is_signature_allowed: wallet.and_then(|wallet| wallet.is_signature_allowed),
@@ -1814,19 +1848,20 @@ fn zero_hash_base64() -> String {
     Hash256([0; 32]).to_base64()
 }
 
-const fn map_address_information_status(status: &AccountStatus) -> &'static str {
-    match status {
+fn map_indexed_information_status(state: &LocalnetAccountState) -> &'static str {
+    match state.state {
         AccountStatus::Active => "active",
-        AccountStatus::Uninit | AccountStatus::Nonexist => "uninitialized",
         AccountStatus::Frozen => "frozen",
+        AccountStatus::Nonexist if !state.is_missing() => "nonexist",
+        AccountStatus::Uninit | AccountStatus::Nonexist => "uninit",
     }
 }
 
-const fn map_wallet_information_status(status: &AccountStatus) -> &'static str {
-    match status {
-        AccountStatus::Active => "active",
-        AccountStatus::Uninit | AccountStatus::Nonexist => "uninit",
-        AccountStatus::Frozen => "frozen",
+fn string_or_number_to_string(value: &V2StringOrNumber) -> String {
+    match value {
+        V2StringOrNumber::String(value) => value.clone(),
+        V2StringOrNumber::Number(value) => value.to_string(),
+        V2StringOrNumber::Unsigned(value) => value.to_string(),
     }
 }
 
@@ -1845,12 +1880,13 @@ mod tests {
         format_v3_shard_id, map_address_information, map_blocks_response, map_jetton_masters,
         map_jetton_wallets, map_nft_collection_token_info, map_nft_item_token_info, map_nft_items,
         map_run_get_method_v3, map_stack_entry, map_transaction_account_state,
+        map_v2_address_information, map_v2_wallet_information,
     };
     use crate::localnet::{
         LocalnetAccountState, LocalnetBlock, LocalnetBlockId, LocalnetRunGetMethodResult,
         LocalnetTransactionId,
     };
-    use crate::storage::{JettonMasterMeta, JettonWalletMeta, NftItemMeta};
+    use crate::storage::{AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use crate::types::Hash256;
     use num_bigint::BigInt;
     use serde_json::json;
@@ -2068,11 +2104,11 @@ mod tests {
     }
 
     #[test]
-    fn missing_address_information_omits_optional_state_fields() {
+    fn address_information_distinguishes_v3_and_legacy_v2_projection() {
         let address = "0:6666666666666666666666666666666666666666666666666666666666666666"
             .parse()
             .expect("valid address");
-        let mapped = map_address_information(&LocalnetAccountState::empty(
+        let mut state = LocalnetAccountState::empty(
             address,
             LocalnetBlockId {
                 workchain: 0,
@@ -2082,13 +2118,58 @@ mod tests {
                 file_hash: Hash256([0; 32]),
             },
             0,
-        ));
+        );
+        let indexed = map_address_information(&state);
+        let legacy =
+            map_v2_address_information(&crate::api::toncenter_v2::map_account_state(&state));
 
-        assert!(mapped.code.is_none());
-        assert!(mapped.data.is_none());
-        assert!(mapped.frozen_hash.is_none());
-        assert_eq!(mapped.last_transaction_lt.as_deref(), Some("0"));
-        assert_eq!(mapped.status, "uninitialized");
+        assert!(indexed.code.is_none());
+        assert!(indexed.data.is_none());
+        assert!(indexed.frozen_hash.is_none());
+        assert_eq!(indexed.last_transaction_lt.as_deref(), Some("0"));
+        assert_eq!(indexed.status, "uninit");
+        assert_eq!(legacy.status, "uninitialized");
+
+        state.state = AccountStatus::Frozen;
+        state.frozen_hash = Some(Hash256([0x77; 32]));
+        assert!(map_address_information(&state).frozen_hash.is_none());
+        let legacy =
+            map_v2_address_information(&crate::api::toncenter_v2::map_account_state(&state));
+        let expected_frozen_hash = Hash256([0x77; 32]).to_base64();
+        assert_eq!(
+            legacy.frozen_hash.as_deref(),
+            Some(expected_frozen_hash.as_str())
+        );
+
+        state.state = AccountStatus::Nonexist;
+        state.account_state_hash = Hash256([1; 32]);
+        assert_eq!(map_address_information(&state).status, "nonexist");
+        let legacy =
+            map_v2_address_information(&crate::api::toncenter_v2::map_account_state(&state));
+        assert_eq!(legacy.status, "uninitialized");
+    }
+
+    #[test]
+    fn legacy_wallet_projection_preserves_signed_identifiers() {
+        let mapped =
+            map_v2_wallet_information(&ton_api::toncenter::v2::responses::WalletInformation {
+                type_field: "ext.accounts.walletInformation".to_owned(),
+                wallet: true,
+                balance: "1".to_owned(),
+                account_state: "active".to_owned(),
+                last_transaction_id: ton_api::toncenter::v2::responses::InternalTransactionId {
+                    type_field: "internal.transactionId".to_owned(),
+                    lt: "0".to_owned(),
+                    hash: Hash256([0; 32]).to_base64(),
+                },
+                wallet_type: Some("highload_v1_r1".to_owned()),
+                seqno: Some(-1),
+                wallet_id: Some(-1),
+                is_signature_allowed: None,
+            });
+
+        assert_eq!(mapped.seqno, Some(-1));
+        assert_eq!(mapped.wallet_id, Some(-1));
     }
 
     #[test]

@@ -223,11 +223,17 @@ pub async fn get_address_information_v3(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationQuery>,
 ) -> impl IntoResponse {
-    let _use_v2 = payload.use_v2.unwrap_or(true);
+    let use_v2 = payload.use_v2.unwrap_or(false);
 
     handle_v3_result(
         node.get_address_information(payload.address, None),
-        toncenter_v3::map_address_information,
+        |state| {
+            if use_v2 {
+                toncenter_v3::map_v2_address_information(&v2::map_account_state(state))
+            } else {
+                toncenter_v3::map_address_information(state)
+            }
+        },
     )
     .await
 }
@@ -236,7 +242,23 @@ pub async fn get_wallet_information_v3(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<WalletInformationQuery>,
 ) -> impl IntoResponse {
-    let _use_v2 = payload.use_v2.unwrap_or(true);
+    let use_v2 = payload.use_v2.unwrap_or(false);
+    if use_v2 {
+        let request = ton_api::toncenter::v2::requests::AddressInformationRequest {
+            address: payload.address,
+            seqno: None,
+        };
+        let state = match super::toncenter_v2::resolve_wallet_information(&node, &request).await {
+            Ok(state) => state,
+            Err(error) => {
+                return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+            }
+        };
+        if !state.wallet && state.account_state != "uninitialized" {
+            return request_error(StatusCode::CONFLICT, "not a wallet");
+        }
+        return (StatusCode::OK, Json(v3::map_v2_wallet_information(&state))).into_response();
+    }
 
     let state = match node
         .get_address_information(payload.address.clone(), None)
@@ -248,7 +270,8 @@ pub async fn get_wallet_information_v3(
         }
     };
     let wallet_type = v2::wallet_type_name_from_code_hash(state.code_hash.as_ref());
-    if state.state == AccountStatus::Active && wallet_type.is_none() {
+    let accepts_non_wallet = state.state == AccountStatus::Uninit || state.is_missing();
+    if wallet_type.is_none() && !accepts_non_wallet {
         return request_error(StatusCode::CONFLICT, "not a wallet");
     }
 
@@ -267,7 +290,7 @@ pub async fn get_wallet_information_v3(
 
     (
         StatusCode::OK,
-        Json(v3::map_wallet_information_v3(
+        Json(v3::map_wallet_information(
             &state,
             wallet_type,
             seqno,
