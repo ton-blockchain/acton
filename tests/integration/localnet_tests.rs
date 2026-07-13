@@ -7,8 +7,8 @@ use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use crate::support::toncenter::{
     DEPLOYER_WALLET_CONFIG, append_localnet_with_base_url as append_localnet_network,
-    extract_canonical_addr_marker, jetton_v1_action_project, nft_v1_action_project,
-    run_localnet_action_project, with_nft_v1_action_fixtures,
+    build_internal_message_boc, extract_canonical_addr_marker, jetton_v1_action_project,
+    nft_v1_action_project, run_localnet_action_project, test_std_addr, with_nft_v1_action_fixtures,
 };
 use acton::wallets;
 use base64::Engine;
@@ -31,11 +31,10 @@ use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::{requests as v2_requests, responses as v2_responses};
 use ton_api::toncenter::v3 as toncenter_v3;
 use ton_localnet::types::{Addr, Hash256};
-use tycho_types::boc::{Boc, BocRepr};
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
+use tycho_types::boc::Boc;
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::models::{
-    AccountState, CurrencyCollection, ExtInMsgInfo, IntAddr, IntMsgInfo, Message, MsgInfo,
-    OwnedMessage, ShardAccount, StateInit, StdAddr,
+    AccountState, ExtInMsgInfo, IntAddr, Message, MsgInfo, ShardAccount, StateInit, StdAddr,
 };
 use tycho_types::num::Tokens;
 use tycho_types::prelude::HashBytes;
@@ -7754,36 +7753,6 @@ fn build_localnet_internal_boc() -> String {
     let target = test_std_addr(0x22);
     base64::engine::general_purpose::STANDARD
         .encode(build_internal_message_boc(source, target, 50_000_000))
-}
-
-fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {
-    let message = OwnedMessage {
-        info: MsgInfo::Int(IntMsgInfo {
-            ihr_disabled: true,
-            bounce: false,
-            bounced: false,
-            src: IntAddr::Std(source),
-            dst: IntAddr::Std(target),
-            value: CurrencyCollection::new(value),
-            ihr_fee: Default::default(),
-            fwd_fee: Default::default(),
-            created_at: 0,
-            created_lt: 0,
-        }),
-        init: None,
-        body: CellSliceParts::from(CellBuilder::new().build().expect("must build empty body")),
-        layout: None,
-    };
-
-    BocRepr::encode(message).expect("must encode internal message boc")
-}
-
-fn test_std_addr(byte: u8) -> StdAddr {
-    StdAddr {
-        anycast: None,
-        address: HashBytes([byte; 32]),
-        workchain: 0,
-    }
 }
 
 fn std_addr_from_raw(raw: &str) -> StdAddr {

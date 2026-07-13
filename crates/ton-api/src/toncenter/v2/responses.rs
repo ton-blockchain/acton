@@ -344,6 +344,10 @@ pub struct MessageFull {
     pub body_hash: String,
     pub msg_data: MessageData,
     pub extra_currencies: Vec<ExtraCurrencyBalance>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub message_decode_error: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

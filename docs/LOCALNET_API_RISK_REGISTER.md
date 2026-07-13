@@ -48,6 +48,7 @@ still defects because they violate schemas even under those limitations.
 | V2-08 token history | Fixed | `getTokenData` detects assets from the account state at the requested block. Real jetton supply/balance and NFT collection/owner transitions are snapshot-covered through typed REST and JSON-RPC responses. |
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
 | V2-10/11 transaction history | Fixed | Account history excludes `to_lt`, requires an exact nonzero cursor, and accepts hex, standard base64, padded base64url, and unpadded base64url hashes. Real REST/JSON-RPC history and invalid cursors are snapshot-covered. |
+| V2-12 transaction DTO | Partial | Decoded endpoints recognize text comments across snake references and expose legacy decode fields, while Std/block-ext endpoints remain raw. V2 and V3 preserve uint32 currency IDs and full VarUint248 amounts. Encrypted/decrypted message classification remains open. |
 | V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
 | V2-16 block headers | Fixed | The response is populated from the serialized block's `BlockInfo`, including the real global ID, key-block fields, and previous block IDs. Basechain/masterchain headers and single/both hash selectors are snapshot-covered. |
 | V2-17 block transactions | Fixed | Zero and unknown cursors start at the first transaction, exact cursors are exclusive, short transaction mode is 135, single block hashes are lookup hints, and validation is typed 422. Generated localnet masterchain blocks have no account blocks, so their empty result is faithful to the source block. |
@@ -177,15 +178,15 @@ coverage is high.
 | `GET /api/v2/getWalletInformation` | High | C | V3/V4 wallet ID, V5 signature flag, all revisions, malformed data, getter failure, historical state. |
 | `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
 | `GET /api/v2/getTransactions` | High | A | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
-| `GET /api/v2/getTransactionsStd` | High | A | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality. |
-| `GET /api/v2/tryLocateTx` | High | A | Real incoming-message lookup, alias parity, not-found 404, invalid addresses, and signed created-LT boundaries are covered. |
+| `GET /api/v2/getTransactionsStd` | High | A | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality, raw message BOCs, and extra currencies. |
+| `GET /api/v2/tryLocateTx` | High | A | Real incoming-message lookup, alias parity, decoded text and extra currencies, not-found 404, invalid addresses, and signed created-LT boundaries are covered. |
 | `GET /api/v2/tryLocateResultTx` | High | A | Real result lookup, REST/RPC parity, deterministic duplicate selection, and typed validation are covered; fork history remains a separate fixture gap. |
 | `GET /api/v2/tryLocateSourceTx` | High | A | Real indexed source lookup, REST/RPC parity, message linkage, not-found 404, and typed validation are covered. |
 | `GET /api/v2/getConfigParam` | High | C | Both aliases together, historical mutation, seqno zero, missing param/config cell, status mapping. |
 | `GET /api/v2/getConfigAll` | High | C | Historical config mutation, seqno zero, and old/missing blocks. |
 | `GET /api/v2/getBlockHeader` | Critical | A | All serialized fields, base/masterchain, single/both hashes, and previous blocks are covered; split/merge/key blocks are outside the current single-shard model. |
 | `GET /api/v2/getBlockTransactions` | High | A | Stateful zero/exact/unknown cursors, short-ID mode, masterchain emptiness, one/both hashes, signed ranges, and count bounds. |
-| `GET /api/v2/getBlockTransactionsExt` | High | A | Shared cursor and validation behavior plus typed full-transaction responses; decoded message and extra-currency DTO gaps remain cross-cutting. |
+| `GET /api/v2/getBlockTransactionsExt` | High | A | Shared cursor and validation behavior, typed full-transaction responses, raw message BOCs, and full-width extra currencies are covered. |
 | `GET /api/v2/getMasterchainInfo` | Medium | C | Exact state root/init values, genesis/head zero, and history/reorg. |
 | `GET /api/v2/getConsensusBlock` | Medium | C | Server-time semantics, paused/manual mining, virtual time, head zero. |
 | `GET /api/v2/getOutMsgQueueSize` | High | D | Real queued messages, correct shard block IDs, configured limit, multiple shards. |
@@ -219,8 +220,10 @@ coverage is high.
 11. **V2-11, transaction cursor (fixed):** all upstream hash encodings are accepted and a
     nonexistent nonzero `(lt, hash)` cursor returns the upstream 500 hash-mismatch error instead of
     neighboring history.
-12. **V2-12, transaction DTO:** message bodies are always raw and extra currencies are empty;
-    upstream can return decoded text/encrypted/decrypted fields and decode errors.
+12. **V2-12, transaction DTO (partially fixed):** decoded transaction and locate responses now
+    recognize text comments across snake references and expose the upstream legacy `message` and
+    decode-error fields. Std/block-ext responses remain raw, and V2/V3 preserve uint32 currency IDs
+    plus full VarUint248 amounts. Encrypted/decrypted message classification remains open.
 13. **V2-13, extended account state:** the absence of specialized wallet/DNS/RWallet/PChan states
     is confirmed. The exact uninitialized/frozen variant mismatch remains high-confidence pending a
     differential fixture.
@@ -462,8 +465,9 @@ coverage is high.
    `getShards`, and failures that must match the corresponding REST status and envelope.
 3. Complete historical account coverage for `sync_utime` and suspended-state semantics, and add
    real mintless and DNS contracts plus parent-verified NFT content to the token fixtures.
-4. Extend the V2 transaction fixture with decoded text/encrypted bodies and extra currencies;
-   account and block cursors, hash encodings, and LT boundaries are covered.
+4. Extend the V2 transaction fixture with encrypted/decrypted bodies and malformed decode cases;
+   text/raw bodies, legacy fields, full-width extra currencies, cursors, hash encodings, and LT
+   boundaries are covered.
 5. Add block-header fixtures if the localnet model gains key blocks, shard splits, or merges;
    ordinary basechain/masterchain fields, pagination cursors, and lookup selectors are covered.
 6. Create a branched three-transaction trace spanning at least two blocks. Assert shared trace ID,

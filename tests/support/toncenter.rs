@@ -18,11 +18,13 @@ use ton_api::toncenter::v2::responses;
 use ton_localnet::types::Addr;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
-use tycho_types::boc::Boc;
+use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::HashBytes;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
 use tycho_types::dict::{Dict, RawDict};
-use tycho_types::models::{IntAddr, ShardAccount, StdAddr};
+use tycho_types::models::{
+    CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OwnedMessage, ShardAccount, StdAddr,
+};
 
 #[derive(Clone)]
 pub(crate) struct ToncenterV2MockResponse {
@@ -49,6 +51,75 @@ kind = "v4r2"
 workchain = 0
 keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
 "#;
+
+pub(crate) fn test_std_addr(byte: u8) -> StdAddr {
+    StdAddr::new(0, HashBytes([byte; 32]))
+}
+
+pub(crate) fn build_internal_message_boc(source: StdAddr, target: StdAddr, value: u128) -> Vec<u8> {
+    build_internal_message_boc_with_currency_and_body(
+        source,
+        target,
+        CurrencyCollection::new(value),
+        Cell::empty_cell(),
+    )
+}
+
+pub(crate) fn build_internal_message_boc_with_currency_and_body(
+    source: StdAddr,
+    target: StdAddr,
+    value: CurrencyCollection,
+    body: Cell,
+) -> Vec<u8> {
+    let message = OwnedMessage {
+        info: MsgInfo::Int(IntMsgInfo {
+            ihr_disabled: true,
+            bounce: false,
+            bounced: false,
+            src: IntAddr::Std(source),
+            dst: IntAddr::Std(target),
+            value,
+            ihr_fee: Default::default(),
+            fwd_fee: Default::default(),
+            created_at: 0,
+            created_lt: 0,
+        }),
+        init: None,
+        body: CellSliceParts::from(body),
+        layout: None,
+    };
+
+    BocRepr::encode(message).expect("internal message must encode")
+}
+
+pub(crate) fn build_text_comment_body(parts: &[&str]) -> Cell {
+    assert!(
+        !parts.is_empty(),
+        "text comment must contain at least one part"
+    );
+
+    let mut next = None;
+    for (index, part) in parts.iter().enumerate().rev() {
+        let mut builder = CellBuilder::new();
+        if index == 0 {
+            builder
+                .store_u32(0)
+                .expect("text comment opcode must store");
+        }
+        let bit_len = u16::try_from(part.len() * 8).expect("text comment part must fit one cell");
+        builder
+            .store_raw(part.as_bytes(), bit_len)
+            .expect("text comment bytes must store");
+        if let Some(next) = next {
+            builder
+                .store_reference(next)
+                .expect("text comment continuation must store");
+        }
+        next = Some(builder.build().expect("text comment cell must build"));
+    }
+
+    next.expect("parts is not empty")
+}
 
 pub(crate) fn spawn_toncenter_v2_mock(
     responses: Vec<ToncenterV2MockResponse>,
@@ -429,6 +500,37 @@ pub(crate) fn find_v2_transaction_block(
 pub(crate) fn find_v2_internal_message(
     node: &LocalnetHandle,
 ) -> (responses::TransactionExt, responses::MessageStd) {
+    find_v2_internal_message_matching(node, |message| {
+        !message.source.account_address.is_empty()
+            && !message.destination.account_address.is_empty()
+            && message.created_lt.parse::<u64>().is_ok_and(|lt| lt > 0)
+    })
+    .expect("fixture has no internal message")
+}
+
+pub(crate) fn find_v2_internal_message_by_hash(
+    node: &LocalnetHandle,
+    hash: &str,
+) -> (responses::TransactionExt, responses::MessageStd) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    loop {
+        if let Some(result) =
+            find_v2_internal_message_matching(node, |message| message.hash == hash)
+        {
+            return result;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "fixture has no internal message with hash {hash}"
+        );
+        thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn find_v2_internal_message_matching(
+    node: &LocalnetHandle,
+    mut predicate: impl FnMut(&responses::MessageStd) -> bool,
+) -> Option<(responses::TransactionExt, responses::MessageStd)> {
     let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
         node.get_json_as("/api/v2/getMasterchainInfo");
     for seqno in (1..=masterchain.result.last.seqno).rev() {
@@ -441,15 +543,12 @@ pub(crate) fn find_v2_internal_message(
             let Some(message) = transaction.in_msg.clone() else {
                 continue;
             };
-            if !message.source.account_address.is_empty()
-                && !message.destination.account_address.is_empty()
-                && message.created_lt.parse::<u64>().is_ok_and(|lt| lt > 0)
-            {
-                return (transaction, message);
+            if predicate(&message) {
+                return Some((transaction, message));
             }
         }
     }
-    panic!("fixture has no internal message");
+    None
 }
 
 pub(crate) fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {

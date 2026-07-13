@@ -25,7 +25,7 @@ use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
 use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
-use tycho_types::num::Tokens;
+use tycho_types::num::{Tokens, VarUint248};
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
 
@@ -243,6 +243,12 @@ pub struct LocalnetContractData {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetExtraCurrency {
+    pub id: u32,
+    pub amount: VarUint248,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
     #[serde(default)]
@@ -259,6 +265,8 @@ pub struct LocalnetMessage {
     pub fwd_fee: u128,
     pub ihr_fee: u128,
     pub created_lt: u64,
+    #[serde(default)]
+    pub extra_currencies: Vec<LocalnetExtraCurrency>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -2991,6 +2999,7 @@ pub(crate) fn convert_to_tx_struct(
             fwd_fee: 0,
             ihr_fee: 0,
             created_lt: 0,
+            extra_currencies: Vec::new(),
         }
     };
 
@@ -3072,14 +3081,27 @@ pub(crate) fn convert_to_message_struct(
     let body_hash = Hash256::from(body_cell.repr_hash());
     let body_bytes = Boc::encode(body_cell);
 
-    let (fwd_fee, ihr_fee, bounce, bounced) = match &msg.info {
-        MsgInfo::Int(info) => (
-            info.fwd_fee.into(),
-            info.ihr_fee.into(),
-            info.bounce,
-            info.bounced,
-        ),
-        _ => (0, 0, false, false),
+    let (fwd_fee, ihr_fee, bounce, bounced, extra_currencies) = match &msg.info {
+        MsgInfo::Int(info) => {
+            let extra_currencies = info
+                .value
+                .other
+                .as_dict()
+                .iter()
+                .map(|entry| {
+                    let (id, amount) = entry?;
+                    Ok(LocalnetExtraCurrency { id, amount })
+                })
+                .collect::<Result<Vec<_>, tycho_types::error::Error>>()?;
+            (
+                info.fwd_fee.into(),
+                info.ihr_fee.into(),
+                info.bounce,
+                info.bounced,
+                extra_currencies,
+            )
+        }
+        _ => (0, 0, false, false, Vec::new()),
     };
 
     // Extract opcode, skipping the bounce prefix for bounced internal messages.
@@ -3118,6 +3140,7 @@ pub(crate) fn convert_to_message_struct(
         fwd_fee,
         ihr_fee,
         created_lt: meta.created_lt.unwrap_or(0),
+        extra_currencies,
     })
 }
 

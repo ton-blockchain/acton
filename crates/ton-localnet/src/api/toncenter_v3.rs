@@ -1051,7 +1051,12 @@ pub(crate) fn map_v3_message(
         source: msg.source.as_ref().map(ToString::to_string),
         destination: msg.destination.as_ref().map(ToString::to_string),
         value: is_internal.then(|| msg.value.to_string()),
-        value_extra_currencies: is_internal.then(HashMap::new),
+        value_extra_currencies: is_internal.then(|| {
+            msg.extra_currencies
+                .iter()
+                .map(|currency| (currency.id.to_string(), currency.amount.to_string()))
+                .collect()
+        }),
         fwd_fee: is_internal.then(|| msg.fwd_fee.to_string()),
         ihr_fee: is_internal.then(|| msg.ihr_fee.to_string()),
         import_fee: is_external_in.then(|| "0".to_owned()),

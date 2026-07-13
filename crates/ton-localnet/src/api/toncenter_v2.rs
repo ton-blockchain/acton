@@ -8,8 +8,9 @@
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
     LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
-    LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
-    LocalnetTransaction, LocalnetTransactionId, LocalnetTransactionsPage,
+    LocalnetConsensusBlock, LocalnetExtraCurrency, LocalnetLibrary, LocalnetMasterchainInfo,
+    LocalnetRunGetMethodResult, LocalnetTransaction, LocalnetTransactionId,
+    LocalnetTransactionsPage,
 };
 use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
@@ -98,6 +99,7 @@ pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::M
     if msg.hash.is_zero() {
         return None;
     }
+    let mapped_data = map_decoded_message_data(msg);
     Some(response::Message::Full(Box::new(response::MessageFull {
         hash: msg.hash.to_base64(),
         source: msg
@@ -115,8 +117,10 @@ pub fn map_message(msg: &crate::localnet::LocalnetMessage) -> Option<response::M
         ihr_fee: msg.ihr_fee.to_string(),
         created_lt: msg.created_lt.to_string(),
         body_hash: msg.body_hash.to_base64(),
-        msg_data: map_message_data(msg),
-        extra_currencies: Vec::new(),
+        msg_data: mapped_data.data,
+        extra_currencies: map_extra_currencies(&msg.extra_currencies),
+        message: mapped_data.message,
+        message_decode_error: mapped_data.decode_error,
     })))
 }
 
@@ -135,8 +139,8 @@ pub fn map_message_std(msg: &crate::localnet::LocalnetMessage) -> Option<respons
         ihr_fee: msg.ihr_fee.to_string(),
         created_lt: msg.created_lt.to_string(),
         body_hash: msg.body_hash.to_base64(),
-        msg_data: map_message_data(msg),
-        extra_currencies: Vec::new(),
+        msg_data: map_raw_message_data(msg),
+        extra_currencies: map_extra_currencies(&msg.extra_currencies),
     })
 }
 
@@ -739,11 +743,73 @@ fn map_optional_account_address(addr: Option<&Addr>) -> response::AccountAddress
     }
 }
 
-fn map_message_data(msg: &crate::localnet::LocalnetMessage) -> response::MessageData {
+fn map_raw_message_data(msg: &crate::localnet::LocalnetMessage) -> response::MessageData {
     response::MessageData::Raw {
         body: msg.body.to_base64(),
         init_state: msg.init_state.to_base64(),
     }
+}
+
+struct MappedMessageData {
+    data: response::MessageData,
+    message: Option<String>,
+    decode_error: Option<String>,
+}
+
+fn map_decoded_message_data(msg: &crate::localnet::LocalnetMessage) -> MappedMessageData {
+    if msg.opcode == Some(0)
+        && let Ok(cell) = Boc::decode(&msg.body)
+        && let Ok(mut body) = cell.as_slice()
+        && body.load_u32().is_ok()
+        && let Some(bytes) = Tuple::parse_snake_bytes_slice(&mut body)
+        && let Ok(message) = String::from_utf8(bytes.clone())
+    {
+        return MappedMessageData {
+            data: response::MessageData::Text {
+                text: base64::engine::general_purpose::STANDARD.encode(bytes),
+            },
+            message: Some(message),
+            decode_error: None,
+        };
+    }
+
+    match legacy_message_body(msg) {
+        Ok(message) => MappedMessageData {
+            data: map_raw_message_data(msg),
+            message: Some(message),
+            decode_error: None,
+        },
+        Err(error) => MappedMessageData {
+            data: map_raw_message_data(msg),
+            message: None,
+            decode_error: Some(format!("Failed to decode message body: {error}")),
+        },
+    }
+}
+
+fn legacy_message_body(msg: &crate::localnet::LocalnetMessage) -> anyhow::Result<String> {
+    let cell = Boc::decode(&msg.body)?;
+    let mut body = cell.as_slice()?;
+    let bit_len = body.size_bits();
+    let mut bytes = vec![0; usize::from(bit_len.div_ceil(8))];
+    body.load_raw(&mut bytes, bit_len)?;
+    Ok(format!(
+        "{}\n",
+        base64::engine::general_purpose::STANDARD.encode(bytes)
+    ))
+}
+
+fn map_extra_currencies(
+    currencies: &[LocalnetExtraCurrency],
+) -> Vec<response::ExtraCurrencyBalance> {
+    currencies
+        .iter()
+        .map(|currency| response::ExtraCurrencyBalance {
+            type_field: "extraCurrency".to_owned(),
+            id: i32::from_be_bytes(currency.id.to_be_bytes()),
+            amount: response::StringOrNumber::String(currency.amount.to_string()),
+        })
+        .collect()
 }
 
 #[cfg(test)]

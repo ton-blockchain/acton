@@ -1,0 +1,125 @@
+{
+  "binary": {
+    "block_ext": {
+      "body_matches": true,
+      "extra_currencies": [],
+      "init_state_is_empty": true,
+      "type": "raw.message"
+    },
+    "decoded_history": {
+      "data": {
+        "body_is_boc": true,
+        "init_state_is_empty": true,
+        "type": "raw"
+      },
+      "decode_error": null,
+      "extra_currencies": [],
+      "legacy_message": {
+        "binary_matches": true
+      }
+    },
+    "std": {
+      "body_matches": true,
+      "extra_currencies": [],
+      "init_state_is_empty": true,
+      "type": "raw.message"
+    }
+  },
+  "fixture": {
+    "decoded_count": 2,
+    "large_extra_currency": "340282366920938463463374607431768211456",
+    "raw_count": 2,
+    "v3_count": 2
+  },
+  "send": {
+    "binary_ok": true,
+    "binary_type": "ok",
+    "text_ok": true,
+    "text_type": "ok"
+  },
+  "text": {
+    "block_ext": {
+      "body_matches": true,
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "123",
+          "id": 7
+        },
+        {
+          "@type": "extraCurrency",
+          "amount": "340282366920938463463374607431768211456",
+          "id": -1
+        }
+      ],
+      "init_state_is_empty": true,
+      "type": "raw.message"
+    },
+    "decoded_history": {
+      "data": {
+        "decoded": "typed message with extra currencies",
+        "type": "text"
+      },
+      "decode_error": null,
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "123",
+          "id": 7
+        },
+        {
+          "@type": "extraCurrency",
+          "amount": "340282366920938463463374607431768211456",
+          "id": -1
+        }
+      ],
+      "legacy_message": {
+        "text_matches": true
+      }
+    },
+    "decoded_locate": {
+      "data": {
+        "decoded": "typed message with extra currencies",
+        "type": "text"
+      },
+      "decode_error": null,
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "123",
+          "id": 7
+        },
+        {
+          "@type": "extraCurrency",
+          "amount": "340282366920938463463374607431768211456",
+          "id": -1
+        }
+      ],
+      "legacy_message": {
+        "text_matches": true
+      }
+    },
+    "std": {
+      "body_matches": true,
+      "extra_currencies": [
+        {
+          "@type": "extraCurrency",
+          "amount": "123",
+          "id": 7
+        },
+        {
+          "@type": "extraCurrency",
+          "amount": "340282366920938463463374607431768211456",
+          "id": -1
+        }
+      ],
+      "init_state_is_empty": true,
+      "type": "raw.message"
+    },
+    "v3": {
+      "body_matches": true,
+      "large_extra_currency": "340282366920938463463374607431768211456",
+      "small_extra_currency": "123"
+    }
+  }
+}

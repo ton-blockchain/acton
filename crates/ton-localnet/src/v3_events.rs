@@ -260,6 +260,7 @@ mod tests {
                 fwd_fee: 0,
                 ihr_fee: 0,
                 created_lt: 455,
+                extra_currencies: Vec::new(),
             },
             out_msgs: Vec::new(),
             total_fees: 0,
