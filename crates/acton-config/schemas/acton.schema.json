@@ -479,7 +479,7 @@
           "minimum": 1.0
         },
         "db-path": {
-          "description": "Path to a SQLite database used by `acton localnet start` for persistent node state",
+          "description": "Path to an `SQLite` database used by `acton localnet start` for persistent node state",
           "type": "string"
         },
         "fork-block-number": {

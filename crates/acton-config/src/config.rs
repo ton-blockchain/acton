@@ -493,7 +493,7 @@ pub struct LocalnetSettings {
     /// Localnet port used by `acton localnet` commands
     #[schemars(default = "default_localnet_port", range(max = 65535))]
     pub port: Option<u16>,
-    /// Path to a SQLite database used by `acton localnet start` for persistent node state
+    /// Path to an `SQLite` database used by `acton localnet start` for persistent node state
     pub db_path: Option<String>,
     /// Network to fork from used by `acton localnet start`
     #[schemars(with = "Option<Network>")]
