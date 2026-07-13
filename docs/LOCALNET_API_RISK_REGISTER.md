@@ -77,7 +77,7 @@ open until their normative contract is chosen.
 | V3-05 transactions by message | Fixed | The request DTO accepts repeated message hashes, at least one message filter is required with upstream 422, and opcode matching is restricted to inbound messages. Query validation is snapshot-covered and input-only opcode filtering has a focused regression test. |
 | V3-06 pending transactions | Partial | Empty and trace-only requests now return upstream 422 because an account filter is required. Account-plus-trace behavior and trace identity remain open. |
 | V3-11 jetton wallet sorting | Partial | Explicit balance sorting and filter-dependent ordering follow upstream precedence. Local insertion order approximates database ID order; unclaimed mintless amounts remain unavailable. |
-| V3-13 event DTO/order | Partial | Jetton transfer filtering uses the transaction's explicit TL-B `aborted` flag and excludes aborted transfers while retaining aborted burns. Trace IDs and time-based ordering remain open. |
+| V3-13 event DTO/order | Partial | Jetton transfer filtering uses the transaction's explicit TL-B `aborted` flag and excludes aborted transfers while retaining aborted burns. All three event routes switch from LT to time ordering when a time bound is present. Trace IDs remain open. |
 | V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
@@ -126,7 +126,7 @@ These are the highest-value targets for the next differential test pass:
 | P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope. |
 | P0 | V3 traces and transactions | Trace identity, trace ranges/ordering, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | Pending account-plus-trace behavior and inherited trace identity remain incompatible. |
-| P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs, ordering, and parser failure handling remain wrong. |
+| P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs and parser failure handling remain wrong. |
 | P0 | Emulation | Only the root transaction is emulated; downstream cascade, states, cells, address book, and metadata are omitted. |
 | P0 | Snapshot load/revert | Applying a snapshot is non-atomic and can leave persistence and memory partially replaced after an error. |
 | P1 | V3 deterministic pagination | Several collection endpoints paginate `HashMap`/`HashSet` iteration or use a different upstream sort key. |
@@ -364,8 +364,9 @@ coverage is high.
     historical results. Parser errors are silently swallowed with `.ok().flatten()`.
 13. **V3-13, event DTO/order (partially fixed):** event parsers now use the explicit ordinary
     transaction `aborted` flag, and jetton transfers exclude aborted transactions while burns keep
-    them, matching upstream. Jetton transfer/burn and NFT transfer responses still omit `trace_id`
-    and ignore upstream time-based ordering.
+    them, matching upstream. Jetton transfer/burn and NFT transfer routes now order by transaction
+    time whenever either time bound is supplied, and by LT otherwise. Their responses still omit
+    `trace_id`.
 14. **V3-14, vesting:** local requires exactly one contract/wallet filter; upstream permits none or
     both. Pagination traverses an unordered set instead of upstream ID order.
 15. **V3-15, NFT items:** default pagination follows map iteration and multi-collection validation
@@ -505,7 +506,7 @@ coverage is high.
    transactions; include opcode matches in both message directions.
 9. Aborted jetton transfer exclusion and aborted burn preservation are covered. Destroy or change
    wallet/item code and prove old jetton transfer, burn, and NFT transfer events remain queryable
-   with correct trace IDs and ordering.
+   with correct trace IDs while retaining the upstream ordering rules.
 10. Run emulateTrace and emulateTonConnect through an A-to-B-to-C cascade with success, bounce,
     failure, state init, and metadata. Compare every transaction, state delta, and auxiliary cell.
 11. Force snapshot restore failures after persistence replacement and after partial memory rebuild;

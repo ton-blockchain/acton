@@ -889,7 +889,13 @@ pub async fn get_jetton_transfers(
         })
         .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
         .collect::<Vec<_>>();
-    sort_events(&mut events, sort, |event| event.transaction_lt);
+    sort_transaction_events(
+        &mut events,
+        sort,
+        bounds,
+        |event| event.transaction_now,
+        |event| event.transaction_lt,
+    );
     let events = paginate(events, limit, offset);
     let selected_wallets = events
         .iter()
@@ -957,7 +963,13 @@ pub async fn get_jetton_burns(
         .filter(|event| master.is_none_or(|address| event.jetton_master == address))
         .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
         .collect::<Vec<_>>();
-    sort_events(&mut events, sort, |event| event.transaction_lt);
+    sort_transaction_events(
+        &mut events,
+        sort,
+        bounds,
+        |event| event.transaction_now,
+        |event| event.transaction_lt,
+    );
     let events = paginate(events, limit, offset);
     let selected_wallets = events
         .iter()
@@ -1122,7 +1134,13 @@ pub async fn get_nft_transfers(
         })
         .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
         .collect::<Vec<_>>();
-    sort_events(&mut events, sort, |event| event.transaction_lt);
+    sort_transaction_events(
+        &mut events,
+        sort,
+        bounds,
+        |event| event.transaction_now,
+        |event| event.transaction_lt,
+    );
     let events = paginate(events, limit, offset);
     let selected_items = events
         .iter()
@@ -1533,6 +1551,10 @@ impl EventBounds {
             && self.start_lt.is_none_or(|start| lt >= start)
             && self.end_lt.is_none_or(|end| lt <= end)
     }
+
+    fn has_time_bound(self) -> bool {
+        self.start_utime.is_some() || self.end_utime.is_some()
+    }
 }
 
 fn parse_event_bounds(
@@ -1564,6 +1586,20 @@ fn sort_events<T, K: Ord>(items: &mut [T], sort: SortOrder, key: impl Fn(&T) -> 
     match sort {
         SortOrder::Asc => items.sort_by_key(key),
         SortOrder::Desc => items.sort_by_key(|item| std::cmp::Reverse(key(item))),
+    }
+}
+
+fn sort_transaction_events<T>(
+    items: &mut [T],
+    sort: SortOrder,
+    bounds: EventBounds,
+    transaction_now: impl Fn(&T) -> u32,
+    transaction_lt: impl Fn(&T) -> u64,
+) {
+    if bounds.has_time_bound() {
+        sort_events(items, sort, transaction_now);
+    } else {
+        sort_events(items, sort, transaction_lt);
     }
 }
 
@@ -2632,6 +2668,55 @@ mod tests {
             limit: 5,
             offset: 0,
             sort: SortOrder::Desc,
+        }
+    }
+
+    #[test]
+    fn event_bounds_choose_upstream_sort_column() {
+        let events = [(30_u64, 10_u32), (20, 30), (10, 20)];
+        let cases = [
+            (
+                EventBounds {
+                    start_utime: None,
+                    end_utime: None,
+                    start_lt: Some(0),
+                    end_lt: Some(u64::MAX),
+                },
+                SortOrder::Asc,
+                [(10, 20), (20, 30), (30, 10)],
+            ),
+            (
+                EventBounds {
+                    start_utime: Some(0),
+                    end_utime: None,
+                    start_lt: None,
+                    end_lt: None,
+                },
+                SortOrder::Asc,
+                [(30, 10), (10, 20), (20, 30)],
+            ),
+            (
+                EventBounds {
+                    start_utime: None,
+                    end_utime: Some(u32::MAX),
+                    start_lt: Some(0),
+                    end_lt: None,
+                },
+                SortOrder::Desc,
+                [(20, 30), (10, 20), (30, 10)],
+            ),
+        ];
+
+        for (bounds, sort, expected) in cases {
+            let mut actual = events;
+            sort_transaction_events(
+                &mut actual,
+                sort,
+                bounds,
+                |(_, utime)| *utime,
+                |(lt, _)| *lt,
+            );
+            assert_eq!(actual, expected);
         }
     }
 
