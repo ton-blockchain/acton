@@ -1,5 +1,5 @@
 use crate::common::assertion;
-use crate::support::localnet::pretty_json_for_snapshot;
+use crate::support::localnet::{assert_v3_bad_request, pretty_json_for_snapshot};
 use crate::support::project::ProjectBuilder;
 use serde_json::{Value, json};
 use ton_api::toncenter::v3::{requests, responses};
@@ -63,18 +63,44 @@ fn filter_and_stack_validation_returns_typed_errors() {
     let node = project.localnet().start();
 
     let mut summary = Vec::new();
-    for (case, path) in [
-        ("pending actions without filter", "/api/v3/pendingActions"),
-        ("pending traces without filter", "/api/v3/pendingTraces"),
-        ("traces without filter", "/api/v3/traces"),
-        ("dns without filter", "/api/v3/dns/records"),
-        ("multisig orders without filter", "/api/v3/multisig/orders"),
+    for (case, path, expected_error) in [
+        (
+            "pending actions without filter",
+            "/api/v3/pendingActions",
+            "account or ext_msg_hash should be specified",
+        ),
+        (
+            "pending traces without filter",
+            "/api/v3/pendingTraces",
+            "account or ext_msg_hash should be specified",
+        ),
+        (
+            "traces without filter",
+            "/api/v3/traces",
+            "Exactly one of `account`, `trace_id`, `tx_hash`, or `msg_hash` is required",
+        ),
+        (
+            "dns without filter",
+            "/api/v3/dns/records",
+            "Exactly one of `wallet` or `domain` is required",
+        ),
+        (
+            "multisig orders without filter",
+            "/api/v3/multisig/orders",
+            "At least one of `address` or `multisig_address` should be specified",
+        ),
         (
             "multisig wallets without filter",
             "/api/v3/multisig/wallets",
+            "At least one of `address` or `wallet_address` should be specified",
         ),
     ] {
         let (status, error): (u16, responses::RequestError) = node.get_json_with_status_as(path);
+        assert_v3_bad_request(
+            status,
+            &serde_json::to_value(&error).expect("RequestError must serialize"),
+            expected_error,
+        );
         summary.push(json!({
             "case": case,
             "status": status,
@@ -83,13 +109,14 @@ fn filter_and_stack_validation_returns_typed_errors() {
         }));
     }
 
-    for (case, stack_entry) in [
+    for (case, stack_entry, expected_error) in [
         (
             "unsupported stack type",
             requests::StackEntry {
                 kind: "unsupported".to_owned(),
                 value: Value::Null,
             },
+            "Unsupported v3 stack entry type",
         ),
         (
             "cell without bytes",
@@ -97,6 +124,7 @@ fn filter_and_stack_validation_returns_typed_errors() {
                 kind: "cell".to_owned(),
                 value: json!({}),
             },
+            "cell stack value must be a base64 string",
         ),
         (
             "tuple without elements",
@@ -104,6 +132,7 @@ fn filter_and_stack_validation_returns_typed_errors() {
                 kind: "tuple".to_owned(),
                 value: json!({}),
             },
+            "tuple stack value must be an array",
         ),
     ] {
         let request = requests::RunGetMethodRequest {
@@ -113,6 +142,11 @@ fn filter_and_stack_validation_returns_typed_errors() {
         };
         let (status, error): (u16, responses::RequestError) =
             node.post_json_with_status_as("/api/v3/runGetMethod", &request);
+        assert_v3_bad_request(
+            status,
+            &serde_json::to_value(&error).expect("RequestError must serialize"),
+            expected_error,
+        );
         summary.push(json!({
             "case": case,
             "status": status,
