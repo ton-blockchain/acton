@@ -451,7 +451,7 @@ async fn lookup_block(node: &Localnet, request: LookupBlock) -> anyhow::Result<R
     let block_id = node
         .lookup_block(
             requested_workchain,
-            request.id.shard.to_string(),
+            request.id.shard,
             request
                 .seqno
                 .map(|()| convert::seqno_from_i32(request.id.seqno))
@@ -504,7 +504,7 @@ async fn lookup_block_with_proof(
     let block_id = node
         .lookup_block(
             requested_workchain,
-            request.id.shard.to_string(),
+            request.id.shard,
             Some(convert::seqno_from_i32(request.id.seqno)?),
             request.lt,
             request.utime,

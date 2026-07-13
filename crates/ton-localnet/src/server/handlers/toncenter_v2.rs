@@ -354,15 +354,17 @@ pub async fn get_block_header(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockHeaderRequest>,
 ) -> Response {
-    handle_result(resolve_block_header(&node, &payload), v2::map_block_header).await
+    let request = parse!(parse_block_header_request(&payload));
+    handle_result(resolve_block_header(&node, &request), v2::map_block_header).await
 }
 
 pub async fn get_block_transactions_ext_post(
     State(node): State<Arc<Localnet>>,
     Json(payload): Json<BlockTransactionsRequest>,
 ) -> Response {
+    let request = parse!(parse_block_transactions_request(&payload));
     handle_result(
-        resolve_block_transactions(&node, &payload),
+        resolve_block_transactions(&node, &request),
         v2::map_block_transactions_ext,
     )
     .await
@@ -379,8 +381,9 @@ pub async fn get_block_transactions(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockTransactionsRequest>,
 ) -> Response {
+    let request = parse!(parse_block_transactions_request(&payload));
     handle_result(
-        resolve_block_transactions(&node, &payload),
+        resolve_block_transactions(&node, &request),
         v2::map_block_transactions,
     )
     .await
@@ -390,8 +393,9 @@ pub async fn get_block_transactions_ext(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<BlockTransactionsRequest>,
 ) -> Response {
+    let request = parse!(parse_block_transactions_request(&payload));
     handle_result(
-        resolve_block_transactions(&node, &payload),
+        resolve_block_transactions(&node, &request),
         v2::map_block_transactions_ext,
     )
     .await
@@ -413,10 +417,7 @@ pub async fn get_shards(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<SeqnoRequest>,
 ) -> Response {
-    let seqno = parse!(payload.seqno.to_u32());
-    if seqno == 0 {
-        return v2_unprocessable_entity("seqno should be positive");
-    }
+    let seqno = parse!(parse_required_seqno(&payload.seqno));
     handle_result(node.get_shards(seqno), |shards| v2::map_shards(shards)).await
 }
 
@@ -424,13 +425,15 @@ pub async fn lookup_block(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<LookupBlockRequest>,
 ) -> Response {
-    let workchain = parse!(payload.workchain.to_i32());
-    let shard = parse!(payload.shard.to_i64());
-    let seqno = parse!(parse_seqno(payload.seqno));
-    let lt = parse!(payload.lt.map(|value| value.to_u64()).transpose());
-    let unixtime = parse!(payload.unixtime.map(|value| value.to_u32()).transpose());
+    let request = parse!(parse_lookup_block_request(&payload));
     handle_result(
-        node.lookup_block(workchain, shard.to_string(), seqno, lt, unixtime),
+        node.lookup_block(
+            request.workchain,
+            request.shard,
+            request.seqno,
+            request.lt,
+            request.unixtime,
+        ),
         v2::map_lookup_block,
     )
     .await
@@ -497,12 +500,18 @@ pub(super) fn parse_libraries_request(raw: &[String]) -> anyhow::Result<Vec<Hash
 }
 
 #[derive(Debug)]
-struct BlockSelector {
+pub(super) struct BlockSelector {
     workchain: i32,
     shard: i64,
     seqno: u32,
     root_hash: Option<Hash256>,
     file_hash: Option<Hash256>,
+}
+
+pub(super) struct ParsedBlockTransactionsRequest {
+    selector: BlockSelector,
+    count: usize,
+    after: Option<(u64, Hash256)>,
 }
 
 fn parse_block_selector(
@@ -520,10 +529,7 @@ fn parse_block_selector(
     if shard != i64::MIN {
         anyhow::bail!("localnet supports only shard {:#x}", i64::MIN);
     }
-    let seqno = seqno.to_u32()?;
-    if seqno == 0 {
-        anyhow::bail!("`seqno` must be positive");
-    }
+    let seqno = parse_required_seqno(seqno)?;
 
     Ok(BlockSelector {
         workchain,
@@ -534,30 +540,34 @@ fn parse_block_selector(
     })
 }
 
-pub(super) async fn resolve_block_header(
-    node: &Localnet,
+pub(super) fn parse_block_header_request(
     payload: &BlockHeaderRequest,
-) -> anyhow::Result<LocalnetBlockHeader> {
-    let selector = parse_block_selector(
+) -> anyhow::Result<BlockSelector> {
+    parse_block_selector(
         &payload.workchain,
         &payload.shard,
         &payload.seqno,
         payload.root_hash.as_ref(),
         payload.file_hash.as_ref(),
-    )?;
+    )
+}
+
+pub(super) async fn resolve_block_header(
+    node: &Localnet,
+    selector: &BlockSelector,
+) -> anyhow::Result<LocalnetBlockHeader> {
     let block = if selector.workchain == -1 {
         node.get_masterchain_block_header(selector.seqno).await?
     } else {
         node.get_block_header(selector.seqno).await?
     };
-    validate_block_id(&block.id, &selector)?;
+    validate_block_id(&block.id, selector)?;
     Ok(block)
 }
 
-pub(super) async fn resolve_block_transactions(
-    node: &Localnet,
+pub(super) fn parse_block_transactions_request(
     payload: &BlockTransactionsRequest,
-) -> anyhow::Result<LocalnetBlockTransactions> {
+) -> anyhow::Result<ParsedBlockTransactionsRequest> {
     let selector = parse_block_selector(
         &payload.workchain,
         &payload.shard,
@@ -565,6 +575,52 @@ pub(super) async fn resolve_block_transactions(
         payload.root_hash.as_ref(),
         payload.file_hash.as_ref(),
     )?;
+
+    let count = payload
+        .count
+        .as_ref()
+        .map(StringOrNumber::to_i32)
+        .transpose()?
+        .unwrap_or(40);
+    if count <= 0 {
+        anyhow::bail!("count should be positive");
+    }
+    if count > 10_000 {
+        anyhow::bail!("count should be less or equal 10000");
+    }
+
+    let after_lt = payload
+        .after_lt
+        .as_ref()
+        .map(StringOrNumber::to_i64)
+        .transpose()?;
+    if after_lt.is_some_and(|after_lt| after_lt < 0) {
+        anyhow::bail!("after_lt should be non-negative");
+    }
+    let after_hash = payload
+        .after_hash
+        .as_ref()
+        .filter(|hash| !hash.is_empty())
+        .map(|hash| parse_hash_any(hash))
+        .transpose()?;
+    if after_lt.is_some() != after_hash.is_some() {
+        anyhow::bail!("after_lt and after_hash should be used together");
+    }
+
+    Ok(ParsedBlockTransactionsRequest {
+        selector,
+        count: count as usize,
+        after: after_lt
+            .zip(after_hash)
+            .map(|(after_lt, after_hash)| (after_lt as u64, after_hash)),
+    })
+}
+
+pub(super) async fn resolve_block_transactions(
+    node: &Localnet,
+    request: &ParsedBlockTransactionsRequest,
+) -> anyhow::Result<LocalnetBlockTransactions> {
+    let selector = &request.selector;
     let mut block = if selector.workchain == -1 {
         let header = node.get_masterchain_block_header(selector.seqno).await?;
         LocalnetBlockTransactions {
@@ -578,8 +634,8 @@ pub(super) async fn resolve_block_transactions(
     } else {
         node.get_block_transactions(selector.seqno).await?
     };
-    validate_block_id(&block.id, &selector)?;
-    paginate_block_transactions(&mut block, payload)?;
+    validate_block_id(&block.id, selector)?;
+    paginate_block_transactions(&mut block, request.count, request.after);
     Ok(block)
 }
 
@@ -593,10 +649,8 @@ fn validate_block_id(
     );
     anyhow::ensure!(block_id.shard == selector.shard, "shard mismatch");
     anyhow::ensure!(block_id.seqno == selector.seqno, "seqno mismatch");
-    if let Some(root_hash) = selector.root_hash {
+    if let (Some(root_hash), Some(file_hash)) = (selector.root_hash, selector.file_hash) {
         anyhow::ensure!(block_id.root_hash == root_hash, "root_hash mismatch");
-    }
-    if let Some(file_hash) = selector.file_hash {
         anyhow::ensure!(block_id.file_hash == file_hash, "file_hash mismatch");
     }
     Ok(())
@@ -604,34 +658,10 @@ fn validate_block_id(
 
 fn paginate_block_transactions(
     block: &mut LocalnetBlockTransactions,
-    payload: &BlockTransactionsRequest,
-) -> anyhow::Result<()> {
-    let count = payload
-        .count
-        .as_ref()
-        .map(StringOrNumber::to_usize)
-        .transpose()?
-        .unwrap_or(40);
-    if !(1..=10_000).contains(&count) {
-        anyhow::bail!("`count` must be between 1 and 10000");
-    }
-
-    let after_lt = payload
-        .after_lt
-        .as_ref()
-        .map(StringOrNumber::to_u64)
-        .transpose()?;
-    let after_hash = payload
-        .after_hash
-        .as_ref()
-        .filter(|hash| !hash.is_empty())
-        .map(|hash| parse_hash_any(hash))
-        .transpose()?;
-    if after_lt.is_some() != after_hash.is_some() {
-        anyhow::bail!("`after_lt` and `after_hash` must be used together");
-    }
-
-    let start = if let (Some(after_lt), Some(after_hash)) = (after_lt, after_hash) {
+    count: usize,
+    after: Option<(u64, Hash256)>,
+) {
+    let start = if let Some((after_lt, after_hash)) = after {
         block
             .transactions
             .iter()
@@ -639,7 +669,7 @@ fn paginate_block_transactions(
                 transaction.transaction_id.lt == after_lt
                     && transaction.address.addr == after_hash.0
             })
-            .map_or(block.transactions.len(), |index| index + 1)
+            .map_or(0, |index| index + 1)
     } else {
         0
     };
@@ -648,13 +678,63 @@ fn paginate_block_transactions(
     transactions.truncate(count);
     block.transactions = transactions;
     block.requested_count = count;
-    Ok(())
+}
+
+pub(super) struct ParsedLookupBlockRequest {
+    pub workchain: i32,
+    pub shard: i64,
+    pub seqno: Option<u32>,
+    pub lt: Option<u64>,
+    pub unixtime: Option<u32>,
+}
+
+pub(super) fn parse_lookup_block_request(
+    payload: &LookupBlockRequest,
+) -> anyhow::Result<ParsedLookupBlockRequest> {
+    let seqno = payload
+        .seqno
+        .as_ref()
+        .map(parse_required_seqno)
+        .transpose()?;
+
+    let lt = payload
+        .lt
+        .as_ref()
+        .map(StringOrNumber::to_i64)
+        .transpose()?;
+    if lt.is_some_and(|lt| lt < 0) {
+        anyhow::bail!("lt should be non-negative");
+    }
+
+    let unixtime = payload
+        .unixtime
+        .as_ref()
+        .map(StringOrNumber::to_i32)
+        .transpose()?;
+    if unixtime.is_some_and(|unixtime| unixtime < 0) {
+        anyhow::bail!("unixtime should be non-negative");
+    }
+
+    if usize::from(seqno.is_some()) + usize::from(lt.is_some()) + usize::from(unixtime.is_some())
+        != 1
+    {
+        anyhow::bail!("exactly one of seqno, lt, unixtime should be specified");
+    }
+
+    Ok(ParsedLookupBlockRequest {
+        workchain: payload.workchain.to_i32()?,
+        shard: payload.shard.to_i64()?,
+        seqno,
+        lt: lt.map(|lt| lt as u64),
+        unixtime: unixtime.map(|unixtime| unixtime as u32),
+    })
 }
 
 pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Option<u32>> {
-    let Some(seqno) = seqno else {
-        return Ok(None);
-    };
+    seqno.as_ref().map(parse_required_seqno).transpose()
+}
+
+pub(super) fn parse_required_seqno(seqno: &StringOrNumber) -> anyhow::Result<u32> {
     let seqno = seqno.to_i32().map_err(|_| {
         ToncenterHttpError::unprocessable_entity("seqno should be a signed 32-bit integer")
     })?;
@@ -663,7 +743,7 @@ pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Optio
             "seqno should be positive",
         ));
     }
-    Ok(Some(seqno as u32))
+    Ok(seqno as u32)
 }
 
 pub(super) fn parse_i32_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {

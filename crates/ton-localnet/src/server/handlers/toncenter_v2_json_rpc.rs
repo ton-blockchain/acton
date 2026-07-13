@@ -1,6 +1,7 @@
 use super::toncenter_v2::{
-    parse_config_param, parse_i32_seqno, parse_libraries_request, parse_seqno,
-    parse_transactions_request, parse_transactions_std_request, resolve_block_header,
+    parse_block_header_request, parse_block_transactions_request, parse_config_param,
+    parse_i32_seqno, parse_libraries_request, parse_lookup_block_request, parse_required_seqno,
+    parse_seqno, parse_transactions_request, parse_transactions_std_request, resolve_block_header,
     resolve_block_transactions, resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
@@ -285,24 +286,27 @@ async fn json_rpc_router(
         }
         "getBlockHeader" => {
             let req: BlockHeaderRequest = parse_params(params, method)?;
+            let request = validate!(parse_block_header_request(&req));
             wire::JsonRpcResult::BlockHeader(Box::new(
-                resolve_block_header(&node, &req)
+                resolve_block_header(&node, &request)
                     .await
                     .map(|r| v2::map_block_header(&r))?,
             ))
         }
         "getBlockTransactions" => {
             let req: BlockTransactionsRequest = parse_params(params, method)?;
+            let request = validate!(parse_block_transactions_request(&req));
             wire::JsonRpcResult::BlockTransactions(Box::new(
-                resolve_block_transactions(&node, &req)
+                resolve_block_transactions(&node, &request)
                     .await
                     .map(|r| v2::map_block_transactions(&r))?,
             ))
         }
         "getBlockTransactionsExt" => {
             let req: BlockTransactionsRequest = parse_params(params, method)?;
+            let request = validate!(parse_block_transactions_request(&req));
             wire::JsonRpcResult::BlockTransactionsExt(Box::new(
-                resolve_block_transactions(&node, &req)
+                resolve_block_transactions(&node, &request)
                     .await
                     .map(|r| v2::map_block_transactions_ext(&r))?,
             ))
@@ -324,27 +328,24 @@ async fn json_rpc_router(
         )),
         "getShards" => {
             let req: SeqnoRequest = parse_params(params, method)?;
-            let seqno = validate!(req.seqno.to_u32());
-            if seqno == 0 {
-                return Err(ToncenterHttpError::unprocessable_entity(
-                    "seqno should be positive",
-                ));
-            }
+            let seqno = validate!(parse_required_seqno(&req.seqno));
             wire::JsonRpcResult::Shards(Box::new(
                 node.get_shards(seqno).await.map(|r| v2::map_shards(&r))?,
             ))
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;
-            let workchain = validate!(req.workchain.to_i32());
-            let shard = validate!(req.shard.to_i64()).to_string();
-            let seqno = validate!(parse_seqno(req.seqno));
-            let lt = validate!(req.lt.map(|value| value.to_u64()).transpose());
-            let unixtime = validate!(req.unixtime.map(|value| value.to_u32()).transpose());
+            let request = validate!(parse_lookup_block_request(&req));
             wire::JsonRpcResult::BlockId(Box::new(
-                node.lookup_block(workchain, shard, seqno, lt, unixtime)
-                    .await
-                    .map(|r| v2::map_lookup_block(&r))?,
+                node.lookup_block(
+                    request.workchain,
+                    request.shard,
+                    request.seqno,
+                    request.lt,
+                    request.unixtime,
+                )
+                .await
+                .map(|r| v2::map_lookup_block(&r))?,
             ))
         }
         _ => {

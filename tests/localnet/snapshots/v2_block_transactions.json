@@ -1,0 +1,74 @@
+{
+  "default_page": {
+    "count": 2,
+    "incomplete": true,
+    "modes": [
+      135,
+      135
+    ],
+    "req_count": 2
+  },
+  "errors": [
+    {
+      "case": "both wrong block hashes",
+      "code": 500,
+      "error": "root_hash mismatch",
+      "status": 500
+    },
+    {
+      "case": "negative after_lt",
+      "code": 422,
+      "error": "after_lt should be non-negative",
+      "status": 422
+    },
+    {
+      "case": "after_lt without hash",
+      "code": 422,
+      "error": "after_lt and after_hash should be used together",
+      "status": 422
+    },
+    {
+      "case": "after_lt i64 overflow",
+      "code": 422,
+      "error": "number too large to fit in target type",
+      "status": 422
+    },
+    {
+      "case": "count i32 overflow",
+      "code": 422,
+      "error": "out of range integral type conversion attempted",
+      "status": 422
+    },
+    {
+      "case": "seqno i32 overflow",
+      "code": 422,
+      "error": "seqno should be a signed 32-bit integer",
+      "status": 422
+    },
+    {
+      "case": "json-rpc count i32 overflow",
+      "code": 422,
+      "error": "out of range integral type conversion attempted",
+      "status": 422
+    }
+  ],
+  "exact_cursor": {
+    "count": 2,
+    "starts_after_cursor": true
+  },
+  "exact_ext_cursor": {
+    "count": 2,
+    "incomplete": true,
+    "req_count": 2
+  },
+  "fixture": {
+    "seqno": 6,
+    "transaction_count": 4
+  },
+  "single_block_hash_is_lookup_hint": {
+    "file_only_matches": true,
+    "root_only_matches": true
+  },
+  "unknown_cursor_starts_at_first": true,
+  "zero_cursor_starts_at_first": true
+}

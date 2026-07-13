@@ -43,13 +43,16 @@ still defects because they violate schemas even under those limitations.
 | V2-02 JSON-RPC envelope | Fixed | The incoming proxy DTO accepts method-only requests and upstream params normalization; local and live tests cover ignored metadata and every params shape. |
 | V2-03 JSON-RPC `getShards` | Fixed | Dispatch now uses the upstream method name; the non-upstream `shards` name is rejected and local/live typed responses are covered. |
 | V2-04 account status | Fixed | REST and JSON-RPC use the same V2 status mapper; a no-state account is covered through both transports. |
-| V2-06 validation errors | Partial | Shared V2 validation and JSON-RPC field parsing now return typed 422 envelopes. Axum extractor rejections and locate-miss semantics remain open. |
+| V2-06 validation errors | Partial | Shared V2 validation, JSON-RPC field parsing, and all block request parsers now return typed 422 envelopes. Axum extractor rejections and locate-miss semantics remain open. |
 | V2-07 positive `seqno` | Fixed | All account, shard-account, wallet, token, and config entry points reject explicit zero, negative, and values above signed int32; REST and JSON-RPC are snapshot-covered. |
 | V2-08 token history | Fixed | `getTokenData` detects assets from the account state at the requested block. Real jetton supply/balance and NFT collection/owner transitions are snapshot-covered through typed REST and JSON-RPC responses. |
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
 | V2-10/11 transaction history | Fixed | Account history excludes `to_lt`, requires an exact nonzero cursor, and accepts hex, standard base64, padded base64url, and unpadded base64url hashes. Real REST/JSON-RPC history and invalid cursors are snapshot-covered. |
 | V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
-| V2-22 numeric ranges | Partial | Numeric get-method IDs, `runGetMethodStd.seqno`, and transaction `limit`/`lt`/`to_lt` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
+| V2-16 block headers | Fixed | The response is populated from the serialized block's `BlockInfo`, including the real global ID, key-block fields, and previous block IDs. Basechain/masterchain headers and single/both hash selectors are snapshot-covered. |
+| V2-17 block transactions | Fixed | Zero and unknown cursors start at the first transaction, exact cursors are exclusive, short transaction mode is 135, single block hashes are lookup hints, and validation is typed 422. Generated localnet masterchain blocks have no account blocks, so their empty result is faithful to the source block. |
+| V2-18 block lookup | Fixed | REST and JSON-RPC require exactly one signed-range selector; seqno, LT, time, zero values, missing selectors, and combined selectors are snapshot-covered. |
+| V2-22 numeric ranges | Partial | Get-method IDs, seqnos, account transaction fields, block transaction fields, lookup selectors, and shard seqnos now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 | V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
 | V2-25 Std zero cursor | Fixed | `getTransactions` treats `lt=0` as absent, while `getTransactionsStd` preserves it as a supplied cursor and returns the canonical empty page for any paired hash. |
@@ -97,7 +100,6 @@ These are the highest-value targets for the next differential test pass:
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
 | P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope, and locate misses can become internal errors. |
-| P0 | V2 block APIs | Block headers contain many hardcoded fields; block transaction cursors and masterchain transactions are wrong; `lookupBlock` selector rules differ. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | `transactionsByMessage` and `pendingTransactions` accept invalid empty filters and use incompatible identity/direction rules. |
 | P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs, abort filtering, ordering, and parser failure handling are wrong. |
@@ -109,7 +111,7 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
 The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
-endpoint-test depth is 5 at grade A, 53 at B, 36 at C, 4 at D, and 7 with no endpoint test. The
+endpoint-test depth is 9 at grade A, 51 at B, 34 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -180,14 +182,14 @@ coverage is high.
 | `GET /api/v2/tryLocateSourceTx` | High | C | Not-found 404, ambiguity and full-scan cost, fork behavior. |
 | `GET /api/v2/getConfigParam` | High | C | Both aliases together, historical mutation, seqno zero, missing param/config cell, status mapping. |
 | `GET /api/v2/getConfigAll` | High | C | Historical config mutation, seqno zero, and old/missing blocks. |
-| `GET /api/v2/getBlockHeader` | Critical | C | Every header field, base/masterchain, split/merge/key block, hashes and previous blocks. |
-| `GET /api/v2/getBlockTransactions` | High | B | Initial zero cursor, unknown cursor, masterchain tx, one/both hashes, and count bounds. |
-| `GET /api/v2/getBlockTransactionsExt` | High | B | Same plus full message and extra-currency DTOs. |
+| `GET /api/v2/getBlockHeader` | Critical | A | All serialized fields, base/masterchain, single/both hashes, and previous blocks are covered; split/merge/key blocks are outside the current single-shard model. |
+| `GET /api/v2/getBlockTransactions` | High | A | Stateful zero/exact/unknown cursors, short-ID mode, masterchain emptiness, one/both hashes, signed ranges, and count bounds. |
+| `GET /api/v2/getBlockTransactionsExt` | High | A | Shared cursor and validation behavior plus typed full-transaction responses; decoded message and extra-currency DTO gaps remain cross-cutting. |
 | `GET /api/v2/getMasterchainInfo` | Medium | C | Exact state root/init values, genesis/head zero, and history/reorg. |
 | `GET /api/v2/getConsensusBlock` | Medium | C | Server-time semantics, paused/manual mining, virtual time, head zero. |
 | `GET /api/v2/getOutMsgQueueSize` | High | D | Real queued messages, correct shard block IDs, configured limit, multiple shards. |
 | `GET /api/v2/getShards` | High | B | REST and JSON-RPC typed responses plus proxy-envelope variants; historical descriptors, split shards, and missing blocks remain uncovered. |
-| `GET /api/v2/lookupBlock` | Critical | C | LT/time selectors, none/multiple selectors, boundaries, seqno zero, shard/workchain validation. |
+| `GET /api/v2/lookupBlock` | Critical | A | Stateful seqno/LT/time lookup plus none/multiple selectors, zero/negative/overflow boundaries, and REST/JSON-RPC parity. |
 
 ### V2 findings and accepted deviations
 
@@ -226,21 +228,22 @@ coverage is high.
 15. **V2-15, token DTOs (partially fixed):** mintless claim state and typed DNS NFT data are
     exposed, and NFT collection data is detected from the collection itself. NFT items with a
     collection still lack upstream parent-address verification and collection-derived content.
-16. **V2-16, block header:** many semantic fields are hardcoded and `prev_key_block_seqno` is
-    populated from the immediate previous block.
-17. **V2-17, block transactions:** the canonical zero cursor returns an empty page, individual
-    root/file hash handling differs, and masterchain blocks always return no transactions.
-18. **V2-18, block lookup:** local accepts zero or multiple selectors and silently prioritizes
-    seqno, LT, then time; upstream HTTP validation requires exactly one selector.
+16. **V2-16, block header (fixed):** every response field is read from the serialized block's
+    `BlockInfo`; previous block IDs and `prev_key_block_seqno` no longer use synthetic defaults.
+17. **V2-17, block transactions (fixed):** zero/unknown/exact cursors, short transaction mode,
+    single versus paired block hashes, signed ranges, and validation statuses match upstream.
+    Localnet masterchain blocks contain no account blocks, so an empty masterchain page is correct.
+18. **V2-18, block lookup (fixed):** the HTTP contract requires exactly one selector and validates
+    seqno, LT, and Unix time in the same signed ranges as the C++ handlers.
 19. **V2-19, out queue:** the response is synthetic, always uses the masterchain head, and reports
     zero size/limit instead of per-shard data.
 20. **V2-20, consensus timestamp:** local returns the latest masterchain block generation time;
     C++ returns current server time.
 21. **V2-21, historical account fields:** `sync_utime` remains current node time and `suspended` is
     always false.
-22. **V2-22, numeric ranges (partially fixed):** numeric get-method IDs and the Std getter seqno now
-    use upstream signed ranges. Other local unsigned request fields can still accept values that
-    cannot be represented by upstream signed schema types.
+22. **V2-22, numeric ranges (partially fixed):** get-method IDs, seqnos, account/block transaction
+    fields, lookup selectors, and shard seqnos use upstream signed ranges. Other local unsigned
+    request fields can still accept values that cannot be represented by upstream schema types.
 23. **V2-23, getter result stack (fixed):** both result formats now reject depth 100 or more with
     code 533 and propagate BOC, tuple, and wire-conversion failures instead of returning a
     successful empty stack.
@@ -454,10 +457,10 @@ coverage is high.
    `getShards`, and failures that must match the corresponding REST status and envelope.
 3. Complete historical account coverage for `sync_utime` and suspended-state semantics, and add
    real mintless and DNS contracts plus parent-verified NFT content to the token fixtures.
-4. Extend the V2 transaction fixture with decoded text/encrypted bodies, extra currencies, and
-   masterchain block transactions; account cursors, hash encodings, and LT boundaries are covered.
-5. Compare every V2/V3 block-header field on basechain, masterchain, key, split, and merge blocks;
-   cover zero and unknown pagination cursors and all lookup selector combinations.
+4. Extend the V2 transaction fixture with decoded text/encrypted bodies and extra currencies;
+   account and block cursors, hash encodings, and LT boundaries are covered.
+5. Add block-header fixtures if the localnet model gains key blocks, shard splits, or merges;
+   ordinary basechain/masterchain fields, pagination cursors, and lookup selectors are covered.
 6. Create a branched three-transaction trace spanning at least two blocks. Assert shared trace ID,
    external hash, end block/time/LT, message counts, inclusive ranges, ordering, and page extras.
 7. Send one internal message in a later block than its creation. Compare `/messages` filtering and

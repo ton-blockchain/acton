@@ -24,7 +24,7 @@ use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
 use tycho_types::cell::{Cell, CellBuilder, CellFamily, Store};
 use tycho_types::dict::Dict;
-use tycho_types::models::{ExtInMsgInfo, Message, MsgInfo};
+use tycho_types::models::{Block, ExtInMsgInfo, Message, MsgInfo};
 use tycho_types::num::Tokens;
 
 const CRC16: Crc<u16> = Crc::<u16>::new(&CRC_16_XMODEM);
@@ -316,10 +316,23 @@ pub struct LocalnetRecoveryPointResult {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetBlockHeader {
     pub id: LocalnetBlockId,
+    pub global_id: i32,
+    pub version: i32,
+    pub after_merge: bool,
+    pub after_split: bool,
+    pub before_split: bool,
+    pub want_merge: bool,
+    pub want_split: bool,
+    pub validator_list_hash_short: i32,
+    pub catchain_seqno: i32,
+    pub min_ref_mc_seqno: i32,
+    pub is_key_block: bool,
+    pub prev_key_block_seqno: i32,
     pub gen_utime: u32,
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub prev_seqno: Option<Seqno>,
+    pub prev_blocks: Vec<LocalnetBlockId>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -1356,14 +1369,11 @@ impl Localnet {
     pub async fn lookup_block(
         &self,
         workchain: i32,
-        shard: String,
+        shard: i64,
         seqno: Option<u32>,
         lt: Option<u64>,
         unixtime: Option<u32>,
     ) -> anyhow::Result<LocalnetBlockId> {
-        let shard = shard.parse::<i64>().map_err(|error| {
-            LocalnetError::protocol_violation(format!("invalid shard number: {error}"))
-        })?;
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::LookupBlock {
@@ -3212,14 +3222,14 @@ fn handle_get_block_header(node: &Node, seqno: u32) -> anyhow::Result<LocalnetBl
     let Some(header) = node.get_block_header(seqno) else {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
-
-    Ok(LocalnetBlockHeader {
-        id: header.block_id(),
-        gen_utime: header.gen_utime,
-        start_lt: header.start_lt,
-        end_lt: header.end_lt,
-        prev_seqno: header.prev_seqno,
-    })
+    let block_boc = node.get_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| node.get_block_header(prev_seqno))
+        .map(|prev| prev.block_id())
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
 }
 
 fn handle_get_masterchain_block_header(
@@ -3229,13 +3239,45 @@ fn handle_get_masterchain_block_header(
     let Some(header) = node.get_masterchain_block_header(seqno) else {
         return Err(LocalnetError::BlockNotFound { seqno }.into());
     };
+    let block_boc = node.get_masterchain_block_data(seqno)?;
+    let prev_blocks = header
+        .prev_seqno
+        .and_then(|prev_seqno| node.get_masterchain_block_header(prev_seqno))
+        .map(|prev| prev.block_id())
+        .into_iter()
+        .collect();
+    parse_block_header(header.block_id(), prev_blocks, &block_boc)
+}
 
+fn parse_block_header(
+    id: LocalnetBlockId,
+    prev_blocks: Vec<LocalnetBlockId>,
+    block_boc: &BocBytes,
+) -> anyhow::Result<LocalnetBlockHeader> {
+    let cell = Boc::decode(block_boc).context("Failed to decode block BOC")?;
+    let block = cell.parse::<Block>().context("Failed to parse block")?;
+    let info = block.load_info().context("Failed to load block info")?;
+
+    let prev_seqno = prev_blocks.first().map(|block| block.seqno);
     Ok(LocalnetBlockHeader {
-        id: header.block_id(),
-        gen_utime: header.gen_utime,
-        start_lt: header.start_lt,
-        end_lt: header.end_lt,
-        prev_seqno: header.prev_seqno,
+        id,
+        global_id: block.global_id,
+        version: info.version as i32,
+        after_merge: info.after_merge,
+        after_split: info.after_split,
+        before_split: info.before_split,
+        want_merge: info.want_merge,
+        want_split: info.want_split,
+        validator_list_hash_short: info.gen_validator_list_hash_short as i32,
+        catchain_seqno: info.gen_catchain_seqno as i32,
+        min_ref_mc_seqno: info.min_ref_mc_seqno as i32,
+        is_key_block: info.key_block,
+        prev_key_block_seqno: info.prev_key_block_seqno as i32,
+        gen_utime: info.gen_utime,
+        start_lt: info.start_lt,
+        end_lt: info.end_lt,
+        prev_seqno,
+        prev_blocks,
     })
 }
 
