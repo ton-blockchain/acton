@@ -441,7 +441,7 @@ pub fn map_run_get_method_std(
 
 fn decode_run_get_method_stack(r: &LocalnetRunGetMethodResult) -> anyhow::Result<Tuple> {
     let stack_cell = Boc::decode(&r.stack)?;
-    Ok(Tuple::deserialize(&stack_cell)?)
+    Tuple::deserialize(&stack_cell)
 }
 
 fn ensure_std_stack_depth(stack: &Tuple) -> anyhow::Result<()> {

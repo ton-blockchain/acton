@@ -8,23 +8,23 @@
   },
   {
     "case": "zero shards seqno",
-    "code": 500,
-    "error": "`seqno` must be positive",
+    "code": 422,
+    "error": "seqno should be positive",
     "id": null,
-    "status": 500
+    "status": 422
   },
   {
     "case": "missing config param",
-    "code": 500,
-    "error": "`param` is required",
+    "code": 422,
+    "error": "only one of config_id or param should be specified",
     "id": null,
-    "status": 500
+    "status": 422
   },
   {
     "case": "invalid hash",
-    "code": 500,
+    "code": 422,
     "error": "Invalid hash format",
     "id": null,
-    "status": 500
+    "status": 422
   }
 ]

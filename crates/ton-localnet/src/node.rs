@@ -545,6 +545,7 @@ impl Node {
             start_lt,
             end_lt,
             shard_block: block_meta.block_id(),
+            config_boc_hash: self.globals.config_boc_hash,
             state_root_hash: masterchain_block.state_root_hash,
             block_hash: masterchain_block_hash,
             file_hash: masterchain_file_hash,
@@ -1567,6 +1568,10 @@ impl Node {
             .take(MASTERCHAIN_PREV_BLOCKS_LIMIT)
             .cloned()
             .collect::<Vec<_>>();
+        let config_cell = self
+            .cas
+            .get_cell(&block.config_boc_hash)
+            .context("Historical config missing")?;
 
         let state = create_masterchain_state_cell(&MasterchainBlockBuildContext {
             seqno,
@@ -1576,7 +1581,7 @@ impl Node {
             prev_block: prev_block.as_ref(),
             prev_state: None,
             shard_block: &shard_block,
-            config_cell: &self.config_cell,
+            config_cell: &config_cell,
             prev_blocks: &prev_blocks,
         })?;
 

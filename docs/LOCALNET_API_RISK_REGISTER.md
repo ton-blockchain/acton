@@ -42,8 +42,13 @@ still defects because they violate schemas even under those limitations.
 | V2-01 `runGetMethodStd` | Fixed | Shared `tvm-ffi` Tonlib stack DTOs, separate Std request/result types, local REST/JSON-RPC snapshot, and a live non-empty TonCenter stack test. |
 | V2-02 JSON-RPC envelope | Fixed | The incoming proxy DTO accepts method-only requests and upstream params normalization; local and live tests cover ignored metadata and every params shape. |
 | V2-03 JSON-RPC `getShards` | Fixed | Dispatch now uses the upstream method name; the non-upstream `shards` name is rejected and local/live typed responses are covered. |
+| V2-04 account status | Fixed | REST and JSON-RPC use the same V2 status mapper; a no-state account is covered through both transports. |
+| V2-06 validation errors | Partial | Shared V2 validation and JSON-RPC field parsing now return typed 422 envelopes. Axum extractor rejections and locate-miss semantics remain open. |
+| V2-07 positive `seqno` | Fixed | All account, shard-account, wallet, token, and config entry points reject explicit zero, negative, and values above signed int32; REST and JSON-RPC are snapshot-covered. |
+| V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
 | V2-22 numeric ranges | Partial | Numeric get-method IDs and `runGetMethodStd.seqno` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
+| V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
 
 ## Rating model
 
@@ -86,8 +91,8 @@ These are the highest-value targets for the next differential test pass:
 
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
-| P0 | V2 request errors | REST and JSON-RPC validation statuses/envelopes diverge, and locate misses can become internal errors. |
-| P0 | V2 historical reads | `getTokenData` ignores `seqno`; config reads return current config; `seqno=0` is accepted as latest. |
+| P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope, and locate misses can become internal errors. |
+| P0 | V2 historical reads | `getTokenData` validates but still ignores a positive historical `seqno` when reading token indexes. |
 | P0 | V2 block APIs | Block headers contain many hardcoded fields; block transaction cursors and masterchain transactions are wrong; `lookupBlock` selector rules differ. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | `transactionsByMessage` and `pendingTransactions` accept invalid empty filters and use incompatible identity/direction rules. |

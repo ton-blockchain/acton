@@ -1,0 +1,149 @@
+{
+  "config_aliases_match": true,
+  "missing_account_state": {
+    "json_rpc": "uninitialized",
+    "rest": "uninitialized"
+  },
+  "validation": [
+    {
+      "case": "address information",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "address balance",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "address state",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "extended address information",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "wallet information",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "token data",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "shard account cell",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "config all",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "config param",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "getAddressInformation",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getAddressBalance",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getAddressState",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getExtendedAddressInformation",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getWalletInformation",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getTokenData",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "getShardAccountCell",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "json-rpc"
+    },
+    {
+      "case": "negative",
+      "code": 422,
+      "error": "seqno should be positive",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "i32 overflow",
+      "code": 422,
+      "error": "seqno should be a signed 32-bit integer",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "missing config selector",
+      "code": 422,
+      "error": "only one of config_id or param should be specified",
+      "status": 422,
+      "transport": "rest"
+    },
+    {
+      "case": "both config selectors",
+      "code": 422,
+      "error": "only one of config_id or param should be specified",
+      "status": 422,
+      "transport": "rest"
+    }
+  ]
+}

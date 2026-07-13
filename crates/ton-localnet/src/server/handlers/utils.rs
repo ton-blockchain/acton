@@ -60,16 +60,21 @@ pub fn error_status(error: &anyhow::Error) -> StatusCode {
 }
 
 pub fn parse_params<T: DeserializeOwned>(params: Value, method: &str) -> anyhow::Result<T> {
-    serde_json::from_value(params).map_err(|_| anyhow::anyhow!("Invalid params for {method}"))
+    serde_json::from_value(params).map_err(|_| {
+        ToncenterHttpError::unprocessable_entity(format!("Invalid params for {method}"))
+    })
 }
 
 pub fn parse_method_name(method: &StringOrNumber) -> anyhow::Result<String> {
     match method {
         StringOrNumber::String(value) => Ok(value.clone()),
-        StringOrNumber::Number(_) | StringOrNumber::Unsigned(_) => method
-            .to_i32()
-            .map(|value| value.to_string())
-            .map_err(|_| anyhow::anyhow!("numeric `method` must be a signed 32-bit integer")),
+        StringOrNumber::Number(_) | StringOrNumber::Unsigned(_) => {
+            method.to_i32().map(|value| value.to_string()).map_err(|_| {
+                ToncenterHttpError::unprocessable_entity(
+                    "numeric `method` must be a signed 32-bit integer",
+                )
+            })
+        }
     }
 }
 

@@ -188,6 +188,151 @@ fn json_rpc_deserializes_utility_and_account_responses() {
 }
 
 #[test]
+fn account_and_config_queries_match_v2_validation_rules() {
+    let project = ProjectBuilder::new("localnet-v2-account-validation").build();
+    let node = project.localnet().start();
+
+    let rest_state: responses::TonlibResponse<String> =
+        node.get_json_as(&format!("/api/v2/getAddressState?address={ZERO_ADDRESS}"));
+    let rpc_state: responses::JsonRpcResponse<String> = node.post_v2_json_rpc(
+        "/api/v2",
+        StringOrNumber::String("state".to_owned()),
+        "getAddressState",
+        requests::AddressInformationRequest {
+            address: ZERO_ADDRESS.to_owned(),
+            seqno: None,
+        },
+    );
+
+    let rest_paths = [
+        (
+            "address information",
+            format!("/api/v2/getAddressInformation?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "address balance",
+            format!("/api/v2/getAddressBalance?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "address state",
+            format!("/api/v2/getAddressState?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "extended address information",
+            format!("/api/v2/getExtendedAddressInformation?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "wallet information",
+            format!("/api/v2/getWalletInformation?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "token data",
+            format!("/api/v2/getTokenData?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        (
+            "shard account cell",
+            format!("/api/v2/getShardAccountCell?address={ZERO_ADDRESS}&seqno=0"),
+        ),
+        ("config all", "/api/v2/getConfigAll?seqno=0".to_owned()),
+        (
+            "config param",
+            "/api/v2/getConfigParam?param=0&seqno=0".to_owned(),
+        ),
+    ];
+    let mut validation = Vec::new();
+    for (case, path) in rest_paths {
+        let (status, error): (u16, responses::TonlibErrorResponse) =
+            node.get_json_with_status_as(&path);
+        validation.push(json!({
+            "transport": "rest",
+            "case": case,
+            "status": status,
+            "code": error.code,
+            "error": error.error,
+        }));
+    }
+
+    for method in [
+        "getAddressInformation",
+        "getAddressBalance",
+        "getAddressState",
+        "getExtendedAddressInformation",
+        "getWalletInformation",
+        "getTokenData",
+        "getShardAccountCell",
+    ] {
+        let (status, error): (u16, responses::TonlibErrorResponse) = node
+            .post_v2_json_rpc_with_status(
+                "/api/v2",
+                StringOrNumber::String(method.to_owned()),
+                method,
+                requests::AddressInformationRequest {
+                    address: ZERO_ADDRESS.to_owned(),
+                    seqno: Some(StringOrNumber::Number(0)),
+                },
+            );
+        validation.push(json!({
+            "transport": "json-rpc",
+            "case": method,
+            "status": status,
+            "code": error.code,
+            "error": error.error,
+        }));
+    }
+
+    for (case, seqno) in [("negative", "-1"), ("i32 overflow", "2147483648")] {
+        let path = format!("/api/v2/getAddressInformation?address={ZERO_ADDRESS}&seqno={seqno}");
+        let (status, error): (u16, responses::TonlibErrorResponse) =
+            node.get_json_with_status_as(&path);
+        validation.push(json!({
+            "transport": "rest",
+            "case": case,
+            "status": status,
+            "code": error.code,
+            "error": error.error,
+        }));
+    }
+
+    let config_by_param: responses::TonlibResponse<responses::ConfigInfo> =
+        node.get_json_as("/api/v2/getConfigParam?param=0");
+    let config_by_id: responses::TonlibResponse<responses::ConfigInfo> =
+        node.get_json_as("/api/v2/getConfigParam?config_id=0");
+    for (case, path) in [
+        ("missing config selector", "/api/v2/getConfigParam"),
+        (
+            "both config selectors",
+            "/api/v2/getConfigParam?param=0&config_id=0",
+        ),
+    ] {
+        let (status, error): (u16, responses::TonlibErrorResponse) =
+            node.get_json_with_status_as(path);
+        validation.push(json!({
+            "transport": "rest",
+            "case": case,
+            "status": status,
+            "code": error.code,
+            "error": error.error,
+        }));
+    }
+
+    let summary = json!({
+        "missing_account_state": {
+            "rest": rest_state.result,
+            "json_rpc": rpc_state.response.result,
+        },
+        "config_aliases_match": config_by_param.result.config.bytes
+            == config_by_id.result.config.bytes,
+        "validation": validation,
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v2_account_validation.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn rest_block_endpoints_deserialize_canonical_responses() {
     let project = ProjectBuilder::new("localnet-v2-rest-block-responses").build();
     let node = project.localnet().arg("--mine-empty-blocks").start();
@@ -504,7 +649,7 @@ fn run_get_method_std_uses_canonical_stack_contract() {
     unknown_field_request["unexpected"] = json!(true);
     let (unknown_field_status, _) =
         node.post_json_raw_with_status("/api/v2/runGetMethodStd", &unknown_field_request);
-    let mut out_of_range_method_request = request_json.clone();
+    let mut out_of_range_method_request = request_json;
     out_of_range_method_request["method"] = json!(i64::from(i32::MAX) + 1);
     let (out_of_range_method_status, _) =
         node.post_json_raw_with_status("/api/v2/runGetMethodStd", &out_of_range_method_request);

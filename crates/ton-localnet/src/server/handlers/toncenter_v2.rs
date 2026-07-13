@@ -24,7 +24,7 @@ macro_rules! parse {
     ($expression:expr) => {
         match $expression {
             Ok(value) => value,
-            Err(error) => return v2_bad_request(error),
+            Err(error) => return v2_unprocessable_entity(error),
         }
     };
 }
@@ -125,26 +125,32 @@ pub async fn get_wallet_information(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
-    handle_result(
-        async move {
-            let seqno = parse_seqno(payload.seqno)?;
-            let info = node
-                .get_address_information(payload.address.clone(), seqno)
-                .await?;
-            let seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
-                node.run_get_method(payload.address, "seqno".to_string(), Vec::new(), seqno)
-                    .await
-                    .ok()
-                    .and_then(|result| v2::map_wallet_seqno(&result))
-            } else {
-                None
-            };
+    handle_result(resolve_wallet_information(&node, &payload), Clone::clone).await
+}
 
-            Ok(v2::map_wallet_information(&info, seqno))
-        },
-        Clone::clone,
-    )
-    .await
+pub(super) async fn resolve_wallet_information(
+    node: &Localnet,
+    payload: &AddressInformationRequest,
+) -> anyhow::Result<ton_api::toncenter::v2::responses::WalletInformation> {
+    let request_seqno = parse_seqno(payload.seqno.clone())?;
+    let info = node
+        .get_address_information(payload.address.clone(), request_seqno)
+        .await?;
+    let wallet_seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
+        node.run_get_method(
+            payload.address.clone(),
+            "seqno".to_owned(),
+            Vec::new(),
+            request_seqno,
+        )
+        .await
+        .ok()
+        .and_then(|result| v2::map_wallet_seqno(&result))
+    } else {
+        None
+    };
+
+    Ok(v2::map_wallet_information(&info, wallet_seqno))
 }
 
 pub async fn get_token_data(
@@ -153,7 +159,9 @@ pub async fn get_token_data(
 ) -> Response {
     handle_result(
         async move {
-            let address = Addr::parse(&payload.address)?;
+            let _seqno = parse_seqno(payload.seqno)?;
+            let address = Addr::parse(&payload.address)
+                .map_err(|error| ToncenterHttpError::unprocessable_entity(error.to_string()))?;
             let mut infos = node.get_address_infos(vec![address]).await?;
             let info = infos
                 .pop()
@@ -420,7 +428,7 @@ pub async fn get_shards(
 ) -> Response {
     let seqno = parse!(payload.seqno.to_u32());
     if seqno == 0 {
-        return v2_bad_request("`seqno` must be positive");
+        return v2_unprocessable_entity("seqno should be positive");
     }
     handle_result(node.get_shards(seqno), |shards| v2::map_shards(shards)).await
 }
@@ -441,13 +449,13 @@ pub async fn lookup_block(
     .await
 }
 
-fn v2_bad_request(error: impl std::fmt::Display) -> Response {
+fn v2_unprocessable_entity(error: impl std::fmt::Display) -> Response {
     (
-        axum::http::StatusCode::BAD_REQUEST,
+        axum::http::StatusCode::UNPROCESSABLE_ENTITY,
         Json(ton_api::toncenter::v2::TonlibErrorResponse {
             ok: false,
             error: error.to_string(),
-            code: 400,
+            code: 422,
             extra: get_extra(),
             jsonrpc: None,
             id: None,
@@ -459,8 +467,9 @@ fn v2_bad_request(error: impl std::fmt::Display) -> Response {
 fn parse_std_addr(
     address: &str,
 ) -> anyhow::Result<(StdAddr, tycho_types::models::Base64StdAddrFlags)> {
-    StdAddr::from_str_ext(address, StdAddrFormat::any())
-        .map_err(|e| anyhow::anyhow!("Invalid address format: {e}"))
+    StdAddr::from_str_ext(address, StdAddrFormat::any()).map_err(|error| {
+        ToncenterHttpError::unprocessable_entity(format!("Invalid address format: {error}"))
+    })
 }
 
 fn detect_given_type(address: &str, bounceable: bool) -> &'static str {
@@ -497,17 +506,27 @@ fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
         return Ok(Hash256(arr));
     }
 
-    anyhow::bail!("Invalid hash format")
+    Err(ToncenterHttpError::unprocessable_entity(
+        "Invalid hash format",
+    ))
 }
 
 pub(super) fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
-    let raw = payload
-        .param
-        .as_ref()
-        .or(payload.config_id.as_ref())
-        .ok_or_else(|| anyhow::anyhow!("`param` is required"))?;
-    raw.to_u32()
-        .map_err(|_| anyhow::anyhow!("Config param must be a non-negative 32-bit integer"))
+    let ((Some(raw), None) | (None, Some(raw))) = (&payload.param, &payload.config_id) else {
+        return Err(ToncenterHttpError::unprocessable_entity(
+            "only one of config_id or param should be specified",
+        ));
+    };
+    let param = raw.to_i32().map_err(|_| {
+        ToncenterHttpError::unprocessable_entity(
+            "config param must be a non-negative 32-bit integer",
+        )
+    })?;
+    u32::try_from(param).map_err(|_| {
+        ToncenterHttpError::unprocessable_entity(
+            "config param must be a non-negative 32-bit integer",
+        )
+    })
 }
 
 pub(super) fn parse_libraries_request(raw: &[String]) -> anyhow::Result<Vec<Hash256>> {
@@ -670,10 +689,18 @@ fn paginate_block_transactions(
 }
 
 pub(super) fn parse_seqno(seqno: Option<StringOrNumber>) -> anyhow::Result<Option<u32>> {
-    seqno
-        .map(|value| value.to_u32())
-        .transpose()
-        .map_err(|_| anyhow::anyhow!("`seqno` must be a non-negative 32-bit integer"))
+    let Some(seqno) = seqno else {
+        return Ok(None);
+    };
+    let seqno = seqno.to_i32().map_err(|_| {
+        ToncenterHttpError::unprocessable_entity("seqno should be a signed 32-bit integer")
+    })?;
+    if seqno <= 0 {
+        return Err(ToncenterHttpError::unprocessable_entity(
+            "seqno should be positive",
+        ));
+    }
+    Ok(Some(seqno as u32))
 }
 
 pub(super) fn parse_i32_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>> {

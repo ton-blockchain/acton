@@ -1,7 +1,7 @@
 use super::toncenter_v2::{
     parse_config_param, parse_i32_seqno, parse_libraries_request, parse_seqno,
     parse_transactions_request, resolve_block_header, resolve_block_transactions,
-    token_wallet_code_hash,
+    resolve_wallet_information, token_wallet_code_hash,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -24,6 +24,12 @@ use ton_api::toncenter::v2::requests::{
     SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
+
+macro_rules! validate {
+    ($expression:expr) => {
+        $expression.map_err(|error| ToncenterHttpError::unprocessable_entity(error.to_string()))?
+    };
+}
 
 pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
@@ -103,8 +109,8 @@ async fn json_rpc_router(
         }
         "runGetMethod" => {
             let req: RunGetMethodRequest = parse_params(params, method)?;
-            let method_str = parse_method_name(&req.method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let method_str = validate!(parse_method_name(&req.method));
+            let seqno = validate!(parse_seqno(req.seqno));
             let result = node
                 .run_get_method(req.address, method_str, req.stack, seqno)
                 .await?;
@@ -112,8 +118,8 @@ async fn json_rpc_router(
         }
         "runGetMethodStd" => {
             let req: RunGetMethodStdRequest = parse_params(params, method)?;
-            let method_str = parse_method_name(&req.method)?;
-            let seqno = parse_i32_seqno(req.seqno)?;
+            let method_str = validate!(parse_method_name(&req.method));
+            let seqno = validate!(parse_i32_seqno(req.seqno));
             let result = node
                 .run_get_method_std(req.address, method_str, req.stack, seqno)
                 .await?;
@@ -121,7 +127,7 @@ async fn json_rpc_router(
         }
         "detectAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
-            let (addr, flags) = parse_std_addr(&req.address)?;
+            let (addr, flags) = validate!(parse_std_addr(&req.address));
             let given_type = detect_given_type(&req.address, flags.bounceable);
             wire::JsonRpcResult::DetectAddress(Box::new(map_detect_address(
                 &addr, flags, given_type,
@@ -129,22 +135,22 @@ async fn json_rpc_router(
         }
         "detectHash" => {
             let req: DetectHashRequest = parse_params(params, method)?;
-            let hash = parse_hash_any(&req.hash)?;
+            let hash = validate!(parse_hash_any(&req.hash));
             wire::JsonRpcResult::DetectHash(Box::new(v2::map_detect_hash(&hash)))
         }
         "packAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
-            let (addr, flags) = parse_std_addr(&req.address)?;
+            let (addr, flags) = validate!(parse_std_addr(&req.address));
             wire::JsonRpcResult::String(v2::map_pack_address(&addr, flags.testnet))
         }
         "unpackAddress" => {
             let req: AddressRequest = parse_params(params, method)?;
-            let (addr, _) = parse_std_addr(&req.address)?;
+            let (addr, _) = validate!(parse_std_addr(&req.address));
             wire::JsonRpcResult::String(v2::map_unpack_address(&addr))
         }
         "getAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::AddressInformation(Box::new(
                 node.get_address_information(req.address, seqno)
                     .await
@@ -153,7 +159,7 @@ async fn json_rpc_router(
         }
         "getShardAccountCell" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::ShardAccountCell(Box::new(
                 node.get_shard_account_cell(req.address, seqno)
                     .await
@@ -162,7 +168,7 @@ async fn json_rpc_router(
         }
         "getAddressBalance" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::String(
                 node.get_address_balance(req.address, seqno)
                     .await?
@@ -171,16 +177,13 @@ async fn json_rpc_router(
         }
         "getAddressState" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
-            wire::JsonRpcResult::String(
-                node.get_address_state(req.address, seqno)
-                    .await?
-                    .to_string(),
-            )
+            let seqno = validate!(parse_seqno(req.seqno));
+            let status = node.get_address_state(req.address, seqno).await?;
+            wire::JsonRpcResult::String(v2::map_account_status(&status).to_owned())
         }
         "getLibraries" => {
             let req: LibrariesRequest = parse_params(params, method)?;
-            let hashes = parse_libraries_request(&req.libraries)?;
+            let hashes = validate!(parse_libraries_request(&req.libraries));
             wire::JsonRpcResult::Libraries(Box::new(
                 node.get_libraries(hashes)
                     .await
@@ -189,7 +192,7 @@ async fn json_rpc_router(
         }
         "getExtendedAddressInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::ExtendedAddressInformation(Box::new(
                 node.get_address_information(req.address, seqno)
                     .await
@@ -198,25 +201,14 @@ async fn json_rpc_router(
         }
         "getWalletInformation" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let request_seqno = parse_seqno(req.seqno)?;
-            let info = node
-                .get_address_information(req.address.clone(), request_seqno)
-                .await?;
-            let seqno = if v2::wallet_type_name_from_code_hash(info.code_hash.as_ref()).is_some() {
-                node.run_get_method(req.address, "seqno".to_string(), Vec::new(), request_seqno)
-                    .await
-                    .ok()
-                    .and_then(|result| v2::map_wallet_seqno(&result))
-            } else {
-                None
-            };
-            wire::JsonRpcResult::WalletInformation(Box::new(v2::map_wallet_information(
-                &info, seqno,
-            )))
+            wire::JsonRpcResult::WalletInformation(Box::new(
+                resolve_wallet_information(node.as_ref(), &req).await?,
+            ))
         }
         "getTokenData" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let address = Addr::parse(&req.address)?;
+            let _seqno = validate!(parse_seqno(req.seqno));
+            let address = validate!(Addr::parse(&req.address));
             let mut infos = node.get_address_infos(vec![address]).await?;
             let info = infos
                 .pop()
@@ -235,7 +227,7 @@ async fn json_rpc_router(
         }
         "getTransactions" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            let (limit, lt, to_lt) = parse_transactions_request(&req)?;
+            let (limit, lt, to_lt) = validate!(parse_transactions_request(&req));
             wire::JsonRpcResult::Transactions(
                 node.get_transactions(req.address, limit, lt, req.hash, to_lt)
                     .await
@@ -244,7 +236,7 @@ async fn json_rpc_router(
         }
         "getTransactionsStd" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            let (page_limit, lt, to_lt) = parse_transactions_request(&req)?;
+            let (page_limit, lt, to_lt) = validate!(parse_transactions_request(&req));
             let fetch_limit = page_limit.saturating_add(1);
             wire::JsonRpcResult::RawTransactions(Box::new(
                 node.get_transactions(req.address, fetch_limit, lt, req.hash, to_lt)
@@ -254,8 +246,8 @@ async fn json_rpc_router(
         }
         "getConfigParam" => {
             let req: ConfigParamRequest = parse_params(params, method)?;
-            let param = parse_config_param(&req)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let param = validate!(parse_config_param(&req));
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::ConfigInfo(Box::new(
                 node.get_config_param(param, seqno)
                     .await
@@ -264,7 +256,7 @@ async fn json_rpc_router(
         }
         "getConfigAll" => {
             let req: ConfigAllRequest = parse_params(params, method)?;
-            let seqno = parse_seqno(req.seqno)?;
+            let seqno = validate!(parse_seqno(req.seqno));
             wire::JsonRpcResult::ConfigInfo(Box::new(
                 node.get_config_all(seqno)
                     .await
@@ -273,7 +265,7 @@ async fn json_rpc_router(
         }
         "tryLocateTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = req.created_lt.to_u64()?;
+            let created_lt = validate!(req.created_lt.to_u64());
             wire::JsonRpcResult::Transaction(Box::new(
                 node.try_locate_tx(req.source, req.destination, created_lt)
                     .await
@@ -282,7 +274,7 @@ async fn json_rpc_router(
         }
         "tryLocateResultTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = req.created_lt.to_u64()?;
+            let created_lt = validate!(req.created_lt.to_u64());
             wire::JsonRpcResult::Transaction(Box::new(
                 node.try_locate_result_tx(req.source, req.destination, created_lt)
                     .await
@@ -291,7 +283,7 @@ async fn json_rpc_router(
         }
         "tryLocateSourceTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = req.created_lt.to_u64()?;
+            let created_lt = validate!(req.created_lt.to_u64());
             wire::JsonRpcResult::Transaction(Box::new(
                 node.try_locate_source_tx(req.source, req.destination, created_lt)
                     .await
@@ -339,19 +331,23 @@ async fn json_rpc_router(
         )),
         "getShards" => {
             let req: SeqnoRequest = parse_params(params, method)?;
-            let seqno = req.seqno.to_u32()?;
-            anyhow::ensure!(seqno > 0, "`seqno` must be positive");
+            let seqno = validate!(req.seqno.to_u32());
+            if seqno == 0 {
+                return Err(ToncenterHttpError::unprocessable_entity(
+                    "seqno should be positive",
+                ));
+            }
             wire::JsonRpcResult::Shards(Box::new(
                 node.get_shards(seqno).await.map(|r| v2::map_shards(&r))?,
             ))
         }
         "lookupBlock" => {
             let req: LookupBlockRequest = parse_params(params, method)?;
-            let workchain = req.workchain.to_i32()?;
-            let shard = req.shard.to_i64()?.to_string();
-            let seqno = parse_seqno(req.seqno)?;
-            let lt = req.lt.map(|value| value.to_u64()).transpose()?;
-            let unixtime = req.unixtime.map(|value| value.to_u32()).transpose()?;
+            let workchain = validate!(req.workchain.to_i32());
+            let shard = validate!(req.shard.to_i64()).to_string();
+            let seqno = validate!(parse_seqno(req.seqno));
+            let lt = validate!(req.lt.map(|value| value.to_u64()).transpose());
+            let unixtime = validate!(req.unixtime.map(|value| value.to_u32()).transpose());
             wire::JsonRpcResult::BlockId(Box::new(
                 node.lookup_block(workchain, shard, seqno, lt, unixtime)
                     .await

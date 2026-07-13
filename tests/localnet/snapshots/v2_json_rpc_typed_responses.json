@@ -4,7 +4,7 @@
     "extended_type": "fullAccountState",
     "is_wallet": false,
     "state": "uninitialized",
-    "state_endpoint": "nonexist",
+    "state_endpoint": "uninitialized",
     "type": "raw.fullAccountState",
     "wallet_type": "ext.accounts.walletInformation"
   },

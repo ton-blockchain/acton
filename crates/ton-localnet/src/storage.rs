@@ -397,6 +397,7 @@ pub struct MasterchainBlockMeta {
     pub start_lt: Lt,
     pub end_lt: Lt,
     pub shard_block: LocalnetBlockId,
+    pub config_boc_hash: Hash256,
     pub state_root_hash: Hash256,
     pub block_hash: Hash256,
     pub file_hash: Hash256,

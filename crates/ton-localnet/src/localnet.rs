@@ -3327,7 +3327,15 @@ fn handle_get_config_param(
 fn handle_get_config_all(node: &Node, seqno: Option<u32>) -> anyhow::Result<BocBytes> {
     ensure_seqno_exists(node, seqno)?;
 
-    node.get_cell(&node.globals.config_boc_hash)
+    let config_boc_hash = match seqno {
+        Some(seqno) if seqno > 0 => {
+            node.get_masterchain_block_header(seqno)
+                .ok_or(LocalnetError::BlockNotFound { seqno })?
+                .config_boc_hash
+        }
+        _ => node.globals.config_boc_hash,
+    };
+    node.get_cell(&config_boc_hash)
         .context("Blockchain config cell not found")
 }
 
@@ -3423,6 +3431,7 @@ mod tests {
     use crate::executor::{ExecContext, ExecResult, TvmExecutor};
     use tycho_types::boc::BocRepr;
     use tycho_types::cell::{CellSliceParts, HashBytes};
+    use tycho_types::models::config::BlockchainConfigParams;
     use tycho_types::models::{CurrencyCollection, IntAddr, IntMsgInfo, OwnedMessage, StdAddr};
 
     const REGULAR_OPCODE: u32 = 0x178d_4519;
@@ -3482,6 +3491,61 @@ mod tests {
         assert_eq!(result.blocks.len(), 2);
         assert_eq!(result.last_block_seqno, 2);
         assert_eq!(node.globals.head_seqno, 2);
+    }
+
+    #[test]
+    fn config_queries_use_the_config_committed_with_each_block() {
+        const TEST_PARAM: u32 = 999;
+
+        let mut node = make_test_node();
+        node.mine_block().expect("first block must be mined");
+        let first_config =
+            handle_get_config_all(&node, Some(1)).expect("first block config must be available");
+
+        let mut builder = CellBuilder::new();
+        builder
+            .store_u32(0xfeed_cafe)
+            .expect("test config marker must fit");
+        let test_param = builder.build().expect("test config param must build");
+        let mut second_config_params = BlockchainConfigParams::from_raw(
+            Boc::decode(&first_config).expect("default config must decode"),
+        );
+        second_config_params
+            .set_raw(TEST_PARAM, test_param.clone())
+            .expect("test config param must be inserted");
+        let second_config_cell = second_config_params
+            .as_dict()
+            .root()
+            .as_ref()
+            .expect("config dictionary must remain non-empty")
+            .clone();
+        let second_config_hash = Hash256::from(second_config_cell.repr_hash());
+        let second_config = BocBytes::from(Boc::encode(second_config_cell));
+        node.cas.put(second_config.clone(), second_config_hash);
+        node.globals.config_boc_hash = second_config_hash;
+
+        node.mine_block().expect("second block must be mined");
+
+        assert_eq!(
+            handle_get_config_all(&node, Some(1)).expect("historical config must remain available"),
+            first_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, Some(2)).expect("second block config must be available"),
+            second_config
+        );
+        assert_eq!(
+            handle_get_config_all(&node, None).expect("latest config must be available"),
+            second_config
+        );
+        assert!(handle_get_config_param(&node, TEST_PARAM, Some(1)).is_err());
+        assert_eq!(
+            handle_get_config_param(&node, TEST_PARAM, Some(2))
+                .expect("new config param must be available at the second block"),
+            BocBytes::from(Boc::encode(test_param))
+        );
+        node.get_masterchain_state_cell(1)
+            .expect("historical masterchain state must use the historical config");
     }
 
     struct NoopExecutor;
