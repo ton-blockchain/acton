@@ -1729,6 +1729,816 @@
           }
         }
       }
+    },
+    "/api/v3/dns/records": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Query DNS records by specified filters. Currently .ton and .t.me DNS are supported.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["dns"],
+        "summary": "Get DNS Records",
+        "operationId": "api_v3_get_dns_records",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Wallet address in any form. DNS records that contain this address in wallet category will be returned.",
+            "name": "wallet",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Domain name to search for. DNS records with this exact domain name will be returned.",
+            "name": "domain",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 100,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/DNSRecordsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/jetton/burns": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get Jetton burns by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["jettons"],
+        "summary": "Get Jetton Burns",
+        "operationId": "api_v3_get_jetton_burns",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of jetton wallet owner in any form. Max 1000",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Jetton wallet address in any form. Max: 1000.",
+            "name": "jetton_wallet",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Jetton master address in any form.",
+            "name": "jetton_master",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **after** given timestamp.",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **before** given timestamp.",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt >= start_lt`.",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt <= end_lt`.",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort transactions by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/JettonBurnsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/jetton/transfers": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get Jetton transfers by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["jettons"],
+        "summary": "Get Jetton Transfers",
+        "operationId": "api_v3_get_jetton_transfers",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of jetton wallet owner in any form. Max 1000",
+            "name": "owner_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Jetton wallet address in any form. Max: 1000.",
+            "name": "jetton_wallet",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Jetton master address in any form.",
+            "name": "jetton_master",
+            "in": "query"
+          },
+          {
+            "enum": ["in", "out"],
+            "type": "string",
+            "description": "Direction of transfer. *Note:* applied only with owner_address.",
+            "name": "direction",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **after** given timestamp.",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **before** given timestamp.",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt >= start_lt`.",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt <= end_lt`.",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort transactions by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/JettonTransfersResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/multisig/orders": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get multisig orders by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["multisig"],
+        "summary": "Get Multisig Orders",
+        "operationId": "api_v3_get_multisig_orders",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Order address in any form. Max: 1024.",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of corresponding multisig. Max: 1024.",
+            "name": "multisig_address",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Parser order actions",
+            "name": "parse_actions",
+            "in": "query"
+          },
+          {
+            "maximum": 1024,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort orders by last_transaction_lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/MultisigOrderResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/multisig/wallets": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get multisig contracts by specified filters with associated orders",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["multisig"],
+        "summary": "Get Multisigs",
+        "operationId": "api_v3_get_multisig_wallets",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Multisig contract address in any form. Max: 1024.",
+            "name": "address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of signer or proposer wallet in any form. Max: 1024.",
+            "name": "wallet_address",
+            "in": "query"
+          },
+          {
+            "maximum": 1024,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort multisigs by last_transaction_lt.",
+            "name": "sort",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": true,
+            "description": "Gather multisig orders",
+            "name": "include_orders",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/MultisigResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/nft/collections": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get NFT collections by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["nfts"],
+        "summary": "Get NFT collections",
+        "operationId": "api_v3_get_nft_collections",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Collection address in any form. Max: 1024.",
+            "name": "collection_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of collection owner in any form. Max: 1024.",
+            "name": "owner_address",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/NFTCollectionsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/nft/sales": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get GetGems NFT sales and auctions by sale/auction contract addresses",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["nfts"],
+        "summary": "Get NFT Sales and Auctions",
+        "operationId": "api_v3_get_nft_sales",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Sale or auction contract address in any form. Max: 1000.",
+            "name": "address",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/NFTSalesResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/nft/transfers": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get transfers of NFT items by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["nfts"],
+        "summary": "Get NFT Transfers",
+        "operationId": "api_v3_get_nft_transfers",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of NFT owner in any form. Max 1000",
+            "name": "owner_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Address of NFT item in any form. Max: 1000.",
+            "name": "item_address",
+            "in": "query"
+          },
+          {
+            "type": "string",
+            "description": "Collection address in any form.",
+            "name": "collection_address",
+            "in": "query"
+          },
+          {
+            "enum": ["in", "out"],
+            "type": "string",
+            "description": "Direction of transfer.",
+            "name": "direction",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **after** given timestamp.",
+            "name": "start_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "description": "Query transactions with generation UTC timestamp **before** given timestamp.",
+            "name": "end_utime",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt >= start_lt`.",
+            "name": "start_lt",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int64",
+            "description": "Query transactions with `lt <= end_lt`.",
+            "name": "end_lt",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          },
+          {
+            "enum": ["asc", "desc"],
+            "type": "string",
+            "default": "desc",
+            "description": "Sort transactions by lt.",
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/NFTTransfersResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/vesting": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get vesting contracts by specified filters",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["vesting"],
+        "summary": "Get Vesting Contracts",
+        "operationId": "api_v3_get_vesting_contracts",
+        "parameters": [
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Vesting contract address in any form. Max: 1000.",
+            "name": "contract_address",
+            "in": "query"
+          },
+          {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi",
+            "description": "Wallet address to filter by owner or sender. Max: 1000.",
+            "name": "wallet_address",
+            "in": "query"
+          },
+          {
+            "type": "boolean",
+            "default": false,
+            "description": "Check if wallet address is in whitelist.",
+            "name": "check_whitelist",
+            "in": "query"
+          },
+          {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer",
+            "format": "int32",
+            "default": 10,
+            "description": "Limit number of queried rows. Use with *offset* to batch read.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "minimum": 0,
+            "type": "integer",
+            "format": "int32",
+            "default": 0,
+            "description": "Skip first N rows. Use with *limit* to batch read.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/VestingContractsResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
     }
   },
   "definitions": {

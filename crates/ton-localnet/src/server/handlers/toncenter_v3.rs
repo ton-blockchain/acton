@@ -4,9 +4,14 @@ use super::toncenter_enrichment::{
 };
 use crate::api::{toncenter_emulate, toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
 use crate::localnet;
-use crate::localnet::{Localnet, LocalnetBlock, LocalnetJettonWalletsQuery, LocalnetTransaction};
-use crate::storage::{AccountStatus, JettonMasterMeta, TraceNode};
+use crate::localnet::{
+    Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery, LocalnetTransaction,
+};
+use crate::storage::{
+    AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta, TraceNode,
+};
 use crate::types::{Addr, Hash256};
+use crate::v3_events::{parse_jetton_burn, parse_jetton_transfer, parse_nft_transfer};
 use axum::{
     Json,
     extract::{Query, RawQuery, State},
@@ -23,11 +28,13 @@ use std::sync::Arc;
 use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
-    BlocksQuery, EstimateFeeRequest, JettonMastersQuery, JettonWalletsQuery, MessagesQuery,
-    NftItemsQuery, PendingActionsQuery, PendingTracesQuery, PendingTransactionsQuery,
-    RunGetMethodRequest, SendMessageRequest, StackEntry, TopAccountsByBalanceQuery, TracesQuery,
+    BlocksQuery, DnsRecordsQuery, EstimateFeeRequest, JettonBurnsQuery, JettonMastersQuery,
+    JettonTransfersQuery, JettonWalletsQuery, MessagesQuery, MultisigOrdersQuery,
+    MultisigWalletsQuery, NftCollectionsQuery, NftItemsQuery, NftSalesQuery, NftTransfersQuery,
+    PendingActionsQuery, PendingTracesQuery, PendingTransactionsQuery, RunGetMethodRequest,
+    SendMessageRequest, StackEntry, TopAccountsByBalanceQuery, TracesQuery,
     TransactionsByMasterchainBlockQuery, TransactionsByMessageQuery, TransactionsQuery,
-    WalletInformationQuery, WalletStatesQuery,
+    VestingQuery, WalletInformationQuery, WalletStatesQuery,
 };
 use toncenter_v3 as v3;
 
@@ -613,21 +620,592 @@ pub async fn get_nft_items(
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<NftItemsQuery>(raw_query.as_deref()));
+    if !payload.index.is_empty() && payload.collection_address.is_empty() {
+        return request_error(
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "index parameter is not allowed without the collection_address".to_owned(),
+        );
+    }
     let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
-
-    handle_v3_result(
-        node.get_nft_items(
+    let include_on_sale = payload.include_on_sale.unwrap_or(false);
+    let real_owner_filter = if include_on_sale && !payload.owner_address.is_empty() {
+        parse!(parse_address_set(&payload.owner_address))
+    } else {
+        HashSet::new()
+    };
+    let query_owner = if real_owner_filter.is_empty() {
+        payload.owner_address
+    } else {
+        Vec::new()
+    };
+    let mut items = match node
+        .get_nft_items(
             payload.address,
-            payload.owner_address,
+            query_owner,
             payload.collection_address,
             payload.index,
             payload.sort_by_last_transaction_lt,
-            Some(limit),
-            Some(offset),
-        ),
-        |items| v3::map_nft_items(items),
+            Some(if real_owner_filter.is_empty() {
+                limit
+            } else {
+                usize::MAX
+            }),
+            Some(if real_owner_filter.is_empty() {
+                offset
+            } else {
+                0
+            }),
+        )
+        .await
+    {
+        Ok(items) => items,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let sales = match load_nft_sales_for_items(node.as_ref(), &items).await {
+        Ok(sales) => sales,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+
+    if !real_owner_filter.is_empty() {
+        let sale_owners = sales
+            .iter()
+            .filter_map(|sale| {
+                sale.nft_owner_address
+                    .map(|owner| (sale.nft_address, owner))
+            })
+            .collect::<HashMap<_, _>>();
+        items.retain(|item| {
+            item.owner_address
+                .is_some_and(|owner| real_owner_filter.contains(&owner))
+                || sale_owners
+                    .get(&item.address)
+                    .is_some_and(|owner| real_owner_filter.contains(owner))
+        });
+        items = paginate(items, limit, offset);
+    }
+
+    (StatusCode::OK, Json(v3::map_nft_items(&items, &sales))).into_response()
+}
+
+pub async fn get_dns_records(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<DnsRecordsQuery>(raw_query.as_deref()));
+    let wallet_value = payload.wallet.as_deref().filter(|value| !value.is_empty());
+    let domain_value = payload.domain.as_deref().filter(|value| !value.is_empty());
+    if wallet_value.is_some() == domain_value.is_some() {
+        return v3_bad_request("Exactly one of `wallet` or `domain` is required");
+    }
+    let wallet = parse!(wallet_value.map(Addr::parse).transpose());
+    let (limit, offset) = parse!(parse_limit_offset_with(
+        payload.limit,
+        payload.offset,
+        100,
+        1000,
+    ));
+    let data = match discover_contract_data(node.as_ref(), &[], true).await {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let records = data
+        .into_iter()
+        .filter_map(|data| data.dns)
+        .filter(|record| {
+            wallet.is_none_or(|address| record.wallet == Some(address))
+                && domain_value.is_none_or(|domain| record.domain == domain)
+        })
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<_>>();
+    (StatusCode::OK, Json(v3::map_dns_records(&records))).into_response()
+}
+
+pub async fn get_jetton_transfers(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<JettonTransfersQuery>(raw_query.as_deref()));
+    parse!(validate_filter_len(
+        "owner_address",
+        payload.owner_address.len(),
+        1000,
+    ));
+    parse!(validate_filter_len(
+        "jetton_wallet",
+        payload.jetton_wallet.len(),
+        1000,
+    ));
+    let owners = parse!(parse_address_set(&payload.owner_address));
+    let wallet_filter = parse!(parse_address_set(&payload.jetton_wallet));
+    let master = parse!(
+        payload
+            .jetton_master
+            .as_deref()
+            .map(Addr::parse)
+            .transpose()
+    );
+    let direction = parse!(parse_message_direction(payload.direction.as_deref()));
+    let bounds = parse!(parse_event_bounds(
+        payload.start_utime,
+        payload.end_utime,
+        payload.start_lt,
+        payload.end_lt,
+    ));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let sort = parse!(parse_sort(payload.sort));
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
+        Ok(context) => context,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let wallets_by_address = wallets
+        .iter()
+        .map(|wallet| (wallet.address, wallet))
+        .collect::<HashMap<_, _>>();
+    let mut events = transactions
+        .iter()
+        .filter_map(|transaction| {
+            let wallet = wallets_by_address.get(&transaction.address)?;
+            parse_jetton_transfer(transaction, wallet).ok().flatten()
+        })
+        .filter(|event| wallet_filter.is_empty() || wallet_filter.contains(&event.source_wallet))
+        .filter(|event| master.is_none_or(|address| event.jetton_master == address))
+        .filter(|event| match direction {
+            Some(MessageDirection::In) => owners.is_empty() || owners.contains(&event.destination),
+            Some(MessageDirection::Out) => owners.is_empty() || owners.contains(&event.source),
+            None => {
+                owners.is_empty()
+                    || owners.contains(&event.source)
+                    || owners.contains(&event.destination)
+            }
+        })
+        .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
+        .collect::<Vec<_>>();
+    sort_events(&mut events, sort, |event| event.transaction_lt);
+    let events = paginate(events, limit, offset);
+    let selected_wallets = events
+        .iter()
+        .map(|event| event.source_wallet)
+        .collect::<HashSet<_>>();
+    let wallets = wallets
+        .into_iter()
+        .filter(|wallet| selected_wallets.contains(&wallet.address))
+        .collect::<Vec<_>>();
+    (
+        StatusCode::OK,
+        Json(v3::map_jetton_transfers(&events, &wallets, &masters)),
+    )
+        .into_response()
+}
+
+pub async fn get_jetton_burns(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<JettonBurnsQuery>(raw_query.as_deref()));
+    parse!(validate_filter_len("address", payload.address.len(), 1000));
+    parse!(validate_filter_len(
+        "jetton_wallet",
+        payload.jetton_wallet.len(),
+        1000,
+    ));
+    let owners = parse!(parse_address_set(&payload.address));
+    let wallet_filter = parse!(parse_address_set(&payload.jetton_wallet));
+    let master = parse!(
+        payload
+            .jetton_master
+            .as_deref()
+            .map(Addr::parse)
+            .transpose()
+    );
+    let bounds = parse!(parse_event_bounds(
+        payload.start_utime,
+        payload.end_utime,
+        payload.start_lt,
+        payload.end_lt,
+    ));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let sort = parse!(parse_sort(payload.sort));
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let (wallets, masters) = match load_jetton_event_context(node.as_ref(), &transactions).await {
+        Ok(context) => context,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let wallets_by_address = wallets
+        .iter()
+        .map(|wallet| (wallet.address, wallet))
+        .collect::<HashMap<_, _>>();
+    let mut events = transactions
+        .iter()
+        .filter_map(|transaction| {
+            let wallet = wallets_by_address.get(&transaction.address)?;
+            parse_jetton_burn(transaction, wallet).ok().flatten()
+        })
+        .filter(|event| owners.is_empty() || owners.contains(&event.owner))
+        .filter(|event| wallet_filter.is_empty() || wallet_filter.contains(&event.jetton_wallet))
+        .filter(|event| master.is_none_or(|address| event.jetton_master == address))
+        .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
+        .collect::<Vec<_>>();
+    sort_events(&mut events, sort, |event| event.transaction_lt);
+    let events = paginate(events, limit, offset);
+    let selected_wallets = events
+        .iter()
+        .map(|event| event.jetton_wallet)
+        .collect::<HashSet<_>>();
+    let wallets = wallets
+        .into_iter()
+        .filter(|wallet| selected_wallets.contains(&wallet.address))
+        .collect::<Vec<_>>();
+    (
+        StatusCode::OK,
+        Json(v3::map_jetton_burns(&events, &wallets, &masters)),
+    )
+        .into_response()
+}
+
+pub async fn get_nft_collections(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<NftCollectionsQuery>(raw_query.as_deref()));
+    parse!(validate_filter_len(
+        "collection_address",
+        payload.collection_address.len(),
+        1000,
+    ));
+    parse!(validate_filter_len(
+        "owner_address",
+        payload.owner_address.len(),
+        1000,
+    ));
+    let collection_filter = parse!(parse_address_set(&payload.collection_address));
+    let owner_filter = parse!(parse_address_set(&payload.owner_address));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let scan_all = collection_filter.is_empty() || !owner_filter.is_empty();
+    let explicit = collection_filter.iter().copied().collect::<Vec<_>>();
+    let data = match discover_contract_data(node.as_ref(), &explicit, scan_all).await {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let mut collections = data
+        .into_iter()
+        .filter_map(|data| data.nft_collection)
+        .filter(|collection| {
+            (collection_filter.is_empty() || collection_filter.contains(&collection.address))
+                && (owner_filter.is_empty()
+                    || collection
+                        .owner_address
+                        .is_some_and(|owner| owner_filter.contains(&owner)))
+        })
+        .collect::<Vec<_>>();
+    collections.sort_by_key(|collection| collection.address.to_string());
+    let collections = paginate(collections, limit, offset);
+    (StatusCode::OK, Json(v3::map_nft_collections(&collections))).into_response()
+}
+
+pub async fn get_nft_sales(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<NftSalesQuery>(raw_query.as_deref()));
+    if payload.address.is_empty() {
+        return v3_bad_request("At least one `address` should be specified");
+    }
+    parse!(validate_filter_len("address", payload.address.len(), 1000));
+    let addresses = parse!(parse_address_set(&payload.address));
+    let data = match discover_contract_data(
+        node.as_ref(),
+        &addresses.iter().copied().collect::<Vec<_>>(),
+        false,
     )
     .await
+    {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let sales = data
+        .into_iter()
+        .filter_map(|data| data.nft_sale)
+        .collect::<Vec<_>>();
+    let items = match load_nft_items(
+        node.as_ref(),
+        sales.iter().map(|sale| sale.nft_address).collect(),
+    )
+    .await
+    {
+        Ok(items) => items,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    (StatusCode::OK, Json(v3::map_nft_sales(&sales, &items))).into_response()
+}
+
+pub async fn get_nft_transfers(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<NftTransfersQuery>(raw_query.as_deref()));
+    parse!(validate_filter_len(
+        "owner_address",
+        payload.owner_address.len(),
+        1000,
+    ));
+    parse!(validate_filter_len(
+        "item_address",
+        payload.item_address.len(),
+        1000,
+    ));
+    let owners = parse!(parse_address_set(&payload.owner_address));
+    let item_filter = parse!(parse_address_set(&payload.item_address));
+    let collection = parse!(
+        payload
+            .collection_address
+            .as_deref()
+            .map(Addr::parse)
+            .transpose()
+    );
+    let direction = parse!(parse_message_direction(payload.direction.as_deref()));
+    let bounds = parse!(parse_event_bounds(
+        payload.start_utime,
+        payload.end_utime,
+        payload.start_lt,
+        payload.end_lt,
+    ));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let sort = parse!(parse_sort(payload.sort));
+    let transactions = match node.get_all_transactions().await {
+        Ok(transactions) => transactions,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let items = match load_nft_items(
+        node.as_ref(),
+        transactions
+            .iter()
+            .map(|transaction| transaction.address)
+            .collect(),
+    )
+    .await
+    {
+        Ok(items) => items,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let items_by_address = items
+        .iter()
+        .map(|item| (item.address, item))
+        .collect::<HashMap<_, _>>();
+    let mut events = transactions
+        .iter()
+        .filter_map(|transaction| {
+            let item = items_by_address.get(&transaction.address)?;
+            parse_nft_transfer(transaction, item).ok().flatten()
+        })
+        .filter(|event| item_filter.is_empty() || item_filter.contains(&event.nft_address))
+        .filter(|event| collection.is_none_or(|address| event.nft_collection == address))
+        .filter(|event| match direction {
+            Some(MessageDirection::In) => owners.is_empty() || owners.contains(&event.new_owner),
+            Some(MessageDirection::Out) => owners.is_empty() || owners.contains(&event.old_owner),
+            None => {
+                owners.is_empty()
+                    || owners.contains(&event.old_owner)
+                    || owners.contains(&event.new_owner)
+            }
+        })
+        .filter(|event| bounds.contains(event.transaction_now, event.transaction_lt))
+        .collect::<Vec<_>>();
+    sort_events(&mut events, sort, |event| event.transaction_lt);
+    let events = paginate(events, limit, offset);
+    let selected_items = events
+        .iter()
+        .map(|event| event.nft_address)
+        .collect::<HashSet<_>>();
+    let items = items
+        .into_iter()
+        .filter(|item| selected_items.contains(&item.address))
+        .collect::<Vec<_>>();
+    (StatusCode::OK, Json(v3::map_nft_transfers(&events, &items))).into_response()
+}
+
+pub async fn get_multisig_orders(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<MultisigOrdersQuery>(raw_query.as_deref()));
+    if payload.address.is_empty() && payload.multisig_address.is_empty() {
+        return v3_bad_request(
+            "At least one of `address` or `multisig_address` should be specified",
+        );
+    }
+    parse!(validate_filter_len("address", payload.address.len(), 1024));
+    parse!(validate_filter_len(
+        "multisig_address",
+        payload.multisig_address.len(),
+        1024,
+    ));
+    let addresses = parse!(parse_address_set(&payload.address));
+    let multisig_addresses = parse!(parse_address_set(&payload.multisig_address));
+    let parse_actions = payload.parse_actions.unwrap_or(false);
+    let (limit, offset) = parse!(parse_limit_offset_with(
+        payload.limit,
+        payload.offset,
+        10,
+        1024,
+    ));
+    let sort = parse!(parse_sort(payload.sort));
+    let data = match discover_contract_data(
+        node.as_ref(),
+        &addresses.iter().copied().collect::<Vec<_>>(),
+        !multisig_addresses.is_empty(),
+    )
+    .await
+    {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let mut orders = data
+        .into_iter()
+        .filter_map(|data| data.multisig_order)
+        .filter(|order| {
+            (addresses.is_empty() || addresses.contains(&order.address))
+                && (multisig_addresses.is_empty()
+                    || multisig_addresses.contains(&order.multisig_address))
+        })
+        .collect::<Vec<_>>();
+    sort_events(&mut orders, sort, |order| order.last_transaction_lt);
+    let orders = paginate(orders, limit, offset);
+    (
+        StatusCode::OK,
+        Json(v3::map_multisig_orders(&orders, parse_actions)),
+    )
+        .into_response()
+}
+
+pub async fn get_multisig_wallets(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<MultisigWalletsQuery>(raw_query.as_deref()));
+    if payload.address.is_empty() && payload.wallet_address.is_empty() {
+        return v3_bad_request("At least one of `address` or `wallet_address` should be specified");
+    }
+    parse!(validate_filter_len("address", payload.address.len(), 1024));
+    parse!(validate_filter_len(
+        "wallet_address",
+        payload.wallet_address.len(),
+        1024,
+    ));
+    let addresses = parse!(parse_address_set(&payload.address));
+    let wallet_addresses = parse!(parse_address_set(&payload.wallet_address));
+    let (limit, offset) = parse!(parse_limit_offset_with(
+        payload.limit,
+        payload.offset,
+        10,
+        1024,
+    ));
+    let sort = parse!(parse_sort(payload.sort));
+    let include_orders = payload.include_orders.unwrap_or(true);
+    let data = match discover_contract_data(
+        node.as_ref(),
+        &addresses.iter().copied().collect::<Vec<_>>(),
+        !wallet_addresses.is_empty() || include_orders,
+    )
+    .await
+    {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let mut multisigs = Vec::new();
+    let mut orders = Vec::new();
+    for data in data {
+        if let Some(multisig) = data.multisig
+            && (addresses.is_empty() || addresses.contains(&multisig.address))
+            && (wallet_addresses.is_empty()
+                || multisig
+                    .signers
+                    .iter()
+                    .chain(&multisig.proposers)
+                    .any(|address| wallet_addresses.contains(address)))
+        {
+            multisigs.push(multisig);
+        }
+        if include_orders && let Some(order) = data.multisig_order {
+            orders.push(order);
+        }
+    }
+    sort_events(&mut multisigs, sort, |multisig| {
+        multisig.last_transaction_lt
+    });
+    let multisigs = paginate(multisigs, limit, offset);
+    let selected = multisigs
+        .iter()
+        .map(|multisig| multisig.address)
+        .collect::<HashSet<_>>();
+    orders.retain(|order| selected.contains(&order.multisig_address));
+    (StatusCode::OK, Json(v3::map_multisigs(&multisigs, &orders))).into_response()
+}
+
+pub async fn get_vesting(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<VestingQuery>(raw_query.as_deref()));
+    if payload.contract_address.is_empty() && payload.wallet_address.is_empty() {
+        return v3_bad_request(
+            "At least one of `contract_address` or `wallet_address` should be specified",
+        );
+    }
+    if !payload.contract_address.is_empty() && !payload.wallet_address.is_empty() {
+        return v3_bad_request(
+            "Only one of `contract_address` or `wallet_address` should be specified",
+        );
+    }
+    parse!(validate_filter_len(
+        "contract_address",
+        payload.contract_address.len(),
+        1000,
+    ));
+    parse!(validate_filter_len(
+        "wallet_address",
+        payload.wallet_address.len(),
+        1000,
+    ));
+    let contracts = parse!(parse_address_set(&payload.contract_address));
+    let wallets = parse!(parse_address_set(&payload.wallet_address));
+    let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
+    let include_whitelist = payload.check_whitelist.unwrap_or(false);
+    let data = match discover_contract_data(
+        node.as_ref(),
+        &contracts.iter().copied().collect::<Vec<_>>(),
+        !wallets.is_empty(),
+    )
+    .await
+    {
+        Ok(data) => data,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let vesting = data
+        .into_iter()
+        .filter_map(|data| data.vesting)
+        .filter(|vesting| {
+            (contracts.is_empty() || contracts.contains(&vesting.address))
+                && (wallets.is_empty()
+                    || wallets.contains(&vesting.owner_address)
+                    || wallets.contains(&vesting.sender_address)
+                    || (include_whitelist
+                        && vesting
+                            .whitelist
+                            .iter()
+                            .any(|address| wallets.contains(address))))
+        })
+        .skip(offset)
+        .take(limit)
+        .collect::<Vec<_>>();
+    (StatusCode::OK, Json(v3::map_vesting_contracts(&vesting))).into_response()
 }
 
 pub async fn send_message_v3(
@@ -715,6 +1293,173 @@ fn extract_stack_bytes(value: &Value, stack_type: &str) -> anyhow::Result<String
         return Ok(b64.to_owned());
     }
     anyhow::bail!("{stack_type} stack value must be a base64 string or an object with `bytes`")
+}
+
+async fn discover_contract_data(
+    node: &Localnet,
+    explicit: &[Addr],
+    scan_all: bool,
+) -> anyhow::Result<Vec<LocalnetContractData>> {
+    let mut addresses = explicit.iter().copied().collect::<HashSet<_>>();
+    if scan_all {
+        addresses.extend(
+            node.get_top_account_balances(usize::MAX, 0)
+                .await?
+                .into_iter()
+                .map(|account| account.account),
+        );
+    }
+
+    let mut result = Vec::with_capacity(addresses.len());
+    for address in addresses {
+        result.push(node.detect_contract_data(address.to_string()).await?);
+    }
+    Ok(result)
+}
+
+async fn load_jetton_event_context(
+    node: &Localnet,
+    transactions: &[LocalnetTransaction],
+) -> anyhow::Result<(Vec<JettonWalletMeta>, HashMap<Addr, JettonMasterMeta>)> {
+    let addresses = transactions
+        .iter()
+        .map(|transaction| transaction.address.to_string())
+        .collect::<HashSet<_>>()
+        .into_iter()
+        .collect();
+    let wallets = node
+        .get_jetton_wallets(LocalnetJettonWalletsQuery {
+            addresses,
+            owner_addresses: Vec::new(),
+            jetton_addresses: Vec::new(),
+            exclude_zero_balance: None,
+            descending: false,
+            limit: Some(usize::MAX),
+            offset: Some(0),
+        })
+        .await?;
+    let mut masters = HashMap::new();
+    let jettons = wallets
+        .iter()
+        .map(|wallet| wallet.jetton_address)
+        .collect::<HashSet<_>>();
+    for jetton in jettons {
+        if let Some(master) = node
+            .get_jetton_masters(vec![jetton.to_string()], Vec::new(), Some(1), Some(0))
+            .await?
+            .pop()
+        {
+            masters.insert(jetton, master);
+        }
+    }
+    Ok((wallets, masters))
+}
+
+async fn load_nft_items(node: &Localnet, addresses: Vec<Addr>) -> anyhow::Result<Vec<NftItemMeta>> {
+    node.get_nft_items(
+        addresses
+            .into_iter()
+            .collect::<HashSet<_>>()
+            .into_iter()
+            .map(|address| address.to_string())
+            .collect(),
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+        None,
+        Some(usize::MAX),
+        Some(0),
+    )
+    .await
+}
+
+async fn load_nft_sales_for_items(
+    node: &Localnet,
+    items: &[NftItemMeta],
+) -> anyhow::Result<Vec<NftSaleMeta>> {
+    let owners_by_nft = items
+        .iter()
+        .filter_map(|item| item.owner_address.map(|owner| (item.address, owner)))
+        .collect::<HashMap<_, _>>();
+    let owner_addresses = owners_by_nft.values().copied().collect::<HashSet<_>>();
+    if owner_addresses.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    Ok(discover_contract_data(
+        node,
+        &owner_addresses.into_iter().collect::<Vec<_>>(),
+        false,
+    )
+    .await?
+    .into_iter()
+    .filter_map(|data| data.nft_sale)
+    .filter(|sale| owners_by_nft.get(&sale.nft_address) == Some(&sale.address))
+    .collect())
+}
+
+fn parse_address_set(values: &[String]) -> anyhow::Result<HashSet<Addr>> {
+    values.iter().map(|value| Addr::parse(value)).collect()
+}
+
+fn validate_filter_len(name: &str, len: usize, max: usize) -> anyhow::Result<()> {
+    if len > max {
+        anyhow::bail!("Maximum {max} `{name}` values allowed");
+    }
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct EventBounds {
+    start_utime: Option<u32>,
+    end_utime: Option<u32>,
+    start_lt: Option<u64>,
+    end_lt: Option<u64>,
+}
+
+impl EventBounds {
+    fn contains(self, utime: u32, lt: u64) -> bool {
+        self.start_utime.is_none_or(|start| utime >= start)
+            && self.end_utime.is_none_or(|end| utime <= end)
+            && self.start_lt.is_none_or(|start| lt >= start)
+            && self.end_lt.is_none_or(|end| lt <= end)
+    }
+}
+
+fn parse_event_bounds(
+    start_utime: Option<i32>,
+    end_utime: Option<i32>,
+    start_lt: Option<u64>,
+    end_lt: Option<u64>,
+) -> anyhow::Result<EventBounds> {
+    let start_utime = parse_non_negative_u32("start_utime", start_utime)?;
+    let end_utime = parse_non_negative_u32("end_utime", end_utime)?;
+    if start_utime
+        .zip(end_utime)
+        .is_some_and(|(start, end)| start > end)
+    {
+        anyhow::bail!("`start_utime` must not be greater than `end_utime`");
+    }
+    if start_lt.zip(end_lt).is_some_and(|(start, end)| start > end) {
+        anyhow::bail!("`start_lt` must not be greater than `end_lt`");
+    }
+    Ok(EventBounds {
+        start_utime,
+        end_utime,
+        start_lt,
+        end_lt,
+    })
+}
+
+fn sort_events<T, K: Ord>(items: &mut [T], sort: SortOrder, key: impl Fn(&T) -> K) {
+    match sort {
+        SortOrder::Asc => items.sort_by_key(key),
+        SortOrder::Desc => items.sort_by_key(|item| std::cmp::Reverse(key(item))),
+    }
+}
+
+fn paginate<T>(items: Vec<T>, limit: usize, offset: usize) -> Vec<T> {
+    items.into_iter().skip(offset).take(limit).collect()
 }
 
 #[derive(Clone, Copy)]
@@ -1490,9 +2235,18 @@ fn sort_blocks(blocks: &mut [LocalnetBlock], order: SortOrder) {
 }
 
 fn parse_limit_offset(limit: Option<i32>, offset: Option<i32>) -> anyhow::Result<(usize, usize)> {
-    let limit = limit.unwrap_or(10);
-    if !(1..=1000).contains(&limit) {
-        anyhow::bail!("`limit` must be between 1 and 1000");
+    parse_limit_offset_with(limit, offset, 10, 1000)
+}
+
+fn parse_limit_offset_with(
+    limit: Option<i32>,
+    offset: Option<i32>,
+    default_limit: i32,
+    max_limit: i32,
+) -> anyhow::Result<(usize, usize)> {
+    let limit = limit.unwrap_or(default_limit);
+    if !(1..=max_limit).contains(&limit) {
+        anyhow::bail!("`limit` must be between 1 and {max_limit}");
     }
     let offset = offset.unwrap_or(0);
     if offset < 0 {

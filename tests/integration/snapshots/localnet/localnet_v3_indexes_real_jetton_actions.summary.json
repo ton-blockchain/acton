@@ -1,0 +1,82 @@
+{
+  "actors": {
+    "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "recipient": "0:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "filters": {
+    "ascending_first_query_id": "101",
+    "burn_query_ids": [
+      "102",
+      "104"
+    ],
+    "descending_first_query_id": "103",
+    "incoming_query_ids": [
+      "101",
+      "103"
+    ],
+    "outgoing_query_ids": [
+      "101",
+      "103"
+    ],
+    "wrong_direction_count": 0
+  },
+  "jetton": {
+    "aborted_burn": {
+      "amount": "10000",
+      "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "query_id": "104",
+      "transaction_aborted": true
+    },
+    "aborted_transfer": {
+      "amount": "10000",
+      "destination": "0:1111111111111111111111111111111111111111111111111111111111111111",
+      "query_id": "103",
+      "source": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "transaction_aborted": true
+    },
+    "burn": {
+      "amount": "50",
+      "custom_payload": null,
+      "jetton_master": "0:c6dd31971cd6537e5002ac7095af13290f18fd7339e58fa0323eb0a78f336621",
+      "jetton_wallet": "0:8ff59566ed3a169ab786d80bb335277b1faf6d4549234b20b0393e5dbf053c28",
+      "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "query_id": "102",
+      "response_destination": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "transaction_aborted": false
+    },
+    "master": {
+      "address": "0:c6dd31971cd6537e5002ac7095af13290f18fd7339e58fa0323eb0a78f336621",
+      "address_book_has_master": true,
+      "admin_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "metadata_has_master": true,
+      "mintable": true,
+      "total_supply": "950"
+    },
+    "recipient_wallet": {
+      "address": "0:8c0e3a32d47a8c19dda5334386046d48f6b1eb2741e0b8fa657ddbfc4312993a",
+      "balance": "100",
+      "jetton": "0:c6dd31971cd6537e5002ac7095af13290f18fd7339e58fa0323eb0a78f336621",
+      "owner": "0:1111111111111111111111111111111111111111111111111111111111111111"
+    },
+    "source_wallet": {
+      "address": "0:8ff59566ed3a169ab786d80bb335277b1faf6d4549234b20b0393e5dbf053c28",
+      "balance": "850",
+      "jetton": "0:c6dd31971cd6537e5002ac7095af13290f18fd7339e58fa0323eb0a78f336621",
+      "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c"
+    },
+    "transfer": {
+      "address_book_has_recipient": true,
+      "amount": "100",
+      "custom_payload": null,
+      "destination": "0:1111111111111111111111111111111111111111111111111111111111111111",
+      "forward_ton_amount": "10000000",
+      "jetton_master": "0:c6dd31971cd6537e5002ac7095af13290f18fd7339e58fa0323eb0a78f336621",
+      "metadata_has_source_wallet": true,
+      "query_id": "101",
+      "response_destination": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "source": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "source_wallet": "0:8ff59566ed3a169ab786d80bb335277b1faf6d4549234b20b0393e5dbf053c28",
+      "transaction_aborted": false
+    }
+  }
+}

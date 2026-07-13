@@ -1,0 +1,62 @@
+{
+  "aborted_transfer": {
+    "new_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "old_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "query_id": "203",
+    "transaction_aborted": true
+  },
+  "actors": {
+    "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "recipient": "0:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "collection": {
+    "address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "address_book_has_collection": true,
+    "metadata_has_collection": true,
+    "next_item_index": "1",
+    "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c"
+  },
+  "filters": {
+    "ascending_first_query_id": "201",
+    "collection_by_owner_count": 1,
+    "collection_by_wrong_owner_count": 0,
+    "descending_first_query_id": "203",
+    "incoming_query_ids": [
+      "201"
+    ],
+    "index_without_collection_error": {
+      "code": 422,
+      "error": "index parameter is not allowed without the collection_address"
+    },
+    "index_without_collection_status": 422,
+    "items_by_collection_index_count": 1,
+    "items_by_owner_count": 1,
+    "outgoing_query_ids": [
+      "201",
+      "203"
+    ],
+    "wrong_direction_count": 0
+  },
+  "item": {
+    "address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "address_book_has_item": true,
+    "collection_address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "index": "0",
+    "init": true,
+    "metadata_has_item": true,
+    "owner_address": "0:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "transfer": {
+    "address_book_has_recipient": true,
+    "custom_payload": null,
+    "forward_amount": "10000000",
+    "metadata_has_item": true,
+    "new_owner": "0:1111111111111111111111111111111111111111111111111111111111111111",
+    "nft_address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "nft_collection": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "old_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "query_id": "201",
+    "response_destination": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+    "transaction_aborted": false
+  }
+}

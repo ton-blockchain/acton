@@ -84,6 +84,245 @@ pub struct ActionsResponse {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsRecord {
+    pub nft_item_address: String,
+    pub nft_item_owner: Option<String>,
+    pub domain: String,
+    pub dns_next_resolver: Option<String>,
+    pub dns_wallet: Option<String>,
+    pub dns_site_adnl: Option<String>,
+    pub dns_storage_bag_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsRecordsResponse {
+    pub records: Vec<DnsRecord>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JettonTransfer {
+    pub query_id: String,
+    pub source: String,
+    pub destination: String,
+    pub amount: String,
+    pub source_wallet: String,
+    pub jetton_master: String,
+    pub transaction_hash: String,
+    pub transaction_lt: String,
+    pub transaction_now: i64,
+    pub transaction_aborted: bool,
+    pub response_destination: Option<String>,
+    pub custom_payload: Option<String>,
+    pub decoded_custom_payload: Option<Value>,
+    pub forward_ton_amount: Option<String>,
+    pub forward_payload: Option<String>,
+    pub decoded_forward_payload: Option<Value>,
+    pub trace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JettonTransfersResponse {
+    pub jetton_transfers: Vec<JettonTransfer>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JettonBurn {
+    pub query_id: String,
+    pub owner: String,
+    pub jetton_wallet: String,
+    pub jetton_master: String,
+    pub transaction_hash: String,
+    pub transaction_lt: String,
+    pub transaction_now: i64,
+    pub transaction_aborted: bool,
+    pub amount: String,
+    pub response_destination: Option<String>,
+    pub custom_payload: Option<String>,
+    pub decoded_custom_payload: Option<Value>,
+    pub trace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JettonBurnsResponse {
+    pub jetton_burns: Vec<JettonBurn>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftCollection {
+    pub address: String,
+    pub owner_address: Option<String>,
+    pub last_transaction_lt: String,
+    pub next_item_index: String,
+    pub collection_content: HashMap<String, Value>,
+    pub data_hash: String,
+    pub code_hash: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftCollectionsResponse {
+    pub nft_collections: Vec<NftCollection>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftTransfer {
+    pub query_id: String,
+    pub nft_address: String,
+    pub nft_collection: String,
+    pub transaction_hash: String,
+    pub transaction_lt: String,
+    pub transaction_now: i64,
+    pub transaction_aborted: bool,
+    pub old_owner: String,
+    pub new_owner: String,
+    pub response_destination: Option<String>,
+    pub custom_payload: Option<String>,
+    pub decoded_custom_payload: Option<Value>,
+    pub forward_amount: Option<String>,
+    pub forward_payload: Option<String>,
+    pub decoded_forward_payload: Option<Value>,
+    pub trace_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftTransfersResponse {
+    pub nft_transfers: Vec<NftTransfer>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftSale {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub address: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_owner_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketplace_address: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_transaction_lt: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code_hash: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub data_hash: Option<String>,
+    pub details: Value,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub nft_item: Option<NftItem>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NftSalesResponse {
+    pub nft_sales: Vec<NftSale>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+    #[serde(default)]
+    pub metadata: Metadata,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultisigOrderAction {
+    pub destination: Option<String>,
+    pub value: Option<String>,
+    pub body_raw: Value,
+    pub parsed: bool,
+    pub error: Option<String>,
+    pub parsed_body: Option<Value>,
+    pub parsed_body_type: String,
+    pub send_mode: u8,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultisigOrder {
+    pub address: String,
+    pub multisig_address: String,
+    pub order_seqno: Option<String>,
+    pub threshold: Option<i32>,
+    pub sent_for_execution: Option<bool>,
+    pub approvals_mask: Option<String>,
+    pub approvals_num: Option<i32>,
+    pub expiration_date: Option<u64>,
+    pub order_boc: Option<String>,
+    #[serde(default)]
+    pub signers: Vec<String>,
+    pub last_transaction_lt: String,
+    pub code_hash: Option<String>,
+    pub data_hash: Option<String>,
+    #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub actions: Vec<MultisigOrderAction>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Multisig {
+    pub address: String,
+    pub next_order_seqno: Option<String>,
+    pub threshold: Option<i32>,
+    #[serde(default)]
+    pub signers: Vec<String>,
+    #[serde(default)]
+    pub proposers: Vec<String>,
+    pub last_transaction_lt: String,
+    pub code_hash: Option<String>,
+    pub data_hash: Option<String>,
+    #[serde(default)]
+    pub orders: Vec<MultisigOrder>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultisigOrdersResponse {
+    pub orders: Vec<MultisigOrder>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultisigsResponse {
+    pub multisigs: Vec<Multisig>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VestingInfo {
+    pub address: Option<String>,
+    pub start_time: Option<i64>,
+    pub total_duration: Option<i64>,
+    pub unlock_period: Option<i64>,
+    pub cliff_duration: Option<i64>,
+    pub sender_address: Option<String>,
+    pub owner_address: Option<String>,
+    pub total_amount: Option<String>,
+    #[serde(default)]
+    pub whitelist: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VestingContractsResponse {
+    pub vesting_contracts: Vec<VestingInfo>,
+    #[serde(default)]
+    pub address_book: AddressBook,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionsResponse {
     pub transactions: Vec<Transaction>,
     #[serde(default)]

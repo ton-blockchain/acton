@@ -686,6 +686,235 @@ fn nft_items_query_covers_filters_sale_and_sorting() -> Result<()> {
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn dns_records_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let response: v3::DnsRecordsResponse = live.get(
+        &live.v3_url,
+        "/dns/records",
+        &v3::DnsRecordsQuery {
+            domain: Some("foundation.ton".to_owned()),
+            limit: Some(2),
+            offset: Some(0),
+            ..Default::default()
+        },
+    )?;
+    assert!(!response.records.is_empty());
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn jetton_transfers_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let initial: v3::JettonTransfersResponse = live.get(
+        &live.v3_url,
+        "/jetton/transfers",
+        &v3::JettonTransfersQuery {
+            limit: Some(2),
+            offset: Some(0),
+            sort: Some("desc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    if let Some(transfer) = initial.jetton_transfers.first() {
+        let _: v3::JettonTransfersResponse = live.get(
+            &live.v3_url,
+            "/jetton/transfers",
+            &v3::JettonTransfersQuery {
+                owner_address: vec![transfer.source.clone(), transfer.destination.clone()],
+                jetton_wallet: vec![transfer.source_wallet.clone()],
+                jetton_master: Some(transfer.jetton_master.clone()),
+                direction: Some("out".to_owned()),
+                start_utime: Some(i32::try_from(transfer.transaction_now)?),
+                end_utime: Some(i32::try_from(transfer.transaction_now)?),
+                start_lt: Some(transfer.transaction_lt.parse()?),
+                end_lt: Some(transfer.transaction_lt.parse()?),
+                limit: Some(2),
+                sort: Some("asc".to_owned()),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn jetton_burns_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let initial: v3::JettonBurnsResponse = live.get(
+        &live.v3_url,
+        "/jetton/burns",
+        &v3::JettonBurnsQuery {
+            limit: Some(2),
+            offset: Some(0),
+            sort: Some("desc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    if let Some(burn) = initial.jetton_burns.first() {
+        let _: v3::JettonBurnsResponse = live.get(
+            &live.v3_url,
+            "/jetton/burns",
+            &v3::JettonBurnsQuery {
+                address: vec![burn.owner.clone()],
+                jetton_wallet: vec![burn.jetton_wallet.clone()],
+                jetton_master: Some(burn.jetton_master.clone()),
+                start_utime: Some(i32::try_from(burn.transaction_now)?),
+                end_utime: Some(i32::try_from(burn.transaction_now)?),
+                start_lt: Some(burn.transaction_lt.parse()?),
+                end_lt: Some(burn.transaction_lt.parse()?),
+                limit: Some(2),
+                sort: Some("asc".to_owned()),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn nft_collections_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let initial: v3::NftCollectionsResponse = live.get(
+        &live.v3_url,
+        "/nft/collections",
+        &v3::NftCollectionsQuery {
+            limit: Some(2),
+            offset: Some(0),
+            ..Default::default()
+        },
+    )?;
+    if let Some(collection) = initial.nft_collections.first() {
+        let _: v3::NftCollectionsResponse = live.get(
+            &live.v3_url,
+            "/nft/collections",
+            &v3::NftCollectionsQuery {
+                collection_address: vec![collection.address.clone()],
+                owner_address: collection.owner_address.clone().into_iter().collect(),
+                limit: Some(2),
+                offset: Some(0),
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn nft_sales_query_covers_no_state_address() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let _: v3::NftSalesResponse = live.get(
+        &live.v3_url,
+        "/nft/sales",
+        &v3::NftSalesQuery {
+            address: vec![NO_STATE_ADDRESS.to_owned()],
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn nft_transfers_query_and_response_match_typed_contract() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let initial: v3::NftTransfersResponse = live.get(
+        &live.v3_url,
+        "/nft/transfers",
+        &v3::NftTransfersQuery {
+            limit: Some(2),
+            offset: Some(0),
+            sort: Some("desc".to_owned()),
+            ..Default::default()
+        },
+    )?;
+    if let Some(transfer) = initial.nft_transfers.first() {
+        let _: v3::NftTransfersResponse = live.get(
+            &live.v3_url,
+            "/nft/transfers",
+            &v3::NftTransfersQuery {
+                owner_address: vec![transfer.old_owner.clone(), transfer.new_owner.clone()],
+                item_address: vec![transfer.nft_address.clone()],
+                collection_address: Some(transfer.nft_collection.clone()),
+                direction: Some("out".to_owned()),
+                start_utime: Some(i32::try_from(transfer.transaction_now)?),
+                end_utime: Some(i32::try_from(transfer.transaction_now)?),
+                start_lt: Some(transfer.transaction_lt.parse()?),
+                end_lt: Some(transfer.transaction_lt.parse()?),
+                limit: Some(2),
+                sort: Some("asc".to_owned()),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn multisig_orders_query_covers_no_state_address() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    for parse_actions in [None, Some(false), Some(true)] {
+        let _: v3::MultisigOrdersResponse = live.get(
+            &live.v3_url,
+            "/multisig/orders",
+            &v3::MultisigOrdersQuery {
+                address: vec![NO_STATE_ADDRESS.to_owned()],
+                parse_actions,
+                limit: Some(2),
+                offset: Some(0),
+                sort: Some("desc".to_owned()),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn multisig_wallets_query_covers_no_state_address() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    for include_orders in [None, Some(false), Some(true)] {
+        let _: v3::MultisigsResponse = live.get(
+            &live.v3_url,
+            "/multisig/wallets",
+            &v3::MultisigWalletsQuery {
+                address: vec![NO_STATE_ADDRESS.to_owned()],
+                include_orders,
+                limit: Some(2),
+                offset: Some(0),
+                sort: Some("desc".to_owned()),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
+fn vesting_query_covers_no_state_address() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    for check_whitelist in [None, Some(false), Some(true)] {
+        let _: v3::VestingContractsResponse = live.get(
+            &live.v3_url,
+            "/vesting",
+            &v3::VestingQuery {
+                contract_address: vec![NO_STATE_ADDRESS.to_owned()],
+                check_whitelist,
+                limit: Some(2),
+                offset: Some(0),
+                ..Default::default()
+            },
+        )?;
+    }
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn send_message_request_deserializes_real_error_without_broadcasting() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 

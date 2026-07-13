@@ -15,7 +15,19 @@ pub fn run_get_method<T: FromStackTuple>(
     libs: Option<&str>,
     name: &str,
 ) -> anyhow::Result<T> {
-    let result = run_get_method_raw(address, code, data, libs, name)?;
+    let result = run_get_method_raw(address, code, data, libs, name, Tuple::empty())?;
+    T::from_tuple(result).map_err(Into::into)
+}
+
+pub fn run_get_method_with_stack<T: FromStackTuple>(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+    name: &str,
+    stack: Tuple,
+) -> anyhow::Result<T> {
+    let result = run_get_method_raw(address, code, data, libs, name, stack)?;
     T::from_tuple(result).map_err(Into::into)
 }
 
@@ -25,6 +37,7 @@ fn run_get_method_raw(
     data: Cell,
     libs: Option<&str>,
     name: &str,
+    stack: Tuple,
 ) -> anyhow::Result<Tuple> {
     const CRC16: crc::Crc<u16> = crc::Crc::<u16>::new(&crc::CRC_16_XMODEM);
 
@@ -51,7 +64,6 @@ fn run_get_method_raw(
 
     let executor = GetExecutor::new(&params)?;
 
-    let stack = Tuple(vec![]);
     let stack = Boc::encode_base64(serialize_tuple(&stack)?);
     let result = executor.run_get_method(&stack, &params, None)?;
 

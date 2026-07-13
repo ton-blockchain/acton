@@ -664,6 +664,83 @@ func TestTonutilsAllSupportedV3CallsAgainstForkLocalnet(t *testing.T) {
 			t.Fatal(err)
 		}
 	})
+	t.Run("dns records", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[dnsRecordsResponseV3](ctx, v3, "dns/records", url.Values{
+			"wallet": {mainnetWallet},
+			"limit":  {"10"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("jetton transfers", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[jettonTransfersResponseV3](ctx, v3, "jetton/transfers", url.Values{
+			"owner_address": {mainnetWallet, noStateAccount},
+			"limit":         {"10"},
+			"sort":          {"desc"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("jetton burns", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[jettonBurnsResponseV3](ctx, v3, "jetton/burns", url.Values{
+			"address": {mainnetWallet, noStateAccount},
+			"limit":   {"10"},
+			"sort":    {"desc"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("nft collections", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[nftCollectionsResponseV3](ctx, v3, "nft/collections", url.Values{
+			"owner_address": {mainnetWallet, noStateAccount},
+			"limit":         {"10"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("nft sales", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[nftSalesResponseV3](ctx, v3, "nft/sales", url.Values{
+			"address": {noStateAccount},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("nft transfers", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[nftTransfersResponseV3](ctx, v3, "nft/transfers", url.Values{
+			"owner_address": {mainnetWallet, noStateAccount},
+			"limit":         {"10"},
+			"sort":          {"desc"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("multisig orders", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[multisigOrdersResponseV3](ctx, v3, "multisig/orders", url.Values{
+			"address":       {noStateAccount},
+			"parse_actions": {"true"},
+			"limit":         {"10"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("multisig wallets", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[multisigsResponseV3](ctx, v3, "multisig/wallets", url.Values{
+			"address":        {noStateAccount},
+			"include_orders": {"true"},
+			"limit":          {"10"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("vesting", func(t *testing.T) {
+		if _, err := toncenter.V3GetCall[vestingContractsResponseV3](ctx, v3, "vesting", url.Values{
+			"contract_address": {noStateAccount},
+			"check_whitelist":  {"true"},
+			"limit":            {"10"},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	})
 	t.Run("run get method with typed stack request", func(t *testing.T) {
 		result, err := toncenter.V3PostCall[runGetMethodResponseV3](ctx, v3, "runGetMethod", runGetMethodRequestV3{
 			Address: mainnetWallet,

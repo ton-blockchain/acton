@@ -12,6 +12,19 @@ pub struct MultisigData {
     pub proposers: Map<u8, IntAddr>,
 }
 
+#[derive(Debug, Clone, tvm_ffi::FromStackTuple)]
+pub struct MultisigOrderData {
+    pub multisig_address: IntAddr,
+    pub order_seqno: BigInt,
+    pub threshold: BigInt,
+    pub sent_for_execution: bool,
+    pub signers: Map<u8, IntAddr>,
+    pub approvals_mask: BigInt,
+    pub approvals_num: BigInt,
+    pub expiration_date: BigInt,
+    pub order: Cell,
+}
+
 #[must_use]
 pub fn get_multisig_data(
     address: String,
@@ -29,4 +42,14 @@ pub fn get_multisig_data_result(
     libs: Option<&str>,
 ) -> anyhow::Result<MultisigData> {
     run_get_method(address, code, data, libs, "get_multisig_data")
+}
+
+#[must_use]
+pub fn get_multisig_order_data(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<MultisigOrderData> {
+    run_get_method(address, code, data, libs, "get_order_data").ok()
 }

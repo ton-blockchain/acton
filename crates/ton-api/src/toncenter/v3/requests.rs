@@ -68,6 +68,115 @@ pub struct PendingTracesQuery {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsRecordsQuery {
+    pub wallet: Option<String>,
+    pub domain: Option<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonBurnsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub jetton_wallet: Vec<String>,
+    pub jetton_master: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct JettonTransfersQuery {
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub jetton_wallet: Vec<String>,
+    pub jetton_master: Option<String>,
+    pub direction: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftCollectionsQuery {
+    #[serde(default)]
+    pub collection_address: Vec<String>,
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftSalesQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct NftTransfersQuery {
+    #[serde(default)]
+    pub owner_address: Vec<String>,
+    #[serde(default)]
+    pub item_address: Vec<String>,
+    pub collection_address: Option<String>,
+    pub direction: Option<String>,
+    pub start_utime: Option<i32>,
+    pub end_utime: Option<i32>,
+    pub start_lt: Option<u64>,
+    pub end_lt: Option<u64>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MultisigOrdersQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub multisig_address: Vec<String>,
+    pub parse_actions: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct MultisigWalletsQuery {
+    #[serde(default)]
+    pub address: Vec<String>,
+    #[serde(default)]
+    pub wallet_address: Vec<String>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+    pub sort: Option<String>,
+    pub include_orders: Option<bool>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct VestingQuery {
+    #[serde(default)]
+    pub contract_address: Vec<String>,
+    #[serde(default)]
+    pub wallet_address: Vec<String>,
+    pub check_whitelist: Option<bool>,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransactionsQuery {
     pub workchain: Option<i32>,
     pub shard: Option<String>,

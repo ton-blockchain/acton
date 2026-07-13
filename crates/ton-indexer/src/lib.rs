@@ -1,5 +1,6 @@
 pub mod common;
 mod content;
+pub mod contracts;
 pub mod jettons;
 pub mod multisigs;
 pub mod nfts;

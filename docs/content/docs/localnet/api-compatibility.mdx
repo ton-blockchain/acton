@@ -83,22 +83,26 @@ The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI spec
 | `GET`  | `/api/v3/actions`                        | ❌                       | Returns classified actions.                                          |
 | `GET`  | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
 | `POST` | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
-| `GET`  | `/api/v3/dns/records`                    | ❌                       | Returns DNS records.                                                 |
-| `GET`  | `/api/v3/jetton/burns`                   | ❌                       | Returns jetton burns.                                                |
-| `GET`  | `/api/v3/jetton/transfers`               | ❌                       | Returns jetton transfers.                                            |
+| `GET`  | `/api/v3/dns/records`                    | ✅                       | Returns DNS records.                                                 |
+| `GET`  | `/api/v3/jetton/burns`                   | ✅                       | Returns jetton burns.                                                |
+| `GET`  | `/api/v3/jetton/transfers`               | ✅                       | Returns jetton transfers.                                            |
 | `GET`  | `/api/v3/masterchainBlockShardState`     | ❌                       | Returns shard state for a masterchain block.                         |
 | `GET`  | `/api/v3/masterchainBlockShards`         | ❌                       | Returns shards referenced by a masterchain block.                    |
-| `GET`  | `/api/v3/multisig/orders`                | ❌                       | Returns multisig orders.                                             |
-| `GET`  | `/api/v3/multisig/wallets`               | ❌                       | Returns multisig wallets.                                            |
-| `GET`  | `/api/v3/nft/collections`                | ❌                       | Returns NFT collections.                                             |
-| `GET`  | `/api/v3/nft/sales`                      | ❌                       | Returns NFT sales.                                                   |
-| `GET`  | `/api/v3/nft/transfers`                  | ❌                       | Returns NFT transfers.                                               |
+| `GET`  | `/api/v3/multisig/orders`                | ✅                       | Returns multisig orders.                                             |
+| `GET`  | `/api/v3/multisig/wallets`               | ✅                       | Returns multisig wallets.                                            |
+| `GET`  | `/api/v3/nft/collections`                | ✅                       | Returns NFT collections.                                             |
+| `GET`  | `/api/v3/nft/sales`                      | ✅                       | Returns NFT sales.                                                   |
+| `GET`  | `/api/v3/nft/transfers`                  | ✅                       | Returns NFT transfers.                                               |
 | `GET`  | `/api/v3/pendingActions`                 | ✅                       | Returns an empty pending-actions collection.                         |
 | `GET`  | `/api/v3/pendingTraces`                  | ✅                       | Returns an empty pending-traces collection.                          |
-| `GET`  | `/api/v3/vesting`                        | ❌                       | Returns vesting contract state.                                      |
+| `GET`  | `/api/v3/vesting`                        | ✅                       | Returns vesting contract state.                                      |
 
 `/api/v3/message` accepts external-in messages only. Use
 `/acton_sendInternalMessage` to inject a raw internal message in local tooling.
+
+`/api/v3/multisig/orders?parse_actions=true` decodes order action envelopes,
+destinations, values, send modes, and `multisig_update_params`. Other embedded
+message bodies retain `body_raw` and use `parsed_body_type: "unknown"`.
 
 ## Streaming API v2
 

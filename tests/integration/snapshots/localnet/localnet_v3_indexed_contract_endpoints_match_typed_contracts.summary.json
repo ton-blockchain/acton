@@ -1,0 +1,43 @@
+{
+  "dns": {
+    "address_book": 0,
+    "records": 0
+  },
+  "jetton_burns": {
+    "address_book": 0,
+    "items": 0,
+    "metadata": 0
+  },
+  "jetton_transfers": {
+    "address_book": 0,
+    "items": 0,
+    "metadata": 0
+  },
+  "multisig_orders": {
+    "address_book": 0,
+    "items": 0
+  },
+  "multisig_wallets": {
+    "address_book": 0,
+    "items": 0
+  },
+  "nft_collections": {
+    "address_book": 0,
+    "items": 0,
+    "metadata": 0
+  },
+  "nft_sales": {
+    "address_book": 0,
+    "items": 0,
+    "metadata": 0
+  },
+  "nft_transfers": {
+    "address_book": 0,
+    "items": 0,
+    "metadata": 0
+  },
+  "vesting": {
+    "address_book": 0,
+    "items": 0
+  }
+}

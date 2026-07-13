@@ -13,6 +13,7 @@ pub mod server;
 pub mod storage;
 pub mod streaming;
 pub mod types;
+mod v3_events;
 mod virtual_clock;
 pub(crate) use error::{LiteServerErrorCode, LocalnetError};
 pub use localnet::{DEFAULT_BLOCK_INTERVAL_MS, Localnet, LocalnetMiningMode};

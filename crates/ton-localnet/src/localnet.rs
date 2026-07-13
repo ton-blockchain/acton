@@ -211,6 +211,16 @@ pub struct LocalnetEstimateFeeResult {
     pub destination_fees: Vec<LocalnetEstimatedFee>,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct LocalnetContractData {
+    pub dns: Option<storage::DnsRecordMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+    pub nft_sale: Option<storage::NftSaleMeta>,
+    pub multisig: Option<storage::MultisigMeta>,
+    pub multisig_order: Option<storage::MultisigOrderMeta>,
+    pub vesting: Option<storage::VestingMeta>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct LocalnetMessage {
     pub hash: Hash256,
@@ -534,6 +544,10 @@ pub(crate) enum Request {
         limit: usize,
         offset: usize,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
+    },
+    DetectContractData {
+        address: Addr,
+        resp: oneshot::Sender<anyhow::Result<LocalnetContractData>>,
     },
     SetAddressName {
         address: Addr,
@@ -1469,6 +1483,18 @@ impl Localnet {
         rx.await?
     }
 
+    pub async fn detect_contract_data(
+        &self,
+        address: String,
+    ) -> anyhow::Result<LocalnetContractData> {
+        let address = Addr::parse(&address)?;
+        let (resp, rx) = oneshot::channel();
+        self.tx
+            .send(Request::DetectContractData { address, resp })
+            .await?;
+        rx.await?
+    }
+
     pub async fn set_address_name(&self, address_str: String, name: String) -> anyhow::Result<()> {
         let address = Addr::parse(&address_str)?;
         let (resp, rx) = oneshot::channel();
@@ -2154,6 +2180,10 @@ fn process_loop_request(
                 limit,
                 offset,
             );
+            let _ = resp.send(res);
+        }
+        Request::DetectContractData { address, resp } => {
+            let res = node.detect_contract_data(&address);
             let _ = resp.send(res);
         }
         Request::SetAddressName {

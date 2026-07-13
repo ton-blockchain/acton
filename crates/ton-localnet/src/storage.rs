@@ -266,6 +266,85 @@ pub struct NftItemMeta {
     pub last_transaction_lt: Lt,
 }
 
+#[derive(Clone, Debug)]
+pub struct DnsRecordMeta {
+    pub nft_item_address: Addr,
+    pub nft_item_owner: Option<Addr>,
+    pub domain: String,
+    pub next_resolver: Option<Addr>,
+    pub wallet: Option<Addr>,
+    pub site_adnl: Option<Hash256>,
+    pub storage_bag_id: Option<Hash256>,
+}
+
+#[derive(Clone, Debug)]
+pub struct NftCollectionMeta {
+    pub address: Addr,
+    pub owner_address: Option<Addr>,
+    pub last_transaction_lt: Lt,
+    pub next_item_index: String,
+    pub collection_content: Value,
+    pub data_hash: Hash256,
+    pub code_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct NftSaleMeta {
+    pub kind: String,
+    pub address: Addr,
+    pub nft_address: Addr,
+    pub nft_owner_address: Option<Addr>,
+    pub marketplace_address: Option<Addr>,
+    pub created_at: Option<i64>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+    pub details: Value,
+    pub related_addresses: Vec<Addr>,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultisigOrderMeta {
+    pub address: Addr,
+    pub multisig_address: Addr,
+    pub order_seqno: String,
+    pub threshold: i32,
+    pub sent_for_execution: bool,
+    pub approvals_mask: String,
+    pub approvals_num: i32,
+    pub expiration_date: u64,
+    pub order_boc: BocBytes,
+    pub signers: Vec<Addr>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct MultisigMeta {
+    pub address: Addr,
+    pub next_order_seqno: String,
+    pub threshold: i32,
+    pub signers: Vec<Addr>,
+    pub proposers: Vec<Addr>,
+    pub last_transaction_lt: Lt,
+    pub code_hash: Hash256,
+    pub data_hash: Hash256,
+}
+
+#[derive(Clone, Debug)]
+pub struct VestingMeta {
+    pub address: Addr,
+    pub start_time: i64,
+    pub total_duration: i64,
+    pub unlock_period: i64,
+    pub cliff_duration: i64,
+    pub sender_address: Addr,
+    pub owner_address: Addr,
+    pub total_amount: String,
+    pub whitelist: Vec<Addr>,
+}
+
 pub struct LatestState {
     pub accounts: HashMap<Addr, AccountMeta>,
 }

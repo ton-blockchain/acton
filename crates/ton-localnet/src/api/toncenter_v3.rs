@@ -13,10 +13,12 @@ use crate::localnet::{
     LocalnetTransaction, convert_to_message_struct,
 };
 use crate::storage::{
-    AccountStateSnapshot, AccountStatus, EmulateTraceResult, JettonMasterMeta, JettonWalletMeta,
-    MessageInfo, MsgMeta, NftItemMeta, TraceNode, TransactionInfo,
+    AccountStateSnapshot, AccountStatus, DnsRecordMeta, EmulateTraceResult, JettonMasterMeta,
+    JettonWalletMeta, MessageInfo, MsgMeta, MultisigMeta, MultisigOrderMeta, NftCollectionMeta,
+    NftItemMeta, NftSaleMeta, TraceNode, TransactionInfo, VestingMeta,
 };
 use crate::types::{Addr, BocBytes, Hash256};
+use crate::v3_events::{JettonBurnEvent, JettonTransferEvent, NftTransferEvent};
 use num_bigint::BigInt;
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -25,9 +27,11 @@ use ton_api::toncenter::v3 as response;
 use tvm_ffi::json_stack::stack_to_json;
 use tvm_ffi::stack::Tuple;
 use tycho_types::boc::Boc;
-use tycho_types::cell::HashBytes;
+use tycho_types::cell::{Cell, CellBuilder, CellSlice, HashBytes};
+use tycho_types::dict::Dict;
 use tycho_types::models::{
-    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, TxInfo,
+    AccountStatusChange, ActionPhase, ComputePhase, ComputePhaseSkipReason, IntAddr,
+    OwnedRelaxedMessage, RelaxedMsgInfo, TxInfo,
 };
 
 #[must_use]
@@ -210,19 +214,31 @@ pub fn map_jetton_wallets_with_metadata(
 }
 
 #[must_use]
-pub fn map_nft_items(items: &[NftItemMeta]) -> response::NftItemsResponse {
-    map_nft_items_with_metadata(items)
+pub fn map_nft_items(items: &[NftItemMeta], sales: &[NftSaleMeta]) -> response::NftItemsResponse {
+    map_nft_items_with_metadata(items, sales)
 }
 
-pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsResponse {
+pub fn map_nft_items_with_metadata(
+    items: &[NftItemMeta],
+    sales: &[NftSaleMeta],
+) -> response::NftItemsResponse {
     let mut address_book = response::AddressBook::new();
     let mut token_info_by_address: HashMap<String, Vec<response::TokenInfo>> = HashMap::new();
     let mut collection_info_added = std::collections::HashSet::new();
+    let sales_by_nft = sales
+        .iter()
+        .map(|sale| (sale.nft_address, sale))
+        .collect::<HashMap<_, _>>();
 
     for item in items {
+        let sale = sales_by_nft.get(&item.address).copied();
         address_book.insert_address(item.address, &["nft_item"]);
         address_book.insert_opt_address(item.owner_address, &[]);
         address_book.insert_opt_address(item.collection_address, &["nft_collection"]);
+        if let Some(sale) = sale {
+            address_book.insert_address(sale.address, &["nft_sale"]);
+            address_book.insert_opt_address(sale.nft_owner_address, &[]);
+        }
 
         token_info_by_address
             .entry(item.address.to_string())
@@ -255,7 +271,489 @@ pub fn map_nft_items_with_metadata(items: &[NftItemMeta]) -> response::NftItemsR
     response::NftItemsResponse {
         address_book,
         metadata,
-        nft_items: items.iter().map(map_nft_item).collect(),
+        nft_items: items
+            .iter()
+            .map(|item| map_nft_item(item, sales_by_nft.get(&item.address).copied()))
+            .collect(),
+    }
+}
+
+#[must_use]
+pub fn map_dns_records(records: &[DnsRecordMeta]) -> response::DnsRecordsResponse {
+    let mut address_book = response::AddressBook::new();
+    let records = records
+        .iter()
+        .map(|record| {
+            address_book.insert_address(record.nft_item_address, &["nft_item", "domain"]);
+            if let Some(row) = address_book.get_mut(&record.nft_item_address.to_string()) {
+                row.domain = Some(record.domain.clone());
+            }
+            address_book.insert_opt_address(record.nft_item_owner, &[]);
+            address_book.insert_opt_address(record.next_resolver, &["domain"]);
+            address_book.insert_opt_address(record.wallet, &["wallet"]);
+
+            response::DnsRecord {
+                nft_item_address: record.nft_item_address.to_string(),
+                nft_item_owner: record.nft_item_owner.map(|address| address.to_string()),
+                domain: record.domain.clone(),
+                dns_next_resolver: record.next_resolver.map(|address| address.to_string()),
+                dns_wallet: record.wallet.map(|address| address.to_string()),
+                dns_site_adnl: record.site_adnl.map(|hash| hash.to_base64()),
+                dns_storage_bag_id: record.storage_bag_id.map(|hash| hash.to_base64()),
+            }
+        })
+        .collect();
+
+    response::DnsRecordsResponse {
+        records,
+        address_book,
+    }
+}
+
+#[must_use]
+pub fn map_jetton_transfers(
+    events: &[JettonTransferEvent],
+    wallets: &[JettonWalletMeta],
+    masters_by_jetton: &HashMap<Addr, JettonMasterMeta>,
+) -> response::JettonTransfersResponse {
+    let enrichment = map_jetton_wallets_with_metadata(wallets, masters_by_jetton);
+    let mut address_book = enrichment.address_book;
+
+    let jetton_transfers = events
+        .iter()
+        .map(|event| {
+            address_book.insert_address(event.source, &[]);
+            address_book.insert_address(event.destination, &[]);
+            address_book.insert_address(event.source_wallet, &["jetton_wallet"]);
+            address_book.insert_address(event.jetton_master, &["jetton_master"]);
+            address_book.insert_opt_address(event.response_destination, &[]);
+            response::JettonTransfer {
+                query_id: event.query_id.clone(),
+                source: event.source.to_string(),
+                destination: event.destination.to_string(),
+                amount: event.amount.clone(),
+                source_wallet: event.source_wallet.to_string(),
+                jetton_master: event.jetton_master.to_string(),
+                transaction_hash: event.transaction_hash.to_base64(),
+                transaction_lt: event.transaction_lt.to_string(),
+                transaction_now: i64::from(event.transaction_now),
+                transaction_aborted: event.transaction_aborted,
+                response_destination: event
+                    .response_destination
+                    .map(|address| address.to_string()),
+                custom_payload: event.custom_payload.as_ref().map(BocBytes::to_base64),
+                decoded_custom_payload: None,
+                forward_ton_amount: Some(event.forward_ton_amount.clone()),
+                forward_payload: event.forward_payload.as_ref().map(BocBytes::to_base64),
+                decoded_forward_payload: None,
+                trace_id: None,
+            }
+        })
+        .collect();
+
+    response::JettonTransfersResponse {
+        jetton_transfers,
+        address_book,
+        metadata: enrichment.metadata,
+    }
+}
+
+#[must_use]
+pub fn map_jetton_burns(
+    events: &[JettonBurnEvent],
+    wallets: &[JettonWalletMeta],
+    masters_by_jetton: &HashMap<Addr, JettonMasterMeta>,
+) -> response::JettonBurnsResponse {
+    let enrichment = map_jetton_wallets_with_metadata(wallets, masters_by_jetton);
+    let mut address_book = enrichment.address_book;
+
+    let jetton_burns = events
+        .iter()
+        .map(|event| {
+            address_book.insert_address(event.owner, &[]);
+            address_book.insert_address(event.jetton_wallet, &["jetton_wallet"]);
+            address_book.insert_address(event.jetton_master, &["jetton_master"]);
+            address_book.insert_opt_address(event.response_destination, &[]);
+            response::JettonBurn {
+                query_id: event.query_id.clone(),
+                owner: event.owner.to_string(),
+                jetton_wallet: event.jetton_wallet.to_string(),
+                jetton_master: event.jetton_master.to_string(),
+                transaction_hash: event.transaction_hash.to_base64(),
+                transaction_lt: event.transaction_lt.to_string(),
+                transaction_now: i64::from(event.transaction_now),
+                transaction_aborted: event.transaction_aborted,
+                amount: event.amount.clone(),
+                response_destination: event
+                    .response_destination
+                    .map(|address| address.to_string()),
+                custom_payload: event.custom_payload.as_ref().map(BocBytes::to_base64),
+                decoded_custom_payload: None,
+                trace_id: None,
+            }
+        })
+        .collect();
+
+    response::JettonBurnsResponse {
+        jetton_burns,
+        address_book,
+        metadata: enrichment.metadata,
+    }
+}
+
+#[must_use]
+pub fn map_nft_collections(collections: &[NftCollectionMeta]) -> response::NftCollectionsResponse {
+    let mut address_book = response::AddressBook::new();
+    let mut metadata = response::Metadata::new();
+    for collection in collections {
+        address_book.insert_address(collection.address, &["nft_collection"]);
+        address_book.insert_opt_address(collection.owner_address, &[]);
+        metadata.insert(
+            collection.address.to_string(),
+            response::AddressMetadata {
+                is_indexed: true,
+                token_info: vec![response::TokenInfo {
+                    valid: Some(true),
+                    kind: Some("nft_collections".to_owned()),
+                    name: content_string(&collection.collection_content, "name"),
+                    description: content_string(&collection.collection_content, "description"),
+                    image: content_string(&collection.collection_content, "image"),
+                    extra: object_fields(&collection.collection_content),
+                    ..Default::default()
+                }],
+            },
+        );
+    }
+
+    response::NftCollectionsResponse {
+        nft_collections: collections
+            .iter()
+            .map(|collection| response::NftCollection {
+                address: collection.address.to_string(),
+                owner_address: collection.owner_address.map(|address| address.to_string()),
+                last_transaction_lt: collection.last_transaction_lt.to_string(),
+                next_item_index: collection.next_item_index.clone(),
+                collection_content: object_fields(&collection.collection_content),
+                data_hash: collection.data_hash.to_base64(),
+                code_hash: collection.code_hash.to_base64(),
+            })
+            .collect(),
+        address_book,
+        metadata,
+    }
+}
+
+#[must_use]
+pub fn map_nft_transfers(
+    events: &[NftTransferEvent],
+    items: &[NftItemMeta],
+) -> response::NftTransfersResponse {
+    let enrichment = map_nft_items_with_metadata(items, &[]);
+    let mut address_book = enrichment.address_book;
+    let nft_transfers = events
+        .iter()
+        .map(|event| {
+            address_book.insert_address(event.nft_address, &["nft_item"]);
+            address_book.insert_address(event.nft_collection, &["nft_collection"]);
+            address_book.insert_address(event.old_owner, &[]);
+            address_book.insert_address(event.new_owner, &[]);
+            address_book.insert_opt_address(event.response_destination, &[]);
+            response::NftTransfer {
+                query_id: event.query_id.clone(),
+                nft_address: event.nft_address.to_string(),
+                nft_collection: event.nft_collection.to_string(),
+                transaction_hash: event.transaction_hash.to_base64(),
+                transaction_lt: event.transaction_lt.to_string(),
+                transaction_now: i64::from(event.transaction_now),
+                transaction_aborted: event.transaction_aborted,
+                old_owner: event.old_owner.to_string(),
+                new_owner: event.new_owner.to_string(),
+                response_destination: event
+                    .response_destination
+                    .map(|address| address.to_string()),
+                custom_payload: event.custom_payload.as_ref().map(BocBytes::to_base64),
+                decoded_custom_payload: None,
+                forward_amount: Some(event.forward_amount.clone()),
+                forward_payload: event.forward_payload.as_ref().map(BocBytes::to_base64),
+                decoded_forward_payload: None,
+                trace_id: None,
+            }
+        })
+        .collect();
+
+    response::NftTransfersResponse {
+        nft_transfers,
+        address_book,
+        metadata: enrichment.metadata,
+    }
+}
+
+#[must_use]
+pub fn map_nft_sales(sales: &[NftSaleMeta], items: &[NftItemMeta]) -> response::NftSalesResponse {
+    let enrichment = map_nft_items_with_metadata(items, sales);
+    let mut address_book = enrichment.address_book;
+    let items_by_address = items
+        .iter()
+        .map(|item| (item.address, item))
+        .collect::<HashMap<_, _>>();
+
+    let nft_sales = sales
+        .iter()
+        .map(|sale| {
+            address_book.insert_address(sale.address, &["nft_sale"]);
+            address_book.insert_address(sale.nft_address, &["nft_item"]);
+            address_book.insert_opt_address(sale.nft_owner_address, &[]);
+            address_book.insert_opt_address(sale.marketplace_address, &[]);
+            for address in &sale.related_addresses {
+                address_book.insert_address(*address, &[]);
+            }
+            response::NftSale {
+                kind: sale.kind.clone(),
+                address: sale.address.to_string(),
+                nft_address: Some(sale.nft_address.to_string()),
+                nft_owner_address: sale.nft_owner_address.map(|address| address.to_string()),
+                marketplace_address: sale.marketplace_address.map(|address| address.to_string()),
+                created_at: sale.created_at,
+                last_transaction_lt: Some(sale.last_transaction_lt.to_string()),
+                code_hash: Some(sale.code_hash.to_base64()),
+                data_hash: Some(sale.data_hash.to_base64()),
+                details: sale.details.clone(),
+                nft_item: items_by_address
+                    .get(&sale.nft_address)
+                    .map(|item| map_nft_item(item, Some(sale))),
+            }
+        })
+        .collect();
+
+    response::NftSalesResponse {
+        nft_sales,
+        address_book,
+        metadata: enrichment.metadata,
+    }
+}
+
+fn map_multisig_order(order: &MultisigOrderMeta, parse_actions: bool) -> response::MultisigOrder {
+    response::MultisigOrder {
+        address: order.address.to_string(),
+        multisig_address: order.multisig_address.to_string(),
+        order_seqno: Some(order.order_seqno.clone()),
+        threshold: Some(order.threshold),
+        sent_for_execution: Some(order.sent_for_execution),
+        approvals_mask: Some(order.approvals_mask.clone()),
+        approvals_num: Some(order.approvals_num),
+        expiration_date: Some(order.expiration_date),
+        order_boc: Some(order.order_boc.to_base64()),
+        signers: order.signers.iter().map(ToString::to_string).collect(),
+        last_transaction_lt: order.last_transaction_lt.to_string(),
+        code_hash: Some(order.code_hash.to_base64()),
+        data_hash: Some(order.data_hash.to_base64()),
+        actions: if parse_actions {
+            parse_multisig_order_actions(order).unwrap_or_default()
+        } else {
+            Vec::new()
+        },
+    }
+}
+
+#[must_use]
+pub fn map_multisig_orders(
+    orders: &[MultisigOrderMeta],
+    parse_actions: bool,
+) -> response::MultisigOrdersResponse {
+    let mut address_book = response::AddressBook::new();
+    for order in orders {
+        address_book.insert_address(order.address, &["multisig_order"]);
+        address_book.insert_address(order.multisig_address, &["multisig"]);
+        for signer in &order.signers {
+            address_book.insert_address(*signer, &[]);
+        }
+    }
+    response::MultisigOrdersResponse {
+        orders: orders
+            .iter()
+            .map(|order| map_multisig_order(order, parse_actions))
+            .collect(),
+        address_book,
+    }
+}
+
+#[must_use]
+pub fn map_multisigs(
+    multisigs: &[MultisigMeta],
+    orders: &[MultisigOrderMeta],
+) -> response::MultisigsResponse {
+    let mut address_book = response::AddressBook::new();
+    let mut orders_by_multisig: HashMap<Addr, Vec<&MultisigOrderMeta>> = HashMap::new();
+    for order in orders {
+        address_book.insert_address(order.address, &["multisig_order"]);
+        address_book.insert_address(order.multisig_address, &["multisig"]);
+        for signer in &order.signers {
+            address_book.insert_address(*signer, &[]);
+        }
+        orders_by_multisig
+            .entry(order.multisig_address)
+            .or_default()
+            .push(order);
+    }
+    let multisigs = multisigs
+        .iter()
+        .map(|multisig| {
+            address_book.insert_address(multisig.address, &["multisig"]);
+            for signer in multisig.signers.iter().chain(&multisig.proposers) {
+                address_book.insert_address(*signer, &[]);
+            }
+            response::Multisig {
+                address: multisig.address.to_string(),
+                next_order_seqno: Some(multisig.next_order_seqno.clone()),
+                threshold: Some(multisig.threshold),
+                signers: multisig.signers.iter().map(ToString::to_string).collect(),
+                proposers: multisig.proposers.iter().map(ToString::to_string).collect(),
+                last_transaction_lt: multisig.last_transaction_lt.to_string(),
+                code_hash: Some(multisig.code_hash.to_base64()),
+                data_hash: Some(multisig.data_hash.to_base64()),
+                orders: orders_by_multisig
+                    .remove(&multisig.address)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|order| map_multisig_order(order, false))
+                    .collect(),
+            }
+        })
+        .collect();
+    response::MultisigsResponse {
+        multisigs,
+        address_book,
+    }
+}
+
+fn parse_multisig_order_actions(
+    order: &MultisigOrderMeta,
+) -> anyhow::Result<Vec<response::MultisigOrderAction>> {
+    let root = Boc::decode(&order.order_boc)?;
+    let actions = Dict::<u8, Cell>::from_raw(Some(root));
+    actions
+        .iter()
+        .map(|entry| {
+            let (_, action) = entry?;
+            Ok(map_multisig_order_action(&action).unwrap_or_else(|error| {
+                response::MultisigOrderAction {
+                    destination: None,
+                    value: None,
+                    body_raw: Value::Null,
+                    parsed: false,
+                    error: Some(error.to_string()),
+                    parsed_body: None,
+                    parsed_body_type: "unknown".to_owned(),
+                    send_mode: 0,
+                }
+            }))
+        })
+        .collect()
+}
+
+fn map_multisig_order_action(cell: &Cell) -> anyhow::Result<response::MultisigOrderAction> {
+    const SEND_MESSAGE: u32 = 0xf138_1e5b;
+    const UPDATE_MULTISIG_PARAMS: u32 = 0x1d0c_fbd3;
+    let mut slice = cell.as_slice()?;
+    let opcode = slice.load_u32()?;
+    if opcode == UPDATE_MULTISIG_PARAMS {
+        let new_threshold = slice.load_u8()?;
+        let signers = load_multisig_addresses(slice.load_reference_cloned()?)?;
+        let proposers = if slice.load_bit()? {
+            load_multisig_addresses(slice.load_reference_cloned()?)?
+        } else {
+            Vec::new()
+        };
+        return Ok(response::MultisigOrderAction {
+            destination: None,
+            value: None,
+            body_raw: Value::Null,
+            parsed: true,
+            error: None,
+            parsed_body: Some(serde_json::json!({
+                "new_threshold": new_threshold,
+                "new_signers": signers,
+                "new_proposers": proposers,
+            })),
+            parsed_body_type: "multisig_update_params".to_owned(),
+            send_mode: 0,
+        });
+    }
+
+    if opcode != SEND_MESSAGE {
+        anyhow::bail!("unsupported multisig order action")
+    }
+    let mode = slice.load_u8()?;
+    let message = slice
+        .load_reference_cloned()?
+        .parse::<OwnedRelaxedMessage>()?;
+    let (destination, value) = match &message.info {
+        RelaxedMsgInfo::Int(info) => (
+            Some(Addr::from(&info.dst).to_string()),
+            Some(info.value.tokens.to_string()),
+        ),
+        RelaxedMsgInfo::ExtOut(_) => (None, Some("0".to_owned())),
+    };
+    let body = CellBuilder::build_from(CellSlice::apply(&message.body)?)?;
+    let body_boc = Boc::encode(body);
+    let body_raw = serde_json::to_value(&body_boc)?;
+    let opcode = Boc::decode(&body_boc)
+        .ok()
+        .and_then(|body| body.as_slice().ok()?.get_u32(0).ok());
+
+    Ok(response::MultisigOrderAction {
+        destination,
+        value,
+        body_raw: body_raw.clone(),
+        parsed: true,
+        error: None,
+        parsed_body: Some(serde_json::json!({
+            "opcode": opcode.unwrap_or_default(),
+            "data": body_raw,
+        })),
+        parsed_body_type: "unknown".to_owned(),
+        send_mode: mode,
+    })
+}
+
+fn load_multisig_addresses(root: Cell) -> anyhow::Result<Vec<String>> {
+    Dict::<u8, IntAddr>::from_raw(Some(root))
+        .iter()
+        .map(|entry| {
+            let (_, address) = entry?;
+            Ok(Addr::from(&address).to_string())
+        })
+        .collect()
+}
+
+#[must_use]
+pub fn map_vesting_contracts(vesting: &[VestingMeta]) -> response::VestingContractsResponse {
+    let mut address_book = response::AddressBook::new();
+    let vesting_contracts = vesting
+        .iter()
+        .map(|contract| {
+            address_book.insert_address(contract.address, &["vesting"]);
+            address_book.insert_address(contract.sender_address, &[]);
+            address_book.insert_address(contract.owner_address, &[]);
+            for address in &contract.whitelist {
+                address_book.insert_address(*address, &[]);
+            }
+            response::VestingInfo {
+                address: Some(contract.address.to_string()),
+                start_time: Some(contract.start_time),
+                total_duration: Some(contract.total_duration),
+                unlock_period: Some(contract.unlock_period),
+                cliff_duration: Some(contract.cliff_duration),
+                sender_address: Some(contract.sender_address.to_string()),
+                owner_address: Some(contract.owner_address.to_string()),
+                total_amount: Some(contract.total_amount.clone()),
+                whitelist: contract.whitelist.iter().map(ToString::to_string).collect(),
+            }
+        })
+        .collect();
+    response::VestingContractsResponse {
+        vesting_contracts,
+        address_book,
     }
 }
 
@@ -636,7 +1134,7 @@ pub(crate) fn map_jetton_master_token_info(master: &JettonMasterMeta) -> respons
     }
 }
 
-fn map_nft_item(item: &NftItemMeta) -> response::NftItem {
+fn map_nft_item(item: &NftItemMeta, sale: Option<&NftSaleMeta>) -> response::NftItem {
     response::NftItem {
         address: item.address.to_string(),
         auction_contract_address: None,
@@ -653,10 +1151,13 @@ fn map_nft_item(item: &NftItemMeta) -> response::NftItem {
         index: item.index.clone(),
         init: item.init,
         last_transaction_lt: item.last_transaction_lt.to_string(),
-        on_sale: false,
+        on_sale: sale.is_some(),
         owner_address: item.owner_address.as_ref().map(ToString::to_string),
-        real_owner: item.owner_address.as_ref().map(ToString::to_string),
-        sale_contract_address: None,
+        real_owner: sale
+            .and_then(|sale| sale.nft_owner_address)
+            .or(item.owner_address)
+            .map(|address| address.to_string()),
+        sale_contract_address: sale.map(|sale| sale.address.to_string()),
     }
 }
 
@@ -1474,7 +1975,7 @@ mod tests {
             .expect("collection address")
             .to_string();
         let token_info = map_nft_item_token_info(&item);
-        let mapped = map_nft_items(&[item]);
+        let mapped = map_nft_items(&[item], &[]);
 
         assert_eq!(token_info.kind.as_deref(), Some("nft_items"));
         assert_eq!(token_info.nft_index.as_deref(), Some("7"));

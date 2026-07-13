@@ -28,9 +28,26 @@ pub struct NftItemData {
     pub individual_content: Cell,
 }
 
+#[derive(Debug, Clone, tvm_ffi::FromStackTuple)]
+pub struct NftCollectionData {
+    pub next_item_index: BigInt,
+    pub collection_content: Cell,
+    pub owner_address: Option<IntAddr>,
+}
+
 #[must_use]
 pub fn get_nft_item_data(address: String, code: Cell, data: Cell) -> Option<NftItemData> {
     run_get_method(address, code, data, None, "get_nft_data").ok()
+}
+
+#[must_use]
+pub fn get_nft_collection_data(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<NftCollectionData> {
+    run_get_method(address, code, data, libs, "get_collection_data").ok()
 }
 
 #[must_use]

@@ -4091,6 +4091,1151 @@ fn localnet_supports_v3_estimate_fee_and_top_accounts() {
 }
 
 #[test]
+fn localnet_v3_indexed_contract_endpoints_match_typed_contracts() {
+    let project = ProjectBuilder::new("localnet-v3-indexed-contract-endpoints").build();
+    fs::write(
+        project.path().join("wallets.toml"),
+        TON_CONNECT_WALLETS_CONFIG,
+    )
+    .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .args(["--accounts", "wallet_v4", "--no-mining"])
+        .start();
+    let no_state = "0:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF";
+
+    let dns: toncenter_v3::DnsRecordsResponse =
+        serde_json::from_value(node.get_json("/api/v3/dns/records?domain=missing.ton"))
+            .expect("dns records response must match typed contract");
+    let jetton_transfers: toncenter_v3::JettonTransfersResponse = serde_json::from_value(
+        node.get_json("/api/v3/jetton/transfers?limit=10&offset=0&sort=desc"),
+    )
+    .expect("jetton transfers response must match typed contract");
+    let jetton_burns: toncenter_v3::JettonBurnsResponse =
+        serde_json::from_value(node.get_json("/api/v3/jetton/burns?limit=10&offset=0&sort=desc"))
+            .expect("jetton burns response must match typed contract");
+    let collections: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/collections?limit=10&offset=0"))
+            .expect("NFT collections response must match typed contract");
+    let sales: toncenter_v3::NftSalesResponse =
+        serde_json::from_value(node.get_json(&format!("/api/v3/nft/sales?address={no_state}")))
+            .expect("NFT sales response must match typed contract");
+    let nft_transfers: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/transfers?limit=10&offset=0&sort=desc"))
+            .expect("NFT transfers response must match typed contract");
+    let orders: toncenter_v3::MultisigOrdersResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/multisig/orders?address={no_state}&parse_actions=true"),
+    ))
+    .expect("multisig orders response must match typed contract");
+    let multisigs: toncenter_v3::MultisigsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/multisig/wallets?address={no_state}&include_orders=true"),
+    ))
+    .expect("multisig wallets response must match typed contract");
+    let vesting: toncenter_v3::VestingContractsResponse = serde_json::from_value(node.get_json(
+        &format!("/api/v3/vesting?contract_address={no_state}&check_whitelist=true"),
+    ))
+    .expect("vesting response must match typed contract");
+
+    let snapshot = json!({
+        "dns": { "records": dns.records.len(), "address_book": dns.address_book.len() },
+        "jetton_burns": { "items": jetton_burns.jetton_burns.len(), "address_book": jetton_burns.address_book.len(), "metadata": jetton_burns.metadata.len() },
+        "jetton_transfers": { "items": jetton_transfers.jetton_transfers.len(), "address_book": jetton_transfers.address_book.len(), "metadata": jetton_transfers.metadata.len() },
+        "multisig_orders": { "items": orders.orders.len(), "address_book": orders.address_book.len() },
+        "multisig_wallets": { "items": multisigs.multisigs.len(), "address_book": multisigs.address_book.len() },
+        "nft_collections": { "items": collections.nft_collections.len(), "address_book": collections.address_book.len(), "metadata": collections.metadata.len() },
+        "nft_sales": { "items": sales.nft_sales.len(), "address_book": sales.address_book.len(), "metadata": sales.metadata.len() },
+        "nft_transfers": { "items": nft_transfers.nft_transfers.len(), "address_book": nft_transfers.address_book.len(), "metadata": nft_transfers.metadata.len() },
+        "vesting": { "items": vesting.vesting_contracts.len(), "address_book": vesting.address_book.len() },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!(
+            "snapshots/localnet/localnet_v3_indexed_contract_endpoints_match_typed_contracts.summary.json"
+        ),
+    );
+
+    node.stop();
+}
+
+fn with_nft_v1_action_fixtures(project: ProjectBuilder) -> ProjectBuilder {
+    project
+        .contract_from_boc_with_types(
+            "NftV1Collection",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/NftV1Collection.boc").to_vec(),
+            "types/nft_v1_collection.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "NftV1Item",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/NftV1Item.boc").to_vec(),
+            "types/nft_v1_item.types.tolk",
+        )
+        .file(
+            "types/nft_v1_collection.types",
+            include_str!("testdata/toncenter_v3_actions/types/nft_v1_collection.types.tolk"),
+        )
+        .file(
+            "types/nft_v1_item.types",
+            include_str!("testdata/toncenter_v3_actions/types/nft_v1_item.types.tolk"),
+        )
+        .file(
+            "wrappers/NftV1Collection.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/NftV1Collection.gen.tolk"),
+        )
+        .file(
+            "wrappers/NftV1Item.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/NftV1Item.gen.tolk"),
+        )
+}
+
+fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {
+    let value = extract_marker_value(output, marker);
+    let address = value
+        .split_once(" (")
+        .map_or(value.as_str(), |(address, _)| address);
+    Addr::parse(address)
+        .unwrap_or_else(|error| panic!("Invalid address `{value}` printed for {marker}: {error}"))
+        .to_string()
+}
+
+#[test]
+fn localnet_v3_indexes_real_jetton_actions() {
+    let project = ProjectBuilder::new("localnet-v3-real-jetton-actions")
+        .contract_from_boc_with_types(
+            "JettonV1Master",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/JettonV1Master.boc").to_vec(),
+            "types/jetton_v1_master.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "JettonV1Wallet",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/JettonV1Wallet.boc").to_vec(),
+            "types/jetton_v1_wallet.types.tolk",
+        )
+        .file(
+            "types/jetton_v1_master.types",
+            include_str!("testdata/toncenter_v3_actions/types/jetton_v1_master.types.tolk"),
+        )
+        .file(
+            "types/jetton_v1_wallet.types",
+            include_str!("testdata/toncenter_v3_actions/types/jetton_v1_wallet.types.tolk"),
+        )
+        .file(
+            "wrappers/JettonV1Master.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/JettonV1Master.gen.tolk"),
+        )
+        .file(
+            "wrappers/JettonV1Wallet.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/JettonV1Wallet.gen.tolk"),
+        )
+        .script_file(
+            "jetton",
+            include_str!("testdata/toncenter_v3_actions/jetton.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/jetton.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
+    let source_wallet = extract_canonical_addr_marker(&script_output, "JETTON_SOURCE_WALLET=");
+    let recipient_wallet =
+        extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let jetton_transfers = loop {
+        let response: toncenter_v3::JettonTransfersResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/jetton/transfers?jetton_wallet={}",
+                encode_query_component(&source_wallet)
+            )))
+            .expect("jetton transfers response must match typed contract");
+        if ["101", "103"].iter().all(|query_id| {
+            response
+                .jetton_transfers
+                .iter()
+                .any(|transfer| transfer.query_id == *query_id)
+        }) || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+
+    let jetton_burns = loop {
+        let response: toncenter_v3::JettonBurnsResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/jetton/burns?jetton_wallet={}",
+                encode_query_component(&source_wallet)
+            )))
+            .expect("jetton burns response must match typed contract");
+        if ["102", "104"].iter().all(|query_id| {
+            response
+                .jetton_burns
+                .iter()
+                .any(|burn| burn.query_id == *query_id)
+        }) || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let incoming: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&jetton_master={}&direction=in&sort=asc",
+            encode_query_component(&recipient),
+            encode_query_component(&jetton_master)
+        )))
+        .expect("incoming jetton transfers must match typed contract");
+    let outgoing: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&direction=out&sort=asc",
+            encode_query_component(&owner)
+        )))
+        .expect("outgoing jetton transfers must match typed contract");
+    let wrong_direction: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?owner_address={}&direction=out",
+            encode_query_component(&recipient)
+        )))
+        .expect("mismatched jetton direction must match typed contract");
+    let first_ascending: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}&sort=asc&limit=1",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("ascending jetton page must match typed contract");
+    let first_descending: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}&sort=desc&limit=1",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("descending jetton page must match typed contract");
+    let burns_by_owner_and_master: toncenter_v3::JettonBurnsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/burns?address={}&jetton_master={}&sort=asc",
+            encode_query_component(&owner),
+            encode_query_component(&jetton_master)
+        )))
+        .expect("filtered jetton burns must match typed contract");
+    let masters: toncenter_v3::JettonMastersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/masters?address={}",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("jetton masters response must match typed contract");
+    let wallets: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?address={}&address={}",
+            encode_query_component(&source_wallet),
+            encode_query_component(&recipient_wallet)
+        )))
+        .expect("jetton wallets response must match typed contract");
+    let transfer = jetton_transfers
+        .jetton_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "101")
+        .expect("successful jetton transfer must be indexed");
+    let burn = jetton_burns
+        .jetton_burns
+        .iter()
+        .find(|burn| burn.query_id == "102")
+        .expect("successful jetton burn must be indexed");
+    let aborted_transfer = jetton_transfers
+        .jetton_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "103")
+        .expect("aborted jetton transfer must be indexed");
+    let aborted_burn = jetton_burns
+        .jetton_burns
+        .iter()
+        .find(|burn| burn.query_id == "104")
+        .expect("aborted jetton burn must be indexed");
+    let master = masters
+        .jetton_masters
+        .first()
+        .expect("deployed jetton master must be indexed");
+    let source_wallet_state = wallets
+        .jetton_wallets
+        .iter()
+        .find(|wallet| wallet.address == source_wallet)
+        .expect("source jetton wallet must be indexed");
+    let recipient_wallet_state = wallets
+        .jetton_wallets
+        .iter()
+        .find(|wallet| wallet.address == recipient_wallet)
+        .expect("recipient jetton wallet must be indexed");
+    let snapshot = json!({
+        "jetton": {
+            "master": {
+                "address": master.address,
+                "admin_address": master.admin_address,
+                "mintable": master.mintable,
+                "total_supply": master.total_supply,
+                "address_book_has_master": masters.address_book.contains_key(&jetton_master),
+                "metadata_has_master": masters.metadata.contains_key(&jetton_master),
+            },
+            "source_wallet": {
+                "address": source_wallet_state.address,
+                "balance": source_wallet_state.balance,
+                "owner": source_wallet_state.owner,
+                "jetton": source_wallet_state.jetton,
+            },
+            "recipient_wallet": {
+                "address": recipient_wallet_state.address,
+                "balance": recipient_wallet_state.balance,
+                "owner": recipient_wallet_state.owner,
+                "jetton": recipient_wallet_state.jetton,
+            },
+            "transfer": {
+                "query_id": transfer.query_id,
+                "source": transfer.source,
+                "destination": transfer.destination,
+                "amount": transfer.amount,
+                "source_wallet": transfer.source_wallet,
+                "jetton_master": transfer.jetton_master,
+                "transaction_aborted": transfer.transaction_aborted,
+                "response_destination": transfer.response_destination,
+                "custom_payload": transfer.custom_payload,
+                "forward_ton_amount": transfer.forward_ton_amount,
+                "address_book_has_recipient": jetton_transfers.address_book.contains_key(&recipient),
+                "metadata_has_source_wallet": jetton_transfers.metadata.contains_key(&source_wallet),
+            },
+            "burn": {
+                "query_id": burn.query_id,
+                "owner": burn.owner,
+                "amount": burn.amount,
+                "jetton_wallet": burn.jetton_wallet,
+                "jetton_master": burn.jetton_master,
+                "transaction_aborted": burn.transaction_aborted,
+                "response_destination": burn.response_destination,
+                "custom_payload": burn.custom_payload,
+            },
+            "aborted_transfer": {
+                "query_id": aborted_transfer.query_id,
+                "amount": aborted_transfer.amount,
+                "source": aborted_transfer.source,
+                "destination": aborted_transfer.destination,
+                "transaction_aborted": aborted_transfer.transaction_aborted,
+            },
+            "aborted_burn": {
+                "query_id": aborted_burn.query_id,
+                "amount": aborted_burn.amount,
+                "owner": aborted_burn.owner,
+                "transaction_aborted": aborted_burn.transaction_aborted,
+            },
+        },
+        "filters": {
+            "incoming_query_ids": incoming.jetton_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "outgoing_query_ids": outgoing.jetton_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wrong_direction_count": wrong_direction.jetton_transfers.len(),
+            "ascending_first_query_id": first_ascending.jetton_transfers.first().map(|event| &event.query_id),
+            "descending_first_query_id": first_descending.jetton_transfers.first().map(|event| &event.query_id),
+            "burn_query_ids": burns_by_owner_and_master.jetton_burns.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+        },
+        "actors": {
+            "owner": owner,
+            "recipient": recipient,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_jetton_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_nft_actions() {
+    let project = with_nft_v1_action_fixtures(ProjectBuilder::new("localnet-v3-real-nft-actions"))
+        .script_file(
+            "nft",
+            include_str!("testdata/toncenter_v3_actions/nft.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/nft.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
+    let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
+    let nft_item = extract_canonical_addr_marker(&script_output, "NFT_ITEM=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let nft_transfers = loop {
+        let response: toncenter_v3::NftTransfersResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/nft/transfers?item_address={}",
+                encode_query_component(&nft_item)
+            )))
+            .expect("NFT transfers response must match typed contract");
+        if ["201", "203"].iter().all(|query_id| {
+            response
+                .nft_transfers
+                .iter()
+                .any(|transfer| transfer.query_id == *query_id)
+        }) || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let collections: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?collection_address={}",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT collections response must match typed contract");
+    let items: toncenter_v3::NftItemsResponse = serde_json::from_value(node.get_json(&format!(
+        "/api/v3/nft/items?address={}",
+        encode_query_component(&nft_item)
+    )))
+    .expect("NFT items response must match typed contract");
+    let collections_by_owner: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?owner_address={}",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT collections owner filter must match typed contract");
+    let collections_by_wrong_owner: toncenter_v3::NftCollectionsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/collections?collection_address={}&owner_address={}",
+            encode_query_component(&nft_collection),
+            encode_query_component(&recipient)
+        )))
+        .expect("NFT collections mismatched owner must match typed contract");
+    let items_by_owner: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}",
+            encode_query_component(&recipient)
+        )))
+        .expect("NFT items owner filter must match typed contract");
+    let items_by_collection_index: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&index=0",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT items collection index filter must match typed contract");
+    let (index_without_collection_status, index_without_collection) =
+        node.get_json_with_status("/api/v3/nft/items?index=0");
+    let incoming: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&direction=in&sort=asc",
+            encode_query_component(&recipient)
+        )))
+        .expect("incoming NFT transfers must match typed contract");
+    let outgoing: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&collection_address={}&direction=out&sort=asc",
+            encode_query_component(&owner),
+            encode_query_component(&nft_collection)
+        )))
+        .expect("outgoing NFT transfers must match typed contract");
+    let wrong_direction: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?owner_address={}&direction=out",
+            encode_query_component(&recipient)
+        )))
+        .expect("mismatched NFT direction must match typed contract");
+    let first_ascending: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}&sort=asc&limit=1",
+            encode_query_component(&nft_item)
+        )))
+        .expect("ascending NFT page must match typed contract");
+    let first_descending: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}&sort=desc&limit=1",
+            encode_query_component(&nft_item)
+        )))
+        .expect("descending NFT page must match typed contract");
+
+    let collection = collections
+        .nft_collections
+        .first()
+        .expect("deployed NFT collection must be indexed");
+    let item = items
+        .nft_items
+        .first()
+        .expect("deployed NFT item must be indexed");
+    let transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "201")
+        .expect("successful NFT transfer must be indexed");
+    let aborted_transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "203")
+        .expect("aborted NFT transfer must be indexed");
+
+    let snapshot = json!({
+        "collection": {
+            "address": collection.address,
+            "owner_address": collection.owner_address,
+            "next_item_index": collection.next_item_index,
+            "address_book_has_collection": collections.address_book.contains_key(&nft_collection),
+            "metadata_has_collection": collections.metadata.contains_key(&nft_collection),
+        },
+        "item": {
+            "address": item.address,
+            "collection_address": item.collection_address,
+            "owner_address": item.owner_address,
+            "index": item.index,
+            "init": item.init,
+            "address_book_has_item": items.address_book.contains_key(&nft_item),
+            "metadata_has_item": items.metadata.contains_key(&nft_item),
+        },
+        "transfer": {
+            "query_id": transfer.query_id,
+            "nft_address": transfer.nft_address,
+            "nft_collection": transfer.nft_collection,
+            "old_owner": transfer.old_owner,
+            "new_owner": transfer.new_owner,
+            "transaction_aborted": transfer.transaction_aborted,
+            "response_destination": transfer.response_destination,
+            "custom_payload": transfer.custom_payload,
+            "forward_amount": transfer.forward_amount,
+            "address_book_has_recipient": nft_transfers.address_book.contains_key(&recipient),
+            "metadata_has_item": nft_transfers.metadata.contains_key(&nft_item),
+        },
+        "aborted_transfer": {
+            "query_id": aborted_transfer.query_id,
+            "old_owner": aborted_transfer.old_owner,
+            "new_owner": aborted_transfer.new_owner,
+            "transaction_aborted": aborted_transfer.transaction_aborted,
+        },
+        "filters": {
+            "collection_by_owner_count": collections_by_owner.nft_collections.len(),
+            "collection_by_wrong_owner_count": collections_by_wrong_owner.nft_collections.len(),
+            "items_by_owner_count": items_by_owner.nft_items.len(),
+            "items_by_collection_index_count": items_by_collection_index.nft_items.len(),
+            "index_without_collection_status": index_without_collection_status,
+            "index_without_collection_error": index_without_collection,
+            "incoming_query_ids": incoming.nft_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "outgoing_query_ids": outgoing.nft_transfers.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wrong_direction_count": wrong_direction.nft_transfers.len(),
+            "ascending_first_query_id": first_ascending.nft_transfers.first().map(|event| &event.query_id),
+            "descending_first_query_id": first_descending.nft_transfers.first().map(|event| &event.query_id),
+        },
+        "actors": {
+            "owner": owner,
+            "recipient": recipient,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_nft_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_getgems_sale() {
+    let project = with_nft_v1_action_fixtures(ProjectBuilder::new("localnet-v3-real-getgems-sale"))
+        .contract_from_boc_with_types(
+            "GetgemsNftFixpriceSaleV3",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/GetgemsNftFixpriceSaleV3.boc")
+                .to_vec(),
+            "types/getgems_nft_fixprice_sale_v3.types.tolk",
+        )
+        .file(
+            "types/getgems_nft_fixprice_sale_v3.types",
+            include_str!(
+                "testdata/toncenter_v3_actions/types/getgems_nft_fixprice_sale_v3.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/GetgemsNftFixpriceSaleV3.gen",
+            include_str!(
+                "testdata/toncenter_v3_actions/wrappers/GetgemsNftFixpriceSaleV3.gen.tolk"
+            ),
+        )
+        .script_file(
+            "getgems_sale",
+            include_str!("testdata/toncenter_v3_actions/getgems_sale.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/getgems_sale.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
+    let nft_item = extract_canonical_addr_marker(&script_output, "NFT_ITEM=");
+    let nft_sale = extract_canonical_addr_marker(&script_output, "NFT_SALE=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let sales = loop {
+        let response: toncenter_v3::NftSalesResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/nft/sales?address={}",
+                encode_query_component(&nft_sale)
+            )))
+            .expect("NFT sales response must match typed contract");
+        if !response.nft_sales.is_empty() || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let nft_transfers: toncenter_v3::NftTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/transfers?item_address={}",
+            encode_query_component(&nft_item)
+        )))
+        .expect("NFT transfers response must match typed contract");
+    let items: toncenter_v3::NftItemsResponse = serde_json::from_value(node.get_json(&format!(
+        "/api/v3/nft/items?address={}&include_on_sale=true",
+        encode_query_component(&nft_item)
+    )))
+    .expect("NFT items response must match typed contract");
+    let items_by_real_owner_without_sale: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&include_on_sale=false",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT real owner filter without sale lookup must match typed contract");
+    let items_by_real_owner_with_sale: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&include_on_sale=true",
+            encode_query_component(&owner)
+        )))
+        .expect("NFT real owner filter with sale lookup must match typed contract");
+    let items_by_contract_owner: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}",
+            encode_query_component(&nft_sale)
+        )))
+        .expect("NFT sale contract owner filter must match typed contract");
+    let mixed_sales: toncenter_v3::NftSalesResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/sales?address={}&address={}",
+            encode_query_component(&nft_sale),
+            encode_query_component(&owner)
+        )))
+        .expect("repeated NFT sale addresses must match typed contract");
+    let (missing_address_status, missing_address_error) =
+        node.get_json_with_status("/api/v3/nft/sales");
+
+    let sale = sales
+        .nft_sales
+        .first()
+        .expect("initialized Getgems sale must be indexed");
+    let item = items
+        .nft_items
+        .first()
+        .expect("listed NFT item must be indexed");
+    let transfer = nft_transfers
+        .nft_transfers
+        .iter()
+        .find(|transfer| transfer.query_id == "202")
+        .expect("NFT transfer into the sale must be indexed");
+
+    let snapshot = json!({
+        "sale": {
+            "type": sale.kind,
+            "address": sale.address,
+            "nft_address": sale.nft_address,
+            "nft_owner_address": sale.nft_owner_address,
+            "marketplace_address": sale.marketplace_address,
+            "created_at": sale.created_at,
+            "details": sale.details,
+            "has_embedded_nft_item": sale.nft_item.is_some(),
+            "embedded_nft_on_sale": sale.nft_item.as_ref().map(|item| item.on_sale),
+            "embedded_nft_real_owner": sale.nft_item.as_ref().and_then(|item| item.real_owner.as_ref()),
+            "embedded_nft_sale_contract": sale.nft_item.as_ref().and_then(|item| item.sale_contract_address.as_ref()),
+            "address_book_has_sale": sales.address_book.contains_key(&nft_sale),
+            "metadata_has_item": sales.metadata.contains_key(&nft_item),
+        },
+        "item": {
+            "address": item.address,
+            "collection_address": item.collection_address,
+            "owner_address": item.owner_address,
+            "owner_is_sale": item.owner_address.as_deref() == Some(nft_sale.as_str()),
+            "on_sale": item.on_sale,
+            "real_owner": item.real_owner,
+            "sale_contract_address": item.sale_contract_address,
+        },
+        "filters": {
+            "real_owner_without_sale_count": items_by_real_owner_without_sale.nft_items.len(),
+            "real_owner_with_sale_count": items_by_real_owner_with_sale.nft_items.len(),
+            "contract_owner_count": items_by_contract_owner.nft_items.len(),
+            "mixed_sale_count": mixed_sales.nft_sales.len(),
+            "missing_address_status": missing_address_status,
+            "missing_address_error": missing_address_error,
+        },
+        "listing_transfer": {
+            "query_id": transfer.query_id,
+            "nft_address": transfer.nft_address,
+            "nft_collection": transfer.nft_collection,
+            "old_owner": transfer.old_owner,
+            "new_owner": transfer.new_owner,
+            "transaction_aborted": transfer.transaction_aborted,
+            "forward_amount": transfer.forward_amount,
+            "new_owner_is_sale": transfer.new_owner == nft_sale,
+        },
+        "actors": {
+            "owner": owner,
+            "collection": nft_collection,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_getgems_sale.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_multisig_actions() {
+    let project = ProjectBuilder::new("localnet-v3-real-multisig-actions")
+        .contract(
+            "librarypublisher",
+            include_str!("testdata/toncenter_v3_actions/library_publisher.tolk"),
+        )
+        .contract_from_boc_with_types(
+            "MultisigV2",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/MultisigV2.boc").to_vec(),
+            "types/multisig_v2.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "MultisigOrderV2",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/MultisigOrderV2.boc").to_vec(),
+            "types/multisig_order_v2.types.tolk",
+        )
+        .contract_from_boc(
+            "MultisigOrderV2Library",
+            base64::engine::general_purpose::STANDARD
+                .decode(
+                    include_str!(
+                        "testdata/toncenter_v3_actions/contracts/MultisigOrderV2.library.boc.base64"
+                    )
+                    .trim(),
+                )
+                .expect("MultisigOrderV2 library fixture must be base64"),
+        )
+        .file(
+            "types/multisig_v2.types",
+            include_str!("testdata/toncenter_v3_actions/types/multisig_v2.types.tolk"),
+        )
+        .file(
+            "types/multisig_order_v2.types",
+            include_str!("testdata/toncenter_v3_actions/types/multisig_order_v2.types.tolk"),
+        )
+        .file(
+            "wrappers/MultisigV2.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/MultisigV2.gen.tolk"),
+        )
+        .file(
+            "wrappers/MultisigOrderV2.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/MultisigOrderV2.gen.tolk"),
+        )
+        .script_file(
+            "multisig",
+            include_str!("testdata/toncenter_v3_actions/multisig.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/multisig.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let cosigner = extract_canonical_addr_marker(&script_output, "COSIGNER=");
+    let multisig_address = extract_canonical_addr_marker(&script_output, "MULTISIG=");
+    let order_address = extract_canonical_addr_marker(&script_output, "MULTISIG_ORDER=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let orders = loop {
+        let response: toncenter_v3::MultisigOrdersResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/multisig/orders?address={}&parse_actions=true",
+                encode_query_component(&order_address)
+            )))
+            .expect("multisig orders response must match typed contract");
+        if !response.orders.is_empty() || Instant::now() >= deadline {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let multisigs: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?address={}&include_orders=true",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig wallets response must match typed contract");
+    let orders_without_actions: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?address={}&parse_actions=false",
+            encode_query_component(&order_address)
+        )))
+        .expect("unparsed multisig orders must match typed contract");
+    let orders_by_multisig: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?multisig_address={}&parse_actions=true",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig-address order filter must match typed contract");
+    let orders_after_offset: toncenter_v3::MultisigOrdersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/orders?multisig_address={}&offset=1",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig order pagination must match typed contract");
+    let multisigs_without_orders: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?address={}&include_orders=false",
+            encode_query_component(&multisig_address)
+        )))
+        .expect("multisig response without orders must match typed contract");
+    let multisigs_by_owner: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&owner)
+        )))
+        .expect("multisig owner filter must match typed contract");
+    let multisigs_by_cosigner: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&cosigner)
+        )))
+        .expect("multisig cosigner filter must match typed contract");
+    let multisigs_by_unrelated_wallet: toncenter_v3::MultisigsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/multisig/wallets?wallet_address={}&include_orders=false",
+            encode_query_component(&order_address)
+        )))
+        .expect("unrelated multisig wallet filter must match typed contract");
+
+    let multisig = multisigs
+        .multisigs
+        .first()
+        .expect("deployed MultisigV2 must be indexed");
+    let order = orders
+        .orders
+        .first()
+        .unwrap_or_else(|| {
+            let account = node.get_json(&format!(
+                "/api/v3/accountStates?address={}",
+                encode_query_component(&order_address)
+            ));
+            panic!(
+                "created MultisigOrderV2 must be indexed\naccount: {account:#}\nmultisigs: {multisigs:#?}"
+            )
+        });
+    let update_action = order
+        .actions
+        .iter()
+        .find(|action| action.parsed_body_type == "multisig_update_params")
+        .expect("multisig update action must be parsed");
+    let send_action = order
+        .actions
+        .iter()
+        .find(|action| action.destination.as_deref() == Some(cosigner.as_str()))
+        .unwrap_or_else(|| {
+            panic!(
+                "multisig send-message action must be parsed: {:#?}",
+                order.actions
+            )
+        });
+    let external_action = order
+        .actions
+        .iter()
+        .find(|action| action.parsed && action.send_mode == 64)
+        .expect("multisig external-out action must be parsed");
+    let unknown_action = order
+        .actions
+        .iter()
+        .find(|action| !action.parsed)
+        .expect("unknown multisig action must be preserved as a parse error");
+    let snapshot = json!({
+        "multisig": {
+            "address": multisig.address,
+            "next_order_seqno": multisig.next_order_seqno,
+            "threshold": multisig.threshold,
+            "signers": multisig.signers,
+            "proposers": multisig.proposers,
+            "embedded_order_count": multisig.orders.len(),
+            "address_book_has_multisig": multisigs.address_book.contains_key(&multisig_address),
+            "address_book_has_owner": multisigs.address_book.contains_key(&owner),
+            "address_book_has_cosigner": multisigs.address_book.contains_key(&cosigner),
+        },
+        "order": {
+            "address": order.address,
+            "multisig_address": order.multisig_address,
+            "order_seqno": order.order_seqno,
+            "threshold": order.threshold,
+            "sent_for_execution": order.sent_for_execution,
+            "approvals_mask": order.approvals_mask,
+            "approvals_num": order.approvals_num,
+            "has_expiration_date": order.expiration_date.is_some(),
+            "signers": order.signers,
+            "address_book_has_order": orders.address_book.contains_key(&order_address),
+        },
+        "actions": {
+            "count": order.actions.len(),
+            "update": {
+                "destination": update_action.destination,
+                "value": update_action.value,
+                "parsed": update_action.parsed,
+                "error": update_action.error,
+                "parsed_body": update_action.parsed_body,
+                "parsed_body_type": update_action.parsed_body_type,
+                "send_mode": update_action.send_mode,
+            },
+            "send": {
+                "destination": send_action.destination,
+                "value": send_action.value,
+                "parsed": send_action.parsed,
+                "error": send_action.error,
+                "parsed_body_type": send_action.parsed_body_type,
+                "send_mode": send_action.send_mode,
+            },
+            "external": {
+                "destination": external_action.destination,
+                "value": external_action.value,
+                "parsed": external_action.parsed,
+                "error": external_action.error,
+                "parsed_body_type": external_action.parsed_body_type,
+                "send_mode": external_action.send_mode,
+            },
+            "unknown": {
+                "destination": unknown_action.destination,
+                "value": unknown_action.value,
+                "parsed": unknown_action.parsed,
+                "error": unknown_action.error,
+                "parsed_body_type": unknown_action.parsed_body_type,
+                "send_mode": unknown_action.send_mode,
+            },
+        },
+        "filters": {
+            "orders_without_actions_count": orders_without_actions.orders.len(),
+            "unparsed_action_count": orders_without_actions.orders.first().map(|order| order.actions.len()),
+            "orders_by_multisig_count": orders_by_multisig.orders.len(),
+            "orders_after_offset_count": orders_after_offset.orders.len(),
+            "embedded_orders_disabled_count": multisigs_without_orders.multisigs.first().map(|multisig| multisig.orders.len()),
+            "wallet_by_owner_count": multisigs_by_owner.multisigs.len(),
+            "wallet_by_cosigner_count": multisigs_by_cosigner.multisigs.len(),
+            "wallet_by_unrelated_count": multisigs_by_unrelated_wallet.multisigs.len(),
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_multisig_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn localnet_v3_indexes_real_vesting_actions() {
+    let project = ProjectBuilder::new("localnet-v3-real-vesting-actions")
+        .contract_from_boc_with_types(
+            "WalletVesting",
+            include_bytes!("testdata/toncenter_v3_actions/contracts/WalletVesting.boc").to_vec(),
+            "types/wallet_vesting.types.tolk",
+        )
+        .file(
+            "types/wallet_vesting.types",
+            include_str!("testdata/toncenter_v3_actions/types/wallet_vesting.types.tolk"),
+        )
+        .file(
+            "wrappers/WalletVesting.gen",
+            include_str!("testdata/toncenter_v3_actions/wrappers/WalletVesting.gen.tolk"),
+        )
+        .script_file(
+            "vesting",
+            include_str!("testdata/toncenter_v3_actions/vesting.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build();
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+
+    let node = project
+        .localnet()
+        .before_start(super::super::support::project::ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_network(project.path(), &node.base_url());
+
+    let script_output = project
+        .acton()
+        .script("scripts/vesting.tolk")
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
+    let sender = extract_canonical_addr_marker(&script_output, "SENDER=");
+    let whitelisted = extract_canonical_addr_marker(&script_output, "WHITELISTED=");
+    let vesting_address = extract_canonical_addr_marker(&script_output, "VESTING=");
+
+    let deadline = Instant::now() + Duration::from_secs(12);
+    let contracts = loop {
+        let response: toncenter_v3::VestingContractsResponse =
+            serde_json::from_value(node.get_json(&format!(
+                "/api/v3/vesting?contract_address={}&check_whitelist=true",
+                encode_query_component(&vesting_address)
+            )))
+            .expect("vesting response must match typed contract");
+        if response
+            .vesting_contracts
+            .first()
+            .is_some_and(|contract| contract.whitelist.contains(&whitelisted))
+            || Instant::now() >= deadline
+        {
+            break response;
+        }
+        thread::sleep(Duration::from_millis(200));
+    };
+    let by_owner: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&owner)
+        )))
+        .expect("vesting owner lookup must match typed contract");
+    let by_whitelist_without_check: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&whitelisted)
+        )))
+        .expect("vesting whitelist lookup must match typed contract");
+    let by_whitelist_with_check: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}&check_whitelist=true",
+            encode_query_component(&whitelisted)
+        )))
+        .expect("vesting checked whitelist lookup must match typed contract");
+    let by_sender: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}",
+            encode_query_component(&sender)
+        )))
+        .expect("vesting sender lookup must match typed contract");
+    let repeated_contracts: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?contract_address={}&contract_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&whitelisted)
+        )))
+        .expect("repeated vesting contracts must match typed contract");
+    let after_offset: toncenter_v3::VestingContractsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/vesting?wallet_address={}&offset=1",
+            encode_query_component(&owner)
+        )))
+        .expect("vesting pagination must match typed contract");
+    let (missing_filter_status, missing_filter_error) =
+        node.get_json_with_status("/api/v3/vesting");
+    let (conflicting_filter_status, conflicting_filter_error) =
+        node.get_json_with_status(&format!(
+            "/api/v3/vesting?contract_address={}&wallet_address={}",
+            encode_query_component(&vesting_address),
+            encode_query_component(&owner)
+        ));
+
+    let vesting = contracts
+        .vesting_contracts
+        .first()
+        .expect("deployed WalletVesting must be indexed");
+    let snapshot = json!({
+        "vesting": {
+            "address": vesting.address,
+            "start_time": vesting.start_time,
+            "total_duration": vesting.total_duration,
+            "unlock_period": vesting.unlock_period,
+            "cliff_duration": vesting.cliff_duration,
+            "sender_address": vesting.sender_address,
+            "owner_address": vesting.owner_address,
+            "total_amount": vesting.total_amount,
+            "whitelist": vesting.whitelist,
+            "address_book_has_vesting": contracts.address_book.contains_key(&vesting_address),
+            "address_book_has_owner": contracts.address_book.contains_key(&owner),
+            "address_book_has_sender": contracts.address_book.contains_key(&sender),
+            "address_book_has_whitelisted": contracts.address_book.contains_key(&whitelisted),
+        },
+        "filters": {
+            "owner_match_count": by_owner.vesting_contracts.len(),
+            "sender_match_count": by_sender.vesting_contracts.len(),
+            "whitelist_without_check_count": by_whitelist_without_check.vesting_contracts.len(),
+            "whitelist_with_check_count": by_whitelist_with_check.vesting_contracts.len(),
+            "repeated_contract_count": repeated_contracts.vesting_contracts.len(),
+            "after_offset_count": after_offset.vesting_contracts.len(),
+            "missing_filter_status": missing_filter_status,
+            "missing_filter_error": missing_filter_error,
+            "conflicting_filter_status": conflicting_filter_status,
+            "conflicting_filter_error": conflicting_filter_error,
+        },
+    });
+    assertion().eq(
+        format!("{}\n", pretty_json_for_snapshot(&snapshot, project.path())),
+        snapbox::file!("snapshots/localnet/localnet_v3_indexes_real_vesting_actions.summary.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 #[ignore = "optional live TonCenter fork contract test"]
 fn localnet_fork_supports_emulate_v1_emulate_ton_connect() {
     let raw_request = std::env::var("ACTON_TONCENTER_LIVE_TONCONNECT_JSON")

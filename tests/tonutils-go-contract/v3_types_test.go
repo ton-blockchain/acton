@@ -449,6 +449,56 @@ type nftItemsResponseV3 struct {
 	Metadata    map[string]addressMetadataV3 `json:"metadata"`
 }
 
+type dnsRecordsResponseV3 struct {
+	Records     []json.RawMessage           `json:"records"`
+	AddressBook map[string]addressBookRowV3 `json:"address_book"`
+}
+
+type jettonTransfersResponseV3 struct {
+	JettonTransfers []json.RawMessage            `json:"jetton_transfers"`
+	AddressBook     map[string]addressBookRowV3  `json:"address_book"`
+	Metadata        map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type jettonBurnsResponseV3 struct {
+	JettonBurns []json.RawMessage            `json:"jetton_burns"`
+	AddressBook map[string]addressBookRowV3  `json:"address_book"`
+	Metadata    map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type nftCollectionsResponseV3 struct {
+	NFTCollections []json.RawMessage            `json:"nft_collections"`
+	AddressBook    map[string]addressBookRowV3  `json:"address_book"`
+	Metadata       map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type nftSalesResponseV3 struct {
+	NFTSales    []json.RawMessage            `json:"nft_sales"`
+	AddressBook map[string]addressBookRowV3  `json:"address_book"`
+	Metadata    map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type nftTransfersResponseV3 struct {
+	NFTTransfers []json.RawMessage            `json:"nft_transfers"`
+	AddressBook  map[string]addressBookRowV3  `json:"address_book"`
+	Metadata     map[string]addressMetadataV3 `json:"metadata"`
+}
+
+type multisigOrdersResponseV3 struct {
+	Orders      []json.RawMessage           `json:"orders"`
+	AddressBook map[string]addressBookRowV3 `json:"address_book"`
+}
+
+type multisigsResponseV3 struct {
+	Multisigs   []json.RawMessage           `json:"multisigs"`
+	AddressBook map[string]addressBookRowV3 `json:"address_book"`
+}
+
+type vestingContractsResponseV3 struct {
+	VestingContracts []json.RawMessage           `json:"vesting_contracts"`
+	AddressBook      map[string]addressBookRowV3 `json:"address_book"`
+}
+
 type sendMessageResponseV3 struct {
 	MessageHash     string `json:"message_hash"`
 	MessageHashNorm string `json:"message_hash_norm"`
