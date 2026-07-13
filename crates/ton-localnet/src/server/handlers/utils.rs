@@ -24,6 +24,14 @@ impl ToncenterHttpError {
         }
         .into()
     }
+
+    pub fn unprocessable_entity(message: impl Into<String>) -> anyhow::Error {
+        Self {
+            status: StatusCode::UNPROCESSABLE_ENTITY,
+            message: message.into(),
+        }
+        .into()
+    }
 }
 
 #[must_use]

@@ -1,5 +1,6 @@
 use super::support::{Live, TypedResponse, fixture, invalid_boc};
 use anyhow::{Context, Result};
+use serde_json::json;
 use ton_api::toncenter::v2;
 use tycho_types::boc::Boc;
 use tycho_types::cell::Cell;
@@ -395,14 +396,34 @@ fn run_get_method_request_covers_latest_and_historical_state() -> Result<()> {
 fn json_rpc_request_and_generic_response() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
 
-    let _: v2::JsonRpcResponse<v2::MasterchainInfo> = live.post(
+    for request in [
+        json!({"method": "getMasterchainInfo"}),
+        json!({"method": "getMasterchainInfo", "params": []}),
+        json!({"method": "getMasterchainInfo", "params": null}),
+        json!({
+            "jsonrpc": 2,
+            "id": {"ignored": true},
+            "method": "getMasterchainInfo",
+            "params": "ignored"
+        }),
+    ] {
+        let response: v2::JsonRpcResponse<v2::MasterchainInfo> =
+            live.post(&live.v2_url, "/jsonRPC", &request)?;
+        assert!(response.jsonrpc.is_none());
+        assert!(response.id.is_none());
+    }
+
+    let _: v2::TonlibErrorResponse = live.post_error(
         &live.v2_url,
         "/jsonRPC",
-        &v2::JsonRpcRequest::new(
-            "live-masterchain-info",
-            "getMasterchainInfo",
-            v2::EmptyRequest {},
-        ),
+        &json!({"method": "getMasterchainInfo", "params": [{}]}),
+    )?;
+
+    let seqno = masterchain_info(&live)?.last.seqno;
+    let _: v2::JsonRpcResponse<v2::Shards> = live.post(
+        &live.v2_url,
+        "/jsonRPC",
+        &json!({"method": "getShards", "params": {"seqno": seqno}}),
     )?;
     Ok(())
 }

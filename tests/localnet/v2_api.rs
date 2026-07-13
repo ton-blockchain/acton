@@ -269,7 +269,7 @@ fn json_rpc_returns_typed_errors_for_invalid_requests() {
         .post_v2_json_rpc_with_status(
             "/api/v2",
             StringOrNumber::Number(1),
-            "shards",
+            "getShards",
             requests::SeqnoRequest {
                 seqno: StringOrNumber::Number(0),
             },
@@ -329,6 +329,96 @@ fn json_rpc_returns_typed_errors_for_invalid_requests() {
     assertion().eq(
         pretty_json_for_snapshot(&summary, project.path()),
         snapbox::file!("snapshots/v2_json_rpc_errors.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn json_rpc_matches_upstream_proxy_envelope() {
+    let project = ProjectBuilder::new("localnet-v2-json-rpc-envelope").build();
+    let node = project.localnet().arg("--mine-empty-blocks").start();
+    let _: Value = node.post_json("/acton_mine", &json!({}));
+    let requests = [
+        ("absent", json!({"method": "getMasterchainInfo"})),
+        (
+            "empty array",
+            json!({"method": "getMasterchainInfo", "params": []}),
+        ),
+        (
+            "null",
+            json!({"method": "getMasterchainInfo", "params": null}),
+        ),
+        (
+            "scalar and ignored metadata",
+            json!({
+                "jsonrpc": 2,
+                "id": {"ignored": true},
+                "method": "getMasterchainInfo",
+                "params": "ignored"
+            }),
+        ),
+    ];
+    let mut normalized_params = Vec::new();
+    let mut masterchain_seqno = None;
+    for (case, request) in requests {
+        let (status, json) = node.post_json_with_status("/api/v2", &request);
+        let response: responses::TonlibResponse<responses::MasterchainInfo> =
+            serde_json::from_value(json.clone()).expect("masterchain response must be typed");
+        masterchain_seqno = Some(response.result.last.seqno);
+        normalized_params.push(json!({
+            "case": case,
+            "status": status,
+            "ok": response.ok,
+            "metadata_omitted": json.get("jsonrpc").is_none() && json.get("id").is_none(),
+        }));
+    }
+
+    let (shards_status, shards_json) = node.post_json_with_status(
+        "/api/v2",
+        &json!({
+            "method": "getShards",
+            "params": {"seqno": masterchain_seqno.expect("masterchain seqno")}
+        }),
+    );
+    let shards: responses::TonlibResponse<responses::Shards> =
+        serde_json::from_value(shards_json).expect("getShards response must be typed");
+    let (array_status, array_error): (u16, responses::TonlibErrorResponse) = node
+        .post_json_with_status_as(
+            "/api/v2",
+            &json!({"method": "getMasterchainInfo", "params": [{}]}),
+        );
+    let (alias_status, alias_error): (u16, responses::TonlibErrorResponse) = node
+        .post_json_with_status_as(
+            "/api/v2",
+            &json!({
+                "method": "shards",
+                "params": {"seqno": masterchain_seqno.expect("masterchain seqno")}
+            }),
+        );
+
+    let summary = json!({
+        "normalized_params": normalized_params,
+        "get_shards": {
+            "status": shards_status,
+            "ok": shards.ok,
+            "count": shards.result.shards.len(),
+        },
+        "nonempty_array": {
+            "status": array_status,
+            "code": array_error.code,
+            "error": array_error.error,
+        },
+        "non_upstream_alias": {
+            "status": alias_status,
+            "code": alias_error.code,
+            "error": alias_error.error,
+        },
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v2_json_rpc_envelope.json"),
     );
 
     node.stop();

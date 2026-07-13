@@ -1,0 +1,43 @@
+{
+  "get_shards": {
+    "count": 1,
+    "ok": true,
+    "status": 200
+  },
+  "non_upstream_alias": {
+    "code": 404,
+    "error": "Method not found",
+    "status": 404
+  },
+  "nonempty_array": {
+    "code": 422,
+    "error": "params must contain an object",
+    "status": 422
+  },
+  "normalized_params": [
+    {
+      "case": "absent",
+      "metadata_omitted": true,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "case": "empty array",
+      "metadata_omitted": true,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "case": "null",
+      "metadata_omitted": true,
+      "ok": true,
+      "status": 200
+    },
+    {
+      "case": "scalar and ignored metadata",
+      "metadata_omitted": true,
+      "ok": true,
+      "status": 200
+    }
+  ]
+}

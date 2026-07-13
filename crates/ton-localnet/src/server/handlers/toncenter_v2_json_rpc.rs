@@ -3,7 +3,7 @@ use super::toncenter_v2::{
     parse_transactions_request, resolve_block_header, resolve_block_transactions,
     token_wallet_code_hash,
 };
-use super::utils::{error_status, get_extra, parse_method_name, parse_params};
+use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
@@ -19,9 +19,9 @@ use std::sync::Arc;
 use ton_api::toncenter::v2 as wire;
 use ton_api::toncenter::v2::requests::{
     AddressInformationRequest, AddressRequest, BlockHeaderRequest, BlockTransactionsRequest,
-    ConfigAllRequest, ConfigParamRequest, DetectHashRequest, JsonRpcRequest, LibrariesRequest,
-    LookupBlockRequest, RunGetMethodRequest, RunGetMethodStdRequest, SendBocRequest, SeqnoRequest,
-    TransactionsRequest, TryLocateTxRequest,
+    ConfigAllRequest, ConfigParamRequest, DetectHashRequest, JsonRpcIncomingRequest,
+    LibrariesRequest, LookupBlockRequest, RunGetMethodRequest, RunGetMethodStdRequest,
+    SendBocRequest, SeqnoRequest, TransactionsRequest, TryLocateTxRequest,
 };
 use tycho_types::models::{StdAddr, StdAddrFormat};
 
@@ -29,7 +29,7 @@ pub async fn json_rpc(
     State(node): State<Arc<Localnet>>,
     State(api_calls): State<ApiCallLog>,
     OriginalUri(original_uri): OriginalUri,
-    Json(payload): Json<JsonRpcRequest<Value>>,
+    Json(payload): Json<JsonRpcIncomingRequest<Value>>,
 ) -> impl IntoResponse {
     tracing::debug!(
         "JSON-RPC request: method={}, id={:?}",
@@ -40,11 +40,7 @@ pub async fn json_rpc(
     let start = ApiCallLog::start();
     let method = payload.method.clone();
     let call_type = classify_json_rpc_call(&method);
-    let request_id = match &payload.id {
-        wire::StringOrNumber::String(value) => Value::String(value.clone()),
-        wire::StringOrNumber::Number(value) => Value::Number((*value).into()),
-        wire::StringOrNumber::Unsigned(value) => Value::Number((*value).into()),
-    };
+    let request_id = payload.id.clone().unwrap_or(Value::Null);
 
     let result: anyhow::Result<Response> = json_rpc_router(node, payload).await;
     let mut response = result.unwrap_or_else(|e| json_rpc_error(error_status(&e), e.to_string()));
@@ -73,11 +69,21 @@ fn classify_json_rpc_call(method: &str) -> ApiCallType {
     }
 }
 
+fn normalize_json_rpc_params(params: Option<Value>) -> anyhow::Result<Value> {
+    match params {
+        Some(params @ Value::Object(_)) => Ok(params),
+        Some(Value::Array(values)) if !values.is_empty() => Err(
+            ToncenterHttpError::unprocessable_entity("params must contain an object"),
+        ),
+        _ => Ok(Value::Object(Default::default())),
+    }
+}
+
 async fn json_rpc_router(
     node: Arc<Localnet>,
-    payload: JsonRpcRequest<Value>,
+    payload: JsonRpcIncomingRequest<Value>,
 ) -> anyhow::Result<Response> {
-    let params = payload.params;
+    let params = normalize_json_rpc_params(payload.params)?;
     let method = payload.method.as_str();
 
     let result: wire::JsonRpcResult = match method {
@@ -331,7 +337,7 @@ async fn json_rpc_router(
                 .await
                 .map(|r| v2::map_out_msg_queue_sizes(&r))?,
         )),
-        "shards" => {
+        "getShards" => {
             let req: SeqnoRequest = parse_params(params, method)?;
             let seqno = req.seqno.to_u32()?;
             anyhow::ensure!(seqno > 0, "`seqno` must be positive");

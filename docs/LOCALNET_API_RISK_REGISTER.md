@@ -40,6 +40,8 @@ still defects because they violate schemas even under those limitations.
 | Finding | Status | Evidence |
 |---|---|---|
 | V2-01 `runGetMethodStd` | Fixed | Shared `tvm-ffi` Tonlib stack DTOs, separate Std request/result types, local REST/JSON-RPC snapshot, and a live non-empty TonCenter stack test. |
+| V2-02 JSON-RPC envelope | Fixed | The incoming proxy DTO accepts method-only requests and upstream params normalization; local and live tests cover ignored metadata and every params shape. |
+| V2-03 JSON-RPC `getShards` | Fixed | Dispatch now uses the upstream method name; the non-upstream `shards` name is rejected and local/live typed responses are covered. |
 | V2-22 numeric ranges | Partial | Numeric get-method IDs and `runGetMethodStd.seqno` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 
@@ -84,7 +86,7 @@ These are the highest-value targets for the next differential test pass:
 
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
-| P0 | V2 JSON-RPC aliases | The request envelope is stricter than upstream proxy behavior; `getShards` is missing; REST and RPC statuses/results diverge. |
+| P0 | V2 request errors | REST and JSON-RPC validation statuses/envelopes diverge, and locate misses can become internal errors. |
 | P0 | V2 historical reads | `getTokenData` ignores `seqno`; config reads return current config; `seqno=0` is accepted as latest. |
 | P0 | V2 block APIs | Block headers contain many hardcoded fields; block transaction cursors and masterchain transactions are wrong; `lookupBlock` selector rules differ. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
@@ -97,8 +99,8 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Middleware | Configured `N` RPS becomes an initial burst of `N` followed by 1 RPS; family-specific error bodies are weakly covered. |
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
-The inventory contains 106 mounted routes: 19 Critical, 53 High, 22 Medium, and 12 Low. Current
-endpoint-test depth is 2 at grade A, 51 at B, 42 at C, 4 at D, and 7 with no endpoint test. The
+The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
+endpoint-test depth is 2 at grade A, 53 at B, 39 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -175,8 +177,7 @@ coverage is high.
 | `GET /api/v2/getMasterchainInfo` | Medium | C | Exact state root/init values, genesis/head zero, and history/reorg. |
 | `GET /api/v2/getConsensusBlock` | Medium | C | Server-time semantics, paused/manual mining, virtual time, head zero. |
 | `GET /api/v2/getOutMsgQueueSize` | High | D | Real queued messages, correct shard block IDs, configured limit, multiple shards. |
-| `GET /api/v2/getShards` | High | C | JSON-RPC alias, historical descriptors, split shards, and missing blocks. |
-| `GET /api/v2/shards` | Medium | C | Alias parity with `getShards`, zero/missing seqno and historical ordering. |
+| `GET /api/v2/getShards` | High | B | REST and JSON-RPC typed responses plus proxy-envelope variants; historical descriptors, split shards, and missing blocks remain uncovered. |
 | `GET /api/v2/lookupBlock` | Critical | C | LT/time selectors, none/multiple selectors, boundaries, seqno zero, shard/workchain validation. |
 
 ### V2 findings and accepted deviations
@@ -185,10 +186,11 @@ coverage is high.
    `[type, value]` decoder. Upstream `RunGetMethodStdHandler` accepts `@type`-discriminated object
    entries and returns the smaller `RunGetMethodStdResult`. The current empty-stack test cannot
    detect either mismatch.
-2. **V2-02, JSON-RPC envelope:** local DTOs require `jsonrpc`, `id`, and `params`; upstream reads
-   only `method`, tolerates absent/empty params, and ignores JSON-RPC metadata before proxying.
-3. **V2-03, JSON-RPC methods:** local dispatch supports `shards` but not upstream-compatible
-   `getShards`.
+2. **V2-02, JSON-RPC envelope (fixed):** the incoming DTO now requires only `method`, matches
+   upstream normalization for absent, null, scalar, empty-array, object, and nonempty-array params,
+   and ignores JSON-RPC metadata before dispatch.
+3. **V2-03, JSON-RPC methods (fixed):** local dispatch supports upstream `getShards` and rejects
+   the non-upstream `shards` name.
 4. **V2-04, account status:** JSON-RPC returns `nonexist` while REST maps the same local status to
    V2 `uninitialized`.
 5. **V2-05, transport (accepted):** most read routes lack the POST form supported by the C++

@@ -25,6 +25,19 @@ impl<T> JsonRpcRequest<T> {
     }
 }
 
+/// Actual input accepted by the upstream `/jsonRPC` proxy.
+///
+/// The proxy reads only `method` and object-shaped `params`. JSON-RPC metadata is ignored; `id` is
+/// retained here solely for local request logging and is never echoed in the response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsonRpcIncomingRequest<T> {
+    pub method: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub params: Option<T>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub id: Option<Value>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SendBocRequest {
     pub boc: String,
@@ -250,5 +263,19 @@ mod tests {
         assert_eq!(value["id"], "request-1");
         assert_eq!(value["method"], "sendBoc");
         assert_eq!(value["params"]["boc"], "te6ccgEBAQEAAgAAAA==");
+    }
+
+    #[test]
+    fn json_rpc_incoming_request_accepts_upstream_minimal_envelope() {
+        let request: JsonRpcIncomingRequest<Value> = serde_json::from_value(serde_json::json!({
+            "method": "getMasterchainInfo",
+            "jsonrpc": 2,
+            "id": {"ignored": true}
+        }))
+        .expect("actual JSON-RPC proxy accepts omitted params and ignored metadata");
+
+        assert_eq!(request.method, "getMasterchainInfo");
+        assert!(request.params.is_none());
+        assert_eq!(request.id, Some(serde_json::json!({"ignored": true})));
     }
 }
