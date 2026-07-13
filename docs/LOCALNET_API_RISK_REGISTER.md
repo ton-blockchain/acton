@@ -47,10 +47,13 @@ still defects because they violate schemas even under those limitations.
 | V2-07 positive `seqno` | Fixed | All account, shard-account, wallet, token, and config entry points reject explicit zero, negative, and values above signed int32; REST and JSON-RPC are snapshot-covered. |
 | V2-08 token history | Fixed | `getTokenData` detects assets from the account state at the requested block. Real jetton supply/balance and NFT collection/owner transitions are snapshot-covered through typed REST and JSON-RPC responses. |
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
+| V2-10/11 transaction history | Fixed | Account history excludes `to_lt`, requires an exact nonzero cursor, and accepts hex, standard base64, padded base64url, and unpadded base64url hashes. Real REST/JSON-RPC history and invalid cursors are snapshot-covered. |
 | V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
-| V2-22 numeric ranges | Partial | Numeric get-method IDs and `runGetMethodStd.seqno` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
+| V2-22 numeric ranges | Partial | Numeric get-method IDs, `runGetMethodStd.seqno`, and transaction `limit`/`lt`/`to_lt` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 | V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
+| V2-25 Std zero cursor | Fixed | `getTransactions` treats `lt=0` as absent, while `getTransactionsStd` preserves it as a supplied cursor and returns the canonical empty page for any paired hash. |
+| V2-26 archival | Accepted | Localnet retains its complete local account history, so selecting an archival worker has no local meaning. Both flag values follow the same typed and snapshot-covered path. |
 
 ## Rating model
 
@@ -106,7 +109,7 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
 The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
-endpoint-test depth is 3 at grade A, 53 at B, 38 at C, 4 at D, and 7 with no endpoint test. The
+endpoint-test depth is 5 at grade A, 53 at B, 36 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -170,8 +173,8 @@ coverage is high.
 | `GET /api/v2/getExtendedAddressInformation` | High | C | Uninit/frozen, specialized wallet/DNS/RWallet/PChan states, revision, history, extra currencies. |
 | `GET /api/v2/getWalletInformation` | High | C | V3/V4 wallet ID, V5 signature flag, all revisions, malformed data, getter failure, historical state. |
 | `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
-| `GET /api/v2/getTransactions` | High | C | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
-| `GET /api/v2/getTransactionsStd` | High | C | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality. |
+| `GET /api/v2/getTransactions` | High | A | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
+| `GET /api/v2/getTransactionsStd` | High | A | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality. |
 | `GET /api/v2/tryLocateTx` | High | C | Not-found 404, ambiguous identical tuples, and created-LT boundaries. |
 | `GET /api/v2/tryLocateResultTx` | High | C | Not-found 404, ambiguity, fork/archive lookup. |
 | `GET /api/v2/tryLocateSourceTx` | High | C | Not-found 404, ambiguity and full-scan cost, fork behavior. |
@@ -207,12 +210,12 @@ coverage is high.
    and resolve it to the current head; upstream rejects an explicitly supplied zero.
 8. **V2-08, token history (fixed):** `getTokenData` detects token data from the account state at
    the requested block instead of reading current indexes.
-9. **V2-09, config history:** historical config requests validate a block but still read the
-   current config BOC.
-10. **V2-10, transaction bound:** local includes `lt == to_lt`; upstream stops at and excludes it.
-11. **V2-11, transaction cursor:** only standard base64 is accepted locally, while upstream also
-    accepts padded base64, base64url, and hex. Whether a nonexistent `(lt, hash)` cursor must fail
-    instead of returning neighboring history remains a high-confidence suspicion needing a fixture.
+9. **V2-09, config history (fixed):** historical config requests read the config BOC committed
+   with the requested masterchain block.
+10. **V2-10, transaction bound (fixed):** local stops before and excludes `lt == to_lt`.
+11. **V2-11, transaction cursor (fixed):** all upstream hash encodings are accepted and a
+    nonexistent nonzero `(lt, hash)` cursor returns the upstream 500 hash-mismatch error instead of
+    neighboring history.
 12. **V2-12, transaction DTO:** message bodies are always raw and extra currencies are empty;
     upstream can return decoded text/encrypted/decrypted fields and decode errors.
 13. **V2-13, extended account state:** the absence of specialized wallet/DNS/RWallet/PChan states
@@ -241,12 +244,12 @@ coverage is high.
 23. **V2-23, getter result stack (fixed):** both result formats now reject depth 100 or more with
     code 533 and propagate BOC, tuple, and wire-conversion failures instead of returning a
     successful empty stack.
-24. **V2-24, config parameter aliases:** upstream requires exactly one of `param` and `config_id`;
-    local handling does not enforce the same XOR contract.
-25. **V2-25, Std transaction cursor:** upstream treats `lt=0` plus a hash as a supplied cursor;
-    local validation rejects or interprets that boundary differently.
-26. **V2-26, archival:** transaction requests parse the upstream `archival` option but local
-    execution ignores it.
+24. **V2-24, config parameter aliases (fixed):** local handling enforces the same `param` versus
+    `config_id` XOR contract as upstream.
+25. **V2-25, Std transaction cursor (fixed):** `getTransactionsStd` preserves `lt=0` plus hash as
+    a supplied cursor, unlike the intentionally different regular transaction endpoint.
+26. **V2-26, archival (accepted):** localnet keeps complete local history and has no separate
+    archival worker, so `archival=true` and `false` intentionally select the same data.
 
 ## TonCenter V3 routes
 
@@ -451,8 +454,8 @@ coverage is high.
    `getShards`, and failures that must match the corresponding REST status and envelope.
 3. Complete historical account coverage for `sync_utime` and suspended-state semantics, and add
    real mintless and DNS contracts plus parent-verified NFT content to the token fixtures.
-4. Build V2 transaction fixtures for exact and invalid cursors, all hash encodings,
-   `to_lt == tx.lt`, decoded text bodies, extra currencies, and masterchain block transactions.
+4. Extend the V2 transaction fixture with decoded text/encrypted bodies, extra currencies, and
+   masterchain block transactions; account cursors, hash encodings, and LT boundaries are covered.
 5. Compare every V2/V3 block-header field on basechain, masterchain, key, split, and merge blocks;
    cover zero and unknown pagination cursors and all lookup selector combinations.
 6. Create a branched three-transaction trace spanning at least two blocks. Assert shared trace ID,

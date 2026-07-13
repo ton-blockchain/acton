@@ -9,7 +9,7 @@ use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
     LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
     LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
-    LocalnetTransaction, LocalnetTransactionId,
+    LocalnetTransaction, LocalnetTransactionId, LocalnetTransactionsPage,
 };
 use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
@@ -38,25 +38,11 @@ pub fn map_transactions(txs: &[LocalnetTransaction]) -> Vec<response::Transactio
     txs.iter().map(map_transaction).collect()
 }
 
-pub fn map_transactions_std(
-    txs: &[LocalnetTransaction],
-    limit: usize,
-) -> response::RawTransactions {
-    let (txs_to_return, previous_id) = if txs.len() > limit {
-        (
-            txs[..limit].to_vec(),
-            txs.get(limit)
-                .map(|tx| tx.transaction_id.clone())
-                .unwrap_or_default(),
-        )
-    } else {
-        (txs.to_vec(), LocalnetTransactionId::default())
-    };
-
+pub fn map_transactions_std(page: &LocalnetTransactionsPage) -> response::RawTransactions {
     response::RawTransactions {
         type_field: "raw.transactions".to_owned(),
-        transactions: txs_to_return.iter().map(map_transaction_std).collect(),
-        previous_transaction_id: map_internal_transaction_id(&previous_id),
+        transactions: page.transactions.iter().map(map_transaction_std).collect(),
+        previous_transaction_id: map_internal_transaction_id(&page.previous_transaction_id),
     }
 }
 

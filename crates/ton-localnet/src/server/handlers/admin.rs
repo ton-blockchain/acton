@@ -688,13 +688,7 @@ fn verified_source_file_content(file: &Value) -> Option<String> {
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-    anyhow::bail!("Invalid hash format")
+    hash.parse()
 }
 
 fn parse_account_state_change(

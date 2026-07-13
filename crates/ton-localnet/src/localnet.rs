@@ -206,6 +206,12 @@ pub struct LocalnetTransaction {
     pub other_fees: u128,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct LocalnetTransactionsPage {
+    pub transactions: Vec<LocalnetTransaction>,
+    pub previous_transaction_id: LocalnetTransactionId,
+}
+
 #[derive(Debug, Clone)]
 pub struct LocalnetAccountBalance {
     pub account: Addr,
@@ -401,7 +407,7 @@ pub(crate) enum Request {
         lt: Option<u64>,
         hash: Option<Hash256>,
         to_lt: Option<u64>,
-        resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
+        resp: oneshot::Sender<anyhow::Result<LocalnetTransactionsPage>>,
     },
     GetAllTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
@@ -989,7 +995,7 @@ impl Localnet {
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
         let address = Addr::parse(&address_str)?;
         let hash = if let Some(h) = hash_str {
-            Some(Hash256::from_base64(&h)?)
+            Some(h.parse()?)
         } else {
             None
         };
@@ -999,10 +1005,8 @@ impl Localnet {
 
     /// Returns transactions for a parsed account address.
     ///
-    /// This is the typed localnet API used by `LiteAPI` adapters. The older
-    /// toncenter-compatible endpoint accepts string/base64 query values and
-    /// converts them before calling this method, so both transports share the
-    /// same actor request and pagination/filtering semantics.
+    /// This typed API is shared by `LiteAPI` and `TonCenter` adapters so both
+    /// transports use the same actor request and pagination semantics.
     pub async fn get_transactions_by_address(
         &self,
         address: Addr,
@@ -1011,6 +1015,20 @@ impl Localnet {
         hash: Option<Hash256>,
         to_lt: Option<u64>,
     ) -> anyhow::Result<Vec<LocalnetTransaction>> {
+        Ok(self
+            .get_transactions_page_by_address(address, limit, lt, hash, to_lt)
+            .await?
+            .transactions)
+    }
+
+    pub async fn get_transactions_page_by_address(
+        &self,
+        address: Addr,
+        limit: usize,
+        lt: Option<u64>,
+        hash: Option<Hash256>,
+        to_lt: Option<u64>,
+    ) -> anyhow::Result<LocalnetTransactionsPage> {
         let (resp, rx) = oneshot::channel();
         self.tx
             .send(Request::GetTransactions {
@@ -2644,11 +2662,29 @@ fn handle_get_transactions(
     lt: Option<u64>,
     hash: Option<Hash256>,
     to_lt: Option<u64>,
-) -> anyhow::Result<Vec<LocalnetTransaction>> {
-    let mut raw_txs = node.get_transactions(&address, limit, lt, hash);
+) -> anyhow::Result<LocalnetTransactionsPage> {
+    let mut raw_txs = node.get_transactions(&address, limit.saturating_add(1), lt, hash);
+
+    if let (Some(lt), Some(hash)) = (lt, hash)
+        && lt != 0
+        && !raw_txs
+            .first()
+            .is_some_and(|tx| tx.meta.lt == lt && tx.meta.tx_hash == hash)
+    {
+        anyhow::bail!("LITE_SERVER_UNKNOWN: transaction hash mismatch");
+    }
+
+    let previous_transaction_id =
+        raw_txs
+            .get(limit)
+            .map_or_else(LocalnetTransactionId::default, |tx| LocalnetTransactionId {
+                lt: tx.meta.lt,
+                hash: tx.meta.tx_hash,
+            });
+    raw_txs.truncate(limit);
 
     if let Some(min_lt) = to_lt {
-        raw_txs.retain(|tx| tx.meta.lt >= min_lt);
+        raw_txs.retain(|tx| tx.meta.lt > min_lt);
     }
 
     let full_txs = raw_txs
@@ -2658,7 +2694,10 @@ fn handle_get_transactions(
             convert_to_tx_struct(tx, tx_boc)
         })
         .collect();
-    Ok(full_txs)
+    Ok(LocalnetTransactionsPage {
+        transactions: full_txs,
+        previous_transaction_id,
+    })
 }
 
 fn handle_get_all_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTransaction>> {

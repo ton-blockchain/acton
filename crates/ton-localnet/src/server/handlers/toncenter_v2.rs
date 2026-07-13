@@ -7,7 +7,6 @@ use axum::{
     extract::{Query, RawQuery, State},
     response::{IntoResponse, Response},
 };
-use base64::Engine;
 use std::sync::Arc;
 use ton_api::toncenter::v2::StringOrNumber;
 use ton_api::toncenter::v2::requests::{
@@ -209,10 +208,16 @@ pub async fn get_transactions(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
 ) -> Response {
-    let (limit, lt, to_lt) = parse!(parse_transactions_request(&payload));
+    let request = parse!(parse_transactions_request(&payload));
     handle_result(
-        node.get_transactions(payload.address, limit, lt, payload.hash, to_lt),
-        |transactions| v2::map_transactions(transactions),
+        node.get_transactions_page_by_address(
+            request.address,
+            request.limit,
+            request.lt,
+            request.hash,
+            request.to_lt,
+        ),
+        |page| v2::map_transactions(&page.transactions),
     )
     .await
 }
@@ -221,11 +226,16 @@ pub async fn get_transactions_std(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TransactionsRequest>,
 ) -> Response {
-    let (page_limit, lt, to_lt) = parse!(parse_transactions_request(&payload));
-    let fetch_limit = page_limit.saturating_add(1);
+    let request = parse!(parse_transactions_std_request(&payload));
     handle_result(
-        node.get_transactions(payload.address, fetch_limit, lt, payload.hash, to_lt),
-        |res| v2::map_transactions_std(res, page_limit),
+        node.get_transactions_page_by_address(
+            request.address,
+            request.limit,
+            request.lt,
+            request.hash,
+            request.to_lt,
+        ),
+        v2::map_transactions_std,
     )
     .await
 }
@@ -460,32 +470,8 @@ fn detect_given_type(address: &str, bounceable: bool) -> &'static str {
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    Err(ToncenterHttpError::unprocessable_entity(
-        "Invalid hash format",
-    ))
+    hash.parse()
+        .map_err(|_| ToncenterHttpError::unprocessable_entity("Invalid hash format"))
 }
 
 pub(super) fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {
@@ -684,34 +670,84 @@ pub(super) fn parse_i32_seqno(seqno: Option<i32>) -> anyhow::Result<Option<u32>>
     parse_seqno(seqno.map(Into::into))
 }
 
+pub(super) struct ParsedTransactionsRequest {
+    pub address: Addr,
+    pub limit: usize,
+    pub lt: Option<u64>,
+    pub hash: Option<Hash256>,
+    pub to_lt: Option<u64>,
+}
+
+#[derive(Clone, Copy)]
+enum ZeroLtPolicy {
+    Absent,
+    Cursor,
+}
+
 pub(super) fn parse_transactions_request(
     payload: &TransactionsRequest,
-) -> anyhow::Result<(usize, Option<u64>, Option<u64>)> {
+) -> anyhow::Result<ParsedTransactionsRequest> {
+    parse_transactions_request_with_policy(payload, ZeroLtPolicy::Absent)
+}
+
+pub(super) fn parse_transactions_std_request(
+    payload: &TransactionsRequest,
+) -> anyhow::Result<ParsedTransactionsRequest> {
+    parse_transactions_request_with_policy(payload, ZeroLtPolicy::Cursor)
+}
+
+fn parse_transactions_request_with_policy(
+    payload: &TransactionsRequest,
+    zero_lt_policy: ZeroLtPolicy,
+) -> anyhow::Result<ParsedTransactionsRequest> {
     let limit = payload
         .limit
         .as_ref()
-        .map(StringOrNumber::to_usize)
+        .map(StringOrNumber::to_i64)
         .transpose()?
         .unwrap_or(10);
-    if !(1..=1000).contains(&limit) {
-        anyhow::bail!("`limit` must be between 1 and 1000");
+    if limit <= 0 {
+        anyhow::bail!("limit should be positive");
+    }
+    if limit > 1000 {
+        anyhow::bail!("limit should be less or equal 1000");
     }
     let lt = payload
         .lt
         .as_ref()
-        .map(StringOrNumber::to_u64)
+        .map(StringOrNumber::to_i64)
         .transpose()?;
+    if lt.is_some_and(|lt| lt < 0) {
+        anyhow::bail!("lt should be non-negative");
+    }
     let to_lt = payload
         .to_lt
         .as_ref()
-        .map(StringOrNumber::to_u64)
+        .map(StringOrNumber::to_i64)
         .transpose()?;
-    let has_lt = lt.is_some_and(|value| value != 0);
+    let has_lt = match zero_lt_policy {
+        ZeroLtPolicy::Absent => lt.is_some_and(|value| value != 0),
+        ZeroLtPolicy::Cursor => lt.is_some(),
+    };
     let has_hash = payload.hash.as_ref().is_some_and(|hash| !hash.is_empty());
     if has_lt != has_hash {
-        anyhow::bail!("`lt` and `hash` must be used together");
+        anyhow::bail!("lt and hash should be used together");
     }
-    Ok((limit, lt.filter(|value| *value != 0), to_lt))
+
+    let hash = payload
+        .hash
+        .as_deref()
+        .filter(|_| has_hash)
+        .map(str::parse)
+        .transpose()
+        .map_err(|_| ToncenterHttpError::unprocessable_entity("failed to parse hash"))?;
+    Ok(ParsedTransactionsRequest {
+        address: Addr::parse(&payload.address)?,
+        limit: limit as usize,
+        lt: has_lt.then(|| lt.unwrap_or_default() as u64),
+        hash,
+        to_lt: to_lt.filter(|to_lt| *to_lt > 0).map(|to_lt| to_lt as u64),
+    })
 }
 
 #[cfg(test)]

@@ -150,6 +150,34 @@ impl Hash256 {
     }
 }
 
+impl FromStr for Hash256 {
+    type Err = anyhow::Error;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.len() == 64 {
+            return Self::from_hex(s);
+        }
+        if s.len() == 44
+            && let Ok(hash) = Self::from_base64(s)
+        {
+            return Ok(hash);
+        }
+
+        for engine in [
+            &base64::engine::general_purpose::URL_SAFE,
+            &base64::engine::general_purpose::URL_SAFE_NO_PAD,
+        ] {
+            if let Ok(bytes) = engine.decode(s)
+                && let Ok(bytes) = <[u8; 32]>::try_from(bytes)
+            {
+                return Ok(Self(bytes));
+            }
+        }
+
+        anyhow::bail!("Invalid hash format")
+    }
+}
+
 impl From<HashBytes> for Hash256 {
     fn from(value: HashBytes) -> Self {
         Self(value.0)
@@ -177,7 +205,7 @@ impl<'de> Deserialize<'de> for Hash256 {
         D: Deserializer<'de>,
     {
         let value = String::deserialize(deserializer)?;
-        Hash256::from_hex(&value).map_err(serde::de::Error::custom)
+        value.parse().map_err(serde::de::Error::custom)
     }
 }
 
@@ -304,6 +332,7 @@ pub type Lt = u64;
 #[cfg(test)]
 mod tests {
     use super::{Addr, BocBytes, Hash256};
+    use base64::Engine as _;
     use tycho_types::models::StdAddr;
     use tycho_types::prelude::HashBytes;
 
@@ -322,6 +351,21 @@ mod tests {
         let json = "\"cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd\"";
         let parsed: Hash256 = serde_json::from_str(json).expect("deserialize hash");
         assert_eq!(parsed, Hash256([0xCD; 32]));
+    }
+
+    #[test]
+    fn hash256_parses_all_upstream_wire_encodings() {
+        let expected = Hash256([0xFB; 32]);
+        let encodings = [
+            expected.to_hex(),
+            expected.to_base64(),
+            base64::engine::general_purpose::URL_SAFE.encode(expected.0),
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(expected.0),
+        ];
+
+        for encoding in encodings {
+            assert_eq!(encoding.parse::<Hash256>().unwrap(), expected);
+        }
     }
 
     #[test]

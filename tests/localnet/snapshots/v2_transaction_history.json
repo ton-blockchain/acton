@@ -1,0 +1,55 @@
+{
+  "exact_rest": {
+    "count": 2,
+    "starts_at_cursor": true
+  },
+  "exclusive_to_lt": {
+    "all_above_boundary": true,
+    "count": 1,
+    "negative_bound_is_unbounded": true
+  },
+  "fixture_transaction_count": 12,
+  "hash_encodings": [
+    {
+      "count": 2,
+      "encoding": "base64",
+      "starts_at_cursor": true
+    },
+    {
+      "count": 2,
+      "encoding": "hex",
+      "starts_at_cursor": true
+    },
+    {
+      "count": 2,
+      "encoding": "base64url",
+      "starts_at_cursor": true
+    },
+    {
+      "count": 2,
+      "encoding": "base64url_no_pad",
+      "starts_at_cursor": true
+    }
+  ],
+  "invalid_cursor": {
+    "rest_code": 500,
+    "rest_error": "LITE_SERVER_UNKNOWN: transaction hash mismatch",
+    "rest_status": 500,
+    "rpc_code": 500,
+    "rpc_error": "LITE_SERVER_UNKNOWN: transaction hash mismatch",
+    "rpc_status": 500
+  },
+  "std_boundary": {
+    "all_above_boundary": true,
+    "count": 1,
+    "previous_is_nonzero": true
+  },
+  "zero_lt": {
+    "decoded_code": 422,
+    "decoded_status": 422,
+    "std_rest_count": 0,
+    "std_rest_previous_is_zero": true,
+    "std_rpc_count": 0,
+    "std_rpc_previous_is_zero": true
+  }
+}

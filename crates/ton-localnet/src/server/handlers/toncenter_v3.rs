@@ -19,7 +19,6 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use base64::Engine;
 use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use serde_json::json;
@@ -2438,30 +2437,8 @@ fn parse_v3_query<T: DeserializeOwned>(raw_query: Option<&str>) -> anyhow::Resul
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    anyhow::bail!("Invalid hash format: {hash}")
+    hash.parse()
+        .map_err(|_| anyhow::anyhow!("Invalid hash format: {hash}"))
 }
 
 fn parse_shard_query(shard: &str) -> anyhow::Result<i64> {

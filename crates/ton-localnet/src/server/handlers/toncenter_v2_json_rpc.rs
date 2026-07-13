@@ -1,7 +1,7 @@
 use super::toncenter_v2::{
     parse_config_param, parse_i32_seqno, parse_libraries_request, parse_seqno,
-    parse_transactions_request, resolve_block_header, resolve_block_transactions,
-    resolve_token_data, resolve_wallet_information,
+    parse_transactions_request, parse_transactions_std_request, resolve_block_header,
+    resolve_block_transactions, resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
@@ -12,7 +12,6 @@ use crate::types::Hash256;
 use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
-use base64::Engine;
 use serde::Serialize;
 use serde_json::Value;
 use std::sync::Arc;
@@ -211,21 +210,31 @@ async fn json_rpc_router(
         }
         "getTransactions" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            let (limit, lt, to_lt) = validate!(parse_transactions_request(&req));
-            wire::JsonRpcResult::Transactions(
-                node.get_transactions(req.address, limit, lt, req.hash, to_lt)
-                    .await
-                    .map(|r| v2::map_transactions(&r))?,
-            )
+            let request = validate!(parse_transactions_request(&req));
+            let page = node
+                .get_transactions_page_by_address(
+                    request.address,
+                    request.limit,
+                    request.lt,
+                    request.hash,
+                    request.to_lt,
+                )
+                .await?;
+            wire::JsonRpcResult::Transactions(v2::map_transactions(&page.transactions))
         }
         "getTransactionsStd" => {
             let req: TransactionsRequest = parse_params(params, method)?;
-            let (page_limit, lt, to_lt) = validate!(parse_transactions_request(&req));
-            let fetch_limit = page_limit.saturating_add(1);
+            let request = validate!(parse_transactions_std_request(&req));
             wire::JsonRpcResult::RawTransactions(Box::new(
-                node.get_transactions(req.address, fetch_limit, lt, req.hash, to_lt)
-                    .await
-                    .map(|r| v2::map_transactions_std(&r, page_limit))?,
+                node.get_transactions_page_by_address(
+                    request.address,
+                    request.limit,
+                    request.lt,
+                    request.hash,
+                    request.to_lt,
+                )
+                .await
+                .map(|page| v2::map_transactions_std(&page))?,
             ))
         }
         "getConfigParam" => {
@@ -395,28 +404,5 @@ fn detect_given_type(address: &str, bounceable: bool) -> &'static str {
 }
 
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
-    if let Ok(parsed) = Hash256::from_hex(hash) {
-        return Ok(parsed);
-    }
-    if let Ok(parsed) = Hash256::from_base64(hash) {
-        return Ok(parsed);
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    if let Ok(bytes) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(hash)
-        && bytes.len() == 32
-    {
-        let mut arr = [0u8; 32];
-        arr.copy_from_slice(&bytes);
-        return Ok(Hash256(arr));
-    }
-
-    anyhow::bail!("Invalid hash format")
+    hash.parse()
 }
