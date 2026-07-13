@@ -1,8 +1,6 @@
 use super::utils::{ToncenterHttpError, get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
-use crate::localnet::{
-    Localnet, LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockTransactions,
-};
+use crate::localnet::{Localnet, LocalnetBlockHeader, LocalnetBlockTransactions};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
@@ -157,31 +155,7 @@ pub async fn get_token_data(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<AddressInformationRequest>,
 ) -> Response {
-    handle_result(
-        async move {
-            let _seqno = parse_seqno(payload.seqno)?;
-            let address = Addr::parse(&payload.address)
-                .map_err(|error| ToncenterHttpError::unprocessable_entity(error.to_string()))?;
-            let mut infos = node.get_address_infos(vec![address]).await?;
-            let info = infos
-                .pop()
-                .ok_or_else(|| anyhow::anyhow!("Address information not found"))?;
-            let jetton_wallet_code_hash = token_wallet_code_hash(&node, &info).await;
-            let jetton_wallet_code = match jetton_wallet_code_hash {
-                Some(hash) => node.get_cell_boc(hash).await?,
-                None => None,
-            };
-
-            v2::map_token_data(&info, jetton_wallet_code.as_ref(), None).ok_or_else(|| {
-                ToncenterHttpError::conflict(format!(
-                    "Smart contract {} is not Jetton or NFT",
-                    payload.address
-                ))
-            })
-        },
-        Clone::clone,
-    )
-    .await
+    handle_result(resolve_token_data(&node, &payload), Clone::clone).await
 }
 
 pub async fn get_shard_account_cell(
@@ -196,25 +170,28 @@ pub async fn get_shard_account_cell(
     .await
 }
 
-pub(super) async fn token_wallet_code_hash(
+pub(super) async fn resolve_token_data(
     node: &Localnet,
-    info: &LocalnetAddressInfo,
-) -> Option<Hash256> {
-    if let Some(master) = info.jetton_master.as_ref() {
-        return Some(master.jetton_wallet_code_hash);
-    }
+    payload: &AddressInformationRequest,
+) -> anyhow::Result<ton_api::toncenter::v2::responses::TokenData> {
+    let seqno = parse_seqno(payload.seqno.clone())?;
+    let address = Addr::parse(&payload.address)
+        .map_err(|error| ToncenterHttpError::unprocessable_entity(error.to_string()))?;
+    let mut infos = node.get_address_infos(vec![address], seqno).await?;
+    let info = infos
+        .pop()
+        .ok_or_else(|| anyhow::anyhow!("Address information not found"))?;
+    let jetton_wallet_code = match info.jetton_wallet_code_hash() {
+        Some(hash) => node.get_cell_boc(hash).await?,
+        None => None,
+    };
 
-    let wallet = info.jetton_wallet.as_ref()?;
-    node.get_jetton_masters(
-        vec![wallet.jetton_address.to_string()],
-        Vec::new(),
-        Some(1),
-        Some(0),
-    )
-    .await
-    .ok()
-    .and_then(|mut masters| masters.pop())
-    .map(|master| master.jetton_wallet_code_hash)
+    v2::map_token_data(&info, jetton_wallet_code.as_ref()).ok_or_else(|| {
+        ToncenterHttpError::conflict(format!(
+            "Smart contract {} is not Jetton or NFT",
+            payload.address
+        ))
+    })
 }
 
 pub async fn get_libraries(

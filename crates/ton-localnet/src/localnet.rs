@@ -107,10 +107,25 @@ pub struct LocalnetAccountState {
 pub struct LocalnetAddressInfo {
     pub address: Addr,
     pub code_hash: Option<Hash256>,
+    pub dns: Option<storage::DnsRecordMeta>,
     pub jetton_wallet: Option<storage::JettonWalletMeta>,
     pub jetton_master: Option<storage::JettonMasterMeta>,
     pub nft_item: Option<storage::NftItemMeta>,
-    pub nft_collection_item: Option<storage::NftItemMeta>,
+    pub nft_collection: Option<storage::NftCollectionMeta>,
+}
+
+impl LocalnetAddressInfo {
+    #[must_use]
+    pub fn jetton_wallet_code_hash(&self) -> Option<Hash256> {
+        self.jetton_master
+            .as_ref()
+            .map(|master| master.jetton_wallet_code_hash)
+            .or_else(|| {
+                self.jetton_wallet
+                    .as_ref()
+                    .map(|wallet| wallet.jetton_wallet_code_hash)
+            })
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -357,6 +372,7 @@ pub(crate) enum Request {
     },
     GetAddressInfos {
         addresses: Vec<Addr>,
+        seqno: Option<u32>,
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetAddressInfo>>>,
     },
     GetCellBoc {
@@ -889,10 +905,15 @@ impl Localnet {
     pub async fn get_address_infos(
         &self,
         addresses: Vec<Addr>,
+        seqno: Option<u32>,
     ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::GetAddressInfos { addresses, resp })
+            .send(Request::GetAddressInfos {
+                addresses,
+                seqno,
+                resp,
+            })
             .await?;
         rx.await?
     }
@@ -1945,8 +1966,12 @@ fn process_loop_request(
             let res = handle_get_account_states(node, addresses, seqno);
             let _ = resp.send(res);
         }
-        Request::GetAddressInfos { addresses, resp } => {
-            let res = handle_get_address_infos(node, addresses);
+        Request::GetAddressInfos {
+            addresses,
+            seqno,
+            resp,
+        } => {
+            let res = handle_get_address_infos(node, addresses, seqno);
             let _ = resp.send(res);
         }
         Request::GetCellBoc { hash, resp } => {
@@ -2360,7 +2385,7 @@ fn registered_verified_source_for_query(
     let Some(address) = address else {
         return Ok(None);
     };
-    let code_hash = handle_get_address_context(node, address)?.code_hash;
+    let code_hash = handle_get_address_context(node, address, None)?.code_hash;
     Ok(code_hash.and_then(|code_hash| node.history.get_verified_source(&code_hash)))
 }
 
@@ -2433,7 +2458,7 @@ fn handle_get_account_states(
         .into_iter()
         .map(|address| {
             let state = handle_get_address_info(node, address, seqno)?;
-            let info = handle_get_address_context(node, address)?;
+            let info = handle_get_address_context(node, address, seqno)?;
             Ok(LocalnetAccountStateWithInfo { state, info })
         })
         .collect()
@@ -2442,47 +2467,23 @@ fn handle_get_account_states(
 fn handle_get_address_infos(
     node: &mut Node,
     addresses: Vec<Addr>,
+    seqno: Option<u32>,
 ) -> anyhow::Result<Vec<LocalnetAddressInfo>> {
     addresses
         .into_iter()
-        .map(|address| handle_get_address_context(node, address))
+        .map(|address| handle_get_address_context(node, address, seqno))
         .collect()
 }
 
 fn handle_get_address_context(
     node: &mut Node,
     address: Addr,
+    seqno: Option<u32>,
 ) -> anyhow::Result<LocalnetAddressInfo> {
-    node.ensure_detected_assets_for_address(&address)?;
-
-    let code_hash = node
-        .get_address_information(&address)
-        .and_then(|meta| meta.code_hash);
-    let jetton_wallet = node
-        .iter_jetton_wallets()
-        .find(|wallet| wallet.address == address)
-        .cloned();
-    let jetton_master = node
-        .iter_jetton_masters()
-        .find(|master| master.address == address)
-        .cloned();
-    let nft_item = node
-        .iter_nft_items()
-        .find(|item| item.address == address)
-        .cloned();
-    let nft_collection_item = node
-        .iter_nft_items()
-        .find(|item| item.collection_address == Some(address))
-        .cloned();
-
-    Ok(LocalnetAddressInfo {
-        address,
-        code_hash,
-        jetton_wallet,
-        jetton_master,
-        nft_item,
-        nft_collection_item,
-    })
+    let seqno = account_query_seqno(node, seqno);
+    let _ = block_id_for_query_seqno(node, seqno)?;
+    let meta = node.get_address_information_at_block(&address, seqno);
+    node.detect_assets_for_account(&address, meta.as_ref())
 }
 
 const fn account_query_seqno(node: &Node, seqno: Option<Seqno>) -> Seqno {

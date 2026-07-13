@@ -1185,6 +1185,19 @@ pub(crate) fn map_nft_collection_token_info(item: &NftItemMeta) -> response::Tok
     }
 }
 
+pub(crate) fn map_nft_collection_meta_token_info(
+    collection: &NftCollectionMeta,
+) -> response::TokenInfo {
+    response::TokenInfo {
+        valid: Some(true),
+        kind: Some("nft_collections".to_owned()),
+        name: content_string(&collection.collection_content, "name"),
+        description: content_string(&collection.collection_content, "description"),
+        image: content_string(&collection.collection_content, "image"),
+        ..Default::default()
+    }
+}
+
 fn map_account_state_full(
     state: &LocalnetAccountState,
     context: Option<&AccountStateContext>,
@@ -1984,7 +1997,9 @@ mod tests {
             code_hash: Hash256([4; 32]),
             data_hash: Hash256([5; 32]),
             jetton_address: sample_jetton_master().address,
+            jetton_wallet_code_hash: Hash256([6; 32]),
             last_transaction_lt: 43,
+            mintless_is_claimed: None,
             owner_address: "0:5555555555555555555555555555555555555555555555555555555555555555"
                 .parse()
                 .expect("valid owner address"),

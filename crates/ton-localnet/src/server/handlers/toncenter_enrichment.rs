@@ -19,7 +19,7 @@ pub(super) async fn load_address_infos(
     addresses: Vec<Addr>,
 ) -> anyhow::Result<HashMap<Addr, AddressInfo>> {
     Ok(node
-        .get_address_infos(addresses)
+        .get_address_infos(addresses, None)
         .await?
         .into_iter()
         .map(|info| (info.address, map_address_info(info)))
@@ -135,11 +135,11 @@ pub(super) fn map_address_info(info: LocalnetAddressInfo) -> AddressInfo {
         out.token_info.push(v3::map_nft_item_token_info(&item));
     }
 
-    if let Some(item) = info.nft_collection_item {
+    if let Some(collection) = info.nft_collection {
         out.interfaces_available = true;
         out.interfaces.insert("nft_collection".to_owned());
         out.token_info
-            .push(v3::map_nft_collection_token_info(&item));
+            .push(v3::map_nft_collection_meta_token_info(&collection));
     }
 
     out

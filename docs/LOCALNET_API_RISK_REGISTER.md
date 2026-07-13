@@ -45,7 +45,9 @@ still defects because they violate schemas even under those limitations.
 | V2-04 account status | Fixed | REST and JSON-RPC use the same V2 status mapper; a no-state account is covered through both transports. |
 | V2-06 validation errors | Partial | Shared V2 validation and JSON-RPC field parsing now return typed 422 envelopes. Axum extractor rejections and locate-miss semantics remain open. |
 | V2-07 positive `seqno` | Fixed | All account, shard-account, wallet, token, and config entry points reject explicit zero, negative, and values above signed int32; REST and JSON-RPC are snapshot-covered. |
+| V2-08 token history | Fixed | `getTokenData` detects assets from the account state at the requested block. Real jetton supply/balance and NFT collection/owner transitions are snapshot-covered through typed REST and JSON-RPC responses. |
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
+| V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
 | V2-22 numeric ranges | Partial | Numeric get-method IDs and `runGetMethodStd.seqno` now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 | V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
@@ -92,7 +94,6 @@ These are the highest-value targets for the next differential test pass:
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
 | P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope, and locate misses can become internal errors. |
-| P0 | V2 historical reads | `getTokenData` validates but still ignores a positive historical `seqno` when reading token indexes. |
 | P0 | V2 block APIs | Block headers contain many hardcoded fields; block transaction cursors and masterchain transactions are wrong; `lookupBlock` selector rules differ. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | `transactionsByMessage` and `pendingTransactions` accept invalid empty filters and use incompatible identity/direction rules. |
@@ -105,7 +106,7 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
 The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
-endpoint-test depth is 2 at grade A, 53 at B, 39 at C, 4 at D, and 7 with no endpoint test. The
+endpoint-test depth is 3 at grade A, 53 at B, 38 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -168,7 +169,7 @@ coverage is high.
 | `GET /api/v2/getLibraries` | Low | A | Duplicate/order/large input behavior and a partially invalid list. |
 | `GET /api/v2/getExtendedAddressInformation` | High | C | Uninit/frozen, specialized wallet/DNS/RWallet/PChan states, revision, history, extra currencies. |
 | `GET /api/v2/getWalletInformation` | High | C | V3/V4 wallet ID, V5 signature flag, all revisions, malformed data, getter failure, historical state. |
-| `GET /api/v2/getTokenData` | Critical | C | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
+| `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
 | `GET /api/v2/getTransactions` | High | C | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
 | `GET /api/v2/getTransactionsStd` | High | C | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality. |
 | `GET /api/v2/tryLocateTx` | High | C | Not-found 404, ambiguous identical tuples, and created-LT boundaries. |
@@ -204,7 +205,8 @@ coverage is high.
    Tonlib envelope; locate misses that are 404 upstream can become 500.
 7. **V2-07, zero seqno:** account, balance, state, wallet, token, and config handlers accept zero
    and resolve it to the current head; upstream rejects an explicitly supplied zero.
-8. **V2-08, token history:** `getTokenData` ignores `seqno` and reads current indexes.
+8. **V2-08, token history (fixed):** `getTokenData` detects token data from the account state at
+   the requested block instead of reading current indexes.
 9. **V2-09, config history:** historical config requests validate a block but still read the
    current config BOC.
 10. **V2-10, transaction bound:** local includes `lt == to_lt`; upstream stops at and excludes it.
@@ -218,8 +220,9 @@ coverage is high.
     differential fixture.
 14. **V2-14, wallet DTO:** `wallet_id` and V5 `is_signature_allowed` are absent; getter errors are
     swallowed into `seqno: null`.
-15. **V2-15, token DTOs:** mintless claim state and DNS NFT data are absent; NFT collection
-    `next_item_index` is inferred from item metadata; content classification is too narrow.
+15. **V2-15, token DTOs (partially fixed):** mintless claim state and typed DNS NFT data are
+    exposed, and NFT collection data is detected from the collection itself. NFT items with a
+    collection still lack upstream parent-address verification and collection-derived content.
 16. **V2-16, block header:** many semantic fields are hardcoded and `prev_key_block_seqno` is
     populated from the immediate previous block.
 17. **V2-17, block transactions:** the canonical zero cursor returns an empty page, individual
@@ -446,8 +449,8 @@ coverage is high.
    nesting depths 99 and 100, and compare both request acceptance and response shape.
 2. Exercise raw V2 JSON-RPC with omitted/null envelope fields, empty array/object params,
    `getShards`, and failures that must match the corresponding REST status and envelope.
-3. Mutate an account, token, and config across blocks; query each historical seqno plus zero and
-   prove state, config, token metadata, `sync_utime`, and validation semantics.
+3. Complete historical account coverage for `sync_utime` and suspended-state semantics, and add
+   real mintless and DNS contracts plus parent-verified NFT content to the token fixtures.
 4. Build V2 transaction fixtures for exact and invalid cursors, all hash encodings,
    `to_lt == tx.lt`, decoded text bodies, extra currencies, and masterchain block transactions.
 5. Compare every V2/V3 block-header field on basechain, masterchain, key, split, and merge blocks;

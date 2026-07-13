@@ -1,5 +1,9 @@
 #![allow(dead_code)]
 
+use crate::common::strip_ansi;
+use crate::support::TestOutputExt;
+use crate::support::localnet::LocalnetHandle;
+use crate::support::project::{ActonCommand, Project, ProjectBuilder};
 use std::fmt::Write as _;
 use std::fs;
 use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
@@ -10,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use ton::ton_core::types::TonAddress;
+use ton_localnet::types::Addr;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::Boc;
@@ -37,6 +42,12 @@ pub(crate) struct CapturedToncenterRequest {
     pub(crate) headers: Vec<(String, String)>,
     pub(crate) body: Vec<u8>,
 }
+
+pub(crate) const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
+kind = "v4r2"
+workchain = 0
+keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
+"#;
 
 pub(crate) fn spawn_toncenter_v2_mock(
     responses: Vec<ToncenterV2MockResponse>,
@@ -259,6 +270,152 @@ api = {{ v2 = "{v2_url}" }}
     );
     fs::write(&acton_toml_path, acton_toml)
         .expect("failed to write Acton.toml with localnet network");
+}
+
+pub(crate) fn append_localnet_with_base_url(project_path: &Path, base_url: &str) {
+    append_custom_network_with_urls(
+        project_path,
+        "localnet",
+        &format!("{base_url}/api/v2"),
+        &format!("{base_url}/api/v3"),
+    );
+}
+
+pub(crate) fn jetton_v1_action_project(name: &str) -> Project {
+    ProjectBuilder::new(name)
+        .contract_from_boc_with_types(
+            "JettonV1Master",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/JettonV1Master.boc"
+            )
+            .to_vec(),
+            "types/jetton_v1_master.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "JettonV1Wallet",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/JettonV1Wallet.boc"
+            )
+            .to_vec(),
+            "types/jetton_v1_wallet.types.tolk",
+        )
+        .file(
+            "types/jetton_v1_master.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/jetton_v1_master.types.tolk"
+            ),
+        )
+        .file(
+            "types/jetton_v1_wallet.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/jetton_v1_wallet.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/JettonV1Master.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/JettonV1Master.gen.tolk"
+            ),
+        )
+        .file(
+            "wrappers/JettonV1Wallet.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/JettonV1Wallet.gen.tolk"
+            ),
+        )
+        .script_file(
+            "jetton",
+            include_str!("../integration/testdata/toncenter_v3_actions/jetton.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build()
+}
+
+pub(crate) fn with_nft_v1_action_fixtures(project: ProjectBuilder) -> ProjectBuilder {
+    project
+        .contract_from_boc_with_types(
+            "NftV1Collection",
+            include_bytes!(
+                "../integration/testdata/toncenter_v3_actions/contracts/NftV1Collection.boc"
+            )
+            .to_vec(),
+            "types/nft_v1_collection.types.tolk",
+        )
+        .contract_from_boc_with_types(
+            "NftV1Item",
+            include_bytes!("../integration/testdata/toncenter_v3_actions/contracts/NftV1Item.boc")
+                .to_vec(),
+            "types/nft_v1_item.types.tolk",
+        )
+        .file(
+            "types/nft_v1_collection.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/nft_v1_collection.types.tolk"
+            ),
+        )
+        .file(
+            "types/nft_v1_item.types",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/types/nft_v1_item.types.tolk"
+            ),
+        )
+        .file(
+            "wrappers/NftV1Collection.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/NftV1Collection.gen.tolk"
+            ),
+        )
+        .file(
+            "wrappers/NftV1Item.gen",
+            include_str!(
+                "../integration/testdata/toncenter_v3_actions/wrappers/NftV1Item.gen.tolk"
+            ),
+        )
+}
+
+pub(crate) fn nft_v1_action_project(name: &str) -> Project {
+    with_nft_v1_action_fixtures(ProjectBuilder::new(name))
+        .script_file(
+            "nft",
+            include_str!("../integration/testdata/toncenter_v3_actions/nft.tolk"),
+        )
+        .mapping("@acton", "../lib")
+        .build()
+}
+
+pub(crate) fn run_localnet_action_project(
+    project: &Project,
+    script_path: &str,
+) -> (LocalnetHandle, String) {
+    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
+        .expect("Failed to write wallets.toml");
+    let node = project
+        .localnet()
+        .before_start(ActonCommand::build)
+        .args(["--accounts", "deployer"])
+        .start();
+    append_localnet_with_base_url(project.path(), &node.base_url());
+    let output = project
+        .acton()
+        .script(script_path)
+        .verify_network("localnet")
+        .run()
+        .success()
+        .get_stdout();
+    (node, output)
+}
+
+pub(crate) fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {
+    let cleaned = strip_ansi(output);
+    let value = cleaned
+        .lines()
+        .map(str::trim)
+        .find_map(|line| line.strip_prefix(marker))
+        .unwrap_or_else(|| panic!("Marker `{marker}` not found in output:\n{cleaned}"));
+    let address = value.split_once(" (").map_or(value, |(address, _)| address);
+    Addr::parse(address)
+        .unwrap_or_else(|error| panic!("Invalid address `{value}` printed for {marker}: {error}"))
+        .to_string()
 }
 
 pub(crate) fn toncenter_v2_seqno_ok_response() -> ToncenterV2MockResponse {

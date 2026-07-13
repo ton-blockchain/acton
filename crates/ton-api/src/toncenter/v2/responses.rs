@@ -1,6 +1,7 @@
 use super::{StringOrNumber, TvmCell, TvmStackEntry};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
 use tvm_ffi::json_stack::{json_to_legacy_stack, std_stack_into_tuple};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -202,6 +203,8 @@ pub enum TokenData {
         balance: String,
         owner: String,
         jetton: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        mintless_is_claimed: Option<bool>,
         jetton_wallet_code: String,
     },
     #[serde(rename = "ext.tokens.nftCollectionData")]
@@ -220,7 +223,7 @@ pub enum TokenData {
         index: String,
         collection_address: Option<String>,
         owner_address: Option<String>,
-        content: TokenContent,
+        content: NftContent,
     },
 }
 
@@ -229,6 +232,54 @@ pub struct TokenContent {
     #[serde(rename = "type")]
     pub kind: String,
     pub data: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum NftContent {
+    Token(TokenContent),
+    Dns(Box<DnsContent>),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DnsContent {
+    pub domain: String,
+    pub data: DnsRecordSet,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DnsRecordSet {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dns_next_resolver: Option<DnsRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub wallet: Option<DnsRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub site: Option<DnsRecord>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<DnsRecord>,
+    #[serde(flatten)]
+    pub extra: HashMap<String, DnsRecord>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "@type")]
+pub enum DnsRecord {
+    #[serde(rename = "dns_storage_address")]
+    StorageAddress { bag_id: String },
+    #[serde(rename = "dns_smc_address")]
+    SmcAddress { smc_addr: SmcAddress },
+    #[serde(rename = "dns_adnl_address")]
+    AdnlAddress { adnl_addr: String },
+    #[serde(rename = "dns_next_resolver")]
+    NextResolver { resolver: SmcAddress },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SmcAddress {
+    #[serde(rename = "@type")]
+    pub type_field: String,
+    pub workchain_id: i32,
+    pub address: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -613,6 +664,69 @@ mod tests {
                 serde_json::from_value(fixture.clone()).expect("message data must deserialize");
             assert_eq!(
                 serde_json::to_value(parsed).expect("message data must serialize"),
+                fixture
+            );
+        }
+    }
+
+    #[test]
+    fn token_data_round_trips_mintless_wallet_and_dns_nft() {
+        let fixtures = [
+            serde_json::json!({
+                "@type": "ext.tokens.jettonWalletData",
+                "address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+                "contract_type": "jetton_wallet",
+                "balance": "1000",
+                "owner": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "jetton": "0:3333333333333333333333333333333333333333333333333333333333333333",
+                "mintless_is_claimed": false,
+                "jetton_wallet_code": "te6ccgEBAQEAAgAAAA=="
+            }),
+            serde_json::json!({
+                "@type": "ext.tokens.nftItemData",
+                "address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+                "contract_type": "nft_item",
+                "init": true,
+                "index": "7",
+                "collection_address": "0:2222222222222222222222222222222222222222222222222222222222222222",
+                "owner_address": "0:3333333333333333333333333333333333333333333333333333333333333333",
+                "content": {
+                    "domain": "example.ton",
+                    "data": {
+                        "dns_next_resolver": {
+                            "@type": "dns_next_resolver",
+                            "resolver": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": "4444444444444444444444444444444444444444444444444444444444444444"
+                            }
+                        },
+                        "wallet": {
+                            "@type": "dns_smc_address",
+                            "smc_addr": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": "5555555555555555555555555555555555555555555555555555555555555555"
+                            }
+                        },
+                        "site": {
+                            "@type": "dns_adnl_address",
+                            "adnl_addr": "6666666666666666666666666666666666666666666666666666666666666666"
+                        },
+                        "storage": {
+                            "@type": "dns_storage_address",
+                            "bag_id": "7777777777777777777777777777777777777777777777777777777777777777"
+                        }
+                    }
+                }
+            }),
+        ];
+
+        for fixture in fixtures {
+            let parsed: TokenData =
+                serde_json::from_value(fixture.clone()).expect("token data must deserialize");
+            assert_eq!(
+                serde_json::to_value(parsed).expect("token data must serialize"),
                 fixture
             );
         }

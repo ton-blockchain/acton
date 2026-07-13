@@ -4867,7 +4867,7 @@ mod tests {
             },
         );
 
-        node.detect_jetton_wallets(&wallet_address)
+        node.detect_assets(&wallet_address)
             .expect("library-backed jetton wallet must be detected");
 
         let wallet = node

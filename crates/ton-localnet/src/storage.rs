@@ -249,7 +249,9 @@ pub struct JettonWalletMeta {
     pub code_hash: Hash256,
     pub data_hash: Hash256,
     pub jetton_address: Addr,
+    pub jetton_wallet_code_hash: Hash256,
     pub last_transaction_lt: Lt,
+    pub mintless_is_claimed: Option<bool>,
     pub owner_address: Addr,
 }
 

@@ -275,7 +275,9 @@ mod tests {
             code_hash: Hash256([1; 32]),
             data_hash: Hash256([2; 32]),
             jetton_address: jetton,
+            jetton_wallet_code_hash: Hash256([3; 32]),
             last_transaction_lt: 456,
+            mintless_is_claimed: None,
             owner_address: owner,
         }
     }

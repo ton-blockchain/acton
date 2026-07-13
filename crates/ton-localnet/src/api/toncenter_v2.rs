@@ -11,7 +11,7 @@ use crate::localnet::{
     LocalnetConsensusBlock, LocalnetLibrary, LocalnetMasterchainInfo, LocalnetRunGetMethodResult,
     LocalnetTransaction, LocalnetTransactionId,
 };
-use crate::storage::{AccountStatus, NftItemMeta};
+use crate::storage::{AccountStatus, DnsRecordMeta, NftCollectionMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
 use base64::Engine;
 use serde_json::value::Value;
@@ -281,7 +281,6 @@ pub fn map_wallet_information(
 pub fn map_token_data(
     info: &LocalnetAddressInfo,
     jetton_wallet_code: Option<&BocBytes>,
-    collection_next_item_index: Option<&str>,
 ) -> Option<response::TokenData> {
     if let Some(master) = info.jetton_master.as_ref() {
         return Some(response::TokenData::JettonMaster {
@@ -304,38 +303,33 @@ pub fn map_token_data(
             balance: wallet.balance.to_string(),
             owner: wallet.owner_address.to_string(),
             jetton: wallet.jetton_address.to_string(),
+            mintless_is_claimed: wallet.mintless_is_claimed,
             jetton_wallet_code: jetton_wallet_code
                 .map(BocBytes::to_base64)
                 .unwrap_or_default(),
         });
     }
 
-    if let Some(item) = info.nft_collection_item.as_ref() {
-        return Some(map_nft_collection_data(
-            info.address.to_string(),
-            item,
-            collection_next_item_index,
-        ));
+    if let Some(collection) = info.nft_collection.as_ref() {
+        return Some(map_nft_collection_data(collection));
     }
 
-    info.nft_item.as_ref().map(map_nft_item_data)
+    info.nft_item
+        .as_ref()
+        .map(|item| map_nft_item_data(item, info.dns.as_ref()))
 }
 
-fn map_nft_collection_data(
-    address: String,
-    item: &NftItemMeta,
-    next_item_index: Option<&str>,
-) -> response::TokenData {
+fn map_nft_collection_data(collection: &NftCollectionMeta) -> response::TokenData {
     response::TokenData::NftCollection {
-        address,
+        address: collection.address.to_string(),
         contract_type: "nft_collection".to_owned(),
-        next_item_index: next_item_index.unwrap_or(&item.index).to_owned(),
-        owner_address: item.owner_address.as_ref().map(ToString::to_string),
-        collection_content: map_token_content(&map_collection_content(&item.content)),
+        next_item_index: collection.next_item_index.clone(),
+        owner_address: collection.owner_address.as_ref().map(ToString::to_string),
+        collection_content: map_token_content(&collection.collection_content),
     }
 }
 
-fn map_nft_item_data(item: &NftItemMeta) -> response::TokenData {
+fn map_nft_item_data(item: &NftItemMeta, dns: Option<&DnsRecordMeta>) -> response::TokenData {
     response::TokenData::NftItem {
         address: item.address.to_string(),
         contract_type: "nft_item".to_owned(),
@@ -343,31 +337,48 @@ fn map_nft_item_data(item: &NftItemMeta) -> response::TokenData {
         index: item.index.clone(),
         collection_address: item.collection_address.as_ref().map(ToString::to_string),
         owner_address: item.owner_address.as_ref().map(ToString::to_string),
-        content: map_token_content(&item.content),
+        content: dns.map_or_else(
+            || response::NftContent::Token(map_token_content(&item.content)),
+            map_dns_content,
+        ),
     }
 }
 
-fn map_collection_content(content: &Value) -> Value {
-    let Some(source) = content.as_object() else {
-        return content.clone();
-    };
+fn map_dns_content(record: &DnsRecordMeta) -> response::NftContent {
+    response::NftContent::Dns(Box::new(response::DnsContent {
+        domain: record.domain.clone(),
+        data: response::DnsRecordSet {
+            dns_next_resolver: record.next_resolver.as_ref().map(|address| {
+                response::DnsRecord::NextResolver {
+                    resolver: map_smc_address(address),
+                }
+            }),
+            wallet: record
+                .wallet
+                .as_ref()
+                .map(|address| response::DnsRecord::SmcAddress {
+                    smc_addr: map_smc_address(address),
+                }),
+            site: record
+                .site_adnl
+                .map(|hash| response::DnsRecord::AdnlAddress {
+                    adnl_addr: hash.to_hex(),
+                }),
+            storage: record
+                .storage_bag_id
+                .map(|hash| response::DnsRecord::StorageAddress {
+                    bag_id: hash.to_hex(),
+                }),
+            ..Default::default()
+        },
+    }))
+}
 
-    let mut mapped = serde_json::Map::new();
-    for (from, to) in [
-        ("collection_uri", "uri"),
-        ("collection_name", "name"),
-        ("collection_description", "description"),
-        ("collection_image", "image"),
-    ] {
-        if let Some(value) = source.get(from) {
-            mapped.insert(to.to_string(), value.clone());
-        }
-    }
-
-    if mapped.is_empty() {
-        content.clone()
-    } else {
-        Value::Object(mapped)
+fn map_smc_address(address: &Addr) -> response::SmcAddress {
+    response::SmcAddress {
+        type_field: "addr_std".to_owned(),
+        workchain_id: address.workchain,
+        address: Hash256(address.addr).to_hex(),
     }
 }
 
@@ -752,7 +763,7 @@ fn map_message_data(msg: &crate::localnet::LocalnetMessage) -> response::Message
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::JettonMasterMeta;
+    use crate::storage::{DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use serde_json::json;
     use tycho_types::cell::Cell;
 
@@ -915,13 +926,14 @@ mod tests {
         let info = LocalnetAddressInfo {
             address: master.address,
             code_hash: Some(master.code_hash),
+            dns: None,
             jetton_wallet: None,
             jetton_master: Some(master),
             nft_item: None,
-            nft_collection_item: None,
+            nft_collection: None,
         };
 
-        let mapped = map_token_data(&info, Some(&wallet_code), None).expect("jetton data must map");
+        let mapped = map_token_data(&info, Some(&wallet_code)).expect("jetton data must map");
 
         let response::TokenData::JettonMaster {
             contract_type,
@@ -938,5 +950,123 @@ mod tests {
         assert_eq!(jetton_wallet_code, "AQID");
         assert_eq!(jetton_content.kind, "onchain");
         assert_eq!(jetton_content.data["symbol"].as_str(), Some("LOC"));
+    }
+
+    #[test]
+    fn token_data_maps_mintless_jetton_wallet() {
+        let wallet_code = BocBytes(vec![1, 2, 3]);
+        let wallet = JettonWalletMeta {
+            address: addr(0xaa),
+            balance: 1000,
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            jetton_address: addr(0xbb),
+            jetton_wallet_code_hash: Hash256([3; 32]),
+            last_transaction_lt: 4,
+            mintless_is_claimed: Some(true),
+            owner_address: addr(0xcc),
+        };
+        let info = LocalnetAddressInfo {
+            address: wallet.address,
+            code_hash: Some(wallet.code_hash),
+            dns: None,
+            jetton_wallet: Some(wallet),
+            jetton_master: None,
+            nft_item: None,
+            nft_collection: None,
+        };
+
+        let mapped = map_token_data(&info, Some(&wallet_code)).expect("wallet data must map");
+
+        assert_eq!(
+            serde_json::to_value(mapped).unwrap(),
+            json!({
+                "@type": "ext.tokens.jettonWalletData",
+                "address": addr(0xaa).to_string(),
+                "contract_type": "jetton_wallet",
+                "balance": "1000",
+                "owner": addr(0xcc).to_string(),
+                "jetton": addr(0xbb).to_string(),
+                "mintless_is_claimed": true,
+                "jetton_wallet_code": "AQID",
+            })
+        );
+    }
+
+    #[test]
+    fn token_data_maps_typed_dns_records() {
+        let item = NftItemMeta {
+            address: addr(0xaa),
+            code_hash: Hash256([1; 32]),
+            data_hash: Hash256([2; 32]),
+            collection_address: Some(addr(0xbb)),
+            owner_address: Some(addr(0xcc)),
+            content: json!({"uri": "https://example.test/item.json"}),
+            index: "7".to_owned(),
+            init: true,
+            last_transaction_lt: 4,
+        };
+        let dns = DnsRecordMeta {
+            nft_item_address: item.address,
+            nft_item_owner: item.owner_address,
+            domain: "example.ton".to_owned(),
+            next_resolver: Some(addr(0x11)),
+            wallet: Some(addr(0x22)),
+            site_adnl: Some(Hash256([0x33; 32])),
+            storage_bag_id: Some(Hash256([0x44; 32])),
+        };
+        let info = LocalnetAddressInfo {
+            address: item.address,
+            code_hash: Some(item.code_hash),
+            dns: Some(dns),
+            jetton_wallet: None,
+            jetton_master: None,
+            nft_item: Some(item),
+            nft_collection: None,
+        };
+
+        let mapped = map_token_data(&info, None).expect("DNS NFT data must map");
+
+        assert_eq!(
+            serde_json::to_value(mapped).unwrap(),
+            json!({
+                "@type": "ext.tokens.nftItemData",
+                "address": addr(0xaa).to_string(),
+                "contract_type": "nft_item",
+                "init": true,
+                "index": "7",
+                "collection_address": addr(0xbb).to_string(),
+                "owner_address": addr(0xcc).to_string(),
+                "content": {
+                    "domain": "example.ton",
+                    "data": {
+                        "dns_next_resolver": {
+                            "@type": "dns_next_resolver",
+                            "resolver": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": Hash256([0x11; 32]).to_hex(),
+                            },
+                        },
+                        "wallet": {
+                            "@type": "dns_smc_address",
+                            "smc_addr": {
+                                "@type": "addr_std",
+                                "workchain_id": 0,
+                                "address": Hash256([0x22; 32]).to_hex(),
+                            },
+                        },
+                        "site": {
+                            "@type": "dns_adnl_address",
+                            "adnl_addr": Hash256([0x33; 32]).to_hex(),
+                        },
+                        "storage": {
+                            "@type": "dns_storage_address",
+                            "bag_id": Hash256([0x44; 32]).to_hex(),
+                        },
+                    },
+                },
+            })
+        );
     }
 }

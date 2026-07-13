@@ -1,0 +1,78 @@
+{
+  "collection": {
+    "current": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "nft_collection",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": "1",
+      "owner": null,
+      "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "total_supply": null,
+      "type": "ext.tokens.nftCollectionData",
+      "wallet_code_present": false
+    },
+    "deploy_seqno": 3,
+    "historical_json_rpc": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "nft_collection",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": "0",
+      "owner": null,
+      "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "total_supply": null,
+      "type": "ext.tokens.nftCollectionData",
+      "wallet_code_present": false
+    },
+    "historical_rest": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "nft_collection",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": "0",
+      "owner": null,
+      "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "total_supply": null,
+      "type": "ext.tokens.nftCollectionData",
+      "wallet_code_present": false
+    }
+  },
+  "item": {
+    "current": {
+      "balance": null,
+      "collection_address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+      "content_type": "onchain",
+      "contract_type": "nft_item",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": null,
+      "owner_address": "0:1111111111111111111111111111111111111111111111111111111111111111",
+      "total_supply": null,
+      "type": "ext.tokens.nftItemData",
+      "wallet_code_present": false
+    },
+    "deploy_seqno": 4,
+    "historical": {
+      "balance": null,
+      "collection_address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+      "content_type": "onchain",
+      "contract_type": "nft_item",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": null,
+      "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "total_supply": null,
+      "type": "ext.tokens.nftItemData",
+      "wallet_code_present": false
+    }
+  }
+}

@@ -5,6 +5,11 @@ use crate::support::localnet::{
 };
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
+use crate::support::toncenter::{
+    DEPLOYER_WALLET_CONFIG, append_localnet_with_base_url as append_localnet_network,
+    extract_canonical_addr_marker, jetton_v1_action_project, nft_v1_action_project,
+    run_localnet_action_project, with_nft_v1_action_fixtures,
+};
 use acton::wallets;
 use base64::Engine;
 use reqwest::blocking::Client;
@@ -148,11 +153,6 @@ fun main() {
 }
 "#;
 
-const DEPLOYER_WALLET_CONFIG: &str = r#"[wallets.deployer]
-kind = "v4r2"
-workchain = 0
-keys = { mnemonic = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later" }
-"#;
 const DEPLOYER_MNEMONIC: &str = "cupboard match uphold miracle fog balance unknown region share hand trophy million toy narrow ability exchange first toast fresh maid report cram strong later";
 const TON_CONNECT_WALLETS_CONFIG: &str = r#"[wallets.wallet_v3]
 kind = "v3r2"
@@ -4168,98 +4168,10 @@ fn localnet_v3_indexed_contract_endpoints_match_typed_contracts() {
     node.stop();
 }
 
-fn with_nft_v1_action_fixtures(project: ProjectBuilder) -> ProjectBuilder {
-    project
-        .contract_from_boc_with_types(
-            "NftV1Collection",
-            include_bytes!("testdata/toncenter_v3_actions/contracts/NftV1Collection.boc").to_vec(),
-            "types/nft_v1_collection.types.tolk",
-        )
-        .contract_from_boc_with_types(
-            "NftV1Item",
-            include_bytes!("testdata/toncenter_v3_actions/contracts/NftV1Item.boc").to_vec(),
-            "types/nft_v1_item.types.tolk",
-        )
-        .file(
-            "types/nft_v1_collection.types",
-            include_str!("testdata/toncenter_v3_actions/types/nft_v1_collection.types.tolk"),
-        )
-        .file(
-            "types/nft_v1_item.types",
-            include_str!("testdata/toncenter_v3_actions/types/nft_v1_item.types.tolk"),
-        )
-        .file(
-            "wrappers/NftV1Collection.gen",
-            include_str!("testdata/toncenter_v3_actions/wrappers/NftV1Collection.gen.tolk"),
-        )
-        .file(
-            "wrappers/NftV1Item.gen",
-            include_str!("testdata/toncenter_v3_actions/wrappers/NftV1Item.gen.tolk"),
-        )
-}
-
-fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {
-    let value = extract_marker_value(output, marker);
-    let address = value
-        .split_once(" (")
-        .map_or(value.as_str(), |(address, _)| address);
-    Addr::parse(address)
-        .unwrap_or_else(|error| panic!("Invalid address `{value}` printed for {marker}: {error}"))
-        .to_string()
-}
-
 #[test]
 fn localnet_v3_indexes_real_jetton_actions() {
-    let project = ProjectBuilder::new("localnet-v3-real-jetton-actions")
-        .contract_from_boc_with_types(
-            "JettonV1Master",
-            include_bytes!("testdata/toncenter_v3_actions/contracts/JettonV1Master.boc").to_vec(),
-            "types/jetton_v1_master.types.tolk",
-        )
-        .contract_from_boc_with_types(
-            "JettonV1Wallet",
-            include_bytes!("testdata/toncenter_v3_actions/contracts/JettonV1Wallet.boc").to_vec(),
-            "types/jetton_v1_wallet.types.tolk",
-        )
-        .file(
-            "types/jetton_v1_master.types",
-            include_str!("testdata/toncenter_v3_actions/types/jetton_v1_master.types.tolk"),
-        )
-        .file(
-            "types/jetton_v1_wallet.types",
-            include_str!("testdata/toncenter_v3_actions/types/jetton_v1_wallet.types.tolk"),
-        )
-        .file(
-            "wrappers/JettonV1Master.gen",
-            include_str!("testdata/toncenter_v3_actions/wrappers/JettonV1Master.gen.tolk"),
-        )
-        .file(
-            "wrappers/JettonV1Wallet.gen",
-            include_str!("testdata/toncenter_v3_actions/wrappers/JettonV1Wallet.gen.tolk"),
-        )
-        .script_file(
-            "jetton",
-            include_str!("testdata/toncenter_v3_actions/jetton.tolk"),
-        )
-        .mapping("@acton", "../lib")
-        .build();
-    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
-        .expect("Failed to write wallets.toml");
-
-    let node = project
-        .localnet()
-        .before_start(super::super::support::project::ActonCommand::build)
-        .args(["--accounts", "deployer"])
-        .start();
-    append_localnet_network(project.path(), &node.base_url());
-
-    let script_output = project
-        .acton()
-        .script("scripts/jetton.tolk")
-        .verify_network("localnet")
-        .run()
-        .success()
-        .get_stdout();
+    let project = jetton_v1_action_project("localnet-v3-real-jetton-actions");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/jetton.tolk");
     let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
     let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
     let jetton_master = extract_canonical_addr_marker(&script_output, "JETTON_MASTER=");
@@ -4473,30 +4385,8 @@ fn localnet_v3_indexes_real_jetton_actions() {
 
 #[test]
 fn localnet_v3_indexes_real_nft_actions() {
-    let project = with_nft_v1_action_fixtures(ProjectBuilder::new("localnet-v3-real-nft-actions"))
-        .script_file(
-            "nft",
-            include_str!("testdata/toncenter_v3_actions/nft.tolk"),
-        )
-        .mapping("@acton", "../lib")
-        .build();
-    fs::write(project.path().join("wallets.toml"), DEPLOYER_WALLET_CONFIG)
-        .expect("Failed to write wallets.toml");
-
-    let node = project
-        .localnet()
-        .before_start(super::super::support::project::ActonCommand::build)
-        .args(["--accounts", "deployer"])
-        .start();
-    append_localnet_network(project.path(), &node.base_url());
-
-    let script_output = project
-        .acton()
-        .script("scripts/nft.tolk")
-        .verify_network("localnet")
-        .run()
-        .success()
-        .get_stdout();
+    let project = nft_v1_action_project("localnet-v3-real-nft-actions");
+    let (node, script_output) = run_localnet_action_project(&project, "scripts/nft.tolk");
     let owner = extract_canonical_addr_marker(&script_output, "OWNER=");
     let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
     let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
@@ -7280,10 +7170,6 @@ fn localnet_supports_utils_detect_and_pack_endpoints() {
     assert_eq!(detect_hash_b64url["result"]["hex"].as_str(), Some(hex_hash));
 
     node.stop();
-}
-
-fn append_localnet_network(project_path: &Path, base_url: &str) {
-    append_custom_localnet_network(project_path, "localnet", base_url);
 }
 
 fn append_custom_localnet_network(project_path: &Path, network_name: &str, base_url: &str) {

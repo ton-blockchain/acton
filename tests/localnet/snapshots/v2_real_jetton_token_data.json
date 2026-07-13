@@ -1,0 +1,86 @@
+{
+  "master": {
+    "current": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "jetton_master",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": null,
+      "owner_address": null,
+      "total_supply": "950",
+      "type": "ext.tokens.jettonMasterData",
+      "wallet_code_present": true
+    },
+    "first_transaction_seqno": 3,
+    "historical_json_rpc": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "jetton_master",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": null,
+      "owner_address": null,
+      "total_supply": "0",
+      "type": "ext.tokens.jettonMasterData",
+      "wallet_code_present": true
+    },
+    "historical_rest": {
+      "balance": null,
+      "collection_address": null,
+      "content_type": "onchain",
+      "contract_type": "jetton_master",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": null,
+      "owner_address": null,
+      "total_supply": "0",
+      "type": "ext.tokens.jettonMasterData",
+      "wallet_code_present": true
+    }
+  },
+  "no_state": {
+    "code": 409,
+    "status": 409
+  },
+  "non_token": {
+    "code": 409,
+    "status": 409
+  },
+  "wallet": {
+    "current": {
+      "balance": "850",
+      "collection_address": null,
+      "content_type": null,
+      "contract_type": "jetton_wallet",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "owner_address": null,
+      "total_supply": null,
+      "type": "ext.tokens.jettonWalletData",
+      "wallet_code_present": true
+    },
+    "first_transaction_seqno": 4,
+    "historical": {
+      "balance": "1000",
+      "collection_address": null,
+      "content_type": null,
+      "contract_type": "jetton_wallet",
+      "domain": null,
+      "mintless_is_claimed": null,
+      "next_item_index": null,
+      "owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
+      "owner_address": null,
+      "total_supply": null,
+      "type": "ext.tokens.jettonWalletData",
+      "wallet_code_present": true
+    }
+  }
+}

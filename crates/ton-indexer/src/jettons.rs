@@ -34,6 +34,11 @@ pub struct JettonWalletData {
     pub jetton_wallet_code: Cell,
 }
 
+#[derive(tvm_ffi::FromStackTuple)]
+struct MintlessClaimData {
+    is_claimed: bool,
+}
+
 #[must_use]
 pub fn get_jetton_data(
     address: String,
@@ -52,6 +57,18 @@ pub fn get_jetton_wallet_data(
     libs: Option<&str>,
 ) -> Option<JettonWalletData> {
     run_get_method(address, code, data, libs, "get_wallet_data").ok()
+}
+
+#[must_use]
+pub fn get_mintless_is_claimed(
+    address: String,
+    code: Cell,
+    data: Cell,
+    libs: Option<&str>,
+) -> Option<bool> {
+    run_get_method::<MintlessClaimData>(address, code, data, libs, "is_claimed")
+        .ok()
+        .map(|data| data.is_claimed)
 }
 
 #[must_use]

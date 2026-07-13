@@ -1,14 +1,14 @@
 use super::toncenter_v2::{
     parse_config_param, parse_i32_seqno, parse_libraries_request, parse_seqno,
     parse_transactions_request, resolve_block_header, resolve_block_transactions,
-    resolve_wallet_information, token_wallet_code_hash,
+    resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
 use crate::localnet::Localnet;
 use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
-use crate::types::{Addr, Hash256};
+use crate::types::Hash256;
 use axum::extract::OriginalUri;
 use axum::response::{IntoResponse, Response};
 use axum::{Json, extract::State, http::StatusCode};
@@ -207,23 +207,7 @@ async fn json_rpc_router(
         }
         "getTokenData" => {
             let req: AddressInformationRequest = parse_params(params, method)?;
-            let _seqno = validate!(parse_seqno(req.seqno));
-            let address = validate!(Addr::parse(&req.address));
-            let mut infos = node.get_address_infos(vec![address]).await?;
-            let info = infos
-                .pop()
-                .ok_or_else(|| anyhow::anyhow!("Address information not found"))?;
-            let jetton_wallet_code_hash = token_wallet_code_hash(node.as_ref(), &info).await;
-            let jetton_wallet_code = match jetton_wallet_code_hash {
-                Some(hash) => node.get_cell_boc(hash).await?,
-                None => None,
-            };
-
-            wire::JsonRpcResult::TokenData(Box::new(
-                v2::map_token_data(&info, jetton_wallet_code.as_ref(), None).ok_or_else(|| {
-                    anyhow::anyhow!("Smart contract {} is not Jetton or NFT", req.address)
-                })?,
-            ))
+            wire::JsonRpcResult::TokenData(Box::new(resolve_token_data(node.as_ref(), &req).await?))
         }
         "getTransactions" => {
             let req: TransactionsRequest = parse_params(params, method)?;

@@ -1,8 +1,61 @@
-use crate::localnet::LocalnetContractData;
+use crate::localnet::{LocalnetAddressInfo, LocalnetContractData};
 use crate::node::Node;
-use crate::storage::{self, AccountStatus, JettonMasterMeta, NftItemMeta};
+use crate::storage::{self, AccountMeta, AccountStatus, JettonMasterMeta, NftItemMeta};
 use crate::types::{Addr, BocBytes, Hash256};
 use tycho_types::boc::Boc;
+use tycho_types::cell::Cell;
+
+struct ActiveContractState {
+    code_hash: Hash256,
+    data_hash: Hash256,
+    code: Cell,
+    data: Cell,
+    libs: Option<String>,
+    last_transaction_lt: u64,
+}
+
+fn detect_dns_record(
+    addr: &Addr,
+    nft_item_owner: Option<Addr>,
+    state: &ActiveContractState,
+) -> Option<storage::DnsRecordMeta> {
+    ton_indexer::contracts::get_dns_data(
+        addr.to_string(),
+        state.code.clone(),
+        state.data.clone(),
+        state.libs.as_deref(),
+    )
+    .map(|dns| storage::DnsRecordMeta {
+        nft_item_address: *addr,
+        nft_item_owner,
+        domain: dns.domain,
+        next_resolver: dns.next_resolver.as_ref().map(Addr::from),
+        wallet: dns.wallet.as_ref().map(Addr::from),
+        site_adnl: dns.site_adnl.map(Hash256::from),
+        storage_bag_id: dns.storage_bag_id.map(Hash256::from),
+    })
+}
+
+fn detect_nft_collection(
+    addr: &Addr,
+    state: &ActiveContractState,
+) -> Option<storage::NftCollectionMeta> {
+    ton_indexer::nfts::get_nft_collection_data(
+        addr.to_string(),
+        state.code.clone(),
+        state.data.clone(),
+        state.libs.as_deref(),
+    )
+    .map(|collection| storage::NftCollectionMeta {
+        address: *addr,
+        owner_address: collection.owner_address.as_ref().map(Addr::from),
+        last_transaction_lt: state.last_transaction_lt,
+        next_item_index: collection.next_item_index.to_string(),
+        collection_content: ton_indexer::nfts::parse_nft_content(collection.collection_content),
+        data_hash: state.data_hash,
+        code_hash: state.code_hash,
+    })
+}
 
 impl Node {
     pub(crate) fn detect_contract_data(
@@ -10,60 +63,26 @@ impl Node {
         addr: &Addr,
     ) -> anyhow::Result<LocalnetContractData> {
         let _ = self.get_address_information(addr);
-        let Some(meta) = self.latest.accounts.get(addr).cloned() else {
+        let meta = self.latest.accounts.get(addr).cloned();
+        let Some(state) = self.load_active_contract_state(meta.as_ref())? else {
             return Ok(LocalnetContractData::default());
         };
-        if meta.status != AccountStatus::Active {
-            return Ok(LocalnetContractData::default());
-        }
-        let (Some(code_hash), Some(data_hash)) = (meta.code_hash, meta.data_hash) else {
-            return Ok(LocalnetContractData::default());
-        };
-        let (Some(code_boc), Some(data_boc)) = (self.cas.get(&code_hash), self.cas.get(&data_hash))
-        else {
-            return Ok(LocalnetContractData::default());
-        };
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-        let libs = self.build_vm_global_libs_boc()?.map(|boc| boc.to_base64());
-        let last_transaction_lt = meta.last_trans_lt.unwrap_or_default();
-        let address = addr.to_string();
-
-        let dns = ton_indexer::contracts::get_dns_data(
-            address.clone(),
-            code.clone(),
-            data.clone(),
-            libs.as_deref(),
-        )
-        .map(|dns| storage::DnsRecordMeta {
-            nft_item_address: *addr,
-            nft_item_owner: self
-                .history
-                .nft_items
-                .get(addr)
-                .and_then(|item| item.owner_address),
-            domain: dns.domain,
-            next_resolver: dns.next_resolver.as_ref().map(Addr::from),
-            wallet: dns.wallet.as_ref().map(Addr::from),
-            site_adnl: dns.site_adnl.map(Hash256::from),
-            storage_bag_id: dns.storage_bag_id.map(Hash256::from),
-        });
-
-        let nft_collection = ton_indexer::nfts::get_nft_collection_data(
-            address.clone(),
-            code.clone(),
-            data.clone(),
-            libs.as_deref(),
-        )
-        .map(|collection| storage::NftCollectionMeta {
-            address: *addr,
-            owner_address: collection.owner_address.as_ref().map(Addr::from),
-            last_transaction_lt,
-            next_item_index: collection.next_item_index.to_string(),
-            collection_content: ton_indexer::nfts::parse_nft_content(collection.collection_content),
-            data_hash,
+        let nft_item_owner = self
+            .history
+            .nft_items
+            .get(addr)
+            .and_then(|item| item.owner_address);
+        let dns = detect_dns_record(addr, nft_item_owner, &state);
+        let nft_collection = detect_nft_collection(addr, &state);
+        let ActiveContractState {
             code_hash,
-        });
+            data_hash,
+            code,
+            data,
+            libs,
+            last_transaction_lt,
+        } = state;
+        let address = addr.to_string();
 
         let nft_sale = ton_indexer::contracts::get_fixed_price_sale_v4_data(
             address.clone(),
@@ -333,9 +352,18 @@ impl Node {
     }
 
     pub(crate) fn detect_assets(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        self.detect_jetton_masters(addr)?;
-        self.detect_jetton_wallets(addr)?;
-        self.detect_nft_items(addr)?;
+        let meta = self.latest.accounts.get(addr).cloned();
+        let info = self.detect_assets_for_account(addr, meta.as_ref())?;
+
+        if let Some(master) = info.jetton_master {
+            self.history.jetton_masters.insert(*addr, master);
+        }
+        if let Some(wallet) = info.jetton_wallet {
+            self.history.jetton_wallets.insert(*addr, wallet);
+        }
+        if let Some(item) = info.nft_item {
+            self.history.nft_items.insert(*addr, item);
+        }
         Ok(())
     }
 
@@ -346,156 +374,129 @@ impl Node {
         self.history.asset_detection_checked.remove(addr);
     }
 
-    pub(crate) fn detect_jetton_wallets(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some((code_hash, data_hash, last_transaction_lt)) =
-            self.latest.accounts.get(addr).and_then(|meta| {
-                if meta.status != AccountStatus::Active {
-                    return None;
-                }
-                Some((
-                    meta.code_hash?,
-                    meta.data_hash?,
-                    meta.last_trans_lt.unwrap_or(0),
-                ))
-            })
-        else {
-            return Ok(());
+    pub(crate) fn detect_assets_for_account(
+        &mut self,
+        addr: &Addr,
+        meta: Option<&AccountMeta>,
+    ) -> anyhow::Result<LocalnetAddressInfo> {
+        let mut info = LocalnetAddressInfo {
+            address: *addr,
+            code_hash: meta.and_then(|meta| meta.code_hash),
+            dns: None,
+            jetton_wallet: None,
+            jetton_master: None,
+            nft_item: None,
+            nft_collection: None,
+        };
+        let Some(state) = self.load_active_contract_state(meta)? else {
+            return Ok(info);
         };
 
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-        let libs = self.build_vm_global_libs_boc()?.map(|boc| boc.to_base64());
-
-        if let Some(wallet_data) = ton_indexer::jettons::get_jetton_wallet_data(
-            addr.to_string(),
-            code,
-            data,
-            libs.as_deref(),
+        let address = addr.to_string();
+        if let Some(jetton_data) = ton_indexer::jettons::get_jetton_data(
+            address.clone(),
+            state.code.clone(),
+            state.data.clone(),
+            state.libs.as_deref(),
         ) {
-            let wallet_meta = storage::JettonWalletMeta {
-                address: *addr,
-                balance: wallet_data.balance.to_str_radix(10).parse().unwrap_or(0),
-                code_hash,
-                data_hash,
-                jetton_address: Addr::from(&wallet_data.jetton_master_address),
-                last_transaction_lt,
-                owner_address: Addr::from(&wallet_data.owner_address),
-            };
-
-            self.history.jetton_wallets.insert(*addr, wallet_meta);
-        }
-
-        Ok(())
-    }
-
-    fn detect_jetton_masters(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some((code_hash, data_hash, last_transaction_lt)) =
-            self.latest.accounts.get(addr).and_then(|meta| {
-                if meta.status != AccountStatus::Active {
-                    return None;
-                }
-                Some((
-                    meta.code_hash?,
-                    meta.data_hash?,
-                    meta.last_trans_lt.unwrap_or(0),
-                ))
-            })
-        else {
-            return Ok(());
-        };
-
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-        let libs = self.build_vm_global_libs_boc()?.map(|boc| boc.to_base64());
-
-        if let Some(jetton_data) =
-            ton_indexer::jettons::get_jetton_data(addr.to_string(), code, data, libs.as_deref())
-        {
-            let wallet_code_hash = Hash256::from(jetton_data.jetton_wallet_code.repr_hash());
-            let wallet_code = BocBytes::from(Boc::encode(jetton_data.jetton_wallet_code.clone()));
-            self.cas.put(wallet_code, wallet_code_hash);
-            let jetton_content = ton_indexer::jettons::resolve_jetton_content(
-                ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
-            );
-
-            let master_meta = JettonMasterMeta {
+            let wallet_code_hash = self.cas.put_cell(jetton_data.jetton_wallet_code);
+            info.jetton_master = Some(JettonMasterMeta {
                 address: *addr,
                 admin_address: jetton_data.admin_address.as_ref().map(Addr::from),
-                code_hash,
-                data_hash,
-                jetton_content,
+                code_hash: state.code_hash,
+                data_hash: state.data_hash,
+                jetton_content: ton_indexer::jettons::resolve_jetton_content(
+                    ton_indexer::jettons::parse_jetton_content(jetton_data.jetton_content),
+                ),
                 jetton_wallet_code_hash: wallet_code_hash,
-                last_transaction_lt,
+                last_transaction_lt: state.last_transaction_lt,
                 mintable: jetton_data.mintable,
                 total_supply: jetton_data
                     .total_supply
                     .to_str_radix(10)
                     .parse()
-                    .unwrap_or(0),
-            };
-
-            self.history.jetton_masters.insert(*addr, master_meta);
+                    .unwrap_or_default(),
+            });
         }
 
-        Ok(())
-    }
-
-    fn detect_nft_items(&mut self, addr: &Addr) -> anyhow::Result<()> {
-        let Some(meta) = self.latest.accounts.get(addr) else {
-            return Ok(());
-        };
-
-        if meta.status != AccountStatus::Active {
-            return Ok(());
-        }
-
-        let Some(code_hash) = meta.code_hash else {
-            return Ok(());
-        };
-        let Some(data_hash) = meta.data_hash else {
-            return Ok(());
-        };
-
-        let Some(code_boc) = self.cas.get(&code_hash) else {
-            return Ok(());
-        };
-        let Some(data_boc) = self.cas.get(&data_hash) else {
-            return Ok(());
-        };
-
-        let code = Boc::decode(&code_boc)?;
-        let data = Boc::decode(&data_boc)?;
-
-        if let Some(nft_data) = ton_indexer::nfts::get_nft_item_data(addr.to_string(), code, data) {
-            let nft_meta = NftItemMeta {
+        if let Some(wallet_data) = ton_indexer::jettons::get_jetton_wallet_data(
+            address.clone(),
+            state.code.clone(),
+            state.data.clone(),
+            state.libs.as_deref(),
+        ) {
+            let mintless_is_claimed = ton_indexer::jettons::get_mintless_is_claimed(
+                address.clone(),
+                state.code.clone(),
+                state.data.clone(),
+                state.libs.as_deref(),
+            );
+            let wallet_code_hash = self.cas.put_cell(wallet_data.jetton_wallet_code);
+            info.jetton_wallet = Some(storage::JettonWalletMeta {
                 address: *addr,
-                code_hash,
-                data_hash,
+                balance: wallet_data
+                    .balance
+                    .to_str_radix(10)
+                    .parse()
+                    .unwrap_or_default(),
+                code_hash: state.code_hash,
+                data_hash: state.data_hash,
+                jetton_address: Addr::from(&wallet_data.jetton_master_address),
+                jetton_wallet_code_hash: wallet_code_hash,
+                last_transaction_lt: state.last_transaction_lt,
+                mintless_is_claimed,
+                owner_address: Addr::from(&wallet_data.owner_address),
+            });
+        }
+
+        if let Some(nft_data) =
+            ton_indexer::nfts::get_nft_item_data(address, state.code.clone(), state.data.clone())
+        {
+            info.nft_item = Some(NftItemMeta {
+                address: *addr,
+                code_hash: state.code_hash,
+                data_hash: state.data_hash,
                 collection_address: nft_data.collection_address.as_ref().map(Addr::from),
                 owner_address: nft_data.owner_address.as_ref().map(Addr::from),
                 content: ton_indexer::nfts::parse_nft_content(nft_data.individual_content),
                 index: nft_data.index.to_str_radix(10),
                 init: nft_data.init,
-                last_transaction_lt: meta.last_trans_lt.unwrap_or(0),
-            };
-
-            self.history.nft_items.insert(*addr, nft_meta);
+                last_transaction_lt: state.last_transaction_lt,
+            });
         }
 
-        Ok(())
+        info.nft_collection = detect_nft_collection(addr, &state);
+        info.dns = detect_dns_record(
+            addr,
+            info.nft_item.as_ref().and_then(|item| item.owner_address),
+            &state,
+        );
+
+        Ok(info)
+    }
+
+    fn load_active_contract_state(
+        &mut self,
+        meta: Option<&AccountMeta>,
+    ) -> anyhow::Result<Option<ActiveContractState>> {
+        let Some(meta) = meta.filter(|meta| meta.status == AccountStatus::Active) else {
+            return Ok(None);
+        };
+        let (Some(code_hash), Some(data_hash)) = (meta.code_hash, meta.data_hash) else {
+            return Ok(None);
+        };
+        let (Some(code_boc), Some(data_boc)) = (self.cas.get(&code_hash), self.cas.get(&data_hash))
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(ActiveContractState {
+            code_hash,
+            data_hash,
+            code: Boc::decode(&code_boc)?,
+            data: Boc::decode(&data_boc)?,
+            libs: self.build_vm_global_libs_boc()?.map(|boc| boc.to_base64()),
+            last_transaction_lt: meta.last_trans_lt.unwrap_or_default(),
+        }))
     }
 }
