@@ -43,15 +43,6 @@ This page tracks TonCenter v2, v3, Streaming API v2, and Emulate API coverage in
 | `POST` | `/api/v2/runGetMethod`                  | ✅                       | Run get method                      |
 | `POST` | `/api/v2/runGetMethodStd`               | ✅                       | Run get method with std stack       |
 
-`/api/v2/getShardAccountCell` accepts `address` and optional `seqno`, and returns
-a TonCenter `tvm.cell` object with base64-encoded BOC bytes. The same method is
-also available through the v2 JSON-RPC entrypoints: `POST /api/v2` and
-`POST /api/v2/jsonRPC`.
-
-`/api/v2/sendBoc`, `/api/v2/sendBocReturnHash`, and the v2 JSON-RPC `sendBoc`
-methods accept external-in messages only. Use `/acton_sendInternalMessage` for
-local development flows that need to inject a raw internal message.
-
 ## TonCenter v3 Coverage Matrix
 
 The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI specification.
@@ -82,12 +73,11 @@ The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI spec
 | `GET`  | `/api/v3/nft/items`                      | ✅                       | Returns NFT items with optional filters, pagination, and metadata.   |
 | `GET`  | `/api/v3/actions`                        | ❌                       | Returns classified actions.                                          |
 | `GET`  | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
-| `POST` | `/api/v3/decode`                         | ❌                       | Decodes message bodies.                                              |
 | `GET`  | `/api/v3/dns/records`                    | ✅                       | Returns DNS records.                                                 |
 | `GET`  | `/api/v3/jetton/burns`                   | ✅                       | Returns jetton burns.                                                |
 | `GET`  | `/api/v3/jetton/transfers`               | ✅                       | Returns jetton transfers.                                            |
-| `GET`  | `/api/v3/masterchainBlockShardState`     | ❌                       | Returns shard state for a masterchain block.                         |
-| `GET`  | `/api/v3/masterchainBlockShards`         | ❌                       | Returns shards referenced by a masterchain block.                    |
+| `GET`  | `/api/v3/masterchainBlockShardState`     | ✅                       | Returns shard state for a masterchain block.                         |
+| `GET`  | `/api/v3/masterchainBlockShards`         | ✅                       | Returns shards referenced by a masterchain block.                    |
 | `GET`  | `/api/v3/multisig/orders`                | ✅                       | Returns multisig orders.                                             |
 | `GET`  | `/api/v3/multisig/wallets`               | ✅                       | Returns multisig wallets.                                            |
 | `GET`  | `/api/v3/nft/collections`                | ✅                       | Returns NFT collections.                                             |
@@ -96,9 +86,6 @@ The matrix below tracks all endpoints from the current TonCenter v3 OpenAPI spec
 | `GET`  | `/api/v3/pendingActions`                 | ✅                       | Returns an empty pending-actions collection.                         |
 | `GET`  | `/api/v3/pendingTraces`                  | ✅                       | Returns an empty pending-traces collection.                          |
 | `GET`  | `/api/v3/vesting`                        | ✅                       | Returns vesting contract state.                                      |
-
-`/api/v3/message` accepts external-in messages only. Use
-`/acton_sendInternalMessage` to inject a raw internal message in local tooling.
 
 `/api/v3/multisig/orders?parse_actions=true` decodes order action envelopes,
 destinations, values, send modes, and `multisig_update_params`. Other embedded
@@ -126,7 +113,3 @@ used for local indexing.
 |--------|-------------------------------------|-------------------------|------------------------------------------------------------------------------|
 | `POST` | `/api/emulate/v1/emulateTrace`      | ✅                       | Emulates external message execution trace against current state (no commit). |
 | `POST` | `/api/emulate/v1/emulateTonConnect` | ✅                       | Emulates a TON Connect transaction request against the sender wallet state.  |
-
-`include_address_book=true` enriches the response with every address referenced by the trace.
-`include_metadata=true` adds locally indexed jetton and NFT metadata, including referenced jetton
-masters. `include_code_data=true` adds collected code and data cells keyed by their base64 hashes.

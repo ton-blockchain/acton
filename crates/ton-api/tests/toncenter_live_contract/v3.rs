@@ -510,6 +510,29 @@ fn blocks_query_covers_hash_block_ranges_and_sorting() -> Result<()> {
 
 #[test]
 #[ignore = "optional live TonCenter contract test"]
+fn masterchain_block_shard_queries_match_typed_contracts() -> Result<()> {
+    let Some(live) = live()? else { return Ok(()) };
+    let seqno = i32::try_from(fixture(&live)?.transaction.mc_block_seqno)?;
+
+    let _: v3::BlocksResponse = live.get(
+        &live.v3_url,
+        "/masterchainBlockShardState",
+        &v3::MasterchainBlockShardStateQuery { seqno },
+    )?;
+    let _: v3::BlocksResponse = live.get(
+        &live.v3_url,
+        "/masterchainBlockShards",
+        &v3::MasterchainBlockShardsQuery {
+            seqno,
+            limit: Some(10),
+            offset: Some(0),
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
+#[ignore = "optional live TonCenter contract test"]
 fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Result<()> {
     let Some(live) = live()? else { return Ok(()) };
     let transaction = &fixture(&live)?.transaction;

@@ -15,6 +15,11 @@
     "sorted_desc": true
   },
   "bad_requests": {
+    "empty_shard_diff_page": {
+      "code": 404,
+      "has_error": true,
+      "status": 404
+    },
     "invalid_hash": {
       "code": 400,
       "has_error": true,
@@ -25,7 +30,27 @@
       "has_error": true,
       "status": 400
     },
+    "invalid_shard_diff_limit": {
+      "code": 400,
+      "has_error": true,
+      "status": 400
+    },
     "invalid_sort": {
+      "code": 400,
+      "has_error": true,
+      "status": 400
+    },
+    "missing_shard_diff_seqno": {
+      "code": 400,
+      "has_error": true,
+      "status": 400
+    },
+    "missing_shard_state_seqno": {
+      "code": 400,
+      "has_error": true,
+      "status": 400
+    },
+    "negative_shard_state_seqno": {
       "code": 400,
       "has_error": true,
       "status": 400
@@ -39,6 +64,16 @@
       "code": 400,
       "has_error": true,
       "status": 400
+    },
+    "unknown_shard_diff": {
+      "code": 404,
+      "has_error": true,
+      "status": 404
+    },
+    "unknown_shard_state": {
+      "code": 404,
+      "has_error": true,
+      "status": 404
     }
   },
   "filters": {
@@ -171,6 +206,15 @@
       "non_empty": true,
       "sorted_desc": true
     }
+  },
+  "masterchain_shards": {
+    "diff_all_reference_requested_masterchain": true,
+    "diff_all_workchain": true,
+    "diff_count": 1,
+    "state_all_workchain": true,
+    "state_and_diff_same_ids": true,
+    "state_contains_selected_block": true,
+    "state_count": 1
   },
   "mine": {
     "mined_at_least_requested": true,

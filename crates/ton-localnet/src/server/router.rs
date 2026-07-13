@@ -8,7 +8,8 @@ use super::handlers::{
     get_block_transactions, get_block_transactions_ext, get_blocks_v3, get_compiler_abi,
     get_config_all, get_config_param, get_consensus_block, get_dns_records,
     get_extended_address_information, get_jetton_burns, get_jetton_masters, get_jetton_transfers,
-    get_jetton_wallets, get_libraries, get_masterchain_info, get_masterchain_info_v3,
+    get_jetton_wallets, get_libraries, get_masterchain_block_shard_state_v3,
+    get_masterchain_block_shards_v3, get_masterchain_info, get_masterchain_info_v3,
     get_messages_v3, get_metadata_v3, get_multisig_orders, get_multisig_wallets,
     get_nft_collections, get_nft_items, get_nft_sales, get_nft_transfers, get_out_msg_queue_size,
     get_pending_actions_v3, get_pending_traces_v3, get_pending_transactions_v3,
@@ -109,6 +110,14 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .route("/v3/addressInformation", get(get_address_information_v3))
         .route("/v3/walletInformation", get(get_wallet_information_v3))
         .route("/v3/masterchainInfo", get(get_masterchain_info_v3))
+        .route(
+            "/v3/masterchainBlockShardState",
+            get(get_masterchain_block_shard_state_v3),
+        )
+        .route(
+            "/v3/masterchainBlockShards",
+            get(get_masterchain_block_shards_v3),
+        )
         .route("/v3/transactions", get(get_transactions_v3))
         .route("/v3/messages", get(get_messages_v3))
         .route(

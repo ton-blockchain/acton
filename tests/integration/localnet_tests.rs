@@ -6185,6 +6185,20 @@ fn localnet_supports_v3_blocks_endpoint() {
         "/api/v3/blocks?workchain=42&limit=10",
         Duration::from_secs(12),
     );
+    let shard_state_json = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/masterchainBlockShardState?seqno={workchain_mc_seqno}"),
+        Duration::from_secs(12),
+    );
+    let shard_state: toncenter_v3::BlocksResponse =
+        serde_json::from_value(shard_state_json).expect("shard state must match typed response");
+    let shard_diff_json = wait_for_ok_response(
+        &node,
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=10&offset=0"),
+        Duration::from_secs(12),
+    );
+    let shard_diff: toncenter_v3::BlocksResponse =
+        serde_json::from_value(shard_diff_json).expect("shard diff must match typed response");
 
     let (shard_without_workchain_status, shard_without_workchain) =
         node.get_json_with_status("/api/v3/blocks?shard=8000000000000000");
@@ -6195,6 +6209,22 @@ fn localnet_supports_v3_blocks_endpoint() {
     let (invalid_limit_status, invalid_limit) = node.get_json_with_status("/api/v3/blocks?limit=0");
     let (invalid_hash_status, invalid_hash) =
         node.get_json_with_status("/api/v3/blocks?root_hash=not-a-hash");
+    let (missing_shard_state_seqno_status, missing_shard_state_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState");
+    let (negative_shard_state_seqno_status, negative_shard_state_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState?seqno=-1");
+    let (unknown_shard_state_status, unknown_shard_state) =
+        node.get_json_with_status("/api/v3/masterchainBlockShardState?seqno=2147483647");
+    let (missing_shard_diff_seqno_status, missing_shard_diff_seqno) =
+        node.get_json_with_status("/api/v3/masterchainBlockShards");
+    let (invalid_shard_diff_limit_status, invalid_shard_diff_limit) = node.get_json_with_status(
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=0"),
+    );
+    let (empty_shard_diff_page_status, empty_shard_diff_page) = node.get_json_with_status(
+        &format!("/api/v3/masterchainBlockShards?seqno={workchain_mc_seqno}&limit=1&offset=1"),
+    );
+    let (unknown_shard_diff_status, unknown_shard_diff) =
+        node.get_json_with_status("/api/v3/masterchainBlockShards?seqno=2147483647");
 
     let paged_first_blocks = v3_blocks_from_response(&paged_first);
     let paged_second_blocks = v3_blocks_from_response(&paged_second);
@@ -6240,12 +6270,38 @@ fn localnet_supports_v3_blocks_endpoint() {
             "offset_moves_window": paged_first_blocks.first().zip(paged_second_blocks.first())
                 .is_some_and(|(first, second)| !same_block_id(first, second)),
         },
+        "masterchain_shards": {
+            "state_count": shard_state.blocks.len(),
+            "state_all_workchain": shard_state.blocks.iter().all(|block| block.workchain != -1),
+            "state_contains_selected_block": shard_state.blocks.iter().any(|block| {
+                block.workchain == 0 && u64::from(block.seqno) == workchain_seqno
+            }),
+            "diff_count": shard_diff.blocks.len(),
+            "diff_all_workchain": shard_diff.blocks.iter().all(|block| block.workchain != -1),
+            "diff_all_reference_requested_masterchain": shard_diff.blocks.iter().all(|block| {
+                u64::try_from(block.master_ref_seqno).ok() == Some(workchain_mc_seqno)
+            }),
+            "state_and_diff_same_ids": shard_state.blocks.iter().all(|state_block| {
+                shard_diff.blocks.iter().any(|diff_block| {
+                    state_block.workchain == diff_block.workchain
+                        && state_block.shard == diff_block.shard
+                        && state_block.seqno == diff_block.seqno
+                })
+            }),
+        },
         "bad_requests": {
             "shard_without_workchain": v3_bad_request_summary(shard_without_workchain_status, &shard_without_workchain),
             "seqno_without_shard": v3_bad_request_summary(seqno_without_shard_status, &seqno_without_shard),
             "invalid_sort": v3_bad_request_summary(invalid_sort_status, &invalid_sort),
             "invalid_limit": v3_bad_request_summary(invalid_limit_status, &invalid_limit),
             "invalid_hash": v3_bad_request_summary(invalid_hash_status, &invalid_hash),
+            "missing_shard_state_seqno": v3_bad_request_summary(missing_shard_state_seqno_status, &missing_shard_state_seqno),
+            "negative_shard_state_seqno": v3_bad_request_summary(negative_shard_state_seqno_status, &negative_shard_state_seqno),
+            "unknown_shard_state": v3_bad_request_summary(unknown_shard_state_status, &unknown_shard_state),
+            "missing_shard_diff_seqno": v3_bad_request_summary(missing_shard_diff_seqno_status, &missing_shard_diff_seqno),
+            "invalid_shard_diff_limit": v3_bad_request_summary(invalid_shard_diff_limit_status, &invalid_shard_diff_limit),
+            "empty_shard_diff_page": v3_bad_request_summary(empty_shard_diff_page_status, &empty_shard_diff_page),
+            "unknown_shard_diff": v3_bad_request_summary(unknown_shard_diff_status, &unknown_shard_diff),
         },
     });
 

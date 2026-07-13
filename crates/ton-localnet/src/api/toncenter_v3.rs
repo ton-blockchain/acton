@@ -218,7 +218,7 @@ pub fn map_nft_items(items: &[NftItemMeta], sales: &[NftSaleMeta]) -> response::
     map_nft_items_with_metadata(items, sales)
 }
 
-pub fn map_nft_items_with_metadata(
+fn map_nft_items_with_metadata(
     items: &[NftItemMeta],
     sales: &[NftSaleMeta],
 ) -> response::NftItemsResponse {

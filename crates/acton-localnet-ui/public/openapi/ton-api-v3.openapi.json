@@ -1352,6 +1352,121 @@
         }
       }
     },
+    "/api/v3/masterchainBlockShardState": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Get the shard state referenced by a masterchain block. Equivalent to the v2 shards endpoint.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get Masterchain Block Shard State",
+        "operationId": "api_v3_get_masterchainBlockShardState",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Masterchain block seqno.",
+            "name": "seqno",
+            "in": "query",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/BlocksResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          },
+          "404": {
+            "description": "Blocks not found",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
+    "/api/v3/masterchainBlockShards": {
+      "get": {
+        "security": [
+          {
+            "APIKeyHeader": []
+          },
+          {
+            "APIKeyQuery": []
+          }
+        ],
+        "description": "Returns workchain blocks that appeared after the previous masterchain block.",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "tags": ["blockchain"],
+        "summary": "Get Masterchain Block Shards",
+        "operationId": "api_v3_get_masterchainBlockShards",
+        "parameters": [
+          {
+            "type": "integer",
+            "format": "int32",
+            "description": "Masterchain block seqno.",
+            "name": "seqno",
+            "in": "query",
+            "required": true
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 10,
+            "description": "Limit number of queried rows.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0,
+            "default": 0,
+            "description": "Skip first N rows.",
+            "name": "offset",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "schema": {
+              "$ref": "#/definitions/BlocksResponse"
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          },
+          "404": {
+            "description": "Blocks not found",
+            "schema": {
+              "$ref": "#/definitions/RequestError"
+            }
+          }
+        }
+      }
+    },
     "/api/v3/metadata": {
       "get": {
         "security": [

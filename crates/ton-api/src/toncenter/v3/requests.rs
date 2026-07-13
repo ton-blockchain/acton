@@ -5,6 +5,18 @@ use serde_json::Value;
 pub struct MasterchainInfoQuery {}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterchainBlockShardStateQuery {
+    pub seqno: i32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MasterchainBlockShardsQuery {
+    pub seqno: i32,
+    pub limit: Option<i32>,
+    pub offset: Option<i32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressInformationQuery {
     pub address: String,
     pub use_v2: Option<bool>,

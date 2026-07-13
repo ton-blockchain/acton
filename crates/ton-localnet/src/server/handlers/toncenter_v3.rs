@@ -3,6 +3,7 @@ use super::toncenter_enrichment::{
     map_address_book_row, map_address_info,
 };
 use crate::api::{toncenter_emulate, toncenter_v2 as v2, toncenter_v3, toncenter_wallet};
+use crate::error::LocalnetError;
 use crate::localnet;
 use crate::localnet::{
     Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery, LocalnetTransaction,
@@ -29,12 +30,13 @@ use ton_api::toncenter::v3 as v3_types;
 use ton_api::toncenter::v3::requests::{
     AccountStatesQuery, AddressInformationQuery, AddressesQuery, AdjacentTransactionsQuery,
     BlocksQuery, DnsRecordsQuery, EstimateFeeRequest, JettonBurnsQuery, JettonMastersQuery,
-    JettonTransfersQuery, JettonWalletsQuery, MessagesQuery, MultisigOrdersQuery,
-    MultisigWalletsQuery, NftCollectionsQuery, NftItemsQuery, NftSalesQuery, NftTransfersQuery,
-    PendingActionsQuery, PendingTracesQuery, PendingTransactionsQuery, RunGetMethodRequest,
-    SendMessageRequest, StackEntry, TopAccountsByBalanceQuery, TracesQuery,
-    TransactionsByMasterchainBlockQuery, TransactionsByMessageQuery, TransactionsQuery,
-    VestingQuery, WalletInformationQuery, WalletStatesQuery,
+    JettonTransfersQuery, JettonWalletsQuery, MasterchainBlockShardStateQuery,
+    MasterchainBlockShardsQuery, MessagesQuery, MultisigOrdersQuery, MultisigWalletsQuery,
+    NftCollectionsQuery, NftItemsQuery, NftSalesQuery, NftTransfersQuery, PendingActionsQuery,
+    PendingTracesQuery, PendingTransactionsQuery, RunGetMethodRequest, SendMessageRequest,
+    StackEntry, TopAccountsByBalanceQuery, TracesQuery, TransactionsByMasterchainBlockQuery,
+    TransactionsByMessageQuery, TransactionsQuery, VestingQuery, WalletInformationQuery,
+    WalletStatesQuery,
 };
 use toncenter_v3 as v3;
 
@@ -276,6 +278,82 @@ pub async fn get_masterchain_info_v3(State(node): State<Arc<Localnet>>) -> impl 
         Clone::clone,
     )
     .await
+}
+
+pub async fn get_masterchain_block_shard_state_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<MasterchainBlockShardStateQuery>(
+        raw_query.as_deref()
+    ));
+    let seqno = parse!(parse_required_non_negative_u32("seqno", payload.seqno));
+    let shard_ids = match node.get_shards(seqno).await {
+        Ok(shards) => shards,
+        Err(error) => {
+            if matches!(
+                error.downcast_ref::<LocalnetError>(),
+                Some(LocalnetError::BlockNotFound { .. })
+            ) {
+                return request_error(StatusCode::NOT_FOUND, "blocks not found");
+            }
+            return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    };
+    let blocks = match node.get_blocks().await {
+        Ok(blocks) => blocks,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let shard_ids = shard_ids
+        .into_iter()
+        .map(|block| (block.workchain, block.shard, block.seqno))
+        .collect::<HashSet<_>>();
+    let mut blocks = blocks
+        .into_iter()
+        .filter(|block| shard_ids.contains(&(block.workchain, block.shard, block.seqno)))
+        .collect::<Vec<_>>();
+    blocks.sort_by_key(|block| (block.workchain, block.shard, block.seqno));
+    if blocks.is_empty() {
+        return request_error(StatusCode::NOT_FOUND, "blocks not found");
+    }
+
+    (StatusCode::OK, Json(v3::map_blocks_response(&blocks))).into_response()
+}
+
+pub async fn get_masterchain_block_shards_v3(
+    State(node): State<Arc<Localnet>>,
+    RawQuery(raw_query): RawQuery,
+) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<MasterchainBlockShardsQuery>(
+        raw_query.as_deref()
+    ));
+    let seqno = parse!(parse_required_non_negative_u32("seqno", payload.seqno));
+    let (limit, offset) = parse!(parse_limit_offset_with(
+        payload.limit,
+        payload.offset,
+        10,
+        1000,
+    ));
+    let blocks = match node.get_blocks().await {
+        Ok(blocks) => blocks,
+        Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    };
+    let mut blocks = blocks
+        .into_iter()
+        .filter(|block| {
+            block
+                .masterchain_block_ref
+                .as_ref()
+                .is_some_and(|masterchain| masterchain.seqno == seqno)
+        })
+        .collect::<Vec<_>>();
+    blocks.sort_by_key(|block| (block.workchain, block.shard, block.seqno));
+    let blocks = paginate(blocks, limit, offset);
+    if blocks.is_empty() {
+        return request_error(StatusCode::NOT_FOUND, "blocks not found");
+    }
+
+    (StatusCode::OK, Json(v3::map_blocks_response(&blocks))).into_response()
 }
 
 pub async fn get_address_book_v3(
