@@ -1,0 +1,30 @@
+{
+  "created": {
+    "ok": true,
+    "result": {
+      "block_seqno": 0,
+      "name": "stable"
+    }
+  },
+  "failed_import": {
+    "code": 500,
+    "reported_error": true,
+    "status": 500
+  },
+  "list_after_failure": {
+    "ok": true,
+    "result": [
+      {
+        "block_seqno": 0,
+        "name": "stable"
+      }
+    ]
+  },
+  "reverted_original": {
+    "ok": true,
+    "result": {
+      "block_seqno": 0,
+      "name": "stable"
+    }
+  }
+}

@@ -442,9 +442,9 @@ coverage is high.
 1. **CTL-01, snapshot atomicity:** `apply_snapshot` replaces persistence and mutates in-memory
    state before final config/library validation. Failure can leave the running node partially
    restored.
-2. **CTL-02, force snapshot/import:** an existing snapshot is deleted before the replacement
-   snapshot is successfully built or read. Imported bytes are not semantically validated until a
-   later revert.
+2. **CTL-02, force snapshot/import (partially fixed):** an existing snapshot is retained until its
+   replacement is successfully built or read. Imported bytes are still not semantically validated
+   until a later revert.
 3. **CTL-03, mine resource bound:** `blocks: u32` is unbounded and feeds both
    `Vec::with_capacity` and a proportional loop.
 4. **CTL-04, source import escape:** bundle entry paths are checked, but absolute/canonicalized

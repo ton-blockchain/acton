@@ -119,3 +119,48 @@ fn build_source_trace_validates_bundle_and_paths() {
 
     node.stop();
 }
+
+#[test]
+fn failed_forced_snapshot_import_preserves_existing_recovery_point() {
+    let project = ProjectBuilder::new("localnet-force-import-atomicity").build();
+    let node = project.localnet().args(["--no-mining"]).start();
+    let created = node.post_json("/acton_snapshot", &json!({ "name": "stable" }));
+    let missing_path = project.path().join("missing-snapshot.json");
+
+    let (status, error): (u16, TonlibErrorResponse) = node.post_json_with_status_as(
+        "/acton_importSnapshot",
+        &json!({
+            "name": "stable",
+            "path": missing_path.display().to_string(),
+            "force": true,
+        }),
+    );
+    let listed = node.post_json("/acton_listSnapshots", &json!({}));
+    let reverted = node.post_json("/acton_revert", &json!({ "name": "stable" }));
+
+    let summary = json!({
+        "created": {
+            "ok": created["ok"],
+            "result": created["result"],
+        },
+        "failed_import": {
+            "status": status,
+            "code": error.code,
+            "reported_error": !error.error.is_empty(),
+        },
+        "list_after_failure": {
+            "ok": listed["ok"],
+            "result": listed["result"],
+        },
+        "reverted_original": {
+            "ok": reverted["ok"],
+            "result": reverted["result"],
+        },
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/acton_force_import_is_atomic.json"),
+    );
+
+    node.stop();
+}

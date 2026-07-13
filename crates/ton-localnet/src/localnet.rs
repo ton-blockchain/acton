@@ -706,9 +706,9 @@ impl RecoveryPoints {
         force: bool,
     ) -> anyhow::Result<LocalnetRecoveryPointResult> {
         let name = normalize_recovery_point_name(name)?;
-        self.remove_existing_name(&name, force)?;
+        let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = node.build_snapshot()?;
-        self.push_snapshot(snapshot, name)
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 
     fn import(
@@ -718,22 +718,28 @@ impl RecoveryPoints {
         force: bool,
     ) -> anyhow::Result<LocalnetRecoveryPointResult> {
         let name = normalize_recovery_point_name(name)?;
-        self.remove_existing_name(&name, force)?;
+        let replacement_index = self.replacement_index(&name, force)?;
         let snapshot = read_snapshot_from_path(path)?;
-        self.push_snapshot(snapshot, name)
+        Ok(self.store_snapshot(snapshot, name, replacement_index))
     }
 
-    fn push_snapshot(
+    fn store_snapshot(
         &mut self,
         snapshot: NodeStateSnapshot,
         name: String,
-    ) -> anyhow::Result<LocalnetRecoveryPointResult> {
+        replacement_index: Option<usize>,
+    ) -> LocalnetRecoveryPointResult {
         let block_seqno = snapshot.globals.head_seqno;
-        self.points.push(RecoveryPoint {
+        let point = RecoveryPoint {
             name: name.clone(),
             snapshot,
-        });
-        Ok(LocalnetRecoveryPointResult { name, block_seqno })
+        };
+        if let Some(index) = replacement_index {
+            self.points[index] = point;
+        } else {
+            self.points.push(point);
+        }
+        LocalnetRecoveryPointResult { name, block_seqno }
     }
 
     fn list(&self) -> Vec<LocalnetRecoveryPointResult> {
@@ -769,15 +775,12 @@ impl RecoveryPoints {
         self.points.clear();
     }
 
-    fn remove_existing_name(&mut self, name: &str, force: bool) -> anyhow::Result<()> {
-        let Some(index) = self.points.iter().position(|point| point.name == name) else {
-            return Ok(());
-        };
-        if !force {
+    fn replacement_index(&self, name: &str, force: bool) -> anyhow::Result<Option<usize>> {
+        let index = self.points.iter().position(|point| point.name == name);
+        if index.is_some() && !force {
             anyhow::bail!("Recovery point name {name} already exists");
         }
-        self.points.remove(index);
-        Ok(())
+        Ok(index)
     }
 
     fn find_index(&self, name: &str) -> anyhow::Result<usize> {
