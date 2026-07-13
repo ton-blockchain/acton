@@ -2558,33 +2558,58 @@ fn handle_get_jetton_wallets(
         })
         .map(|(id, wallet)| (id, wallet.clone()))
         .collect::<Vec<_>>();
-    wallets.sort_by(|(left_id, left), (right_id, right)| {
-        let compare_sort_column = || match query.sort {
-            Some(LocalnetSortOrder::Asc) => left.balance.cmp(&right.balance),
-            Some(LocalnetSortOrder::Desc) => right.balance.cmp(&left.balance),
-            None => left_id.cmp(right_id),
-        };
-
-        if query.jetton_addresses.len() == 1 {
-            left.jetton_address
-                .cmp(&right.jetton_address)
-                .then_with(compare_sort_column)
-        } else if !query.owner_addresses.is_empty() {
-            left.owner_address
-                .cmp(&right.owner_address)
-                .then_with(compare_sort_column)
-        } else if !query.addresses.is_empty() {
-            left.address.cmp(&right.address)
-        } else {
-            compare_sort_column()
+    match query.sort {
+        Some(LocalnetSortOrder::Asc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                left.balance.cmp(&right.balance)
+            });
         }
-    });
+        Some(LocalnetSortOrder::Desc) => {
+            sort_jetton_wallets(&mut wallets, &query, |(_, left), (_, right)| {
+                right.balance.cmp(&left.balance)
+            });
+        }
+        None => {
+            sort_jetton_wallets(&mut wallets, &query, |(left_id, _), (right_id, _)| {
+                left_id.cmp(right_id)
+            });
+        }
+    }
     Ok(wallets
         .into_iter()
         .skip(query.offset)
         .take(query.limit)
         .map(|(_, wallet)| wallet)
         .collect())
+}
+
+fn sort_jetton_wallets(
+    wallets: &mut [(usize, storage::JettonWalletMeta)],
+    query: &ParsedJettonWalletsQuery,
+    compare_sort_column: impl Fn(
+        &(usize, storage::JettonWalletMeta),
+        &(usize, storage::JettonWalletMeta),
+    ) -> std::cmp::Ordering,
+) {
+    if query.jetton_addresses.len() == 1 {
+        wallets.sort_by(|left, right| {
+            left.1
+                .jetton_address
+                .cmp(&right.1.jetton_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.owner_addresses.is_empty() {
+        wallets.sort_by(|left, right| {
+            left.1
+                .owner_address
+                .cmp(&right.1.owner_address)
+                .then_with(|| compare_sort_column(left, right))
+        });
+    } else if !query.addresses.is_empty() {
+        wallets.sort_by_key(|(_, wallet)| wallet.address);
+    } else {
+        wallets.sort_by(compare_sort_column);
+    }
 }
 
 fn handle_get_nft_items(
