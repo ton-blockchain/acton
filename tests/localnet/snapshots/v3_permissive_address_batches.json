@@ -1,0 +1,17 @@
+{
+  "address_book_keys": [
+    "0:0000000000000000000000000000000000000000000000000000000000000000",
+    "not-an-address"
+  ],
+  "invalid": {
+    "domain": null,
+    "interfaces": [],
+    "user_friendly": null
+  },
+  "metadata": {},
+  "valid": {
+    "domain": null,
+    "has_user_friendly": true,
+    "interfaces": []
+  }
+}

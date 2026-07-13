@@ -370,10 +370,13 @@ pub async fn get_address_book_v3(
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
-    let addresses = parse!(parse_requested_addresses(payload.address));
+    let addresses = parse!(parse_permissive_addresses(payload.address));
     let infos = match load_address_infos(
         node.as_ref(),
-        addresses.iter().map(|(_, address)| *address).collect(),
+        addresses
+            .iter()
+            .filter_map(|(_, address)| *address)
+            .collect(),
     )
     .await
     {
@@ -384,8 +387,20 @@ pub async fn get_address_book_v3(
     let address_book = addresses
         .into_iter()
         .map(|(requested, address)| {
-            let info = infos.get(&address).cloned().unwrap_or_default();
-            (requested, map_address_book_row(address, &info))
+            let row = match address {
+                Some(address) => {
+                    let info = infos.get(&address).cloned().unwrap_or_default();
+                    let mut row = map_address_book_row(address, &info);
+                    row.interfaces.get_or_insert_default();
+                    row
+                }
+                None => v3_types::AddressBookRow {
+                    user_friendly: None,
+                    domain: None,
+                    interfaces: Some(Vec::new()),
+                },
+            };
+            (requested, row)
         })
         .collect::<v3_types::AddressBook>();
 
@@ -397,8 +412,11 @@ pub async fn get_metadata_v3(
     RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<AddressesQuery>(raw_query.as_deref()));
-    let addresses = parse!(parse_requested_addresses(payload.address));
-    let addresses = addresses.into_iter().map(|(_, address)| address).collect();
+    let addresses = parse!(parse_permissive_addresses(payload.address));
+    let addresses = addresses
+        .into_iter()
+        .filter_map(|(_, address)| address)
+        .collect();
     match build_metadata_for_addresses(node.as_ref(), addresses).await {
         Ok(metadata) => (StatusCode::OK, Json(metadata)).into_response(),
         Err(e) => request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -2546,14 +2564,17 @@ fn parse_required_addresses(values: Vec<String>) -> anyhow::Result<Vec<Addr>> {
         .collect()
 }
 
-fn parse_requested_addresses(values: Vec<String>) -> anyhow::Result<Vec<(String, Addr)>> {
+fn parse_permissive_addresses(values: Vec<String>) -> anyhow::Result<Vec<(String, Option<Addr>)>> {
     if values.is_empty() {
         anyhow::bail!("at least 1 address required");
     }
-    values
+    Ok(values
         .into_iter()
-        .map(|value| Addr::parse(&value).map(|address| (value, address)))
-        .collect()
+        .map(|value| {
+            let address = Addr::parse(&value).ok();
+            (value, address)
+        })
+        .collect())
 }
 
 fn parse_opcode(opcode: &str) -> anyhow::Result<u32> {

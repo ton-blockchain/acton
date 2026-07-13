@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 11 | 5 | 8 |
-| High | 13 | 5 | 19 |
+| High | 14 | 5 | 18 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **24** | **11** | **30** |
+| **Total** | **25** | **11** | **29** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -296,8 +296,8 @@ coverage is high.
 |---|---|---|---|
 | `GET /api/v3/traces` | Critical | B | No-filter listing, end-based ranges/order, mc block existence, branched/multi-block identity and summaries. |
 | `GET /api/v3/accountStates` | High | B | Missing-row cardinality, contract methods, `code_hash`, frozen details, extra currencies. |
-| `GET /api/v3/addressBook` | Medium | C | Invalid input preservation, DNS names, interface variants, repeated spelling forms. |
-| `GET /api/v3/metadata` | High | C | On/off-chain variants, merge precedence/completeness, invalid addresses, destroyed contracts. |
+| `GET /api/v3/addressBook` | Medium | C | Mixed valid/invalid batches preserve requested keys with the production null/empty row shape; add DNS names, friendly-address flag variants, and repeated spelling forms. |
+| `GET /api/v3/metadata` | High | C | Invalid addresses are ignored in mixed batches; add on/off-chain variants, merge precedence/completeness, and destroyed contracts. |
 | `GET /api/v3/addressInformation` | Medium | B | `use_v2`, frozen/nonexistent sources, status parity and historical behavior. |
 | `GET /api/v3/walletInformation` | High | B | Active non-wallet 409, all wallet versions, malformed data and optional fields. |
 | `GET /api/v3/masterchainInfo` | High | C | Exact block header fields, genesis/head zero and forked history. |
@@ -381,8 +381,9 @@ coverage is high.
     unfiltered NFT collections and multisig rows use first transaction LT plus address as the
     local stable equivalent of upstream insertion ID. Later contract updates no longer reorder
     multisig pages, and filtered NFT collection queries do not invent an upstream-absent order.
-18. **V3-18, address book/metadata invalid input:** local rejects the whole request. Upstream keeps
-    invalid address-book keys with null data and silently ignores invalid metadata addresses.
+18. **V3-18, address book/metadata invalid input (fixed):** mixed batches retain every requested
+    address-book key; invalid keys have null user-friendly/domain fields and empty interfaces,
+    matching the production API. Metadata silently ignores invalid addresses.
 19. **V3-19, address/wallet information (partial):** both handlers still parse and ignore `use_v2`.
     Active non-wallet accounts now return upstream 409.
 20. **V3-20, errors:** backend errors collapse to 500 and parser errors generally use 400 instead

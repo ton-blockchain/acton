@@ -9,6 +9,45 @@ use tycho_types::cell::Cell;
 const ZERO_ADDRESS: &str = "0:0000000000000000000000000000000000000000000000000000000000000000";
 
 #[test]
+fn address_book_and_metadata_accept_mixed_address_batches() {
+    let project = ProjectBuilder::new("localnet-v3-permissive-address-batches").build();
+    let node = project.localnet().start();
+    let invalid = "not-an-address";
+
+    let address_book: responses::AddressBook = node.get_json_as(&format!(
+        "/api/v3/addressBook?address={ZERO_ADDRESS}&address={invalid}"
+    ));
+    let metadata: responses::Metadata = node.get_json_as(&format!(
+        "/api/v3/metadata?address={invalid}&address={ZERO_ADDRESS}"
+    ));
+    let valid_row = address_book
+        .get(ZERO_ADDRESS)
+        .expect("valid address must remain in the address book");
+    let invalid_row = address_book
+        .get(invalid)
+        .expect("invalid requested key must remain in the address book");
+    let mut address_book_keys = address_book.keys().collect::<Vec<_>>();
+    address_book_keys.sort_unstable();
+    let summary = json!({
+        "address_book_keys": address_book_keys,
+        "invalid": invalid_row,
+        "valid": {
+            "has_user_friendly": valid_row.user_friendly.is_some(),
+            "domain": &valid_row.domain,
+            "interfaces": &valid_row.interfaces,
+        },
+        "metadata": metadata,
+    });
+
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v3_permissive_address_batches.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
 fn collection_endpoints_deserialize_empty_responses() {
     let project = ProjectBuilder::new("localnet-v3-empty-collection-responses").build();
     let node = project.localnet().start();
