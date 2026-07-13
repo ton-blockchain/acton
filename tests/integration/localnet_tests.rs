@@ -1,5 +1,8 @@
 use crate::common::{assertion, strip_ansi};
 use crate::support::TestOutputExt;
+use crate::support::localnet::{
+    assert_v3_bad_request, is_success_response, pretty_json_for_snapshot, response_payload,
+};
 use crate::support::project::ProjectBuilder;
 use crate::support::snapshots::normalize_output_preserve_escapes;
 use acton::wallets;
@@ -19,6 +22,8 @@ use ton::ton_core::types::TonAddress;
 use ton::ton_wallet::{Mnemonic, TonWallet, WalletVersion};
 use ton_api::Network;
 use ton_api::toncenter::emulate::v1::EmulateTraceResponse;
+use ton_api::toncenter::v2::StringOrNumber;
+use ton_api::toncenter::v2::{requests as v2_requests, responses as v2_responses};
 use ton_api::toncenter::v3 as toncenter_v3;
 use ton_localnet::types::{Addr, Hash256};
 use tycho_types::boc::{Boc, BocRepr};
@@ -555,15 +560,21 @@ fn localnet_starts_and_serves_masterchain_info() {
 fn localnet_v2_json_rpc_entrypoints_share_canonical_envelope() {
     let project = ProjectBuilder::new("localnet-v2-json-rpc-entrypoints").build();
     let node = project.localnet().start();
-    let request = json!({
-        "jsonrpc": "2.0",
-        "id": "masterchain",
-        "method": "getMasterchainInfo",
-        "params": {}
-    });
 
-    let responses = ["/api/v2", "/api/v2/jsonRPC", "/api/v2/v2/jsonRPC"]
-        .map(|path| (path, node.post_json(path, &request)));
+    let responses = ["/api/v2", "/api/v2/jsonRPC", "/api/v2/v2/jsonRPC"].map(|path| {
+        let response: v2_responses::JsonRpcResponse<v2_responses::MasterchainInfo> = node
+            .post_v2_json_rpc(
+                path,
+                StringOrNumber::String("masterchain".to_owned()),
+                "getMasterchainInfo",
+                v2_requests::EmptyRequest {},
+            );
+        (
+            path,
+            serde_json::to_value(response)
+                .expect("Typed getMasterchainInfo response must serialize"),
+        )
+    });
     let expected_seqno = responses[0].1["result"]["last"]["seqno"].clone();
     let summary = Value::Array(
         responses
@@ -6017,7 +6028,7 @@ fn localnet_supports_v3_transactions_endpoints() {
     assert_v3_bad_request(status, &response, "`limit` must be between 1 and 1000");
     let (status, response) =
         node.get_json_with_status("/api/v3/transactions?account=not-an-address");
-    assert_v3_bad_request(status, &response, "Invalid address format");
+    assert_v3_bad_request(status, &response, "Invalid address");
     let (status, response) =
         node.get_json_with_status("/api/v3/transactionsByMessage?direction=sideways");
     assert_v3_bad_request(status, &response, "Invalid `direction`");
@@ -6028,7 +6039,7 @@ fn localnet_supports_v3_transactions_endpoints() {
     assert_v3_bad_request(status, &response, "Invalid hash format");
     let (status, response) =
         node.get_json_with_status("/api/v3/pendingTransactions?account=bad-account");
-    assert_v3_bad_request(status, &response, "Invalid address format");
+    assert_v3_bad_request(status, &response, "Invalid address");
     let (status, response) =
         node.get_json_with_status("/api/v3/pendingTransactions?trace_id=bad-hash");
     assert_v3_bad_request(status, &response, "Invalid hash format");
@@ -7310,31 +7321,6 @@ fn extract_prefixed_line_value(output: &str, prefix: &str) -> String {
         .unwrap_or_else(|| panic!("Line starting with `{prefix}` not found in output:\n{cleaned}"))
 }
 
-fn is_success_response(response: &Value) -> bool {
-    match response.get("ok").and_then(Value::as_bool) {
-        Some(ok) => ok,
-        None => response.get("error").is_none(),
-    }
-}
-
-fn response_payload(response: &Value) -> &Value {
-    if response.get("ok").and_then(Value::as_bool) == Some(true) {
-        response.get("result").unwrap_or_else(|| {
-            panic!(
-                "Expected `result` for wrapped successful response:\n{}",
-                serde_json::to_string_pretty(response).unwrap_or_default()
-            )
-        })
-    } else if response.get("ok").is_none() && response.get("error").is_none() {
-        response
-    } else {
-        panic!(
-            "Expected successful response, got:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        )
-    }
-}
-
 fn run_v3_get_num_at_seqno(
     node: &crate::support::localnet::LocalnetHandle,
     address: &str,
@@ -7367,14 +7353,6 @@ fn run_v3_get_num_at_seqno(
         .strip_prefix("0x")
         .expect("v3 numeric get-method result must use hexadecimal format");
     i64::from_str_radix(digits, 16).expect("numeric get-method result must parse")
-}
-
-fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> String {
-    let response_json = format!(
-        "{}\n",
-        serde_json::to_string_pretty(value).expect("Failed to serialize JSON snapshot")
-    );
-    normalize_output_preserve_escapes(&response_json, project_path)
 }
 
 fn get_json_with_status(client: &Client, url: &str) -> (u16, Value) {
@@ -8210,42 +8188,6 @@ fn assert_transactions_sorted_by_lt_desc(transactions: &[Value]) {
             serde_json::to_string_pretty(transactions).unwrap_or_default()
         );
     }
-}
-
-fn assert_v3_bad_request(status: u16, response: &Value, expected_error_fragment: &str) {
-    assert_eq!(
-        status,
-        400,
-        "Expected HTTP 400 for v3 bad request response:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
-    if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
-        assert!(
-            !ok,
-            "Expected v3 bad request response:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        );
-    } else {
-        assert!(
-            response.get("error").is_some(),
-            "Expected v3 bad request response with `error` field:\n{}",
-            serde_json::to_string_pretty(response).unwrap_or_default()
-        );
-    }
-    assert_eq!(
-        response["code"].as_i64(),
-        Some(400),
-        "Expected code=400 in v3 bad request response:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
-    assert!(
-        response["error"]
-            .as_str()
-            .unwrap_or_default()
-            .contains(expected_error_fragment),
-        "Expected error to contain `{expected_error_fragment}`:\n{}",
-        serde_json::to_string_pretty(response).unwrap_or_default()
-    );
 }
 
 fn has_incoming_transaction_from_source(response: &Value, source: &str) -> bool {

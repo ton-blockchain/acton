@@ -1,0 +1,32 @@
+[
+  {
+    "case": "wrong language",
+    "code": 500,
+    "error": "Source-level retrace supports only Tolk bundles",
+    "status": 500
+  },
+  {
+    "case": "old compiler",
+    "code": 500,
+    "error": "Source-level retrace requires Tolk compiler 1.4.0 or newer, got 1.3.9",
+    "status": 500
+  },
+  {
+    "case": "no files",
+    "code": 500,
+    "error": "Source bundle does not contain files",
+    "status": 500
+  },
+  {
+    "case": "no entrypoint",
+    "code": 500,
+    "error": "Source bundle does not contain entrypoint",
+    "status": 500
+  },
+  {
+    "case": "unsafe path",
+    "code": 500,
+    "error": "Unsafe source path `../main.tolk`",
+    "status": 500
+  }
+]

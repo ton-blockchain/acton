@@ -1,6 +1,7 @@
 pub use acton_source_trace::{
     BuildSourceTraceRequest, SourceTraceBundleRequest, SourceTraceCompilerRequest,
     SourceTraceContextRequest, SourceTraceFileRequest, SourceTraceInMessageContextRequest,
+    SourceTraceResponse,
 };
 use serde::Deserialize;
 use serde_json::Value;

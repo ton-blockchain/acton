@@ -1,0 +1,33 @@
+{
+  "account": {
+    "balance": "0",
+    "extended_type": "fullAccountState",
+    "is_wallet": false,
+    "state": "uninitialized",
+    "state_endpoint": "nonexist",
+    "type": "raw.fullAccountState",
+    "wallet_type": "ext.accounts.walletInformation"
+  },
+  "address_roundtrip": true,
+  "config_type": "configInfo",
+  "detected_address": {
+    "given_type": "raw_form",
+    "raw_form": "0:0000000000000000000000000000000000000000000000000000000000000000",
+    "test_only": false,
+    "type": "ext.utils.detectedAddress"
+  },
+  "detected_hash": {
+    "hex": "0000000000000000000000000000000000000000000000000000000000000000",
+    "type": "ext.utils.detectedHash"
+  },
+  "ids": {
+    "signed": null,
+    "string": null,
+    "unsigned": null
+  },
+  "library_count": 0,
+  "masterchain_type": "blocks.masterchainInfo",
+  "packed_address_length": 48,
+  "raw_transaction_count": 0,
+  "transaction_count": 0
+}

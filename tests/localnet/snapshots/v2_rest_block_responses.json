@@ -1,0 +1,30 @@
+{
+  "consensus": {
+    "has_timestamp": true,
+    "type": "ext.blocks.consensusBlock"
+  },
+  "header": {
+    "matches_requested_block": true,
+    "type": "blocks.header"
+  },
+  "lookup_matches_requested_block": true,
+  "out_queue": {
+    "shard_count": 1,
+    "type": "blocks.outMsgQueueSizes"
+  },
+  "shards": {
+    "count": 1,
+    "type": "blocks.shards"
+  },
+  "transactions": {
+    "count": 0,
+    "incomplete": false,
+    "matches_requested_block": true,
+    "type": "blocks.transactions"
+  },
+  "transactions_ext": {
+    "incomplete": false,
+    "matches_short_count": true,
+    "type": "blocks.transactionsExt"
+  }
+}

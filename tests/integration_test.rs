@@ -3,6 +3,8 @@ mod common;
 #[cfg(test)]
 mod integration;
 #[cfg(test)]
+mod localnet;
+#[cfg(test)]
 mod support;
 
 use acton_config::schema::{

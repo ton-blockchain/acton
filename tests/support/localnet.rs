@@ -1,6 +1,8 @@
 use crate::common::acton_exe;
 use crate::support::project::{ActonCommand, Project};
+use crate::support::snapshots::normalize_output_preserve_escapes;
 use reqwest::blocking::Client;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use std::fs::{self, File, OpenOptions};
 use std::io::Read;
@@ -9,6 +11,9 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
 use std::time::{Duration, Instant};
+use ton_api::toncenter::v2::StringOrNumber;
+use ton_api::toncenter::v2::requests::JsonRpcRequest;
+use ton_api::toncenter::v2::responses::JsonRpcResponse;
 
 const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(15);
 const STOP_TIMEOUT: Duration = Duration::from_secs(3);
@@ -215,6 +220,13 @@ impl LocalnetHandle {
     }
 
     pub(crate) fn get_json(&self, path: &str) -> Value {
+        self.get_json_as(path)
+    }
+
+    pub(crate) fn get_json_as<T>(&self, path: &str) -> T
+    where
+        T: DeserializeOwned,
+    {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
             .with_auth(self.client.get(&url))
@@ -228,11 +240,17 @@ impl LocalnetHandle {
             status.is_success(),
             "GET {url} failed with status {status}: {body}"
         );
-        serde_json::from_str(&body)
-            .unwrap_or_else(|e| panic!("GET {url} returned invalid JSON: {e}\n{body}"))
+        parse_json_body("GET", &url, &body)
     }
 
     pub(crate) fn get_json_with_status(&self, path: &str) -> (u16, Value) {
+        self.get_json_with_status_as(path)
+    }
+
+    pub(crate) fn get_json_with_status_as<T>(&self, path: &str) -> (u16, T)
+    where
+        T: DeserializeOwned,
+    {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
             .with_auth(self.client.get(&url))
@@ -242,8 +260,7 @@ impl LocalnetHandle {
         let body = response
             .text()
             .unwrap_or_else(|e| panic!("Failed to read GET {url} response body: {e}"));
-        let json = serde_json::from_str(&body)
-            .unwrap_or_else(|e| panic!("GET {url} returned invalid JSON: {e}\n{body}"));
+        let json = parse_json_body("GET", &url, &body);
         (status, json)
     }
 
@@ -253,7 +270,18 @@ impl LocalnetHandle {
         json
     }
 
-    pub(crate) fn post_json(&self, path: &str, payload: &Value) -> Value {
+    pub(crate) fn post_json<P>(&self, path: &str, payload: &P) -> Value
+    where
+        P: Serialize + ?Sized,
+    {
+        self.post_json_as(path, payload)
+    }
+
+    pub(crate) fn post_json_as<T, P>(&self, path: &str, payload: &P) -> T
+    where
+        T: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
             .with_auth(self.client.post(&url).json(payload))
@@ -267,11 +295,21 @@ impl LocalnetHandle {
             status.is_success(),
             "POST {url} failed with status {status}: {body}"
         );
-        serde_json::from_str(&body)
-            .unwrap_or_else(|e| panic!("POST {url} returned invalid JSON: {e}\n{body}"))
+        parse_json_body("POST", &url, &body)
     }
 
-    pub(crate) fn post_json_with_status(&self, path: &str, payload: &Value) -> (u16, Value) {
+    pub(crate) fn post_json_with_status<P>(&self, path: &str, payload: &P) -> (u16, Value)
+    where
+        P: Serialize + ?Sized,
+    {
+        self.post_json_with_status_as(path, payload)
+    }
+
+    pub(crate) fn post_json_with_status_as<T, P>(&self, path: &str, payload: &P) -> (u16, T)
+    where
+        T: DeserializeOwned,
+        P: Serialize + ?Sized,
+    {
         let url = format!("{}{}", self.base_url(), normalize_path(path));
         let response = self
             .with_auth(self.client.post(&url).json(payload))
@@ -281,15 +319,47 @@ impl LocalnetHandle {
         let body = response
             .text()
             .unwrap_or_else(|e| panic!("Failed to read POST {url} response body: {e}"));
-        let json = serde_json::from_str(&body)
-            .unwrap_or_else(|e| panic!("POST {url} returned invalid JSON: {e}\n{body}"));
+        let json = parse_json_body("POST", &url, &body);
         (status, json)
     }
 
-    pub(crate) fn post_json_error(&self, path: &str, payload: &Value) -> Value {
+    pub(crate) fn post_json_error<P>(&self, path: &str, payload: &P) -> Value
+    where
+        P: Serialize + ?Sized,
+    {
         let (status, json) = self.post_json_with_status(path, payload);
         assert!(status >= 400, "POST {path} unexpectedly succeeded: {json}");
         json
+    }
+
+    pub(crate) fn post_v2_json_rpc<T, P>(
+        &self,
+        path: &str,
+        id: StringOrNumber,
+        method: impl Into<String>,
+        params: P,
+    ) -> JsonRpcResponse<T>
+    where
+        T: DeserializeOwned,
+        P: Serialize,
+    {
+        let request = v2_json_rpc_request(id, method, params);
+        self.post_json_as(path, &request)
+    }
+
+    pub(crate) fn post_v2_json_rpc_with_status<T, P>(
+        &self,
+        path: &str,
+        id: StringOrNumber,
+        method: impl Into<String>,
+        params: P,
+    ) -> (u16, T)
+    where
+        T: DeserializeOwned,
+        P: Serialize,
+    {
+        let request = v2_json_rpc_request(id, method, params);
+        self.post_json_with_status_as(path, &request)
     }
 
     pub(crate) fn stop(mut self) {
@@ -390,6 +460,82 @@ impl LocalnetHandle {
     }
 }
 
+pub(crate) fn v2_json_rpc_request<P>(
+    id: StringOrNumber,
+    method: impl Into<String>,
+    params: P,
+) -> JsonRpcRequest<P> {
+    JsonRpcRequest {
+        jsonrpc: "2.0".to_owned(),
+        id,
+        method: method.into(),
+        params,
+    }
+}
+
+pub(crate) fn pretty_json_for_snapshot(value: &Value, project_path: &Path) -> String {
+    let response_json = format!(
+        "{}\n",
+        serde_json::to_string_pretty(value).expect("Failed to serialize JSON snapshot")
+    );
+    normalize_output_preserve_escapes(&response_json, project_path)
+}
+
+pub(crate) fn is_success_response(response: &Value) -> bool {
+    match response.get("ok").and_then(Value::as_bool) {
+        Some(ok) => ok,
+        None => response.get("error").is_none(),
+    }
+}
+
+pub(crate) fn response_payload(response: &Value) -> &Value {
+    if response.get("ok").and_then(Value::as_bool) == Some(true) {
+        response
+            .get("result")
+            .unwrap_or_else(|| panic!("Successful response has no `result`: {response}"))
+    } else if response.get("ok").is_none() && response.get("error").is_none() {
+        response
+    } else {
+        panic!("Expected successful response: {response}")
+    }
+}
+
+pub(crate) fn assert_v3_bad_request(status: u16, response: &Value, expected_error_fragment: &str) {
+    assert_eq!(
+        status,
+        400,
+        "Expected HTTP 400 for v3 bad request response:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
+    if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
+        assert!(
+            !ok,
+            "Expected v3 bad request response:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        );
+    } else {
+        assert!(
+            response.get("error").is_some(),
+            "Expected v3 bad request response with `error` field:\n{}",
+            serde_json::to_string_pretty(response).unwrap_or_default()
+        );
+    }
+    assert_eq!(
+        response["code"].as_i64(),
+        Some(400),
+        "Expected code=400 in v3 bad request response:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
+    assert!(
+        response["error"]
+            .as_str()
+            .unwrap_or_default()
+            .contains(expected_error_fragment),
+        "Expected error to contain `{expected_error_fragment}`:\n{}",
+        serde_json::to_string_pretty(response).unwrap_or_default()
+    );
+}
+
 impl Drop for LocalnetHandle {
     fn drop(&mut self) {
         self.terminate();
@@ -442,6 +588,14 @@ fn normalize_path(path: &str) -> String {
     } else {
         format!("/{path}")
     }
+}
+
+fn parse_json_body<T>(method: &str, url: &str, body: &str) -> T
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_str(body)
+        .unwrap_or_else(|e| panic!("{method} {url} returned invalid JSON: {e}\n{body}"))
 }
 
 #[cfg(unix)]

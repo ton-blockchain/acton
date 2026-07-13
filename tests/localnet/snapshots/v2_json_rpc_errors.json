@@ -1,0 +1,30 @@
+[
+  {
+    "case": "unknown method",
+    "code": 404,
+    "error": "Method not found",
+    "id": null,
+    "status": 404
+  },
+  {
+    "case": "zero shards seqno",
+    "code": 500,
+    "error": "`seqno` must be positive",
+    "id": null,
+    "status": 500
+  },
+  {
+    "case": "missing config param",
+    "code": 500,
+    "error": "`param` is required",
+    "id": null,
+    "status": 500
+  },
+  {
+    "case": "invalid hash",
+    "code": 500,
+    "error": "Invalid hash format",
+    "id": null,
+    "status": 500
+  }
+]

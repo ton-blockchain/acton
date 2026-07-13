@@ -1,0 +1,21 @@
+{
+  "dns_record_count": 0,
+  "multisig_count": 0,
+  "multisig_order_count": 0,
+  "pending_actions": {
+    "address_book_count": 0,
+    "count": 0,
+    "metadata_count": 0
+  },
+  "pending_traces": {
+    "address_book_count": 0,
+    "count": 0,
+    "metadata_count": 0
+  },
+  "traces": {
+    "address_book_count": 0,
+    "count": 0,
+    "metadata_count": 0
+  },
+  "vesting_count": 0
+}

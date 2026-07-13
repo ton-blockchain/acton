@@ -98,7 +98,7 @@ impl SourceTraceBundleRequest {
     }
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceResponse {
     pub code_hash: String,
@@ -107,13 +107,13 @@ pub struct SourceTraceResponse {
     pub truncated: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceFileInfo {
     pub path: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceStep {
     pub index: usize,
@@ -126,7 +126,7 @@ pub struct SourceTraceStep {
     pub exception: Option<SourceTraceException>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceLocation {
     pub file: String,
@@ -136,14 +136,14 @@ pub struct SourceTraceLocation {
     pub end_column: usize,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceVmPosition {
     pub cell_hash: String,
     pub offset: i32,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceFrame {
     pub function_name: String,
@@ -152,7 +152,7 @@ pub struct SourceTraceFrame {
     pub is_builtin: bool,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct SourceTraceVariable {
     pub name: String,
     pub value: String,
@@ -161,7 +161,7 @@ pub struct SourceTraceVariable {
     pub children: Vec<SourceTraceVariable>,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SourceTraceException {
     pub errno: String,
