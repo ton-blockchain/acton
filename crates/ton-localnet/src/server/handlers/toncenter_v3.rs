@@ -10,7 +10,8 @@ use crate::localnet::{
     LocalnetNftItemsOrder, LocalnetNftItemsQuery, LocalnetSortOrder, LocalnetTransaction,
 };
 use crate::storage::{
-    AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta, TraceNode,
+    AccountStatus, DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta,
+    TraceNode,
 };
 use crate::types::{Addr, Hash256};
 use crate::v3_events::{parse_jetton_burn, parse_jetton_transfer, parse_nft_transfer};
@@ -820,17 +821,42 @@ pub async fn get_dns_records(
         Ok(data) => data,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let records = data
+    let records = filter_dns_records(
+        data.into_iter().filter_map(|data| data.dns),
+        wallet,
+        domain_value,
+        limit,
+        offset,
+    );
+    (StatusCode::OK, Json(v3::map_dns_records(&records))).into_response()
+}
+
+fn filter_dns_records(
+    records: impl IntoIterator<Item = DnsRecordMeta>,
+    wallet: Option<Addr>,
+    domain: Option<&str>,
+    limit: usize,
+    offset: usize,
+) -> Vec<DnsRecordMeta> {
+    let mut records = records
         .into_iter()
-        .filter_map(|data| data.dns)
         .filter(|record| {
             wallet.is_none_or(|address| record.wallet == Some(address))
-                && domain_value.is_none_or(|domain| record.domain == domain)
+                && domain.is_none_or(|domain| record.domain == domain)
         })
-        .skip(offset)
-        .take(limit)
         .collect::<Vec<_>>();
-    (StatusCode::OK, Json(v3::map_dns_records(&records))).into_response()
+    sort_dns_records(&mut records);
+    paginate(records, limit, offset)
+}
+
+fn sort_dns_records(records: &mut [DnsRecordMeta]) {
+    records.sort_unstable_by(|left, right| {
+        left.domain
+            .chars()
+            .count()
+            .cmp(&right.domain.chars().count())
+            .then_with(|| left.domain.cmp(&right.domain))
+    });
 }
 
 pub async fn get_jetton_transfers(
@@ -2601,6 +2627,25 @@ mod tests {
     use super::*;
     use crate::localnet::{LocalnetMessage, LocalnetTransactionId};
 
+    fn test_addr(byte: u8) -> Addr {
+        Addr {
+            workchain: 0,
+            addr: [byte; 32],
+        }
+    }
+
+    fn dns_record(domain: &str, address_byte: u8, wallet: Option<Addr>) -> DnsRecordMeta {
+        DnsRecordMeta {
+            nft_item_address: test_addr(address_byte),
+            nft_item_owner: None,
+            domain: domain.to_owned(),
+            next_resolver: None,
+            wallet,
+            site_adnl: None,
+            storage_bag_id: None,
+        }
+    }
+
     fn message(hash_byte: u8, opcode: u32) -> LocalnetMessage {
         LocalnetMessage {
             hash: Hash256([hash_byte; 32]),
@@ -2652,6 +2697,56 @@ mod tests {
             hash: transaction.hash,
         };
         transaction
+    }
+
+    #[test]
+    fn dns_records_follow_upstream_length_then_domain_order() {
+        let mut records = vec![
+            dns_record("longer.ton", 1, None),
+            dns_record("\u{e9}.ton", 2, None),
+            dns_record("b.ton", 3, None),
+            dns_record("aa.ton", 4, None),
+            dns_record("a.ton", 5, None),
+        ];
+
+        sort_dns_records(&mut records);
+
+        assert_eq!(
+            records
+                .iter()
+                .map(|record| record.domain.as_str())
+                .collect::<Vec<_>>(),
+            ["a.ton", "b.ton", "\u{e9}.ton", "aa.ton", "longer.ton"]
+        );
+    }
+
+    #[test]
+    fn dns_record_filters_are_applied_before_ordering_and_pagination() {
+        let wallet = test_addr(9);
+        let records = vec![
+            dns_record("longer.ton", 1, Some(wallet)),
+            dns_record("b.ton", 2, Some(wallet)),
+            dns_record("a.ton", 3, Some(wallet)),
+            dns_record("aa.ton", 4, Some(test_addr(8))),
+        ];
+
+        let page = filter_dns_records(records, Some(wallet), None, 1, 1);
+
+        assert_eq!(page.len(), 1);
+        assert_eq!(page[0].domain, "b.ton");
+
+        let exact = filter_dns_records(
+            [
+                dns_record("a.ton", 1, Some(wallet)),
+                dns_record("b.ton", 2, Some(wallet)),
+            ],
+            None,
+            Some("b.ton"),
+            100,
+            0,
+        );
+        assert_eq!(exact.len(), 1);
+        assert_eq!(exact[0].domain, "b.ton");
     }
 
     fn transactions_query() -> ParsedTransactionsV3Query {

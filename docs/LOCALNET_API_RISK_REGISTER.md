@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 11 | 5 | 8 |
-| High | 11 | 5 | 21 |
+| High | 12 | 5 | 20 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **22** | **11** | **32** |
+| **Total** | **23** | **11** | **31** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -325,7 +325,7 @@ coverage is high.
 | `GET /api/v3/nft/collections` | High | B | Upstream order, scan cost, metadata variants, destroyed collections and stable pagination. |
 | `GET /api/v3/nft/sales` | High | B | Auctions, telemint/version variants, completed/destroyed sales, pagination and price edge cases. |
 | `GET /api/v3/nft/transfers` | Critical | B | Trace ID, destroyed item history, time ordering, bounced/aborted semantics and parser errors. |
-| `GET /api/v3/dns/records` | High | D | Real DNS contracts/categories, deterministic length/domain order, expired/deleted records. |
+| `GET /api/v3/dns/records` | High | C | Length/domain ordering, including equal-length and UTF-8 names, is covered; add real DNS contracts/categories and expired/deleted records. |
 | `GET /api/v3/multisig/orders` | High | B | ID versus LT ordering, malformed actions, expiry, threshold corners and multiple wallets. |
 | `GET /api/v3/multisig/wallets` | High | B | Stable pagination, multiple wallets/orders, include-orders behavior and malformed config. |
 | `GET /api/v3/vesting` | Critical | A | Two real contracts with empty/non-empty whitelists, empty/combined filters, stable ordering, and pagination boundaries; unlock-schedule arithmetic boundaries remain untested. |
@@ -375,7 +375,8 @@ coverage is high.
 15. **V3-15, NFT items (fixed):** default pagination follows insertion/ID order; one collection
     sorts by numeric index, owner filters sort by owner/collection/index, repeated or multiple
     collections retain upstream multi-filter ordering, and empty index values are ignored.
-16. **V3-16, DNS:** default result order is unstable; upstream orders by domain length and name.
+16. **V3-16, DNS (fixed):** matching records are ordered before pagination by domain character
+    length and then name, matching upstream PostgreSQL text semantics.
 17. **V3-17, other collection ordering:** jetton masters, NFT collections, and multisig routes use
     unstable or different pagination keys from the upstream database ID order.
 18. **V3-18, address book/metadata invalid input:** local rejects the whole request. Upstream keeps
