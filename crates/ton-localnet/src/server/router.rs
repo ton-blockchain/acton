@@ -32,7 +32,7 @@ use crate::server::{
 };
 use axum::{
     Json, Router,
-    extract::Request,
+    extract::{Request, State},
     http::{Method, StatusCode, header},
     middleware::{self, Next},
     response::{IntoResponse, Response},
@@ -48,6 +48,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
+use ton_api::toncenter::{v2::responses::TonlibErrorResponse, v3::responses::RequestError};
 use tower_governor::governor::GovernorConfigBuilder;
 use tower_governor::key_extractor::GlobalKeyExtractor;
 use tower_governor::{GovernorError, GovernorLayer};
@@ -184,7 +185,8 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
         .merge(api_v2_router)
         .merge(api_v3_router)
         .merge(emulate_router)
-        .merge(streaming_router);
+        .merge(streaming_router)
+        .fallback(handle_unknown_api);
     let api_calls_for_admin = state.api_calls.clone();
     let acton_router = Router::new()
         .route("/acton_fundAccount", post(faucet))
@@ -268,7 +270,7 @@ pub fn create_router(state: ServerState, rate_limit_rps: Option<u32>) -> Router 
 
     let app = Router::new()
         .merge(protected_router)
-        .fallback(handle_embedded_ui)
+        .fallback(handle_unknown_route)
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 
@@ -289,14 +291,38 @@ async fn require_auth(request: Request, next: Next, auth_token: Arc<str>) -> Res
         return next.run(request).await;
     }
 
-    (
+    unauthorized_response()
+}
+
+fn unauthorized_response() -> Response {
+    tonlib_error_response(
         StatusCode::UNAUTHORIZED,
-        Json(json!({
-            "ok": false,
-            "error": "Unauthorized: missing or invalid localnet API token",
-            "code": 401,
-            "@extra": get_extra()
-        })),
+        "Unauthorized: missing or invalid localnet API token",
+    )
+}
+
+fn tonlib_error_response(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(TonlibErrorResponse {
+            ok: false,
+            error: error.into(),
+            code: i32::from(status.as_u16()),
+            extra: get_extra(),
+            jsonrpc: None,
+            id: None,
+        }),
+    )
+        .into_response()
+}
+
+fn request_error_response(status: StatusCode, error: impl Into<String>) -> Response {
+    (
+        status,
+        Json(RequestError {
+            code: Some(i32::from(status.as_u16())),
+            error: error.into(),
+        }),
     )
         .into_response()
 }
@@ -505,7 +531,34 @@ fn governor_error_response(error: GovernorError, max_requests_per_second: u32) -
     }
 }
 
-async fn handle_embedded_ui(uri: axum::http::Uri) -> Response {
+async fn handle_unknown_api(request: Request) -> Response {
+    let path = request
+        .uri()
+        .path()
+        .strip_prefix("/api")
+        .unwrap_or_else(|| request.uri().path());
+    if path == "/v2" || path.starts_with("/v2/") {
+        tonlib_error_response(StatusCode::NOT_FOUND, "Not Found")
+    } else {
+        request_error_response(StatusCode::NOT_FOUND, "Not Found")
+    }
+}
+
+async fn handle_unknown_route(State(state): State<ServerState>, request: Request) -> Response {
+    if request.uri().path().starts_with("/acton_") {
+        if let Some(auth_token) = state.auth_token.as_deref()
+            && request.method() != Method::OPTIONS
+            && !request_has_valid_auth(&request, auth_token)
+        {
+            return unauthorized_response();
+        }
+        return tonlib_error_response(StatusCode::NOT_FOUND, "Not Found");
+    }
+
+    handle_embedded_ui(request.uri()).await
+}
+
+async fn handle_embedded_ui(uri: &axum::http::Uri) -> Response {
     let path = uri.path().trim_start_matches('/');
     let path = if path.is_empty() { "index.html" } else { path };
 

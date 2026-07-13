@@ -1,8 +1,10 @@
 use crate::common::assertion;
 use crate::support::localnet::pretty_json_for_snapshot;
 use crate::support::project::ProjectBuilder;
+use reqwest::blocking::Client;
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::responses::{TonlibErrorResponse, TonlibResponse};
+use ton_api::toncenter::v3::responses::RequestError;
 use ton_localnet::server::models::{
     BuildSourceTraceRequest, SourceTraceBundleRequest, SourceTraceCompilerRequest,
     SourceTraceFileRequest, SourceTraceResponse,
@@ -12,6 +14,98 @@ const MINIMAL_CONTRACT: &str = r"
 fun onInternalMessage(_: InMessage) {}
 fun onBouncedMessage(_: InMessageBounced) {}
 ";
+
+#[test]
+fn unknown_api_and_control_routes_return_authenticated_json_errors() {
+    let project = ProjectBuilder::new("localnet-unknown-routes").build();
+    let node = project.localnet().require_auth().start();
+
+    let client = Client::new();
+    let unauthorized_api = client
+        .get(format!("{}/api/v2/doesNotExist", node.base_url()))
+        .send()
+        .expect("unauthorized unknown API request must be sent");
+    let unauthorized_api_status = unauthorized_api.status().as_u16();
+    let unauthorized_api: TonlibErrorResponse = unauthorized_api
+        .json()
+        .expect("unauthorized unknown API response must be typed JSON");
+    let unauthorized_control = client
+        .get(format!("{}/acton_doesNotExist", node.base_url()))
+        .send()
+        .expect("unauthorized unknown control request must be sent");
+    let unauthorized_control_status = unauthorized_control.status().as_u16();
+    let unauthorized_control: TonlibErrorResponse = unauthorized_control
+        .json()
+        .expect("unauthorized unknown control response must be typed JSON");
+
+    let (v2_status, v2): (u16, TonlibErrorResponse) =
+        node.get_json_with_status_as("/api/v2/doesNotExist");
+    let (v3_status, v3): (u16, RequestError) = node.get_json_with_status_as("/api/v3/doesNotExist");
+    let (emulate_status, emulate): (u16, RequestError) =
+        node.post_json_with_status_as("/api/emulate/v1/doesNotExist", &json!({}));
+    let (streaming_status, streaming): (u16, RequestError) =
+        node.get_json_with_status_as("/api/streaming/v2/doesNotExist");
+    let (control_status, control): (u16, TonlibErrorResponse) =
+        node.get_json_with_status_as("/acton_doesNotExist");
+
+    let ui = client
+        .get(format!("{}/unknown/ui/route", node.base_url()))
+        .send()
+        .expect("unknown UI route request must be sent");
+    let ui_status = ui.status().as_u16();
+    let ui_content_type = ui
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default()
+        .to_owned();
+    let ui_body = ui.text().expect("unknown UI route body must be readable");
+
+    let summary = json!({
+        "unauthorized": {
+            "api": {
+                "status": unauthorized_api_status,
+                "code": unauthorized_api.code,
+                "error": unauthorized_api.error,
+            },
+            "control": {
+                "status": unauthorized_control_status,
+                "code": unauthorized_control.code,
+                "error": unauthorized_control.error,
+            },
+        },
+        "not_found": {
+            "v2": { "status": v2_status, "code": v2.code, "error": v2.error },
+            "v3": { "status": v3_status, "code": v3.code, "error": v3.error },
+            "emulate": {
+                "status": emulate_status,
+                "code": emulate.code,
+                "error": emulate.error,
+            },
+            "streaming": {
+                "status": streaming_status,
+                "code": streaming.code,
+                "error": streaming.error,
+            },
+            "control": {
+                "status": control_status,
+                "code": control.code,
+                "error": control.error,
+            },
+        },
+        "ui": {
+            "status": ui_status,
+            "content_type": ui_content_type,
+            "html_shell": ui_body.contains("<div id=\"root\"></div>"),
+        },
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/unknown_routes.json"),
+    );
+
+    node.stop();
+}
 
 #[test]
 fn build_source_trace_deserializes_canonical_response() {

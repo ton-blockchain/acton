@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 12 | 5 | 7 |
-| High | 15 | 4 | 18 |
+| High | 16 | 4 | 17 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **27** | **10** | **28** |
+| **Total** | **28** | **10** | **27** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -84,6 +84,7 @@ open until their normative contract is chosen.
 | V3-21 trace extras | Fixed | Trace address-book and metadata entries are retained with their trace through filtering and pagination, then merged only for the selected page. A two-trace stateful snapshot covers offset and LT filtering. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
+| CTL-10 unknown route fallback | Fixed | Unknown V2, V3, emulate, streaming, and control routes return their typed JSON `404` envelopes. Protected unknown routes require authentication, while non-API paths retain the SPA fallback. |
 
 ## Rating model
 
@@ -175,7 +176,7 @@ coverage is high.
 | Artificial response delay | Medium | C | V2 success is covered; V3/emulate/error responses and concurrent delay updates are not. |
 | CORS | Medium | C | Basic preflight is covered; method/header matrix, WS Origin, and auth interaction are not. |
 | Compression | Medium | O | JSON/static compression, `Vary`, and explicit SSE exclusion have no endpoint-level tests. |
-| Unknown route fallback | High | O | Unknown `/api/*` and `/acton_*` paths fall through to the embedded SPA and can return `200 text/html` instead of an authenticated API 404. |
+| Unknown route fallback | High | A | Typed `404` responses, authentication, all public API families, control routes, and preservation of the SPA fallback are snapshot-covered. |
 
 ## TonCenter V2 routes
 
@@ -491,9 +492,9 @@ coverage is high.
    `jetton`, `nft`, `dns`, and `multisig`.
 9. **CTL-09, OpenAPI drift:** the control OpenAPI omits exposed routes
    `acton_buildSourceTrace`, `acton_getApiCalls`, and `acton_setMiningMode`.
-10. **CTL-10, unknown route fallback:** the router's embedded-UI fallback handles unknown API and
-    control paths, producing an HTML success response instead of the API family's authenticated
-    404/error envelope.
+10. **CTL-10, unknown route fallback (fixed):** unknown API routes are handled inside the protected
+    API router, while unknown control routes enforce the configured token before returning a typed
+    JSON `404`. Only non-API paths reach the embedded SPA fallback.
 
 ## Differential test backlog
 
