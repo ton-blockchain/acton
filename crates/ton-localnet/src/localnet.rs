@@ -8,6 +8,7 @@ use crate::streaming::StreamingCommitEvent;
 use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256, Lt, Seqno};
 use anyhow::Context;
 use crc::{CRC_16_XMODEM, Crc};
+use num_bigint::BigInt;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
@@ -146,6 +147,25 @@ pub struct LocalnetJettonWalletsQuery {
     pub offset: Option<usize>,
 }
 
+#[derive(Debug, Clone)]
+pub struct LocalnetNftItemsQuery {
+    pub addresses: Vec<String>,
+    pub owner_addresses: Vec<String>,
+    pub collection_addresses: Vec<String>,
+    pub indexes: Vec<String>,
+    pub order: LocalnetNftItemsOrder,
+    pub limit: Option<usize>,
+    pub offset: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetNftItemsOrder {
+    Insertion,
+    OwnerCollectionIndex,
+    CollectionIndex,
+    LastTransactionLtDesc,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum LocalnetSortOrder {
     Asc,
@@ -159,6 +179,17 @@ pub(crate) struct ParsedJettonWalletsQuery {
     jetton_addresses: HashSet<Addr>,
     exclude_zero_balance: bool,
     sort: Option<LocalnetSortOrder>,
+    limit: usize,
+    offset: usize,
+}
+
+#[derive(Debug)]
+pub(crate) struct ParsedNftItemsQuery {
+    addresses: HashSet<Addr>,
+    owner_addresses: HashSet<Addr>,
+    collection_addresses: HashSet<Addr>,
+    indexes: HashSet<BigInt>,
+    order: LocalnetNftItemsOrder,
     limit: usize,
     offset: usize,
 }
@@ -576,13 +607,7 @@ pub(crate) enum Request {
         resp: oneshot::Sender<anyhow::Result<Vec<storage::JettonWalletMeta>>>,
     },
     GetNftItems {
-        addresses: HashSet<Addr>,
-        owner_addresses: HashSet<Addr>,
-        collection_addresses: HashSet<Addr>,
-        indexes: HashSet<String>,
-        sort_by_last_transaction_lt: bool,
-        limit: usize,
-        offset: usize,
+        query: ParsedNftItemsQuery,
         resp: oneshot::Sender<anyhow::Result<Vec<storage::NftItemMeta>>>,
     },
     DetectContractData {
@@ -1485,34 +1510,31 @@ impl Localnet {
         rx.await?
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub async fn get_nft_items(
         &self,
-        addresses: Vec<String>,
-        owner_addresses: Vec<String>,
-        collection_addresses: Vec<String>,
-        indexes: Vec<String>,
-        sort_by_last_transaction_lt: Option<bool>,
-        limit: Option<usize>,
-        offset: Option<usize>,
+        query: LocalnetNftItemsQuery,
     ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-        let addresses = Self::parse_addresses(addresses)?;
-        let owner_addresses = Self::parse_addresses(owner_addresses)?;
-        let collection_addresses = Self::parse_addresses(collection_addresses)?;
+        let query = ParsedNftItemsQuery {
+            addresses: Self::parse_addresses(query.addresses)?,
+            owner_addresses: Self::parse_addresses(query.owner_addresses)?,
+            collection_addresses: Self::parse_addresses(query.collection_addresses)?,
+            indexes: query
+                .indexes
+                .into_iter()
+                .filter(|index| !index.is_empty())
+                .map(|index| {
+                    index
+                        .parse()
+                        .with_context(|| format!("Invalid NFT index `{index}`"))
+                })
+                .collect::<anyhow::Result<_>>()?,
+            order: query.order,
+            limit: query.limit.unwrap_or(10),
+            offset: query.offset.unwrap_or(0),
+        };
 
         let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::GetNftItems {
-                addresses,
-                owner_addresses,
-                collection_addresses,
-                indexes: indexes.into_iter().collect(),
-                sort_by_last_transaction_lt: sort_by_last_transaction_lt.unwrap_or(false),
-                limit: limit.unwrap_or(10),
-                offset: offset.unwrap_or(0),
-                resp,
-            })
-            .await?;
+        self.tx.send(Request::GetNftItems { query, resp }).await?;
         rx.await?
     }
 
@@ -2180,26 +2202,8 @@ fn process_loop_request(
             let res = handle_get_jetton_wallets(node, query);
             let _ = resp.send(res);
         }
-        Request::GetNftItems {
-            addresses,
-            owner_addresses,
-            collection_addresses,
-            indexes,
-            sort_by_last_transaction_lt,
-            limit,
-            offset,
-            resp,
-        } => {
-            let res = handle_get_nft_items(
-                node,
-                addresses,
-                owner_addresses,
-                collection_addresses,
-                indexes,
-                sort_by_last_transaction_lt,
-                limit,
-                offset,
-            );
+        Request::GetNftItems { query, resp } => {
+            let res = handle_get_nft_items(node, query);
             let _ = resp.send(res);
         }
         Request::DetectContractData { address, resp } => {
@@ -2583,60 +2587,129 @@ fn handle_get_jetton_wallets(
         .collect())
 }
 
-#[allow(clippy::too_many_arguments)]
 fn handle_get_nft_items(
     node: &mut Node,
-    addresses: HashSet<Addr>,
-    owner_addresses: HashSet<Addr>,
-    collection_addresses: HashSet<Addr>,
-    indexes: HashSet<String>,
-    sort_by_last_transaction_lt: bool,
-    limit: usize,
-    offset: usize,
+    query: ParsedNftItemsQuery,
 ) -> anyhow::Result<Vec<storage::NftItemMeta>> {
-    for addr in &addresses {
+    for addr in &query.addresses {
         node.ensure_detected_assets_for_address(addr)?;
     }
 
-    let items = node.iter_nft_items().filter(|item| {
-        if !addresses.is_empty() && !addresses.contains(&item.address) {
-            return false;
+    let matches_query = |item: &storage::NftItemMeta| -> anyhow::Result<bool> {
+        if !query.addresses.is_empty() && !query.addresses.contains(&item.address) {
+            return Ok(false);
         }
-        if !owner_addresses.is_empty()
+        if !query.owner_addresses.is_empty()
             && !item
                 .owner_address
-                .is_some_and(|address| owner_addresses.contains(&address))
+                .is_some_and(|address| query.owner_addresses.contains(&address))
         {
-            return false;
+            return Ok(false);
         }
-        if !collection_addresses.is_empty()
+        if !query.collection_addresses.is_empty()
             && !item
                 .collection_address
-                .is_some_and(|address| collection_addresses.contains(&address))
+                .is_some_and(|address| query.collection_addresses.contains(&address))
         {
-            return false;
+            return Ok(false);
         }
-        if !indexes.is_empty() && !indexes.contains(&item.index) {
-            return false;
+        if !query.indexes.is_empty() {
+            let index = parse_stored_nft_index(item)?;
+            if !query.indexes.contains(&index) {
+                return Ok(false);
+            }
         }
-        true
-    });
+        Ok(true)
+    };
 
-    if sort_by_last_transaction_lt {
-        let mut items = items.cloned().collect::<Vec<_>>();
-        items.sort_by(|a, b| {
-            b.last_transaction_lt
-                .cmp(&a.last_transaction_lt)
-                .then_with(|| a.address.cmp(&b.address))
-        });
-        let start = offset.min(items.len());
-        let end = start.saturating_add(limit).min(items.len());
-        items.truncate(end);
-        items.drain(..start);
-        return Ok(items);
+    if query.limit == 0 {
+        return Ok(Vec::new());
+    }
+    if query.order == LocalnetNftItemsOrder::Insertion {
+        let mut result = Vec::new();
+        let mut skipped = 0;
+        for item in node.iter_nft_items() {
+            if !matches_query(item)? {
+                continue;
+            }
+            if skipped < query.offset {
+                skipped += 1;
+                continue;
+            }
+            result.push(item.clone());
+            if result.len() == query.limit {
+                break;
+            }
+        }
+        return Ok(result);
     }
 
-    Ok(items.skip(offset).take(limit).cloned().collect())
+    let mut items = Vec::new();
+    for item in node.iter_nft_items() {
+        if matches_query(item)? {
+            items.push(item.clone());
+        }
+    }
+    match query.order {
+        LocalnetNftItemsOrder::Insertion => unreachable!(),
+        LocalnetNftItemsOrder::LastTransactionLtDesc => {
+            items.sort_by(|left, right| {
+                right
+                    .last_transaction_lt
+                    .cmp(&left.last_transaction_lt)
+                    .then_with(|| left.address.cmp(&right.address))
+            });
+        }
+        LocalnetNftItemsOrder::OwnerCollectionIndex | LocalnetNftItemsOrder::CollectionIndex => {
+            let mut indexed_items = items
+                .into_iter()
+                .map(|item| {
+                    let index = parse_stored_nft_index(&item)?;
+                    Ok((item, index))
+                })
+                .collect::<anyhow::Result<Vec<_>>>()?;
+            if query.order == LocalnetNftItemsOrder::OwnerCollectionIndex {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left.owner_address
+                        .is_none()
+                        .cmp(&right.owner_address.is_none())
+                        .then_with(|| left.owner_address.cmp(&right.owner_address))
+                        .then_with(|| {
+                            left.collection_address
+                                .is_none()
+                                .cmp(&right.collection_address.is_none())
+                        })
+                        .then_with(|| left.collection_address.cmp(&right.collection_address))
+                        .then_with(|| left_index.cmp(right_index))
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            } else {
+                indexed_items.sort_by(|(left, left_index), (right, right_index)| {
+                    left_index
+                        .cmp(right_index)
+                        .then_with(|| left.address.cmp(&right.address))
+                });
+            }
+            return Ok(indexed_items
+                .into_iter()
+                .skip(query.offset)
+                .take(query.limit)
+                .map(|(item, _)| item)
+                .collect());
+        }
+    }
+
+    Ok(items
+        .into_iter()
+        .skip(query.offset)
+        .take(query.limit)
+        .collect())
+}
+
+fn parse_stored_nft_index(item: &storage::NftItemMeta) -> anyhow::Result<BigInt> {
+    item.index
+        .parse()
+        .with_context(|| format!("Invalid stored NFT index `{}`", item.index))
 }
 
 fn handle_get_transactions(
@@ -3709,6 +3782,96 @@ mod tests {
 
     fn wallet_balances(wallets: &[storage::JettonWalletMeta]) -> Vec<u128> {
         wallets.iter().map(|wallet| wallet.balance).collect()
+    }
+
+    #[test]
+    fn nft_item_queries_follow_upstream_order_precedence() {
+        let mut node = make_test_node();
+        let owner = test_addr(10);
+        let collection_a = test_addr(20);
+        let collection_b = test_addr(21);
+        for item in [
+            test_nft_item(1, owner, Some(collection_b), "10", 10),
+            test_nft_item(2, owner, Some(collection_b), "2", 40),
+            test_nft_item(3, owner, Some(collection_a), "7", 20),
+            test_nft_item(4, owner, None, "1", 30),
+        ] {
+            node.history.nft_items.insert(item.address, item);
+        }
+
+        let default = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::Insertion),
+        )
+        .expect("default NFT query must succeed");
+        assert_eq!(nft_item_addresses(&default), vec![1, 2, 3, 4]);
+
+        let mut collection_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        collection_query.collection_addresses.insert(collection_b);
+        let by_collection = handle_get_nft_items(&mut node, collection_query)
+            .expect("collection NFT query must succeed");
+        assert_eq!(nft_item_indexes(&by_collection), vec!["2", "10"]);
+
+        let mut owner_query = test_nft_items_query(LocalnetNftItemsOrder::OwnerCollectionIndex);
+        owner_query.owner_addresses.insert(owner);
+        let by_owner =
+            handle_get_nft_items(&mut node, owner_query).expect("owner NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_owner), vec![3, 2, 1, 4]);
+
+        let by_lt = handle_get_nft_items(
+            &mut node,
+            test_nft_items_query(LocalnetNftItemsOrder::LastTransactionLtDesc),
+        )
+        .expect("LT-sorted NFT query must succeed");
+        assert_eq!(nft_item_addresses(&by_lt), vec![2, 4, 3, 1]);
+
+        let mut page_query = test_nft_items_query(LocalnetNftItemsOrder::CollectionIndex);
+        page_query.collection_addresses.insert(collection_b);
+        page_query.limit = 1;
+        page_query.offset = 1;
+        let page =
+            handle_get_nft_items(&mut node, page_query).expect("paginated NFT query must succeed");
+        assert_eq!(nft_item_indexes(&page), vec!["10"]);
+    }
+
+    fn test_nft_items_query(order: LocalnetNftItemsOrder) -> ParsedNftItemsQuery {
+        ParsedNftItemsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            collection_addresses: HashSet::new(),
+            indexes: HashSet::new(),
+            order,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_nft_item(
+        id: u8,
+        owner_address: Addr,
+        collection_address: Option<Addr>,
+        index: &str,
+        last_transaction_lt: Lt,
+    ) -> storage::NftItemMeta {
+        storage::NftItemMeta {
+            address: test_addr(id),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            collection_address,
+            owner_address: Some(owner_address),
+            content: Value::Null,
+            index: index.to_owned(),
+            init: true,
+            last_transaction_lt,
+        }
+    }
+
+    fn nft_item_addresses(items: &[storage::NftItemMeta]) -> Vec<u8> {
+        items.iter().map(|item| item.address.addr[0]).collect()
+    }
+
+    fn nft_item_indexes(items: &[storage::NftItemMeta]) -> Vec<&str> {
+        items.iter().map(|item| item.index.as_str()).collect()
     }
 
     fn internal_message_boc(bounced: bool, body_words: &[u32]) -> BocBytes {

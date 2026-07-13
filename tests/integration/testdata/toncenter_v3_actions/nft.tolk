@@ -24,7 +24,7 @@ fun main() {
     val recipient = address(RECIPIENT);
     val collection = NftV1Collection.fromStorage({
         adminAddress: owner.address,
-        nextItemIndex: 0,
+        nextItemIndex: 2,
         content: NftV1CollectionContent {
             collectionMetadata: createEmptyCell(),
             commonContent: createEmptyCell(),
@@ -39,6 +39,17 @@ fun main() {
     waitForTransaction(collection.deploy(owner.address, { value: ton("1"), bounce: false }));
     waitForTransaction(collection.sendNftV1DeployItem(
         owner.address,
+        199,
+        1,
+        ton("0.2"),
+        {
+            ownerAddress: owner.address,
+            content: createEmptyCell(),
+        },
+        { value: ton("0.4"), bounce: false },
+    ));
+    waitForTransaction(collection.sendNftV1DeployItem(
+        owner.address,
         200,
         0,
         ton("0.2"),
@@ -50,6 +61,7 @@ fun main() {
     ));
 
     val item = NftV1Item.fromAddress(collection.getNftAddressByIndex(0));
+    val itemSecond = NftV1Item.fromAddress(collection.getNftAddressByIndex(1));
     waitForTransaction(item.sendNftV1Transfer(
         owner.address,
         201,
@@ -75,4 +87,5 @@ fun main() {
     println("RECIPIENT={}", recipient);
     println("NFT_COLLECTION={}", collection.address);
     println("NFT_ITEM={}", item.address);
+    println("NFT_ITEM_SECOND={}", itemSecond.address);
 }

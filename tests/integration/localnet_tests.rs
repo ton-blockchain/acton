@@ -4370,6 +4370,7 @@ fn localnet_v3_indexes_real_nft_actions() {
     let recipient = extract_canonical_addr_marker(&script_output, "RECIPIENT=");
     let nft_collection = extract_canonical_addr_marker(&script_output, "NFT_COLLECTION=");
     let nft_item = extract_canonical_addr_marker(&script_output, "NFT_ITEM=");
+    let nft_item_second = extract_canonical_addr_marker(&script_output, "NFT_ITEM_SECOND=");
 
     let deadline = Instant::now() + Duration::from_secs(12);
     let nft_transfers = loop {
@@ -4426,6 +4427,53 @@ fn localnet_v3_indexes_real_nft_actions() {
             encode_query_component(&nft_collection)
         )))
         .expect("NFT items collection index filter must match typed contract");
+    let all_items: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json("/api/v3/nft/items"))
+            .expect("unfiltered NFT items must match typed contract");
+    let items_by_collection: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("NFT collection items must match typed contract");
+    let items_by_repeated_collection: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&collection_address={}",
+            encode_query_component(&nft_collection),
+            encode_query_component(&nft_collection)
+        )))
+        .expect("repeated NFT collection filter must match typed contract");
+    let items_by_empty_index: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&index=",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("empty NFT index filter must match typed contract");
+    let items_by_owners: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?owner_address={}&owner_address={}",
+            encode_query_component(&owner),
+            encode_query_component(&recipient)
+        )))
+        .expect("multi-owner NFT items must match typed contract");
+    let items_by_lt: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&sort_by_last_transaction_lt=true",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("LT-sorted NFT items must match typed contract");
+    let first_item_page: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&limit=1",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("first NFT item page must match typed contract");
+    let second_item_page: toncenter_v3::NftItemsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/nft/items?collection_address={}&limit=1&offset=1",
+            encode_query_component(&nft_collection)
+        )))
+        .expect("second NFT item page must match typed contract");
     let (index_without_collection_status, index_without_collection) =
         node.get_json_with_status("/api/v3/nft/items?index=0");
     let incoming: toncenter_v3::NftTransfersResponse =
@@ -4527,6 +4575,17 @@ fn localnet_v3_indexes_real_nft_actions() {
             "wrong_direction_count": wrong_direction.nft_transfers.len(),
             "ascending_first_query_id": first_ascending.nft_transfers.first().map(|event| &event.query_id),
             "descending_first_query_id": first_descending.nft_transfers.first().map(|event| &event.query_id),
+        },
+        "item_ordering": {
+            "expected_insertion_addresses": [&nft_item_second, &nft_item],
+            "unfiltered_addresses": all_items.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "single_collection_indexes": items_by_collection.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "repeated_collection_indexes": items_by_repeated_collection.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "empty_index_indexes": items_by_empty_index.nft_items.iter().map(|item| &item.index).collect::<Vec<_>>(),
+            "multi_owner_addresses": items_by_owners.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "last_transaction_lt_addresses": items_by_lt.nft_items.iter().map(|item| &item.address).collect::<Vec<_>>(),
+            "first_page_index": first_item_page.nft_items.first().map(|item| &item.index),
+            "second_page_index": second_item_page.nft_items.first().map(|item| &item.index),
         },
         "actors": {
             "owner": owner,

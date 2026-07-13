@@ -10,10 +10,10 @@
     "recipient": "0:1111111111111111111111111111111111111111111111111111111111111111"
   },
   "collection": {
-    "address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "address": "0:2b882f79e45a8d0b90c4903c2b1506d746474904a0ab41153ec115852343f325",
     "address_book_has_collection": true,
     "metadata_has_collection": true,
-    "next_item_index": "1",
+    "next_item_index": "2",
     "owner_address": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c"
   },
   "filters": {
@@ -38,13 +38,45 @@
     "wrong_direction_count": 0
   },
   "item": {
-    "address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
+    "address": "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34",
     "address_book_has_item": true,
-    "collection_address": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "collection_address": "0:2b882f79e45a8d0b90c4903c2b1506d746474904a0ab41153ec115852343f325",
     "index": "0",
     "init": true,
     "metadata_has_item": true,
     "owner_address": "0:1111111111111111111111111111111111111111111111111111111111111111"
+  },
+  "item_ordering": {
+    "empty_index_indexes": [
+      "0",
+      "1"
+    ],
+    "expected_insertion_addresses": [
+      "0:8b12f02b794a2ee9704b5d2212d929c739fde95adc1071eb5412f3247d7d0259",
+      "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34"
+    ],
+    "first_page_index": "0",
+    "last_transaction_lt_addresses": [
+      "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34",
+      "0:8b12f02b794a2ee9704b5d2212d929c739fde95adc1071eb5412f3247d7d0259"
+    ],
+    "multi_owner_addresses": [
+      "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34",
+      "0:8b12f02b794a2ee9704b5d2212d929c739fde95adc1071eb5412f3247d7d0259"
+    ],
+    "repeated_collection_indexes": [
+      "1",
+      "0"
+    ],
+    "second_page_index": "1",
+    "single_collection_indexes": [
+      "0",
+      "1"
+    ],
+    "unfiltered_addresses": [
+      "0:8b12f02b794a2ee9704b5d2212d929c739fde95adc1071eb5412f3247d7d0259",
+      "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34"
+    ]
   },
   "transfer": {
     "address_book_has_recipient": true,
@@ -52,8 +84,8 @@
     "forward_amount": "10000000",
     "metadata_has_item": true,
     "new_owner": "0:1111111111111111111111111111111111111111111111111111111111111111",
-    "nft_address": "0:954d9ff237f85ec7a4295534ee9498c625e6cd2d87e3084816a34d4b3d2036bb",
-    "nft_collection": "0:3d4dada29bf556529cce39e659c08a57b1ebf247983d7dd5d491060192d397e3",
+    "nft_address": "0:dfa69143e133a7bd43996806a546c8a0c7f54c2a7e33e4cc021b66b2a366dc34",
+    "nft_collection": "0:2b882f79e45a8d0b90c4903c2b1506d746474904a0ab41153ec115852343f325",
     "old_owner": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
     "query_id": "201",
     "response_destination": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",

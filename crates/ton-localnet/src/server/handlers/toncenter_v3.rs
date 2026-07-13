@@ -6,8 +6,8 @@ use crate::api::{toncenter_emulate, toncenter_v2 as v2, toncenter_v3, toncenter_
 use crate::error::LocalnetError;
 use crate::localnet;
 use crate::localnet::{
-    Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery, LocalnetSortOrder,
-    LocalnetTransaction,
+    Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery,
+    LocalnetNftItemsOrder, LocalnetNftItemsQuery, LocalnetSortOrder, LocalnetTransaction,
 };
 use crate::storage::{
     AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta, TraceNode,
@@ -731,6 +731,15 @@ pub async fn get_nft_items(
     }
     let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
     let include_on_sale = payload.include_on_sale.unwrap_or(false);
+    let order = if payload.sort_by_last_transaction_lt.unwrap_or(false) {
+        LocalnetNftItemsOrder::LastTransactionLtDesc
+    } else if payload.collection_address.len() == 1 {
+        LocalnetNftItemsOrder::CollectionIndex
+    } else if !payload.owner_address.is_empty() {
+        LocalnetNftItemsOrder::OwnerCollectionIndex
+    } else {
+        LocalnetNftItemsOrder::Insertion
+    };
     let real_owner_filter = if include_on_sale && !payload.owner_address.is_empty() {
         parse!(parse_address_set(&payload.owner_address))
     } else {
@@ -742,23 +751,23 @@ pub async fn get_nft_items(
         Vec::new()
     };
     let mut items = match node
-        .get_nft_items(
-            payload.address,
-            query_owner,
-            payload.collection_address,
-            payload.index,
-            payload.sort_by_last_transaction_lt,
-            Some(if real_owner_filter.is_empty() {
+        .get_nft_items(LocalnetNftItemsQuery {
+            addresses: payload.address,
+            owner_addresses: query_owner,
+            collection_addresses: payload.collection_address,
+            indexes: payload.index,
+            order,
+            limit: Some(if real_owner_filter.is_empty() {
                 limit
             } else {
                 usize::MAX
             }),
-            Some(if real_owner_filter.is_empty() {
+            offset: Some(if real_owner_filter.is_empty() {
                 offset
             } else {
                 0
             }),
-        )
+        })
         .await
     {
         Ok(items) => items,
@@ -1477,20 +1486,20 @@ async fn load_jetton_event_context(
 }
 
 async fn load_nft_items(node: &Localnet, addresses: Vec<Addr>) -> anyhow::Result<Vec<NftItemMeta>> {
-    node.get_nft_items(
-        addresses
+    node.get_nft_items(LocalnetNftItemsQuery {
+        addresses: addresses
             .into_iter()
             .collect::<HashSet<_>>()
             .into_iter()
             .map(|address| address.to_string())
             .collect(),
-        Vec::new(),
-        Vec::new(),
-        Vec::new(),
-        None,
-        Some(usize::MAX),
-        Some(0),
-    )
+        owner_addresses: Vec::new(),
+        collection_addresses: Vec::new(),
+        indexes: Vec::new(),
+        order: LocalnetNftItemsOrder::Insertion,
+        limit: Some(usize::MAX),
+        offset: Some(0),
+    })
     .await
 }
 

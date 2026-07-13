@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 11 | 5 | 8 |
-| High | 10 | 5 | 22 |
+| High | 11 | 5 | 21 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **21** | **11** | **33** |
+| **Total** | **22** | **11** | **32** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -79,6 +79,7 @@ open until their normative contract is chosen.
 | V3-11 jetton wallet sorting | Partial | Explicit balance sorting and filter-dependent ordering follow upstream precedence. Local insertion order approximates database ID order; unclaimed mintless amounts remain unavailable. |
 | V3-13 event DTO/order | Partial | Jetton transfer filtering uses the transaction's explicit TL-B `aborted` flag and excludes aborted transfers while retaining aborted burns. All three event routes switch from LT to time ordering when a time bound is present. Trace IDs remain open. |
 | V3-14 vesting | Fixed | Empty and combined filters follow upstream AND semantics, including optional whitelist matching. Results are ordered before pagination by first local transaction LT and address. A two-contract stateful test covers empty and non-empty TVM dictionaries, repeated unfiltered reads, combined matches/misses, and page boundaries. |
+| V3-15 NFT items | Fixed | Query order follows upstream precedence: insertion/ID order by default, numeric index order for one collection, owner/collection/index order for owner filters, and LT descending when requested. Empty indexes are ignored and repeated collection filters retain multi-filter semantics. Synthetic numeric/null-order cases and two backfilled real items cover pagination. |
 | V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
@@ -136,7 +137,7 @@ These are the highest-value targets for the next differential test pass:
 | P1 | Source trace | Absolute imports can escape the temporary root and requested compiler versions are not actually selected. |
 
 The inventory contains 105 mounted routes: 19 Critical, 53 High, 21 Medium, and 12 Low. Current
-endpoint-test depth is 10 at grade A, 50 at B, 34 at C, 4 at D, and 7 with no endpoint test. The
+endpoint-test depth is 11 at grade A, 49 at B, 34 at C, 4 at D, and 7 with no endpoint test. The
 cross-cutting middleware and fallback rows are not included in these counts.
 
 The current coverage report (`target/coverage/localnet/summary-no-liteapi.json`) reports 87.52% line,
@@ -320,7 +321,7 @@ coverage is high.
 | `GET /api/v3/jetton/wallets` | Critical | B | Balance and filter-dependent ordering, mintless/zero balances, destroyed/frozen/code-upgraded wallets. |
 | `GET /api/v3/jetton/transfers` | Critical | B | Aborted tx exclusion, trace ID, destroyed wallet history, time ordering and parser errors. |
 | `GET /api/v3/jetton/burns` | High | B | Trace ID, destroyed wallet history, time ordering, malformed bodies and parser errors. |
-| `GET /api/v3/nft/items` | High | B | Stable default ordering, multi-collection validation, destroyed items and rare sale types. |
+| `GET /api/v3/nft/items` | High | A | Two backfilled real items cover default, owner, single/repeated collection, empty-index, LT, and page ordering; destroyed items and rare sale types remain. |
 | `GET /api/v3/nft/collections` | High | B | Upstream order, scan cost, metadata variants, destroyed collections and stable pagination. |
 | `GET /api/v3/nft/sales` | High | B | Auctions, telemint/version variants, completed/destroyed sales, pagination and price edge cases. |
 | `GET /api/v3/nft/transfers` | Critical | B | Trace ID, destroyed item history, time ordering, bounced/aborted semantics and parser errors. |
@@ -371,8 +372,9 @@ coverage is high.
 14. **V3-14, vesting (fixed):** requests permit no filter or both filters with upstream AND and
     optional whitelist semantics. Empty TVM dictionary values decode as an absent cell, and results
     are deterministically ordered before pagination by first local transaction LT and address.
-15. **V3-15, NFT items:** default pagination follows map iteration and multi-collection validation
-    is absent.
+15. **V3-15, NFT items (fixed):** default pagination follows insertion/ID order; one collection
+    sorts by numeric index, owner filters sort by owner/collection/index, repeated or multiple
+    collections retain upstream multi-filter ordering, and empty index values are ignored.
 16. **V3-16, DNS:** default result order is unstable; upstream orders by domain length and name.
 17. **V3-17, other collection ordering:** jetton masters, NFT collections, and multisig routes use
     unstable or different pagination keys from the upstream database ID order.
@@ -518,9 +520,9 @@ coverage is high.
 
 1. Create at least two jetton wallets with different balances/LTs and multiple masters/owners;
    assert upstream validation and sort order.
-2. Create multiple DNS, NFT, jetton-master, collection, and multisig records; request every page
-   repeatedly and after unrelated map insertions to detect duplicates, gaps, and unstable order.
-   Two real vesting contracts, including an empty whitelist, are covered.
+2. Create multiple DNS, distinct NFT collections, jetton-master, collection, and multisig records;
+   request every page repeatedly and after unrelated map insertions to detect duplicates, gaps, and
+   unstable order. Two backfilled NFT items and two real vesting contracts are covered.
 3. Cover rare NFT sale implementations: completed/destroyed fixed-price sales, auctions, telemint,
    and items whose owner/collection changes after their indexed events.
 4. Publish one multi-transaction commit and assert exactly one logical streaming notification;

@@ -1,6 +1,7 @@
 use crate::api::toncenter_v3;
 use crate::localnet::{
-    Localnet, LocalnetJettonWalletsQuery, LocalnetTransaction, convert_to_tx_struct,
+    Localnet, LocalnetJettonWalletsQuery, LocalnetNftItemsOrder, LocalnetNftItemsQuery,
+    LocalnetTransaction, convert_to_tx_struct,
 };
 use crate::storage;
 use crate::storage::TraceNode;
@@ -611,15 +612,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let items = node
-        .get_nft_items(
-            vec![address_str.clone()],
-            Vec::new(),
-            Vec::new(),
-            Vec::new(),
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_nft_items(LocalnetNftItemsQuery {
+            addresses: vec![address_str.clone()],
+            owner_addresses: Vec::new(),
+            collection_addresses: Vec::new(),
+            indexes: Vec::new(),
+            order: LocalnetNftItemsOrder::Insertion,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(item) = items.first() {
         info.interfaces.insert("nft_item".to_string());
@@ -628,15 +629,15 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
     }
 
     let collections = node
-        .get_nft_items(
-            Vec::new(),
-            Vec::new(),
-            vec![address_str],
-            Vec::new(),
-            Some(false),
-            Some(1),
-            Some(0),
-        )
+        .get_nft_items(LocalnetNftItemsQuery {
+            addresses: Vec::new(),
+            owner_addresses: Vec::new(),
+            collection_addresses: vec![address_str],
+            indexes: Vec::new(),
+            order: LocalnetNftItemsOrder::CollectionIndex,
+            limit: Some(1),
+            offset: Some(0),
+        })
         .await?;
     if let Some(item) = collections.first() {
         info.interfaces.insert("nft_collection".to_string());
