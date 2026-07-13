@@ -18,6 +18,14 @@
       "101",
       "103"
     ],
+    "wallet_balances_ascending": [
+      "100",
+      "850"
+    ],
+    "wallet_balances_descending": [
+      "850",
+      "100"
+    ],
     "wrong_direction_count": 0
   },
   "jetton": {

@@ -4253,6 +4253,18 @@ fn localnet_v3_indexes_real_jetton_actions() {
             encode_query_component(&recipient_wallet)
         )))
         .expect("jetton wallets response must match typed contract");
+    let wallets_ascending: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?jetton_address={}&sort=asc",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("ascending jetton wallets must match typed contract");
+    let wallets_descending: toncenter_v3::JettonWalletsResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/wallets?jetton_address={}&sort=desc",
+            encode_query_component(&jetton_master)
+        )))
+        .expect("descending jetton wallets must match typed contract");
     let transfer = jetton_transfers
         .jetton_transfers
         .iter()
@@ -4354,6 +4366,8 @@ fn localnet_v3_indexes_real_jetton_actions() {
             "ascending_first_query_id": first_ascending.jetton_transfers.first().map(|event| &event.query_id),
             "descending_first_query_id": first_descending.jetton_transfers.first().map(|event| &event.query_id),
             "burn_query_ids": burns_by_owner_and_master.jetton_burns.iter().map(|event| &event.query_id).collect::<Vec<_>>(),
+            "wallet_balances_ascending": wallets_ascending.jetton_wallets.iter().map(|wallet| &wallet.balance).collect::<Vec<_>>(),
+            "wallet_balances_descending": wallets_descending.jetton_wallets.iter().map(|wallet| &wallet.balance).collect::<Vec<_>>(),
         },
         "actors": {
             "owner": owner,

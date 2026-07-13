@@ -302,7 +302,7 @@ coverage is high.
 | `POST /api/v3/estimateFee` | High | B | State init, signature checking, bounce/storage/IHR fees and config changes against upstream. |
 | `POST /api/v3/runGetMethod` | High | B | Nested stack values, failed exit codes, historical seqno, malformed result stack and libraries. |
 | `GET /api/v3/jetton/masters` | High | B | Stable unfiltered pagination, deterministic admin, metadata variants and destroyed masters. |
-| `GET /api/v3/jetton/wallets` | Critical | B | Balance sorting, multi-master validation, mintless/zero balances, destroyed/frozen/code-upgraded wallets. |
+| `GET /api/v3/jetton/wallets` | Critical | B | Balance and filter-dependent ordering, mintless/zero balances, destroyed/frozen/code-upgraded wallets. |
 | `GET /api/v3/jetton/transfers` | Critical | B | Aborted tx exclusion, trace ID, destroyed wallet history, time ordering and parser errors. |
 | `GET /api/v3/jetton/burns` | High | B | Trace ID, destroyed wallet history, time ordering, malformed bodies and parser errors. |
 | `GET /api/v3/nft/items` | High | B | Stable default ordering, multi-collection validation, destroyed items and rare sale types. |
@@ -341,8 +341,10 @@ coverage is high.
    catchain fields are hardcoded. Selector dependencies are stricter than upstream.
 10. **V3-10, account states:** local synthesizes `nonexist` rows upstream does not return, omits
     contract methods, and lacks the upstream `code_hash` filter.
-11. **V3-11, jetton wallet sorting:** `sort` orders by last transaction LT locally but by balance
-    upstream. Required validation for multiple masters plus owner is missing.
+11. **V3-11, jetton wallet sorting (partially fixed):** explicit `sort` orders by balance, while
+    absent sorting and address, owner, or single-master filters follow the upstream ordering
+    precedence. Local insertion order approximates the upstream database ID; zero-balance filtering
+    still cannot include an unclaimed mintless amount that local discovery does not store.
 12. **V3-12, historical event loss:** jetton and NFT event handlers rediscover current wallets or
     items before exposing old events. Destroyed, frozen, or code-upgraded contracts can erase
     historical results. Parser errors are silently swallowed with `.ok().flatten()`.

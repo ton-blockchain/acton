@@ -141,9 +141,15 @@ pub struct LocalnetJettonWalletsQuery {
     pub owner_addresses: Vec<String>,
     pub jetton_addresses: Vec<String>,
     pub exclude_zero_balance: Option<bool>,
-    pub descending: bool,
+    pub sort: Option<LocalnetSortOrder>,
     pub limit: Option<usize>,
     pub offset: Option<usize>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum LocalnetSortOrder {
+    Asc,
+    Desc,
 }
 
 #[derive(Debug)]
@@ -152,7 +158,7 @@ pub(crate) struct ParsedJettonWalletsQuery {
     owner_addresses: HashSet<Addr>,
     jetton_addresses: HashSet<Addr>,
     exclude_zero_balance: bool,
-    descending: bool,
+    sort: Option<LocalnetSortOrder>,
     limit: usize,
     offset: usize,
 }
@@ -1467,7 +1473,7 @@ impl Localnet {
             owner_addresses: Self::parse_addresses(query.owner_addresses)?,
             jetton_addresses: Self::parse_addresses(query.jetton_addresses)?,
             exclude_zero_balance: query.exclude_zero_balance.unwrap_or(false),
-            descending: query.descending,
+            sort: query.sort,
             limit: query.limit.unwrap_or(10),
             offset: query.offset.unwrap_or(0),
         };
@@ -2525,7 +2531,9 @@ fn handle_get_jetton_wallets(
 
     let mut wallets = node
         .iter_jetton_wallets()
+        .enumerate()
         .filter(|wallet| {
+            let wallet = wallet.1;
             if !query.addresses.is_empty() && !query.addresses.contains(&wallet.address) {
                 return false;
             }
@@ -2544,20 +2552,34 @@ fn handle_get_jetton_wallets(
             }
             true
         })
-        .cloned()
+        .map(|(id, wallet)| (id, wallet.clone()))
         .collect::<Vec<_>>();
-    wallets.sort_by(|a, b| {
-        a.last_transaction_lt
-            .cmp(&b.last_transaction_lt)
-            .then_with(|| a.address.cmp(&b.address))
+    wallets.sort_by(|(left_id, left), (right_id, right)| {
+        let compare_sort_column = || match query.sort {
+            Some(LocalnetSortOrder::Asc) => left.balance.cmp(&right.balance),
+            Some(LocalnetSortOrder::Desc) => right.balance.cmp(&left.balance),
+            None => left_id.cmp(right_id),
+        };
+
+        if query.jetton_addresses.len() == 1 {
+            left.jetton_address
+                .cmp(&right.jetton_address)
+                .then_with(compare_sort_column)
+        } else if !query.owner_addresses.is_empty() {
+            left.owner_address
+                .cmp(&right.owner_address)
+                .then_with(compare_sort_column)
+        } else if !query.addresses.is_empty() {
+            left.address.cmp(&right.address)
+        } else {
+            compare_sort_column()
+        }
     });
-    if query.descending {
-        wallets.reverse();
-    }
     Ok(wallets
         .into_iter()
         .skip(query.offset)
         .take(query.limit)
+        .map(|(_, wallet)| wallet)
         .collect())
 }
 
@@ -3584,6 +3606,109 @@ mod tests {
         let config_boc = BocBytes::from_base64(DEFAULT_CONFIG).expect("must decode default config");
         Node::new(Box::new(NoopExecutor), config_boc, StateSource::Local)
             .expect("must create test node")
+    }
+
+    #[test]
+    fn jetton_wallet_queries_follow_upstream_sort_precedence() {
+        let mut node = make_test_node();
+        let owner_a = test_addr(10);
+        let owner_b = test_addr(11);
+        let master_a = test_addr(20);
+        let master_b = test_addr(21);
+        for wallet in [
+            test_jetton_wallet(1, owner_b, master_a, 300, 10),
+            test_jetton_wallet(2, owner_a, master_a, 100, 30),
+            test_jetton_wallet(3, owner_a, master_b, 200, 20),
+            test_jetton_wallet(4, owner_b, master_b, 0, 40),
+        ] {
+            node.history.jetton_wallets.insert(wallet.address, wallet);
+        }
+
+        let default = handle_get_jetton_wallets(&mut node, test_jetton_wallet_query(None))
+            .expect("default query must succeed");
+        assert_eq!(wallet_addresses(&default), vec![1, 2, 3, 4]);
+
+        let ascending = handle_get_jetton_wallets(
+            &mut node,
+            test_jetton_wallet_query(Some(LocalnetSortOrder::Asc)),
+        )
+        .expect("ascending query must succeed");
+        assert_eq!(wallet_balances(&ascending), vec![0, 100, 200, 300]);
+
+        let mut descending_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        descending_query.offset = 1;
+        descending_query.limit = 2;
+        let descending = handle_get_jetton_wallets(&mut node, descending_query)
+            .expect("descending page must succeed");
+        assert_eq!(wallet_balances(&descending), vec![200, 100]);
+
+        let mut address_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        address_query.addresses = HashSet::from([test_addr(3), test_addr(1)]);
+        let by_address = handle_get_jetton_wallets(&mut node, address_query)
+            .expect("address query must succeed");
+        assert_eq!(wallet_addresses(&by_address), vec![1, 3]);
+
+        let mut owner_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        owner_query.owner_addresses.insert(owner_a);
+        let by_owner =
+            handle_get_jetton_wallets(&mut node, owner_query).expect("owner query must succeed");
+        assert_eq!(wallet_balances(&by_owner), vec![200, 100]);
+
+        let mut combined_query = test_jetton_wallet_query(Some(LocalnetSortOrder::Desc));
+        combined_query.owner_addresses.insert(owner_a);
+        combined_query.jetton_addresses.insert(master_a);
+        let combined = handle_get_jetton_wallets(&mut node, combined_query)
+            .expect("combined owner and jetton query must succeed");
+        assert_eq!(wallet_addresses(&combined), vec![2]);
+
+        let mut nonzero_query = test_jetton_wallet_query(None);
+        nonzero_query.exclude_zero_balance = true;
+        let nonzero = handle_get_jetton_wallets(&mut node, nonzero_query)
+            .expect("nonzero query must succeed");
+        assert_eq!(wallet_addresses(&nonzero), vec![1, 2, 3]);
+    }
+
+    fn test_jetton_wallet_query(sort: Option<LocalnetSortOrder>) -> ParsedJettonWalletsQuery {
+        ParsedJettonWalletsQuery {
+            addresses: HashSet::new(),
+            owner_addresses: HashSet::new(),
+            jetton_addresses: HashSet::new(),
+            exclude_zero_balance: false,
+            sort,
+            limit: usize::MAX,
+            offset: 0,
+        }
+    }
+
+    fn test_jetton_wallet(
+        id: u8,
+        owner_address: Addr,
+        jetton_address: Addr,
+        balance: u128,
+        last_transaction_lt: Lt,
+    ) -> storage::JettonWalletMeta {
+        storage::JettonWalletMeta {
+            address: test_addr(id),
+            balance,
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_address,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt,
+            mintless_is_claimed: None,
+            owner_address,
+        }
+    }
+
+    fn wallet_addresses(wallets: &[storage::JettonWalletMeta]) -> Vec<u8> {
+        wallets
+            .iter()
+            .map(|wallet| wallet.address.addr[0])
+            .collect()
+    }
+
+    fn wallet_balances(wallets: &[storage::JettonWalletMeta]) -> Vec<u128> {
+        wallets.iter().map(|wallet| wallet.balance).collect()
     }
 
     fn internal_message_boc(bounced: bool, body_words: &[u32]) -> BocBytes {

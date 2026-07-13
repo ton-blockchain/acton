@@ -6,7 +6,8 @@ use crate::api::{toncenter_emulate, toncenter_v2 as v2, toncenter_v3, toncenter_
 use crate::error::LocalnetError;
 use crate::localnet;
 use crate::localnet::{
-    Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery, LocalnetTransaction,
+    Localnet, LocalnetBlock, LocalnetContractData, LocalnetJettonWalletsQuery, LocalnetSortOrder,
+    LocalnetTransaction,
 };
 use crate::storage::{
     AccountStatus, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta, TraceNode,
@@ -665,14 +666,20 @@ pub async fn get_jetton_wallets(
 ) -> impl IntoResponse {
     let payload = parse!(parse_v3_query::<JettonWalletsQuery>(raw_query.as_deref()));
     let (limit, offset) = parse!(parse_limit_offset(payload.limit, payload.offset));
-    let sort = parse!(parse_sort(payload.sort));
+    let sort = match payload.sort {
+        Some(sort) => Some(parse!(parse_sort(Some(sort)))),
+        None => None,
+    };
     let wallets = match node
         .get_jetton_wallets(LocalnetJettonWalletsQuery {
             addresses: payload.address,
             owner_addresses: payload.owner_address,
             jetton_addresses: payload.jetton_address,
             exclude_zero_balance: payload.exclude_zero_balance,
-            descending: matches!(sort, SortOrder::Desc),
+            sort: sort.map(|sort| match sort {
+                SortOrder::Asc => LocalnetSortOrder::Asc,
+                SortOrder::Desc => LocalnetSortOrder::Desc,
+            }),
             limit: Some(limit),
             offset: Some(offset),
         })
@@ -1434,7 +1441,7 @@ async fn load_jetton_event_context(
             owner_addresses: Vec::new(),
             jetton_addresses: Vec::new(),
             exclude_zero_balance: None,
-            descending: false,
+            sort: None,
             limit: Some(usize::MAX),
             offset: Some(0),
         })

@@ -444,7 +444,7 @@ async fn jettons_notification(
             owner_addresses: Vec::new(),
             jetton_addresses: Vec::new(),
             exclude_zero_balance: Some(false),
-            descending: true,
+            sort: None,
             limit: Some(1),
             offset: Some(0),
         })
@@ -589,7 +589,7 @@ async fn collect_address_info(node: &Localnet, address: Addr) -> anyhow::Result<
             owner_addresses: Vec::new(),
             jetton_addresses: Vec::new(),
             exclude_zero_balance: Some(false),
-            descending: true,
+            sort: None,
             limit: Some(1),
             offset: Some(0),
         })
