@@ -43,7 +43,7 @@ still defects because they violate schemas even under those limitations.
 | V2-02 JSON-RPC envelope | Fixed | The incoming proxy DTO accepts method-only requests and upstream params normalization; local and live tests cover ignored metadata and every params shape. |
 | V2-03 JSON-RPC `getShards` | Fixed | Dispatch now uses the upstream method name; the non-upstream `shards` name is rejected and local/live typed responses are covered. |
 | V2-04 account status | Fixed | REST and JSON-RPC use the same V2 status mapper; a no-state account is covered through both transports. |
-| V2-06 validation errors | Partial | Shared V2 validation, JSON-RPC field parsing, and all block request parsers now return typed 422 envelopes. Axum extractor rejections and locate-miss semantics remain open. |
+| V2-06 validation errors | Partial | Shared V2 validation, JSON-RPC field parsing, block request parsers, and transaction lookup validation now return typed envelopes. Axum extractor rejections remain open. |
 | V2-07 positive `seqno` | Fixed | All account, shard-account, wallet, token, and config entry points reject explicit zero, negative, and values above signed int32; REST and JSON-RPC are snapshot-covered. |
 | V2-08 token history | Fixed | `getTokenData` detects assets from the account state at the requested block. Real jetton supply/balance and NFT collection/owner transitions are snapshot-covered through typed REST and JSON-RPC responses. |
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
@@ -52,11 +52,12 @@ still defects because they violate schemas even under those limitations.
 | V2-16 block headers | Fixed | The response is populated from the serialized block's `BlockInfo`, including the real global ID, key-block fields, and previous block IDs. Basechain/masterchain headers and single/both hash selectors are snapshot-covered. |
 | V2-17 block transactions | Fixed | Zero and unknown cursors start at the first transaction, exact cursors are exclusive, short transaction mode is 135, single block hashes are lookup hints, and validation is typed 422. Generated localnet masterchain blocks have no account blocks, so their empty result is faithful to the source block. |
 | V2-18 block lookup | Fixed | REST and JSON-RPC require exactly one signed-range selector; seqno, LT, time, zero values, missing selectors, and combined selectors are snapshot-covered. |
-| V2-22 numeric ranges | Partial | Get-method IDs, seqnos, account transaction fields, block transaction fields, lookup selectors, and shard seqnos now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
+| V2-22 numeric ranges | Partial | Get-method IDs, seqnos, account transaction fields, block transaction fields, lookup selectors, locate created LT, and shard seqnos now use the upstream signed ranges; the remaining V2 numeric fields are still open. |
 | V2-23 getter result stack | Fixed | Both result formats propagate BOC/conversion errors, enforce the upstream depth-100 boundary, and map that boundary to HTTP 533. |
 | V2-24 config aliases | Fixed | `getConfigParam` requires exactly one of `param` and `config_id`; both valid aliases and both invalid selector shapes are covered. |
 | V2-25 Std zero cursor | Fixed | `getTransactions` treats `lt=0` as absent, while `getTransactionsStd` preserves it as a supplied cursor and returns the canonical empty page for any paired hash. |
 | V2-26 archival | Accepted | Localnet retains its complete local account history, so selecting an archival worker has no local meaning. Both flag values follow the same typed and snapshot-covered path. |
+| V2-27 transaction lookup | Fixed | All three locate routes share typed address/LT parsing, return the upstream 404 for a miss, deterministically select duplicate tuples, and use the existing outgoing-message index. Real incoming/source transactions plus REST/JSON-RPC errors and boundaries are snapshot-covered. |
 
 ## Rating model
 
@@ -99,7 +100,7 @@ These are the highest-value targets for the next differential test pass:
 
 | Priority | Surface | Why it is dangerous |
 |---|---|---|
-| P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope, and locate misses can become internal errors. |
+| P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
 | P0 | V3 message-derived queries | `transactionsByMessage` and `pendingTransactions` accept invalid empty filters and use incompatible identity/direction rules. |
 | P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs, abort filtering, ordering, and parser failure handling are wrong. |
@@ -135,8 +136,8 @@ coverage is high.
 | Surface | Risk | Coverage | Finding or missing evidence |
 |---|---|---|---|
 | V2 GET/POST parity | Accepted | N/A | Upstream accepts GET and POST for most read operations; localnet intentionally exposes only GET for read-only operations. |
-| V2 error envelope | High | C | Parse errors, Axum extraction errors, backend errors, and not-found results produce 400/500/plain responses instead of upstream 404/422 Tonlib envelopes. |
-| V2 numeric domains | Medium | D | Local unsigned fields accept values above upstream signed `int32`/`int64` ranges. |
+| V2 error envelope | High | C | Shared parsers and transaction not-found paths use typed Tonlib envelopes; Axum extraction and unclassified backend errors can still produce incompatible responses. |
+| V2 numeric domains | Medium | C | The high-risk signed ranges are covered, but some remaining unsigned local fields can still accept values above upstream `int32`/`int64` schema limits. |
 | V3 error status mapping | High | C | Backend failures collapse to 500 and most validation failures use 400; upstream distinguishes 404, 409, and 422. |
 | V3 collection pagination | High | C | Multiple handlers scan local maps and paginate before imposing an upstream-compatible stable order. |
 | V3 discovery cost | High | C | Several unfiltered endpoints run contract detectors across all accounts; malformed contracts can fail a whole request. |
@@ -177,9 +178,9 @@ coverage is high.
 | `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
 | `GET /api/v2/getTransactions` | High | A | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
 | `GET /api/v2/getTransactionsStd` | High | A | `lt=0` with hash, exact/unknown cursor, previous transaction boundary, `to_lt` equality. |
-| `GET /api/v2/tryLocateTx` | High | C | Not-found 404, ambiguous identical tuples, and created-LT boundaries. |
-| `GET /api/v2/tryLocateResultTx` | High | C | Not-found 404, ambiguity, fork/archive lookup. |
-| `GET /api/v2/tryLocateSourceTx` | High | C | Not-found 404, ambiguity and full-scan cost, fork behavior. |
+| `GET /api/v2/tryLocateTx` | High | A | Real incoming-message lookup, alias parity, not-found 404, invalid addresses, and signed created-LT boundaries are covered. |
+| `GET /api/v2/tryLocateResultTx` | High | A | Real result lookup, REST/RPC parity, deterministic duplicate selection, and typed validation are covered; fork history remains a separate fixture gap. |
+| `GET /api/v2/tryLocateSourceTx` | High | A | Real indexed source lookup, REST/RPC parity, message linkage, not-found 404, and typed validation are covered. |
 | `GET /api/v2/getConfigParam` | High | C | Both aliases together, historical mutation, seqno zero, missing param/config cell, status mapping. |
 | `GET /api/v2/getConfigAll` | High | C | Historical config mutation, seqno zero, and old/missing blocks. |
 | `GET /api/v2/getBlockHeader` | Critical | A | All serialized fields, base/masterchain, single/both hashes, and previous blocks are covered; split/merge/key blocks are outside the current single-shard model. |
@@ -206,8 +207,8 @@ coverage is high.
    V2 `uninitialized`.
 5. **V2-05, transport (accepted):** most read routes lack the POST form supported by the C++
    server. This is an intentional localnet simplification and is not scheduled for a fix.
-6. **V2-06, errors:** invalid requests commonly become 400/500 or Axum text instead of a 422
-   Tonlib envelope; locate misses that are 404 upstream can become 500.
+6. **V2-06, errors (partially fixed):** shared request parsers and locate misses now use typed
+   Tonlib envelopes; Axum extractor rejections can still bypass them.
 7. **V2-07, zero seqno:** account, balance, state, wallet, token, and config handlers accept zero
    and resolve it to the current head; upstream rejects an explicitly supplied zero.
 8. **V2-08, token history (fixed):** `getTokenData` detects token data from the account state at
@@ -242,8 +243,9 @@ coverage is high.
 21. **V2-21, historical account fields:** `sync_utime` remains current node time and `suspended` is
     always false.
 22. **V2-22, numeric ranges (partially fixed):** get-method IDs, seqnos, account/block transaction
-    fields, lookup selectors, and shard seqnos use upstream signed ranges. Other local unsigned
-    request fields can still accept values that cannot be represented by upstream schema types.
+    fields, lookup selectors, locate created LT, and shard seqnos use upstream signed ranges. Other
+    local unsigned request fields can still accept values that cannot be represented by upstream
+    schema types.
 23. **V2-23, getter result stack (fixed):** both result formats now reject depth 100 or more with
     code 533 and propagate BOC, tuple, and wire-conversion failures instead of returning a
     successful empty stack.
@@ -253,6 +255,9 @@ coverage is high.
     a supplied cursor, unlike the intentionally different regular transaction endpoint.
 26. **V2-26, archival (accepted):** localnet keeps complete local history and has no separate
     archival worker, so `archival=true` and `false` intentionally select the same data.
+27. **V2-27, transaction lookup (fixed):** all locate variants share address and signed-LT
+    validation, return the upstream 404 miss, choose duplicate message tuples deterministically,
+    and reuse the outgoing-message index for source transactions.
 
 ## TonCenter V3 routes
 

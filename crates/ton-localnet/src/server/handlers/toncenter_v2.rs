@@ -1,6 +1,8 @@
 use super::utils::{ToncenterHttpError, get_extra, handle_result, parse_method_name};
 use crate::api::toncenter_v2 as v2;
-use crate::localnet::{Localnet, LocalnetBlockHeader, LocalnetBlockTransactions};
+use crate::localnet::{
+    Localnet, LocalnetBlockHeader, LocalnetBlockTransactions, TransactionLookupKind,
+};
 use crate::types::{Addr, Hash256};
 use axum::{
     Json,
@@ -244,9 +246,14 @@ pub async fn try_locate_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
-    let created_lt = parse!(payload.created_lt.to_u64());
+    let request = parse!(parse_try_locate_tx_request(&payload));
     handle_result(
-        node.try_locate_tx(payload.source, payload.destination, created_lt),
+        node.locate_transaction(
+            request.source,
+            request.destination,
+            request.created_lt,
+            TransactionLookupKind::Result,
+        ),
         v2::map_transaction,
     )
     .await
@@ -256,9 +263,14 @@ pub async fn try_locate_result_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
-    let created_lt = parse!(payload.created_lt.to_u64());
+    let request = parse!(parse_try_locate_tx_request(&payload));
     handle_result(
-        node.try_locate_result_tx(payload.source, payload.destination, created_lt),
+        node.locate_transaction(
+            request.source,
+            request.destination,
+            request.created_lt,
+            TransactionLookupKind::Result,
+        ),
         v2::map_transaction,
     )
     .await
@@ -268,9 +280,14 @@ pub async fn try_locate_source_tx(
     State(node): State<Arc<Localnet>>,
     Query(payload): Query<TryLocateTxRequest>,
 ) -> Response {
-    let created_lt = parse!(payload.created_lt.to_u64());
+    let request = parse!(parse_try_locate_tx_request(&payload));
     handle_result(
-        node.try_locate_source_tx(payload.source, payload.destination, created_lt),
+        node.locate_transaction(
+            request.source,
+            request.destination,
+            request.created_lt,
+            TransactionLookupKind::Source,
+        ),
         v2::map_transaction,
     )
     .await
@@ -475,6 +492,31 @@ fn detect_given_type(address: &str, bounceable: bool) -> &'static str {
 fn parse_hash_any(hash: &str) -> anyhow::Result<Hash256> {
     hash.parse()
         .map_err(|_| ToncenterHttpError::unprocessable_entity("Invalid hash format"))
+}
+
+pub(super) struct ParsedTryLocateTxRequest {
+    pub source: Addr,
+    pub destination: Addr,
+    pub created_lt: u64,
+}
+
+pub(super) fn parse_try_locate_tx_request(
+    payload: &TryLocateTxRequest,
+) -> anyhow::Result<ParsedTryLocateTxRequest> {
+    let created_lt = payload.created_lt.to_i64().map_err(|_| {
+        ToncenterHttpError::unprocessable_entity("created_lt should be a signed 64-bit integer")
+    })?;
+    if created_lt < 0 {
+        return Err(ToncenterHttpError::unprocessable_entity(
+            "created_lt should be non-negative",
+        ));
+    }
+
+    Ok(ParsedTryLocateTxRequest {
+        source: Addr::parse(&payload.source)?,
+        destination: Addr::parse(&payload.destination)?,
+        created_lt: created_lt as u64,
+    })
 }
 
 pub(super) fn parse_config_param(payload: &ConfigParamRequest) -> anyhow::Result<u32> {

@@ -1,0 +1,68 @@
+{
+  "destination_lookup": {
+    "alias_matches_incoming_transaction": true,
+    "alias_matches_result": true,
+    "result_matches_incoming_transaction": true
+  },
+  "errors": [
+    {
+      "case": "missing REST transaction",
+      "code": 404,
+      "error": "transaction was not found",
+      "method": "tryLocateTx",
+      "status": 404
+    },
+    {
+      "case": "missing REST transaction",
+      "code": 404,
+      "error": "transaction was not found",
+      "method": "tryLocateResultTx",
+      "status": 404
+    },
+    {
+      "case": "missing REST transaction",
+      "code": 404,
+      "error": "transaction was not found",
+      "method": "tryLocateSourceTx",
+      "status": 404
+    },
+    {
+      "case": "negative created_lt",
+      "code": 422,
+      "error": "created_lt should be non-negative",
+      "method": "tryLocateResultTx",
+      "status": 422
+    },
+    {
+      "case": "created_lt int64 overflow",
+      "code": 422,
+      "error": "created_lt should be a signed 64-bit integer",
+      "method": "tryLocateResultTx",
+      "status": 422
+    },
+    {
+      "case": "invalid source",
+      "code": 422,
+      "error": "Invalid address, only standard internal address is allowed",
+      "method": "tryLocateResultTx",
+      "status": 422
+    },
+    {
+      "case": "empty destination",
+      "code": 422,
+      "error": "Invalid address, only standard internal address is allowed",
+      "method": "tryLocateResultTx",
+      "status": 422
+    }
+  ],
+  "fixture": {
+    "created_lt_is_positive": true,
+    "has_internal_destination": true,
+    "has_internal_source": true
+  },
+  "source_lookup": {
+    "belongs_to_source": true,
+    "contains_located_message": true,
+    "rest_and_rpc_match": true
+  }
+}

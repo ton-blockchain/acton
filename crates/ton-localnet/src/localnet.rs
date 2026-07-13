@@ -299,6 +299,12 @@ pub struct LocalnetMiningMode {
     pub skip_empty_blocks: bool,
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum TransactionLookupKind {
+    Source,
+    Result,
+}
+
 impl Default for LocalnetMiningMode {
     fn default() -> Self {
         Self {
@@ -444,22 +450,11 @@ pub(crate) enum Request {
     GetPendingTransactions {
         resp: oneshot::Sender<anyhow::Result<Vec<LocalnetTransaction>>>,
     },
-    TryLocateTx {
+    LocateTransaction {
         source: Addr,
         destination: Addr,
         created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateResultTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
-        resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
-    },
-    TryLocateSourceTx {
-        source: Addr,
-        destination: Addr,
-        created_lt: u64,
+        kind: TransactionLookupKind,
         resp: oneshot::Sender<anyhow::Result<LocalnetTransaction>>,
     },
     RunGetMethod {
@@ -1114,60 +1109,20 @@ impl Localnet {
         rx.await?
     }
 
-    pub async fn try_locate_tx(
+    pub(crate) async fn locate_transaction(
         &self,
-        source_str: String,
-        destination_str: String,
+        source: Addr,
+        destination: Addr,
         created_lt: u64,
+        kind: TransactionLookupKind,
     ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Addr::parse(&source_str)?;
-        let destination = Addr::parse(&destination_str)?;
         let (resp, rx) = oneshot::channel();
         self.tx
-            .send(Request::TryLocateTx {
+            .send(Request::LocateTransaction {
                 source,
                 destination,
                 created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_result_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Addr::parse(&source_str)?;
-        let destination = Addr::parse(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateResultTx {
-                source,
-                destination,
-                created_lt,
-                resp,
-            })
-            .await?;
-        rx.await?
-    }
-
-    pub async fn try_locate_source_tx(
-        &self,
-        source_str: String,
-        destination_str: String,
-        created_lt: u64,
-    ) -> anyhow::Result<LocalnetTransaction> {
-        let source = Addr::parse(&source_str)?;
-        let destination = Addr::parse(&destination_str)?;
-        let (resp, rx) = oneshot::channel();
-        self.tx
-            .send(Request::TryLocateSourceTx {
-                source,
-                destination,
-                created_lt,
+                kind,
                 resp,
             })
             .await?;
@@ -2072,31 +2027,14 @@ fn process_loop_request(
             let res = handle_get_pending_transactions(node);
             let _ = resp.send(res);
         }
-        Request::TryLocateTx {
+        Request::LocateTransaction {
             source,
             destination,
             created_lt,
+            kind,
             resp,
         } => {
-            let res = handle_try_locate_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateResultTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_result_tx(node, source, destination, created_lt);
-            let _ = resp.send(res);
-        }
-        Request::TryLocateSourceTx {
-            source,
-            destination,
-            created_lt,
-            resp,
-        } => {
-            let res = handle_try_locate_source_tx(node, source, destination, created_lt);
+            let res = handle_locate_transaction(node, source, destination, created_lt, kind);
             let _ = resp.send(res);
         }
         Request::RunGetMethod {
@@ -2903,76 +2841,41 @@ fn handle_get_pending_transactions(node: &Node) -> anyhow::Result<Vec<LocalnetTr
     Ok(result)
 }
 
-fn handle_try_locate_tx(
+fn handle_locate_transaction(
     node: &Node,
     source: Addr,
     destination: Addr,
     created_lt: u64,
+    kind: TransactionLookupKind,
 ) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
+    let expected_account = match kind {
+        TransactionLookupKind::Source => source,
+        TransactionLookupKind::Result => destination,
+    };
     let tx_hash = node
         .history
-        .msg_to_tx
-        .get(&msg_hash)
-        .copied()
-        .context("Destination transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located destination transaction is missing")?;
-
-    if tx.meta.account != destination {
-        anyhow::bail!("Located transaction does not belong to destination account")
-    }
-
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn handle_try_locate_result_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    handle_try_locate_tx(node, source, destination, created_lt)
-}
-
-fn handle_try_locate_source_tx(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<LocalnetTransaction> {
-    let msg_hash = find_message_hash(node, source, destination, created_lt)?;
-    let tx_hash = node
-        .history
-        .tx_by_hash
-        .iter()
-        .find_map(|(hash, tx)| {
-            (tx.account == source && tx.out_msg_hashes.contains(&msg_hash)).then_some(*hash)
-        })
-        .context("Source transaction not found for message")?;
-    let tx = node
-        .get_transaction_by_hash(&tx_hash)
-        .context("Located source transaction is missing")?;
-    convert_to_tx_struct(&tx, tx.tx_boc.clone())
-}
-
-fn find_message_hash(
-    node: &Node,
-    source: Addr,
-    destination: Addr,
-    created_lt: u64,
-) -> anyhow::Result<Hash256> {
-    node.history
         .msg_by_hash
         .iter()
-        .find_map(|(hash, msg)| {
-            (msg.src == Some(source)
+        .filter(|(_, msg)| {
+            msg.src == Some(source)
                 && msg.dst == Some(destination)
-                && msg.created_lt == Some(created_lt))
-            .then_some(*hash)
+                && msg.created_lt == Some(created_lt)
         })
-        .context("Message not found by source, destination and created_lt")
+        .filter_map(|(msg_hash, _)| {
+            let tx_hash = match kind {
+                TransactionLookupKind::Source => node.indexes.tx_by_out_msg.get(msg_hash),
+                TransactionLookupKind::Result => node.history.msg_to_tx.get(msg_hash),
+            }?;
+            let tx = node.history.tx_by_hash.get(tx_hash)?;
+            (tx.account == expected_account).then_some((tx.lt, *tx_hash))
+        })
+        .max()
+        .map(|(_, tx_hash)| tx_hash)
+        .ok_or(LocalnetError::TransactionNotFound)?;
+    let tx = node
+        .get_transaction_by_hash(&tx_hash)
+        .context("Located transaction is missing")?;
+    convert_to_tx_struct(&tx, tx.tx_boc.clone())
 }
 
 fn handle_run_get_method(

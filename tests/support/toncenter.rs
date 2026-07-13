@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use ton::ton_core::types::TonAddress;
+use ton_api::toncenter::v2::responses;
 use ton_localnet::types::Addr;
 use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
@@ -403,6 +404,52 @@ pub(crate) fn run_localnet_action_project(
         .success()
         .get_stdout();
     (node, output)
+}
+
+pub(crate) fn find_v2_transaction_block(
+    node: &LocalnetHandle,
+    minimum_transactions: usize,
+) -> (u32, responses::BlockTransactions) {
+    let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
+        node.get_json_as("/api/v2/getMasterchainInfo");
+    for seqno in (1..=masterchain.result.last.seqno).rev() {
+        let seqno = u32::try_from(seqno).expect("localnet seqno must fit u32");
+        let response: responses::TonlibResponse<responses::BlockTransactions> =
+            node.get_json_as(&format!(
+                "/api/v2/getBlockTransactions?workchain=0&shard={}&seqno={seqno}&count=10000",
+                i64::MIN
+            ));
+        if response.result.transactions.len() >= minimum_transactions {
+            return (seqno, response.result);
+        }
+    }
+    panic!("fixture has no block with {minimum_transactions} transactions");
+}
+
+pub(crate) fn find_v2_internal_message(
+    node: &LocalnetHandle,
+) -> (responses::TransactionExt, responses::MessageStd) {
+    let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
+        node.get_json_as("/api/v2/getMasterchainInfo");
+    for seqno in (1..=masterchain.result.last.seqno).rev() {
+        let response: responses::TonlibResponse<responses::BlockTransactionsExt> = node
+            .get_json_as(&format!(
+                "/api/v2/getBlockTransactionsExt?workchain=0&shard={}&seqno={seqno}&count=10000",
+                i64::MIN
+            ));
+        for transaction in response.result.transactions {
+            let Some(message) = transaction.in_msg.clone() else {
+                continue;
+            };
+            if !message.source.account_address.is_empty()
+                && !message.destination.account_address.is_empty()
+                && message.created_lt.parse::<u64>().is_ok_and(|lt| lt > 0)
+            {
+                return (transaction, message);
+            }
+        }
+    }
+    panic!("fixture has no internal message");
 }
 
 pub(crate) fn extract_canonical_addr_marker(output: &str, marker: &str) -> String {

@@ -1,13 +1,14 @@
 use super::toncenter_v2::{
     parse_block_header_request, parse_block_transactions_request, parse_config_param,
     parse_i32_seqno, parse_libraries_request, parse_lookup_block_request, parse_required_seqno,
-    parse_seqno, parse_transactions_request, parse_transactions_std_request, resolve_block_header,
-    resolve_block_transactions, resolve_token_data, resolve_wallet_information,
+    parse_seqno, parse_transactions_request, parse_transactions_std_request,
+    parse_try_locate_tx_request, resolve_block_header, resolve_block_transactions,
+    resolve_token_data, resolve_wallet_information,
 };
 use super::utils::{ToncenterHttpError, error_status, get_extra, parse_method_name, parse_params};
 use crate::api::toncenter_v2 as v2;
 use crate::api::toncenter_v2::map_detect_address;
-use crate::localnet::Localnet;
+use crate::localnet::{Localnet, TransactionLookupKind};
 use crate::server::{ApiCallAlreadyRecorded, ApiCallFamily, ApiCallInput, ApiCallLog, ApiCallType};
 use crate::types::Hash256;
 use axum::extract::OriginalUri;
@@ -259,29 +260,44 @@ async fn json_rpc_router(
         }
         "tryLocateTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = validate!(req.created_lt.to_u64());
+            let request = validate!(parse_try_locate_tx_request(&req));
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_tx(req.source, req.destination, created_lt)
-                    .await
-                    .map(|r| v2::map_transaction(&r))?,
+                node.locate_transaction(
+                    request.source,
+                    request.destination,
+                    request.created_lt,
+                    TransactionLookupKind::Result,
+                )
+                .await
+                .map(|r| v2::map_transaction(&r))?,
             ))
         }
         "tryLocateResultTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = validate!(req.created_lt.to_u64());
+            let request = validate!(parse_try_locate_tx_request(&req));
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_result_tx(req.source, req.destination, created_lt)
-                    .await
-                    .map(|r| v2::map_transaction(&r))?,
+                node.locate_transaction(
+                    request.source,
+                    request.destination,
+                    request.created_lt,
+                    TransactionLookupKind::Result,
+                )
+                .await
+                .map(|r| v2::map_transaction(&r))?,
             ))
         }
         "tryLocateSourceTx" => {
             let req: TryLocateTxRequest = parse_params(params, method)?;
-            let created_lt = validate!(req.created_lt.to_u64());
+            let request = validate!(parse_try_locate_tx_request(&req));
             wire::JsonRpcResult::Transaction(Box::new(
-                node.try_locate_source_tx(req.source, req.destination, created_lt)
-                    .await
-                    .map(|r| v2::map_transaction(&r))?,
+                node.locate_transaction(
+                    request.source,
+                    request.destination,
+                    request.created_lt,
+                    TransactionLookupKind::Source,
+                )
+                .await
+                .map(|r| v2::map_transaction(&r))?,
             ))
         }
         "getBlockHeader" => {

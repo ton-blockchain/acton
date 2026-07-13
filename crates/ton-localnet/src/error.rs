@@ -46,6 +46,9 @@ pub(crate) enum LocalnetError {
 
     #[error("Timed out waiting for masterchain seqno {seqno}")]
     MasterchainWaitTimeout { seqno: u32 },
+
+    #[error("transaction was not found")]
+    TransactionNotFound,
 }
 
 impl LocalnetError {
@@ -66,7 +69,8 @@ impl LocalnetError {
         match self {
             Self::BlockNotFound { .. }
             | Self::BlockLookupNotFound { .. }
-            | Self::BlockDataNotFound { .. } => LiteServerErrorCode::NotReady,
+            | Self::BlockDataNotFound { .. }
+            | Self::TransactionNotFound => LiteServerErrorCode::NotReady,
             Self::ProtocolViolation { .. } | Self::InvalidRequest { .. } => {
                 LiteServerErrorCode::ProtoViolation
             }

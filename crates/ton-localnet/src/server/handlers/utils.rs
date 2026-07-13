@@ -51,6 +51,7 @@ pub fn error_status(error: &anyhow::Error) -> StatusCode {
                 StatusCode::UNPROCESSABLE_ENTITY
             }
             LocalnetError::MasterchainWaitTimeout { .. } => StatusCode::GATEWAY_TIMEOUT,
+            LocalnetError::TransactionNotFound => StatusCode::NOT_FOUND,
             LocalnetError::BlockNotFound { .. }
             | LocalnetError::BlockLookupNotFound { .. }
             | LocalnetError::BlockDataNotFound { .. } => StatusCode::INTERNAL_SERVER_ERROR,

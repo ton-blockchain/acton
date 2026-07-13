@@ -1,6 +1,8 @@
 use crate::common::assertion;
-use crate::support::localnet::{LocalnetHandle, pretty_json_for_snapshot};
-use crate::support::toncenter::{jetton_v1_action_project, run_localnet_action_project};
+use crate::support::localnet::pretty_json_for_snapshot;
+use crate::support::toncenter::{
+    find_v2_transaction_block, jetton_v1_action_project, run_localnet_action_project,
+};
 use serde_json::{Value, json};
 use ton_api::toncenter::v2::{StringOrNumber, requests, responses};
 
@@ -11,7 +13,7 @@ const ZERO_HASH: &str = "0000000000000000000000000000000000000000000000000000000
 fn block_transactions_match_upstream_pagination_contract() {
     let project = jetton_v1_action_project("localnet-v2-block-transactions");
     let (node, _) = run_localnet_action_project(&project, "scripts/jetton.tolk");
-    let (seqno, all) = find_transaction_block(&node, 3);
+    let (seqno, all) = find_v2_transaction_block(&node, 3);
     let first = &all.transactions[0];
     let after_hash = account_hash(&first.account);
     let query = block_query(0, seqno);
@@ -138,7 +140,7 @@ fn block_transactions_match_upstream_pagination_contract() {
 fn block_lookup_and_headers_match_upstream_contract() {
     let project = jetton_v1_action_project("localnet-v2-block-lookup");
     let (node, _) = run_localnet_action_project(&project, "scripts/jetton.tolk");
-    let (seqno, transactions) = find_transaction_block(&node, 1);
+    let (seqno, transactions) = find_v2_transaction_block(&node, 1);
     let query = block_query(0, seqno);
     let header: responses::TonlibResponse<responses::BlockHeader> =
         node.get_json_as(&format!("/api/v2/getBlockHeader?{query}"));
@@ -256,26 +258,6 @@ fn block_lookup_and_headers_match_upstream_contract() {
     );
 
     node.stop();
-}
-
-fn find_transaction_block(
-    node: &LocalnetHandle,
-    minimum_transactions: usize,
-) -> (u32, responses::BlockTransactions) {
-    let masterchain: responses::TonlibResponse<responses::MasterchainInfo> =
-        node.get_json_as("/api/v2/getMasterchainInfo");
-    for seqno in (1..=masterchain.result.last.seqno).rev() {
-        let seqno = u32::try_from(seqno).expect("localnet seqno must fit u32");
-        let response: responses::TonlibResponse<responses::BlockTransactions> =
-            node.get_json_as(&format!(
-                "/api/v2/getBlockTransactions?{}&count=10000",
-                block_query(0, seqno)
-            ));
-        if response.result.transactions.len() >= minimum_transactions {
-            return (seqno, response.result);
-        }
-    }
-    panic!("fixture has no block with {minimum_transactions} transactions");
 }
 
 fn block_query(workchain: i32, seqno: u32) -> String {
