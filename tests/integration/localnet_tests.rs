@@ -574,6 +574,51 @@ fn localnet_mines_empty_blocks_on_interval_without_transactions() {
 }
 
 #[test]
+fn localnet_uses_configured_db_path_relative_to_project_root() {
+    let project = ProjectBuilder::new("localnet-configured-db-path").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\ndb-path = \"state/localnet.sqlite\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to configure db-path in Acton.toml");
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir(&nested_dir).expect("failed to create nested working directory");
+    let db_path = project.path().join("state/localnet.sqlite");
+
+    let node = project.localnet().current_dir(nested_dir).start();
+    assert!(db_path.is_file(), "configured database must be created");
+    node.stop();
+}
+
+#[test]
+fn localnet_cli_db_path_overrides_configured_path() {
+    let project = ProjectBuilder::new("localnet-cli-db-path-override").build();
+    let acton_toml_path = project.path().join("Acton.toml");
+    let mut acton_toml =
+        fs::read_to_string(&acton_toml_path).expect("failed to read generated Acton.toml");
+    acton_toml.push_str("\n[localnet]\ndb-path = \"state/config.sqlite\"\n");
+    fs::write(&acton_toml_path, acton_toml).expect("failed to configure db-path in Acton.toml");
+
+    let nested_dir = project.path().join("nested");
+    fs::create_dir(&nested_dir).expect("failed to create nested working directory");
+    let configured_db_path = project.path().join("state/config.sqlite");
+    let cli_db_path = nested_dir.join("cli.sqlite");
+
+    let node = project
+        .localnet()
+        .current_dir(&nested_dir)
+        .args(["--db-path", "cli.sqlite"])
+        .start();
+    assert!(cli_db_path.is_file(), "CLI database must be created");
+    assert!(
+        !configured_db_path.exists(),
+        "configured database must not be used when --db-path is passed"
+    );
+    node.stop();
+}
+
+#[test]
 fn localnet_no_mining_mines_only_on_request() {
     let project = ProjectBuilder::new("localnet-no-mining-manual-blocks").build();
     let acton_toml_path = project.path().join("Acton.toml");

@@ -5,7 +5,7 @@ description: "Persist local node state with SQLite or export/import state as JSO
 
 The local node supports two state workflows:
 
-- Persistent SQLite database (`--db-path`)
+- Persistent SQLite database (`--db-path` or `[localnet].db-path`)
 - Portable JSON snapshots (`--load-state`, `--dump-state`)
 
 JSON snapshots are versioned exports of local node state. The current on-disk
@@ -18,6 +18,18 @@ Use a database file when you want state continuity across runs:
 ```bash
 acton localnet start --db-path .acton/localnet.db
 ```
+
+To make persistence the project default, configure the same path in
+`Acton.toml`:
+
+```acton-toml title="Acton.toml"
+[localnet]
+db-path = ".acton/localnet.db"
+```
+
+Configured relative paths resolve from the project root. `--db-path` overrides
+the configured value for a single run; a relative CLI path resolves from the
+current working directory.
 
 This is useful for long-running local environments.
 
@@ -44,7 +56,8 @@ acton localnet start \
 ```
 
 <Callout>
-`--load-state` and `--db-path` cannot be used together in one run for now.
+`--load-state` cannot be used when a database path comes from either
+`--db-path` or `[localnet].db-path`.
 </Callout>
 
 ## What a JSON Snapshot Contains
@@ -70,8 +83,8 @@ snapshot can also bring back explorer-oriented metadata and local admin state.
 - snapshots are currently written as versioned JSON files; the current format is `version = 1`
 - loading a snapshot with an unsupported version fails immediately
 - snapshots may stop being compatible if the snapshot schema changes in a future release
-- JSON snapshots and SQLite persistence are separate workflows; `--db-path` and `--load-state`
-  cannot be combined in one run
+- JSON snapshots and SQLite persistence are separate workflows; `--load-state`
+  cannot be combined with a database path from either CLI or `Acton.toml`
 - when you use `--dump-state`, the snapshot is written on graceful shutdown
 
 ## Choosing a Strategy
