@@ -49,7 +49,7 @@ still defects because they violate schemas even under those limitations.
 | V2-09 config history | Fixed | Each masterchain block stores its config hash; config reads and rebuilt historical states use that hash. A real config-param mutation across blocks is covered. |
 | V2-10/11 transaction history | Fixed | Account history excludes `to_lt`, requires an exact nonzero cursor, and accepts hex, standard base64, padded base64url, and unpadded base64url hashes. Real REST/JSON-RPC history and invalid cursors are snapshot-covered. |
 | V2-12 transaction DTO | Partial | Decoded endpoints recognize text comments across snake references and expose legacy decode fields, while Std/block-ext endpoints remain raw. V2 and V3 preserve uint32 currency IDs and full VarUint248 amounts. Encrypted/decrypted message classification remains open. |
-| V2-13 extended account state | Partial | Code-less uninit/frozen/active accounts and V3/V4 states, revision, raw/friendly address flags, historical `sync_utime`, and full-width extra currencies are typed and snapshot-covered. Recognized malformed wallet data is an error instead of a raw success. Highload, DNS, RWallet, and PChan state decoders remain open. |
+| V2-13 extended account state | Partial | Code-less uninit/frozen/active accounts, V3/V4, Highload V1/V2, and Manual DNS states are typed and snapshot-covered, including pinned revisions, unsigned wallet IDs, signed seqnos, raw/friendly address flags, historical `sync_utime`, and full-width extra currencies. Recognized malformed state data is an error instead of a raw success. RWallet and PChan decoders remain open. |
 | V2-14 wallet DTO | Fixed | V1-V5 and the upstream V5-beta hash are detected from the decoded code BOC and read with the same storage prefixes as C++, with signed seqno, wallet ID, signature flag, and exact optional-field omission. Real V2-V5 startup wallets plus prefix-only/malformed data, stale hash, highload-negative, and no-state cases are covered; V1 shares the tested V1/V2 parser path. |
 | V2-15 token DTOs | Partial | Mintless claim state, the typed DNS content union, and direct NFT collection detection now match the C++ response contract. Parent-contract NFT verification and collection-derived item content remain open. |
 | V2-16 block headers | Fixed | The response is populated from the serialized block's `BlockInfo`, including the real global ID, key-block fields, and previous block IDs. Basechain/masterchain headers and single/both hash selectors are snapshot-covered. |
@@ -177,7 +177,7 @@ coverage is high.
 | `GET /api/v2/getAddressBalance` | Medium | B | Historical and zero seqno and not-found/error transport. |
 | `GET /api/v2/getAddressState` | High | C | Nonexistent REST/RPC mismatch, frozen/uninit states, historical and zero seqno. |
 | `GET /api/v2/getLibraries` | Low | A | Duplicate/order/large input behavior and a partially invalid list. |
-| `GET /api/v2/getExtendedAddressInformation` | Critical | B | Code-less states, V3/V4 revision, malformed recognized data, raw/friendly address flags, history, and extra currencies are covered; Highload/DNS/RWallet/PChan states remain raw. |
+| `GET /api/v2/getExtendedAddressInformation` | Critical | B | Code-less, V3/V4, all pinned Highload V1/V2 and Manual DNS revisions, high-bit IDs/seqnos, missing optional state data, malformed recognized data, raw/friendly address flags, history, and extra currencies are covered; RWallet/PChan states remain raw. |
 | `GET /api/v2/getWalletInformation` | Critical | B | Typed real V2-V5 wallets, decoded-code classification, prefix-only/malformed data, stale-hash and highload/non-wallet negatives, exact optional fields, signed seqno, and V5 beta are covered; V1 shares the V1/V2 parser path, while fork-history differential coverage remains open. |
 | `GET /api/v2/getTokenData` | Critical | A | Historical seqno, mintless jetton, NFT item/collection, DNS NFT, content variants, stale index, non-token status. |
 | `GET /api/v2/getTransactions` | High | A | Exact/unknown cursor, all hash encodings, `to_lt` equality, archival history, decoded messages, extra currencies. |
@@ -227,10 +227,10 @@ coverage is high.
     recognize text comments across snake references and expose the upstream legacy `message` and
     decode-error fields. Std/block-ext responses remain raw, and V2/V3 preserve uint32 currency IDs
     plus full VarUint248 amounts. Encrypted/decrypted message classification remains open.
-13. **V2-13, extended account state (partially fixed):** code-less states and standard V3/V4
-    states, revisions, raw/friendly address flags, historical time, and extra currencies now match
-    upstream. Recognized malformed wallet data fails instead of becoming a raw success.
-    Highload/DNS/RWallet/PChan states still fall back to raw.
+13. **V2-13, extended account state (partially fixed):** code-less states, standard V3/V4,
+    Highload V1/V2, and Manual DNS states, revisions, raw/friendly address flags, historical time,
+    and extra currencies now match upstream. Recognized malformed state data fails instead of
+    becoming a raw success. RWallet and PChan states still fall back to raw.
 14. **V2-14, wallet DTO (fixed):** the handler classifies the decoded code BOC and reads the same
     storage prefixes as C++ instead of calling a getter or trusting cached hashes. It emits the
     upstream optional wallet ID/signature fields, signed seqno, and exact V5-beta hash.
@@ -468,8 +468,9 @@ coverage is high.
    nesting depths 99 and 100, and compare both request acceptance and response shape.
 2. Exercise raw V2 JSON-RPC with omitted/null envelope fields, empty array/object params,
    `getShards`, and failures that must match the corresponding REST status and envelope.
-3. Add suspended-state semantics and specialized Highload/DNS/RWallet/PChan extended-account
-   fixtures, plus parent-verified NFT content to the token fixtures.
+3. Add suspended-state semantics and specialized RWallet/PChan extended-account fixtures, plus
+   parent-verified NFT content to the token fixtures. Highload V1/V2 and Manual DNS fixtures are
+   covered.
 4. Extend the V2 transaction fixture with encrypted/decrypted bodies and malformed decode cases;
    text/raw bodies, legacy fields, full-width extra currencies, cursors, hash encodings, and LT
    boundaries are covered.

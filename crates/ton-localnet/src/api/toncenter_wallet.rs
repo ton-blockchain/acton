@@ -96,7 +96,7 @@ pub(crate) fn read_standard_wallet_state(
     read_standard_wallet_data(account, version)
 }
 
-fn account_code_hash(account: &LocalnetAccountState) -> anyhow::Result<Hash256> {
+pub(crate) fn account_code_hash(account: &LocalnetAccountState) -> anyhow::Result<Hash256> {
     account
         .code
         .as_ref()
@@ -188,7 +188,10 @@ fn classify_v2_wallet_code(account: &LocalnetAccountState) -> anyhow::Result<Opt
         return Ok(None);
     }
 
-    let code_hash = account_code_hash(account)?;
+    classify_v2_wallet_code_hash(account_code_hash(account)?)
+}
+
+fn classify_v2_wallet_code_hash(code_hash: Hash256) -> anyhow::Result<Option<V2WalletCode>> {
     let ton_hash = TonHash::from_vec(code_hash.0.to_vec())?;
     if let Ok(version) = WalletVersion::get_version_by_code(ton_hash) {
         return Ok(V2WalletVersion::try_from(version).ok().map(|v2_version| {

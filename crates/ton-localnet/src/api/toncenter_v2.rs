@@ -5,7 +5,10 @@
 //! - `map_consensus_block` and internal-message responses are Acton extensions, not v2 `OpenAPI`
 //!   operations.
 
-use crate::api::toncenter_wallet::{V2WalletState, V2WalletVersion, read_v2_extended_wallet_state};
+use crate::api::toncenter_v2_account_state::{
+    V2ExtendedAccountState, read_v2_extended_account_state,
+};
+use crate::api::toncenter_wallet::{V2WalletState, V2WalletVersion};
 use crate::localnet::{
     LocalnetAcceptedExternalMessage, LocalnetAcceptedInternalMessage, LocalnetAccountState,
     LocalnetAddressInfo, LocalnetBlockHeader, LocalnetBlockId, LocalnetBlockTransactions,
@@ -214,18 +217,60 @@ fn map_extended_account_state_kind(
         ));
     }
 
-    if let Some(wallet) = read_v2_extended_wallet_state(state)? {
-        let seqno = i32::from_be_bytes(wallet.seqno.to_be_bytes());
-        let wallet_id = i64::from(
-            wallet
-                .wallet_id
-                .context("Specialized V2 wallet state has no wallet ID")?,
-        );
-        return Ok(match wallet.version {
-            V2WalletVersion::V3R1 => (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 1),
-            V2WalletVersion::V3R2 => (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 2),
-            V2WalletVersion::V4R2 => (response::AccountStateKind::WalletV4 { wallet_id, seqno }, 2),
-            version => anyhow::bail!("Unsupported specialized V2 wallet state: {version:?}"),
+    if let Some(account) = read_v2_extended_account_state(state)? {
+        return Ok(match account {
+            V2ExtendedAccountState::Standard(wallet) => {
+                let seqno = i32::from_be_bytes(wallet.seqno.to_be_bytes());
+                let wallet_id = i64::from(u32::from_be_bytes(
+                    wallet
+                        .wallet_id
+                        .context("Specialized V2 wallet state has no wallet ID")?
+                        .to_be_bytes(),
+                ));
+                match wallet.version {
+                    V2WalletVersion::V3R1 => {
+                        (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 1)
+                    }
+                    V2WalletVersion::V3R2 => {
+                        (response::AccountStateKind::WalletV3 { wallet_id, seqno }, 2)
+                    }
+                    V2WalletVersion::V4R2 => {
+                        (response::AccountStateKind::WalletV4 { wallet_id, seqno }, 2)
+                    }
+                    version => {
+                        anyhow::bail!("Unsupported specialized V2 wallet state: {version:?}")
+                    }
+                }
+            }
+            V2ExtendedAccountState::HighloadV1 {
+                revision,
+                wallet_id,
+                seqno,
+            } => (
+                response::AccountStateKind::WalletHighloadV1 {
+                    wallet_id: i64::from(wallet_id),
+                    seqno: i32::from_be_bytes(seqno.to_be_bytes()),
+                },
+                revision,
+            ),
+            V2ExtendedAccountState::HighloadV2 {
+                revision,
+                wallet_id,
+            } => (
+                response::AccountStateKind::WalletHighloadV2 {
+                    wallet_id: i64::from(wallet_id),
+                },
+                revision,
+            ),
+            V2ExtendedAccountState::Dns {
+                revision,
+                wallet_id,
+            } => (
+                response::AccountStateKind::Dns {
+                    wallet_id: i64::from(wallet_id),
+                },
+                revision,
+            ),
         });
     }
 

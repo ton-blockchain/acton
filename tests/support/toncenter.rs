@@ -20,10 +20,11 @@ use tvm_ffi::json_stack::legacy_stack_to_json;
 use tvm_ffi::stack::{Tuple, TupleItem};
 use tycho_types::boc::{Boc, BocRepr};
 use tycho_types::cell::HashBytes;
-use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Store};
+use tycho_types::cell::{Cell, CellBuilder, CellFamily, CellSliceParts, Lazy, Store};
 use tycho_types::dict::{Dict, RawDict};
 use tycho_types::models::{
-    CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OwnedMessage, ShardAccount, StdAddr,
+    Account, AccountState, CurrencyCollection, IntAddr, IntMsgInfo, MsgInfo, OptionalAccount,
+    OwnedMessage, ShardAccount, StateInit, StdAddr,
 };
 
 #[derive(Clone)]
@@ -217,6 +218,36 @@ pub(crate) fn build_internal_message_boc_with_currency_and_body(
     };
 
     BocRepr::encode(message).expect("internal message must encode")
+}
+
+pub(crate) fn active_shard_account_boc64(
+    address: StdAddr,
+    code: Cell,
+    data: Option<Cell>,
+    balance: u128,
+) -> String {
+    let account = Account {
+        address: IntAddr::Std(address),
+        storage_stat: Default::default(),
+        last_trans_lt: 0,
+        balance: CurrencyCollection::new(balance),
+        state: AccountState::Active(StateInit {
+            code: Some(code),
+            data,
+            ..Default::default()
+        }),
+    };
+    let shard_account = ShardAccount {
+        account: Lazy::new(&OptionalAccount(Some(account)))
+            .expect("active test account must serialize"),
+        last_trans_hash: HashBytes::ZERO,
+        last_trans_lt: 0,
+    };
+    let mut builder = CellBuilder::new();
+    shard_account
+        .store_into(&mut builder, Cell::empty_context())
+        .expect("test shard account must serialize");
+    Boc::encode_base64(builder.build().expect("test shard account cell must build"))
 }
 
 pub(crate) fn build_text_comment_body(parts: &[&str]) -> Cell {
