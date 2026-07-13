@@ -62,6 +62,10 @@ still defects because they violate schemas even under those limitations.
 | V2-25 Std zero cursor | Fixed | `getTransactions` treats `lt=0` as absent, while `getTransactionsStd` preserves it as a supplied cursor and returns the canonical empty page for any paired hash. |
 | V2-26 archival | Accepted | Localnet retains its complete local account history, so selecting an archival worker has no local meaning. Both flag values follow the same typed and snapshot-covered path. |
 | V2-27 transaction lookup | Fixed | All three locate routes share typed address/LT parsing, return the upstream 404 for a miss, deterministically select duplicate tuples, and use the existing outgoing-message index. Real incoming/source transactions plus REST/JSON-RPC errors and boundaries are snapshot-covered. |
+| V3-05 transactions by message | Fixed | The request DTO accepts repeated message hashes, at least one message filter is required with upstream 422, and opcode matching is restricted to inbound messages. Query validation is snapshot-covered and input-only opcode filtering has a focused regression test. |
+| V3-06 pending transactions | Partial | Empty and trace-only requests now return upstream 422 because an account filter is required. Account-plus-trace behavior and trace identity remain open. |
+| V3-19 wallet information | Partial | Active non-wallet accounts now return upstream 409 `not a wallet`, covered with a real active account state. `use_v2` behavior remains open for both address-information routes. |
+| V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 
 ## Rating model
 
@@ -106,7 +110,7 @@ These are the highest-value targets for the next differential test pass:
 |---|---|---|
 | P0 | V2 request errors | Axum extractor rejections still bypass the typed envelope. |
 | P0 | V3 traces and transactions | Trace identity, range boundaries, sort keys, `mc_seqno`, trace summaries, and full transaction DTOs diverge. |
-| P0 | V3 message-derived queries | `transactionsByMessage` and `pendingTransactions` accept invalid empty filters and use incompatible identity/direction rules. |
+| P0 | V3 message-derived queries | Pending account-plus-trace behavior and inherited trace identity remain incompatible. |
 | P0 | V3 token and NFT events | Historical events can disappear after contract changes; trace IDs, abort filtering, ordering, and parser failure handling are wrong. |
 | P0 | Emulation | Only the root transaction is emulated; downstream cascade, states, cells, address book, and metadata are omitted. |
 | P0 | Snapshot load/revert | Applying a snapshot is non-atomic and can leave persistence and memory partially replaced after an error. |
@@ -322,11 +326,10 @@ coverage is high.
 4. **V3-04, trace summary:** local emits an invalid `classification_state="classified"`, computes
    message counts from an incomplete formula, and cannot represent the end block of a multi-block
    trace correctly.
-5. **V3-05, transactions by message:** an empty filter returns general transactions instead of
-   422; message hash is singular; opcode filtering can apply to output messages although upstream
-   constrains it to input messages.
-6. **V3-06, pending transactions:** local permits empty and trace-only queries and combines
-   account/trace differently; upstream requires account filters. Trace matching also inherits the
+5. **V3-05, transactions by message (fixed):** requests require a message filter, accept repeated
+   message hashes, and constrain opcode matching to input messages.
+6. **V3-06, pending transactions (partial):** account filters are now required. Local still
+   combines account and trace filters differently, and trace matching inherits the
    transaction-hash identity bug.
 7. **V3-07, transaction DTO:** standalone transaction states contain hashes but not full state;
    only ordinary details are partially mapped, with credit/bounce and rare transaction kinds lost.
@@ -353,15 +356,14 @@ coverage is high.
     unstable or different pagination keys from the upstream database ID order.
 18. **V3-18, address book/metadata invalid input:** local rejects the whole request. Upstream keeps
     invalid address-book keys with null data and silently ignores invalid metadata addresses.
-19. **V3-19, address/wallet information:** both handlers parse and ignore `use_v2`.
-    `walletInformation` additionally returns 200 with empty wallet fields for an active non-wallet
-    instead of upstream 409.
+19. **V3-19, address/wallet information (partial):** both handlers still parse and ignore `use_v2`.
+    Active non-wallet accounts now return upstream 409.
 20. **V3-20, errors:** backend errors collapse to 500 and parser errors generally use 400 instead
     of upstream 404/409/422 distinctions.
 21. **V3-21, trace extras:** address book and metadata are collected before filtering and
     pagination, so a page can leak extras for traces absent from that page.
-22. **V3-22, getter decoding:** a result stack decode failure is converted to successful empty
-    stack rather than an error.
+22. **V3-22, getter decoding (fixed):** result BOC and tuple decoding failures propagate as
+    errors instead of successful empty stacks.
 23. **V3-23, discovery complexity:** contract discovery and several filters scan all accounts and
     run getters repeatedly. A single malformed active contract can fail a whole endpoint, while a
     large state can make cheap-looking queries expensive.

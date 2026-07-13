@@ -19,6 +19,7 @@ use crate::storage::{
 };
 use crate::types::{Addr, BocBytes, ExtraCurrency, Hash256};
 use crate::v3_events::{JettonBurnEvent, JettonTransferEvent, NftTransferEvent};
+use anyhow::Context;
 use num_bigint::BigInt;
 use serde_json::value::Value;
 use std::collections::HashMap;
@@ -1303,17 +1304,20 @@ fn map_cells_by_hash_base64(cells: &HashMap<Hash256, BocBytes>) -> HashMap<Strin
         .collect()
 }
 
-pub fn map_run_get_method_v3(result: &LocalnetRunGetMethodResult) -> response::RunGetMethodResult {
-    let stack_cell = Boc::decode(&result.stack).unwrap_or_default();
-    let stack_tuple = Tuple::deserialize(&stack_cell).unwrap_or_default();
+pub fn map_run_get_method_v3(
+    result: &LocalnetRunGetMethodResult,
+) -> anyhow::Result<response::RunGetMethodResult> {
+    let stack_cell = Boc::decode(&result.stack).context("Failed to decode get-method stack BOC")?;
+    let stack_tuple =
+        Tuple::deserialize(&stack_cell).context("Failed to deserialize get-method stack tuple")?;
     let stack = stack_tuple.0.iter().map(map_stack_entry).collect();
 
-    response::RunGetMethodResult {
+    Ok(response::RunGetMethodResult {
         gas_used: response::StringOrNumber::Unsigned(result.gas_used),
         exit_code: result.exit_code,
         stack,
         vm_log: Some(result.vm_log.to_string()),
-    }
+    })
 }
 
 fn collect_transactions(
@@ -1840,13 +1844,17 @@ mod tests {
     use super::{
         format_v3_shard_id, map_address_information, map_blocks_response, map_jetton_masters,
         map_jetton_wallets, map_nft_collection_token_info, map_nft_item_token_info, map_nft_items,
-        map_stack_entry, map_transaction_account_state,
+        map_run_get_method_v3, map_stack_entry, map_transaction_account_state,
     };
-    use crate::localnet::{LocalnetAccountState, LocalnetBlock, LocalnetBlockId};
+    use crate::localnet::{
+        LocalnetAccountState, LocalnetBlock, LocalnetBlockId, LocalnetRunGetMethodResult,
+        LocalnetTransactionId,
+    };
     use crate::storage::{JettonMasterMeta, JettonWalletMeta, NftItemMeta};
     use crate::types::Hash256;
     use num_bigint::BigInt;
     use serde_json::json;
+    use std::sync::Arc;
     use tvm_ffi::stack::{Tuple, TupleItem};
     use tycho_types::boc::Boc;
     use tycho_types::cell::Cell;
@@ -1934,6 +1942,25 @@ mod tests {
                 {"type": "list", "value": []},
                 {"type": "num", "value": "NaN"}
             ])
+        );
+    }
+
+    #[test]
+    fn run_get_method_rejects_corrupt_result_stack_boc() {
+        let result = LocalnetRunGetMethodResult {
+            gas_used: 0,
+            stack: vec![0xff].into(),
+            exit_code: 0,
+            vm_log: Arc::from(""),
+            block_id: LocalnetBlockId::first(),
+            last_transaction_id: LocalnetTransactionId::default(),
+        };
+
+        let error = map_run_get_method_v3(&result).expect_err("corrupt stack BOC must fail");
+        assert!(
+            error
+                .to_string()
+                .contains("Failed to decode get-method stack BOC")
         );
     }
 

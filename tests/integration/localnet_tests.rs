@@ -5848,7 +5848,7 @@ fn localnet_supports_v3_transactions_endpoints() {
 
     let by_message_offset = wait_for_ok_response(
         &node,
-        "/api/v3/transactionsByMessage?limit=1&offset=1",
+        &format!("/api/v3/transactionsByMessage?msg_hash={in_msg_hash_query}&limit=1&offset=1"),
         Duration::from_secs(12),
     );
     assert!(
@@ -5859,7 +5859,7 @@ fn localnet_supports_v3_transactions_endpoints() {
 
     let pending = wait_for_ok_response(
         &node,
-        "/api/v3/pendingTransactions",
+        &format!("/api/v3/pendingTransactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}"),
         Duration::from_secs(12),
     );
     let pending_payload = response_payload(&pending);

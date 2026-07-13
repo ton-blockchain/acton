@@ -1,0 +1,37 @@
+[
+  {
+    "case": "transactions by message without filter",
+    "code": 422,
+    "error": "at least one of msg_hash, body_hash, opcode should be specified",
+    "status": 422
+  },
+  {
+    "case": "transactions by message with direction only",
+    "code": 422,
+    "error": "at least one of msg_hash, body_hash, opcode should be specified",
+    "status": 422
+  },
+  {
+    "case": "pending transactions without account",
+    "code": 422,
+    "error": "at least 1 account address required",
+    "status": 422
+  },
+  {
+    "case": "pending transactions with trace only",
+    "code": 422,
+    "error": "at least 1 account address required",
+    "status": 422
+  },
+  {
+    "address_book_count": 0,
+    "case": "transactions by repeated message hashes",
+    "transaction_count": 0
+  },
+  {
+    "case": "active account that is not a wallet",
+    "code": 409,
+    "error": "not a wallet",
+    "status": 409
+  }
+]

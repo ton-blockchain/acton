@@ -236,35 +236,43 @@ pub async fn get_wallet_information_v3(
 ) -> impl IntoResponse {
     let _use_v2 = payload.use_v2.unwrap_or(true);
 
-    handle_v3_result(
-        async move {
-            let state = node
-                .get_address_information(payload.address.clone(), None)
-                .await?;
-            let wallet_type = v2::wallet_type_name_from_code_hash(state.code_hash.as_ref());
-            let parsed_wallet = toncenter_wallet::read_standard_wallet_state(&state).ok();
-            let seqno = if let Some(wallet) = parsed_wallet {
-                Some(wallet.seqno)
-            } else if wallet_type.is_some() {
-                node.run_get_method(payload.address, "seqno".to_owned(), Vec::new(), None)
-                    .await
-                    .ok()
-                    .and_then(|result| v2::map_wallet_seqno(&result))
-            } else {
-                None
-            };
-            let wallet_id = parsed_wallet.and_then(|wallet| wallet.wallet_id);
+    let state = match node
+        .get_address_information(payload.address.clone(), None)
+        .await
+    {
+        Ok(state) => state,
+        Err(error) => {
+            return request_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+        }
+    };
+    let wallet_type = v2::wallet_type_name_from_code_hash(state.code_hash.as_ref());
+    if state.state == AccountStatus::Active && wallet_type.is_none() {
+        return request_error(StatusCode::CONFLICT, "not a wallet");
+    }
 
-            Ok(v3::map_wallet_information_v3(
-                &state,
-                wallet_type,
-                seqno,
-                wallet_id,
-            ))
-        },
-        Clone::clone,
+    let parsed_wallet = toncenter_wallet::read_standard_wallet_state(&state).ok();
+    let seqno = if let Some(wallet) = parsed_wallet {
+        Some(wallet.seqno)
+    } else if wallet_type.is_some() {
+        node.run_get_method(payload.address, "seqno".to_owned(), Vec::new(), None)
+            .await
+            .ok()
+            .and_then(|result| v2::map_wallet_seqno(&result))
+    } else {
+        None
+    };
+    let wallet_id = parsed_wallet.and_then(|wallet| wallet.wallet_id);
+
+    (
+        StatusCode::OK,
+        Json(v3::map_wallet_information_v3(
+            &state,
+            wallet_type,
+            seqno,
+            wallet_id,
+        )),
     )
-    .await
+        .into_response()
 }
 
 pub async fn get_masterchain_info_v3(State(node): State<Arc<Localnet>>) -> impl IntoResponse {
@@ -486,9 +494,17 @@ pub async fn get_blocks_v3(
 
 pub async fn get_transactions_by_message_v3(
     State(node): State<Arc<Localnet>>,
-    Query(payload): Query<TransactionsByMessageQuery>,
+    RawQuery(raw_query): RawQuery,
 ) -> impl IntoResponse {
+    let payload = parse!(parse_v3_query::<TransactionsByMessageQuery>(
+        raw_query.as_deref()
+    ));
     let parsed = parse!(parse_transactions_by_message_v3_query(payload));
+    if parsed.msg_hashes.is_none() && parsed.body_hash.is_none() && parsed.opcode.is_none() {
+        return v3_unprocessable_entity(
+            "at least one of msg_hash, body_hash, opcode should be specified",
+        );
+    }
 
     handle_v3_result(node.get_all_transactions(), move |txs| {
         let filtered = filter_transactions_by_message_v3(txs, &parsed);
@@ -614,6 +630,9 @@ pub async fn get_pending_transactions_v3(
         raw_query.as_deref()
     ));
     let parsed = parse!(parse_pending_transactions_v3_query(payload));
+    if parsed.account.is_none() {
+        return v3_unprocessable_entity("at least 1 account address required");
+    }
 
     handle_v3_result(node.get_pending_transactions(), move |txs| {
         let filtered = filter_pending_transactions_v3(txs, &parsed);
@@ -1325,8 +1344,13 @@ pub async fn run_get_method_v3(
     };
 
     handle_v3_result(
-        node.run_get_method(payload.address, payload.method, stack, None),
-        toncenter_v3::map_run_get_method_v3,
+        async move {
+            let result = node
+                .run_get_method(payload.address, payload.method, stack, None)
+                .await?;
+            toncenter_v3::map_run_get_method_v3(&result)
+        },
+        Clone::clone,
     )
     .await
 }
@@ -1593,7 +1617,7 @@ struct ParsedBlocksV3Query {
 }
 
 struct ParsedTransactionsByMessageV3Query {
-    msg_hash: Option<Hash256>,
+    msg_hashes: Option<HashSet<Hash256>>,
     body_hash: Option<Hash256>,
     opcode: Option<u32>,
     direction: Option<MessageDirection>,
@@ -1726,11 +1750,7 @@ fn parse_transactions_by_message_v3_query(
     let direction = parse_message_direction(payload.direction.as_deref())?;
 
     Ok(ParsedTransactionsByMessageV3Query {
-        msg_hash: payload
-            .msg_hash
-            .as_deref()
-            .map(parse_hash_any)
-            .transpose()?,
+        msg_hashes: parse_hashes(payload.msg_hash)?,
         body_hash: payload
             .body_hash
             .as_deref()
@@ -2005,22 +2025,22 @@ fn filter_transactions_by_message_v3(
     txs: &[LocalnetTransaction],
     query: &ParsedTransactionsByMessageV3Query,
 ) -> Vec<LocalnetTransaction> {
-    let has_message_filter =
-        query.msg_hash.is_some() || query.body_hash.is_some() || query.opcode.is_some();
     let mut filtered = txs
         .iter()
         .filter(|tx| {
-            if !has_message_filter && query.direction.is_none() {
-                return true;
-            }
-
             let mut messages = Vec::new();
-            match query.direction {
-                Some(MessageDirection::In) => messages.push(&tx.in_msg),
-                Some(MessageDirection::Out) => messages.extend(tx.out_msgs.iter()),
-                None => {
+            if query.opcode.is_some() {
+                if query.direction != Some(MessageDirection::Out) {
                     messages.push(&tx.in_msg);
-                    messages.extend(tx.out_msgs.iter());
+                }
+            } else {
+                match query.direction {
+                    Some(MessageDirection::In) => messages.push(&tx.in_msg),
+                    Some(MessageDirection::Out) => messages.extend(tx.out_msgs.iter()),
+                    None => {
+                        messages.push(&tx.in_msg);
+                        messages.extend(tx.out_msgs.iter());
+                    }
                 }
             }
 
@@ -2028,9 +2048,9 @@ fn filter_transactions_by_message_v3(
                 .into_iter()
                 .filter(|msg| !msg.hash.is_zero())
                 .any(|msg| {
-                    if let Some(msg_hash) = query.msg_hash
-                        && msg.hash != msg_hash
-                        && msg.hash_norm != Some(msg_hash)
+                    if let Some(msg_hashes) = &query.msg_hashes
+                        && !msg_hashes.contains(&msg.hash)
+                        && msg.hash_norm.is_none_or(|hash| !msg_hashes.contains(&hash))
                     {
                         return false;
                     }
@@ -2489,6 +2509,10 @@ fn v3_bad_request(error: impl Into<String>) -> Response {
     request_error(StatusCode::BAD_REQUEST, error)
 }
 
+fn v3_unprocessable_entity(error: impl Into<String>) -> Response {
+    request_error(StatusCode::UNPROCESSABLE_ENTITY, error)
+}
+
 fn request_error(status: StatusCode, error: impl Into<String>) -> Response {
     (
         status,
@@ -2503,6 +2527,48 @@ fn request_error(status: StatusCode, error: impl Into<String>) -> Response {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::localnet::{LocalnetMessage, LocalnetTransactionId};
+
+    fn message(hash_byte: u8, opcode: u32) -> LocalnetMessage {
+        LocalnetMessage {
+            hash: Hash256([hash_byte; 32]),
+            hash_norm: None,
+            source: None,
+            destination: None,
+            bounce: false,
+            bounced: false,
+            value: 0,
+            body_hash: Hash256([hash_byte.wrapping_add(1); 32]),
+            body: Default::default(),
+            init_state: Default::default(),
+            opcode: Some(opcode),
+            fwd_fee: 0,
+            ihr_fee: 0,
+            created_lt: 0,
+            extra_currencies: Vec::new(),
+        }
+    }
+
+    fn transaction_with_message_opcodes(in_opcode: u32, out_opcode: u32) -> LocalnetTransaction {
+        LocalnetTransaction {
+            hash: Hash256([3; 32]),
+            address: Addr::default(),
+            mc_block_seqno: 1,
+            utime: 1,
+            data: Default::default(),
+            success: true,
+            exit_code: 0,
+            transaction_id: LocalnetTransactionId {
+                lt: 1,
+                hash: Hash256([3; 32]),
+            },
+            in_msg: message(1, in_opcode),
+            out_msgs: vec![message(2, out_opcode)],
+            total_fees: 0,
+            storage_fees: 0,
+            other_fees: 0,
+        }
+    }
 
     fn transactions_query() -> ParsedTransactionsV3Query {
         ParsedTransactionsV3Query {
@@ -2568,6 +2634,38 @@ mod tests {
         assert_eq!(
             transactions_fast_path(&query),
             Some(TransactionsFastPath::Recent)
+        );
+    }
+
+    #[test]
+    fn transactions_by_message_filters_match_upstream_semantics() {
+        let transactions = [transaction_with_message_opcodes(7, 9)];
+        let mut query = ParsedTransactionsByMessageV3Query {
+            msg_hashes: None,
+            body_hash: None,
+            opcode: Some(9),
+            direction: None,
+            limit: 10,
+            offset: 0,
+        };
+
+        assert!(filter_transactions_by_message_v3(&transactions, &query).is_empty());
+
+        query.opcode = Some(7);
+        assert_eq!(
+            filter_transactions_by_message_v3(&transactions, &query).len(),
+            1
+        );
+
+        query.direction = Some(MessageDirection::Out);
+        assert!(filter_transactions_by_message_v3(&transactions, &query).is_empty());
+
+        query.direction = None;
+        query.opcode = None;
+        query.msg_hashes = Some(HashSet::from([Hash256([2; 32]), Hash256([8; 32])]));
+        assert_eq!(
+            filter_transactions_by_message_v3(&transactions, &query).len(),
+            1
         );
     }
 }

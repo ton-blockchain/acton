@@ -510,29 +510,38 @@ pub(crate) fn response_payload(response: &Value) -> &Value {
 }
 
 pub(crate) fn assert_v3_bad_request(status: u16, response: &Value, expected_error_fragment: &str) {
+    assert_v3_error(status, response, 400, expected_error_fragment);
+}
+
+pub(crate) fn assert_v3_error(
+    status: u16,
+    response: &Value,
+    expected_status: u16,
+    expected_error_fragment: &str,
+) {
     assert_eq!(
         status,
-        400,
-        "Expected HTTP 400 for v3 bad request response:\n{}",
+        expected_status,
+        "Expected HTTP {expected_status} for v3 error response:\n{}",
         serde_json::to_string_pretty(response).unwrap_or_default()
     );
     if let Some(ok) = response.get("ok").and_then(Value::as_bool) {
         assert!(
             !ok,
-            "Expected v3 bad request response:\n{}",
+            "Expected v3 error response:\n{}",
             serde_json::to_string_pretty(response).unwrap_or_default()
         );
     } else {
         assert!(
             response.get("error").is_some(),
-            "Expected v3 bad request response with `error` field:\n{}",
+            "Expected v3 error response with `error` field:\n{}",
             serde_json::to_string_pretty(response).unwrap_or_default()
         );
     }
     assert_eq!(
         response["code"].as_i64(),
-        Some(400),
-        "Expected code=400 in v3 bad request response:\n{}",
+        Some(i64::from(expected_status)),
+        "Expected code={expected_status} in v3 error response:\n{}",
         serde_json::to_string_pretty(response).unwrap_or_default()
     );
     assert!(

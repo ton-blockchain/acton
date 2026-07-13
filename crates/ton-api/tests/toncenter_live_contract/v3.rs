@@ -549,7 +549,7 @@ fn transactions_by_message_query_covers_hash_body_opcode_and_direction() -> Resu
         &live.v3_url,
         "/transactionsByMessage",
         &v3::TransactionsByMessageQuery {
-            msg_hash: Some(message.hash.clone()),
+            msg_hash: vec![message.hash.clone(), transaction.hash.clone()],
             direction: Some(direction.to_owned()),
             limit: Some(2),
             offset: Some(0),

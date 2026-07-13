@@ -228,7 +228,8 @@ pub struct BlocksQuery {
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct TransactionsByMessageQuery {
-    pub msg_hash: Option<String>,
+    #[serde(default)]
+    pub msg_hash: Vec<String>,
     pub body_hash: Option<String>,
     pub opcode: Option<String>,
     pub direction: Option<String>,
