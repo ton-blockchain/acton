@@ -285,6 +285,7 @@ pub struct DnsRecordMeta {
 pub struct NftCollectionMeta {
     pub address: Addr,
     pub owner_address: Option<Addr>,
+    pub first_transaction_lt: Lt,
     pub last_transaction_lt: Lt,
     pub next_item_index: String,
     pub collection_content: Value,
@@ -311,6 +312,7 @@ pub struct NftSaleMeta {
 pub struct MultisigOrderMeta {
     pub address: Addr,
     pub multisig_address: Addr,
+    pub first_transaction_lt: Lt,
     pub order_seqno: String,
     pub threshold: i32,
     pub sent_for_execution: bool,
@@ -327,6 +329,7 @@ pub struct MultisigOrderMeta {
 #[derive(Clone, Debug)]
 pub struct MultisigMeta {
     pub address: Addr,
+    pub first_transaction_lt: Lt,
     pub next_order_seqno: String,
     pub threshold: i32,
     pub signers: Vec<Addr>,

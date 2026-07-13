@@ -39,6 +39,7 @@ fn detect_dns_record(
 fn detect_nft_collection(
     addr: &Addr,
     state: &ActiveContractState,
+    first_transaction_lt: u64,
 ) -> Option<storage::NftCollectionMeta> {
     ton_indexer::nfts::get_nft_collection_data(
         addr.to_string(),
@@ -49,6 +50,7 @@ fn detect_nft_collection(
     .map(|collection| storage::NftCollectionMeta {
         address: *addr,
         owner_address: collection.owner_address.as_ref().map(Addr::from),
+        first_transaction_lt,
         last_transaction_lt: state.last_transaction_lt,
         next_item_index: collection.next_item_index.to_string(),
         collection_content: ton_indexer::nfts::parse_nft_content(collection.collection_content),
@@ -72,8 +74,10 @@ impl Node {
             .nft_items
             .get(addr)
             .and_then(|item| item.owner_address);
+        let first_transaction_lt =
+            self.account_first_transaction_lt(addr, state.last_transaction_lt);
         let dns = detect_dns_record(addr, nft_item_owner, &state);
-        let nft_collection = detect_nft_collection(addr, &state);
+        let nft_collection = detect_nft_collection(addr, &state, first_transaction_lt);
         let ActiveContractState {
             code_hash,
             data_hash,
@@ -82,12 +86,6 @@ impl Node {
             libs,
             last_transaction_lt,
         } = state;
-        let first_transaction_lt = self
-            .indexes
-            .tx_by_account
-            .get(addr)
-            .and_then(|transactions| transactions.last_key_value())
-            .map_or(last_transaction_lt, |(key, _)| key.0.0);
         let address = addr.to_string();
 
         let nft_sale = ton_indexer::contracts::get_fixed_price_sale_v4_data(
@@ -255,6 +253,7 @@ impl Node {
         )
         .map(|multisig| storage::MultisigMeta {
             address: *addr,
+            first_transaction_lt,
             next_order_seqno: multisig.next_order_seqno.to_string(),
             threshold: multisig.threshold.to_string().parse().unwrap_or_default(),
             signers: multisig
@@ -283,6 +282,7 @@ impl Node {
         .map(|order| storage::MultisigOrderMeta {
             address: *addr,
             multisig_address: Addr::from(&order.multisig_address),
+            first_transaction_lt,
             order_seqno: order.order_seqno.to_string(),
             threshold: order.threshold.to_string().parse().unwrap_or_default(),
             sent_for_execution: order.sent_for_execution,
@@ -473,7 +473,9 @@ impl Node {
             });
         }
 
-        info.nft_collection = detect_nft_collection(addr, &state);
+        let first_transaction_lt =
+            self.account_first_transaction_lt(addr, state.last_transaction_lt);
+        info.nft_collection = detect_nft_collection(addr, &state, first_transaction_lt);
         info.dns = detect_dns_record(
             addr,
             info.nft_item.as_ref().and_then(|item| item.owner_address),
@@ -481,6 +483,14 @@ impl Node {
         );
 
         Ok(info)
+    }
+
+    fn account_first_transaction_lt(&self, addr: &Addr, fallback: u64) -> u64 {
+        self.indexes
+            .tx_by_account
+            .get(addr)
+            .and_then(|transactions| transactions.last_key_value())
+            .map_or(fallback, |(key, _)| key.0.0)
     }
 
     fn load_active_contract_state(

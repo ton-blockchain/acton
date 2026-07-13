@@ -3682,6 +3682,50 @@ mod tests {
     }
 
     #[test]
+    fn jetton_master_pages_preserve_detection_order() {
+        let mut node = make_test_node();
+        let admin_a = test_addr(10);
+        let admin_b = test_addr(11);
+        for master in [
+            test_jetton_master(3, admin_a),
+            test_jetton_master(1, admin_b),
+            test_jetton_master(2, admin_a),
+        ] {
+            node.history.jetton_masters.insert(master.address, master);
+        }
+
+        let default = handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::new(), 2, 1)
+            .expect("default jetton master page must succeed");
+        let by_admin =
+            handle_get_jetton_masters(&mut node, HashSet::new(), HashSet::from([admin_a]), 1, 1)
+                .expect("admin jetton master page must succeed");
+
+        assert_eq!(jetton_master_addresses(&default), [1, 2]);
+        assert_eq!(jetton_master_addresses(&by_admin), [2]);
+    }
+
+    fn test_jetton_master(id: u8, admin_address: Addr) -> storage::JettonMasterMeta {
+        storage::JettonMasterMeta {
+            address: test_addr(id),
+            admin_address: Some(admin_address),
+            code_hash: Hash256([id; 32]),
+            data_hash: Hash256([id.wrapping_add(1); 32]),
+            jetton_content: Value::Null,
+            jetton_wallet_code_hash: Hash256([id.wrapping_add(2); 32]),
+            last_transaction_lt: u64::from(id),
+            mintable: true,
+            total_supply: 0,
+        }
+    }
+
+    fn jetton_master_addresses(masters: &[storage::JettonMasterMeta]) -> Vec<u8> {
+        masters
+            .iter()
+            .map(|master| master.address.addr[0])
+            .collect()
+    }
+
+    #[test]
     fn jetton_wallet_queries_follow_upstream_sort_precedence() {
         let mut node = make_test_node();
         let owner_a = test_addr(10);

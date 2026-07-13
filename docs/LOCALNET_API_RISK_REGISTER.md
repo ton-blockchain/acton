@@ -44,9 +44,9 @@ open until their normative contract is chosen.
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
 | Critical | 11 | 5 | 8 |
-| High | 12 | 5 | 20 |
+| High | 13 | 5 | 19 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **23** | **11** | **31** |
+| **Total** | **24** | **11** | **30** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -317,17 +317,17 @@ coverage is high.
 | `POST /api/v3/message` | High | B | Invalid BOC/status, duplicate/replay, multi-root input and normalized hash behavior. |
 | `POST /api/v3/estimateFee` | High | B | State init, signature checking, bounce/storage/IHR fees and config changes against upstream. |
 | `POST /api/v3/runGetMethod` | High | B | Nested stack values, failed exit codes, historical seqno, malformed result stack and libraries. |
-| `GET /api/v3/jetton/masters` | High | B | Stable unfiltered pagination, deterministic admin, metadata variants and destroyed masters. |
+| `GET /api/v3/jetton/masters` | High | B | Detection-order pagination and interleaved admin filters are covered; add multiple real masters, metadata variants, and destroyed masters. |
 | `GET /api/v3/jetton/wallets` | Critical | B | Balance and filter-dependent ordering, mintless/zero balances, destroyed/frozen/code-upgraded wallets. |
 | `GET /api/v3/jetton/transfers` | Critical | B | Aborted tx exclusion, trace ID, destroyed wallet history, time ordering and parser errors. |
 | `GET /api/v3/jetton/burns` | High | B | Trace ID, destroyed wallet history, time ordering, malformed bodies and parser errors. |
 | `GET /api/v3/nft/items` | High | A | Two backfilled real items cover default, owner, single/repeated collection, empty-index, LT, and page ordering; destroyed items and rare sale types remain. |
-| `GET /api/v3/nft/collections` | High | B | Upstream order, scan cost, metadata variants, destroyed collections and stable pagination. |
+| `GET /api/v3/nft/collections` | High | B | Unfiltered creation-order pagination is covered; add multiple real collections, scan cost, metadata variants, and destroyed collections. |
 | `GET /api/v3/nft/sales` | High | B | Auctions, telemint/version variants, completed/destroyed sales, pagination and price edge cases. |
 | `GET /api/v3/nft/transfers` | Critical | B | Trace ID, destroyed item history, time ordering, bounced/aborted semantics and parser errors. |
 | `GET /api/v3/dns/records` | High | C | Length/domain ordering, including equal-length and UTF-8 names, is covered; add real DNS contracts/categories and expired/deleted records. |
-| `GET /api/v3/multisig/orders` | High | B | ID versus LT ordering, malformed actions, expiry, threshold corners and multiple wallets. |
-| `GET /api/v3/multisig/wallets` | High | B | Stable pagination, multiple wallets/orders, include-orders behavior and malformed config. |
+| `GET /api/v3/multisig/orders` | High | B | Creation versus update ordering and pagination are covered; add malformed actions, expiry, threshold corners, and multiple real wallets. |
+| `GET /api/v3/multisig/wallets` | High | B | Creation versus update ordering and wallet-filtered pagination are covered; add multiple real wallets/orders and malformed config. |
 | `GET /api/v3/vesting` | Critical | A | Two real contracts with empty/non-empty whitelists, empty/combined filters, stable ordering, and pagination boundaries; unlock-schedule arithmetic boundaries remain untested. |
 
 ### Confirmed V3 findings
@@ -377,8 +377,10 @@ coverage is high.
     collections retain upstream multi-filter ordering, and empty index values are ignored.
 16. **V3-16, DNS (fixed):** matching records are ordered before pagination by domain character
     length and then name, matching upstream PostgreSQL text semantics.
-17. **V3-17, other collection ordering:** jetton masters, NFT collections, and multisig routes use
-    unstable or different pagination keys from the upstream database ID order.
+17. **V3-17, other collection ordering (fixed):** jetton masters preserve their detection order;
+    unfiltered NFT collections and multisig rows use first transaction LT plus address as the
+    local stable equivalent of upstream insertion ID. Later contract updates no longer reorder
+    multisig pages, and filtered NFT collection queries do not invent an upstream-absent order.
 18. **V3-18, address book/metadata invalid input:** local rejects the whole request. Upstream keeps
     invalid address-book keys with null data and silently ignores invalid metadata addresses.
 19. **V3-19, address/wallet information (partial):** both handlers still parse and ignore `use_v2`.

@@ -10,8 +10,8 @@ use crate::localnet::{
     LocalnetNftItemsOrder, LocalnetNftItemsQuery, LocalnetSortOrder, LocalnetTransaction,
 };
 use crate::storage::{
-    AccountStatus, DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, NftItemMeta, NftSaleMeta,
-    TraceNode,
+    AccountStatus, DnsRecordMeta, JettonMasterMeta, JettonWalletMeta, MultisigMeta,
+    MultisigOrderMeta, NftCollectionMeta, NftItemMeta, NftSaleMeta, TraceNode,
 };
 use crate::types::{Addr, Hash256};
 use crate::v3_events::{parse_jetton_burn, parse_jetton_transfer, parse_nft_transfer};
@@ -1045,20 +1045,37 @@ pub async fn get_nft_collections(
         Ok(data) => data,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let mut collections = data
+    let collections = filter_nft_collections(
+        data.into_iter().filter_map(|data| data.nft_collection),
+        &collection_filter,
+        &owner_filter,
+        limit,
+        offset,
+    );
+    (StatusCode::OK, Json(v3::map_nft_collections(&collections))).into_response()
+}
+
+fn filter_nft_collections(
+    collections: impl IntoIterator<Item = NftCollectionMeta>,
+    addresses: &HashSet<Addr>,
+    owners: &HashSet<Addr>,
+    limit: usize,
+    offset: usize,
+) -> Vec<NftCollectionMeta> {
+    let mut collections = collections
         .into_iter()
-        .filter_map(|data| data.nft_collection)
         .filter(|collection| {
-            (collection_filter.is_empty() || collection_filter.contains(&collection.address))
-                && (owner_filter.is_empty()
+            (addresses.is_empty() || addresses.contains(&collection.address))
+                && (owners.is_empty()
                     || collection
                         .owner_address
-                        .is_some_and(|owner| owner_filter.contains(&owner)))
+                        .is_some_and(|owner| owners.contains(&owner)))
         })
         .collect::<Vec<_>>();
-    collections.sort_by_key(|collection| collection.address.to_string());
-    let collections = paginate(collections, limit, offset);
-    (StatusCode::OK, Json(v3::map_nft_collections(&collections))).into_response()
+    if addresses.is_empty() && owners.is_empty() {
+        collections.sort_by_key(|collection| (collection.first_transaction_lt, collection.address));
+    }
+    paginate(collections, limit, offset)
 }
 
 pub async fn get_nft_sales(
@@ -1224,22 +1241,41 @@ pub async fn get_multisig_orders(
         Ok(data) => data,
         Err(e) => return request_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let mut orders = data
+    let orders = filter_multisig_orders(
+        data.into_iter().filter_map(|data| data.multisig_order),
+        &addresses,
+        &multisig_addresses,
+        sort,
+        limit,
+        offset,
+    );
+    (
+        StatusCode::OK,
+        Json(v3::map_multisig_orders(&orders, parse_actions)),
+    )
+        .into_response()
+}
+
+fn filter_multisig_orders(
+    orders: impl IntoIterator<Item = MultisigOrderMeta>,
+    addresses: &HashSet<Addr>,
+    multisig_addresses: &HashSet<Addr>,
+    sort: SortOrder,
+    limit: usize,
+    offset: usize,
+) -> Vec<MultisigOrderMeta> {
+    let mut orders = orders
         .into_iter()
-        .filter_map(|data| data.multisig_order)
         .filter(|order| {
             (addresses.is_empty() || addresses.contains(&order.address))
                 && (multisig_addresses.is_empty()
                     || multisig_addresses.contains(&order.multisig_address))
         })
         .collect::<Vec<_>>();
-    sort_events(&mut orders, sort, |order| order.last_transaction_lt);
-    let orders = paginate(orders, limit, offset);
-    (
-        StatusCode::OK,
-        Json(v3::map_multisig_orders(&orders, parse_actions)),
-    )
-        .into_response()
+    sort_events(&mut orders, sort, |order| {
+        (order.first_transaction_lt, order.address)
+    });
+    paginate(orders, limit, offset)
 }
 
 pub async fn get_multisig_wallets(
@@ -1279,31 +1315,53 @@ pub async fn get_multisig_wallets(
     let mut multisigs = Vec::new();
     let mut orders = Vec::new();
     for data in data {
-        if let Some(multisig) = data.multisig
-            && (addresses.is_empty() || addresses.contains(&multisig.address))
-            && (wallet_addresses.is_empty()
-                || multisig
-                    .signers
-                    .iter()
-                    .chain(&multisig.proposers)
-                    .any(|address| wallet_addresses.contains(address)))
-        {
+        if let Some(multisig) = data.multisig {
             multisigs.push(multisig);
         }
         if include_orders && let Some(order) = data.multisig_order {
             orders.push(order);
         }
     }
-    sort_events(&mut multisigs, sort, |multisig| {
-        multisig.last_transaction_lt
-    });
-    let multisigs = paginate(multisigs, limit, offset);
+    let multisigs = filter_multisigs(
+        multisigs,
+        &addresses,
+        &wallet_addresses,
+        sort,
+        limit,
+        offset,
+    );
     let selected = multisigs
         .iter()
         .map(|multisig| multisig.address)
         .collect::<HashSet<_>>();
     orders.retain(|order| selected.contains(&order.multisig_address));
     (StatusCode::OK, Json(v3::map_multisigs(&multisigs, &orders))).into_response()
+}
+
+fn filter_multisigs(
+    multisigs: impl IntoIterator<Item = MultisigMeta>,
+    addresses: &HashSet<Addr>,
+    wallet_addresses: &HashSet<Addr>,
+    sort: SortOrder,
+    limit: usize,
+    offset: usize,
+) -> Vec<MultisigMeta> {
+    let mut multisigs = multisigs
+        .into_iter()
+        .filter(|multisig| {
+            (addresses.is_empty() || addresses.contains(&multisig.address))
+                && (wallet_addresses.is_empty()
+                    || multisig
+                        .signers
+                        .iter()
+                        .chain(&multisig.proposers)
+                        .any(|address| wallet_addresses.contains(address)))
+        })
+        .collect::<Vec<_>>();
+    sort_events(&mut multisigs, sort, |multisig| {
+        (multisig.first_transaction_lt, multisig.address)
+    });
+    paginate(multisigs, limit, offset)
 }
 
 pub async fn get_vesting(
@@ -2626,6 +2684,7 @@ fn request_error(status: StatusCode, error: impl Into<String>) -> Response {
 mod tests {
     use super::*;
     use crate::localnet::{LocalnetMessage, LocalnetTransactionId};
+    use crate::types::BocBytes;
 
     fn test_addr(byte: u8) -> Addr {
         Addr {
@@ -2643,6 +2702,67 @@ mod tests {
             wallet,
             site_adnl: None,
             storage_bag_id: None,
+        }
+    }
+
+    fn nft_collection(
+        address_byte: u8,
+        owner: Addr,
+        first_transaction_lt: u64,
+        last_transaction_lt: u64,
+    ) -> NftCollectionMeta {
+        NftCollectionMeta {
+            address: test_addr(address_byte),
+            owner_address: Some(owner),
+            first_transaction_lt,
+            last_transaction_lt,
+            next_item_index: "0".to_owned(),
+            collection_content: Value::Null,
+            data_hash: Hash256([address_byte; 32]),
+            code_hash: Hash256([address_byte.wrapping_add(1); 32]),
+        }
+    }
+
+    fn multisig(
+        address_byte: u8,
+        signer: Addr,
+        first_transaction_lt: u64,
+        last_transaction_lt: u64,
+    ) -> MultisigMeta {
+        MultisigMeta {
+            address: test_addr(address_byte),
+            first_transaction_lt,
+            next_order_seqno: "0".to_owned(),
+            threshold: 1,
+            signers: vec![signer],
+            proposers: Vec::new(),
+            last_transaction_lt,
+            code_hash: Hash256([address_byte; 32]),
+            data_hash: Hash256([address_byte.wrapping_add(1); 32]),
+        }
+    }
+
+    fn multisig_order(
+        address_byte: u8,
+        multisig_address: Addr,
+        first_transaction_lt: u64,
+        last_transaction_lt: u64,
+    ) -> MultisigOrderMeta {
+        MultisigOrderMeta {
+            address: test_addr(address_byte),
+            multisig_address,
+            first_transaction_lt,
+            order_seqno: "0".to_owned(),
+            threshold: 1,
+            sent_for_execution: false,
+            approvals_mask: "0".to_owned(),
+            approvals_num: 0,
+            expiration_date: 0,
+            order_boc: BocBytes::default(),
+            signers: Vec::new(),
+            last_transaction_lt,
+            code_hash: Hash256([address_byte; 32]),
+            data_hash: Hash256([address_byte.wrapping_add(1); 32]),
         }
     }
 
@@ -2747,6 +2867,68 @@ mod tests {
         );
         assert_eq!(exact.len(), 1);
         assert_eq!(exact[0].domain, "b.ton");
+    }
+
+    #[test]
+    fn nft_collection_default_page_uses_creation_order() {
+        let owner = test_addr(9);
+        let collections = [
+            nft_collection(1, owner, 20, 100),
+            nft_collection(2, owner, 30, 30),
+            nft_collection(3, owner, 10, 90),
+        ];
+
+        let page = filter_nft_collections(collections, &HashSet::new(), &HashSet::new(), 2, 1);
+
+        assert_eq!(
+            page.iter()
+                .map(|collection| collection.address.addr[0])
+                .collect::<Vec<_>>(),
+            [1, 2]
+        );
+    }
+
+    #[test]
+    fn multisig_wallets_sort_by_creation_instead_of_latest_update() {
+        let signer = test_addr(9);
+        let rows = [multisig(1, signer, 10, 100), multisig(2, signer, 20, 20)];
+
+        let descending = filter_multisigs(
+            rows.clone(),
+            &HashSet::new(),
+            &HashSet::from([signer]),
+            SortOrder::Desc,
+            10,
+            0,
+        );
+        let ascending =
+            filter_multisigs(rows, &HashSet::new(), &HashSet::new(), SortOrder::Asc, 1, 1);
+
+        assert_eq!(descending[0].address, test_addr(2));
+        assert_eq!(ascending[0].address, test_addr(2));
+    }
+
+    #[test]
+    fn multisig_orders_sort_by_creation_before_pagination() {
+        let multisig_address = test_addr(9);
+        let rows = [
+            multisig_order(1, multisig_address, 10, 100),
+            multisig_order(2, multisig_address, 20, 20),
+        ];
+
+        let descending = filter_multisig_orders(
+            rows.clone(),
+            &HashSet::new(),
+            &HashSet::from([multisig_address]),
+            SortOrder::Desc,
+            10,
+            0,
+        );
+        let ascending_page =
+            filter_multisig_orders(rows, &HashSet::new(), &HashSet::new(), SortOrder::Asc, 1, 1);
+
+        assert_eq!(descending[0].address, test_addr(2));
+        assert_eq!(ascending_page[0].address, test_addr(2));
     }
 
     fn transactions_query() -> ParsedTransactionsV3Query {
