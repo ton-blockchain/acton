@@ -9,14 +9,12 @@
       "102",
       "104"
     ],
-    "descending_first_query_id": "103",
+    "descending_first_query_id": "101",
     "incoming_query_ids": [
-      "101",
-      "103"
+      "101"
     ],
     "outgoing_query_ids": [
-      "101",
-      "103"
+      "101"
     ],
     "wallet_balances_ascending": [
       "100",
@@ -35,13 +33,7 @@
       "query_id": "104",
       "transaction_aborted": true
     },
-    "aborted_transfer": {
-      "amount": "10000",
-      "destination": "0:1111111111111111111111111111111111111111111111111111111111111111",
-      "query_id": "103",
-      "source": "0:513ec97b0c602901c3cf14ac0aa588292468969cccd0d84a4c3fb81e7f897a9c",
-      "transaction_aborted": true
-    },
+    "aborted_transfer_present": false,
     "burn": {
       "amount": "50",
       "custom_payload": null,

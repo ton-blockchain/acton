@@ -871,6 +871,7 @@ pub async fn get_jetton_transfers(
         .collect::<HashMap<_, _>>();
     let mut events = transactions
         .iter()
+        .filter(|transaction| !transaction.aborted)
         .filter_map(|transaction| {
             let wallet = wallets_by_address.get(&transaction.address)?;
             parse_jetton_transfer(transaction, wallet).ok().flatten()
@@ -2588,7 +2589,7 @@ mod tests {
             mc_block_seqno: 1,
             utime: 1,
             data: Default::default(),
-            success: true,
+            aborted: false,
             exit_code: 0,
             transaction_id: LocalnetTransactionId {
                 lt: 1,

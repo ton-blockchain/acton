@@ -148,6 +148,10 @@ fn action_result_code_from_tx_info(tx_info: Option<&TxInfo>) -> Option<i32> {
     info.action_phase.as_ref().map(|phase| phase.result_code)
 }
 
+fn transaction_aborted_from_tx_info(tx_info: Option<&TxInfo>) -> bool {
+    matches!(tx_info, Some(TxInfo::Ordinary(info)) if info.aborted)
+}
+
 fn gas_used_from_tx_info(tx_info: Option<&TxInfo>) -> u64 {
     let Some(TxInfo::Ordinary(info)) = tx_info else {
         return 0;
@@ -762,6 +766,7 @@ impl Node {
 
         let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
         let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
             transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
@@ -771,7 +776,7 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
             total_fees,
@@ -2104,7 +2109,7 @@ impl Node {
             account: *addr,
             lt,
             now: gen_utime,
-            success: true,
+            aborted: true,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -2321,6 +2326,7 @@ impl Node {
         let tx_info = exec_result.tx.info.load().ok();
         let compute_exit_code = compute_exit_code_from_tx_info(tx_info.as_ref());
         let action_result_code = action_result_code_from_tx_info(tx_info.as_ref());
+        let aborted = transaction_aborted_from_tx_info(tx_info.as_ref());
         let (storage_fees, other_fees) =
             transaction_fee_breakdown(&exec_result.tx, tx_info.as_ref());
         let total_fees = exec_result.tx.total_fees.tokens.into();
@@ -2330,7 +2336,7 @@ impl Node {
             account: dst,
             lt,
             now: gen_utime,
-            success: compute_exit_code == Some(0) && action_result_code == Some(0),
+            aborted,
             compute_exit_code,
             action_result_code,
             total_fees,
@@ -3382,7 +3388,7 @@ mod tests {
             account,
             lt: 1,
             now: 3,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -3503,7 +3509,7 @@ mod tests {
                 account,
                 lt: 10,
                 now: 3,
-                success: true,
+                aborted: false,
                 compute_exit_code: Some(0),
                 action_result_code: Some(0),
                 total_fees: 0,
@@ -4101,7 +4107,7 @@ mod tests {
             account: parent_account,
             lt: 1,
             now: 2,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,
@@ -4116,7 +4122,7 @@ mod tests {
             account: child_account,
             lt: 2,
             now: 2,
-            success: true,
+            aborted: false,
             compute_exit_code: Some(0),
             action_result_code: Some(0),
             total_fees: 0,

@@ -426,7 +426,7 @@ pub struct TxMeta {
     pub account: Addr,
     pub lt: Lt,
     pub now: u32,
-    pub success: bool,
+    pub aborted: bool,
     pub compute_exit_code: Option<i32>,
     pub action_result_code: Option<i32>,
     #[serde(default)]

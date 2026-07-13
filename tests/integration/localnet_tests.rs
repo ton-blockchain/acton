@@ -4165,25 +4165,6 @@ fn localnet_v3_indexes_real_jetton_actions() {
         extract_canonical_addr_marker(&script_output, "JETTON_RECIPIENT_WALLET=");
 
     let deadline = Instant::now() + Duration::from_secs(12);
-    let jetton_transfers = loop {
-        let response: toncenter_v3::JettonTransfersResponse =
-            serde_json::from_value(node.get_json(&format!(
-                "/api/v3/jetton/transfers?jetton_wallet={}",
-                encode_query_component(&source_wallet)
-            )))
-            .expect("jetton transfers response must match typed contract");
-        if ["101", "103"].iter().all(|query_id| {
-            response
-                .jetton_transfers
-                .iter()
-                .any(|transfer| transfer.query_id == *query_id)
-        }) || Instant::now() >= deadline
-        {
-            break response;
-        }
-        thread::sleep(Duration::from_millis(200));
-    };
-
     let jetton_burns = loop {
         let response: toncenter_v3::JettonBurnsResponse =
             serde_json::from_value(node.get_json(&format!(
@@ -4202,6 +4183,12 @@ fn localnet_v3_indexes_real_jetton_actions() {
         }
         thread::sleep(Duration::from_millis(200));
     };
+    let jetton_transfers: toncenter_v3::JettonTransfersResponse =
+        serde_json::from_value(node.get_json(&format!(
+            "/api/v3/jetton/transfers?jetton_wallet={}",
+            encode_query_component(&source_wallet)
+        )))
+        .expect("jetton transfers response must match typed contract");
     let incoming: toncenter_v3::JettonTransfersResponse =
         serde_json::from_value(node.get_json(&format!(
             "/api/v3/jetton/transfers?owner_address={}&jetton_master={}&direction=in&sort=asc",
@@ -4275,11 +4262,10 @@ fn localnet_v3_indexes_real_jetton_actions() {
         .iter()
         .find(|burn| burn.query_id == "102")
         .expect("successful jetton burn must be indexed");
-    let aborted_transfer = jetton_transfers
+    let aborted_transfer_present = jetton_transfers
         .jetton_transfers
         .iter()
-        .find(|transfer| transfer.query_id == "103")
-        .expect("aborted jetton transfer must be indexed");
+        .any(|transfer| transfer.query_id == "103");
     let aborted_burn = jetton_burns
         .jetton_burns
         .iter()
@@ -4345,13 +4331,7 @@ fn localnet_v3_indexes_real_jetton_actions() {
                 "response_destination": burn.response_destination,
                 "custom_payload": burn.custom_payload,
             },
-            "aborted_transfer": {
-                "query_id": aborted_transfer.query_id,
-                "amount": aborted_transfer.amount,
-                "source": aborted_transfer.source,
-                "destination": aborted_transfer.destination,
-                "transaction_aborted": aborted_transfer.transaction_aborted,
-            },
+            "aborted_transfer_present": aborted_transfer_present,
             "aborted_burn": {
                 "query_id": aborted_burn.query_id,
                 "amount": aborted_burn.amount,

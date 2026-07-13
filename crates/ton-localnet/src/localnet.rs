@@ -204,7 +204,7 @@ pub struct LocalnetTransaction {
     pub mc_block_seqno: u32,
     pub utime: u32,
     pub data: BocBytes,
-    pub success: bool,
+    pub aborted: bool,
     pub exit_code: i32,
     pub transaction_id: LocalnetTransactionId,
     pub in_msg: LocalnetMessage,
@@ -3055,7 +3055,7 @@ pub(crate) fn convert_to_tx_struct(
         mc_block_seqno: tx.meta.block_seqno,
         utime: tx.meta.now,
         data: tx_boc,
-        success: tx.meta.success,
+        aborted: tx.meta.aborted,
         exit_code: tx.meta.compute_exit_code.unwrap_or(0),
         transaction_id: LocalnetTransactionId {
             lt: tx.meta.lt,

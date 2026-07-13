@@ -1000,7 +1000,7 @@ fn map_v3_transaction(tx: &LocalnetTransaction) -> response::Transaction {
         prev_trans_lt: tx_details.prev_trans_lt,
         description: response::TransactionDescr {
             kind: "ord".to_owned(),
-            aborted: Some(tx_details.aborted.unwrap_or(!tx.success)),
+            aborted: Some(tx_details.aborted.unwrap_or(tx.aborted)),
             destroyed: Some(tx_details.destroyed.unwrap_or(false)),
             credit_first: Some(tx_details.credit_first.unwrap_or(false)),
             is_tock: Some(false),
@@ -1416,7 +1416,7 @@ fn map_transaction(tx: &TransactionInfo, emulated: bool) -> response::Transactio
         prev_trans_lt: tx_details.prev_trans_lt,
         description: response::TransactionDescr {
             kind: "ord".to_owned(),
-            aborted: Some(tx_details.aborted.unwrap_or(!tx.meta.success)),
+            aborted: Some(tx_details.aborted.unwrap_or(tx.meta.aborted)),
             destroyed: Some(tx_details.destroyed.unwrap_or(false)),
             credit_first: Some(tx_details.credit_first.unwrap_or(false)),
             is_tock: Some(false),
