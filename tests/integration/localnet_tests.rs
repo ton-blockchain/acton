@@ -766,8 +766,7 @@ fn localnet_manual_mining_time_controls_update_blocks_and_transactions() {
         .as_u64()
         .expect("mine response must expose last_block_seqno") as u32;
     let tx_block_gen_utime = block_header_gen_utime(&node, tx_block_seqno);
-    let tx_response = wait_for_v3_transactions_response(
-        &node,
+    let tx_response = node.wait_for_non_empty_v3_transactions(
         &format!("/api/v3/transactions?account={target}&limit=10"),
         Duration::from_secs(3),
     );
@@ -2231,8 +2230,7 @@ fn localnet_admin_change_account_state_updates_selected_account() {
         &format!("/api/v2/getShardAccountCell?address={active}"),
         Duration::from_secs(5),
     );
-    let freeze_current_tx_response = wait_for_v3_transactions_response(
-        &node,
+    let freeze_current_tx_response = node.wait_for_non_empty_v3_transactions(
         &format!("/api/v3/transactions?account={active}&limit=1&sort=desc"),
         Duration::from_secs(5),
     );
@@ -2485,8 +2483,7 @@ fn localnet_admin_change_account_state_can_defer_current_freeze_until_manual_min
         &format!("/api/v2/getShardAccountCell?address={active}"),
         Duration::from_secs(5),
     );
-    let tx_response = wait_for_v3_transactions_response(
-        &node,
+    let tx_response = node.wait_for_non_empty_v3_transactions(
         &format!("/api/v3/transactions?account={active}&limit=2&sort=desc"),
         Duration::from_secs(5),
     );
@@ -3492,8 +3489,7 @@ fn localnet_uses_normalized_hash_for_send_boc_return_hash_and_v3_lookup() {
         Some(message_hash)
     );
 
-    let by_msg_hash = wait_for_v3_transactions_response(
-        &node,
+    let by_msg_hash = node.wait_for_non_empty_v3_transactions(
         &format!(
             "/api/v3/transactionsByMessage?msg_hash={normalized_hash_query}&direction=in&limit=50"
         ),
@@ -3620,7 +3616,7 @@ fn localnet_send_boc_return_hash_waits_for_scheduled_block_before_transaction_ap
     let before_tick_transactions = v3_transactions_from_response(&before_tick);
 
     let after_tick =
-        wait_for_v3_transactions_response(&node, &by_message_query, Duration::from_secs(8));
+        node.wait_for_non_empty_v3_transactions(&by_message_query, Duration::from_secs(8));
     let after_tick_transactions = v3_transactions_from_response(&after_tick);
     let matched_normalized_hash = after_tick_transactions
         .iter()
@@ -5434,8 +5430,7 @@ fn localnet_supports_v3_core_lookup_endpoints() {
         }),
     );
     assert_eq!(faucet["ok"].as_bool(), Some(true));
-    let transactions = wait_for_v3_transactions_response(
-        &node,
+    let transactions = node.wait_for_non_empty_v3_transactions(
         &format!(
             "/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=100&sort=desc"
         ),
@@ -5650,8 +5645,7 @@ fn localnet_supports_v3_transactions_endpoints() {
         );
     }
 
-    let all_txs_response = wait_for_v3_transactions_response(
-        &node,
+    let all_txs_response = node.wait_for_non_empty_v3_transactions(
         "/api/v3/transactions?limit=100&sort=desc",
         Duration::from_secs(12),
     );
@@ -6388,13 +6382,11 @@ fn localnet_batches_pending_faucet_messages_into_one_scheduled_block() {
         }),
     );
 
-    let first_account_response = wait_for_v3_transactions_response(
-        &node,
+    let first_account_response = node.wait_for_non_empty_v3_transactions(
         &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_A}&limit=10"),
         Duration::from_secs(8),
     );
-    let second_account_response = wait_for_v3_transactions_response(
-        &node,
+    let second_account_response = node.wait_for_non_empty_v3_transactions(
         &format!("/api/v3/transactions?account={V3_TRANSACTIONS_TEST_ACCOUNT_B}&limit=10"),
         Duration::from_secs(8),
     );
@@ -7619,29 +7611,6 @@ fn wait_for_non_empty_v3_traces_response(
         assert!(
             Instant::now() < deadline,
             "Timed out waiting for non-empty traces response from `{query}`; last status={status}:\n{}",
-            serde_json::to_string_pretty(&response).unwrap_or_default()
-        );
-        thread::sleep(Duration::from_millis(200));
-    }
-}
-
-fn wait_for_v3_transactions_response(
-    node: &crate::support::localnet::LocalnetHandle,
-    query: &str,
-    timeout: Duration,
-) -> Value {
-    let deadline = Instant::now() + timeout;
-    loop {
-        let (status, response) = node.get_json_with_status(query);
-        if (200..300).contains(&status)
-            && is_success_response(&response)
-            && !v3_transactions_from_response(&response).is_empty()
-        {
-            return response;
-        }
-        assert!(
-            Instant::now() < deadline,
-            "Timed out waiting for non-empty v3 transactions from `{query}`; last status={status}:\n{}",
             serde_json::to_string_pretty(&response).unwrap_or_default()
         );
         thread::sleep(Duration::from_millis(200));

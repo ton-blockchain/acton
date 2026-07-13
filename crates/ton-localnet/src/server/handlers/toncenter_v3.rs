@@ -152,8 +152,6 @@ async fn collect_v3_traces(
 
     let mut traces = Vec::new();
     let mut seen = HashSet::new();
-    let mut address_book = v3_types::AddressBook::new();
-    let mut metadata = v3_types::Metadata::new();
     for result in futures_for_trace_hashes(node, tx_hashes, msg_hashes).await {
         let trace = match result {
             Ok(trace) => trace,
@@ -161,17 +159,15 @@ async fn collect_v3_traces(
             Err(e) => return Err(e),
         };
         let mapped = v3::map_traces(&trace);
-        address_book.extend(mapped.address_book);
-        metadata.extend(mapped.metadata);
-        traces.extend(
-            mapped
-                .traces
-                .into_iter()
-                .filter(|trace| seen.insert(trace.trace_id.clone())),
-        );
+        let Some(trace) = mapped.traces.into_iter().next() else {
+            continue;
+        };
+        if seen.insert(trace.trace_id.clone()) {
+            traces.push((trace, mapped.address_book, mapped.metadata));
+        }
     }
 
-    traces.retain(|trace| {
+    traces.retain(|(trace, _, _)| {
         mc_seqno.is_none_or(|seqno| {
             trace.mc_seqno_start == seqno.to_string() || trace.mc_seqno_end == seqno.to_string()
         }) && start_utime.is_none_or(|start| trace.start_utime >= start)
@@ -191,11 +187,19 @@ async fn collect_v3_traces(
                     .is_some_and(|value| value <= end)
             })
     });
-    traces.sort_by_key(|trace| trace.start_lt.parse::<u64>().ok().unwrap_or_default());
+    traces.sort_by_key(|(trace, _, _)| trace.start_lt.parse::<u64>().ok().unwrap_or_default());
     if matches!(sort, SortOrder::Desc) {
         traces.reverse();
     }
-    traces = traces.into_iter().skip(offset).take(limit).collect();
+    let page = traces.into_iter().skip(offset).take(limit);
+    let mut traces = Vec::with_capacity(limit);
+    let mut address_book = v3_types::AddressBook::new();
+    let mut metadata = v3_types::Metadata::new();
+    for (trace, trace_address_book, trace_metadata) in page {
+        traces.push(trace);
+        address_book.extend(trace_address_book);
+        metadata.extend(trace_metadata);
+    }
 
     Ok(v3_types::TracesResponse {
         traces,

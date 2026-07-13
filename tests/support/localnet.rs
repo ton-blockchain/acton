@@ -264,6 +264,32 @@ impl LocalnetHandle {
         (status, json)
     }
 
+    pub(crate) fn wait_for_non_empty_v3_transactions(
+        &self,
+        path: &str,
+        timeout: Duration,
+    ) -> Value {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let (status, response) = self.get_json_with_status(path);
+            if (200..300).contains(&status)
+                && is_success_response(&response)
+                && response
+                    .get("transactions")
+                    .and_then(Value::as_array)
+                    .is_some_and(|transactions| !transactions.is_empty())
+            {
+                return response;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "Timed out waiting for non-empty v3 transactions from `{path}`; last status={status}:\n{}",
+                serde_json::to_string_pretty(&response).unwrap_or_default()
+            );
+            thread::sleep(Duration::from_millis(200));
+        }
+    }
+
     pub(crate) fn get_json_error(&self, path: &str) -> Value {
         let (status, json) = self.get_json_with_status(path);
         assert!(status >= 400, "GET {path} unexpectedly succeeded: {json}");

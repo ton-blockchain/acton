@@ -3,7 +3,9 @@ use crate::support::localnet::{assert_v3_bad_request, assert_v3_error, pretty_js
 use crate::support::project::ProjectBuilder;
 use crate::support::toncenter::{active_shard_account_boc64, test_std_addr};
 use serde_json::{Value, json};
+use std::time::Duration;
 use ton_api::toncenter::v3::{requests, responses};
+use ton_localnet::types::Hash256;
 use tycho_types::cell::Cell;
 
 const ZERO_ADDRESS: &str = "0:0000000000000000000000000000000000000000000000000000000000000000";
@@ -140,6 +142,93 @@ fn information_endpoints_honor_use_v2_projection() {
     assertion().eq(
         pretty_json_for_snapshot(&summary, project.path()),
         snapbox::file!("snapshots/v3_information_source.json"),
+    );
+
+    node.stop();
+}
+
+#[test]
+fn trace_extras_follow_filtering_and_pagination() {
+    let project = ProjectBuilder::new("localnet-v3-trace-page-extras").build();
+    let node = project.localnet().start();
+    let first_address = "0:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    let second_address = "0:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+
+    for address in [first_address, second_address] {
+        node.post_json(
+            "/acton_fundAccount",
+            &json!({
+                "address": address,
+                "amount": 1_000_000_000u64,
+            }),
+        );
+    }
+
+    let first_transactions: responses::TransactionsResponse =
+        serde_json::from_value(node.wait_for_non_empty_v3_transactions(
+            &format!("/api/v3/transactions?account={first_address}&limit=1&sort=desc"),
+            Duration::from_secs(8),
+        ))
+        .expect("first faucet transaction response must be typed");
+    let second_transactions: responses::TransactionsResponse =
+        serde_json::from_value(node.wait_for_non_empty_v3_transactions(
+            &format!("/api/v3/transactions?account={second_address}&limit=1&sort=desc"),
+            Duration::from_secs(8),
+        ))
+        .expect("second faucet transaction response must be typed");
+    let first_transaction = first_transactions
+        .transactions
+        .first()
+        .expect("first faucet request must create a transaction");
+    let second_transaction = second_transactions
+        .transactions
+        .first()
+        .expect("second faucet request must create a transaction");
+    let first_hash = Hash256::from_base64(&first_transaction.hash)
+        .expect("transaction hash must be base64")
+        .to_hex();
+    let second_hash = Hash256::from_base64(&second_transaction.hash)
+        .expect("transaction hash must be base64")
+        .to_hex();
+    let base_query = format!("trace_id={first_hash}&trace_id={second_hash}&sort=asc");
+
+    let first_page: responses::TracesResponse =
+        node.get_json_as(&format!("/api/v3/traces?{base_query}&limit=1"));
+    let second_page: responses::TracesResponse =
+        node.get_json_as(&format!("/api/v3/traces?{base_query}&limit=1&offset=1"));
+    let filtered: responses::TracesResponse = node.get_json_as(&format!(
+        "/api/v3/traces?{base_query}&start_lt={}&limit=10",
+        second_transaction.lt
+    ));
+
+    let summarize = |response: responses::TracesResponse| {
+        let mut transaction_accounts = response
+            .traces
+            .iter()
+            .flat_map(|trace| trace.transactions.values())
+            .map(|transaction| transaction.account.clone())
+            .collect::<Vec<_>>();
+        transaction_accounts.sort_unstable();
+        transaction_accounts.dedup();
+        let mut address_book = response.address_book.into_keys().collect::<Vec<_>>();
+        address_book.sort_unstable();
+        let mut metadata = response.metadata.into_keys().collect::<Vec<_>>();
+        metadata.sort_unstable();
+        json!({
+            "trace_count": response.traces.len(),
+            "transaction_accounts": transaction_accounts,
+            "address_book": address_book,
+            "metadata": metadata,
+        })
+    };
+    let summary = json!({
+        "first_page": summarize(first_page),
+        "second_page": summarize(second_page),
+        "start_lt_filtered": summarize(filtered),
+    });
+    assertion().eq(
+        pretty_json_for_snapshot(&summary, project.path()),
+        snapbox::file!("snapshots/v3_trace_page_extras.json"),
     );
 
     node.stop();

@@ -43,10 +43,10 @@ open until their normative contract is chosen.
 
 | Risk | Fixed | Partial | Open |
 |---|---:|---:|---:|
-| Critical | 11 | 5 | 8 |
+| Critical | 12 | 5 | 7 |
 | High | 15 | 4 | 18 |
 | Medium | 0 | 1 | 3 |
-| **Total** | **26** | **10** | **29** |
+| **Total** | **27** | **10** | **28** |
 
 | Finding | Status | Evidence |
 |---|---|---|
@@ -81,6 +81,7 @@ open until their normative contract is chosen.
 | V3-14 vesting | Fixed | Empty and combined filters follow upstream AND semantics, including optional whitelist matching. Results are ordered before pagination by first local transaction LT and address. A two-contract stateful test covers empty and non-empty TVM dictionaries, repeated unfiltered reads, combined matches/misses, and page boundaries. |
 | V3-15 NFT items | Fixed | Query order follows upstream precedence: insertion/ID order by default, numeric index order for one collection, owner/collection/index order for owner filters, and LT descending when requested. Empty indexes are ignored and repeated collection filters retain multi-filter semantics. Synthetic numeric/null-order cases and two backfilled real items cover pagination. |
 | V3-19 information source | Fixed | Both information routes default to the indexed projection and honor `use_v2`; the legacy wallet path reuses the V2 resolver. Missing, uninit, frozen, destroyed, and active non-wallet states are typed and snapshot-covered. Status vocabulary, legacy-only `frozen_hash`, projection-specific 409 behavior, and signed int64 wallet identifiers match upstream. |
+| V3-21 trace extras | Fixed | Trace address-book and metadata entries are retained with their trace through filtering and pagination, then merged only for the selected page. A two-trace stateful snapshot covers offset and LT filtering. |
 | V3-22 getter result stack | Fixed | Invalid result BOCs and tuple encodings propagate as errors instead of successful empty stacks. |
 | CTL-02 force snapshot/import | Partial | Forced replacement retains the existing recovery point until snapshot creation or import succeeds. Imported bytes are still validated only during revert. |
 
@@ -294,7 +295,7 @@ coverage is high.
 
 | Method and route | Risk | Coverage | Important edge, rare, or complex cases |
 |---|---|---|---|
-| `GET /api/v3/traces` | Critical | B | No-filter listing, end-based ranges/order, mc block existence, branched/multi-block identity and summaries. |
+| `GET /api/v3/traces` | Critical | B | Page-local extras are covered with offset and LT filtering; add no-filter listing, end-based ranges/order, mc block existence, branched/multi-block identity and summaries. |
 | `GET /api/v3/accountStates` | High | B | Missing-row cardinality, contract methods, `code_hash`, frozen details, extra currencies. |
 | `GET /api/v3/addressBook` | Medium | C | Mixed valid/invalid batches preserve requested keys with the production null/empty row shape; add DNS names, friendly-address flag variants, and repeated spelling forms. |
 | `GET /api/v3/metadata` | High | C | Invalid addresses are ignored in mixed batches; add on/off-chain variants, merge precedence/completeness, and destroyed contracts. |
@@ -391,8 +392,9 @@ coverage is high.
     and preserve signed int64 wallet seqno and wallet IDs.
 20. **V3-20, errors:** backend errors collapse to 500 and parser errors generally use 400 instead
     of upstream 404/409/422 distinctions.
-21. **V3-21, trace extras:** address book and metadata are collected before filtering and
-    pagination, so a page can leak extras for traces absent from that page.
+21. **V3-21, trace extras (fixed):** each mapped trace retains its address book and metadata
+    through filtering and pagination; only extras belonging to the selected page are merged into
+    the response.
 22. **V3-22, getter decoding (fixed):** result BOC and tuple decoding failures propagate as
     errors instead of successful empty stacks.
 23. **V3-23, discovery complexity:** contract discovery and several filters scan all accounts and
