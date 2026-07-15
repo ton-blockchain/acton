@@ -400,7 +400,7 @@
   align-items: center;
   color: var(--text-primary);
   font-size: var(--font-size-xs);
-  line-height: 1.4;
+  line-height: 20px;
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
 }
@@ -410,7 +410,7 @@
   align-items: center;
   color: var(--text-secondary);
   font-size: var(--font-size-xs);
-  line-height: 1.4;
+  line-height: 20px;
   white-space: nowrap;
 }
 

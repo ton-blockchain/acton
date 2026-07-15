@@ -2,7 +2,7 @@ import {Check, Copy} from "lucide-react"
 import type {ComponentPropsWithRef} from "react"
 
 import {cx} from "../../lib/cx"
-import {CopyInlineAction, InlineActions} from "../InlineActions"
+import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
 import styles from "./OpcodeChip.module.css"
 
 export type OpcodeChipProps = Readonly<

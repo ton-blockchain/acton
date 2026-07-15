@@ -50,7 +50,7 @@ export function ValueFlowTable({
 
   return (
     <DataTable className={className} minWidth="34rem">
-      <DataTableTable aria-label="Value flow">
+      <DataTableTable aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell columnWidth="34%">Account</DataTableHeaderCell>

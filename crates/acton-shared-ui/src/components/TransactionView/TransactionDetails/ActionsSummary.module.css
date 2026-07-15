@@ -283,7 +283,7 @@
 
 .messageDataTitle {
   font-size: 0.6875rem;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   letter-spacing: 0.4px;
 }
 

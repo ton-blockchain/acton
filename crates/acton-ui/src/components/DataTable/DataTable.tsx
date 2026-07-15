@@ -22,6 +22,7 @@ export type DataTableProps = Readonly<
 export type DataTableTableProps = Readonly<
   ComponentPropsWithRef<"table"> & {
     readonly layout?: DataTableLayout
+    readonly rowDividers?: boolean
   }
 >
 
@@ -141,9 +142,24 @@ export function DataTable({
   )
 }
 
-export function DataTableTable({className, layout = "fixed", ref, ...props}: DataTableTableProps) {
+export function DataTableTable({
+  className,
+  layout = "fixed",
+  ref,
+  rowDividers = true,
+  ...props
+}: DataTableTableProps) {
   return (
-    <table {...props} ref={ref} className={cx(styles.table, layoutClassNames[layout], className)} />
+    <table
+      {...props}
+      ref={ref}
+      className={cx(
+        styles.table,
+        layoutClassNames[layout],
+        !rowDividers && styles.tableWithoutRowDividers,
+        className,
+      )}
+    />
   )
 }
 
