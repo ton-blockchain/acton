@@ -1,6 +1,5 @@
 export * from "./components/ui/Card"
 export * from "./components/ui/Input"
-export * from "./components/ui/Table"
 export * from "./components/ContractSourcePanel/ContractSourcePanel"
 export * from "./components/TransactionView/ParsedBodySection/ParsedBodySection"
 export * from "./components/TransactionView/ParsedValueView/ParsedValueView"

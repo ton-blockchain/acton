@@ -2389,57 +2389,13 @@
 .rpcStatusIcon {
   width: 22px;
   height: 22px;
-  margin-left: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
 }
 
-.rpcCallsTableFrame {
-  border: 1px solid var(--litenode-border-subtle);
-  border-radius: 8px;
-  background: var(--litenode-surface);
-  overflow: hidden;
-}
-
 .rpcCallsTable {
-  min-width: 680px;
-  background: var(--litenode-surface);
-}
-
-.rpcCallsTable th,
-.rpcCallsTable td {
-  border-color: var(--litenode-border-subtle);
-}
-
-.rpcCallsTable th {
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-muted);
-  font-size: 0.78rem;
-  font-weight: 400;
-}
-
-.rpcCallsTable td {
-  background: var(--litenode-surface);
-  color: var(--litenode-text);
-  font-size: 0.84rem;
-}
-
-.rpcStatusCell {
-  vertical-align: middle;
-}
-
-.rpcCallsTable tbody tr:hover td {
-  background: var(--litenode-surface-hover);
-}
-
-.rpcCallsTable thead tr:hover {
-  background: var(--litenode-surface-subtle);
-}
-
-.rpcDurationCell {
-  color: var(--litenode-text-muted);
-  white-space: nowrap;
+  --acton-color-surface-row: var(--litenode-surface-hover);
 }
 
 .rpcStatusSuccess {
@@ -2451,24 +2407,11 @@
 }
 
 .rpcTypeCell {
-  color: var(--litenode-text-muted);
   text-transform: lowercase;
 }
 
-.rpcMethodCell {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  max-width: 220px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.rpcCodeCell {
-  color: var(--litenode-text-subtle);
-}
-
+.rpcDurationCell,
 .rpcTimestampCell {
-  color: var(--litenode-text-muted);
   white-space: nowrap;
 }
 

@@ -14,6 +14,49 @@
   padding: 0;
 }
 
+.tableWrapper {
+  position: relative;
+  width: 100%;
+  overflow: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  caption-side: bottom;
+  font-size: var(--font-size-sm);
+}
+
+.table thead {
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.table tr {
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color var(--transition-duration-fast);
+}
+
+.table tr:hover {
+  background-color: var(--hover-bg);
+}
+
+.table th {
+  height: 3rem;
+  padding: 0 var(--spacing-md);
+  text-align: left;
+  vertical-align: middle;
+  font-weight: var(--font-weight-medium);
+}
+
+.table td {
+  padding: var(--spacing-md);
+  vertical-align: middle;
+}
+
 .historyContent tbody > tr {
   border-top: 1px solid var(--tonscan-border) !important;
   border-bottom: 0 !important;
@@ -512,6 +555,11 @@
 
 .clickableRow {
   cursor: pointer;
+}
+
+.clickableRow:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--litenode-focus);
 }
 
 .txLinkCell {
