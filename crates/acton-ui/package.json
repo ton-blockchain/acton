@@ -16,6 +16,7 @@
     "./components/content-tabs": "./src/components/ContentTabs/index.ts",
     "./components/data-table": "./src/components/DataTable/index.ts",
     "./components/disclosure-toggle": "./src/components/DisclosureToggle/index.ts",
+    "./components/exit-code-chip": "./src/components/ExitCodeChip/index.ts",
     "./components/info-popover": "./src/components/InfoPopover/index.ts",
     "./components/inline-actions": "./src/components/InlineActions/index.ts",
     "./components/inline-button": "./src/components/InlineButton/index.ts",

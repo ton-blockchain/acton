@@ -289,6 +289,58 @@ loading state, and `aria-expanded`.
 - Do not use DisclosureToggle for full-width collapsible headers, large
   accordions, or register-form buttons.
 
+## ExitCodeChip
+
+Status: ready
+
+Import:
+
+```tsx
+import {ExitCodeChip} from "@acton/ui"
+```
+
+Use ExitCodeChip for TVM compute-phase exit codes and transaction action result
+codes. It owns success classification, standard TVM descriptions, contract ABI
+error lookup, and the contextual popover.
+
+### Minimal ABI Shape
+
+The `abi` prop is structural and intentionally limited to the data the chip
+reads:
+
+```tsx
+interface ExitCodeAbi {
+  readonly thrown_errors?: readonly {
+    readonly err_code: number
+    readonly name?: string
+    readonly description?: string
+  }[]
+}
+```
+
+A full compiler ABI is assignable to this shape, but `@acton/ui` does not import
+or depend on compiler ABI types.
+
+### States To Review Visually
+
+- Missing code: yellow `Unknown` chip
+- Compute success: 0 and 1
+- Action success: 0
+- Standard TVM compute error
+- Standard action error
+- Contract-defined ABI error
+- Unknown custom error
+
+### Agent Guidance
+
+- Set `phase="action"` for action result codes; compute is the default.
+- Pass `abi` only when contract-defined thrown errors are available.
+- Pass `undefined` while the result is unavailable; the component renders an
+  `Unknown` warning chip.
+- Import the component directly from `@acton/ui`; do not recreate standard exit
+  code descriptions in application code.
+- Do not add a full ABI package dependency to consumers that only need the chip.
+
 ## ContentTabs
 
 Status: ready

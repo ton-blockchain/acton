@@ -1,0 +1,65 @@
+.exitCode {
+  display: inline-block;
+  padding: 0 var(--acton-space-2);
+  border-radius: var(--acton-radius-control-sm);
+  font-size: var(--acton-font-size-compact);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.5;
+}
+
+.interactive {
+  cursor: help;
+}
+
+.success {
+  background-color: color-mix(in srgb, var(--acton-color-success) 14%, transparent);
+  color: var(--acton-color-success);
+}
+
+.unknown {
+  background-color: color-mix(in srgb, var(--acton-color-warning) 14%, transparent);
+  color: var(--acton-color-warning-text);
+}
+
+.error {
+  background-color: color-mix(in srgb, var(--acton-color-danger-text) 14%, transparent);
+  color: var(--acton-color-danger-text);
+}
+
+.exitCodeName {
+  font-weight: var(--acton-font-weight-normal);
+  opacity: 0.8;
+}
+
+.popoverContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  max-width: 20rem;
+}
+
+.popoverSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-1);
+}
+
+.popoverLabel {
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.popoverDocs {
+  margin-top: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+}
+
+.popoverLink {
+  color: var(--acton-color-accent);
+  text-decoration: underline;
+  text-underline-offset: 0.12em;
+}
+
+.popoverLink:hover {
+  color: var(--acton-color-accent-hover);
+}

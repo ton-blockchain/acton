@@ -1,4 +1,5 @@
 import type {OutAction} from "@ton/core"
+import {ExitCodeChip} from "@acton/ui"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
 
@@ -17,7 +18,6 @@ import {ChangeLibraryModeViewer} from "../ChangeLibraryModeViewer/ChangeLibraryM
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
-import {ExitCodeChip} from "../ExitCodeChip/ExitCodeChip"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
 import {SendModeViewer} from "../SendModeViewer/SendModeViewer"

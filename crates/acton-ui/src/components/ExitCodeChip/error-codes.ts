@@ -1,11 +1,42 @@
-export interface ExitCodeDescription {
+interface ExitCodeDescription {
   readonly name: string
   readonly description: string
   readonly phase: string
   readonly docsAnchor?: string
 }
 
-export const EXIT_CODE_DESCRIPTIONS = {
+export type ExitCodePhase = "compute" | "action"
+
+/**
+ * Minimal structural projection of a contract ABI used to resolve contract-defined exit codes.
+ *
+ * Full compiler ABI objects are assignable to this type, but ExitCodeChip only reads the thrown
+ * error code, symbolic name, and optional description. Keeping this projection local prevents
+ * @acton/ui from depending on an ABI compiler package or pulling its complete type graph.
+ */
+export interface ExitCodeAbi {
+  readonly thrown_errors?: readonly {
+    readonly err_code: number
+    readonly name?: string
+    readonly description?: string
+  }[]
+}
+
+export interface ExitCodeInfo {
+  readonly customSymbolicName?: string
+  readonly description: string
+  readonly displayName: string
+  readonly docsUrl?: string
+  readonly isSuccess: boolean
+  readonly origin: string
+}
+
+interface CustomExitCodeInfo {
+  readonly symbolicName: string
+  readonly description: string
+}
+
+const EXIT_CODE_DESCRIPTIONS: Readonly<Record<number, ExitCodeDescription>> = {
   0: {
     docsAnchor: "#0-normal-termination",
     name: "Success",
@@ -192,13 +223,54 @@ export const EXIT_CODE_DESCRIPTIONS = {
     description: "Common developer-defined code often used similarly to 130 (unknown opcode).",
     phase: "User-defined",
   },
-} as const satisfies Record<number, ExitCodeDescription>
+}
 
 const TVM_EXIT_CODES_DOCS_BASE_URL = "https://docs.ton.org/tvm/exit-codes"
+const UNKNOWN_EXIT_CODE_DESCRIPTION =
+  "Contract returned a user-defined exit code that is not declared in the ABI, so no symbolic description is available for this value."
 
-export function getExitCodeDocsUrl(exitCode: number): string | undefined {
-  const description = (EXIT_CODE_DESCRIPTIONS as Record<number, ExitCodeDescription>)[exitCode]
+const getExitCodeDocsUrl = (exitCode: number): string | undefined => {
+  const description = EXIT_CODE_DESCRIPTIONS[exitCode]
   return description?.docsAnchor
     ? `${TVM_EXIT_CODES_DOCS_BASE_URL}${description.docsAnchor}`
     : undefined
+}
+
+const getCustomExitCodeInfo = (
+  exitCode: number,
+  abi: ExitCodeAbi | undefined,
+): CustomExitCodeInfo | undefined => {
+  const thrownError = abi?.thrown_errors?.find(error => error.err_code === exitCode)
+  const symbolicName = thrownError?.name
+
+  if (!symbolicName) return undefined
+
+  return {
+    symbolicName,
+    description: thrownError.description ?? symbolicName,
+  }
+}
+
+const getPhaseLabel = (phase: ExitCodePhase): string =>
+  phase === "action" ? "Action phase" : "Compute phase"
+
+export function resolveExitCode(
+  exitCode: number,
+  abi: ExitCodeAbi | undefined,
+  phase: ExitCodePhase,
+): ExitCodeInfo {
+  const standardDescription = EXIT_CODE_DESCRIPTIONS[exitCode]
+  const customExitCode = getCustomExitCodeInfo(exitCode, abi)
+
+  return {
+    customSymbolicName: customExitCode?.symbolicName,
+    displayName: standardDescription?.name ?? customExitCode?.symbolicName ?? "Custom Exit Code",
+    description:
+      standardDescription?.description ??
+      customExitCode?.description ??
+      UNKNOWN_EXIT_CODE_DESCRIPTION,
+    origin: standardDescription?.phase ?? getPhaseLabel(phase),
+    docsUrl: standardDescription ? getExitCodeDocsUrl(exitCode) : undefined,
+    isSuccess: phase === "action" ? exitCode === 0 : exitCode === 0 || exitCode === 1,
+  }
 }

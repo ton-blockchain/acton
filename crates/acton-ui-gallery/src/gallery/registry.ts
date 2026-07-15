@@ -4,6 +4,7 @@ import {checkboxGallery} from "./checkboxGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {dataTableGallery} from "./dataTableGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
+import {exitCodeChipGallery} from "./exitCodeChipGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
@@ -25,6 +26,7 @@ export const galleries = [
   inlineButtonGallery,
   inlineActionsGallery,
   disclosureToggleGallery,
+  exitCodeChipGallery,
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,

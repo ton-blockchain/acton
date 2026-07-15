@@ -43,6 +43,16 @@
   --acton-color-success: hsl(142 64% 36%);
   /* Success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 44% 72%);
+  /* Warning action and status color. */
+  --acton-color-warning: hsl(45 93% 47%);
+  /* Hover state for warning actions. */
+  --acton-color-warning-hover: hsl(38 92% 42%);
+  /* Text and icon color for warning inline feedback. */
+  --acton-color-warning-text: hsl(32 81% 29%);
+  /* Hover state for warning inline text and icons. */
+  --acton-color-warning-text-hover: hsl(26 90% 37%);
+  /* Text and icon color placed on warning backgrounds. */
+  --acton-color-warning-foreground: hsl(26 83% 14%);
   /* Destructive action color. */
   --acton-color-danger: hsl(0 84% 60%);
   /* Hover state for destructive action color. */
@@ -176,6 +186,16 @@
   --acton-color-success: hsl(142 69% 58%);
   /* Dark success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 39% 30%);
+  /* Dark warning action and status color. */
+  --acton-color-warning: hsl(45 93% 47%);
+  /* Dark hover state for warning actions. */
+  --acton-color-warning-hover: hsl(48 96% 53%);
+  /* Dark text and icon color for warning inline feedback. */
+  --acton-color-warning-text: hsl(43 96% 56%);
+  /* Dark hover state for warning inline text and icons. */
+  --acton-color-warning-text-hover: hsl(48 96% 69%);
+  /* Dark text and icon color placed on warning backgrounds. */
+  --acton-color-warning-foreground: hsl(26 83% 14%);
   /* Dark destructive action color. */
   --acton-color-danger: hsl(0 63% 31%);
   /* Dark hover state for destructive action color. */
