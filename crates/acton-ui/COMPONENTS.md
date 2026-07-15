@@ -212,6 +212,8 @@ row item.
 - `visibility="always"`: actions are always visible.
 - `InlineAction` uses a 20px control with a 13px icon to match existing inline
   copy actions in localnet/shared UI.
+- `size="compact"` uses a 16px control with an 11px icon for tight chips and
+  metadata values.
 - `CopyInlineAction` copies `value`, switches to `copiedIcon`, updates the
   accessible label/title, and resets after 2000ms by default.
 
@@ -232,9 +234,59 @@ row item.
   should change to a check mark after copying.
 - Keep `InlineAction` visually neutral; handle destructive intent through label,
   placement, confirmation, or surrounding context.
+- Use `size="compact"` only when the surrounding value is itself compact; keep
+  the default size for standalone inline actions.
 - Use `InlineButton` instead when the action needs a visible text label like
   `Debug`.
 - Do not hide remove actions behind hover-only visibility.
+
+## OpcodeChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { OpcodeChip } from "@acton/ui"
+```
+
+Use OpcodeChip for TON message opcodes that may have a domain-resolved ABI name.
+It owns hexadecimal formatting and composes its copy interaction from
+`InlineActions` and `CopyInlineAction`.
+
+### Composition
+
+```tsx
+<OpcodeChip
+  opcode={opcode}
+  abiName={resolvedOpcodeName}
+  showOpcode
+/>
+```
+
+- `opcode`: numeric opcode. Zero is valid and renders as `0x0`; `undefined`
+  renders `Empty` without a copy action.
+- `abiName`: optional symbolic name resolved by domain code.
+- `showOpcode`: keeps the hexadecimal value visible beside `abiName`.
+- The copy action appears on hover or keyboard focus and is always visible on
+  coarse pointer devices.
+
+### States To Review Visually
+
+- Missing opcode
+- Zero opcode
+- Numeric opcode without an ABI name
+- ABI name with hexadecimal secondary text
+- ABI name without secondary text
+- Copy hover/focus and copied state
+
+### Agent Guidance
+
+- Pass a number and let OpcodeChip format the hexadecimal value.
+- Resolve ABI names outside `@acton/ui` and pass the prepared string.
+- Do not wrap OpcodeChip in another copy control.
+- Do not duplicate copy state, timers, clipboard calls, or copy/check icons in
+  consumers.
 
 ## DisclosureToggle
 

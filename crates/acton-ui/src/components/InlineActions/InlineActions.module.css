@@ -43,8 +43,6 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.25rem;
-  height: 1.25rem;
   padding: 0;
   border: 1px solid transparent;
   border-radius: var(--acton-radius-control-sm);
@@ -76,11 +74,29 @@
   justify-content: center;
 }
 
+.actionSizeDefault {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.actionSizeCompact {
+  width: 1rem;
+  height: 1rem;
+}
+
 .inlineAction svg {
   display: block;
+  flex: 0 0 auto;
+}
+
+.actionSizeDefault svg {
   width: 0.8125rem;
   height: 0.8125rem;
-  flex: 0 0 auto;
+}
+
+.actionSizeCompact svg {
+  width: 0.6875rem;
+  height: 0.6875rem;
 }
 
 .actionVariantDefault {

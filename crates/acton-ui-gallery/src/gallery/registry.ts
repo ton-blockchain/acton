@@ -10,6 +10,7 @@ import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
 import {modeViewerGallery} from "./modeViewerGallery"
+import {opcodeChipGallery} from "./opcodeChipGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
@@ -28,6 +29,7 @@ export const galleries = [
   inlineActionsGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,
+  opcodeChipGallery,
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,

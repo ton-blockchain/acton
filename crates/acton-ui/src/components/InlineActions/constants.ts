@@ -3,6 +3,10 @@ export const ACTON_INLINE_ACTION_VARIANTS = {
     default: "Neutral inline action",
     accent: "Highlighted inline action",
   },
+  size: {
+    default: "Standard inline action",
+    compact: "Compact inline action",
+  },
 } as const
 
 export const ACTON_INLINE_ACTIONS_VISIBILITY = {

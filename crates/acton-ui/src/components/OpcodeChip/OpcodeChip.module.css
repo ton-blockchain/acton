@@ -1,0 +1,28 @@
+.opcodeChip {
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-sm);
+  font-synthesis: none;
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.5;
+}
+
+.value {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: var(--acton-space-2);
+}
+
+.opcodeText,
+.opcodeSubText {
+  white-space: nowrap;
+}
+
+.opcodeText {
+  color: var(--acton-color-text);
+}
+
+.opcodeSubText {
+  color: var(--acton-color-text-muted);
+}

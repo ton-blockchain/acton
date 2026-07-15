@@ -2,6 +2,7 @@ import type {OutAction} from "@ton/core"
 import {
   ChangeLibraryModeViewer,
   ExitCodeChip,
+  OpcodeChip,
   parseReserveMode,
   RawDataBlock,
   ReserveModeViewer,
@@ -23,7 +24,6 @@ import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
-import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {
   formatCellBocHex,
   formatMessageRelaxedBocHex,

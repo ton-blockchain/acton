@@ -11,12 +11,14 @@ import styles from "./InlineActions.module.css"
 import type {ACTON_INLINE_ACTIONS_VISIBILITY, ACTON_INLINE_ACTION_VARIANTS} from "./constants"
 
 export type ActonInlineActionVariant = keyof typeof ACTON_INLINE_ACTION_VARIANTS.variant
+export type ActonInlineActionSize = keyof typeof ACTON_INLINE_ACTION_VARIANTS.size
 export type ActonInlineActionsVisibility = keyof typeof ACTON_INLINE_ACTIONS_VISIBILITY.visibility
 
 export type InlineActionProps = Readonly<
   Omit<ComponentPropsWithRef<"button">, "children"> & {
     readonly icon: ReactNode
     readonly label: string
+    readonly size?: ActonInlineActionSize
     readonly variant?: ActonInlineActionVariant
   }
 >
@@ -47,6 +49,11 @@ const actionVariantClassNames = {
   accent: styles.actionVariantAccent,
 } satisfies Record<ActonInlineActionVariant, string>
 
+const actionSizeClassNames = {
+  default: styles.actionSizeDefault,
+  compact: styles.actionSizeCompact,
+} satisfies Record<ActonInlineActionSize, string>
+
 const visibilityClassNames = {
   hover: styles.visibilityHover,
   always: styles.visibilityAlways,
@@ -58,6 +65,7 @@ export function InlineAction({
   icon,
   label,
   ref,
+  size = "default",
   title,
   type = "button",
   variant = "default",
@@ -70,7 +78,12 @@ export function InlineAction({
       type={type}
       aria-label={ariaLabel ?? label}
       title={title ?? label}
-      className={cx(styles.inlineAction, actionVariantClassNames[variant], className)}
+      className={cx(
+        styles.inlineAction,
+        actionVariantClassNames[variant],
+        actionSizeClassNames[size],
+        className,
+      )}
     >
       <span className={styles.actionIcon} aria-hidden="true">
         {icon}
