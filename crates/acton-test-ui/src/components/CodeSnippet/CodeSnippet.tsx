@@ -1,4 +1,4 @@
-import type React from "react"
+import type {ReactNode} from "react"
 import {useEffect, useState} from "react"
 
 import {HighlightedCode} from "@acton/ui"
@@ -10,16 +10,16 @@ interface CodeSnippetProps {
   readonly line: number
   readonly contextLines?: number
   readonly projectRoot?: string
-  readonly ideOpener?: React.ReactNode
+  readonly ideOpener?: ReactNode
 }
 
-export const CodeSnippet: React.FC<CodeSnippetProps> = ({
+export function CodeSnippet({
   filePath,
   line,
   contextLines = 5,
   projectRoot,
   ideOpener,
-}) => {
+}: CodeSnippetProps) {
   const [snippet, setSnippet] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()

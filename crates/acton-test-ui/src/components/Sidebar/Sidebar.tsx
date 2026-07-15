@@ -10,8 +10,9 @@ import {
   FiX,
 } from "react-icons/fi"
 import {ThemeSwitch, type ThemeMode} from "@acton/ui"
-import {AppIcon, type TestReport, TestStatus} from "@acton/shared-ui"
+import {type TestReport, TestStatus} from "@acton/shared-ui"
 
+import {AppIcon} from "../AppIcon/AppIcon"
 import {Summary} from "../Summary/Summary"
 
 import {DocsSidebarIcon} from "./DocsSidebarIcon"

@@ -1,11 +1,9 @@
-import type React from "react"
-
 interface AppIconProps {
   readonly theme: string
   readonly size?: number
 }
 
-export const AppIcon: React.FC<AppIconProps> = ({theme, size = 28}) => {
+export function AppIcon({theme, size = 28}: AppIconProps) {
   const fillColor = theme === "dark" ? "#ecebeb" : "#4DB8FF"
 
   return (

@@ -42,7 +42,6 @@ import {
   fmt,
   getTransactionOpcode,
   processTransactions,
-  CodeSnippet,
   TransactionTree,
   ContractChip,
   resolveAbiOpcodeName,
@@ -50,6 +49,7 @@ import {
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
+import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
 import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
 import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
 

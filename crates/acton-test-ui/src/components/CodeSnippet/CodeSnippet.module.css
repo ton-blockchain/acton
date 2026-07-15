@@ -1,8 +1,8 @@
 .container {
   margin-top: var(--spacing-md);
+  overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
-  overflow: hidden;
   background-color: var(--bg-color);
 }
 
