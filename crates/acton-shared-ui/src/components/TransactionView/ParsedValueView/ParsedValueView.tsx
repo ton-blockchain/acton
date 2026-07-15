@@ -1,10 +1,10 @@
+import {Check, Copy} from "lucide-react"
 import type React from "react"
 
-import {VisuallyGroupedNumber} from "@acton/ui"
+import {CopyInlineAction, InlineActions, VisuallyGroupedNumber} from "@acton/ui"
 import type {ContractData, ParsedValue, ParsedValueMapEntry} from "@/types/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
-import {CopyableValue} from "../CopyableValue/CopyableValue"
 import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "../scalarDisplay"
 
 import styles from "./ParsedValueView.module.css"
@@ -148,9 +148,20 @@ export function ParsedValueView({
       }
 
       return (
-        <CopyableValue value={value.rawValue} label="raw value">
+        <InlineActions
+          actions={
+            <CopyInlineAction
+              value={value.rawValue}
+              label="Copy raw value"
+              copiedLabel="Raw value copied"
+              size="compact"
+              icon={<Copy />}
+              copiedIcon={<Check />}
+            />
+          }
+        >
           {scalarValue}
-        </CopyableValue>
+        </InlineActions>
       )
     }
     case "array": {
