@@ -1,5 +1,5 @@
 import {Check, CircleAlert, RefreshCw} from "lucide-react"
-import {Button} from "@acton/ui"
+import {Button, Checkbox} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@acton/shared-ui"
@@ -81,30 +81,18 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
       <section className={styles.rpcCallsLayout}>
         <div className={styles.rpcCallsToolbar}>
           <div className={styles.rpcCallsFilters}>
-            <label className={styles.rpcCallsFilter}>
-              <input
-                type="checkbox"
-                checked={statusFilter.success}
-                onChange={() => toggleStatusFilter("success")}
-              />
-              <span className={styles.rpcFilterCheckbox}>
-                <Check size={13} strokeWidth={2.5} />
-              </span>
-              <span>Success</span>
-              <span className={styles.rpcFilterCount}>{successCount}</span>
-            </label>
-            <label className={styles.rpcCallsFilter}>
-              <input
-                type="checkbox"
-                checked={statusFilter.failed}
-                onChange={() => toggleStatusFilter("failed")}
-              />
-              <span className={styles.rpcFilterCheckbox}>
-                <Check size={13} strokeWidth={2.5} />
-              </span>
-              <span>Failed</span>
-              <span className={styles.rpcFilterCount}>{failedCount}</span>
-            </label>
+            <Checkbox
+              label="Success"
+              count={successCount}
+              checked={statusFilter.success}
+              onChange={() => toggleStatusFilter("success")}
+            />
+            <Checkbox
+              label="Failed"
+              count={failedCount}
+              checked={statusFilter.failed}
+              onChange={() => toggleStatusFilter("failed")}
+            />
           </div>
           <Button
             type="button"

@@ -1,4 +1,4 @@
-import {ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {Checkbox, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import type {ThemeMode} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
@@ -727,34 +727,22 @@ function NetworkDropdown({
                     disabled={!isNetworkFormOpen}
                   />
                 </label>
-                <label className={styles.networkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={customTestOnly}
-                    disabled={!isNetworkFormOpen}
-                    onChange={event => setCustomTestOnly(event.target.checked)}
-                  />
-                  <span className={styles.networkCheckboxText}>
-                    <span className={styles.networkCheckboxLabel}>Testnet addresses</span>
-                    <span className={styles.networkCheckboxDescription}>
-                      Copy addresses and open links as testnet addresses.
-                    </span>
-                  </span>
-                </label>
-                <label className={styles.networkCheckboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={customSupportsActions}
-                    disabled={!isNetworkFormOpen}
-                    onChange={event => setCustomSupportsActions(event.target.checked)}
-                  />
-                  <span className={styles.networkCheckboxText}>
-                    <span className={styles.networkCheckboxLabel}>Support actions</span>
-                    <span className={styles.networkCheckboxDescription}>
-                      Enable Toncenter /actions history for this network.
-                    </span>
-                  </span>
-                </label>
+                <Checkbox
+                  className={styles.networkCheckbox}
+                  label="Testnet addresses"
+                  description="Copy addresses and open links as testnet addresses."
+                  checked={customTestOnly}
+                  disabled={!isNetworkFormOpen}
+                  onChange={event => setCustomTestOnly(event.currentTarget.checked)}
+                />
+                <Checkbox
+                  className={styles.networkCheckbox}
+                  label="Support actions"
+                  description="Enable Toncenter /actions history for this network."
+                  checked={customSupportsActions}
+                  disabled={!isNetworkFormOpen}
+                  onChange={event => setCustomSupportsActions(event.currentTarget.checked)}
+                />
                 <div className={styles.networkFormActions}>
                   <button
                     type="button"

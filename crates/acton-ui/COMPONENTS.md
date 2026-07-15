@@ -234,6 +234,8 @@ row item.
   metadata values.
 - `CopyInlineAction` copies `value`, switches to `copiedIcon`, updates the
   accessible label/title, and resets after 2000ms by default.
+- `CopyInlineAction` uses copy/check icons by default; pass `icon` and
+  `copiedIcon` only when the surrounding domain needs different symbols.
 
 ### Visibility Rules
 

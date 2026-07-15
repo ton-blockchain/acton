@@ -5,7 +5,7 @@
   grid-template-columns: 1rem minmax(0, auto);
   align-items: start;
   min-width: 0;
-  gap: var(--acton-space-2);
+  gap: var(--acton-space-3);
   color: var(--acton-color-text);
   font: inherit;
   font-size: var(--acton-font-size-sm);

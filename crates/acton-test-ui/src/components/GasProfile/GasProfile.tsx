@@ -1,4 +1,5 @@
 import type React from "react"
+import {Checkbox} from "@acton/ui"
 import {useEffect, useMemo, useRef, useState} from "react"
 import flamegraph, {tooltip as flamegraphTooltip, type FlameGraphDatum} from "d3-flame-graph"
 import {select} from "d3-selection"
@@ -896,16 +897,14 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) =>
                                   )
                                 })}
                               </div>
-                              <label className={styles.instructionStackToggle}>
-                                <input
-                                  type="checkbox"
-                                  checked={showOnlyStackInstructions}
-                                  onChange={event =>
-                                    setShowOnlyStackInstructions(event.currentTarget.checked)
-                                  }
-                                />
-                                <span>Stack only</span>
-                              </label>
+                              <Checkbox
+                                className={styles.instructionStackToggle}
+                                label="Stack only"
+                                checked={showOnlyStackInstructions}
+                                onChange={event =>
+                                  setShowOnlyStackInstructions(event.currentTarget.checked)
+                                }
+                              />
                             </div>
                           )}
                         </div>

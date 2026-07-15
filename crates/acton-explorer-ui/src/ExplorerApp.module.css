@@ -487,47 +487,10 @@
   opacity: 0.7;
 }
 
-.networkCheckboxRow {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 10px;
+.networkCheckbox {
   min-height: 42px;
   margin-top: 4px;
   padding-inline: 3px;
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  letter-spacing: 0;
-  cursor: pointer;
-}
-
-.networkCheckboxRow input {
-  width: 14px;
-  height: 14px;
-  margin: 1px 0 0;
-  accent-color: var(--tonscan-accent);
-}
-
-.networkCheckboxText {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.networkCheckboxLabel {
-  color: var(--tonscan-text-primary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-}
-
-.networkCheckboxDescription {
-  color: var(--tonscan-text-secondary);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-  line-height: 1.25;
 }
 
 .networkFormActions {

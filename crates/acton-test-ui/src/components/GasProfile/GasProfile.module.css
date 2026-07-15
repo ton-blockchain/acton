@@ -273,26 +273,10 @@
 }
 
 .instructionStackToggle {
-  display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xs);
   min-height: 28px;
-  color: var(--text-secondary);
-  cursor: pointer;
   font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
   white-space: nowrap;
-}
-
-.instructionStackToggle:hover {
-  color: var(--text-primary);
-}
-
-.instructionStackToggle input {
-  width: 14px;
-  height: 14px;
-  margin: 0;
-  accent-color: var(--text-primary);
 }
 
 .instructionFilterButton {
