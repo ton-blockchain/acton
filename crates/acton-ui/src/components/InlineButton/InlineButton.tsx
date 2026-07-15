@@ -2,15 +2,7 @@ import type {ComponentPropsWithRef, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
 import styles from "./InlineButton.module.css"
-
-export const ACTON_INLINE_BUTTON_VARIANTS = {
-  variant: {
-    default: "Neutral inline action",
-    utility: "Compact utility inline action",
-    accent: "Highlighted inline action",
-    danger: "Destructive inline action",
-  },
-} as const
+import type {ACTON_INLINE_BUTTON_VARIANTS} from "./constants"
 
 export type ActonInlineButtonVariant = keyof typeof ACTON_INLINE_BUTTON_VARIANTS.variant
 

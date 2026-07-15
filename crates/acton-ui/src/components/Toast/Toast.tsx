@@ -206,6 +206,7 @@ function ToastIcon({variant}: {readonly variant: ToastVariant}) {
   return <Info size={17} strokeWidth={2.25} />
 }
 
+// react-doctor-disable-next-line react-doctor/only-export-components -- hook exports are safe Fast Refresh boundaries
 export function useToast() {
   const context = useContext(ToastContext)
 

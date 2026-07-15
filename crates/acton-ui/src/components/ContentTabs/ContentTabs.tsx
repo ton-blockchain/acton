@@ -63,6 +63,7 @@ export function ContentTabs<TValue extends string = string>({
   const activeIndex = tabs.findIndex(tab => tab.value === selectedValue)
   const activeTabId = activeIndex >= 0 ? getTabId(baseId, activeIndex) : undefined
 
+  // react-doctor-disable-next-line react-doctor/no-reset-all-state-on-prop-change -- clears completed async selection tracking
   useEffect(() => {
     if (!promiseSelection) return
     if (value !== promiseSelection.value || promiseSelection.status === "loading") return
@@ -206,6 +207,7 @@ function getTabId(baseId: string, index: number) {
 }
 
 function getEnabledTabs<TValue extends string>(tabs: readonly ContentTab<TValue>[]) {
+  // react-doctor-disable-next-line react-doctor/js-combine-iterations -- tab lists are small and the chain is clearer
   return tabs.map((tab, index) => ({index, tab})).filter(item => !item.tab.disabled)
 }
 

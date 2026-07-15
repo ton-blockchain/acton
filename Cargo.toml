@@ -23,6 +23,9 @@ exclude = [
   "crates/acton-shared-ui",
   "crates/acton-localnet-ui",
   "crates/acton-explorer-ui",
+  "crates/ton-language-server-core",
+  "crates/ton-language-server-native",
+  "crates/ton-language-server-wasm",
 ]
 
 [workspace.package]

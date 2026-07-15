@@ -8,20 +8,7 @@ import {
 
 import {cx} from "../../lib/cx"
 import styles from "./InlineActions.module.css"
-
-export const ACTON_INLINE_ACTION_VARIANTS = {
-  variant: {
-    default: "Neutral inline action",
-    accent: "Highlighted inline action",
-  },
-} as const
-
-export const ACTON_INLINE_ACTIONS_VISIBILITY = {
-  visibility: {
-    hover: "Reveal on hover and focus",
-    always: "Always visible",
-  },
-} as const
+import type {ACTON_INLINE_ACTIONS_VISIBILITY, ACTON_INLINE_ACTION_VARIANTS} from "./constants"
 
 export type ActonInlineActionVariant = keyof typeof ACTON_INLINE_ACTION_VARIANTS.variant
 export type ActonInlineActionsVisibility = keyof typeof ACTON_INLINE_ACTIONS_VISIBILITY.visibility
@@ -107,6 +94,7 @@ export function CopyInlineAction({
   const [isCopied, setIsCopied] = useState(false)
   const currentLabel = isCopied ? copiedLabel : label
 
+  // react-doctor-disable-next-line react-doctor/no-reset-all-state-on-prop-change -- avoids showing copied state for a new value
   useEffect(() => {
     setIsCopied(false)
   }, [value])
