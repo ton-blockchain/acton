@@ -3,6 +3,8 @@ import {useLocation, useNavigate, useParams} from "react-router-dom"
 import {useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
+import {HighlightedCode} from "@acton/ui"
+
 import type {TonClient} from "../api/client"
 import type {ExtendedContractABI} from "../api/compilerAbi"
 import type {
@@ -1239,9 +1241,11 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
                   >
                     <Copy size={18} />
                   </button>
-                  <pre className={styles.metadataJson}>
-                    <code>{renderJson(activeMetadataJson)}</code>
-                  </pre>
+                  <HighlightedCode
+                    className={styles.metadataJson}
+                    value={activeMetadataJson}
+                    language="json"
+                  />
                 </div>
               </section>
             </div>
@@ -1415,54 +1419,6 @@ const AccountAddressDetailRow: FC<AccountAddressDetailRowProps> = ({
     )}
   </div>
 )
-
-const JSON_TOKEN_RE =
-  /("(?:\\.|[^"\\])*")(\s*:)?|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null)/g
-
-function renderJson(json: string): ReactNode[] {
-  const parts: ReactNode[] = []
-  let lastIndex = 0
-  let key = 0
-
-  for (const match of json.matchAll(JSON_TOKEN_RE)) {
-    if (match.index === undefined) continue
-
-    if (match.index > lastIndex) {
-      parts.push(json.slice(lastIndex, match.index))
-    }
-
-    const [token, stringToken, colon, literalToken] = match
-    if (stringToken) {
-      parts.push(
-        <span
-          key={`json-token-${key++}`}
-          className={colon ? styles.metadataJsonKey : styles.metadataJsonValue}
-        >
-          {stringToken}
-        </span>,
-      )
-      if (colon) {
-        parts.push(colon)
-      }
-    } else if (literalToken) {
-      parts.push(
-        <span key={`json-token-${key++}`} className={styles.metadataJsonValue}>
-          {literalToken}
-        </span>,
-      )
-    } else {
-      parts.push(token)
-    }
-
-    lastIndex = match.index + token.length
-  }
-
-  if (lastIndex < json.length) {
-    parts.push(json.slice(lastIndex))
-  }
-
-  return parts
-}
 
 function getAccountTokenInfo(
   stateV3: AccountStatesResponse | void,

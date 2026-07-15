@@ -651,22 +651,9 @@
 }
 
 .metadataJson {
-  margin: 0;
-  padding: 16px 44px 16px 16px;
-  overflow: auto;
-  color: var(--tonscan-text-primary);
-  background: transparent;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  line-height: 18px;
-}
-
-.metadataJsonKey {
-  color: var(--tonscan-text-primary);
-}
-
-.metadataJsonValue {
-  color: var(--tonscan-link);
+  --acton-highlighted-code-font-size: var(--font-size-xs);
+  --acton-highlighted-code-line-height: 18px;
+  --acton-highlighted-code-padding: 16px 44px 16px 16px;
 }
 
 @media (max-width: 1100px) {

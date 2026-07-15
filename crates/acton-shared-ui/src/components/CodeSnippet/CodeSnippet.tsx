@@ -1,8 +1,9 @@
 import type React from "react"
 import {useEffect, useState} from "react"
 
+import {HighlightedCode} from "@acton/ui"
+
 import styles from "./CodeSnippet.module.css"
-import {highlightTolkToHtml} from "./tolk-highlighter"
 
 interface CodeSnippetProps {
   readonly filePath: string
@@ -20,7 +21,6 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
   ideOpener,
 }) => {
   const [snippet, setSnippet] = useState<string | undefined>()
-  const [highlightedHtml, setHighlightedHtml] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
 
@@ -30,10 +30,15 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
       : filePath
 
   useEffect(() => {
+    const controller = new AbortController()
+
     const loadContent = async () => {
       setLoading(true)
+      setError(undefined)
       try {
-        const result = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`)
+        const result = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`, {
+          signal: controller.signal,
+        })
         if (!result.ok) throw new Error("Failed to fetch file content")
         const content = await result.text()
 
@@ -41,16 +46,10 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
         const start = Math.max(0, line - contextLines - 1)
         const end = Math.min(lines.length, line + contextLines)
         const snippetLines = lines.slice(start, end)
-        const snippetText = snippetLines.join("\n")
-
-        setSnippet(snippetText)
-
-        const isDark = document.documentElement.classList.contains("dark-theme")
-        const html = await highlightTolkToHtml(snippetText, isDark)
-
-        setHighlightedHtml(html)
+        setSnippet(snippetLines.join("\n"))
         setLoading(false)
       } catch (error: unknown) {
+        if (error instanceof Error && error.name === "AbortError") return
         console.error(error)
         setError((error as {message: string}).message)
         setLoading(false)
@@ -58,23 +57,12 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
     }
 
     void loadContent()
-
-    // Listen for theme changes
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.attributeName === "class") {
-          void loadContent()
-        }
-      }
-    })
-
-    observer.observe(document.documentElement, {attributes: true})
-    return () => observer.disconnect()
+    return () => controller.abort()
   }, [filePath, line, contextLines])
 
   if (loading) return <div className={styles.loading}>Loading code snippet...</div>
   if (error) return <div className={styles.error}>Error: {error}</div>
-  if (!snippet || !highlightedHtml) return
+  if (snippet === undefined) return
 
   const startLine = Math.max(1, line - contextLines)
   const snippetLines = snippet.split("\n")
@@ -100,7 +88,7 @@ export const CodeSnippet: React.FC<CodeSnippetProps> = ({
             </div>
           ))}
         </div>
-        <div className={styles.shikiWrapper} dangerouslySetInnerHTML={{__html: highlightedHtml}} />
+        <HighlightedCode className={styles.shikiWrapper} value={snippet} language="tolk" />
         {startLine + snippetLines.findIndex((_, index) => startLine + index === line) === line && (
           <div
             className={styles.activeLineOverlay}

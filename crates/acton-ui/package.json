@@ -17,6 +17,7 @@
     "./components/data-table": "./src/components/DataTable/index.ts",
     "./components/disclosure-toggle": "./src/components/DisclosureToggle/index.ts",
     "./components/exit-code-chip": "./src/components/ExitCodeChip/index.ts",
+    "./components/highlighted-code": "./src/components/HighlightedCode/index.ts",
     "./components/info-popover": "./src/components/InfoPopover/index.ts",
     "./components/inline-actions": "./src/components/InlineActions/index.ts",
     "./components/inline-button": "./src/components/InlineButton/index.ts",
@@ -42,7 +43,8 @@
     "@base-ui/react": "^1.6.0",
     "lucide-react": "^0.474.0",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "shiki": "^3.22.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

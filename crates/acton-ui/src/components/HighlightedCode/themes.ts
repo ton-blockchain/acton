@@ -60,7 +60,7 @@ export const jetbrainsDarculaTheme: ThemeRegistration = {
         "support.class",
         "type.identifier",
       ],
-      settings: {foreground: "#A2BA6DFF"},
+      settings: {foreground: "#A2BA6D"},
     },
     {
       scope: ["property", "meta.property-name", "meta.object-literal.key"],

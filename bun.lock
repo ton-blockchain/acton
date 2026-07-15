@@ -151,6 +151,7 @@
         "lucide-react": "^0.474.0",
         "react-markdown": "^10.1.0",
         "remark-gfm": "^4.0.1",
+        "shiki": "^3.22.0",
       },
       "devDependencies": {
         "@types/react": "^19.2.7",

@@ -847,41 +847,14 @@
   display: none;
 }
 
-.signPreviewDetails pre,
-.tlbSchemaCode,
 .tlbHighlightedCode {
-  max-height: 240px;
+  --acton-highlighted-code-font-size: 0.74rem;
+  --acton-highlighted-code-line-height: 1.45;
+  --acton-highlighted-code-max-height: 240px;
+  --acton-highlighted-code-padding: 12px;
+
   margin: 0;
   border-top: 1px solid var(--litenode-border-subtle);
-  overflow: auto;
-}
-
-.tlbSchemaCode {
-  padding: 12px;
-  color: var(--litenode-text-muted);
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
-  font-size: 0.74rem;
-  line-height: 1.45;
-  white-space: pre-wrap;
-}
-
-.tlbSchemaCode code {
-  font: inherit;
-}
-
-.tlbHighlightedCode :global(pre) {
-  margin: 0 !important;
-  padding: 12px !important;
-  background: transparent !important;
-  font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace !important;
-  font-size: 0.74rem !important;
-  line-height: 1.45 !important;
-  white-space: pre-wrap !important;
-}
-
-.tlbHighlightedCode :global(code) {
-  font: inherit !important;
 }
 
 .spinning {

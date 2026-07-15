@@ -37,21 +37,17 @@
 
 .disasmBlock {
   width: 100%;
-  max-height: min(32rem, 60vh);
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: var(--border-radius-md);
   background-color: var(--bg-secondary-color);
 }
 
 .disasmCode {
-  margin: 0;
-  padding: var(--spacing-md);
-  font-size: var(--font-size-xs);
-  line-height: 1.5;
-  color: var(--text-primary);
-  font-family: var(--font-mono), monospace;
-  white-space: pre;
+  --acton-highlighted-code-font-size: var(--font-size-xs);
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: min(32rem, 60vh);
+  --acton-highlighted-code-padding: var(--spacing-md);
 }
 
 .disasmLoading,

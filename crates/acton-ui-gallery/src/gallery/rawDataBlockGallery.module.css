@@ -19,13 +19,9 @@
   overflow: hidden;
 }
 
-.keyword {
-  color: var(--acton-color-danger-text);
-  font-weight: var(--acton-font-weight-semibold);
-}
-
-.number {
-  color: var(--acton-color-accent);
+.highlightedCode {
+  --acton-highlighted-code-padding: var(--acton-space-4) calc(var(--acton-space-6) + 2.25rem)
+    var(--acton-space-4) var(--acton-space-4);
 }
 
 .sampleRow {

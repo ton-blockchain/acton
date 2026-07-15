@@ -1,4 +1,4 @@
-import {CopyInlineAction, InlineAction, InlineActions} from "@acton/ui"
+import {type ActonInlineActionSize, CopyInlineAction, InlineAction, InlineActions} from "@acton/ui"
 import {Check, Copy, ExternalLink, Trash2} from "lucide-react"
 
 import styles from "./inlineActionsGallery.module.css"
@@ -9,12 +9,17 @@ const iconProps = {
   strokeWidth: 2.25,
 } as const
 
-function CopyAction({label = "Copy", value}: Readonly<{label?: string; value: string}>) {
+function CopyAction({
+  label = "Copy",
+  size,
+  value,
+}: Readonly<{label?: string; size?: ActonInlineActionSize; value: string}>) {
   return (
     <CopyInlineAction
       value={value}
       label={label}
       copiedLabel="Copied"
+      size={size}
       icon={<Copy {...iconProps} aria-hidden="true" />}
       copiedIcon={<Check {...iconProps} aria-hidden="true" />}
     />
@@ -34,6 +39,18 @@ function HoverSample() {
           actions={<CopyAction label="Copy hash" value="0:9f7d8a02b618e67cf2c941f551eaf0c9" />}
         >
           <code className={styles.inlineCode}>0:9f7d8a02b618e67cf2c941f551eaf0c9</code>
+        </InlineActions>
+      </article>
+      <article className={styles.sample}>
+        <div className={styles.sampleText}>
+          <h4>Compact</h4>
+          <p>Use the smaller action inside tight chips and metadata values.</p>
+        </div>
+        <InlineActions
+          visibility="hover"
+          actions={<CopyAction label="Copy opcode" size="compact" value="0x7369676e" />}
+        >
+          <code className={styles.inlineCode}>0x7369676e</code>
         </InlineActions>
       </article>
       <article className={styles.sample}>
@@ -103,11 +120,13 @@ export const inlineActionsGallery = {
     "Use hover visibility for helper actions such as copy hash, copy address, or copy id.",
     "Use always visibility for destructive actions, important row actions, and touch-heavy surfaces.",
     "Use CopyInlineAction when copy should switch to a check mark after click.",
+    'Use size="compact" for copy actions embedded in tight chips and metadata values.',
   ],
   avoid: [
     "Do not place the inline content outside InlineActions when hover or focus reveal is needed.",
     "Do not use hover visibility for delete or other high-consequence actions.",
     "Do not use InlineAction for text buttons; use InlineButton when the action needs a visible label.",
+    "Do not use the compact size as the default for standalone inline actions.",
   ],
   sections: [
     {

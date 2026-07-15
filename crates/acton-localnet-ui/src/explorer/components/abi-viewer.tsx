@@ -2,8 +2,7 @@ import {Buffer} from "node:buffer"
 import {useEffect, useMemo, useState} from "react"
 import type {JSX, MouseEvent, ReactNode} from "react"
 
-import {RawDataBlock} from "@acton/ui"
-import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "@acton/shared-ui"
+import {HighlightedCode, RawDataBlock} from "@acton/ui"
 import {
   Address,
   Cell,
@@ -22,20 +21,14 @@ import {
   type Ty,
 } from "@ton/tolk-abi-to-typescript"
 import {Link2, Play} from "lucide-react"
-import {createHighlighterCore} from "shiki/core"
-import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
-import type {LanguageRegistration} from "shiki/types"
 
 import type {TonClient} from "../api/client"
 import type {V3RunGetMethodResponse, V3RunGetMethodStackEntry} from "../api/types"
-
-import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
 
 import {abiSymbolAnchorId} from "./abiAnchors"
 import styles from "./abi-viewer.module.css"
 
 export type AbiTab = "view" | "raw"
-type HighlightLanguage = "json" | "tolk"
 type AbiSimpleArgKind = "number" | "string" | "bool" | "address" | "cell"
 
 interface AbiSimpleArgInput {
@@ -73,26 +66,6 @@ type AbiMessage = Readonly<
   | ContractABI["outgoing_messages"][number]
   | ContractABI["emitted_events"][number]
 >
-
-const grammarWithName = (grammar: unknown, name: string): LanguageRegistration =>
-  ({
-    ...(grammar as Record<string, unknown>),
-    name,
-  }) as LanguageRegistration
-
-const tolkGrammar = grammarWithName(tolkGrammarRaw, "tolk")
-
-let abiHighlighterPromise: ReturnType<typeof createHighlighterCore> | undefined
-
-const getAbiHighlighter = () => {
-  abiHighlighterPromise ??= createHighlighterCore({
-    themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
-    langs: [tolkGrammar, import("shiki/langs/json.mjs")],
-    engine: createJavaScriptRegexEngine(),
-  })
-
-  return abiHighlighterPromise
-}
 
 export function AbiPanel({
   activeTab,
@@ -173,7 +146,9 @@ export function AbiPanel({
           variant="standalone"
           value={abiJson}
           copyLabel="ABI"
-          customContent={<CodeContent value={abiJson} language="json" wrap={false} />}
+          customContent={
+            <HighlightedCode className={styles.highlightedCode} value={abiJson} language="json" />
+          }
         />
       )}
     </section>
@@ -517,10 +492,10 @@ function AbiGetMethodResult({
       <details className={styles.abiDetails}>
         <summary>Raw stack JSON</summary>
         <div className={styles.abiDetailsCode}>
-          <CodeContent
+          <HighlightedCode
+            className={styles.highlightedCode}
             value={JSON.stringify(result.stack, undefined, 2)}
             language="json"
-            wrap={false}
           />
         </div>
       </details>
@@ -1906,95 +1881,12 @@ function TolkCode({
 }): JSX.Element {
   return (
     <div className={styles.abiTolkCode}>
-      <CodeContent value={value} language="tolk" wrap={wrap} />
+      <HighlightedCode
+        className={styles.highlightedCode}
+        value={value}
+        language="tolk"
+        wrap={wrap}
+      />
     </div>
-  )
-}
-
-function CodeContent({
-  value,
-  language,
-  wrap,
-}: {
-  readonly value: string
-  readonly language?: HighlightLanguage
-  readonly wrap: boolean
-}): JSX.Element {
-  if (language) {
-    return <HighlightedCode value={value} language={language} wrap={wrap} />
-  }
-
-  return (
-    <pre className={`${styles.code} ${wrap ? styles.codeWrap : ""}`}>
-      <code>{value}</code>
-    </pre>
-  )
-}
-
-function HighlightedCode({
-  value,
-  language,
-  wrap,
-}: {
-  readonly value: string
-  readonly language: HighlightLanguage
-  readonly wrap: boolean
-}): JSX.Element {
-  const [highlightedHtml, setHighlightedHtml] = useState<string | undefined>()
-
-  useEffect(() => {
-    let isActive = true
-
-    const highlight = async () => {
-      setHighlightedHtml(undefined)
-      try {
-        const highlighter = await getAbiHighlighter()
-        const isDark = document.documentElement.classList.contains("dark-theme")
-        const html = highlighter.codeToHtml(value, {
-          lang: language,
-          theme: isDark ? "jetbrains-darcula" : "jetbrains-light",
-        })
-
-        if (isActive) {
-          setHighlightedHtml(html)
-        }
-      } catch (error) {
-        console.error("Failed to highlight ABI code:", error)
-        if (isActive) {
-          setHighlightedHtml(undefined)
-        }
-      }
-    }
-
-    void highlight()
-
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.attributeName === "class") {
-          void highlight()
-        }
-      }
-    })
-    observer.observe(document.documentElement, {attributes: true})
-
-    return () => {
-      isActive = false
-      observer.disconnect()
-    }
-  }, [language, value])
-
-  if (!highlightedHtml) {
-    return (
-      <pre className={`${styles.code} ${wrap ? styles.codeWrap : ""}`}>
-        <code>{value}</code>
-      </pre>
-    )
-  }
-
-  return (
-    <div
-      className={`${styles.highlightedCode} ${wrap ? styles.highlightedCodeWrap : ""}`}
-      dangerouslySetInnerHTML={{__html: highlightedHtml}}
-    />
   )
 }

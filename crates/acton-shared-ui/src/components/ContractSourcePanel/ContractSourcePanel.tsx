@@ -4,16 +4,7 @@ import type {CSSProperties, JSX} from "react"
 import {Cell} from "@ton/core"
 import {Cell as TasmCell, runtime, text} from "@ton/tasm"
 import {Check, CheckCircle2, Copy, ExternalLink, FileCode2, Folder, Menu} from "lucide-react"
-import {createHighlighterCore} from "shiki/core"
-import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
-import type {LanguageRegistration} from "shiki/types"
-import {RawDataBlock} from "@acton/ui"
-
-import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "../CodeSnippet/jetbrains-themes"
-
-import funcGrammarRaw from "../../../../../docs/grammars/grammar-func.json"
-import tasmGrammarRaw from "../../../../../docs/grammars/grammar-tasm.json"
-import tolkGrammarRaw from "../../../../../docs/grammars/grammar-tolk.json"
+import {HighlightedCode, RawDataBlock, type HighlightedCodeLanguage} from "@acton/ui"
 
 import styles from "./ContractSourcePanel.module.css"
 
@@ -32,7 +23,6 @@ export type ContractSourceTab =
   | "hex"
   | "hex-hash"
   | "base64-hash"
-type HighlightLanguage = "tasm" | "json" | "tolk" | "func"
 
 export interface ContractVerifiedSource {
   readonly code_hash: string
@@ -97,28 +87,7 @@ interface FileTreeDraftNode {
   readonly file?: SourceFile
 }
 
-const grammarWithName = (grammar: unknown, name: string): LanguageRegistration =>
-  ({
-    ...(grammar as Record<string, unknown>),
-    name,
-  }) as LanguageRegistration
-
-const tasmGrammar = grammarWithName(tasmGrammarRaw, "tasm")
-const tolkGrammar = grammarWithName(tolkGrammarRaw, "tolk")
-const funcGrammar = grammarWithName(funcGrammarRaw, "func")
 const VERIFIER_BASE_URL = "https://verifier.acton.monster"
-
-let contractSourceHighlighterPromise: ReturnType<typeof createHighlighterCore> | undefined
-
-const getContractSourceHighlighter = () => {
-  contractSourceHighlighterPromise ??= createHighlighterCore({
-    themes: [jetbrainsLightTheme, jetbrainsDarculaTheme],
-    langs: [tasmGrammar, tolkGrammar, funcGrammar, import("shiki/langs/json.mjs")],
-    engine: createJavaScriptRegexEngine(),
-  })
-
-  return contractSourceHighlighterPromise
-}
 
 export function ContractSourcePanel({
   codeBoc,
@@ -452,7 +421,7 @@ function VerifiedCodeViewer({
             ))}
           </div>
           <div className={styles.verifiedCode}>
-            <CodeContent value={code} language={language} wrap={false} />
+            <HighlightedCode className={styles.highlightedCode} value={code} language={language} />
           </div>
         </div>
       </div>
@@ -521,7 +490,7 @@ function fileContent(file: SourceFile): string {
   return file.content.endsWith("\n") ? file.content.slice(0, -1) : file.content
 }
 
-function languageForPath(path: string): HighlightLanguage | undefined {
+function languageForPath(path: string): HighlightedCodeLanguage | undefined {
   const normalizedPath = path.toLowerCase()
   if (normalizedPath.endsWith(".tolk")) {
     return "tolk"
@@ -649,7 +618,7 @@ function ContractTextPanel({
 }: {
   readonly title: string
   readonly value: string
-  readonly language?: HighlightLanguage
+  readonly language?: HighlightedCodeLanguage
   readonly wrap?: boolean
 }): JSX.Element {
   return (
@@ -658,7 +627,14 @@ function ContractTextPanel({
       variant="standalone"
       value={value}
       copyLabel={title}
-      customContent={<CodeContent value={value} language={language} wrap={wrap} />}
+      customContent={
+        <HighlightedCode
+          className={styles.highlightedCode}
+          value={value}
+          language={language}
+          wrap={wrap}
+        />
+      }
     />
   )
 }
@@ -696,93 +672,5 @@ function CopyTextButton({
     >
       {isCopied ? <Check size={14} /> : <Copy size={14} />}
     </button>
-  )
-}
-
-function CodeContent({
-  value,
-  language,
-  wrap,
-}: {
-  readonly value: string
-  readonly language?: HighlightLanguage
-  readonly wrap: boolean
-}): JSX.Element {
-  if (language) {
-    return <HighlightedCode value={value} language={language} wrap={wrap} />
-  }
-
-  return (
-    <pre className={`${styles.code} ${wrap ? styles.codeWrap : ""}`}>
-      <code>{value}</code>
-    </pre>
-  )
-}
-
-function HighlightedCode({
-  value,
-  language,
-  wrap,
-}: {
-  readonly value: string
-  readonly language: HighlightLanguage
-  readonly wrap: boolean
-}): JSX.Element {
-  const [highlightedHtml, setHighlightedHtml] = useState<string | undefined>()
-
-  useEffect(() => {
-    let isActive = true
-
-    const highlight = async () => {
-      setHighlightedHtml(undefined)
-      try {
-        const highlighter = await getContractSourceHighlighter()
-        const isDark = document.documentElement.classList.contains("dark-theme")
-        const html = highlighter.codeToHtml(value, {
-          lang: language,
-          theme: isDark ? "jetbrains-darcula" : "jetbrains-light",
-        })
-
-        if (isActive) {
-          setHighlightedHtml(html)
-        }
-      } catch (error) {
-        console.error("Failed to highlight contract code:", error)
-        if (isActive) {
-          setHighlightedHtml(undefined)
-        }
-      }
-    }
-
-    void highlight()
-
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.attributeName === "class") {
-          void highlight()
-        }
-      }
-    })
-    observer.observe(document.documentElement, {attributes: true})
-
-    return () => {
-      isActive = false
-      observer.disconnect()
-    }
-  }, [language, value])
-
-  if (!highlightedHtml) {
-    return (
-      <pre className={`${styles.code} ${wrap ? styles.codeWrap : ""}`}>
-        <code>{value}</code>
-      </pre>
-    )
-  }
-
-  return (
-    <div
-      className={`${styles.highlightedCode} ${wrap ? styles.highlightedCodeWrap : ""}`}
-      dangerouslySetInnerHTML={{__html: highlightedHtml}}
-    />
   )
 }

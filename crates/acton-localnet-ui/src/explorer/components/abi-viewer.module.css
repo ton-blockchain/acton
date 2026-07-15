@@ -97,42 +97,12 @@
   box-shadow: 0 0 0 3px var(--litenode-focus);
 }
 
-.code {
-  margin: 0;
-  max-height: 600px;
-  min-height: 96px;
-  overflow: auto;
-  padding: var(--spacing-md);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  line-height: 1.5;
-  white-space: pre;
-  word-break: normal;
-}
-
-.codeWrap {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
 .highlightedCode {
-  max-height: 600px;
-  min-height: 96px;
-  overflow: auto;
-}
-
-.highlightedCode :global(pre) {
-  margin: 0 !important;
-  padding: var(--spacing-md) !important;
-  background: transparent !important;
-  font-family: var(--font-mono) !important;
-  font-size: var(--font-size-sm) !important;
-  line-height: 1.5 !important;
-}
-
-.highlightedCodeWrap :global(pre) {
-  white-space: pre-wrap !important;
+  --acton-highlighted-code-font-size: var(--font-size-sm);
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: 600px;
+  --acton-highlighted-code-min-height: 96px;
+  --acton-highlighted-code-padding: var(--spacing-md);
 }
 
 .abiPanel {
@@ -150,9 +120,8 @@
 }
 
 .sourceShellContent .abiView,
-.sourceShellContent .highlightedCode,
-.sourceShellContent .code {
-  max-height: none;
+.sourceShellContent .highlightedCode {
+  --acton-highlighted-code-max-height: none;
   overflow-y: visible;
 }
 
@@ -551,9 +520,8 @@
   width: 100%;
 }
 
-.abiDecodedResult .abiTolkCode .code,
-.abiDecodedResult .abiTolkCode .highlightedCode :global(pre) {
-  font-size: var(--font-size-xs) !important;
+.abiDecodedResult .abiTolkCode .highlightedCode {
+  --acton-highlighted-code-font-size: var(--font-size-xs);
 }
 
 .abiDetails {
@@ -626,18 +594,10 @@
 }
 
 .abiDetailsCode .highlightedCode {
-  max-height: none;
-}
-
-.abiDetailsCode .highlightedCode :global(pre) {
-  padding: 10px !important;
-  font-size: 12px !important;
-  line-height: 1.5 !important;
-}
-
-.abiDetailsCode .code {
-  margin: 0;
-  padding: 10px;
+  --acton-highlighted-code-font-size: 12px;
+  --acton-highlighted-code-line-height: 1.5;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-padding: 10px;
   border: 0;
   background: transparent;
   font-size: 12px;
@@ -868,24 +828,12 @@
   min-width: 0;
 }
 
-.abiTolkCode .code {
-  max-height: none;
-  padding: 0;
-  overflow-x: auto;
-  font-size: 12px;
-  line-height: 1.55;
-}
-
 .abiTolkCode .highlightedCode {
-  max-height: none;
-  min-height: auto;
-  overflow: auto;
-}
-
-.abiTolkCode .highlightedCode :global(pre) {
-  padding: 0 !important;
-  font-size: 12px !important;
-  line-height: 1.55 !important;
+  --acton-highlighted-code-font-size: 12px;
+  --acton-highlighted-code-line-height: 1.55;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-min-height: 0;
+  --acton-highlighted-code-padding: 0;
 }
 
 .abiTolkCode .highlightedCode :global(code) {

@@ -601,6 +601,62 @@ parsed scalar values, storage diffs, balances, gas values, counters, and ids.
   truncation.
 - Do not insert literal spaces into technical numbers for readability.
 
+## HighlightedCode
+
+Status: ready
+
+Import:
+
+```tsx
+import { HighlightedCode } from "@acton/ui"
+```
+
+Use HighlightedCode for read-only syntax-highlighted source code. It owns the
+shared Shiki instance, JetBrains light/dark themes, loading fallback, scrolling,
+and wrapping behavior.
+
+### Languages
+
+- tolk: Tolk source and generated declarations.
+- func: legacy FunC source.
+- tasm: TVM assembly and decompiled code.
+- tlb: TL-B schemas.
+- json: ABI, stack, metadata, and other JSON.
+- Omit language for plain preformatted text with the same code geometry.
+
+### Composition
+
+```tsx
+<RawDataBlock
+  title="Disassembly"
+  value={disassembly}
+  customContent={
+    <HighlightedCode value={disassembly} language="tasm" />
+  }
+/>
+```
+
+- value: complete source text to render.
+- language: optional supported grammar.
+- wrap: enables preformatted wrapping; disabled by default.
+- maxHeight and minHeight: constrain the component-owned scroll area.
+- className: allows a surface to override the documented
+  --acton-highlighted-code-* sizing variables without creating another
+  highlighter.
+
+### Agent Guidance
+
+- Keep fetching, decompilation, parsing, tabs, copy actions, and line annotations
+  in caller-owned domain components.
+- Compose HighlightedCode through RawDataBlock.customContent when code also
+  needs a frame, title, copy button, or disclosure behavior.
+- Use the Monaco-based CodeEditor for editable code, CodeLens, decorations,
+  folding, trace navigation, or completion.
+- A coverage viewer may use highlightCodeToTokens because it renders hit counts
+  and status per line; do not flatten that viewer into a static block.
+- Do not create local Shiki instances, theme observers, or hand-written token
+  coloring.
+
 ## RawDataBlock
 
 Status: ready

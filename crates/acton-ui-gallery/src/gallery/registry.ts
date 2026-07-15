@@ -5,6 +5,7 @@ import {contentTabsGallery} from "./contentTabsGallery"
 import {dataTableGallery} from "./dataTableGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
+import {highlightedCodeGallery} from "./highlightedCodeGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
@@ -30,6 +31,7 @@ export const galleries = [
   disclosureToggleGallery,
   exitCodeChipGallery,
   opcodeChipGallery,
+  highlightedCodeGallery,
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,

@@ -2,8 +2,7 @@ import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {FiSearch} from "react-icons/fi"
 
-import type {HighlightedToken} from "@acton/shared-ui"
-import {highlightTolkToTokens} from "@acton/shared-ui"
+import {highlightCodeToTokens, type HighlightedCodeToken} from "@acton/ui"
 
 import {parseLcov, type CoverageFile} from "../../utils/lcov"
 
@@ -61,7 +60,7 @@ const BOLD_FONT_STYLE = 2
 const UNDERLINE_FONT_STYLE = 4
 const STRIKETHROUGH_FONT_STYLE = 8
 
-const tokenStyle = (token: HighlightedToken): React.CSSProperties | undefined => {
+const tokenStyle = (token: HighlightedCodeToken): React.CSSProperties | undefined => {
   const style: React.CSSProperties = {}
 
   if (token.htmlStyle) {
@@ -104,7 +103,7 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
   const [sourceError, setSourceError] = useState<string | undefined>()
   const [isLoadingSource, setIsLoadingSource] = useState(false)
   const [highlightedLines, setHighlightedLines] = useState<
-    readonly (readonly HighlightedToken[])[] | undefined
+    readonly (readonly HighlightedCodeToken[])[] | undefined
   >()
   const codePaneRef = useRef<HTMLDivElement | null>(null)
 
@@ -191,7 +190,7 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
     const renderHighlightedLines = async () => {
       try {
         const isDark = document.documentElement.classList.contains("dark-theme")
-        const tokens = await highlightTolkToTokens(sourceContent, isDark)
+        const tokens = await highlightCodeToTokens(sourceContent, "tolk", isDark ? "dark" : "light")
         if (!isDisposed) {
           setHighlightedLines(tokens)
         }

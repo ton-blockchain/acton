@@ -2,6 +2,8 @@ import type * as React from "react"
 import {useEffect, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 
+import {HighlightedCode} from "@acton/ui"
+
 import {disassembleBocHex} from "@/utils/disasm"
 
 import styles from "./DisasmSection.module.css"
@@ -88,9 +90,7 @@ export function DisasmSection({
           <div className={styles.disasmError}>{state.error}</div>
         ) : state.status === "ready" && state.bocHex === bocHex ? (
           <div className={styles.disasmBlock}>
-            <pre className={styles.disasmCode}>
-              <code>{state.disasm}</code>
-            </pre>
+            <HighlightedCode className={styles.disasmCode} value={state.disasm} language="tasm" />
           </div>
         ) : undefined)}
     </div>

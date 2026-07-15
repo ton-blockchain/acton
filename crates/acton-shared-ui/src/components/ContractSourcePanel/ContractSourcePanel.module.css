@@ -10,10 +10,8 @@
   --contract-source-compact-panel-height: calc(var(--contract-source-compact-code-height) + 39px);
 }
 
-.sourceShellCompact .code,
 .sourceShellCompact .highlightedCode {
-  max-height: var(--contract-source-compact-panel-height);
-  overflow: auto;
+  --acton-highlighted-code-max-height: var(--contract-source-compact-panel-height);
 }
 
 .sourceShellCompact .sourceDataBlock > div {
@@ -141,54 +139,11 @@
   border-radius: inherit;
 }
 
-.code {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  line-height: 1.6;
-  color: var(--tonscan-text-primary, var(--text-primary));
-  white-space: pre;
-  word-break: normal;
-  padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md);
-  margin: 0;
-  overflow-x: auto;
-  max-height: 600px;
-  background: transparent;
-}
-
-.codeWrap {
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-all;
-  overflow-x: hidden;
-}
-
 .highlightedCode {
-  max-height: 600px;
-  overflow: auto;
-}
-
-.highlightedCode :global(pre) {
-  margin: 0 !important;
-  padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md) !important;
-  overflow: visible !important;
-  background: transparent !important;
-  font-family: var(--font-mono) !important;
-  font-size: 13px !important;
-  line-height: 1.6 !important;
-}
-
-.highlightedCode :global(code) {
-  display: block;
-  width: max-content;
-  min-width: 100%;
-  font-family: var(--font-mono) !important;
-}
-
-.highlightedCodeWrap :global(code) {
-  width: auto;
-  white-space: pre-wrap !important;
-  overflow-wrap: anywhere;
-  word-break: break-all;
+  --acton-highlighted-code-font-size: 13px;
+  --acton-highlighted-code-line-height: 1.6;
+  --acton-highlighted-code-max-height: 600px;
+  --acton-highlighted-code-padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md);
 }
 
 .verifiedLoading {
@@ -458,23 +413,11 @@
   flex: 1 0 auto;
 }
 
-.verifiedCode .code {
-  max-height: none;
-  padding: 12px 16px;
-  overflow: visible;
-  font-size: 13px;
-  line-height: 1.5rem;
-}
-
 .verifiedCode .highlightedCode {
-  max-height: none;
+  --acton-highlighted-code-line-height: 1.5rem;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-padding: 12px 16px;
   overflow: visible;
-}
-
-.verifiedCode .highlightedCode :global(pre) {
-  padding: 12px 16px !important;
-  font-size: 13px !important;
-  line-height: 1.5rem !important;
 }
 
 .verifiedCode .highlightedCode :global(.line) {
