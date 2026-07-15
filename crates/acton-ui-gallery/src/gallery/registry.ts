@@ -14,10 +14,12 @@ import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {toastGallery} from "./toastGallery"
+import {tokensGallery} from "./tokensGallery"
 import {visuallyGroupedNumberGallery} from "./visuallyGroupedNumberGallery"
 import type {ComponentGallery} from "./types"
 
 export const galleries = [
+  tokensGallery,
   buttonGallery,
   breadcrumbsGallery,
   inlineButtonGallery,

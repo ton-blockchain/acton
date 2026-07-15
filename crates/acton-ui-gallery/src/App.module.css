@@ -240,6 +240,10 @@
   border-top: 1px solid var(--acton-color-border);
 }
 
+.componentHeader + .sections > .gallerySection:first-child {
+  border-top: 0;
+}
+
 .sectionHeader {
   display: grid;
   min-width: 0;

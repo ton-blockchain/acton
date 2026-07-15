@@ -4,10 +4,11 @@ import {useEffect, useState} from "react"
 
 import styles from "./App.module.css"
 import {galleries} from "./gallery/registry"
+import type {ComponentGallery} from "./gallery/types"
 
 type Theme = "light" | "dark"
 
-const initialGallery = galleries[0]
+const initialGallery = galleries.find(gallery => gallery.id === "button") ?? galleries[0]
 const galleryParamName = "component"
 const themeStorageKey = "acton-ui-gallery-theme"
 
@@ -16,7 +17,8 @@ export function App() {
   const [activeGalleryId, setActiveGalleryId] = useState(getInitialGalleryId)
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
 
-  const activeGallery = galleries.find(gallery => gallery.id === activeGalleryId) ?? initialGallery
+  const activeGallery: ComponentGallery =
+    galleries.find(gallery => gallery.id === activeGalleryId) ?? initialGallery
 
   useEffect(() => {
     if (!isNavigationOpen) return
@@ -56,7 +58,7 @@ export function App() {
           <button
             type="button"
             className={styles.menuButton}
-            aria-label="Open component navigation"
+            aria-label="Open gallery navigation"
             aria-controls="gallery-navigation-panel"
             aria-expanded={isNavigationOpen}
             onClick={() => setIsNavigationOpen(true)}
@@ -78,7 +80,7 @@ export function App() {
           <button
             type="button"
             className={styles.backdrop}
-            aria-label="Close component navigation"
+            aria-label="Close gallery navigation"
             onClick={() => setIsNavigationOpen(false)}
           />
         ) : undefined}
@@ -90,22 +92,22 @@ export function App() {
           <div className={styles.sidebarHeader}>
             <div className={styles.sidebarHeaderText}>
               <p className={styles.eyebrow}>Acton UI</p>
-              <h1 className={styles.title}>Component gallery</h1>
+              <h1 className={styles.title}>UI gallery</h1>
               <p className={styles.sidebarText}>
-                Visual inventory for reusable Acton primitives, variants, states, and usage notes.
+                Visual inventory for Acton foundations, reusable primitives, variants, and states.
               </p>
             </div>
             <button
               type="button"
               className={styles.drawerClose}
-              aria-label="Close component navigation"
+              aria-label="Close gallery navigation"
               onClick={() => setIsNavigationOpen(false)}
             >
               <X size={17} aria-hidden="true" />
             </button>
           </div>
 
-          <nav className={styles.navigation} aria-label="Components">
+          <nav className={styles.navigation} aria-label="Gallery pages">
             {galleries.map(gallery => (
               <button
                 key={gallery.id}
@@ -134,45 +136,49 @@ export function App() {
         <main className={styles.main}>
           <header className={styles.componentHeader}>
             <div className={styles.componentHeaderText}>
-              <p className={styles.eyebrow}>Component</p>
+              <p className={styles.eyebrow}>
+                {activeGallery.kind === "foundation" ? "Foundation" : "Component"}
+              </p>
               <h2 className={styles.componentTitle}>{activeGallery.title}</h2>
               <p className={styles.componentSummary}>{activeGallery.summary}</p>
             </div>
           </header>
 
-          <section className={styles.notesGrid} aria-label="Usage guidance">
-            <article className={styles.noteBlock}>
-              <h3>Use When</h3>
-              <ul>
-                {activeGallery.usage.map(item => (
-                  <li key={item}>
-                    <MarkdownText className={styles.noteText} tone="muted">
-                      {item}
-                    </MarkdownText>
-                  </li>
-                ))}
-              </ul>
-            </article>
-            <article className={styles.noteBlock}>
-              <h3>Avoid When</h3>
-              <ul>
-                {activeGallery.avoid.map(item => (
-                  <li key={item}>
-                    <MarkdownText className={styles.noteText} tone="muted">
-                      {item}
-                    </MarkdownText>
-                  </li>
-                ))}
-              </ul>
-            </article>
-            <article className={styles.agentBlock}>
-              <h3>Agent Note</h3>
-              <MarkdownText className={styles.agentText} tone="muted">
-                {activeGallery.agentSummary}
-              </MarkdownText>
-              <code>{activeGallery.importStatement}</code>
-            </article>
-          </section>
+          {activeGallery.kind === "foundation" ? undefined : (
+            <section className={styles.notesGrid} aria-label="Usage guidance">
+              <article className={styles.noteBlock}>
+                <h3>Use When</h3>
+                <ul>
+                  {activeGallery.usage.map(item => (
+                    <li key={item}>
+                      <MarkdownText className={styles.noteText} tone="muted">
+                        {item}
+                      </MarkdownText>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+              <article className={styles.noteBlock}>
+                <h3>Avoid When</h3>
+                <ul>
+                  {activeGallery.avoid.map(item => (
+                    <li key={item}>
+                      <MarkdownText className={styles.noteText} tone="muted">
+                        {item}
+                      </MarkdownText>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+              <article className={styles.agentBlock}>
+                <h3>Agent Note</h3>
+                <MarkdownText className={styles.agentText} tone="muted">
+                  {activeGallery.agentSummary}
+                </MarkdownText>
+                <code>{activeGallery.importStatement}</code>
+              </article>
+            </section>
+          )}
 
           <div className={styles.sections}>
             {activeGallery.sections.map(section => (
@@ -183,7 +189,7 @@ export function App() {
               >
                 <div className={styles.sectionHeader}>
                   <h3 id={section.id}>{section.title}</h3>
-                  <p>{section.description}</p>
+                  {section.description ? <p>{section.description}</p> : undefined}
                 </div>
                 {section.content}
               </section>

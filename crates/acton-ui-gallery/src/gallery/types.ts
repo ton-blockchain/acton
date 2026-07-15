@@ -8,18 +8,28 @@ export type GalleryNote = Readonly<{
 export type GallerySection = Readonly<{
   id: string
   title: string
-  description: string
+  description?: string
   content: ReactNode
 }>
 
-export type ComponentGallery = Readonly<{
+type GalleryPage = Readonly<{
   id: string
   title: string
   status: string
   summary: string
-  importStatement: string
-  agentSummary: string
-  usage: readonly string[]
-  avoid: readonly string[]
   sections: readonly GallerySection[]
 }>
+
+export type ComponentGallery = GalleryPage &
+  (
+    | Readonly<{
+        kind?: "component"
+        importStatement: string
+        agentSummary: string
+        usage: readonly string[]
+        avoid: readonly string[]
+      }>
+    | Readonly<{
+        kind: "foundation"
+      }>
+  )
