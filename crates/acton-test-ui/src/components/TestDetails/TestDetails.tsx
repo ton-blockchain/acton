@@ -14,7 +14,17 @@ import {
 } from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
-import {RawDataBlock} from "@acton/ui"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableGroupRow,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableTable,
+  RawDataBlock,
+} from "@acton/ui"
 
 import {
   type TestReport,
@@ -35,12 +45,6 @@ import {
   CodeSnippet,
   TransactionTree,
   ContractChip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
   resolveAbiOpcodeName,
   ValueFlowTable,
 } from "@acton/shared-ui"
@@ -845,11 +849,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     const isTreasuryDeploy = trace?.traces[summary.traceIndex]?.is_treasury_deploy === true
 
     return (
-      <TableRow
+      <DataTableRow
         key={`${test.suite_name}:${test.name}:trace-fee:${summary.traceIndex}`}
-        className={isTreasuryDeploy ? styles.treasuryDeployTraceFeeRow : undefined}
+        groupChild={isTreasuryDeploy}
+        hover
       >
-        <TableCell>
+        <DataTableCell truncate>
           <button
             type="button"
             className={styles.traceLinkButton}
@@ -865,19 +870,13 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             </span>
             <FiArrowUpRight className={styles.traceLinkIcon} aria-hidden="true" />
           </button>
-        </TableCell>
-        <TableCell className={styles.numericCell}>{summary.transactionCount.toString()}</TableCell>
-        <TableCell className={styles.numericCell}>{summary.totalGasUsed.toString()}</TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalGasFees)}
-        </TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalForwardFees)}
-        </TableCell>
-        <TableCell className={styles.numericCell}>
-          {fmt.formatCurrency(summary.totalFees)}
-        </TableCell>
-      </TableRow>
+        </DataTableCell>
+        <DataTableCell align="center">{summary.transactionCount.toString()}</DataTableCell>
+        <DataTableCell>{summary.totalGasUsed.toString()}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalGasFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalForwardFees)}</DataTableCell>
+        <DataTableCell>{fmt.formatCurrency(summary.totalFees)}</DataTableCell>
+      </DataTableRow>
     )
   }
 
@@ -1060,37 +1059,29 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           {traceFeeSummaries.length > 0 && (
             <div className={styles.traceFeesSection}>
               <div className={styles.traceFeesTitle}>Fee Summary</div>
-              <div className={styles.traceFeesTableWrapper}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Trace</TableHead>
-                      <TableHead>Tx Count</TableHead>
-                      <TableHead>Gas Used</TableHead>
-                      <TableHead>Gas Fee</TableHead>
-                      <TableHead>Forward Fee</TableHead>
-                      <TableHead>Total Fee</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
+              <DataTable minWidth="62rem">
+                <DataTableTable aria-label="Trace fee summary">
+                  <DataTableHead>
+                    <DataTableRow>
+                      <DataTableHeaderCell columnWidth="16rem">Trace</DataTableHeaderCell>
+                      <DataTableHeaderCell align="center" columnWidth="8rem">
+                        Tx Count
+                      </DataTableHeaderCell>
+                      <DataTableHeaderCell columnWidth="8rem">Gas Used</DataTableHeaderCell>
+                      <DataTableHeaderCell columnWidth="12rem">Gas Fee</DataTableHeaderCell>
+                      <DataTableHeaderCell columnWidth="13rem">Forward Fee</DataTableHeaderCell>
+                      <DataTableHeaderCell columnWidth="13rem">Total Fee</DataTableHeaderCell>
+                    </DataTableRow>
+                  </DataTableHead>
+                  <DataTableBody>
                     {treasuryDeployTraceFeeSummaries.length > 0 && (
-                      <TableRow className={styles.treasuryDeploySummaryRow}>
-                        <TableCell colSpan={6}>
-                          <button
-                            type="button"
-                            className={styles.treasuryDeploySummaryToggle}
-                            onClick={handleToggleTreasuryDeployTraces}
-                            aria-expanded={shouldShowTreasuryDeployTraces}
-                          >
-                            {shouldShowTreasuryDeployTraces ? (
-                              <FiChevronUp aria-hidden="true" />
-                            ) : (
-                              <FiChevronDown aria-hidden="true" />
-                            )}
-                            <span>{treasuryDeployTraceLabel}</span>
-                          </button>
-                        </TableCell>
-                      </TableRow>
+                      <DataTableGroupRow
+                        colSpan={6}
+                        expanded={shouldShowTreasuryDeployTraces}
+                        onToggle={handleToggleTreasuryDeployTraces}
+                      >
+                        {treasuryDeployTraceLabel}
+                      </DataTableGroupRow>
                     )}
                     {shouldShowTreasuryDeployTraces &&
                       treasuryDeployTraceFeeSummaries.map(traceFeeSummary =>
@@ -1099,9 +1090,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                     {regularTraceFeeSummaries.map(traceFeeSummary =>
                       renderTraceFeeSummaryRow(traceFeeSummary),
                     )}
-                  </TableBody>
-                </Table>
-              </div>
+                  </DataTableBody>
+                </DataTableTable>
+              </DataTable>
             </div>
           )}
 
