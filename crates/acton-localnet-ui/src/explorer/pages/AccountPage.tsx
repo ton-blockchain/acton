@@ -22,7 +22,7 @@ import type {
 } from "../api/types"
 import {AccountInfo} from "../components/AccountInfo"
 import {AddressLabel} from "../components/AddressLabel"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {AccountDetails} from "../components/AccountDetails"
 import {
   NFT_COLLECTION_IMAGE_SOURCE_KEYS,
@@ -853,7 +853,7 @@ export const AccountPage: FC<AccountPageProps> = ({client}) => {
     <div className={styles.container}>
       {formattedAddress && (
         <>
-          <Breadcrumbs
+          <ExplorerBreadcrumbs
             items={[
               {
                 label: formattedAddress,

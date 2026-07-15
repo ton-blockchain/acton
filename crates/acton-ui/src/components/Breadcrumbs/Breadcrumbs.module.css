@@ -2,8 +2,12 @@
   min-width: 0;
   min-height: 1.5rem;
   color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans), sans-serif;
   font-size: var(--acton-font-size-sm);
+  font-synthesis: none;
   line-height: 1.5rem;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .list {
@@ -54,11 +58,9 @@
 
 .linkItem {
   color: var(--acton-color-accent);
-  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
 }
 
 .linkItem:hover {
-  color: var(--acton-color-accent-hover);
   text-decoration: underline;
 }
 

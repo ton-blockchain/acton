@@ -35,7 +35,7 @@ import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {AddressChip} from "../components/AddressChip"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {
   formatAddress as formatDisplayAddress,
   hashToHex,
@@ -648,7 +648,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       <div className={styles.content}>
         {traces.length > 0 && (
           <>
-            <Breadcrumbs
+            <ExplorerBreadcrumbs
               items={[
                 {
                   label: traceAddressDisplay,

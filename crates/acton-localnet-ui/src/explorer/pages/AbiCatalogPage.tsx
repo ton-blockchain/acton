@@ -11,7 +11,7 @@ import {
   type BundledCompilerAbiCatalogEntry,
 } from "../api/compilerAbiCatalog"
 import {AbiPanel, type AbiTab} from "../components/abi-viewer"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
@@ -161,7 +161,7 @@ export const AbiCatalogPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "ABI"}]} />
+      <ExplorerBreadcrumbs items={[{label: "ABI"}]} />
       <div className={styles.hero}>
         <h1 className={styles.title}>ABI</h1>
       </div>
@@ -376,7 +376,7 @@ export const AbiDetailsPage: FC = () => {
   if (state.loading) {
     return (
       <section className={styles.container}>
-        <Breadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Loading"}]} />
+        <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Loading"}]} />
         <AbiDetailsSkeleton />
       </section>
     )
@@ -385,7 +385,7 @@ export const AbiDetailsPage: FC = () => {
   if (!entry) {
     return (
       <section className={styles.container}>
-        <Breadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Not found"}]} />
+        <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: "Not found"}]} />
         <div className={styles.emptyPage}>ABI not found</div>
       </section>
     )
@@ -396,7 +396,7 @@ export const AbiDetailsPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: title}]} />
+      <ExplorerBreadcrumbs items={[{label: "ABI", path: routes.abiPath}, {label: title}]} />
       <section className={styles.detailsHeader}>
         <div className={styles.detailsMain}>
           <h1 className={styles.title}>{title}</h1>

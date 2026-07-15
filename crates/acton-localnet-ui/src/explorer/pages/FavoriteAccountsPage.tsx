@@ -8,7 +8,7 @@ import type {TonClient} from "../api/client"
 import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/jettonWallets"
 import type {JettonWallet} from "../api/types"
 import {AddressChip} from "../components/AddressChip"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
 import {normalizeAddress, toRawAddress} from "../components/utils"
@@ -151,7 +151,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "Favorite accounts"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Favorite accounts"}]} />
       <header className={styles.hero}>
         <div>
           <h1 className={styles.title}>Favorite accounts</h1>

@@ -10,7 +10,7 @@ import type {
   SourceFile,
   VerificationSourceResponse,
 } from "../api/types"
-import {Breadcrumbs} from "../components/Breadcrumbs"
+import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
 import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
@@ -121,7 +121,7 @@ export const SourceCatalogPage: FC = () => {
 
   return (
     <section className={styles.container}>
-      <Breadcrumbs items={[{label: "Sources"}]} />
+      <ExplorerBreadcrumbs items={[{label: "Sources"}]} />
       <div className={styles.hero}>
         <h1 className={styles.title}>Sources</h1>
       </div>
