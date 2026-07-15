@@ -1,6 +1,6 @@
 import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
-import {useToast} from "@acton/ui"
-import {Button, Card, CardContent, CardHeader, CardTitle, Input} from "@acton/shared-ui"
+import {Button, useToast} from "@acton/ui"
+import {Card, CardContent, CardHeader, CardTitle, Input} from "@acton/shared-ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -641,9 +641,13 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}>
+                <Button
+                  type="submit"
+                  variant="primary"
+                  trailingIcon={<FastForward size={15} />}
+                  disabled={isAdvancingTime || !parsedTimeAdvanceSeconds}
+                >
                   {isAdvancingTime ? "Advancing..." : "Advance"}
-                  <FastForward size={15} />
                 </Button>
               </div>
             </form>

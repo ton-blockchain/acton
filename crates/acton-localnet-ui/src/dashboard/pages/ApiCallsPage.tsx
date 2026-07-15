@@ -1,15 +1,8 @@
 import {Check, CircleAlert, RefreshCw} from "lucide-react"
+import {Button} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC} from "react"
-import {
-  Button,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@acton/shared-ui"
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@acton/shared-ui"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {ApiCallRecord, ApiCallStatus} from "../../explorer/api/types"
@@ -117,10 +110,10 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
             type="button"
             variant="outline"
             size="sm"
+            leadingIcon={<RefreshCw size={14} className={isRefreshing ? styles.spinning : ""} />}
             disabled={isRefreshing}
             onClick={() => void loadCalls(true)}
           >
-            <RefreshCw size={14} className={isRefreshing ? styles.spinning : ""} />
             Refresh
           </Button>
         </div>

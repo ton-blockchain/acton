@@ -1,4 +1,4 @@
-import {EXIT_CODE_DESCRIPTIONS} from "@acton/shared-ui"
+import {getStandardExitCodeInfo} from "@acton/ui"
 import type {ABIThrownError, ContractABI} from "@ton/tolk-abi-to-typescript"
 
 export interface ExitCodeFormatOptions {
@@ -53,10 +53,7 @@ function exitCodeDescription(code: number | string, options: ExitCodeFormatOptio
   }
 
   const numeric = numericExitCode(code)
-  const stdInfo =
-    numeric === undefined
-      ? undefined
-      : EXIT_CODE_DESCRIPTIONS[numeric as keyof typeof EXIT_CODE_DESCRIPTIONS]
+  const stdInfo = numeric === undefined ? undefined : getStandardExitCodeInfo(numeric)
   if (stdInfo?.name) {
     return stdInfo.name
   }

@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
-import {Button} from "@acton/shared-ui"
+import {Button} from "@acton/ui"
 
 import type {TonClient} from "../../explorer/api/client"
 import {
@@ -149,17 +149,20 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
               </h2>
               <Button
                 type="button"
+                variant="primary"
                 size="sm"
                 className={styles.refreshButton}
+                leadingIcon={
+                  <RefreshCw
+                    size={14}
+                    className={isRefreshingBalances || walletTokensLoading ? styles.spinning : ""}
+                  />
+                }
                 onClick={() => void handleRefreshWallets()}
                 disabled={
                   runtimeWallets.length === 0 || isRefreshingBalances || walletTokensLoading
                 }
               >
-                <RefreshCw
-                  size={14}
-                  className={isRefreshingBalances || walletTokensLoading ? styles.spinning : ""}
-                />
                 Refresh
               </Button>
             </div>
@@ -304,10 +307,10 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           variant="outline"
                           size="sm"
                           className={styles.tableActionButton}
+                          leadingIcon={<Unplug size={14} />}
                           onClick={() => void handleDisconnectSession(session.sessionId)}
                           disabled={isSubmitting}
                         >
-                          <Unplug size={14} />
                           Disconnect
                         </Button>
                       </td>
@@ -338,13 +341,13 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                         variant="outline"
                         size="sm"
                         className={styles.tableActionButton}
+                        leadingIcon={<Link2 size={14} />}
                         disabled={
                           runtimeWallets.length === 0 ||
                           tonConnectUrl.trim().length === 0 ||
                           isSubmitting
                         }
                       >
-                        <Link2 size={14} />
                         Handle request
                       </Button>
                     </form>

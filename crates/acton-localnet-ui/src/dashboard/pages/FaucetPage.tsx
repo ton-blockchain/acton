@@ -1,6 +1,6 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
-import {useToast} from "@acton/ui"
-import {Button, Input} from "@acton/shared-ui"
+import {Button, useToast} from "@acton/ui"
+import {Input} from "@acton/shared-ui"
 import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"
@@ -660,11 +660,14 @@ export const FaucetPage: FC<FaucetPageProps> = ({client}) => {
 
           <div className={styles.formFooter}>
             <div />
-            <Button type="submit" className={styles.sendButton} disabled={isSubmitDisabled}>
-              <span>
-                {isSubmitting ? "Sending..." : isJettonMode ? "Mint Jetton" : "Send GRAM"}
-              </span>
-              <ArrowUpRight size={16} />
+            <Button
+              type="submit"
+              variant="primary"
+              className={styles.sendButton}
+              trailingIcon={<ArrowUpRight size={16} />}
+              disabled={isSubmitDisabled}
+            >
+              {isSubmitting ? "Sending..." : isJettonMode ? "Mint Jetton" : "Send GRAM"}
             </Button>
           </div>
         </form>

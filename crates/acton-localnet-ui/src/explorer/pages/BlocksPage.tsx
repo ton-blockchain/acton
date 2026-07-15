@@ -1,6 +1,6 @@
 import {Check, ChevronLeft, ChevronRight, ChevronsRight, Copy} from "lucide-react"
 import {Link, useNavigate, useParams} from "react-router-dom"
-import {Button} from "@acton/shared-ui"
+import {Button} from "@acton/ui"
 import {useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -320,33 +320,33 @@ export const BlockDetailsPage: FC<BlocksPageProps> = ({client}) => {
               type="button"
               variant="outline"
               size="sm"
+              leadingIcon={<ChevronLeft size={14} />}
               disabled={!prevPath}
               onClick={() => prevPath && void navigate(prevPath)}
             >
-              <ChevronLeft size={14} />
               Prev block
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              trailingIcon={<ChevronRight size={14} />}
               disabled={!nextPath}
               onClick={() => nextPath && void navigate(nextPath)}
             >
               Next block
-              <ChevronRight size={14} />
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
+              trailingIcon={<ChevronsRight size={14} />}
               disabled={
                 !latestPath || (state.block !== undefined && latestPath === blockPath(state.block))
               }
               onClick={() => latestPath && void navigate(latestPath)}
             >
               Latest
-              <ChevronsRight size={14} />
             </Button>
           </div>
         ) : null}

@@ -1,6 +1,5 @@
 import {Check, Copy, KeyRound, Shield, X} from "lucide-react"
-import {Button} from "@acton/shared-ui"
-import {useToast} from "@acton/ui"
+import {Button, useToast} from "@acton/ui"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, ReactNode} from "react"
 import {
@@ -745,6 +744,7 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
               Reject
             </Button>
             <Button
+              variant="primary"
               onClick={() => void handleApproveConnect()}
               disabled={!selectedConnectWallet || isSubmitting}
             >
@@ -805,7 +805,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             >
               Reject
             </Button>
-            <Button onClick={() => void handleApproveTransaction()} disabled={isSubmitting}>
+            <Button
+              variant="primary"
+              onClick={() => void handleApproveTransaction()}
+              disabled={isSubmitting}
+            >
               Approve
             </Button>
           </div>
@@ -828,7 +832,11 @@ export const WalletRuntimeProvider: FC<WalletRuntimeProviderProps> = ({
             >
               Reject
             </Button>
-            <Button onClick={() => void handleApproveSignData()} disabled={isSubmitting}>
+            <Button
+              variant="primary"
+              onClick={() => void handleApproveSignData()}
+              disabled={isSubmitting}
+            >
               Sign
             </Button>
           </div>

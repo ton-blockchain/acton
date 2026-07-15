@@ -5,6 +5,14 @@ interface ExitCodeDescription {
   readonly docsAnchor?: string
 }
 
+/** Metadata for a standard TVM exit code known to the base UI library. */
+export interface StandardExitCodeInfo {
+  readonly name: string
+  readonly description: string
+  readonly phase: string
+  readonly docsUrl?: string
+}
+
 export type ExitCodePhase = "compute" | "action"
 
 /**
@@ -236,6 +244,21 @@ const getExitCodeDocsUrl = (exitCode: number): string | undefined => {
     : undefined
 }
 
+/** Returns standard TVM metadata, or undefined for contract-defined and unknown exit codes. */
+export function getStandardExitCodeInfo(exitCode: number): StandardExitCodeInfo | undefined {
+  const standardDescription = EXIT_CODE_DESCRIPTIONS[exitCode]
+  if (!standardDescription) {
+    return undefined
+  }
+
+  return {
+    name: standardDescription.name,
+    description: standardDescription.description,
+    phase: standardDescription.phase,
+    docsUrl: getExitCodeDocsUrl(exitCode),
+  }
+}
+
 const getCustomExitCodeInfo = (
   exitCode: number,
   abi: ExitCodeAbi | undefined,
@@ -259,18 +282,16 @@ export function resolveExitCode(
   abi: ExitCodeAbi | undefined,
   phase: ExitCodePhase,
 ): ExitCodeInfo {
-  const standardDescription = EXIT_CODE_DESCRIPTIONS[exitCode]
+  const standardExitCode = getStandardExitCodeInfo(exitCode)
   const customExitCode = getCustomExitCodeInfo(exitCode, abi)
 
   return {
     customSymbolicName: customExitCode?.symbolicName,
-    displayName: standardDescription?.name ?? customExitCode?.symbolicName ?? "Custom Exit Code",
+    displayName: standardExitCode?.name ?? customExitCode?.symbolicName ?? "Custom Exit Code",
     description:
-      standardDescription?.description ??
-      customExitCode?.description ??
-      UNKNOWN_EXIT_CODE_DESCRIPTION,
-    origin: standardDescription?.phase ?? getPhaseLabel(phase),
-    docsUrl: standardDescription ? getExitCodeDocsUrl(exitCode) : undefined,
+      standardExitCode?.description ?? customExitCode?.description ?? UNKNOWN_EXIT_CODE_DESCRIPTION,
+    origin: standardExitCode?.phase ?? getPhaseLabel(phase),
+    docsUrl: standardExitCode?.docsUrl,
     isSuccess: phase === "action" ? exitCode === 0 : exitCode === 0 || exitCode === 1,
   }
 }

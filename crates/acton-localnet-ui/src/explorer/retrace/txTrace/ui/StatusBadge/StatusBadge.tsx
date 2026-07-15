@@ -1,6 +1,7 @@
 import type React from "react"
 
-import {EXIT_CODE_DESCRIPTIONS, Tooltip} from "@acton/shared-ui"
+import {getStandardExitCodeInfo} from "@acton/ui"
+import {Tooltip} from "@acton/shared-ui"
 
 import styles from "./StatusBadge.module.css"
 
@@ -73,10 +74,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
     )
   }
   if (type === "failed") {
-    const info =
-      exitCode === undefined
-        ? undefined
-        : EXIT_CODE_DESCRIPTIONS[exitCode as keyof typeof EXIT_CODE_DESCRIPTIONS]
+    const info = exitCode === undefined ? undefined : getStandardExitCodeInfo(exitCode)
     const description = info?.description
     const phase = info?.phase
     const displayName = info?.name ?? "Custom error"
