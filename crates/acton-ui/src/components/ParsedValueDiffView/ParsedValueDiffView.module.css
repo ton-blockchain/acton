@@ -17,21 +17,17 @@
 }
 
 .nested {
-  display: flex;
+  display: grid;
   min-width: 0;
-  flex-direction: column;
-  gap: var(--acton-space-1);
+  grid-auto-rows: minmax(1.5625rem, auto);
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--acton-space-1) var(--acton-space-2);
   padding-inline-start: var(--acton-space-3);
   border-inline-start: 1px solid var(--acton-color-border);
 }
 
 .nestedEntry {
-  display: grid;
-  min-width: 0;
-  min-height: 1.5625rem;
-  grid-template-columns: max-content minmax(0, 1fr);
-  gap: var(--acton-space-2);
-  align-items: center;
+  display: contents;
 }
 
 .nestedMap {
@@ -225,7 +221,7 @@
 }
 
 @media (max-width: 640px) {
-  .nestedEntry {
+  .nested {
     grid-template-columns: minmax(0, 1fr);
     row-gap: var(--acton-space-1);
   }

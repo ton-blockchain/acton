@@ -117,14 +117,18 @@ function EdgeTransactionTooltipContent({
   data: EdgeTransactionTooltipData
   renderAddressChip?: (address: string, options: {readonly shorten: boolean}) => React.ReactNode
 }): React.JSX.Element {
+  const fromAddressContent = data.fromAddress
+    ? renderAddressChip?.(data.fromAddress, {shorten: true})
+    : undefined
+
   return (
     <div className={styles.tooltipContent}>
       <div className={styles.tooltipField}>
         <div className={styles.tooltipFieldLabel}>From Address</div>
         <div className={styles.tooltipFieldValue}>
           {data.fromAddress ? (
-            <span className={styles.tooltipAddressChip}>
-              {renderAddressChip?.(data.fromAddress, {shorten: true}) ?? data.fromAddress}
+            <span className={fromAddressContent ? styles.tooltipAddressChip : undefined}>
+              {fromAddressContent ?? data.fromAddress}
             </span>
           ) : (
             (data.fromLabel ?? "unknown")
@@ -184,15 +188,18 @@ function NodeTransactionTooltipContent({
   onContractClick?: (address: string) => void
   renderAddressChip?: (address: string, options: {readonly shorten: boolean}) => React.ReactNode
 }): React.JSX.Element {
+  const contractAddressContent = data.contract.address
+    ? renderAddressChip?.(data.contract.address, {shorten: false})
+    : undefined
+
   return (
     <div className={styles.tooltipContent}>
       <div className={styles.tooltipField}>
         <div className={styles.tooltipFieldLabel}>{data.contract.typeName}</div>
         <div className={styles.tooltipFieldValue}>
           {data.contract.address ? (
-            <span className={styles.tooltipAddressChip}>
-              {renderAddressChip?.(data.contract.address, {shorten: false}) ??
-                data.contract.address}
+            <span className={contractAddressContent ? styles.tooltipAddressChip : undefined}>
+              {contractAddressContent ?? data.contract.address}
             </span>
           ) : (
             "unknown"
@@ -518,13 +525,13 @@ export function TransactionTree({
         <g className={styles.rootNode}>
           <circle
             r={15}
-            fill={"var(--bg-color)"}
-            stroke="var(--text-primary)"
+            fill="var(--acton-color-surface)"
+            stroke="var(--acton-color-text)"
             strokeWidth={1.5}
             className={styles.rootCircle}
           />
           <text
-            fill="var(--text-primary)"
+            fill="var(--acton-color-text)"
             strokeWidth="0"
             x="0"
             y="5"
@@ -544,13 +551,13 @@ export function TransactionTree({
         <g className={styles.rootNode}>
           <circle
             r={15}
-            fill={"var(--bg-color)"}
-            stroke="var(--text-primary)"
+            fill="var(--acton-color-surface)"
+            stroke="var(--acton-color-text)"
             strokeWidth={1.5}
             className={styles.rootCircle}
           />
           <text
-            fill="var(--text-primary)"
+            fill="var(--acton-color-text)"
             strokeWidth="0"
             x="0"
             y="5"
@@ -600,7 +607,7 @@ export function TransactionTree({
               <title>External Out</title>
               <path
                 d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
-                fill="var(--text-muted)"
+                fill="var(--acton-color-text-subtle)"
               ></path>
             </svg>
           </foreignObject>
@@ -608,7 +615,7 @@ export function TransactionTree({
           <circle
             r={15}
             fill="transparent"
-            stroke="var(--border-color)"
+            stroke="var(--acton-color-border)"
             strokeWidth={1}
             className={styles.nodeCircleDefault}
           />
@@ -669,7 +676,7 @@ export function TransactionTree({
             <title>Incoming Message</title>
             <path
               d="M0.400044 0.549983C0.648572 0.218612 1.11867 0.151455 1.45004 0.399983L3.45004 1.89998C3.6389 2.04162 3.75004 2.26392 3.75004 2.49998C3.75004 2.73605 3.6389 2.95834 3.45004 3.09998L1.45004 4.59998C1.11867 4.84851 0.648572 4.78135 0.400044 4.44998C0.151516 4.11861 0.218673 3.64851 0.550044 3.39998L1.75004 2.49998L0.550044 1.59998C0.218673 1.35145 0.151516 0.881354 0.400044 0.549983Z"
-              fill="var(--text-muted)"
+              fill="var(--acton-color-text-subtle)"
             ></path>
           </svg>
         </foreignObject>
@@ -684,15 +691,15 @@ export function TransactionTree({
               : isFailed
                 ? "var(--transaction-tree-failed-node-fill)"
                 : isSelected
-                  ? "var(--text-primary)"
-                  : "var(--bg-color)"
+                  ? "var(--acton-color-text)"
+                  : "var(--acton-color-surface)"
           }
           stroke={
             isActionHighlighted
               ? "var(--transaction-tree-action-highlight-stroke)"
               : isFailed
                 ? "var(--transaction-tree-failed-node-stroke)"
-                : "var(--text-primary)"
+                : "var(--acton-color-text)"
           }
           strokeWidth={isActionHighlighted || isFailed ? 2 : 1.5}
           onClick={() => {
@@ -720,8 +727,8 @@ export function TransactionTree({
               : isFailed
                 ? "var(--transaction-tree-failed-node-text)"
                 : isSelected
-                  ? "var(--bg-color)"
-                  : "var(--text-primary)"
+                  ? "var(--acton-color-surface)"
+                  : "var(--acton-color-text)"
           }
           strokeWidth="0"
           x="0"

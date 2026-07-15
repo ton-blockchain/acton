@@ -20,12 +20,12 @@
 
 .sourceShellCompact .editorTabVerified,
 .sourceShellCompact .editorTabVerified.editorTabActive {
-  color: var(--tonscan-text-primary, var(--text-primary));
+  color: var(--acton-color-text);
 }
 
 .sourceShellCompact .editorTabVerified.editorTabActive {
-  border-color: var(--tonscan-border, var(--border-color));
-  border-bottom-color: var(--tonscan-border, var(--border-color));
+  border-color: var(--acton-color-border);
+  border-bottom-color: var(--acton-color-border);
 }
 
 .editorTabBar {
@@ -47,11 +47,11 @@
 .editorTab {
   min-height: 34px;
   padding: 8px 18px;
-  border: 1px solid var(--tonscan-border, var(--border-color));
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  background: var(--tonscan-row-hover, var(--bg-secondary-color));
-  color: var(--tonscan-text-secondary, var(--text-secondary));
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -74,20 +74,20 @@
 }
 
 .editorTab:hover {
-  color: var(--tonscan-text-primary, var(--text-primary));
+  color: var(--acton-color-text);
 }
 
 .editorTab:focus-visible,
 .bundleTab:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--litenode-focus, var(--color-primary, var(--link-color)));
+  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
 
 .editorTabVerified {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: var(--tonscan-success, var(--color-passed));
+  color: var(--acton-color-success);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -98,23 +98,23 @@
 .editorTabActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary, var(--text-primary));
-  background: var(--tonscan-bg, var(--bg-color));
-  border-bottom-color: var(--tonscan-bg, var(--bg-color));
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface);
+  border-bottom-color: var(--acton-color-surface);
 }
 
 .editorTabVerified.editorTabActive {
-  color: var(--tonscan-success, var(--color-passed));
-  background: var(--tonscan-bg, var(--bg-color));
+  color: var(--acton-color-success);
+  background: var(--acton-color-surface);
   border-color: color-mix(
     in srgb,
-    var(--tonscan-success, var(--color-passed)) 72%,
-    var(--tonscan-border, var(--border-color))
+    var(--acton-color-success) 72%,
+    var(--acton-color-border)
   );
   border-bottom-color: color-mix(
     in srgb,
-    var(--tonscan-success, var(--color-passed)) 72%,
-    var(--tonscan-border, var(--border-color))
+    var(--acton-color-success) 72%,
+    var(--acton-color-border)
   );
 }
 
@@ -135,7 +135,7 @@
 
 .verifiedLoading {
   margin-top: 10px;
-  color: var(--tonscan-text-secondary, var(--text-secondary));
+  color: var(--acton-color-text-muted);
   font-size: var(--font-size-xs);
 }
 
@@ -161,8 +161,8 @@
   max-width: 100%;
   padding: 3px;
   overflow-x: auto;
-  background: var(--tonscan-row-hover, var(--bg-secondary-color));
-  border: 1px solid var(--tonscan-border, var(--border-color));
+  background: var(--acton-color-surface-hover);
+  border: 1px solid var(--acton-color-border);
   border-radius: 10px;
   scrollbar-width: none;
 }
@@ -177,7 +177,7 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: var(--tonscan-text-secondary, var(--text-secondary));
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
@@ -187,12 +187,12 @@
 }
 
 .bundleTab:hover {
-  color: var(--tonscan-text-primary, var(--text-primary));
+  color: var(--acton-color-text);
 }
 
 .bundleTabActive {
-  color: var(--tonscan-text-primary, var(--text-primary));
-  background: var(--tonscan-bg, var(--bg-color));
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface);
 }
 
 .empty {
@@ -201,14 +201,14 @@
   justify-content: center;
   text-align: center;
   padding: var(--spacing-xl);
-  color: var(--tonscan-text-secondary, var(--text-secondary));
+  color: var(--acton-color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
 
 .panelEmpty {
-  background-color: var(--tonscan-bg, var(--bg-color));
-  border: 1px solid var(--tonscan-border, var(--border-color));
+  background-color: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--border-radius-md);
 }
 

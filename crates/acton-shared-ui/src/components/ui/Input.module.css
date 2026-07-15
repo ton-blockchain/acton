@@ -3,14 +3,14 @@
   width: 100%;
   height: 2.5rem;
   border-radius: 0.625rem;
-  border: 1px solid var(--litenode-border-control, var(--border-color));
-  background: var(--litenode-surface, var(--bg-color));
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface);
   padding: 0 0.875rem;
-  color: var(--litenode-text, var(--text-primary));
+  color: var(--acton-color-text);
   font: inherit;
   line-height: 1.25rem;
   box-sizing: border-box;
-  box-shadow: var(--litenode-shadow-sm, var(--shadow));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--acton-color-text) 8%, transparent);
   transition:
     border-color var(--transition-duration-fast) ease,
     box-shadow var(--transition-duration-fast) ease,
@@ -18,18 +18,17 @@
 }
 
 .input::placeholder {
-  color: var(--litenode-text-soft, var(--text-muted));
+  color: var(--acton-color-text-subtle);
 }
 
 .input:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong, var(--border-color));
+  border-color: var(--acton-color-border-strong);
 }
 
 .input:focus-visible {
   outline: none;
-  border-color: var(--litenode-border-strong, var(--border-color));
-  box-shadow: 0 0 0 2px
-    var(--litenode-focus, color-mix(in srgb, var(--text-primary) 14%, transparent));
+  border-color: var(--acton-color-border-strong);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .input:disabled {

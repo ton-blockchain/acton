@@ -1,14 +1,14 @@
 .transactionDetailsContainer {
   border-radius: var(--border-radius-md);
-  background-color: var(--tonscan-card-bg, var(--bg-color));
-  border: 1px solid var(--border-color);
+  background-color: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   position: relative;
   line-height: 1.6;
 }
 
 .detailRow {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
   transition: background-color 0.15s ease;
 }
 
@@ -21,19 +21,19 @@
   align-items: center;
   text-align: left;
   font-weight: var(--font-weight-medium);
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   padding: var(--spacing-xs) var(--spacing-mds);
   width: 160px;
   flex-shrink: 0;
   vertical-align: top;
   font-size: 0.8125rem;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--acton-color-border);
   box-sizing: border-box;
 }
 
 .detailValue {
   padding: var(--spacing-xs) var(--spacing-mds);
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   word-break: break-all;
   font-size: 0.8125rem;
   flex-grow: 1;
@@ -42,7 +42,7 @@
 
 .heightDetailValue {
   padding: var(--spacing-sm) var(--spacing-mds);
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   word-break: break-all;
   font-size: 0.8125rem;
   flex-grow: 1;
@@ -77,8 +77,12 @@
   justify-content: center;
   padding: 1px 8px;
   border-radius: var(--border-radius-full);
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 80%, var(--color-todo-bg));
-  color: var(--text-primary);
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 84%,
+    var(--acton-color-accent)
+  );
+  color: var(--acton-color-text);
   font-size: 0.75rem;
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.2px;
@@ -91,8 +95,12 @@
   justify-content: center;
   padding: 1px 8px;
   border-radius: var(--border-radius-full);
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 84%, var(--text-muted));
-  color: var(--text-primary);
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 84%,
+    var(--acton-color-text-subtle)
+  );
+  color: var(--acton-color-text);
   font-size: 0.75rem;
   font-weight: var(--font-weight-medium);
   letter-spacing: 0.2px;
@@ -104,12 +112,12 @@
 }
 
 .timestampDetailSecondary {
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .labeledSectionRow {
   display: flex;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .labeledSectionRow:last-child {
@@ -119,12 +127,12 @@
 .labeledSectionTitle {
   text-align: left;
   font-weight: var(--font-weight-semibold);
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   padding: var(--spacing-xs) var(--spacing-mds);
   width: 160px;
   flex-shrink: 0;
   font-size: 0.8125rem;
-  border-right: 1px solid var(--border-color);
+  border-right: 1px solid var(--acton-color-border);
   box-sizing: border-box;
   letter-spacing: 0.5px;
   display: flex;
@@ -210,14 +218,14 @@
 
 .multiColumnItemTitle {
   font-size: 0.6875rem;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .multiColumnItemValue {
   font-size: 0.8125rem;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   word-break: break-word;
   gap: var(--spacing-xs);
   display: flex;
@@ -225,12 +233,12 @@
 
 .booleanTrue {
   font-weight: var(--font-weight-semibold);
-  color: var(--color-passed);
+  color: var(--acton-color-success);
 }
 
 .booleanFalse {
   font-weight: var(--font-weight-semibold);
-  color: var(--color-failed);
+  color: var(--acton-color-danger-text);
 }
 
 .numberValue {
@@ -254,7 +262,7 @@
 }
 
 .timeInlineLabel {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   font-size: 0.75rem;
   font-weight: var(--font-weight-medium);
   white-space: nowrap;
@@ -262,7 +270,7 @@
 
 .timeInlineText {
   min-width: 0;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   overflow-wrap: anywhere;
 }
 
@@ -287,7 +295,7 @@
 }
 
 .actionsLoadError {
-  color: var(--color-failed);
+  color: var(--acton-color-danger-text);
   font-size: var(--font-size-xs);
 }
 
@@ -315,7 +323,7 @@
   overflow-x: auto;
   overflow-y: hidden;
   font-size: var(--font-size-xs);
-  color: var(--text-primary);
+  color: var(--acton-color-text);
 }
 
 .parsedBodyContent {
@@ -352,7 +360,7 @@
 
 .stateInitAbiName {
   min-width: 0;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: 0.8125rem;
   line-height: 20px;
   overflow-wrap: anywhere;
@@ -367,13 +375,13 @@
 }
 
 .stateInitAbiInfoTitle {
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-medium);
 }
 
 .stateInitAbiInfoText {
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-normal);
 }
@@ -398,7 +406,7 @@
 .storageChangeBadge {
   display: inline-flex;
   align-items: center;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: var(--font-size-xs);
   line-height: 20px;
   font-weight: var(--font-weight-medium);
@@ -408,7 +416,7 @@
 .storageAccountStatus {
   display: inline-flex;
   align-items: center;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--font-size-xs);
   line-height: 20px;
   white-space: nowrap;
@@ -417,7 +425,7 @@
 .storageUnavailable {
   display: inline-flex;
   align-items: center;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   font-size: var(--font-size-xs);
   line-height: 20px;
   white-space: nowrap;
@@ -442,16 +450,16 @@
   align-self: flex-start;
   padding: 1px 6px;
   border-radius: var(--border-radius-full);
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-secondary-color);
-  color: var(--text-secondary);
+  border: 1px solid var(--acton-color-border);
+  background-color: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
   font-size: 0.6875rem;
   line-height: 1.4;
 }
 
 .parsedTypeLabel {
   align-self: flex-start;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: 0.75rem;
   line-height: 1.4;
   font-weight: var(--font-weight-medium);
@@ -466,11 +474,11 @@
   min-width: 0;
   padding-left: var(--spacing-mds);
   padding-bottom: var(--spacing-mds);
-  border-left: 1px solid var(--border-color);
+  border-left: 1px solid var(--acton-color-border);
 }
 
 .parsedEntryKey {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   white-space: nowrap;
   text-align: left;
   align-self: center;
@@ -496,7 +504,7 @@
 
 .parsedNull,
 .parsedEmpty {
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
 }
 
 .parsedMapEntry {
@@ -506,9 +514,9 @@
   grid-auto-rows: minmax(25px, auto);
   row-gap: var(--spacing-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--border-radius-sm);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
 }
 
 @media (max-width: 768px) {
@@ -570,7 +578,7 @@
     min-height: 0;
     box-sizing: border-box;
     padding: 6px 0;
-    border-bottom: 1px solid var(--border-color);
+    border-bottom: 1px solid var(--acton-color-border);
   }
 
   .multiColumnItem:last-child {

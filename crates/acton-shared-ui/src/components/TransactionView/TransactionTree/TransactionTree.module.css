@@ -4,15 +4,19 @@
   overflow: hidden;
   line-height: 1.6;
   --transaction-tree-failed-node-fill: #edb04d;
-  --transaction-tree-failed-node-stroke: var(--text-primary);
+  --transaction-tree-failed-node-stroke: var(--acton-color-text);
   --transaction-tree-failed-node-text: #ffffff;
-  --transaction-tree-failed-badge-fill: var(--text-primary);
-  --transaction-tree-failed-badge-text: var(--bg-color);
-  --transaction-tree-failed-badge-stroke: var(--bg-color);
-  --transaction-tree-failed-badge-mark-stroke: var(--bg-color);
-  --transaction-tree-action-highlight-fill: var(--color-todo-bg);
-  --transaction-tree-action-highlight-stroke: var(--color-todo);
-  --transaction-tree-action-highlight-text: var(--color-todo-text);
+  --transaction-tree-failed-badge-fill: var(--acton-color-text);
+  --transaction-tree-failed-badge-text: var(--acton-color-surface);
+  --transaction-tree-failed-badge-stroke: var(--acton-color-surface);
+  --transaction-tree-failed-badge-mark-stroke: var(--acton-color-surface);
+  --transaction-tree-action-highlight-fill: color-mix(
+    in srgb,
+    var(--acton-color-accent) 18%,
+    transparent
+  );
+  --transaction-tree-action-highlight-stroke: var(--acton-color-accent);
+  --transaction-tree-action-highlight-text: var(--acton-color-accent);
 }
 
 .container:has(:global(.retraceRoot)) {
@@ -78,7 +82,7 @@
 }
 
 .edgeStyle {
-  stroke: var(--text-muted);
+  stroke: var(--acton-color-text-subtle);
   stroke-width: 1px;
 }
 
@@ -94,14 +98,14 @@
   font-size: var(--font-size-xs);
   font-weight: bold;
   margin: 0;
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   text-align: end;
 }
 
 .edgeText {
   font-size: 0.625rem;
   margin: 0;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -123,17 +127,17 @@
 
 .edgeTextContent {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .treeContainer :global(.rd3t-link) {
-  stroke: var(--text-muted);
+  stroke: var(--acton-color-text-subtle);
 }
 
 .tooltip {
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-popover-surface);
   border-radius: var(--border-radius-md);
-  box-shadow: var(--shadow-tooltip);
+  box-shadow: var(--acton-shadow-popover);
   padding: var(--spacing-md);
   font-size: var(--font-size-sm);
   min-width: 200px;
@@ -152,8 +156,10 @@
   height: 0;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid var(--bg-color);
-  filter: drop-shadow(0 2px 1px var(--shadow-color-soft));
+  border-top: 8px solid var(--acton-color-popover-surface);
+  filter: drop-shadow(
+    0 2px 1px color-mix(in srgb, var(--acton-color-text) 16%, transparent)
+  );
 }
 
 .tooltipContent {
@@ -170,13 +176,13 @@
 
 .tooltipFieldLabel {
   font-weight: var(--font-weight-semibold);
-  color: var(--text-primary);
+  color: var(--acton-color-text);
   font-size: var(--font-size-sm);
   line-height: 1.2;
 }
 
 .tooltipFieldValue {
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--font-size-sm);
   line-height: 1.4;
   word-wrap: break-word;
@@ -205,7 +211,7 @@
 .tooltipSubValue {
   margin-top: var(--spacing-xs);
   font-size: var(--font-size-xs);
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
   line-height: 1.3;
 }
 
@@ -279,15 +285,15 @@
 }
 
 .storageMetaBadgeCreated {
-  color: var(--color-passed-text);
-  background-color: var(--color-passed-bg);
-  border-color: color-mix(in srgb, var(--color-passed) 24%, transparent);
+  color: var(--acton-color-diff-added-text);
+  background-color: var(--acton-color-diff-added-surface);
+  border-color: color-mix(in srgb, var(--acton-color-success) 24%, transparent);
 }
 
 .storageMetaBadgeDestroyed {
-  color: var(--color-failed-text);
-  background-color: var(--color-failed-bg);
-  border-color: color-mix(in srgb, var(--color-failed) 24%, transparent);
+  color: var(--acton-color-diff-removed-text);
+  background-color: var(--acton-color-diff-removed-surface);
+  border-color: color-mix(in srgb, var(--acton-color-danger) 24%, transparent);
 }
 
 .storageDiffScroll {
@@ -313,7 +319,9 @@
 }
 
 .nodeCircleActionHighlighted {
-  filter: drop-shadow(0 0 0.25rem color-mix(in srgb, var(--color-todo) 42%, transparent));
+  filter: drop-shadow(
+    0 0 0.25rem color-mix(in srgb, var(--acton-color-accent) 42%, transparent)
+  );
 }
 
 .failedBadge {

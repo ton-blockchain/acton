@@ -1,10 +1,10 @@
 .tooltip {
   position: fixed;
   z-index: 10000;
-  background-color: var(--bg-color);
+  background-color: var(--acton-color-popover-surface);
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-popover);
+  border: 1px solid var(--acton-color-popover-border);
+  box-shadow: var(--acton-shadow-popover);
   padding: var(--spacing-md);
   font-size: var(--font-size-sm);
   min-width: 280px;

@@ -10,16 +10,16 @@
   align-items: center;
   gap: var(--spacing-xs);
   font-size: 0.6875rem;
-  color: var(--text-muted);
+  color: var(--acton-color-text-subtle);
   letter-spacing: 0.4px;
 }
 
 .disasmBlock {
   width: 100%;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--border-radius-md);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
 }
 
 .disasmCode {
@@ -37,11 +37,19 @@
 }
 
 .disasmLoading {
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 85%, var(--bg-color));
-  color: var(--text-secondary);
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 85%,
+    var(--acton-color-surface)
+  );
+  color: var(--acton-color-text-muted);
 }
 
 .disasmError {
-  background-color: color-mix(in srgb, var(--color-failed-bg) 88%, var(--bg-color));
-  color: var(--color-failed-text);
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-diff-removed-surface) 88%,
+    var(--acton-color-surface)
+  );
+  color: var(--acton-color-diff-removed-text);
 }

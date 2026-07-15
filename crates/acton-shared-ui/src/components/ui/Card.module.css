@@ -1,8 +1,8 @@
 .card {
   border-radius: var(--border-radius-lg);
-  border: 1px solid var(--border-color);
-  background-color: var(--bg-secondary-color);
-  color: var(--text-primary);
+  border: 1px solid var(--acton-color-border);
+  background-color: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   overflow: hidden;
 }
 
@@ -22,7 +22,7 @@
 
 .description {
   font-size: var(--font-size-sm);
-  color: var(--text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .content {
