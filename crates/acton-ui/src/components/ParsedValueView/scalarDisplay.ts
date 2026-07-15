@@ -1,4 +1,4 @@
-import {formatCurrency} from "@/utils/format"
+import {formatCurrency} from "../../lib/formatCurrency"
 
 const DECIMAL_SCALAR_PATTERN = /^-?\d+(?:\.\d+)?$/
 const INTEGER_SCALAR_PATTERN = /^-?\d+$/
@@ -28,13 +28,8 @@ function isAsciiUppercase(value: string): boolean {
 }
 
 function identifierWordBoundary(prev: string, current: string, next: string | undefined): boolean {
-  if (isAsciiDigit(prev) !== isAsciiDigit(current)) {
-    return true
-  }
-
-  if (isAsciiLowercase(prev) && isAsciiUppercase(current)) {
-    return true
-  }
+  if (isAsciiDigit(prev) !== isAsciiDigit(current)) return true
+  if (isAsciiLowercase(prev) && isAsciiUppercase(current)) return true
 
   return (
     isAsciiUppercase(prev) &&
@@ -62,9 +57,7 @@ function identifierHasWord(name: string, needle: string): boolean {
 
     const next = index + 1 < name.length ? name[index + 1] : undefined
     if (prev !== undefined && start !== undefined && identifierWordBoundary(prev, current, next)) {
-      if (name.slice(start, index).toLowerCase() === needle.toLowerCase()) {
-        return true
-      }
+      if (name.slice(start, index).toLowerCase() === needle.toLowerCase()) return true
       start = index
     } else if (start === undefined) {
       start = index
@@ -77,9 +70,7 @@ function identifierHasWord(name: string, needle: string): boolean {
 }
 
 function shouldFormatIntegerAsHex(fieldName: string | undefined): boolean {
-  if (fieldName === undefined) {
-    return false
-  }
+  if (fieldName === undefined) return false
 
   return (
     identifierHasWord(fieldName, "key") ||
@@ -104,18 +95,18 @@ function formatIntegerAsHex(value: string): string {
   return `${sign}0x${absoluteValue.toString(16)}`
 }
 
+export interface ScalarDisplayContext {
+  readonly value: string
+  readonly typeName?: string
+  readonly fieldName?: string
+}
+
 export function formatScalarByFieldName({
   value,
   typeName,
   fieldName,
-}: {
-  readonly value: string
-  readonly typeName?: string
-  readonly fieldName?: string
-}): string {
-  if (!INTEGER_SCALAR_PATTERN.test(value)) {
-    return value
-  }
+}: ScalarDisplayContext): string {
+  if (!INTEGER_SCALAR_PATTERN.test(value)) return value
 
   if (shouldFormatIntegerAsHex(fieldName)) {
     try {

@@ -1,0 +1,237 @@
+.root {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-2);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+}
+
+.typeLabel {
+  align-self: flex-start;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.4;
+}
+
+.nested {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1);
+  padding-inline-start: var(--acton-space-3);
+  border-inline-start: 1px solid var(--acton-color-border);
+}
+
+.nestedEntry {
+  display: grid;
+  min-width: 0;
+  min-height: 1.5625rem;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--acton-space-2);
+  align-items: center;
+}
+
+.nestedMap {
+  display: flex;
+  min-width: 0;
+  width: min(50rem, 100%);
+  flex-direction: column;
+  padding-inline-start: var(--acton-space-3);
+  border-inline-start: 1px solid var(--acton-color-border);
+}
+
+.entryKey {
+  align-self: center;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.entryValue {
+  min-width: 0;
+  align-self: center;
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.mapEntry {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1-5);
+  padding-block-end: var(--acton-space-2);
+}
+
+.mapEntry + .mapEntry {
+  padding-block-start: var(--acton-space-2);
+  border-block-start: 1px solid var(--acton-color-border);
+}
+
+.mapSection {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.mapSectionLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.mapKey,
+.mapValue {
+  min-width: 0;
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.35;
+}
+
+.mapKey {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.entryChanged {
+  color: var(--acton-color-text);
+}
+
+.entryAdded {
+  --acton-parsed-value-tone: var(--acton-color-diff-added-text);
+
+  color: var(--acton-color-diff-added-text);
+}
+
+.entryRemoved {
+  --acton-parsed-value-tone: var(--acton-color-diff-removed-text);
+
+  color: var(--acton-color-diff-removed-text);
+}
+
+.mapEntry.entryAdded,
+.mapEntry.entryRemoved {
+  padding: var(--acton-space-2);
+  border: 1px solid;
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.mapEntry.entryAdded:not(:last-child),
+.mapEntry.entryRemoved:not(:last-child) {
+  margin-block-end: var(--acton-space-2);
+}
+
+.mapEntry.entryAdded {
+  border-color: color-mix(in srgb, var(--acton-color-diff-added) 24%, transparent);
+  background: var(--acton-color-diff-added-surface);
+}
+
+.mapEntry.entryRemoved {
+  border-color: color-mix(in srgb, var(--acton-color-diff-removed) 24%, transparent);
+  background: var(--acton-color-diff-removed-surface);
+}
+
+.mapEntry.entryAdded .mapKey,
+.mapEntry.entryRemoved .mapKey {
+  color: inherit;
+}
+
+.leafValue {
+  --acton-parsed-value-font-size: var(--acton-font-size-xs);
+
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+}
+
+.leafDiff {
+  display: flex;
+  min-width: 0;
+  width: 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--acton-space-1);
+}
+
+.diffPill {
+  --acton-parsed-value-font-size: var(--acton-font-size-xs);
+
+  display: inline-flex;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 1.5rem;
+  align-items: center;
+  padding: 0 var(--acton-space-2);
+  border: 1px solid transparent;
+  border-radius: var(--acton-radius-round);
+  line-height: 1;
+}
+
+.diffPillBefore {
+  --acton-parsed-value-tone: var(--acton-color-diff-removed-text);
+
+  border-color: color-mix(in srgb, var(--acton-color-diff-removed) 24%, transparent);
+  background: var(--acton-color-diff-removed-surface);
+  color: var(--acton-color-diff-removed-text);
+}
+
+.diffPillAfter {
+  --acton-parsed-value-tone: var(--acton-color-diff-added-text);
+
+  border-color: color-mix(in srgb, var(--acton-color-diff-added) 24%, transparent);
+  background: var(--acton-color-diff-added-surface);
+  color: var(--acton-color-diff-added-text);
+}
+
+.diffPillNeutral {
+  border-color: var(--acton-color-border);
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text-muted);
+}
+
+.emptyValue {
+  align-self: flex-start;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.4;
+}
+
+.diffArrow,
+.diffPlaceholder {
+  color: var(--acton-color-text-muted);
+}
+
+.diffArrow {
+  display: inline-flex;
+  width: 1.5rem;
+  height: 1.5rem;
+  flex: 0 0 1.5rem;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--acton-font-size-xs);
+  line-height: 1;
+}
+
+.diffArrow svg {
+  display: block;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+@media (max-width: 640px) {
+  .nestedEntry {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--acton-space-1);
+  }
+
+  .entryKey {
+    align-self: end;
+    white-space: normal;
+  }
+}

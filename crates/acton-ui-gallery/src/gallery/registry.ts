@@ -2,6 +2,7 @@ import {buttonGallery} from "./buttonGallery"
 import {breadcrumbsGallery} from "./breadcrumbsGallery"
 import {checkboxGallery} from "./checkboxGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
+import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
@@ -13,6 +14,9 @@ import {markdownTextGallery} from "./markdownTextGallery"
 import {modeViewerGallery} from "./modeViewerGallery"
 import {opcodeChipGallery} from "./opcodeChipGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
+import {parsedBodySectionGallery} from "./parsedBodySectionGallery"
+import {parsedValueDiffViewGallery} from "./parsedValueDiffViewGallery"
+import {parsedValueViewGallery} from "./parsedValueViewGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
 import {skeletonGallery} from "./skeletonGallery"
@@ -28,9 +32,13 @@ export const galleries = [
   breadcrumbsGallery,
   inlineButtonGallery,
   inlineActionsGallery,
+  contractChipGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,
   opcodeChipGallery,
+  parsedValueViewGallery,
+  parsedValueDiffViewGallery,
+  parsedBodySectionGallery,
   highlightedCodeGallery,
   contentTabsGallery,
   pillTabsGallery,

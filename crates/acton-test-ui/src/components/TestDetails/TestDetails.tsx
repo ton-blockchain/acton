@@ -15,6 +15,7 @@ import {
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
 import {
+  ContractChip,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -43,7 +44,6 @@ import {
   getTransactionOpcode,
   processTransactions,
   TransactionTree,
-  ContractChip,
   resolveAbiOpcodeName,
   ValueFlowTable,
 } from "@acton/shared-ui"

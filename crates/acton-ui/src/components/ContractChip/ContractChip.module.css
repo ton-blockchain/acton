@@ -1,0 +1,88 @@
+.contractChipActions {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  gap: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+  transition: padding-inline-end var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.contractChipActions:hover,
+.contractChipActions:focus-within {
+  padding-inline-end: 1.25rem;
+}
+
+.copyAction {
+  position: absolute;
+  inset-block-start: 50%;
+  inset-inline-end: 0;
+  transform: translateY(-50%);
+}
+
+.contractChip {
+  appearance: none;
+  display: inline-flex;
+  min-width: 0;
+  min-height: 1.5rem;
+  align-items: center;
+  gap: var(--acton-space-2);
+  padding: 0 var(--acton-space-1);
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.4;
+  text-align: left;
+}
+
+.unavailable {
+  color: var(--acton-color-text-muted);
+}
+
+.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.clickable:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: 2px;
+}
+
+.contractLetter {
+  display: inline-flex;
+  width: 1.375rem;
+  height: 1.375rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--acton-radius-round);
+  background: var(--acton-color-text-muted);
+  color: var(--acton-color-surface);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.contractName {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text);
+  font-weight: var(--acton-font-weight-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contractAddress {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

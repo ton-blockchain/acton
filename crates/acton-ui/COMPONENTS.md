@@ -260,6 +260,143 @@ row item.
   `Debug`.
 - Do not hide remove actions behind hover-only visibility.
 
+## ContractChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { ContractChip } from "@acton/ui"
+```
+
+Use ContractChip for TON addresses that may have a known contract identity. It
+renders minimal metadata (`letter` and `displayName`), falls back to the
+address, and composes copying from `CopyInlineAction`.
+
+### States To Review Visually
+
+- Missing address
+- Unknown contract with shortened address
+- Known contract
+- Caller-formatted address
+- Clickable contract plus independent copy action
+
+### Agent Guidance
+
+- Pass a `ReadonlyMap<string, ContractChipData>`; richer domain contract records
+  are structurally compatible, but ContractChip does not consume their ABI.
+- Pass `formatAddress` when network-specific friendly formatting is required.
+- Keep TON parsing libraries outside `@acton/ui`; the formatter callback owns
+  that policy.
+- Use `onContractClick` for navigation and let the component keep the copy
+  action as a sibling rather than nesting interactive elements.
+- Do not wrap ContractChip in another copy control.
+
+## ParsedValueView
+
+Status: ready
+
+Import:
+
+```tsx
+import { ParsedValueView, type ParsedValue } from "@acton/ui"
+```
+
+Use ParsedValueView after domain code has decoded an ABI, message body, or
+storage cell into the minimal exported `ParsedValue` union. It renders scalar,
+address, boolean, null, void, array, object, and map nodes recursively.
+
+### States To Review Visually
+
+- Null and void
+- True and false
+- Decimal, hexadecimal, coin, and raw-copy scalars
+- Known and unknown addresses
+- Empty and populated arrays
+- Empty and populated objects
+- Empty and populated maps
+- Nested structures on narrow screens
+
+### Agent Guidance
+
+- Keep ABI lookup, symbol tables, cells, tuple readers, and parsing outside the
+  component.
+- Depend only on the minimal `ParsedValue` shape; richer parser output can be
+  structurally compatible.
+- Pass `fieldName` for isolated scalars when field-sensitive hex or coin display
+  rules should apply.
+- Pass `rawValue` on a scalar to enable the shared compact copy action.
+- Reuse ContractChip metadata and `formatAddress` for address nodes.
+- Do not duplicate the recursive array, object, or map layout in callers.
+
+## ParsedValueDiffView
+
+Status: ready
+
+Import:
+
+```tsx
+import { buildStorageDiff, ParsedValueDiffView } from "@acton/ui"
+```
+
+Use `buildStorageDiff` to compare two minimal named `ParsedValue` roots and
+render the result with ParsedValueDiffView. The builder and renderer depend only
+on presentation models; ABI lookup, cell decoding, and parser policy stay in
+domain code.
+
+### States To Review Visually
+
+- Unchanged leaf
+- Changed leaf
+- Added and removed leaves
+- Address changes with known contract metadata
+- Serialized cell-like values with raw copy actions
+- Nested object and array changes
+- Nested map additions, removals, and changed values
+- Empty containers
+
+### Agent Guidance
+
+- Pass `{ name, value }` as `ParsedStorageValue`; richer decoded storage records
+  are structurally compatible.
+- Build the diff once outside render when the before/after values are stable.
+- Pass ContractChip metadata and `formatAddress` for address leaves.
+- Provide a `ParsedValueDiff` directly only when comparison already belongs to
+  domain code.
+- Do not pass ABI objects, cells, dictionaries, or parser contexts.
+- Do not duplicate ParsedValueView leaf formatting inside diff consumers.
+
+## ParsedBodySection
+
+Status: ready
+
+Import:
+
+```tsx
+import { ParsedBodySection } from "@acton/ui"
+```
+
+Use ParsedBodySection for an accessible disclosure around a decoded body. It
+accepts only `{ name, value }`, delegates the tree to ParsedValueView, and does
+not know how the ABI was selected or parsed.
+
+### States To Review Visually
+
+- Collapsed
+- Expanded
+- Custom title
+- Nested body wider than its container
+- Missing body, which intentionally renders nothing
+
+### Agent Guidance
+
+- Pass an already decoded `ParsedTransactionBody`.
+- Use `defaultExpanded` only when decoded data should be immediately visible.
+- Use `title` for another body-like decoded structure such as storage.
+- Do not add another disclosure control around ParsedBodySection.
+- Do not perform decoding or ABI fallback inside the component.
+
 ## OpcodeChip
 
 Status: ready

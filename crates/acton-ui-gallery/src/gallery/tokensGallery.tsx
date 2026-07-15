@@ -55,6 +55,7 @@ const groupDefinitions = [
     matches: (token: string) =>
       token.startsWith("--acton-color-success") ||
       token.startsWith("--acton-color-danger") ||
+      token.startsWith("--acton-color-diff") ||
       token.startsWith("--acton-color-warning") ||
       token.startsWith("--acton-color-skeleton"),
   },

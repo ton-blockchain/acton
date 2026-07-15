@@ -1,10 +1,12 @@
 import type {OutAction} from "@ton/core"
 import {
   ChangeLibraryModeViewer,
+  ContractChip,
   CopyInlineButton,
   ExitCodeChip,
   OpcodeChip,
   parseReserveMode,
+  ParsedBodySection,
   RawDataBlock,
   ReserveModeViewer,
   SendModeViewer,
@@ -21,8 +23,6 @@ import type {ContractData} from "@/types/transaction"
 import {fmt} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
 
-import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
-import {ContractChip} from "../ContractChip/ContractChip"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {
   formatCellBocHex,

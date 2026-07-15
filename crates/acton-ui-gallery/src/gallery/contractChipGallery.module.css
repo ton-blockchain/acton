@@ -1,0 +1,83 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+.sample {
+  display: flex;
+  min-width: 0;
+  min-height: 9rem;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--acton-space-5);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.sampleHeader {
+  display: grid;
+  gap: var(--acton-space-1);
+}
+
+.sampleTitle {
+  margin: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.sampleDescription {
+  margin: 0;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5;
+}
+
+.chipLine {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.formatPanel,
+.interactiveSample {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: var(--acton-space-4);
+  padding: var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.formatLabel {
+  flex: 0 0 auto;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+}
+
+.interactiveSample {
+  flex-wrap: wrap;
+}
+
+.interactionResult {
+  min-width: 15rem;
+  flex: 1 1 20rem;
+  overflow: hidden;
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .formatPanel {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

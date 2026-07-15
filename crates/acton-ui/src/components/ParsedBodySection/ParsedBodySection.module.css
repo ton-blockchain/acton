@@ -1,0 +1,31 @@
+.parsedBodySection {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1-5);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+}
+
+.parsedBodyTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  letter-spacing: 0.025rem;
+}
+
+.parsedBodyTree {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+}
+
+.parsedBodyContent {
+  width: max-content;
+  min-width: 100%;
+}

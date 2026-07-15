@@ -1,0 +1,151 @@
+.parsedContainer {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1-5);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+}
+
+.parsedBadge {
+  align-self: flex-start;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.4;
+}
+
+.parsedTypeLabel {
+  align-self: flex-start;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.4;
+}
+
+.parsedNested {
+  display: grid;
+  min-width: 0;
+  grid-auto-rows: minmax(1.5625rem, auto);
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: var(--acton-space-1) var(--acton-space-2);
+  padding-block-end: var(--acton-space-1-5);
+  padding-inline-start: var(--acton-space-3);
+  border-inline-start: 1px solid var(--acton-color-border);
+}
+
+.parsedNestedMap {
+  width: min(50rem, 100%);
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 0;
+}
+
+.parsedEntryKey {
+  align-self: center;
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.35;
+  text-align: start;
+  white-space: nowrap;
+}
+
+.parsedEntryValue {
+  min-width: 0;
+  align-self: center;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.parsedScalar {
+  color: var(--acton-parsed-value-tone, inherit);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-parsed-value-font-size, var(--acton-font-size-xs));
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.parsedPlainScalar,
+.parsedNull,
+.parsedVoid,
+.parsedEmpty {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.parsedPlainScalar {
+  color: var(--acton-parsed-value-tone, inherit);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-parsed-value-font-size, inherit);
+}
+
+.parsedNull,
+.parsedVoid,
+.parsedEmpty {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+}
+
+.parsedMapEntry {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--acton-space-1-5);
+  padding-block-end: var(--acton-space-2);
+}
+
+.parsedMapEntry + .parsedMapEntry {
+  padding-block-start: var(--acton-space-2);
+  border-block-start: 1px solid var(--acton-color-border);
+}
+
+.parsedMapSection {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.parsedMapSectionLabel {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-medium);
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.parsedMapSectionValue {
+  min-width: 0;
+  font-size: var(--acton-font-size-sm);
+  line-height: 1.35;
+}
+
+.booleanTrue,
+.booleanFalse {
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-parsed-value-font-size, var(--acton-font-size-sm));
+  font-weight: var(--acton-font-weight-semibold);
+}
+
+.booleanTrue {
+  color: var(--acton-parsed-value-tone, var(--acton-color-success));
+}
+
+.booleanFalse {
+  color: var(--acton-parsed-value-tone, var(--acton-color-danger-text));
+}
+
+@media (max-width: 640px) {
+  .parsedNested:not(.parsedNestedMap) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--acton-space-1);
+  }
+
+  .parsedEntryKey {
+    align-self: end;
+    white-space: normal;
+  }
+}

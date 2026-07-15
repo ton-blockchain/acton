@@ -1,8 +1,7 @@
-/* eslint-disable unicorn/prefer-spread */
-
 import type {Address} from "@ton/core"
 import type React from "react"
 import {useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
+import {buildStorageDiff, type ParsedValueDiff, ParsedValueDiffView} from "@acton/ui"
 import {
   type CustomNodeElementProps,
   type RawNodeDatum,
@@ -29,9 +28,7 @@ import {
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 
 import {SmartTooltip} from "./SmartTooltip"
-import {StorageDiffView} from "./StorageDiffView"
 import styles from "./TransactionTree.module.css"
-import {buildStorageDiff, type StorageDiffNode} from "./storageDiff"
 import {useTooltip} from "./useTooltip"
 
 interface EdgeTransactionTooltipData {
@@ -59,7 +56,7 @@ interface NodeTransactionTooltipData {
     readonly isCreated: boolean
     readonly isDestroyed: boolean
   }
-  readonly storageDiff: StorageDiffNode | undefined
+  readonly storageDiff: ParsedValueDiff | undefined
 }
 
 interface TransactionTreeProps {
@@ -224,7 +221,7 @@ function NodeTransactionTooltipContent({
               </div>
             )}
             <div className={styles.storageDiffScroll}>
-              <StorageDiffView
+              <ParsedValueDiffView
                 diff={data.storageDiff}
                 contracts={contracts}
                 onContractClick={onContractClick}

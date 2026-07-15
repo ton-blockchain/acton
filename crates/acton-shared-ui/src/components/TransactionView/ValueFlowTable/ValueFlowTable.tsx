@@ -1,5 +1,6 @@
 import type React from "react"
 import {
+  ContractChip,
   DataTable,
   DataTableBody,
   DataTableCell,
@@ -12,8 +13,6 @@ import {
 
 import type {ContractData, ValueFlowItem} from "@/types/transaction"
 import {formatCurrency} from "@/utils/format"
-
-import {ContractChip} from "../ContractChip/ContractChip"
 
 import styles from "./ValueFlowTable.module.css"
 

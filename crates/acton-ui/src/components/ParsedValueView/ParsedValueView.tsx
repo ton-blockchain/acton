@@ -1,19 +1,22 @@
 import {Check, Copy} from "lucide-react"
-import type React from "react"
 
-import {CopyInlineAction, InlineActions, VisuallyGroupedNumber} from "@acton/ui"
-import type {ContractData, ParsedValue, ParsedValueMapEntry} from "@/types/transaction"
+import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
+import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
+import {VisuallyGroupedNumber} from "../VisuallyGroupedNumber/VisuallyGroupedNumber"
 
-import {ContractChip} from "../ContractChip/ContractChip"
-import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "../scalarDisplay"
-
+import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "./scalarDisplay"
+import type {ParsedValue, ParsedValueMapEntry} from "./types"
 import styles from "./ParsedValueView.module.css"
 
-interface AddressFormatOptions {
-  readonly testOnly?: boolean
+export interface ParsedValueViewProps extends ContractReferenceOptions {
+  readonly value: ParsedValue
+  readonly fallbackTypeName?: string
+  readonly fieldName?: string
 }
 
-function ParsedTypeLabel({typeName}: {readonly typeName: string}): React.JSX.Element {
+type ParsedValueContext = ContractReferenceOptions
+
+function ParsedTypeLabel({typeName}: {readonly typeName: string}) {
   return <span className={styles.parsedTypeLabel}>{typeName}</span>
 }
 
@@ -21,15 +24,9 @@ function ParsedValueRow({
   label,
   value,
   contracts,
-  addressFormat,
+  formatAddress,
   onContractClick,
-}: {
-  readonly label: string
-  readonly value: ParsedValue
-  readonly contracts: Map<string, ContractData>
-  readonly addressFormat?: AddressFormatOptions
-  readonly onContractClick?: (address: string) => void
-}): React.JSX.Element {
+}: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
   return (
     <>
       <div className={styles.parsedEntryKey}>{label}:</div>
@@ -37,7 +34,7 @@ function ParsedValueRow({
         <ParsedValueView
           value={value}
           contracts={contracts}
-          addressFormat={addressFormat}
+          formatAddress={formatAddress}
           onContractClick={onContractClick}
           fieldName={label}
         />
@@ -49,14 +46,9 @@ function ParsedValueRow({
 function ParsedMapEntry({
   entry,
   contracts,
-  addressFormat,
+  formatAddress,
   onContractClick,
-}: {
-  readonly entry: ParsedValueMapEntry
-  readonly contracts: Map<string, ContractData>
-  readonly addressFormat?: AddressFormatOptions
-  readonly onContractClick?: (address: string) => void
-}): React.JSX.Element {
+}: ParsedValueContext & {readonly entry: ParsedValueMapEntry}) {
   return (
     <div className={styles.parsedMapEntry}>
       <div className={styles.parsedMapSection}>
@@ -65,7 +57,7 @@ function ParsedMapEntry({
           <ParsedValueView
             value={entry.key}
             contracts={contracts}
-            addressFormat={addressFormat}
+            formatAddress={formatAddress}
             onContractClick={onContractClick}
           />
         </div>
@@ -76,7 +68,7 @@ function ParsedMapEntry({
           <ParsedValueView
             value={entry.value}
             contracts={contracts}
-            addressFormat={addressFormat}
+            formatAddress={formatAddress}
             onContractClick={onContractClick}
           />
         </div>
@@ -85,47 +77,29 @@ function ParsedMapEntry({
   )
 }
 
-interface ParsedValueViewProps {
-  readonly value: ParsedValue
-  readonly contracts: Map<string, ContractData>
-  readonly addressFormat?: AddressFormatOptions
-  readonly onContractClick?: (address: string) => void
-  readonly fallbackTypeName?: string
-  readonly fieldName?: string
-}
-
 export function ParsedValueView({
   value,
   contracts,
-  addressFormat,
+  formatAddress,
   onContractClick,
   fallbackTypeName,
   fieldName,
-}: ParsedValueViewProps): React.JSX.Element {
+}: ParsedValueViewProps) {
+  const context = {contracts, formatAddress, onContractClick}
+
   switch (value.kind) {
-    case "null": {
+    case "null":
       return <span className={styles.parsedNull}>null</span>
-    }
-    case "void": {
+    case "void":
       return <span className={styles.parsedVoid}>void</span>
-    }
-    case "address": {
-      return (
-        <ContractChip
-          address={value.value}
-          contracts={contracts}
-          addressFormat={addressFormat}
-          onContractClick={onContractClick}
-        />
-      )
-    }
-    case "boolean": {
+    case "address":
+      return <ContractChip address={value.value} {...context} />
+    case "boolean":
       return (
         <span className={value.value ? styles.booleanTrue : styles.booleanFalse}>
           {value.value ? "true" : "false"}
         </span>
       )
-    }
     case "scalar": {
       const displayValue = formatScalarByFieldName({
         value: value.value,
@@ -143,9 +117,7 @@ export function ParsedValueView({
         />
       )
 
-      if (!value.rawValue) {
-        return scalarValue
-      }
+      if (!value.rawValue) return scalarValue
 
       return (
         <InlineActions
@@ -164,10 +136,8 @@ export function ParsedValueView({
         </InlineActions>
       )
     }
-    case "array": {
-      if (value.items.length === 0) {
-        return <span className={styles.parsedEmpty}>[]</span>
-      }
+    case "array":
+      if (value.items.length === 0) return <span className={styles.parsedEmpty}>[]</span>
 
       return (
         <div className={styles.parsedContainer}>
@@ -175,18 +145,16 @@ export function ParsedValueView({
           <div className={styles.parsedNested}>
             {value.items.map((item, index) => (
               <ParsedValueRow
+                // react-doctor-disable-next-line react-doctor/no-array-index-as-key -- the index is the semantic identity of an array item
                 key={`array-item-${index}`}
                 label={`[${index}]`}
                 value={item}
-                contracts={contracts}
-                addressFormat={addressFormat}
-                onContractClick={onContractClick}
+                {...context}
               />
             ))}
           </div>
         </div>
       )
-    }
     case "object": {
       const typeName = value.typeName ?? fallbackTypeName
 
@@ -202,9 +170,7 @@ export function ParsedValueView({
                   key={entry.key}
                   label={entry.key}
                   value={entry.value}
-                  contracts={contracts}
-                  addressFormat={addressFormat}
-                  onContractClick={onContractClick}
+                  {...context}
                 />
               ))}
             </div>
@@ -212,7 +178,7 @@ export function ParsedValueView({
         </div>
       )
     }
-    case "map": {
+    case "map":
       return (
         <div className={styles.parsedContainer}>
           <span className={styles.parsedBadge}>{value.typeName ?? "map"}</span>
@@ -220,19 +186,12 @@ export function ParsedValueView({
             <span className={styles.parsedEmpty}>{"{}"}</span>
           ) : (
             <div className={`${styles.parsedNested} ${styles.parsedNestedMap}`}>
-              {value.entries.map((entry, index) => (
-                <ParsedMapEntry
-                  key={`map-entry-${index}`}
-                  entry={entry}
-                  contracts={contracts}
-                  addressFormat={addressFormat}
-                  onContractClick={onContractClick}
-                />
+              {value.entries.map(entry => (
+                <ParsedMapEntry key={JSON.stringify(entry.key)} entry={entry} {...context} />
               ))}
             </div>
           )}
         </div>
       )
-    }
   }
 }

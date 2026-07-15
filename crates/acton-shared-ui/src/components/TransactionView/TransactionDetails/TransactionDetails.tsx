@@ -2,10 +2,15 @@ import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import {
+  buildStorageDiff,
+  ContractChip,
   CopyInlineButton,
   ExitCodeChip,
   InfoPopover,
   OpcodeChip,
+  ParsedBodySection,
+  ParsedValueDiffView,
+  ParsedValueView,
   RawDataBlock,
   SendModeViewer,
 } from "@acton/ui"
@@ -29,11 +34,6 @@ import {
   resolveTransactionOpcodeName,
 } from "@/utils/transaction"
 
-import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
-import {ContractChip} from "../ContractChip/ContractChip"
-import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
-import {StorageDiffView} from "../TransactionTree/StorageDiffView"
-import {buildStorageDiff} from "../TransactionTree/storageDiff"
 import {
   formatCellBocHex,
   formatMessageBocHex,
@@ -682,7 +682,7 @@ export function TransactionDetails({
 
           {showStorageDiff && storageDiff && (
             <div className={styles.storageDiffDetails} data-testid="storage-diff-details">
-              <StorageDiffView
+              <ParsedValueDiffView
                 diff={storageDiff}
                 contracts={contracts}
                 onContractClick={onContractClick}
@@ -867,6 +867,7 @@ export function TransactionDetails({
               contracts={contracts}
               contractAddress={tx.address?.toString() ?? ""}
               additionalMessageBodyAbis={additionalMessageBodyAbis}
+              onContractClick={onContractClick}
               renderSourceLocation={renderSourceLocation}
             />
           </div>

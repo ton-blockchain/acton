@@ -1,12 +1,11 @@
 import {Buffer} from "node:buffer"
 import {useMemo, useState} from "react"
 import type {FC, JSX} from "react"
-import {RawDataBlock} from "@acton/ui"
+import {ParsedValueView, RawDataBlock} from "@acton/ui"
 
 import {
   ContractSourcePanel,
   decodeStorageDataCell,
-  ParsedValueView,
   type ContractData,
   type ContractVerifiedSource,
 } from "@acton/shared-ui"
@@ -17,7 +16,7 @@ import type {TonClient} from "../api/client"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {useAddressFormat} from "../hooks/useNetworkInfo"
 import {AbiPanel, type AbiTab} from "./abi-viewer"
-import type {AddressFormatOptions} from "./utils"
+import {formatAddress, type AddressFormatOptions} from "./utils"
 
 import styles from "./ContractCode.module.css"
 
@@ -244,6 +243,7 @@ function StoragePanel({
   readonly onContractClick?: (address: string) => void
   readonly unavailableMessage: string
 }): JSX.Element {
+  const formatStorageAddress = (address: string) => formatAddress(address, false, addressFormat)
   const activeStorage =
     activeTab === "base64"
       ? {
@@ -292,7 +292,7 @@ function StoragePanel({
               <ParsedValueView
                 value={parsedStorage.value}
                 contracts={contracts}
-                addressFormat={addressFormat}
+                formatAddress={formatStorageAddress}
                 onContractClick={onContractClick}
                 fallbackTypeName={parsedStorage.name}
               />

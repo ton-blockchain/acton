@@ -43,6 +43,12 @@
   --acton-color-success: hsl(142 64% 36%);
   /* Success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 44% 72%);
+  /* Added-value accent used by structured diffs. */
+  --acton-color-diff-added: #10b981;
+  /* Added-value surface used by structured diffs. */
+  --acton-color-diff-added-surface: #ecfdf5;
+  /* Added-value text used by structured diffs. */
+  --acton-color-diff-added-text: #065f46;
   /* Warning action and status color. */
   --acton-color-warning: hsl(45 93% 47%);
   /* Hover state for warning actions. */
@@ -63,6 +69,12 @@
   --acton-color-danger-text-hover: hsl(0 74% 42%);
   /* Text and icon color placed on danger backgrounds. */
   --acton-color-danger-foreground: hsl(0 0% 98%);
+  /* Removed-value accent used by structured diffs. */
+  --acton-color-diff-removed: #ef4444;
+  /* Removed-value surface used by structured diffs. */
+  --acton-color-diff-removed-surface: #fef2f2;
+  /* Removed-value text used by structured diffs. */
+  --acton-color-diff-removed-text: #991b1b;
   /* Accessible focus halo around keyboard-focused controls. */
   --acton-color-focus-ring: hsl(240 6% 10% / 0.18);
   /* Scrim behind temporary overlays such as mobile drawers. */
@@ -86,6 +98,8 @@
   --acton-font-mono:
     "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
+  /* Smallest text for compact structural labels. */
+  --acton-font-size-3xs: 0.625rem;
   /* Micro text for inline utility captions and dense technical actions. */
   --acton-font-size-2xs: 0.6875rem;
   /* Extra-small text for dense metadata. */
@@ -186,6 +200,12 @@
   --acton-color-success: hsl(142 69% 58%);
   /* Dark success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 39% 30%);
+  /* Dark added-value accent used by structured diffs. */
+  --acton-color-diff-added: #22c55e;
+  /* Dark added-value surface used by structured diffs. */
+  --acton-color-diff-added-surface: rgb(20 83 45 / 32%);
+  /* Dark added-value text used by structured diffs. */
+  --acton-color-diff-added-text: #86efac;
   /* Dark warning action and status color. */
   --acton-color-warning: hsl(45 93% 47%);
   /* Dark hover state for warning actions. */
@@ -206,6 +226,12 @@
   --acton-color-danger-text-hover: hsl(0 96% 79%);
   /* Dark text and icon color placed on danger backgrounds. */
   --acton-color-danger-foreground: hsl(0 86% 97%);
+  /* Dark removed-value accent used by structured diffs. */
+  --acton-color-diff-removed: #ef4444;
+  /* Dark removed-value surface used by structured diffs. */
+  --acton-color-diff-removed-surface: rgb(127 29 29 / 32%);
+  /* Dark removed-value text used by structured diffs. */
+  --acton-color-diff-removed-text: #fca5a5;
   /* Dark accessible focus halo around keyboard-focused controls. */
   --acton-color-focus-ring: hsl(0 0% 98% / 0.22);
   /* Dark scrim behind temporary overlays such as mobile drawers. */

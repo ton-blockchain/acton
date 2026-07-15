@@ -1,0 +1,40 @@
+.valueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--acton-space-3);
+}
+
+.valueSample {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-3);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control);
+  background: var(--acton-color-surface);
+}
+
+.valueLabel {
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-2xs);
+}
+
+.valueResult {
+  min-width: 0;
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+}
+
+.structureGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  gap: var(--acton-space-4);
+}
+
+@media (max-width: 640px) {
+  .structureGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

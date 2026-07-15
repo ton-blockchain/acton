@@ -1,94 +1,37 @@
-import type {ParsedContractStorage, ParsedValue} from "@/types/transaction"
+import type {ParsedValue, ParsedValueLeaf} from "../ParsedValueView/types"
 
-export type StorageDiffStatus = "unchanged" | "changed" | "added" | "removed"
+import type {ParsedValueDiff, ParsedValueDiffContainerKind, ParsedValueDiffStatus} from "./types"
 
-export type StorageLeafValue =
-  | {
-      readonly kind: "null"
-    }
-  | {
-      readonly kind: "void"
-    }
-  | {
-      readonly kind: "address"
-      readonly value: string
-    }
-  | {
-      readonly kind: "scalar"
-      readonly value: string
-      readonly rawValue?: string
-      readonly typeName?: string
-    }
-  | {
-      readonly kind: "boolean"
-      readonly value: boolean
-    }
+export interface ParsedStorageValue {
+  readonly name: string
+  readonly value: ParsedValue
+}
 
-export interface StorageValueEntry {
+interface StorageValueEntry {
   readonly key: string
   readonly value: StorageValue
 }
 
-export type StorageObjectKind = "object" | "array" | "map"
-
-export type StorageValue =
-  | StorageLeafValue
+type StorageValue =
+  | ParsedValueLeaf
   | {
       readonly kind: "object"
-      readonly objectKind: StorageObjectKind
+      readonly objectKind: ParsedValueDiffContainerKind
       readonly typeName?: string
       readonly entries: readonly StorageValueEntry[]
     }
 
-export interface StorageDiffEntry {
-  readonly key: string
-  readonly value: StorageDiffNode
-}
-
-export type StorageDiffNode =
-  | {
-      readonly kind: "leaf"
-      readonly status: StorageDiffStatus
-      readonly before: StorageLeafValue | undefined
-      readonly after: StorageLeafValue | undefined
-    }
-  | {
-      readonly kind: "object"
-      readonly status: StorageDiffStatus
-      readonly objectKind: StorageObjectKind
-      readonly typeName?: string
-      readonly entries: readonly StorageDiffEntry[]
-    }
-
-const scalar = (value: string, rawValue?: string, typeName?: string): StorageLeafValue => ({
+const scalar = (value: string, rawValue?: string, typeName?: string): ParsedValueLeaf => ({
   kind: "scalar",
   value,
   rawValue,
   typeName,
 })
 
-const nullValue = (): StorageLeafValue => ({
-  kind: "null",
-})
-
-const voidValue = (): StorageLeafValue => ({
-  kind: "void",
-})
-
-const addressValue = (value: string): StorageLeafValue => ({
-  kind: "address",
-  value,
-})
-
-const booleanValue = (value: boolean): StorageLeafValue => ({
-  kind: "boolean",
-  value,
-})
-
 const objectValue = (
   entries: readonly StorageValueEntry[],
   typeName?: string,
-  objectKind: StorageObjectKind = "object",
+  objectKind: ParsedValueDiffContainerKind = "object",
 ): Extract<StorageValue, {readonly kind: "object"}> => ({
   kind: "object",
   objectKind,
@@ -96,24 +39,19 @@ const objectValue = (
   entries,
 })
 
-const stringifyParsedValue = (value: ParsedValue): string => {
+function stringifyParsedValue(value: ParsedValue): string {
   switch (value.kind) {
-    case "null": {
+    case "null":
       return "null"
-    }
-    case "void": {
+    case "void":
       return "void"
-    }
     case "address":
-    case "scalar": {
+    case "scalar":
       return value.value
-    }
-    case "boolean": {
+    case "boolean":
       return value.value ? "true" : "false"
-    }
-    case "array": {
+    case "array":
       return `[${value.items.map(item => stringifyParsedValue(item)).join(", ")}]`
-    }
     case "object": {
       const renderedEntries = value.entries
         .map(entry => `${entry.key}: ${stringifyParsedValue(entry.value)}`)
@@ -129,24 +67,15 @@ const stringifyParsedValue = (value: ParsedValue): string => {
   }
 }
 
-const normalizeParsedValue = (value: ParsedValue): StorageValue => {
+function normalizeParsedValue(value: ParsedValue): StorageValue {
   switch (value.kind) {
-    case "null": {
-      return nullValue()
-    }
-    case "void": {
-      return voidValue()
-    }
-    case "boolean": {
-      return booleanValue(value.value)
-    }
-    case "scalar": {
-      return scalar(value.value, value.rawValue, value.typeName)
-    }
-    case "address": {
-      return addressValue(value.value)
-    }
-    case "array": {
+    case "null":
+    case "void":
+    case "boolean":
+    case "scalar":
+    case "address":
+      return value
+    case "array":
       return objectValue(
         value.items.map((item, index) => ({
           key: `[${index}]`,
@@ -155,8 +84,7 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
         "array",
         "array",
       )
-    }
-    case "map": {
+    case "map":
       return objectValue(
         value.entries.map(entry => ({
           key: stringifyParsedValue(entry.key),
@@ -165,24 +93,19 @@ const normalizeParsedValue = (value: ParsedValue): StorageValue => {
         value.typeName ?? "map",
         "map",
       )
-    }
-    case "object": {
+    case "object":
       return objectValue(
         value.entries.map(entry => ({
           key: entry.key,
           value: normalizeParsedValue(entry.value),
         })),
         value.typeName,
-        "object",
       )
-    }
   }
 }
 
-const normalizeStorage = (value: ParsedContractStorage | undefined): StorageValue | undefined => {
-  if (!value) {
-    return undefined
-  }
+function normalizeStorage(value: ParsedStorageValue | undefined): StorageValue | undefined {
+  if (!value) return undefined
 
   const normalized = normalizeParsedValue(value.value)
   if (normalized.kind === "object") {
@@ -194,7 +117,7 @@ const normalizeStorage = (value: ParsedContractStorage | undefined): StorageValu
   return objectValue([{key: "value", value: normalized}], value.name)
 }
 
-const toAddedDiff = (value: StorageValue): StorageDiffNode => {
+function toAddedDiff(value: StorageValue): ParsedValueDiff {
   if (value.kind === "object") {
     return {
       kind: "object",
@@ -216,7 +139,7 @@ const toAddedDiff = (value: StorageValue): StorageDiffNode => {
   }
 }
 
-const toRemovedDiff = (value: StorageValue): StorageDiffNode => {
+function toRemovedDiff(value: StorageValue): ParsedValueDiff {
   if (value.kind === "object") {
     return {
       kind: "object",
@@ -238,22 +161,12 @@ const toRemovedDiff = (value: StorageValue): StorageDiffNode => {
   }
 }
 
-const areLeafValuesEqual = (before: StorageLeafValue, after: StorageLeafValue): boolean => {
-  if (before.kind !== after.kind) {
-    return false
-  }
+function areLeafValuesEqual(before: ParsedValueLeaf, after: ParsedValueLeaf): boolean {
+  if (before.kind !== after.kind) return false
 
-  if (before.kind === "null" && after.kind === "null") {
-    return true
-  }
-
-  if (before.kind === "boolean" && after.kind === "boolean") {
-    return before.value === after.value
-  }
-
-  if (before.kind === "address" && after.kind === "address") {
-    return before.value === after.value
-  }
+  if (before.kind === "null" && after.kind === "null") return true
+  if (before.kind === "boolean" && after.kind === "boolean") return before.value === after.value
+  if (before.kind === "address" && after.kind === "address") return before.value === after.value
 
   if (before.kind === "scalar" && after.kind === "scalar") {
     return (before.rawValue ?? before.value) === (after.rawValue ?? after.value)
@@ -262,21 +175,13 @@ const areLeafValuesEqual = (before: StorageLeafValue, after: StorageLeafValue): 
   return false
 }
 
-const diffStorageValues = (
+function diffStorageValues(
   before: StorageValue | undefined,
   after: StorageValue | undefined,
-): StorageDiffNode | undefined => {
-  if (!before && !after) {
-    return undefined
-  }
-
-  if (!before) {
-    return after ? toAddedDiff(after) : undefined
-  }
-
-  if (!after) {
-    return toRemovedDiff(before)
-  }
+): ParsedValueDiff | undefined {
+  if (!before && !after) return undefined
+  if (!before) return after ? toAddedDiff(after) : undefined
+  if (!after) return toRemovedDiff(before)
 
   if (before.kind !== after.kind) {
     return {
@@ -305,26 +210,20 @@ const diffStorageValues = (
     }
   }
 
-  const orderedKeys: string[] = [
-    ...before.entries.map(entry => entry.key),
-    ...after.entries
-      .map(entry => entry.key)
-      .filter(key => !before.entries.some(beforeEntry => beforeEntry.key === key)),
-  ]
-
-  const beforeEntryMap = new Map<string, StorageValue>(
-    before.entries.map(entry => [entry.key, entry.value]),
-  )
-  const afterEntryMap = new Map<string, StorageValue>(
-    after.entries.map(entry => [entry.key, entry.value]),
-  )
-
+  const orderedKeys = before.entries.map(entry => entry.key)
+  const knownKeys = new Set(orderedKeys)
+  for (const entry of after.entries) {
+    if (knownKeys.has(entry.key)) continue
+    orderedKeys.push(entry.key)
+    knownKeys.add(entry.key)
+  }
+  const beforeEntryMap = new Map(before.entries.map(entry => [entry.key, entry.value]))
+  const afterEntryMap = new Map(after.entries.map(entry => [entry.key, entry.value]))
   const entries = orderedKeys.flatMap(key => {
     const value = diffStorageValues(beforeEntryMap.get(key), afterEntryMap.get(key))
     return value ? [{key, value}] : []
   })
-
-  const status: StorageDiffStatus =
+  const status: ParsedValueDiffStatus =
     before.typeName !== after.typeName ||
     before.objectKind !== after.objectKind ||
     entries.some(entry => entry.value.status !== "unchanged")
@@ -340,9 +239,9 @@ const diffStorageValues = (
   }
 }
 
-export const buildStorageDiff = (
-  before: ParsedContractStorage | undefined,
-  after: ParsedContractStorage | undefined,
-): StorageDiffNode | undefined => {
+export function buildStorageDiff(
+  before: ParsedStorageValue | undefined,
+  after: ParsedStorageValue | undefined,
+): ParsedValueDiff | undefined {
   return diffStorageValues(normalizeStorage(before), normalizeStorage(after))
 }
