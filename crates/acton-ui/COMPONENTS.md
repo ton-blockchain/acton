@@ -341,6 +341,56 @@ or depend on compiler ABI types.
   code descriptions in application code.
 - Do not add a full ABI package dependency to consumers that only need the chip.
 
+## ModeViewer
+
+Status: ready
+
+Import:
+
+```tsx
+import {
+  ChangeLibraryModeViewer,
+  ModeViewer,
+  ReserveModeViewer,
+  SendModeViewer,
+} from "@acton/ui"
+```
+
+Use the three domain wrappers for TON action modes. They share the same inline
+layout, separators, empty state, and explanatory popovers, while each wrapper
+keeps its bit parsing in a separate parser module.
+
+### Wrappers
+
+- `ReserveModeViewer`: reserve base mode and optional reserve flags.
+- `SendModeViewer`: independent message send flags and regular mode `0`.
+- `ChangeLibraryModeViewer`: library visibility, bounce behavior, and unknown
+  bits.
+
+All wrappers accept `mode: number | undefined`. An unavailable value renders
+`No mode`.
+
+### Base Component
+
+`ModeViewer` accepts `mode` and a `parseMode` function returning entries with
+`name`, `value`, `description`, and an optional `docsUrl`. Use it directly only
+when adding another mode family; callers rendering the three known TON modes
+should use a wrapper.
+
+Descriptions may be plain strings or composed parts. Use `{name, value}` parts
+for inline mode constants and `{code}` parts for Tolk functions, types, and
+other code references.
+
+### Agent Guidance
+
+- Keep every mode family's constants and bit rules in its own folder and parser
+  file.
+- Reuse `ModeViewer` for presentation instead of rebuilding separators and
+  popovers.
+- Do not add reserve, send, or library-specific branches to `ModeViewer`.
+- Do not use one domain wrapper for a different mode family even when bit values
+  overlap.
+
 ## ContentTabs
 
 Status: ready

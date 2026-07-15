@@ -75,6 +75,7 @@ export function Popover({
       <PopoverBase.Trigger
         closeDelay={closeDelay}
         delay={openDelay}
+        nativeButton={false}
         openOnHover={interaction === "hover"}
         render={
           <span

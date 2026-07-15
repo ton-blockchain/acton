@@ -9,6 +9,7 @@ import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
+import {modeViewerGallery} from "./modeViewerGallery"
 import {pillTabsGallery} from "./pillTabsGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
@@ -30,6 +31,7 @@ export const galleries = [
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,
+  modeViewerGallery,
   popoverGallery,
   infoPopoverGallery,
   toastGallery,

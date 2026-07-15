@@ -1,5 +1,11 @@
 import type {OutAction} from "@ton/core"
-import {ExitCodeChip} from "@acton/ui"
+import {
+  ChangeLibraryModeViewer,
+  ExitCodeChip,
+  parseReserveMode,
+  ReserveModeViewer,
+  SendModeViewer,
+} from "@acton/ui"
 import React, {useState} from "react"
 import {FiBookOpen, FiCode, FiCornerUpRight, FiLock, FiPackage} from "react-icons/fi"
 
@@ -11,16 +17,12 @@ import type {
 import type {ContractData} from "@/types/transaction"
 import {fmt, DataBlock} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
-import {parseReserveMode} from "@/utils/transaction"
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
-import {ChangeLibraryModeViewer} from "../ChangeLibraryModeViewer/ChangeLibraryModeViewer"
 import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
-import {ReserveModeViewer} from "../ReserveModeViewer/ReserveModeViewer"
-import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 import {
   formatCellBocHex,
   formatMessageRelaxedBocHex,

@@ -1,7 +1,7 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
-import {ExitCodeChip, InfoPopover} from "@acton/ui"
+import {ExitCodeChip, InfoPopover, SendModeViewer} from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
@@ -27,7 +27,6 @@ import {ContractChip} from "../ContractChip/ContractChip"
 import {CopyValueButton} from "../CopyValueButton"
 import {OpcodeChip} from "../OpcodeChip/OpcodeChip"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
-import {SendModeViewer} from "../SendModeViewer/SendModeViewer"
 import {StorageDiffView} from "../TransactionTree/StorageDiffView"
 import {buildStorageDiff} from "../TransactionTree/storageDiff"
 import {
