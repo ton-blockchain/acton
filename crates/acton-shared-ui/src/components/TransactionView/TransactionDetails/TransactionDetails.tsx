@@ -1,7 +1,7 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
-import {ExitCodeChip, InfoPopover, SendModeViewer} from "@acton/ui"
+import {ExitCodeChip, InfoPopover, RawDataBlock, SendModeViewer} from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
@@ -10,7 +10,7 @@ import type {
   TransactionBlockRef,
   TransactionInfo,
 } from "@/types/transaction"
-import {ContractSourcePanel, DataBlock, fmt, type ContractVerifiedSource} from "@/index"
+import {ContractSourcePanel, fmt, type ContractVerifiedSource} from "@/index"
 import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
 import {
   computeSendMode,
@@ -560,7 +560,7 @@ export function TransactionDetails({
                             </div>
                           </div>
                         ) : (
-                          <DataBlock data={stateInitDataBocHex} copyLabel="state data BOC" />
+                          <RawDataBlock value={stateInitDataBocHex!} copyLabel="state data BOC" />
                         )}
                       </div>
                     )}

@@ -14,6 +14,7 @@ import {
 } from "react-icons/fi"
 import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
 import {VscCode} from "react-icons/vsc"
+import {RawDataBlock} from "@acton/ui"
 
 import {
   type TestReport,
@@ -32,7 +33,6 @@ import {
   getTransactionOpcode,
   processTransactions,
   CodeSnippet,
-  DataBlock,
   TransactionTree,
   ContractChip,
   Table,
@@ -148,6 +148,13 @@ const getStatusDescription = (test: TestReport): string | undefined => {
 
 const stringifyError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error)
+
+const formatDuration = (duration: {secs: number; nanos: number}): string => {
+  const ms = duration.secs * 1000 + duration.nanos / 1_000_000
+  if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
+  if (ms < 1000) return `${ms.toFixed(1)}ms`
+  return `${(ms / 1000).toFixed(2)}s`
+}
 
 export const TestDetails: React.FC<TestDetailsProps> = ({
   test,
@@ -333,7 +340,9 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     setIsLoadingExecutionLogs(true)
     setExecutionLogs(undefined)
 
-    void fetch(`/api/test-logs?${params.toString()}`, {signal: controller.signal})
+    void fetch(`/api/test-logs?${params.toString()}`, {
+      signal: controller.signal,
+    })
       .then(async res => {
         if (!res.ok) {
           throw new Error(`Failed to fetch test logs: ${res.status}`)
@@ -389,13 +398,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     )
   }
 
-  const formatDuration = (duration: {secs: number; nanos: number}) => {
-    const ms = duration.secs * 1000 + duration.nanos / 1_000_000
-    if (ms < 1) return `${(ms * 1000).toFixed(0)}µs`
-    if (ms < 1000) return `${ms.toFixed(1)}ms`
-    return `${(ms / 1000).toFixed(2)}s`
-  }
-
   const transactionCount = useMemo(() => {
     if (!trace) return 0
     return trace.traces.reduce((acc, t) => acc + t.transactions.length, 0)
@@ -409,7 +411,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   const skippedTracesCount = trace?.skipped_traces_count ?? 0
   const skippedTraceLabel = formatSkippedTraceCount(skippedTracesCount)
   const traceEntries = useMemo(() => {
-    return (trace?.traces ?? []).map((traceItem, index) => ({traceItem, index}))
+    return (trace?.traces ?? []).map((traceItem, index) => ({
+      traceItem,
+      index,
+    }))
   }, [trace])
   const treasuryDeployTraceEntries = useMemo(
     () => traceEntries.filter(({traceItem}) => traceItem.is_treasury_deploy === true),
@@ -756,23 +761,25 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           )}
           <div className={styles.logSection}>
             <div className={styles.logSectionTitle}>Error</div>
-            <DataBlock data={failedMessage.error} />
+            <RawDataBlock value={failedMessage.error} />
           </div>
           {failedMessage.vm_exit_code !== undefined && (
             <div className={styles.logSection}>
               <div className={styles.logSectionTitle}>VM Exit Code</div>
-              <DataBlock data={failedMessage.vm_exit_code.toString()} />
+              <RawDataBlock value={failedMessage.vm_exit_code.toString()} />
             </div>
           )}
           {hasExecutorLog && (
             <div className={styles.logSection}>
               <div className={styles.logSectionTitle}>Executor Log</div>
-              <DataBlock data={failedMessage.executor_logs ?? ""} />
+              <RawDataBlock value={failedMessage.executor_logs ?? ""} />
             </div>
           )}
           <div className={styles.logSection}>
             <div className={styles.logSectionTitle}>VM Log</div>
-            <DataBlock data={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT} />
+            <RawDataBlock
+              value={hasVmLog ? (failedMessage.vm_log_diff ?? "") : MISSING_VM_LOG_HINT}
+            />
           </div>
         </div>
       )
@@ -783,49 +790,54 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     const hasStdout = hasNonEmptyLog(executionLogs?.stdout)
     const hasStderr = hasNonEmptyLog(executionLogs?.stderr)
     const hasVmLog = hasNonEmptyLog(executionLogs?.vm_log)
-
-    const summaryKinds = [
-      hasStdout ? "stdout" : undefined,
-      hasStderr ? "stderr" : undefined,
-    ].filter(Boolean)
     const hasAnyLogs = hasStdout || hasStderr || hasVmLog
 
     if (!hasAnyLogs && !isLoadingExecutionLogs) {
       return
     }
 
+    if (isLoadingExecutionLogs) {
+      return (
+        <RawDataBlock
+          empty
+          emptyContent="Loading test logs..."
+          showCopy={false}
+          title="Test Logs"
+          value=""
+        />
+      )
+    }
+
     return (
-      <details className={styles.infoLogsSection}>
-        <summary className={styles.infoLogsSummary}>
-          <span className={styles.infoLogsTitle}>Test Logs</span>
-          {(isLoadingExecutionLogs || summaryKinds.length > 0) && (
-            <span className={styles.infoLogsMeta}>
-              {isLoadingExecutionLogs ? "loading..." : summaryKinds.join(" · ")}
-            </span>
-          )}
-        </summary>
-        {!isLoadingExecutionLogs && (
-          <div className={styles.infoLogsContent}>
-            {hasStdout && (
-              <div className={styles.logSection}>
-                <div className={styles.logSectionTitle}>Stdout</div>
-                <DataBlock data={executionLogs?.stdout ?? ""} />
-              </div>
-            )}
-            {hasStderr && (
-              <div className={styles.logSection}>
-                <div className={styles.logSectionTitle}>Stderr</div>
-                <DataBlock data={executionLogs?.stderr ?? ""} />
-              </div>
-            )}
-            {hasVmLog && (
-              <div className={styles.logSection}>
-                <DataBlock data={executionLogs?.vm_log ?? ""} />
-              </div>
-            )}
-          </div>
+      <div className={styles.infoLogsSection}>
+        {hasStdout && (
+          <RawDataBlock
+            collapsible
+            copyLabel="Test stdout"
+            defaultExpanded={false}
+            title="Test Output"
+            value={executionLogs?.stdout ?? ""}
+          />
         )}
-      </details>
+        {hasStderr && (
+          <RawDataBlock
+            collapsible
+            copyLabel="Test stderr"
+            defaultExpanded={false}
+            title="Test Error Output"
+            value={executionLogs?.stderr ?? ""}
+          />
+        )}
+        {hasVmLog && (
+          <RawDataBlock
+            collapsible
+            copyLabel="Test VM log"
+            defaultExpanded={false}
+            title="Test VM Log"
+            value={executionLogs?.vm_log ?? ""}
+          />
+        )}
+      </div>
     )
   }
 
@@ -936,8 +948,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           {test.status === TestStatus.Failed && (
             <div className={styles.errorSection}>
               <div className={styles.errorTitle}>Error Message</div>
-              <DataBlock
-                data={
+              <RawDataBlock
+                value={
                   test.failed_transaction_context
                     ? (test.message ?? "expect(actual).toHaveTx(expected)")
                     : (test.detailed_message ?? test.message ?? "No error message available")
@@ -1138,19 +1150,19 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 {hasExecutorLog && (
                   <div className={styles.logSection}>
                     <div className={styles.logSectionTitle}>Executor Log</div>
-                    <DataBlock
-                      data={tx.executor_logs}
-                      visualDynamic="executor-log"
-                      visualPlaceholder="<executor log>"
+                    <RawDataBlock
+                      value={tx.executor_logs}
+                      data-visual-dynamic="executor-log"
+                      data-visual-placeholder="<executor log>"
                     />
                   </div>
                 )}
                 <div className={styles.logSection}>
                   <div className={styles.logSectionTitle}>VM Log</div>
-                  <DataBlock
-                    data={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
-                    visualDynamic="vm-log"
-                    visualPlaceholder="<vm log>"
+                  <RawDataBlock
+                    value={hasVmLog ? tx.vm_log_diff : MISSING_VM_LOG_HINT}
+                    data-visual-dynamic="vm-log"
+                    data-visual-placeholder="<vm log>"
                   />
                 </div>
               </div>
@@ -1167,10 +1179,10 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           <div className={styles.txLogs}>
             <div className={styles.logSection}>
               <div className={styles.logSectionTitle}>VM Log</div>
-              <DataBlock
-                data={MISSING_VM_LOG_HINT}
-                visualDynamic="vm-log"
-                visualPlaceholder="<vm log>"
+              <RawDataBlock
+                value={MISSING_VM_LOG_HINT}
+                data-visual-dynamic="vm-log"
+                data-visual-placeholder="<vm log>"
               />
             </div>
           </div>

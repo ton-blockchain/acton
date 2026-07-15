@@ -1,11 +1,11 @@
 import {Buffer} from "node:buffer"
 import {useMemo, useState} from "react"
 import type {FC, JSX} from "react"
+import {RawDataBlock} from "@acton/ui"
 
 import {
   ContractSourcePanel,
   decodeStorageDataCell,
-  DataBlock,
   ParsedValueView,
   type ContractData,
   type ContractVerifiedSource,
@@ -36,6 +36,14 @@ interface ContractCodeProps {
 
 type ContractCodeTab = "storage" | "source" | "abi"
 type StorageTab = "parsed" | "base64" | "hex" | "hex-hash" | "base64-hash"
+
+const STORAGE_TABS: readonly {tab: StorageTab; label: string}[] = [
+  {tab: "parsed", label: "parsed"},
+  {tab: "base64", label: "base64"},
+  {tab: "hex", label: "hex"},
+  {tab: "hex-hash", label: "hex hash"},
+  {tab: "base64-hash", label: "base64 hash"},
+]
 
 function readContractHashTab(): ContractCodeTab {
   if (typeof globalThis.window === "undefined") {
@@ -236,13 +244,6 @@ function StoragePanel({
   readonly onContractClick?: (address: string) => void
   readonly unavailableMessage: string
 }): JSX.Element {
-  const storageTabs: readonly {tab: StorageTab; label: string}[] = [
-    {tab: "parsed", label: "parsed"},
-    {tab: "base64", label: "base64"},
-    {tab: "hex", label: "hex"},
-    {tab: "hex-hash", label: "hex hash"},
-    {tab: "base64-hash", label: "base64 hash"},
-  ]
   const activeStorage =
     activeTab === "base64"
       ? {
@@ -273,7 +274,7 @@ function StoragePanel({
   return (
     <section className={styles.sourceShell}>
       <div className={styles.editorTabBar}>
-        {storageTabs.map(item => (
+        {STORAGE_TABS.map(item => (
           <button
             key={item.tab}
             type="button"
@@ -301,9 +302,11 @@ function StoragePanel({
           <div className={`${styles.empty} ${styles.panelEmpty}`}>{unavailableMessage}</div>
         )
       ) : activeStorage?.value ? (
-        <ContractTextPanel
-          title={activeStorage.title}
+        <RawDataBlock
+          className={styles.sourceDataBlock}
+          variant="standalone"
           value={activeStorage.value}
+          copyLabel={activeStorage.title}
           wrap={activeStorage.wrap}
         />
       ) : (
@@ -312,28 +315,5 @@ function StoragePanel({
         </div>
       )}
     </section>
-  )
-}
-
-function ContractTextPanel({
-  title,
-  value,
-  wrap = false,
-}: {
-  readonly title: string
-  readonly value: string
-  readonly wrap?: boolean
-}): JSX.Element {
-  return (
-    <DataBlock
-      className={styles.sourceDataBlock}
-      variant="standalone"
-      copyLabel={title}
-      copyValue={value}
-    >
-      <pre className={`${styles.code} ${wrap ? styles.codeWrap : ""}`}>
-        <code>{value}</code>
-      </pre>
-    </DataBlock>
   )
 }

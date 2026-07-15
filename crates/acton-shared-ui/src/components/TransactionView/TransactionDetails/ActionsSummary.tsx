@@ -3,6 +3,7 @@ import {
   ChangeLibraryModeViewer,
   ExitCodeChip,
   parseReserveMode,
+  RawDataBlock,
   ReserveModeViewer,
   SendModeViewer,
 } from "@acton/ui"
@@ -15,7 +16,7 @@ import type {
   SourceLocation,
 } from "@/types"
 import type {ContractData} from "@/types/transaction"
-import {fmt, DataBlock} from "@/index"
+import {fmt} from "@/index"
 import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
@@ -341,7 +342,7 @@ const renderActionDetails = (
               <div className={styles.detailRow}>
                 <span className={styles.detailLabel}>Body:</span>
                 <div className={styles.detailValue}>
-                  <DataBlock data={messageBodyBocHex} copyLabel="body BOC" />
+                  <RawDataBlock value={messageBodyBocHex} copyLabel="body BOC" />
                 </div>
               </div>
             )}
@@ -427,13 +428,13 @@ const renderActionDetails = (
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Code Hash:</span>
               <span className={styles.detailValue}>
-                <DataBlock data={action.newCode.hash().toString("hex")} />
+                <RawDataBlock value={action.newCode.hash().toString("hex")} />
               </span>
             </div>
             <div className={styles.detailRow}>
               <span className={styles.detailLabel}>Code BoC:</span>
               <span className={styles.detailValue}>
-                <DataBlock data={newCodeBocHex} copyLabel="code BOC" />
+                <RawDataBlock value={newCodeBocHex} copyLabel="code BOC" />
               </span>
             </div>
             <DisasmSection bocHex={newCodeBocHex} />
@@ -520,9 +521,9 @@ const renderActionDetails = (
                 {action.libRef.type === "hash" ? "Hash:" : "Library:"}
               </span>
               <span className={styles.detailValue}>
-                <DataBlock
+                <RawDataBlock
                   copyLabel={action.libRef.type === "hash" ? "library hash" : "library BOC"}
-                  data={
+                  value={
                     action.libRef.type === "hash"
                       ? action.libRef.libHash.toString("hex")
                       : embeddedLibraryBocHex!

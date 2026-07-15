@@ -2,8 +2,9 @@ import type React from "react"
 
 import type {StackElement} from "@ton/tasm/dist/trace"
 import {Address, Cell} from "@ton/core"
+import {RawDataBlock} from "@acton/ui"
 
-import {DataBlock, type ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/shared-ui"
 
 import AddressDetails from "../AddressDetails"
 import CellTreeView from "../CellTreeView/CellTreeView"
@@ -80,7 +81,7 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({
           cellDetailsContent = (
             <>
               <div className={styles.dataSection}>
-                <DataBlock data={rootCell.toBoc().toString("hex")} maxHeight={100} />
+                <RawDataBlock value={rootCell.toBoc().toString("hex")} maxHeight={100} />
               </div>
             </>
           )
@@ -90,7 +91,7 @@ const StackItemDetails: React.FC<StackItemDetailsProps> = ({
         cellDetailsContent = (
           <>
             <div className={styles.dataSection}>
-              <DataBlock data={rootCell.toBoc().toString("hex")} maxHeight={100} />
+              <RawDataBlock value={rootCell.toBoc().toString("hex")} maxHeight={100} />
             </div>
           </>
         )

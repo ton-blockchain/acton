@@ -7,9 +7,9 @@ import {Check, CheckCircle2, Copy, ExternalLink, FileCode2, Folder, Menu} from "
 import {createHighlighterCore} from "shiki/core"
 import {createJavaScriptRegexEngine} from "shiki/engine/javascript"
 import type {LanguageRegistration} from "shiki/types"
+import {RawDataBlock} from "@acton/ui"
 
 import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "../CodeSnippet/jetbrains-themes"
-import {DataBlock} from "../DataBlock/DataBlock"
 
 import funcGrammarRaw from "../../../../../docs/grammars/grammar-func.json"
 import tasmGrammarRaw from "../../../../../docs/grammars/grammar-tasm.json"
@@ -653,14 +653,13 @@ function ContractTextPanel({
   readonly wrap?: boolean
 }): JSX.Element {
   return (
-    <DataBlock
+    <RawDataBlock
       className={styles.sourceDataBlock}
       variant="standalone"
+      value={value}
       copyLabel={title}
-      copyValue={value}
-    >
-      <CodeContent value={value} language={language} wrap={wrap} />
-    </DataBlock>
+      customContent={<CodeContent value={value} language={language} wrap={wrap} />}
+    />
   )
 }
 

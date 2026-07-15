@@ -240,6 +240,7 @@ export const rawDataBlockGallery = {
     "Use title with collapsible when a raw payload needs a compact reveal header.",
     "Use empty with emptyContent when a raw payload was expected but no data exists.",
     "Pass copyLabel so the copy button has a useful accessible label.",
+    "Use customContent only when a highlighter already renders its own pre or structured HTML.",
   ],
   avoid: [
     "Do not use for parsed key-value data or tables.",

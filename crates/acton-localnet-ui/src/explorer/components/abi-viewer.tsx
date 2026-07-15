@@ -2,7 +2,8 @@ import {Buffer} from "node:buffer"
 import {useEffect, useMemo, useState} from "react"
 import type {JSX, MouseEvent, ReactNode} from "react"
 
-import {DataBlock, jetbrainsDarculaTheme, jetbrainsLightTheme} from "@acton/shared-ui"
+import {RawDataBlock} from "@acton/ui"
+import {jetbrainsDarculaTheme, jetbrainsLightTheme} from "@acton/shared-ui"
 import {
   Address,
   Cell,
@@ -166,15 +167,14 @@ export function AbiPanel({
           showSymbolAnchors={showSymbolAnchors}
         />
       ) : (
-        <DataBlock
+        <RawDataBlock
           className={styles.sourceDataBlock}
           contentClassName={heightMode === "content" ? styles.sourceDataBlockContent : undefined}
           variant="standalone"
+          value={abiJson}
           copyLabel="ABI"
-          copyValue={abiJson}
-        >
-          <CodeContent value={abiJson} language="json" wrap={false} />
-        </DataBlock>
+          customContent={<CodeContent value={abiJson} language="json" wrap={false} />}
+        />
       )}
     </section>
   )

@@ -594,8 +594,11 @@ renders the scrollable `pre/code` area and owns copy button state.
   plain text.
 - `empty`: renders a quiet empty state instead of `pre/code`; copy is hidden.
 - `emptyContent`: text or React content explaining why raw data is unavailable.
-- `children`: optional highlighted code content; `value` remains the copy
-  source.
+- `children`: optional highlighted code fragments rendered inside the built-in
+  `pre/code`; `value` remains the copy source.
+- `customContent`: a complete pre-rendered code viewer that replaces the
+  built-in `pre/code`. Use it when a highlighter already returns its own
+  `<pre>` or structured HTML.
 
 ### States To Review Visually
 

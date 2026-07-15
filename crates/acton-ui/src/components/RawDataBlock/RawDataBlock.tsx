@@ -22,6 +22,8 @@ export type RawDataBlockProps = Readonly<
     readonly contentClassName?: string
     readonly copyLabel?: string
     readonly copyValue?: string
+    /** Fully rendered content that replaces the built-in pre/code presentation. */
+    readonly customContent?: ReactNode
     readonly defaultExpanded?: boolean
     readonly empty?: boolean
     readonly emptyContent?: ReactNode
@@ -53,6 +55,7 @@ export function RawDataBlock({
   contentClassName,
   copyLabel = "raw data",
   copyValue,
+  customContent,
   defaultExpanded = true,
   empty = false,
   emptyContent = "No data available",
@@ -176,6 +179,8 @@ export function RawDataBlock({
         >
           {empty ? (
             <div className={styles.empty}>{emptyContent}</div>
+          ) : customContent !== undefined && customContent !== null ? (
+            customContent
           ) : (
             <pre className={cx(styles.pre, wrap && styles.preWrap)}>
               <code className={codeClassName}>{children ?? value}</code>
