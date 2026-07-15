@@ -1,0 +1,393 @@
+.workspace {
+  --code-viewer-max-height: 38.75rem;
+
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(11.875rem, 16.25rem) minmax(0, 1fr);
+  min-width: 0;
+  min-height: 26.25rem;
+  overflow: hidden;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
+}
+
+.desktopTreeHidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.attachedToTabs {
+  border-start-start-radius: 0;
+}
+
+.compact {
+  --code-viewer-max-height: 22.5rem;
+
+  min-height: 24.9375rem;
+}
+
+.fileTree {
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+}
+
+.desktopTreeToggle,
+.desktopTreeExpand {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.desktopTreeToggle {
+  position: absolute;
+  z-index: 2;
+  top: var(--acton-space-2);
+  right: var(--acton-space-2);
+}
+
+.desktopTreeToggle:hover,
+.desktopTreeExpand:hover {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.desktopTreeToggle:focus-visible,
+.desktopTreeExpand:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -1px;
+}
+
+.desktopTreeToggle svg,
+.desktopTreeExpand svg {
+  width: 1rem;
+  height: 1rem;
+  color: inherit;
+}
+
+.fileTreeList {
+  height: 100%;
+  max-height: var(--code-viewer-max-height);
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: var(--acton-space-2);
+  scrollbar-width: none;
+}
+
+.fileTreeList::-webkit-scrollbar {
+  display: none;
+}
+
+.treeLevel {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.treeItem {
+  padding: 0;
+  margin: 0;
+}
+
+.treeRow {
+  appearance: none;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-1-5);
+  width: 100%;
+  min-width: 0;
+  min-height: 1.875rem;
+  padding: 0 var(--acton-space-2) 0
+    calc(var(--acton-space-1) + var(--code-tree-depth, 0) * var(--acton-space-4));
+  border: 0;
+  border-radius: var(--acton-radius-control-sm);
+  background: transparent;
+  color: var(--acton-color-text-muted);
+  font: inherit;
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.875rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--acton-duration-fast) var(--acton-ease-standard),
+    color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.treeRow:hover,
+.treeRow:focus-visible,
+.activeRow {
+  background: var(--acton-color-surface-hover);
+  color: var(--acton-color-text);
+}
+
+.treeRow:focus-visible,
+.mobileTreeToggle:focus-visible,
+.externalAction:focus-visible,
+.copyAction:focus-visible {
+  outline: 1px solid var(--acton-color-focus-ring);
+  outline-offset: -1px;
+}
+
+.treeRow > span:not(.entrypoint, .disclosurePlaceholder) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folderRow {
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.disclosureIcon,
+.rowIcon {
+  flex: 0 0 auto;
+  width: 0.875rem;
+  height: 0.875rem;
+  color: inherit;
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.disclosureIcon {
+  width: 0.75rem;
+  height: 0.75rem;
+}
+
+.disclosurePlaceholder {
+  flex: 0 0 0.75rem;
+  width: 0.75rem;
+}
+
+.entrypoint {
+  flex: 0 0 auto;
+  min-width: auto;
+  margin-left: auto;
+  padding: 0 var(--acton-space-1-5);
+  border-radius: var(--acton-radius-round);
+  background: color-mix(in srgb, var(--acton-color-accent) 18%, var(--acton-color-surface));
+  color: var(--acton-color-accent);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-3xs);
+  font-weight: var(--acton-font-weight-semibold);
+  line-height: 1.125rem;
+}
+
+.codePane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.codePaneHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--acton-space-2);
+  height: 2.375rem;
+  padding: 0 var(--acton-space-2) 0 var(--acton-space-3);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1;
+}
+
+.codePanePath {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.externalAction {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--acton-space-1-5);
+  margin-right: var(--acton-space-2);
+  border-radius: var(--acton-radius-control-sm);
+  color: var(--acton-color-accent);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-normal);
+  line-height: 1;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--acton-duration-fast) var(--acton-ease-standard);
+}
+
+.externalAction:hover {
+  color: var(--acton-color-accent-hover);
+}
+
+.externalAction svg {
+  width: 0.8125rem;
+  height: 0.8125rem;
+}
+
+.copyAction {
+  flex: 0 0 auto;
+}
+
+.codeFrame {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  max-height: var(--code-viewer-max-height);
+  overflow: auto;
+  overscroll-behavior: none;
+  background: var(--acton-color-canvas);
+}
+
+.lineNumbers {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: flex-start;
+  box-sizing: border-box;
+  flex: 0 0 auto;
+  height: max-content;
+  min-height: 100%;
+  min-width: 3rem;
+  padding: var(--acton-space-3) 0;
+  border-right: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  line-height: 1.5rem;
+  text-align: right;
+  user-select: none;
+}
+
+.lineNumbers span {
+  display: block;
+  padding: 0 var(--acton-space-2);
+}
+
+.code {
+  min-width: max-content;
+  flex: 1 0 auto;
+}
+
+.highlightedCode {
+  --acton-highlighted-code-line-height: 1.5rem;
+  --acton-highlighted-code-max-height: none;
+  --acton-highlighted-code-padding: var(--acton-space-3) var(--acton-space-4);
+
+  overflow: visible;
+}
+
+.highlightedCode :global(.line) {
+  min-height: 1.5rem;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 10rem;
+  padding: var(--acton-space-6);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-canvas);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+  text-align: center;
+}
+
+.mobileFileTree,
+.mobileTreeToggle {
+  display: none;
+}
+
+@media (max-width: 45rem) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .desktopFileTree {
+    display: none;
+  }
+
+  .desktopTreeToggle,
+  .desktopTreeExpand {
+    display: none;
+  }
+
+  .mobileTreeToggle {
+    appearance: none;
+    display: inline-flex;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    padding: 0;
+    border: 0;
+    border-radius: var(--acton-radius-control-sm);
+    background: transparent;
+    color: var(--acton-color-text-muted);
+    cursor: pointer;
+  }
+
+  .mobileTreeToggle:hover,
+  .mobileTreeToggleOpen {
+    background: var(--acton-color-surface-hover);
+    color: var(--acton-color-text);
+  }
+
+  .mobileTreeToggle svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .mobileFileTree {
+    display: none;
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
+
+  .mobileFileTreeOpen {
+    display: block;
+  }
+
+  .mobileFileTree .fileTreeList {
+    max-height: min(48dvh, 21.25rem);
+  }
+
+  .codeFrame {
+    max-height: 35rem;
+  }
+
+  .externalAction {
+    max-width: 8rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

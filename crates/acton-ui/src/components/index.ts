@@ -1,6 +1,7 @@
 export * from "./Button"
 export * from "./Breadcrumbs"
 export * from "./Checkbox"
+export * from "./CodeViewer"
 export * from "./ContentTabs"
 export * from "./ContractChip"
 export * from "./DataTable"

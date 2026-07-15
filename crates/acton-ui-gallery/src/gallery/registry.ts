@@ -1,6 +1,7 @@
 import {buttonGallery} from "./buttonGallery"
 import {breadcrumbsGallery} from "./breadcrumbsGallery"
 import {checkboxGallery} from "./checkboxGallery"
+import {codeViewerGallery} from "./codeViewerGallery"
 import {contentTabsGallery} from "./contentTabsGallery"
 import {contractChipGallery} from "./contractChipGallery"
 import {dataTableGallery} from "./dataTableGallery"
@@ -32,6 +33,7 @@ export const galleries = [
   breadcrumbsGallery,
   inlineButtonGallery,
   inlineActionsGallery,
+  codeViewerGallery,
   contractChipGallery,
   disclosureToggleGallery,
   exitCodeChipGallery,

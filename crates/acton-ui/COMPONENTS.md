@@ -758,6 +758,62 @@ parsed scalar values, storage diffs, balances, gas values, counters, and ids.
   truncation.
 - Do not insert literal spaces into technical numbers for readability.
 
+## CodeViewer
+
+Status: ready
+
+Import:
+
+```tsx
+import { CodeViewer } from "@acton/ui"
+```
+
+Use CodeViewer for read-only multi-file source bundles. It owns the collapsible
+file tree, active-file selection, entrypoint marker, line numbers, syntax
+highlighting, copy action, optional external action, and responsive file picker.
+
+### Composition
+
+```tsx
+<CodeViewer
+  files={sourceFiles}
+  entrypoint="contracts/main.tolk"
+  externalActionUrl={verificationUrl}
+  externalActionLabel="View verification"
+/>
+```
+
+- `files`: minimal `{path, content}` records; domain-specific source metadata
+  stays in the caller.
+- `entrypoint`: optional path selected initially and marked as `main`.
+- `externalActionUrl` and `externalActionLabel`: optional navigation to a
+  verifier, repository, artifact, or other source context.
+- `compact`: limits the source height for dense details panels.
+- `attachedToTabs`: removes the leading top corner radius when the viewer sits
+  directly below a tab bar.
+- `emptyMessage`: caller-provided text for an empty source bundle.
+
+### States To Review Visually
+
+- Nested expanded folders
+- Independently collapsed folders
+- Active and hovered files
+- Entrypoint marker
+- Compact layout
+- Mobile file picker
+- Empty source bundle
+
+### Agent Guidance
+
+- Use it for verified contracts, generated source bundles, and other read-only
+  multi-file code.
+- Keep loading, verification, compilation, decompilation, and source-domain
+  types outside the component.
+- Let CodeViewer own file selection, tree disclosure, copying, line numbers,
+  highlighting, and responsive behavior.
+- Use HighlightedCode directly for a single source value without a file tree.
+- Use CodeEditor for editable code, debugger navigation, or completions.
+
 ## HighlightedCode
 
 Status: ready
