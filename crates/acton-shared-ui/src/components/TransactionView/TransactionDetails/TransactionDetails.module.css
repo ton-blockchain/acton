@@ -286,35 +286,6 @@
   outline: none;
 }
 
-.actionsToggleButton {
-  background: none;
-  border: none;
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: var(--spacing-xs);
-  margin-left: var(--spacing-xs);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.actionsToggleButton:hover {
-  color: var(--text-primary);
-}
-
-.actionsToggleButton:disabled {
-  color: var(--text-muted);
-  cursor: wait;
-  opacity: 0.7;
-}
-
-.actionsToggleText {
-  margin-left: var(--spacing-xs);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
-}
-
 .actionsLoadError {
   color: var(--color-failed);
   font-size: var(--font-size-xs);
@@ -323,23 +294,20 @@
 .parsedBodySection {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1-5);
   min-width: 0;
+  color: var(--acton-color-text);
+  font-family: var(--acton-font-sans);
+  font-synthesis: none;
 }
 
 .parsedBodyTitle {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  letter-spacing: 0.4px;
-}
-
-.parsedBodyTitle .actionsToggleButton {
-  color: inherit;
-  padding: 0;
-  font: inherit;
+  gap: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  letter-spacing: 0.025rem;
 }
 
 .parsedBodyTree {
@@ -366,14 +334,14 @@
 .stateInitFieldTitle {
   display: flex;
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   min-width: 0;
 }
 
-.stateInitFieldTitle .actionsToggleButton {
-  color: var(--text-muted);
-  padding: 0;
-  font: inherit;
+.stateInitField .multiColumnItemTitle {
+  color: var(--acton-color-text-muted);
+  font-size: var(--acton-font-size-2xs);
+  letter-spacing: 0.025rem;
 }
 
 .stateInitAbiValue {
@@ -461,11 +429,6 @@
   max-height: 260px;
   overflow: auto;
   box-sizing: border-box;
-}
-
-.storageToggleButton {
-  margin-left: 0;
-  padding-left: 0;
 }
 
 .parsedContainer {

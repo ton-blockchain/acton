@@ -1,8 +1,7 @@
 import type * as React from "react"
 import {useEffect, useState} from "react"
-import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 
-import {HighlightedCode} from "@acton/ui"
+import {DisclosureToggle, HighlightedCode} from "@acton/ui"
 
 import {disassembleBocHex} from "@/utils/disasm"
 
@@ -72,17 +71,13 @@ export function DisasmSection({
     <div className={styles.disasmSection}>
       <div className={styles.disasmTitle}>
         {title}
-        <button
-          type="button"
+        <DisclosureToggle
+          expanded={isExpanded}
+          contextLabel="disassembled code"
           onClick={() => {
-            setIsExpanded(!isExpanded)
+            setIsExpanded(expanded => !expanded)
           }}
-          className={styles.actionsToggleButton}
-          aria-label={isExpanded ? "Hide disassembled code" : "Show disassembled code"}
-        >
-          {isExpanded ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-          <span className={styles.actionsToggleText}>{isExpanded ? "Hide" : "Show"}</span>
-        </button>
+        />
       </div>
 
       {isExpanded &&

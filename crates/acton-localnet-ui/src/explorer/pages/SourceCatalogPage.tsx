@@ -1,6 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {CopyInlineAction, useToast} from "@acton/ui"
+import {CopyInlineAction, InlineAction, InlineActions, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {
@@ -10,7 +10,6 @@ import type {
   VerificationSourceResponse,
 } from "../api/types"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 import {normalizeCodeHash} from "../metadata/codeHash"
@@ -193,24 +192,25 @@ export const SourceCatalogPage: FC = () => {
                   tableEntries.map(entry => (
                     <tr key={entry.codeHash} className={styles.tableRow}>
                       <td>
-                        <InlineActionGroup className={styles.nameCell} spacing="loose">
-                          <div className={styles.entrypointCell}>
+                        <InlineActions
+                          className={styles.nameCell}
+                          visibility="always"
+                          actions={
+                            metadataRegistry.canWriteSources ? (
+                              <InlineAction
+                                label="Delete source"
+                                icon={<Trash2 />}
+                                onClick={() => {
+                                  void handleDeleteSource(entry.codeHash)
+                                }}
+                              />
+                            ) : undefined
+                          }
+                        >
+                          <span className={styles.entrypointCell}>
                             <span>{entry.entrypoint}</span>
-                          </div>
-                          {metadataRegistry.canWriteSources && (
-                            <InlineActionButton
-                              type="button"
-                              onClick={() => {
-                                void handleDeleteSource(entry.codeHash)
-                              }}
-                              variant="danger"
-                              aria-label="Delete source"
-                              title="Delete source"
-                            >
-                              <Trash2 size={13} />
-                            </InlineActionButton>
-                          )}
-                        </InlineActionGroup>
+                          </span>
+                        </InlineActions>
                       </td>
                       <td>
                         <div className={styles.codeHashCell}>

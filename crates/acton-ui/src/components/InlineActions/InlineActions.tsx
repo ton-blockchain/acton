@@ -135,7 +135,9 @@ export function InlineActions({
       className={cx(styles.inlineActions, visibilityClassNames[visibility], className)}
     >
       <span className={styles.content}>{children}</span>
-      <span className={styles.actions}>{actions}</span>
+      {actions !== null && actions !== undefined && (
+        <span className={styles.actions}>{actions}</span>
+      )}
     </span>
   )
 }

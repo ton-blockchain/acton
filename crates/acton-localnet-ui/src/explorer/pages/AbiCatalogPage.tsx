@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {useToast} from "@acton/ui"
+import {InlineAction, InlineActions, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useParams} from "react-router-dom"
 
@@ -12,7 +12,6 @@ import {
 } from "../api/compilerAbiCatalog"
 import {AbiPanel, type AbiTab} from "../components/abi-viewer"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {JsonUploadField} from "../components/JsonUploadField"
 import {useExplorerRoutePaths} from "../hooks/useExplorerRoutePaths"
 import {normalizeCodeHash} from "../metadata/codeHash"
@@ -291,32 +290,33 @@ export const AbiCatalogPage: FC = () => {
                         >
                           <span className={styles.visuallyHidden}>Open {title} ABI</span>
                         </Link>
-                        <InlineActionGroup className={styles.nameCell} spacing="loose">
-                          <div className={styles.primaryCell}>
-                            <div className={styles.nameLine}>
+                        <InlineActions
+                          className={styles.nameCell}
+                          visibility="always"
+                          actions={
+                            deleteCodeHash ? (
+                              <InlineAction
+                                label="Delete ABI"
+                                icon={<Trash2 />}
+                                onClick={event => {
+                                  event.preventDefault()
+                                  event.stopPropagation()
+                                  void handleDeleteAbi(deleteCodeHash)
+                                }}
+                              />
+                            ) : undefined
+                          }
+                        >
+                          <span className={styles.primaryCell}>
+                            <span className={styles.nameLine}>
                               <span className={styles.nameText}>{title}</span>
                               {entry.source === "local" && (
                                 <span className={styles.localBadge}>local</span>
                               )}
-                            </div>
+                            </span>
                             {title !== contractName && <small>{contractName}</small>}
-                          </div>
-                          {deleteCodeHash && (
-                            <InlineActionButton
-                              type="button"
-                              variant="danger"
-                              onClick={event => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                void handleDeleteAbi(deleteCodeHash)
-                              }}
-                              aria-label="Delete ABI"
-                              title="Delete ABI"
-                            >
-                              <Trash2 size={13} />
-                            </InlineActionButton>
-                          )}
-                        </InlineActionGroup>
+                          </span>
+                        </InlineActions>
                       </td>
                       <td>{stats.methods}</td>
                       <td>{stats.messages}</td>

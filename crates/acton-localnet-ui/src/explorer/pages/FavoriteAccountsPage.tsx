@@ -1,7 +1,7 @@
 import {useEffect, useRef, useState} from "react"
 import type {FC} from "react"
 import {Link} from "react-router-dom"
-import {useToast} from "@acton/ui"
+import {InlineAction, InlineActions, useToast} from "@acton/ui"
 import {Star, Trash2} from "lucide-react"
 
 import type {TonClient} from "../api/client"
@@ -9,7 +9,6 @@ import {loadJettonWalletsWithMasters, sortJettonWalletsByAmount} from "../api/je
 import type {JettonWallet} from "../api/types"
 import {AddressChip} from "../components/AddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
-import {InlineActionButton, InlineActionGroup} from "../components/InlineActionButton"
 import {WalletAccountSummary, type AccountBalanceState} from "../components/WalletAccountSummary"
 import {normalizeAddress, toRawAddress} from "../components/utils"
 import {useAddressBook} from "../hooks/useAddressBook"
@@ -185,7 +184,16 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                 {favorites.map(favorite => (
                   <tr key={favorite.address} className={styles.tableRow}>
                     <td className={styles.accountCell}>
-                      <InlineActionGroup>
+                      <InlineActions
+                        visibility="always"
+                        actions={
+                          <InlineAction
+                            label="Remove from favorites"
+                            icon={<Trash2 />}
+                            onClick={() => handleRemove(favorite)}
+                          />
+                        }
+                      >
                         <AddressChip
                           address={favorite.address}
                           fallback="Account"
@@ -194,16 +202,7 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                             openPath(routes.addressPath(address), event)
                           }
                         />
-                        <InlineActionButton
-                          type="button"
-                          variant="danger"
-                          onClick={() => handleRemove(favorite)}
-                          aria-label="Remove from favorites"
-                          title="Remove from favorites"
-                        >
-                          <Trash2 size={13} />
-                        </InlineActionButton>
-                      </InlineActionGroup>
+                      </InlineActions>
                     </td>
                     <td className={styles.balanceCell}>
                       <WalletAccountSummary

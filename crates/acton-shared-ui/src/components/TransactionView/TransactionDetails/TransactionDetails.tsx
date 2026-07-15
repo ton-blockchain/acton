@@ -1,10 +1,10 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
-import {FiChevronDown, FiChevronUp} from "react-icons/fi"
 import {
   buildStorageDiff,
   ContractChip,
   CopyInlineButton,
+  DisclosureToggle,
   ExitCodeChip,
   InfoPopover,
   OpcodeChip,
@@ -506,19 +506,13 @@ export function TransactionDetails({
               <div className={styles.parsedBodySection}>
                 <div className={styles.parsedBodyTitle}>
                   State Init
-                  <button
-                    type="button"
+                  <DisclosureToggle
+                    expanded={showStateInit}
+                    contextLabel="state init"
                     onClick={() => {
-                      setShowStateInit(!showStateInit)
+                      setShowStateInit(expanded => !expanded)
                     }}
-                    className={styles.actionsToggleButton}
-                    aria-label={showStateInit ? "Hide state init" : "Show state init"}
-                  >
-                    {showStateInit ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                    <span className={styles.actionsToggleText}>
-                      {showStateInit ? "Hide" : "Show"}
-                    </span>
-                  </button>
+                  />
                 </div>
                 {showStateInit && (
                   <div className={styles.stateInitSection}>
@@ -577,25 +571,13 @@ export function TransactionDetails({
                       <div className={styles.stateInitField}>
                         <div className={styles.stateInitFieldTitle}>
                           <span className={styles.multiColumnItemTitle}>Code</span>
-                          <button
-                            type="button"
+                          <DisclosureToggle
+                            expanded={showStateInitCode}
+                            contextLabel="state init code"
                             onClick={() => {
-                              setShowStateInitCode(!showStateInitCode)
+                              setShowStateInitCode(expanded => !expanded)
                             }}
-                            className={styles.actionsToggleButton}
-                            aria-label={
-                              showStateInitCode ? "Hide state init code" : "Show state init code"
-                            }
-                          >
-                            {showStateInitCode ? (
-                              <FiChevronUp size={14} />
-                            ) : (
-                              <FiChevronDown size={14} />
-                            )}
-                            <span className={styles.actionsToggleText}>
-                              {showStateInitCode ? "Hide" : "Show"}
-                            </span>
-                          </button>
+                          />
                           {stateInitCodeBocHex && (
                             <CopyInlineButton
                               className={styles.fieldCopyButton}
@@ -648,35 +630,23 @@ export function TransactionDetails({
               )}
             </div>
             {!storageDiff && canLoadStorage && (
-              <button
-                type="button"
+              <DisclosureToggle
+                expanded={false}
+                contextLabel="storage state change"
+                showLabel="Load"
+                loadingLabel="Loading"
+                loading={isLoadingStorage}
                 onClick={() => void handleStorageLoad()}
-                className={`${styles.actionsToggleButton} ${styles.storageToggleButton}`}
-                aria-label="Load storage state change"
-                disabled={isLoadingStorage}
-              >
-                <FiChevronDown size={14} />
-                <span className={styles.actionsToggleText}>
-                  {isLoadingStorage ? "Loading" : "Load"}
-                </span>
-              </button>
+              />
             )}
             {storageDiff && (
-              <button
-                type="button"
+              <DisclosureToggle
+                expanded={showStorageDiff}
+                contextLabel="storage state change"
                 onClick={() => {
                   setExpandedStorageLt(showStorageDiff ? undefined : tx.lt)
                 }}
-                className={`${styles.actionsToggleButton} ${styles.storageToggleButton}`}
-                aria-label={
-                  showStorageDiff ? "Hide storage state change" : "Show storage state change"
-                }
-              >
-                {showStorageDiff ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                <span className={styles.actionsToggleText}>
-                  {showStorageDiff ? "Hide" : "Show"}
-                </span>
-              </button>
+              />
             )}
           </div>
 
@@ -834,18 +804,12 @@ export function TransactionDetails({
                 <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
                   {fmt.formatNumber(actionPhase.totalActions)}
                   {canToggleActions && (
-                    <button
-                      type="button"
+                    <DisclosureToggle
+                      expanded={showActions}
+                      contextLabel="actions"
+                      loading={isLoadingActions}
                       onClick={() => void handleActionsToggle()}
-                      className={styles.actionsToggleButton}
-                      aria-label={showActions ? "Hide actions" : "Show actions"}
-                      disabled={isLoadingActions}
-                    >
-                      {showActions ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
-                      <span className={styles.actionsToggleText}>
-                        {isLoadingActions ? "Loading" : showActions ? "Hide" : "Show"}
-                      </span>
-                    </button>
+                    />
                   )}
                 </div>
               </div>
