@@ -214,48 +214,6 @@
   background: transparent !important;
 }
 
-.valueFlowPanel > div {
-  background: transparent;
-}
-
-.valueFlowPanel > div > div:first-child {
-  min-height: 44px;
-  padding: 0 20px;
-  align-items: center;
-  background: transparent;
-  border-bottom: 1px solid var(--tonscan-border);
-  color: var(--tonscan-text-secondary) !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.valueFlowPanel > div > div:first-child > div {
-  font-size: var(--font-size-xs) !important;
-  font-weight: var(--font-weight-medium) !important;
-  letter-spacing: 0.05em;
-}
-
-.valueFlowPanel > div > div:not(:first-child) {
-  padding: 12px 20px;
-  border-bottom: 0;
-}
-
-.valueFlowPanel[data-show-total="true"] > div > div:not(:first-child):not(:last-child) {
-  border-bottom: 0;
-}
-
-.valueFlowPanel[data-show-total="true"] > div > div:last-child {
-  min-height: 0;
-  margin: 0 20px;
-  padding: 12px 0;
-  border-bottom: 0;
-}
-
-.valueFlowPanel:not([data-show-total="true"]) > div > div:last-child {
-  border-bottom: 0;
-}
-
 .detailsList {
   display: flex;
   flex-direction: column;

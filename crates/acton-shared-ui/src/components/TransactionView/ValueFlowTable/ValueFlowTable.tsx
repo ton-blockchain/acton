@@ -1,4 +1,14 @@
 import type React from "react"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableFooter,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableTable,
+} from "@acton/ui"
 
 import type {ContractData, ValueFlowItem} from "@/types/transaction"
 import {formatCurrency} from "@/utils/format"
@@ -40,46 +50,50 @@ export function ValueFlowTable({
   })
 
   return (
-    <div
-      className={
-        className ? `${styles.valueFlowContainer} ${className}` : styles.valueFlowContainer
-      }
-      data-show-total={showTotal ? "true" : undefined}
-    >
-      <div className={styles.flowList}>
-        <div className={styles.flowHeader}>
-          <div className={styles.flowCol}>Account</div>
-          <div className={`${styles.flowCol} ${styles.amountCol}`}>Balance Change</div>
-          <div className={`${styles.flowCol} ${styles.feeCol}`}>Network Fee</div>
-        </div>
-        {sortedItems.map(item => (
-          <div key={item.address} className={styles.flowRow}>
-            <div className={styles.flowCol}>
-              <ContractChip
-                address={item.address}
-                contracts={contracts}
-                onContractClick={onContractClick}
-              />
-            </div>
-            <div
-              className={`${styles.flowCol} ${styles.amountCol} ${item.change > 0n ? styles.positive : item.change < 0n ? styles.negative : ""}`}
-            >
-              <div className={styles.changeValue}>{formatSignedCurrency(item.change)}</div>
-            </div>
-            <div className={`${styles.flowCol} ${styles.feeCol}`}>{formatCurrency(item.fee)}</div>
-          </div>
-        ))}
+    <DataTable className={className} minWidth="34rem">
+      <DataTableTable aria-label="Value flow">
+        <DataTableHead>
+          <DataTableRow>
+            <DataTableHeaderCell columnWidth="34%">Account</DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="33%">
+              Balance Change
+            </DataTableHeaderCell>
+            <DataTableHeaderCell align="right" columnWidth="33%">
+              Network Fee
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {sortedItems.map(item => (
+            <DataTableRow key={item.address}>
+              <DataTableCell>
+                <ContractChip
+                  address={item.address}
+                  contracts={contracts}
+                  onContractClick={onContractClick}
+                />
+              </DataTableCell>
+              <DataTableCell align="right">
+                <span className={item.change > 0n ? styles.positive : undefined}>
+                  {formatSignedCurrency(item.change)}
+                </span>
+              </DataTableCell>
+              <DataTableCell align="right">{formatCurrency(item.fee)}</DataTableCell>
+            </DataTableRow>
+          ))}
+        </DataTableBody>
         {showTotal && (
-          <div className={styles.flowFooter}>
-            <div className={styles.flowCol} />
-            <div className={styles.flowCol} />
-            <div className={`${styles.flowCol} ${styles.feeCol} ${styles.totalFee}`}>
-              Total: {formatCurrency(totalFee)}
-            </div>
-          </div>
+          <DataTableFooter>
+            <DataTableRow>
+              <DataTableCell colSpan={2} />
+              <DataTableCell align="right" className={styles.totalCell} tone="strong">
+                Total: {formatCurrency(totalFee)}
+              </DataTableCell>
+            </DataTableRow>
+          </DataTableFooter>
         )}
-      </div>
-    </div>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
