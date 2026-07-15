@@ -157,6 +157,3 @@ body {
     background-color var(--transition-duration-normal),
     color var(--transition-duration-normal);
 }
-
-/* Global Tooltip Overrides for Tonscan style */
-/* We will use specific class names instead of global overrides with !important */

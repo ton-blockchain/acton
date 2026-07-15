@@ -24,7 +24,7 @@ import {
   SkipForward,
 } from "lucide-react"
 
-import {CopyValueButton, Tooltip, type ContractData} from "@acton/shared-ui"
+import {CopyValueButton, type ContractData} from "@acton/shared-ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -37,7 +37,8 @@ import type {
 } from "../../../../api/types"
 import {normalizeAddress} from "../../../../components/utils"
 import {useAddressFormat} from "../../../../hooks/useNetworkInfo"
-import {useLineExecutionData, useTraceStepper} from "../../hooks"
+import {useLineExecutionData} from "../../hooks/useLineExecutionData"
+import {useTraceStepper} from "../../hooks/useTraceStepper"
 import {findAddressContract, isTonAddress} from "../../lib/addressContracts"
 import {formatExitCode} from "../../lib/exitCodeFormatting"
 import type {ExitCode, RetraceResultAndCode} from "../../lib/types"
@@ -1460,14 +1461,11 @@ function RetraceWorkspaceFc({
 
           {stateUpdateHashOk === false && (
             <div className={styles.statusContainer} role="status" aria-live="polite">
-              <Tooltip
-                content={
-                  "Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
-                }
-                placement="bottom"
-              >
-                <StatusBadge type="warning" text="Trace Incomplete" />
-              </Tooltip>
+              <StatusBadge
+                type="warning"
+                text="Trace Incomplete"
+                popoverContent="Because the transaction runs in a local sandbox, we can't always reproduce it exactly. Sandbox replay was incomplete, and some values may differ from those on the real blockchain."
+              />
             </div>
           )}
         </div>

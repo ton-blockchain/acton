@@ -1,7 +1,6 @@
 import type React from "react"
 
-import {getStandardExitCodeInfo} from "@acton/ui"
-import {Tooltip} from "@acton/shared-ui"
+import {getStandardExitCodeInfo, Popover} from "@acton/ui"
 
 import styles from "./StatusBadge.module.css"
 
@@ -11,9 +10,10 @@ export interface StatusBadgeProps {
   readonly type: StatusType
   readonly text?: string
   readonly exitCode?: number
+  readonly popoverContent?: React.ReactNode
 }
 
-const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
+const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode, popoverContent}) => {
   const getAriaLabel = () => {
     const statusText = text ?? type
     switch (type) {
@@ -38,7 +38,12 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
       </div>
     )
     return (
-      <Tooltip content={tooltipContent} placement="bottom">
+      <Popover
+        ariaLabel={`Explain ${getAriaLabel()}`}
+        closeDelay={0}
+        content={tooltipContent}
+        placement="bottom"
+      >
         <span
           className={styles.statusSuccess}
           role="status"
@@ -70,7 +75,7 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
           </svg>
           {text ?? "Success"}
         </span>
-      </Tooltip>
+      </Popover>
     )
   }
   if (type === "failed") {
@@ -96,7 +101,12 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
       </div>
     )
     return (
-      <Tooltip content={tooltipContent} placement="bottom">
+      <Popover
+        ariaLabel={`Explain ${getAriaLabel()}`}
+        closeDelay={0}
+        content={tooltipContent}
+        placement="bottom"
+      >
         <span
           className={styles.statusFailed}
           role="status"
@@ -135,11 +145,11 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
           </svg>
           {text ?? "Failed"}
         </span>
-      </Tooltip>
+      </Popover>
     )
   }
   if (type === "warning") {
-    return (
+    const badge = (
       <span
         className={styles.statusWarning}
         role="status"
@@ -163,6 +173,21 @@ const StatusBadge: React.FC<StatusBadgeProps> = ({type, text, exitCode}) => {
         </svg>
         {text ?? "Warning"}
       </span>
+    )
+
+    if (!popoverContent) {
+      return badge
+    }
+
+    return (
+      <Popover
+        ariaLabel={`Explain ${getAriaLabel()}`}
+        closeDelay={0}
+        content={popoverContent}
+        placement="bottom"
+      >
+        {badge}
+      </Popover>
     )
   }
 
