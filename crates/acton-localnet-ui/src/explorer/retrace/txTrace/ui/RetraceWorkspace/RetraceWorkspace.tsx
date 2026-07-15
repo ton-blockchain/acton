@@ -24,7 +24,8 @@ import {
   SkipForward,
 } from "lucide-react"
 
-import {CopyValueButton, type ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/shared-ui"
+import {CopyInlineAction} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
@@ -494,7 +495,13 @@ function SourceVariableValue({value, label}: {readonly value: string; readonly l
   return (
     <span className={styles.sourceVariableValueWrap}>
       <span className={styles.sourceVariableValue}>{value}</span>
-      <CopyValueButton className={styles.sourceVariableCopyButton} value={value} label={label} />
+      <CopyInlineAction
+        className={styles.sourceVariableCopyButton}
+        value={value}
+        label={`Copy ${label}`}
+        copiedLabel={`Copied ${label}`}
+        size="compact"
+      />
     </span>
   )
 }

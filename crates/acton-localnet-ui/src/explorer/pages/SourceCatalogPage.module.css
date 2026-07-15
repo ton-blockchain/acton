@@ -274,38 +274,16 @@
 }
 
 .hashCopyButton {
-  width: 20px;
-  height: 20px;
   flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--tonscan-text-secondary, var(--litenode-text-muted));
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition:
-    color 120ms ease,
-    opacity 120ms ease;
+  transition: opacity 120ms ease;
 }
 
 .codeHashCell:hover .hashCopyButton,
 .codeHashCell:focus-within .hashCopyButton {
   opacity: 1;
   pointer-events: auto;
-}
-
-.hashCopyButton:hover {
-  color: var(--litenode-text);
-}
-
-.hashCopyButton:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
 }
 
 .empty {

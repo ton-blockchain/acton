@@ -134,7 +134,7 @@ Status: ready
 Import:
 
 ```tsx
-import { InlineButton } from "@acton/ui"
+import { CopyInlineButton, InlineButton } from "@acton/ui"
 ```
 
 Use InlineButton for embedded command actions inside rows, cards, details
@@ -157,12 +157,30 @@ draw a boxed control surface.
 - Accent
 - Danger
 - Embedded row context
+- Copy feedback (`CopyInlineButton`)
+
+### Copy Actions
+
+Use `CopyInlineButton` for a text-and-icon copy command. It composes
+`InlineButton` with the `utility` variant, copies `value`, switches to a check
+icon and `Copied` text, and resets after 2000ms by default.
+
+```tsx
+<CopyInlineButton
+  value={rawMessage}
+  label="Copy raw message"
+  copiedLabel="Copied raw message"
+>
+  Copy raw message
+</CopyInlineButton>
+```
 
 ### Agent Guidance
 
 - Prefer `InlineButton` for Debug-style actions inside existing content.
 - Use `utility` for compact text+icon commands such as `Copy raw body` or
   `Copy raw state init`.
+- Use `CopyInlineButton` instead of wiring clipboard and copied state by hand.
 - Keep `utility` visually smaller than the default/accent variants; it should
   feel like an inline caption action, not a regular button.
 - Pair `accent` with a small lucide icon when the action benefits from quick

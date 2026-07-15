@@ -164,20 +164,9 @@
 
 .sectionCopyButton,
 .fieldCopyButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  width: auto;
-  height: 1rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: color 0.15s ease;
+  transition: opacity var(--transition-duration-fast) ease;
 }
 
 .fieldCopyButton {
@@ -198,29 +187,6 @@
 .fieldCopyButton:focus-visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.sectionCopyButton:hover,
-.sectionCopyButton:focus-visible,
-.fieldCopyButton:hover,
-.fieldCopyButton:focus-visible {
-  color: var(--text-primary);
-  outline: none;
-}
-
-.sectionCopyButton svg,
-.fieldCopyButton svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
-
-.sectionCopyButton span,
-.fieldCopyButton span {
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  white-space: nowrap;
 }
 
 .multiColumnRow {

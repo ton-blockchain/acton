@@ -3,7 +3,8 @@ import type {StackElement} from "@ton/tasm/dist/trace"
 import {Cell} from "@ton/core"
 import {motion, AnimatePresence, type Variants} from "framer-motion"
 
-import {CopyValueButton, type ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/shared-ui"
+import {CopyInlineAction} from "@acton/ui"
 
 import {formatAddress} from "../../../../../components/utils"
 import {useAddressFormat} from "../../../../../hooks/useNetworkInfo"
@@ -157,9 +158,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
         return (
           <div className={styles.integerItem} key={keyPrefix}>
             {value} <span className={styles.integerItemHexValue}>({hexPresentation})</span>
-            <CopyValueButton
+            <CopyInlineAction
               className={styles.integerItemCopyButton}
-              label="integer value"
+              label="Copy integer value"
+              copiedLabel="Copied integer value"
+              size="compact"
               value={value.toString()}
             />
           </div>
@@ -186,9 +189,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
               <div className={styles.stackItemDetails}>
                 Bits: {cell.bits.length}, Refs: {cell.refs.length}
               </div>
-              <CopyValueButton
+              <CopyInlineAction
                 className={styles.cellItemCopyButton}
-                label="cell as BoC"
+                label="Copy cell as BoC"
+                copiedLabel="Copied cell as BoC"
+                size="compact"
                 value={element.boc}
               />
             </div>
@@ -217,9 +222,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
                 tabIndex={0}
               >
                 {renderAddressContent(readable, keyPrefix, contract)}
-                <CopyValueButton
+                <CopyInlineAction
                   className={styles.addressItemCopyButton}
-                  label="address"
+                  label="Copy address"
+                  copiedLabel="Copied address"
+                  size="compact"
                   value={readable}
                 />
               </div>
@@ -243,9 +250,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
                 : expandedItem === keyPrefix
                   ? element.hex
                   : truncateMiddle(element.hex, 35)}
-              <CopyValueButton
+              <CopyInlineAction
                 className={styles.sliceItemCopyButton}
-                label="slice as BoC"
+                label="Copy slice as BoC"
+                copiedLabel="Copied slice as BoC"
+                size="compact"
                 value={element.hex}
               />
             </div>
@@ -278,9 +287,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             <div className={styles.stackItemDetails}>
               Bits: {cell.bits.length}, Refs: {cell.refs.length}
             </div>
-            <CopyValueButton
+            <CopyInlineAction
               className={styles.builderItemCopyButton}
-              label="builder as BoC"
+              label="Copy builder as BoC"
+              copiedLabel="Copied builder as BoC"
+              size="compact"
               value={element.hex}
             />
           </div>
@@ -302,9 +313,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             <div className={styles.stackItemValue}>
               {expandedItem === keyPrefix ? element.name : truncateMiddle(element.name, 35)}
             </div>
-            <CopyValueButton
+            <CopyInlineAction
               className={styles.continuationItemCopyButton}
-              label="continuation"
+              label="Copy continuation"
+              copiedLabel="Copied continuation"
+              size="compact"
               value={element.name}
             />
             {expandedItem === keyPrefix && (
@@ -337,9 +350,11 @@ const StackViewer: React.FC<StackViewerProps> = ({stack, title, contracts, onSta
             tabIndex={0}
           >
             {renderAddressContent(readable, keyPrefix, contract)}
-            <CopyValueButton
+            <CopyInlineAction
               className={styles.addressItemCopyButton}
-              label="address"
+              label="Copy address"
+              copiedLabel="Copied address"
+              size="compact"
               value={readable}
             />
           </div>

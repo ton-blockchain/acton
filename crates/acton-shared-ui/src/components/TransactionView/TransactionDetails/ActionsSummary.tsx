@@ -1,6 +1,7 @@
 import type {OutAction} from "@ton/core"
 import {
   ChangeLibraryModeViewer,
+  CopyInlineButton,
   ExitCodeChip,
   OpcodeChip,
   parseReserveMode,
@@ -22,7 +23,6 @@ import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/u
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
-import {CopyValueButton} from "../CopyValueButton"
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {
   formatCellBocHex,
@@ -238,12 +238,14 @@ const renderActionDetails = (
   const contractAbi = contract?.abi
   const rawActionBocHex = formatOutActionBocHex(action)
   const copyRawActionButton = (
-    <CopyValueButton
+    <CopyInlineButton
       className={styles.detailsCopyButton}
       value={rawActionBocHex}
-      label="raw action"
-      caption="Copy raw action"
-    />
+      label="Copy raw action"
+      copiedLabel="Copied raw action"
+    >
+      Copy raw action
+    </CopyInlineButton>
   )
 
   switch (action.type) {
@@ -354,25 +356,31 @@ const renderActionDetails = (
               >
                 {parsedBody && (
                   <div className={styles.messageDataCopyActions}>
-                    <CopyValueButton
+                    <CopyInlineButton
                       className={styles.messageDataCopyButton}
                       value={messageBocHex}
-                      label="raw message"
-                      caption="Copy raw message"
-                    />
-                    <CopyValueButton
+                      label="Copy raw message"
+                      copiedLabel="Copied raw message"
+                    >
+                      Copy raw message
+                    </CopyInlineButton>
+                    <CopyInlineButton
                       className={styles.messageDataCopyButton}
                       value={messageBodyBocHex}
-                      label="raw data"
-                      caption="Copy raw body"
-                    />
+                      label="Copy raw data"
+                      copiedLabel="Copied raw data"
+                    >
+                      Copy raw body
+                    </CopyInlineButton>
                     {stateInitBocHex && (
-                      <CopyValueButton
+                      <CopyInlineButton
                         className={styles.messageDataCopyButton}
                         value={stateInitBocHex}
-                        label="raw state init"
-                        caption="Copy raw state init"
-                      />
+                        label="Copy raw state init"
+                        copiedLabel="Copied raw state init"
+                      >
+                        Copy raw state init
+                      </CopyInlineButton>
                     )}
                   </div>
                 )}

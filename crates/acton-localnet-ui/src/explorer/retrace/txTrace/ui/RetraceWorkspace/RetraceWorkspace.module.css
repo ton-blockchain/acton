@@ -709,27 +709,10 @@
   right: 0;
   bottom: 0;
   z-index: 2;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 18px;
   margin: auto 0;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  color: var(--tonscan-text-secondary);
-  background: transparent;
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition:
-    opacity var(--transition-duration-fast),
-    color var(--transition-duration-fast);
-}
-
-.sourceVariableCopyButton:hover {
-  color: var(--tonscan-text-primary);
+  transition: opacity var(--transition-duration-fast);
 }
 
 .sourceVariableRow:hover .sourceVariableCopyButton,

@@ -1,7 +1,6 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
-import {useToast} from "@acton/ui"
-import {CopyValueButton} from "@acton/shared-ui"
+import {CopyInlineAction, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 
 import type {
@@ -218,10 +217,12 @@ export const SourceCatalogPage: FC = () => {
                           <span className={styles.codeHash} title={entry.codeHash}>
                             {shortCodeHash(entry.codeHash)}
                           </span>
-                          <CopyValueButton
+                          <CopyInlineAction
                             className={styles.hashCopyButton}
                             value={entry.codeHash}
-                            label="code hash"
+                            label="Copy code hash"
+                            copiedLabel="Copied code hash"
+                            size="compact"
                           />
                         </div>
                       </td>

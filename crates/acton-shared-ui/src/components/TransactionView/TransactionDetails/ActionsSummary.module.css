@@ -135,20 +135,9 @@
 
 .detailsCopyButton,
 .messageDataCopyButton {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.25rem;
-  width: auto;
-  height: 1rem;
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--text-secondary);
-  cursor: pointer;
   opacity: 0;
   pointer-events: none;
-  transition: color 0.15s ease;
+  transition: opacity var(--transition-duration-fast) ease;
 }
 
 .actionDetails:hover .detailsCopyButton,
@@ -159,29 +148,6 @@
 .messageDataCopyButton:focus-visible {
   opacity: 1;
   pointer-events: auto;
-}
-
-.detailsCopyButton:hover,
-.detailsCopyButton:focus-visible,
-.messageDataCopyButton:hover,
-.messageDataCopyButton:focus-visible {
-  color: var(--text-primary);
-  outline: none;
-}
-
-.detailsCopyButton svg,
-.messageDataCopyButton svg {
-  display: block;
-  width: 12px;
-  height: 12px;
-}
-
-.detailsCopyButton span,
-.messageDataCopyButton span {
-  font-size: 0.6875rem;
-  font-weight: var(--font-weight-medium);
-  line-height: 1;
-  white-space: nowrap;
 }
 
 .failureBadge {

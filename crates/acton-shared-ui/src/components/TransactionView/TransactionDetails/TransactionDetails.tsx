@@ -1,7 +1,14 @@
 import * as React from "react"
 import {useEffect, useRef, useState} from "react"
 import {FiChevronDown, FiChevronUp} from "react-icons/fi"
-import {ExitCodeChip, InfoPopover, OpcodeChip, RawDataBlock, SendModeViewer} from "@acton/ui"
+import {
+  CopyInlineButton,
+  ExitCodeChip,
+  InfoPopover,
+  OpcodeChip,
+  RawDataBlock,
+  SendModeViewer,
+} from "@acton/ui"
 
 import type {BackendContractInfo, SourceLocation} from "@/types"
 import type {
@@ -24,7 +31,6 @@ import {
 
 import {ParsedBodySection} from "../ParsedBodySection/ParsedBodySection"
 import {ContractChip} from "../ContractChip/ContractChip"
-import {CopyValueButton} from "../CopyValueButton"
 import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
 import {StorageDiffView} from "../TransactionTree/StorageDiffView"
 import {buildStorageDiff} from "../TransactionTree/storageDiff"
@@ -75,13 +81,15 @@ function renderSectionCopyActions(
   return (
     <div className={styles.sectionCopyActions}>
       {availableActions.map(action => (
-        <CopyValueButton
+        <CopyInlineButton
           key={action.label}
           className={styles.sectionCopyButton}
           value={action.value}
-          label={action.label}
-          caption={action.caption}
-        />
+          label={`Copy ${action.label}`}
+          copiedLabel={`Copied ${action.label}`}
+        >
+          {action.caption}
+        </CopyInlineButton>
       ))}
     </div>
   )
@@ -539,12 +547,14 @@ export function TransactionDetails({
                         <div className={styles.stateInitFieldTitle}>
                           <span className={styles.multiColumnItemTitle}>Data</span>
                           {parsedStateInitData && stateInitDataBocHex && (
-                            <CopyValueButton
+                            <CopyInlineButton
                               className={styles.fieldCopyButton}
                               value={stateInitDataBocHex}
-                              label="state data BoC"
-                              caption="Copy BoC"
-                            />
+                              label="Copy state data BoC"
+                              copiedLabel="Copied state data BoC"
+                            >
+                              Copy BoC
+                            </CopyInlineButton>
                           )}
                         </div>
                         {parsedStateInitData ? (
@@ -587,12 +597,14 @@ export function TransactionDetails({
                             </span>
                           </button>
                           {stateInitCodeBocHex && (
-                            <CopyValueButton
+                            <CopyInlineButton
                               className={styles.fieldCopyButton}
                               value={stateInitCodeBocHex}
-                              label="state code BoC"
-                              caption="Copy BoC"
-                            />
+                              label="Copy state code BoC"
+                              copiedLabel="Copied state code BoC"
+                            >
+                              Copy BoC
+                            </CopyInlineButton>
                           )}
                         </div>
                         {showStateInitCode && (

@@ -1,4 +1,9 @@
-import {ACTON_INLINE_BUTTON_VARIANTS, InlineButton, type ActonInlineButtonVariant} from "@acton/ui"
+import {
+  ACTON_INLINE_BUTTON_VARIANTS,
+  CopyInlineButton,
+  InlineButton,
+  type ActonInlineButtonVariant,
+} from "@acton/ui"
 import {ArrowRight, Bug, Copy, Trash2} from "lucide-react"
 
 import styles from "./inlineButtonGallery.module.css"
@@ -94,14 +99,14 @@ function UtilityCopyTable() {
                 <span className={styles.utilityValue}>{row.value}</span>
                 <span className={styles.utilityActions}>
                   {row.actions.map(action => (
-                    <InlineButton
+                    <CopyInlineButton
                       key={action}
-                      variant="utility"
-                      leadingIcon={<Copy {...utilityIconProps} aria-hidden="true" />}
-                      title={action}
+                      value={`${row.label}: ${row.value}`}
+                      label={action}
+                      copiedLabel={`${action} copied`}
                     >
                       {action}
-                    </InlineButton>
+                    </CopyInlineButton>
                   ))}
                 </span>
               </div>
@@ -119,12 +124,13 @@ export const inlineButtonGallery = {
   status: "ready",
   summary:
     "InlineButton is an embedded action-link for dense rows, metadata blocks, and tool surfaces. It keeps button semantics without drawing a boxed control.",
-  importStatement: 'import { InlineButton } from "@acton/ui"',
+  importStatement: 'import { CopyInlineButton, InlineButton } from "@acton/ui"',
   agentSummary:
     "Use InlineButton for Debug-style actions inside existing content. Do not use Button plus custom classes for inline command links.",
   usage: [
     "Use inside rows, cards, details panels, and compact metadata groups.",
     "Use utility for compact copy/reveal/raw-data actions with a text label.",
+    "Use CopyInlineButton when a utility copy action needs copied feedback.",
     "Use accent for debug, inspect, reveal, or related tool actions.",
     "Keep the label short and pair with a small lucide icon when the action benefits from recognition.",
   ],

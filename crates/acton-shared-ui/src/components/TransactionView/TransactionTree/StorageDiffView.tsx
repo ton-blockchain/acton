@@ -1,10 +1,9 @@
 import type React from "react"
 
-import {VisuallyGroupedNumber} from "@acton/ui"
+import {CopyInlineAction, VisuallyGroupedNumber} from "@acton/ui"
 import type {ContractData} from "@/types/transaction"
 
 import {ContractChip} from "../ContractChip/ContractChip"
-import {CopyValueButton} from "../CopyValueButton"
 import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "../scalarDisplay"
 
 import styles from "./StorageDiffView.module.css"
@@ -88,7 +87,13 @@ function renderLeafValue(
         return (
           <span className={styles.storageLeafWithActions}>
             {valueElement}
-            <CopyValueButton className={styles.copyButton} value={value.rawValue} />
+            <CopyInlineAction
+              className={styles.copyButton}
+              value={value.rawValue}
+              label="Copy full BOC hex"
+              copiedLabel="Copied full BOC hex"
+              size="compact"
+            />
           </span>
         )
       }

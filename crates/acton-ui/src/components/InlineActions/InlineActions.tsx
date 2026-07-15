@@ -1,12 +1,8 @@
-import {
-  useEffect,
-  useState,
-  type ComponentPropsWithRef,
-  type MouseEvent,
-  type ReactNode,
-} from "react"
+import {Check, Copy} from "lucide-react"
+import type {ComponentPropsWithRef, MouseEvent, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
+import {useCopyValue} from "../../lib/useCopyValue"
 import styles from "./InlineActions.module.css"
 import type {ACTON_INLINE_ACTIONS_VISIBILITY, ACTON_INLINE_ACTION_VARIANTS} from "./constants"
 
@@ -25,9 +21,9 @@ export type InlineActionProps = Readonly<
 
 export type CopyInlineActionProps = Readonly<
   Omit<InlineActionProps, "aria-label" | "icon" | "label" | "onClick" | "title" | "type"> & {
-    readonly copiedIcon: ReactNode
+    readonly copiedIcon?: ReactNode
     readonly copiedLabel?: string
-    readonly icon: ReactNode
+    readonly icon?: ReactNode
     readonly label?: string
     readonly onCopy?: (value: string) => Promise<void> | void
     readonly onCopyError?: (error: unknown) => void
@@ -93,9 +89,9 @@ export function InlineAction({
 }
 
 export function CopyInlineAction({
-  copiedIcon,
+  copiedIcon = <Check />,
   copiedLabel = "Copied",
-  icon,
+  icon = <Copy />,
   label = "Copy",
   onCopy,
   onCopyError,
@@ -104,35 +100,12 @@ export function CopyInlineAction({
   value,
   ...props
 }: CopyInlineActionProps) {
-  const [isCopied, setIsCopied] = useState(false)
+  const {copy, isCopied} = useCopyValue({onCopy, onCopyError, resetDelay, value})
   const currentLabel = isCopied ? copiedLabel : label
-
-  // react-doctor-disable-next-line react-doctor/no-reset-all-state-on-prop-change -- avoids showing copied state for a new value
-  useEffect(() => {
-    setIsCopied(false)
-  }, [value])
-
-  useEffect(() => {
-    if (!isCopied || resetDelay <= 0) return
-
-    const timer = globalThis.setTimeout(() => setIsCopied(false), resetDelay)
-    return () => globalThis.clearTimeout(timer)
-  }, [isCopied, resetDelay])
 
   const handleClick = async (event: MouseEvent<HTMLButtonElement>) => {
     if (stopPropagation) event.stopPropagation()
-
-    try {
-      if (onCopy) {
-        await onCopy(value)
-      } else {
-        await navigator.clipboard.writeText(value)
-      }
-
-      setIsCopied(true)
-    } catch (error) {
-      onCopyError?.(error)
-    }
+    await copy()
   }
 
   return (
