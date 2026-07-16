@@ -602,8 +602,7 @@ const startFanoutGraphTestUi = async (): Promise<RunningActonUi> => {
 
 export const test = base.extend<TestFixtures, WorkerFixtures>({
   startedActonUi: [
-    // Playwright requires fixture functions to receive an object destructuring pattern.
-    // eslint-disable-next-line no-empty-pattern
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
     async ({}, use) => {
       const running = await startActonTestUi()
       try {
@@ -616,8 +615,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   startedFanoutGraphUi: [
-    // Playwright requires fixture functions to receive an object destructuring pattern.
-    // eslint-disable-next-line no-empty-pattern
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
     async ({}, use) => {
       const running = await startFanoutGraphTestUi()
       try {
@@ -630,8 +628,7 @@ export const test = base.extend<TestFixtures, WorkerFixtures>({
   ],
 
   startedProfiledActonUi: [
-    // Playwright requires fixture functions to receive an object destructuring pattern.
-    // eslint-disable-next-line no-empty-pattern
+    // biome-ignore lint/correctness/noEmptyPattern: Playwright requires an object destructuring pattern.
     async ({}, use) => {
       const running = await startActonTestUi({
         coverage: false,

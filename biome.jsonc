@@ -75,7 +75,6 @@
       },
       "correctness": {
         "preset": "all",
-        "noEmptyPattern": "off",
         "noNodejsModules": "off",
         "noSolidDestructuredProps": "off",
         "noUnresolvedImports": "off",
