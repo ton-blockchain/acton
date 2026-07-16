@@ -69,35 +69,6 @@
   text-transform: uppercase;
 }
 
-.connectInput {
-  box-sizing: border-box;
-  width: 100%;
-  height: 2.125rem;
-  min-width: 0;
-  padding: 0 var(--acton-space-3);
-  border: 1px solid var(--acton-color-border-control);
-  border-radius: var(--acton-radius-control);
-  background: var(--acton-color-surface-raised);
-  color: var(--acton-color-text);
-  font: inherit;
-  font-size: var(--acton-font-size-compact);
-  font-weight: var(--acton-font-weight-medium);
-  letter-spacing: 0;
-}
-
-.connectInput::placeholder {
-  color: var(--acton-color-text-subtle);
-}
-
-.connectInput:hover {
-  border-color: var(--acton-color-border-strong);
-}
-
-.connectInput:focus-visible {
-  outline: 1px solid var(--acton-color-focus-ring);
-  outline-offset: 2px;
-}
-
 .connectAction {
   justify-self: stretch;
 }

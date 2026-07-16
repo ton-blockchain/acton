@@ -2,7 +2,7 @@ import {Buffer} from "node:buffer"
 import {useEffect, useMemo, useState} from "react"
 import type {JSX, MouseEvent, ReactNode} from "react"
 
-import {HighlightedCode, RawDataBlock} from "@acton/ui"
+import {HighlightedCode, Input, RawDataBlock} from "@acton/ui"
 import {
   Address,
   Cell,
@@ -400,7 +400,9 @@ function AbiGetMethodItem({
                       <option value="true">true</option>
                     </select>
                   ) : (
-                    <input
+                    <Input
+                      size="sm"
+                      mono
                       id={inputId}
                       className={styles.abiArgInput}
                       value={argValues[index] ?? ""}

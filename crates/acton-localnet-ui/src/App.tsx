@@ -1,6 +1,6 @@
 import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
-import {ToastProvider} from "@acton/ui"
+import {Input, ToastProvider} from "@acton/ui"
 import type {ThemeMode} from "@acton/ui"
 import {
   Suspense,
@@ -547,23 +547,17 @@ const LocalnetAuthOverlay: FC<LocalnetAuthOverlayProps> = ({
             }
           }}
         >
-          <label className={styles.authLabel} htmlFor="localnet-api-token">
-            API token
-          </label>
-          <div className={styles.authInputFrame}>
-            <KeyRound size={17} aria-hidden="true" />
-            <input
-              ref={inputRef}
-              id="localnet-api-token"
-              className={styles.authInput}
-              type="password"
-              value={draftToken}
-              placeholder="Paste token"
-              onChange={event => setDraftToken(event.target.value)}
-              autoComplete="off"
-              spellCheck={false}
-            />
-          </div>
+          <Input
+            ref={inputRef}
+            id="localnet-api-token"
+            className={styles.authInput}
+            type="password"
+            label="API token"
+            leadingIcon={<KeyRound size={17} />}
+            value={draftToken}
+            placeholder="Paste token"
+            onChange={event => setDraftToken(event.target.value)}
+          />
 
           <div className={styles.authActions}>
             <button

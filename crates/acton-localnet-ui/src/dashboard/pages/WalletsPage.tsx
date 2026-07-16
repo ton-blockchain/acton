@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import {Link2, RefreshCw, Unplug} from "lucide-react"
-import {Button} from "@acton/ui"
+import {Button, Input} from "@acton/ui"
 
 import type {TonClient} from "../../explorer/api/client"
 import {
@@ -328,7 +328,8 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                       <label className={styles.connectInlineLabel} htmlFor="ton-connect-url">
                         Connect URL
                       </label>
-                      <input
+                      <Input
+                        size="sm"
                         id="ton-connect-url"
                         className={styles.connectInput}
                         value={tonConnectUrl}

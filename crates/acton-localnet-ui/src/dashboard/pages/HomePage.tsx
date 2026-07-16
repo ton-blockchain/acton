@@ -1,6 +1,6 @@
 import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
-import {Button, useToast} from "@acton/ui"
-import {Card, CardContent, CardHeader, CardTitle, Input} from "@acton/shared-ui"
+import {Button, Input, useToast} from "@acton/ui"
+import {Card, CardContent, CardHeader, CardTitle} from "@acton/shared-ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"

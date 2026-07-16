@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent, JSX} from "react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
-import {InlineAction, InlineActions, useToast} from "@acton/ui"
+import {InlineAction, InlineActions, Input, useToast} from "@acton/ui"
 import {CircleAlert, Plus, Trash2, Upload} from "lucide-react"
 import {Link, useParams} from "react-router-dom"
 
@@ -201,9 +201,11 @@ export const AbiCatalogPage: FC = () => {
                     <td colSpan={6}>
                       <form className={styles.abiInlineForm} onSubmit={handleAbiUpload}>
                         <div className={styles.formGrid}>
-                          <label className={styles.fieldLabel}>
+                          <label className={styles.fieldLabel} htmlFor="abi-display-name">
                             Display name
-                            <input
+                            <Input
+                              id="abi-display-name"
+                              size="sm"
                               className={styles.textInput}
                               value={abiName}
                               onChange={event => setAbiName(event.target.value)}
@@ -215,7 +217,8 @@ export const AbiCatalogPage: FC = () => {
                             <div className={styles.codeHashList}>
                               {abiCodeHashes.map((codeHash, index) => (
                                 <div key={index} className={styles.codeHashRow}>
-                                  <input
+                                  <Input
+                                    size="sm"
                                     className={styles.textInput}
                                     value={codeHash}
                                     onChange={event => updateAbiCodeHash(index, event.target.value)}

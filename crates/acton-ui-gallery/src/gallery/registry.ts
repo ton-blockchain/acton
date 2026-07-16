@@ -9,6 +9,7 @@ import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
+import {inputGallery} from "./inputGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
 import {inlineButtonGallery} from "./inlineButtonGallery"
 import {markdownTextGallery} from "./markdownTextGallery"
@@ -30,6 +31,7 @@ import type {ComponentGallery} from "./types"
 export const galleries = [
   tokensGallery,
   buttonGallery,
+  inputGallery,
   breadcrumbsGallery,
   inlineButtonGallery,
   inlineActionsGallery,

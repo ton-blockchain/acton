@@ -124,45 +124,12 @@
   gap: 9px;
 }
 
-.authLabel {
-  color: var(--litenode-text-subtle);
-  font-size: 0.78rem;
-  font-weight: 650;
-}
-
-.authInputFrame {
+.authInput {
   height: 42px;
-  min-width: 0;
-  padding: 0 11px;
-  border: 1px solid var(--litenode-border-control);
   border-radius: 12px;
   background: var(--litenode-surface);
-  color: var(--litenode-text-faint);
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  box-shadow: var(--litenode-inset-highlight);
-}
-
-.authInputFrame:focus-within {
-  border-color: var(--litenode-border-strong);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.authInput {
-  min-width: 0;
-  flex: 1 1 auto;
-  border: 0;
-  outline: 0;
-  padding: 0;
-  background: transparent;
   color: var(--litenode-text);
-  font-family: inherit;
   font-size: 0.9rem;
-}
-
-.authInput::placeholder {
-  color: var(--litenode-text-soft);
 }
 
 .authActions {

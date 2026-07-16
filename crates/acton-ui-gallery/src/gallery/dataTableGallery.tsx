@@ -11,6 +11,7 @@ import {
   DataTableSkeletonRows,
   DataTableTable,
   InlineButton,
+  Input,
 } from "@acton/ui"
 import {ExternalLink, Link2, RefreshCw, Unplug} from "lucide-react"
 import {useEffect, useRef, useState} from "react"
@@ -207,9 +208,9 @@ function SessionsSample() {
                 <label className={styles.connectLabel} htmlFor="gallery-ton-connect-url">
                   Connect URL
                 </label>
-                <input
+                <Input
+                  size="sm"
                   id="gallery-ton-connect-url"
-                  className={styles.connectInput}
                   placeholder="tonconnect://..."
                   aria-label="TON Connect URL"
                 />

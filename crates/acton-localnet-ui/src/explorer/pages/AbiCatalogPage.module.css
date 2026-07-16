@@ -53,23 +53,8 @@
 }
 
 .textInput {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  border-radius: 8px;
+  height: 38px;
   background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
-  font: inherit;
-  font-size: var(--font-size-sm);
-  font-weight: 400;
-  min-height: 38px;
-  padding: 0 10px;
-}
-
-.textInput:focus {
-  outline: none;
-  border-color: var(--litenode-focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--litenode-focus) 18%, transparent);
 }
 
 .primaryButton,

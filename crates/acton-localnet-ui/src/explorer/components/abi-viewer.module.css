@@ -376,27 +376,10 @@
 }
 
 .abiArgInput {
-  width: 100%;
-  min-height: 36px;
-  box-sizing: border-box;
   padding: 7px 9px;
-  border: 1px solid var(--tonscan-border);
-  border-radius: 8px;
-  outline: 0;
   background: var(--tonscan-card-bg);
-  color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.45;
-}
-
-.abiArgInput:focus-visible {
-  border-color: var(--tonscan-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tonscan-accent) 18%, transparent);
-}
-
-.abiArgInput::placeholder {
-  color: var(--tonscan-text-secondary);
 }
 
 .abiStackInput {

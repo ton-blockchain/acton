@@ -1,6 +1,5 @@
 import {ArrowUpRight, Check, ChevronDown, Coins, Loader2, X} from "lucide-react"
-import {Button, useToast} from "@acton/ui"
-import {Input} from "@acton/shared-ui"
+import {Button, Input, useToast} from "@acton/ui"
 import type {Address} from "@ton/core"
 import {useCallback, useEffect, useId, useMemo, useRef, useState} from "react"
 import type {FC, FormEvent, ReactNode} from "react"

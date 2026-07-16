@@ -1,5 +1,4 @@
 export * from "./components/ui/Card"
-export * from "./components/ui/Input"
 export * from "./components/ContractSourcePanel/ContractSourcePanel"
 export * from "./components/TransactionView/DisasmSection/DisasmSection"
 export * from "./components/TransactionView/TransactionDetails/TransactionDetails"

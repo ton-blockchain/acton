@@ -1,4 +1,4 @@
-import {Checkbox, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
+import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
 import type {ThemeMode} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
@@ -683,9 +683,11 @@ function NetworkDropdown({
                 }}
               >
                 <div className={styles.networkFormTitle}>{networkFormTitle}</div>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-name">
                   <span className={styles.networkFieldLabel}>Name</span>
-                  <input
+                  <Input
+                    id="custom-network-name"
+                    size="sm"
                     className={styles.networkInput}
                     value={customName}
                     onChange={event => setCustomName(event.target.value)}
@@ -693,9 +695,11 @@ function NetworkDropdown({
                     disabled={!isNetworkFormOpen}
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-v2-endpoint">
                   <span className={styles.networkFieldLabel}>V2 endpoint</span>
-                  <input
+                  <Input
+                    id="custom-network-v2-endpoint"
+                    size="sm"
                     className={styles.networkInput}
                     value={customV2Url}
                     onChange={event => setCustomV2Url(event.target.value)}
@@ -704,9 +708,11 @@ function NetworkDropdown({
                     required
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-v3-endpoint">
                   <span className={styles.networkFieldLabel}>V3 endpoint</span>
-                  <input
+                  <Input
+                    id="custom-network-v3-endpoint"
+                    size="sm"
                     className={styles.networkInput}
                     value={customV3Url}
                     onChange={event => setCustomV3Url(event.target.value)}
@@ -715,9 +721,11 @@ function NetworkDropdown({
                     required
                   />
                 </label>
-                <label className={styles.networkField}>
+                <label className={styles.networkField} htmlFor="custom-network-api-key">
                   <span className={styles.networkFieldLabel}>API key</span>
-                  <input
+                  <Input
+                    id="custom-network-api-key"
+                    size="sm"
                     type="password"
                     className={styles.networkInput}
                     value={customApiKey}

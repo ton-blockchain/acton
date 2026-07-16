@@ -432,41 +432,11 @@
 }
 
 .connectInput {
-  width: 100%;
   height: 34px;
-  border: 1px solid var(--litenode-border-control);
   border-radius: 9px;
   background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text);
-  font: inherit;
   font-size: 0.82rem;
   font-weight: 500;
-  line-height: 1;
-  padding: 0 11px;
-  box-sizing: border-box;
-  transition:
-    border-color 120ms ease,
-    box-shadow 120ms ease,
-    background-color 120ms ease;
-}
-
-.connectInput::placeholder {
-  color: var(--litenode-text-soft);
-}
-
-.connectInput:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong);
-}
-
-.connectInput:focus-visible {
-  outline: none;
-  border-color: var(--litenode-border-strong);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
-}
-
-.connectInput:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
 }
 
 .copyableAddress {

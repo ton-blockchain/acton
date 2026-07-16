@@ -260,6 +260,71 @@ row item.
   `Debug`.
 - Do not hide remove actions behind hover-only visibility.
 
+## Input
+
+Status: ready
+
+Import:
+
+```tsx
+import { Input } from "@acton/ui"
+```
+
+Use Input for standalone single-line form values, filters, editable names,
+amounts, endpoints, addresses, and code hashes. It keeps native input behavior
+and forwards native attributes and refs.
+
+### Composition
+
+```tsx
+<Input
+  label="Code hash"
+  description="Hex or base64 contract code hash."
+  mono
+  spellCheck={false}
+/>
+```
+
+- `size`: `sm`, `md`, or `lg`; `md` is the default.
+- `label`: optional accessible field label. Omit it when the caller already
+  renders a linked label.
+- `description`: optional neutral helper text linked with
+  `aria-describedby`.
+- `invalid`: applies validation styling and `aria-invalid` without owning an
+  error message.
+- `leadingIcon`: optional decorative icon for standard search, token, or
+  credential fields. The icon is hidden from assistive technology.
+- `mono`: uses the shared monospace stack for hashes, addresses, and other
+  technical values.
+- `fieldClassName`: layout hook for the optional label/description wrapper;
+  `className` always targets the native input.
+
+### States To Review Visually
+
+- Empty and populated
+- Hover and keyboard focus
+- Read-only and disabled
+- Invalid
+- Required label
+- Small, medium, and large
+- Search, password, number, and monospace values
+
+### Agent Guidance
+
+- Use Input for a single-line native input value.
+- Prefer the built-in label and description when no surrounding form field
+  owns them.
+- Use `invalid` or `aria-invalid` to expose validation state, then report the
+  actual validation or request failure through Toast.
+- Input defaults `autoComplete`, `autoCorrect`, and `autoCapitalize` to `off`,
+  and `spellCheck` to `false`, because most Acton values are technical. Override
+  them explicitly for credential, email, name, or prose-like fields.
+- Keep file inputs native and use Checkbox for boolean values.
+- Do not add leading icons, unit suffixes, or embedded buttons through absolute
+  positioning outside Input. Use `leadingIcon` for a single decorative icon;
+  unit suffixes and interactive actions belong in a dedicated InputGroup.
+- Do not add an inline error-message API to Input.
+
 ## ContractChip
 
 Status: ready
