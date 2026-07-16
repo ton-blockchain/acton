@@ -31,6 +31,7 @@
     "./components/parsed-value-diff-view": "./src/components/ParsedValueDiffView/index.ts",
     "./components/parsed-value-view": "./src/components/ParsedValueView/index.ts",
     "./components/raw-data-block": "./src/components/RawDataBlock/index.ts",
+    "./components/search-input": "./src/components/SearchInput/index.ts",
     "./components/skeleton": "./src/components/Skeleton/index.ts",
     "./components/theme-switch": "./src/components/ThemeSwitch/index.ts",
     "./components/toast": "./src/components/Toast/index.ts",

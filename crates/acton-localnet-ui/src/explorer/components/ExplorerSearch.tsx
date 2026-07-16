@@ -1,7 +1,8 @@
-import {useToast} from "@acton/ui"
-import {FileCode2, History, Search, X} from "lucide-react"
-import {useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {FC, KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent} from "react"
+import {SearchInput, useToast} from "@acton/ui"
+import type {SearchInputItem} from "@acton/ui"
+import {FileCode2, History, Search} from "lucide-react"
+import {useCallback, useEffect, useMemo, useState} from "react"
+import type {FC} from "react"
 import {useNavigate} from "react-router-dom"
 import type {NavigateFunction} from "react-router-dom"
 
@@ -20,8 +21,6 @@ import {formatAddress, hashToHex, parseAddress} from "./utils"
 import type {AddressFormatOptions} from "./utils"
 
 import {abiSymbolAnchorId} from "./abiAnchors"
-import styles from "./ExplorerSearch.module.css"
-
 type ExplorerSearchVariant = "hero" | "header"
 
 interface ExplorerSearchProps {
@@ -63,10 +62,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   const [input, setInput] = useState("")
   const [history, setHistory] = useState<readonly string[]>([])
   const [abiSearchIndex, setAbiSearchIndex] = useState<readonly AbiSearchIndexEntry[]>([])
-  const [isFocused, setIsFocused] = useState(false)
   const [isInvalid, setIsInvalid] = useState(false)
-  const [showHistoryDropdown, setShowHistoryDropdown] = useState(false)
-  const inputRef = useRef<HTMLInputElement>(null)
   const hasQuery = input.trim().length > 0
   const tonAssetsNameMatches = searchTonAssetsNames(input)
   const abiNameMatches = useMemo(
@@ -74,9 +70,6 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
     [abiSearchIndex, input],
   )
   const visibleHistory = hasQuery ? [] : history
-  const showDropdown =
-    showHistoryDropdown &&
-    (visibleHistory.length > 0 || tonAssetsNameMatches.length > 0 || abiNameMatches.length > 0)
 
   useEffect(() => {
     setHistory(readSearchHistory())
@@ -96,12 +89,6 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
     }
   }, [])
 
-  useEffect(() => {
-    if (autoFocus) {
-      inputRef.current?.focus()
-    }
-  }, [autoFocus])
-
   const persistHistory = useCallback((nextHistory: readonly string[]) => {
     setHistory(nextHistory)
     localStorage.setItem(EXPLORER_HISTORY_STORAGE_KEY, JSON.stringify(nextHistory))
@@ -119,11 +106,9 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
   )
 
   const removeFromHistory = useCallback(
-    (event: ReactMouseEvent, value: string) => {
-      event.stopPropagation()
+    (value: string) => {
       const nextHistory = history.filter(item => item !== value)
       persistHistory(nextHistory)
-      setShowHistoryDropdown(nextHistory.length > 0)
     },
     [history, persistHistory],
   )
@@ -141,9 +126,8 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
             navigate,
             addToHistory,
             setInput,
-            setShowHistoryDropdown,
           })
-          return
+          return true
         }
 
         const [abiMatch] = searchAbiIndex(value, abiSearchIndex, 1)
@@ -154,12 +138,11 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
             navigate,
             addToHistory,
             setInput,
-            setShowHistoryDropdown,
           })
-          return
+          return true
         }
 
-        if (!value.trim()) return
+        if (!value.trim()) return false
 
         setIsInvalid(true)
         const opcode = normalizeOpcodeSearchQuery(value)
@@ -169,7 +152,7 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
             description: `${OPCODE_NOT_FOUND_DESCRIPTION} ${opcode}.`,
             variant: "error",
           })
-          return
+          return false
         }
 
         showToast({
@@ -177,14 +160,14 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
           description: INVALID_SEARCH_DESCRIPTION,
           variant: "error",
         })
-        return
+        return false
       }
 
       setInput("")
       setIsInvalid(false)
       addToHistory(target.displayValue)
-      setShowHistoryDropdown(false)
       void navigate(target.path)
+      return true
     },
     [
       abiSearchIndex,
@@ -197,167 +180,64 @@ export const ExplorerSearch: FC<ExplorerSearchProps> = ({
     ],
   )
 
-  const handleInputKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLInputElement>) => {
-      if (event.key === "Enter") {
-        handleSearch(input)
-      }
-    },
-    [handleSearch, input],
-  )
-
-  const rootClassName = [
-    styles.search,
-    variant === "header" ? styles.searchHeader : styles.searchHero,
-    className ?? "",
+  const dropdownItems: readonly SearchInputItem[] = [
+    ...tonAssetsNameMatches.map(match => ({
+      id: `tonassets:${match.address}`,
+      label: match.name,
+      description: formatAddress(match.address, false, addressFormat),
+      icon: <Search size={16} />,
+      onSelect: () =>
+        openTonAssetsNameMatch({
+          match,
+          addressFormat,
+          routes,
+          navigate,
+          addToHistory,
+          setInput,
+        }),
+    })),
+    ...abiNameMatches.map(match => ({
+      id: `abi:${match.slug}:${match.kind}:${match.name}`,
+      label: match.name,
+      description: `ABI · ${match.kind} · ${match.detail}${match.opcode ? ` · ${match.opcode}` : ""}`,
+      icon: <FileCode2 size={16} />,
+      onSelect: () =>
+        openAbiNameMatch({
+          match,
+          routes,
+          navigate,
+          addToHistory,
+          setInput,
+        }),
+    })),
+    ...visibleHistory.map(item => ({
+      id: `history:${item}`,
+      label: formatHistoryItem(item, addressFormat),
+      icon: <History size={16} />,
+      onSelect: () => handleSearch(item),
+      onRemove: () => removeFromHistory(item),
+      removeLabel: "Remove from history",
+    })),
   ]
-    .filter(Boolean)
-    .join(" ")
 
   return (
-    <section className={rootClassName} aria-label="Explorer search">
-      <div
-        className={`${styles.inputWrapper} ${isFocused ? styles.focused : ""} ${
-          isInvalid ? styles.inputInvalid : ""
-        }`}
-      >
-        <div className={styles.searchIcon} aria-hidden="true">
-          <Search size={variant === "header" ? 16 : 20} />
-        </div>
-        <input
-          ref={inputRef}
-          type="text"
-          spellCheck="false"
-          autoComplete="off"
-          autoCorrect="off"
-          className={styles.input}
-          placeholder="Search by address or hash"
-          value={input}
-          aria-invalid={isInvalid}
-          onChange={event => {
-            const nextInput = event.target.value
-            setInput(nextInput)
-            if (isFocused) {
-              setShowHistoryDropdown(true)
-            }
-            if (isInvalid) {
-              setIsInvalid(false)
-            }
-          }}
-          onKeyDown={handleInputKeyDown}
-          onFocus={() => {
-            setIsFocused(true)
-            if (
-              visibleHistory.length > 0 ||
-              tonAssetsNameMatches.length > 0 ||
-              abiNameMatches.length > 0
-            ) {
-              setShowHistoryDropdown(true)
-            }
-          }}
-          onBlur={() => {
-            setIsFocused(false)
-            globalThis.setTimeout(() => setShowHistoryDropdown(false), 100)
-          }}
-          onClick={() => {
-            if (
-              isFocused &&
-              (visibleHistory.length > 0 ||
-                tonAssetsNameMatches.length > 0 ||
-                abiNameMatches.length > 0)
-            ) {
-              setShowHistoryDropdown(true)
-            }
-          }}
-        />
-      </div>
-
-      {showDropdown && (
-        <div className={styles.historyDropdown} onMouseDown={event => event.preventDefault()}>
-          {tonAssetsNameMatches.map(match => (
-            <div key={`tonassets:${match.address}`} className={styles.historyItem}>
-              <button
-                type="button"
-                className={`${styles.historyItemButton} ${styles.nameMatchButton}`}
-                onClick={() =>
-                  openTonAssetsNameMatch({
-                    match,
-                    addressFormat,
-                    routes,
-                    navigate,
-                    addToHistory,
-                    setInput,
-                    setShowHistoryDropdown,
-                  })
-                }
-              >
-                <Search size={16} className={styles.historyItemIcon} aria-hidden="true" />
-                <span className={styles.nameMatchText}>
-                  <span className={styles.nameMatchName}>{match.name}</span>
-                  <span className={styles.nameMatchAddress}>
-                    {formatAddress(match.address, false, addressFormat)}
-                  </span>
-                </span>
-              </button>
-            </div>
-          ))}
-          {abiNameMatches.map(match => (
-            <div
-              key={`abi:${match.slug}:${match.kind}:${match.name}`}
-              className={styles.historyItem}
-            >
-              <button
-                type="button"
-                className={`${styles.historyItemButton} ${styles.nameMatchButton}`}
-                onClick={() =>
-                  openAbiNameMatch({
-                    match,
-                    routes,
-                    navigate,
-                    addToHistory,
-                    setInput,
-                    setShowHistoryDropdown,
-                  })
-                }
-              >
-                <FileCode2 size={16} className={styles.historyItemIcon} aria-hidden="true" />
-                <span className={styles.nameMatchText}>
-                  <span className={styles.nameMatchName}>{match.name}</span>
-                  <span className={styles.nameMatchAddress}>
-                    ABI · {match.kind} · {match.detail}
-                    {match.opcode ? ` · ${match.opcode}` : ""}
-                  </span>
-                </span>
-              </button>
-            </div>
-          ))}
-          {visibleHistory.map(item => (
-            <div key={`history:${item}`} className={styles.historyItem}>
-              <button
-                type="button"
-                className={styles.historyItemButton}
-                onClick={() => handleSearch(item)}
-              >
-                <History size={16} className={styles.historyItemIcon} aria-hidden="true" />
-                <span className={styles.historyValue}>
-                  {formatHistoryItem(item, addressFormat)}
-                </span>
-              </button>
-              <button
-                type="button"
-                className={styles.historyItemDeleteButton}
-                onMouseDown={event => event.preventDefault()}
-                onClick={event => removeFromHistory(event, item)}
-                title="Remove from history"
-                aria-label="Remove from history"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
+    <SearchInput
+      ariaLabel="Explorer search"
+      autoFocus={autoFocus}
+      className={className}
+      invalid={isInvalid}
+      items={dropdownItems}
+      onSubmit={handleSearch}
+      onValueChange={nextInput => {
+        setInput(nextInput)
+        if (isInvalid) {
+          setIsInvalid(false)
+        }
+      }}
+      placeholder="Search by address or hash"
+      size={variant === "header" ? "sm" : "lg"}
+      value={input}
+    />
   )
 }
 
@@ -407,7 +287,6 @@ function openTonAssetsNameMatch({
   navigate,
   addToHistory,
   setInput,
-  setShowHistoryDropdown,
 }: {
   readonly match: TonAssetsNameMatch
   readonly addressFormat: AddressFormatOptions
@@ -415,12 +294,10 @@ function openTonAssetsNameMatch({
   readonly navigate: NavigateFunction
   readonly addToHistory: (value: string) => void
   readonly setInput: (value: string) => void
-  readonly setShowHistoryDropdown: (value: boolean) => void
 }) {
   const displayAddress = parseAddress(match.address)?.toString(addressFormat) ?? match.address
   setInput("")
   addToHistory(displayAddress)
-  setShowHistoryDropdown(false)
   void navigate(routes.addressPath(displayAddress))
 }
 
@@ -430,18 +307,15 @@ function openAbiNameMatch({
   navigate,
   addToHistory,
   setInput,
-  setShowHistoryDropdown,
 }: {
   readonly match: AbiSearchIndexEntry
   readonly routes: ExplorerRoutes
   readonly navigate: NavigateFunction
   readonly addToHistory: (value: string) => void
   readonly setInput: (value: string) => void
-  readonly setShowHistoryDropdown: (value: boolean) => void
 }) {
   setInput("")
   addToHistory(match.name)
-  setShowHistoryDropdown(false)
   const path = routes.abiDetailsPath(match.slug)
   void navigate(match.targetHash ? `${path}#${match.targetHash}` : path)
 }

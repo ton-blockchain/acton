@@ -1,0 +1,13 @@
+.openSample,
+.states {
+  width: min(100%, 40rem);
+}
+
+.openSample {
+  min-height: 15rem;
+}
+
+.states {
+  display: grid;
+  gap: var(--acton-space-4);
+}

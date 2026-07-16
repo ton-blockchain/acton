@@ -21,6 +21,7 @@ import {parsedValueDiffViewGallery} from "./parsedValueDiffViewGallery"
 import {parsedValueViewGallery} from "./parsedValueViewGallery"
 import {popoverGallery} from "./popoverGallery"
 import {rawDataBlockGallery} from "./rawDataBlockGallery"
+import {searchInputGallery} from "./searchInputGallery"
 import {skeletonGallery} from "./skeletonGallery"
 import {themeSwitchGallery} from "./themeSwitchGallery"
 import {toastGallery} from "./toastGallery"
@@ -32,6 +33,7 @@ export const galleries = [
   tokensGallery,
   buttonGallery,
   inputGallery,
+  searchInputGallery,
   breadcrumbsGallery,
   inlineButtonGallery,
   inlineActionsGallery,

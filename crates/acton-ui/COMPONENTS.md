@@ -325,6 +325,71 @@ and forwards native attributes and refs.
   unit suffixes and interactive actions belong in a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
+## SearchInput
+
+Status: ready
+
+Import:
+
+```tsx
+import { SearchInput } from "@acton/ui"
+```
+
+Use SearchInput for a search field that reveals recent queries or resolved
+matches. It owns the field, floating list, focus transitions, removable rows,
+and one-line or two-line item layout. The caller continues to own lookup,
+history persistence, validation messages, and navigation.
+
+### Composition
+
+```tsx
+<SearchInput
+  ariaLabel="Explorer search"
+  value={query}
+  items={matches.map(match => ({
+    id: match.address,
+    label: match.name,
+    description: match.address,
+    onSelect: () => openAddress(match.address),
+  }))}
+  onValueChange={setQuery}
+  onSubmit={search}
+/>
+```
+
+- `size`: `sm` for headers and dense toolbars, or `lg` for primary page search.
+- `items`: resolved rows with a stable `id`, label, optional description and
+  icon, and an `onSelect` callback.
+- `onRemove`: optional history-row command. SearchInput supplies the remove
+  button, accessible label, and focus behavior.
+- `onSubmit`: handles Enter; return `false` when validation fails and the
+  control should stay open.
+- `open` and `onOpenChange`: optional controlled visibility for previews or
+  coordinated layouts. Normal product usage can leave visibility uncontrolled.
+
+### States To Review Visually
+
+- Empty query with removable history
+- Query with one-line matches
+- Query with two-line matches
+- Small and large sizes
+- Invalid control
+- Empty result list
+- Keyboard focus moving from the input into a result or remove button
+
+### Agent Guidance
+
+- Keep domain lookup, `localStorage`, router calls, and toasts outside the base
+  component.
+- Pass already formatted labels and descriptions; SearchInput does not know
+  about TON addresses or ABI declarations.
+- Use `description` only for secondary identity such as an address, kind, or
+  opcode.
+- Let SearchInput own open/close and blur behavior instead of adding delayed
+  timers in feature code.
+- Use Input for a search field without a dropdown, and use a command palette
+  for global application commands.
+
 ## ContractChip
 
 Status: ready
