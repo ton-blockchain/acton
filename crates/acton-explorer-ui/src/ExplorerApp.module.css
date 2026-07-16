@@ -1,4 +1,6 @@
 .appShell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
   background: var(--tonscan-bg);
   color: var(--tonscan-text-primary);
@@ -543,7 +545,10 @@
 }
 
 .main {
-  min-height: calc(100vh - 52px);
+  display: flex;
+  flex: 1 0 auto;
+  min-height: 0;
+  flex-direction: column;
 }
 
 @media (max-width: 640px) {

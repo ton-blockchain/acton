@@ -1,0 +1,130 @@
+.banner {
+  position: relative;
+  z-index: 30;
+  width: 100%;
+  border-bottom: 1px solid color-mix(in srgb, white 18%, transparent);
+  background-color: color-mix(in srgb, var(--tonscan-accent) 82%, #1746b6);
+  background-image:
+    linear-gradient(color-mix(in srgb, white 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, white 8%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+  color: white;
+}
+
+.inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 1136px;
+  min-height: 36px;
+  margin-inline: auto;
+  padding: 6px 48px;
+}
+
+.message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  margin: 0;
+  gap: 7px;
+  color: inherit;
+  font-size: var(--font-size-xs);
+  line-height: 1.35;
+  text-align: center;
+}
+
+.message strong {
+  font-weight: var(--font-weight-bold);
+}
+
+.developerIcon {
+  display: block;
+  flex: 0 0 auto;
+}
+
+.separator {
+  opacity: 0.58;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 4px;
+  color: inherit;
+  font-weight: var(--font-weight-semibold);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, white 58%, transparent);
+  text-underline-offset: 3px;
+  white-space: nowrap;
+  transition: text-decoration-color var(--transition-duration-fast);
+}
+
+.link:hover {
+  text-decoration-color: white;
+}
+
+.link:focus-visible,
+.closeButton:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px white;
+}
+
+.closeButton {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0.72;
+  transform: translateY(calc(-50% + 1px));
+  transition:
+    background-color var(--transition-duration-fast),
+    opacity var(--transition-duration-fast);
+}
+
+.closeButton:hover {
+  background: color-mix(in srgb, white 12%, transparent);
+  opacity: 1;
+}
+
+.closeButton svg {
+  display: block;
+}
+
+@media (max-width: 720px) {
+  .inner {
+    justify-content: flex-start;
+    min-height: 44px;
+    padding: 7px 48px 7px 16px;
+  }
+
+  .message {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 2px 6px;
+    text-align: left;
+  }
+
+  .developerIcon,
+  .message strong {
+    align-self: center;
+  }
+
+  .separator:first-of-type {
+    display: none;
+  }
+}

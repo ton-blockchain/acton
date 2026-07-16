@@ -4,9 +4,17 @@ import {ExplorerSearch} from "../components/ExplorerSearch"
 
 import styles from "./ExplorerIndexPage.module.css"
 
-export const ExplorerIndexPage: FC = () => {
+interface ExplorerIndexPageProps {
+  readonly fillAvailableHeight?: boolean
+}
+
+export const ExplorerIndexPage: FC<ExplorerIndexPageProps> = ({fillAvailableHeight = false}) => {
+  const pageClassName = fillAvailableHeight
+    ? `${styles.inputPage} ${styles.inputPageFillAvailableHeight}`
+    : styles.inputPage
+
   return (
-    <div className={styles.inputPage}>
+    <div className={pageClassName}>
       <div className={styles.centeredInputContainer}>
         <header className={styles.logoSection}>
           <h1 className={styles.logoTitle}>

@@ -1,10 +1,15 @@
-.openSample,
+.historySample,
+.resultsSample,
 .states {
   width: min(100%, 40rem);
 }
 
-.openSample {
-  min-height: 15rem;
+.historySample {
+  min-height: 19.5rem;
+}
+
+.resultsSample {
+  min-height: 9.75rem;
 }
 
 .states {

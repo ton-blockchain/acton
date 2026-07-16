@@ -35,6 +35,7 @@ import "@acton/ui/styles/tokens.css"
 import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
+import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import styles from "./ExplorerApp.module.css"
 
 type BuiltinSelectableExplorerNetworkId = "mainnet" | "testnet"
@@ -902,6 +903,7 @@ export const ExplorerApp: FC = () => {
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
                 <div className={styles.appShell}>
+                  <DeveloperExplorerBanner />
                   <ExplorerHeaderFrame>
                     <div className={styles.headerInner}>
                       <div className={styles.headerPrimary}>
@@ -964,7 +966,7 @@ export const ExplorerApp: FC = () => {
                   </ExplorerHeaderFrame>
                   <main className={styles.main}>
                     <Routes>
-                      <Route path="/" element={<ExplorerIndexPage />} />
+                      <Route path="/" element={<ExplorerIndexPage fillAvailableHeight />} />
                       <Route path="/blocks" element={<BlocksPage client={client} />} />
                       <Route path="/abi" element={<AbiCatalogPage />} />
                       <Route path="/abi/:slug" element={<AbiDetailsPage />} />

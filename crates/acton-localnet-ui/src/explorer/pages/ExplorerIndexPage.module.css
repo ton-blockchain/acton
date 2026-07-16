@@ -9,6 +9,11 @@
   color: var(--text-primary);
 }
 
+.inputPageFillAvailableHeight {
+  flex: 1 0 auto;
+  min-height: 0;
+}
+
 .centeredInputContainer {
   width: 100%;
   max-width: 720px;

@@ -34,7 +34,7 @@ function HistorySample() {
   )
 
   return (
-    <div className={styles.openSample}>
+    <div className={styles.historySample}>
       <SearchInput
         ariaLabel="Search history example"
         items={items}
@@ -67,7 +67,7 @@ function ResultsSample() {
   ]
 
   return (
-    <div className={styles.openSample}>
+    <div className={styles.resultsSample}>
       <SearchInput
         ariaLabel="Compact search results example"
         items={items}
