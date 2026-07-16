@@ -64,6 +64,10 @@ struct FaucetChallengeResponse {
     version: u32,
     challenge: String,
     difficulty: u32,
+    #[serde(default = "default_pow_max_solve_ttl_seconds")]
+    max_solve_ttl_seconds: u64,
+    #[serde(default = "default_pow_max_nonce_attempts")]
+    max_nonce_attempts: u64,
 }
 
 #[derive(serde::Deserialize)]
@@ -101,8 +105,8 @@ impl AirdropTarget {
 
 const HTTP_RETRY_ATTEMPTS: usize = 3;
 const HTTP_RETRY_BACKOFF_MS: [u64; 3] = [200, 500, 1000];
-const POW_MAX_SOLVE_DURATION: Duration = Duration::from_secs(60);
-const POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
+const DEFAULT_POW_MAX_SOLVE_TTL_SECONDS: u64 = 60;
+const DEFAULT_POW_MAX_NONCE_ATTEMPTS: u64 = 1_000_000_000;
 const CHALLENGE_VERSION: [u32; 1] = [1];
 const DEFAULT_FAUCET_URL: &str = "https://faucet.ton.org/";
 const DEFAULT_LOCALNET_PORT: u16 = 5411;
@@ -526,7 +530,12 @@ fn perform_testnet_airdrop(
         );
     }
     let start = Instant::now();
-    let nonce = solve_challenge(&challenge_data.challenge, challenge_data.difficulty)?;
+    let nonce = solve_challenge(
+        &challenge_data.challenge,
+        challenge_data.difficulty,
+        challenge_data.max_solve_ttl_seconds,
+        challenge_data.max_nonce_attempts,
+    )?;
     let duration = start.elapsed();
     if !json {
         println!("{} Challenge solved in {:?}", "✓".green(), duration);
@@ -806,13 +815,26 @@ fn airdrop_headers() -> HeaderMap {
     headers
 }
 
-fn solve_challenge(challenge: &str, difficulty: u32) -> anyhow::Result<u64> {
+fn solve_challenge(
+    challenge: &str,
+    difficulty: u32,
+    max_solve_ttl_seconds: u64,
+    max_nonce_attempts: u64,
+) -> anyhow::Result<u64> {
     solve_challenge_with_limits(
         challenge,
         difficulty,
-        POW_MAX_SOLVE_DURATION,
-        POW_MAX_NONCE_ATTEMPTS,
+        Duration::from_secs(max_solve_ttl_seconds),
+        max_nonce_attempts,
     )
+}
+
+const fn default_pow_max_solve_ttl_seconds() -> u64 {
+    DEFAULT_POW_MAX_SOLVE_TTL_SECONDS
+}
+
+const fn default_pow_max_nonce_attempts() -> u64 {
+    DEFAULT_POW_MAX_NONCE_ATTEMPTS
 }
 
 fn is_supported_challenge_version(version: u32) -> bool {
@@ -2297,7 +2319,8 @@ mod wallet_name_tests {
 
     #[test]
     fn test_solve_challenge_rejects_too_high_difficulty() {
-        let err = solve_challenge("abc", 257).expect_err("difficulty > 256 must fail");
+        let err =
+            solve_challenge("abc", 257, 60, 1_000_000_000).expect_err("difficulty > 256 must fail");
         assert!(
             err.to_string()
                 .contains("PoW difficulty must be at most 256 bits"),
