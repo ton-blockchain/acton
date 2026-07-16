@@ -215,7 +215,13 @@ export const FavoriteAccountsPage: FC<FavoriteAccountsPageProps> = ({client}) =>
                         }
                       />
                     </td>
-                    <td className={styles.savedAtCell}>{formatSavedAt(favorite.savedAt)}</td>
+                    <td
+                      className={styles.savedAtCell}
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
+                      {formatSavedAt(favorite.savedAt)}
+                    </td>
                   </tr>
                 ))}
               </tbody>

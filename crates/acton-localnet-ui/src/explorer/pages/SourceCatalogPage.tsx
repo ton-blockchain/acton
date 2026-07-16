@@ -228,7 +228,9 @@ export const SourceCatalogPage: FC = () => {
                       </td>
                       <td>{entry.compiler}</td>
                       <td>{entry.files}</td>
-                      <td>{formatSavedAt(entry.savedAt)}</td>
+                      <td data-visual-dynamic="time" data-visual-placeholder="<time>">
+                        {formatSavedAt(entry.savedAt)}
+                      </td>
                     </tr>
                   ))
                 )}

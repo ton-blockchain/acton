@@ -434,7 +434,13 @@ const BlockTableSection: FC<{
                   </Link>
                 </td>
                 <td>{block.tx_count.toLocaleString()}</td>
-                <td title={formatAbsoluteBlockTime(block)}>{formatCompactBlockTime(block)}</td>
+                <td
+                  title={formatAbsoluteBlockTime(block)}
+                  data-visual-dynamic="time"
+                  data-visual-placeholder="<time>"
+                >
+                  {formatCompactBlockTime(block)}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -627,6 +633,7 @@ const BlockSummaryTable: FC<{readonly block: V3Block}> = ({block}) => {
         label="Generated at"
         value={formatAbsoluteBlockTime(block)}
         title={formatAbsoluteBlockTime(block)}
+        visualPlaceholder="<time>"
       />
       <SummaryItem label="Root hash" value={block.root_hash} copyValue={block.root_hash} mono />
       <SummaryItem label="File hash" value={block.file_hash} copyValue={block.file_hash} mono />
@@ -642,14 +649,24 @@ interface SummaryItemProps {
   readonly title?: string
   readonly copyValue?: string
   readonly mono?: boolean
+  readonly visualPlaceholder?: string
 }
 
-const SummaryItem: FC<SummaryItemProps> = ({label, value, title, copyValue, mono = false}) => (
+const SummaryItem: FC<SummaryItemProps> = ({
+  label,
+  value,
+  title,
+  copyValue,
+  mono = false,
+  visualPlaceholder,
+}) => (
   <div className={styles.blockSummaryRow}>
     <span className={styles.blockSummaryLabel}>{label}</span>
     <span
       className={`${styles.blockSummaryValue} ${copyValue ? styles.blockSummaryValueWithCopy : ""} ${mono ? styles.blocksMonoCell : ""}`}
       title={title ?? value}
+      data-visual-dynamic={visualPlaceholder ? "time" : undefined}
+      data-visual-placeholder={visualPlaceholder}
     >
       {copyValue ? (
         <>

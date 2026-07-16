@@ -108,38 +108,38 @@ function ToastProviderBridge({
   readonly theme?: string
   readonly viewportClassName?: string
 }>) {
-  const toastManager = ToastBase.useToastManager<ToastData>()
+  const {add, close, promise: trackPromise, update} = ToastBase.useToastManager<ToastData>()
 
   const showToast = useCallback(
     (options: ToastOptions) => {
-      return toastManager.add(toBaseToastOptions(options, options.variant ?? "info"))
+      return add(toBaseToastOptions(options, options.variant ?? "info"))
     },
-    [toastManager],
+    [add],
   )
 
   const updateToast = useCallback(
     (id: string, options: ToastUpdateOptions) => {
-      toastManager.update(id, toBaseToastOptions(options, options.variant))
+      update(id, toBaseToastOptions(options, options.variant))
     },
-    [toastManager],
+    [update],
   )
 
   const dismissToast = useCallback(
     (id?: string) => {
-      toastManager.close(id)
+      close(id)
     },
-    [toastManager],
+    [close],
   )
 
   const promiseToast = useCallback(
     <Value,>(promise: Promise<Value>, options: ToastPromiseOptions<Value>) => {
-      return toastManager.promise(promise, {
+      return trackPromise(promise, {
         loading: resolvePromiseState(options.loading, "loading"),
         success: result => resolvePromiseState(options.success, "success", result),
         error: error => resolvePromiseState(options.error, "error", error),
       })
     },
-    [toastManager],
+    [trackPromise],
   )
 
   const contextValue = useMemo<ToastContextValue>(

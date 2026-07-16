@@ -79,6 +79,7 @@ interface NodeInfoRow {
   readonly isLoading?: boolean
   readonly title?: string
   readonly variant?: "time"
+  readonly visualPlaceholder?: string
 }
 
 export const HomePage: FC<HomePageProps> = ({client}) => {
@@ -144,6 +145,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         label: "Uptime",
         value: nodeInfo ? formatDuration(nodeInfo.uptime_seconds) : undefined,
         isLoading,
+        visualPlaceholder: "<uptime>",
       },
       {
         label: "State source",
@@ -164,6 +166,7 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
         title: nodeTimeOffset ? `${nodeTime} (${nodeTimeOffset})` : nodeTime,
         isLoading,
         variant: "time",
+        visualPlaceholder: "<time>",
       },
     ]
   }, [nodeInfo])
@@ -418,7 +421,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                       </Link>
                     ) : row.variant === "time" ? (
                       <div className={styles.nodeInfoTimeControl} title={title}>
-                        <span className={styles.nodeInfoTimeText}>
+                        <span
+                          className={styles.nodeInfoTimeText}
+                          data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                          data-visual-placeholder={row.visualPlaceholder}
+                        >
                           <span className={styles.nodeInfoValueText}>{value}</span>
                           {row.secondaryValue && (
                             <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>
@@ -438,7 +445,12 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                         </button>
                       </div>
                     ) : (
-                      <span className={styles.nodeInfoValue} title={title}>
+                      <span
+                        className={styles.nodeInfoValue}
+                        title={title}
+                        data-visual-dynamic={row.visualPlaceholder ? "time" : undefined}
+                        data-visual-placeholder={row.visualPlaceholder}
+                      >
                         <span className={styles.nodeInfoValueText}>{value}</span>
                         {row.secondaryValue && (
                           <span className={styles.nodeInfoValueMeta}>{row.secondaryValue}</span>

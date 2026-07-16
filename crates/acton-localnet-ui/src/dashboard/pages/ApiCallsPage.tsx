@@ -169,7 +169,12 @@ export const ApiCallsPage: FC<ApiCallsPageProps> = ({client}) => {
                     <DataTableCell className={styles.rpcDurationCell} tone="muted">
                       {formatApiCallDuration(call.duration_ns)}
                     </DataTableCell>
-                    <DataTableCell className={styles.rpcTimestampCell} tone="muted">
+                    <DataTableCell
+                      className={styles.rpcTimestampCell}
+                      tone="muted"
+                      data-visual-dynamic="time"
+                      data-visual-placeholder="<time>"
+                    >
                       {formatTimestamp(call.timestamp_ms)}
                     </DataTableCell>
                   </DataTableRow>

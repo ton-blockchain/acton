@@ -843,7 +843,13 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         }
                       >
                         <td className={`${styles.time} ${styles.timeColumn}`}>
-                          <span title={formattedTime.title}>{formattedTime.label}</span>
+                          <span
+                            title={formattedTime.title}
+                            data-visual-dynamic="time"
+                            data-visual-placeholder="<time>"
+                          >
+                            {formattedTime.label}
+                          </span>
                         </td>
                         <td className={styles.actionColumn}>
                           <div className={styles.action}>
@@ -1314,7 +1320,13 @@ export function ActionHistoryRows({
             {showTimeColumn && (
               <td className={`${styles.time} ${styles.timeColumn}`}>
                 {!continuesFromTrace && formattedTime && (
-                  <span title={formattedTime.title}>{formattedTime.label}</span>
+                  <span
+                    title={formattedTime.title}
+                    data-visual-dynamic="time"
+                    data-visual-placeholder="<time>"
+                  >
+                    {formattedTime.label}
+                  </span>
                 )}
               </td>
             )}

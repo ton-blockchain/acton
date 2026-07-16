@@ -151,7 +151,13 @@ export const DeveloperTransactionList: FC<DeveloperTransactionListProps> = ({
                 title={row.statusLabel}
               >
                 <td className={styles.timeCell}>
-                  <span title={timeTitle}>{formatTimeAgo(row.time)}</span>
+                  <span
+                    title={timeTitle}
+                    data-visual-dynamic="time"
+                    data-visual-placeholder="<time>"
+                  >
+                    {formatTimeAgo(row.time)}
+                  </span>
                 </td>
                 <td className={`${styles.addressCell} ${styles.fromCell}`}>
                   <EndpointCell

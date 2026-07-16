@@ -298,7 +298,11 @@ export const WalletsPage: FC<WalletsPageProps> = ({client}) => {
                           onCopyAddress={handleCopyAddress}
                         />
                       </td>
-                      <td className={styles.sessionActivityCell}>
+                      <td
+                        className={styles.sessionActivityCell}
+                        data-visual-dynamic="time"
+                        data-visual-placeholder="<time>"
+                      >
                         {formatDateTime(session.lastActivityAt)}
                       </td>
                       <td className={styles.sessionActionsCell}>
