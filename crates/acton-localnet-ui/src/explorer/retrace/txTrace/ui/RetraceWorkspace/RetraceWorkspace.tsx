@@ -526,6 +526,7 @@ function SourceVariableRow({
   }, [hasChildren])
 
   return (
+    // biome-ignore lint/a11y/useFocusableInteractive: Interaction is handled by the nested toggle button.
     <div
       className={styles.sourceVariableGroup}
       role="treeitem"
@@ -692,6 +693,7 @@ function SourceDebugResizableSection({
         </div>
       )}
       {!collapsed && canResize && (
+        // biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only.
         <div
           className={styles.sourceDebugResizeHandle}
           role="separator"
@@ -1292,6 +1294,7 @@ function SourceFilesEditor({
           </Suspense>
         </div>
         {activeSourceTrace && (
+          // biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only.
           <div
             className={styles.sourceDebugPanelResizeHandle}
             role="separator"

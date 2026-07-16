@@ -56,7 +56,6 @@
         "noStaticElementInteractions": "off",
         "noSvgWithoutTitle": "off",
         "useAriaPropsSupportedByRole": "off",
-        "useFocusableInteractive": "off",
         "useSemanticElements": "off"
       },
       "complexity": {
