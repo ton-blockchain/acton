@@ -653,6 +653,7 @@
 
 th.valueContainer {
   display: table-cell;
+  text-align: right;
   vertical-align: middle;
 }
 

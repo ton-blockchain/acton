@@ -1025,7 +1025,19 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                       <tr
                         key={holder.address}
                         className={`${styles.row} ${styles.clickableRow}`}
+                        tabIndex={onAddressClick ? 0 : undefined}
                         onClick={event => onAddressClick?.(holder.owner, event)}
+                        onKeyDown={
+                          onAddressClick
+                            ? event => {
+                                if (event.target !== event.currentTarget) return
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault()
+                                  event.currentTarget.click()
+                                }
+                              }
+                            : undefined
+                        }
                       >
                         <td>
                           <AddressChip address={holder.owner} onAddressClick={onAddressClick} />
