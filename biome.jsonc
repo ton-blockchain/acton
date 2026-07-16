@@ -147,8 +147,7 @@
         "noShadow": "off",
         "noSkippedTests": "off",
         "noUnnecessaryConditions": "off",
-        "useAwait": "off",
-        "useIterableCallbackReturn": "off"
+        "useAwait": "off"
       }
     }
   }

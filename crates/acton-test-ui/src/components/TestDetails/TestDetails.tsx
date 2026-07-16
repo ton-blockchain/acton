@@ -1128,7 +1128,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
             const hasVmLog = hasNonEmptyLog(tx.vm_log_diff)
             const hasExecutorLog = hasNonEmptyLog(tx.executor_logs)
 
-            if (!hasVmLog && !hasExecutorLog) return
+            if (!hasVmLog && !hasExecutorLog) return null
 
             return (
               <div key={tx.lt} className={styles.txLogs}>
