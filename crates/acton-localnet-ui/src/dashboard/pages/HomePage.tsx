@@ -1,6 +1,5 @@
 import {BookOpen, Check, Copy, FastForward, X} from "lucide-react"
 import {Button, Input, useToast} from "@acton/ui"
-import {Card, CardContent, CardHeader, CardTitle} from "@acton/shared-ui"
 import {Link, useNavigate} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useState} from "react"
 import type {FC, FormEvent} from "react"
@@ -393,11 +392,11 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
 
       <section className={styles.homeLayout}>
         <div className={styles.homeTopRow}>
-          <Card className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <CardHeader className={styles.dashboardCardHeader}>
-              <CardTitle className={styles.dashboardCardTitle}>Node info</CardTitle>
-            </CardHeader>
-            <CardContent className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
+          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+            <header className={styles.dashboardCardHeader}>
+              <h2 className={styles.dashboardCardTitle}>Node info</h2>
+            </header>
+            <div className={`${styles.dashboardCardContent} ${styles.nodeInfoList}`}>
               {nodeInfoRows.map(row => {
                 const value = row.value ?? "—"
                 const title = row.title ?? value
@@ -449,14 +448,14 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
-          <Card className={`${styles.dashboardCard} ${styles.homeCard}`}>
-            <CardHeader className={styles.dashboardCardHeader}>
-              <CardTitle className={styles.dashboardCardTitle}>Endpoints</CardTitle>
-            </CardHeader>
-            <CardContent className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
+          <section className={`${styles.dashboardCard} ${styles.homeCard}`}>
+            <header className={styles.dashboardCardHeader}>
+              <h2 className={styles.dashboardCardTitle}>Endpoints</h2>
+            </header>
+            <div className={`${styles.dashboardCardContent} ${styles.endpointList}`}>
               {endpointRows.map(endpoint => {
                 const isCopied = copiedEndpoint === endpoint.value
 
@@ -491,8 +490,8 @@ export const HomePage: FC<HomePageProps> = ({client}) => {
                   </div>
                 )
               })}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </div>
 
         {homeState.error ? (

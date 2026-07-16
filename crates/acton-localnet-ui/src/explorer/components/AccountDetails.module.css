@@ -10,10 +10,6 @@
   border-bottom: 0 !important;
 }
 
-.historyContent {
-  padding: 0;
-}
-
 .tableWrapper {
   position: relative;
   width: 100%;
@@ -67,10 +63,6 @@
   padding-bottom: 12px !important;
 }
 
-.tokensContent {
-  padding: 0;
-}
-
 .addressWrapper {
   display: flex;
   align-items: center;
@@ -99,9 +91,11 @@
 .tableCard {
   --border-color: var(--tonscan-border);
 
-  background-color: var(--tonscan-card-bg) !important;
-  border: 1px solid var(--tonscan-border) !important;
-  border-radius: 16px !important;
+  overflow: hidden;
+  border: 1px solid var(--tonscan-border);
+  border-radius: 16px;
+  background-color: var(--tonscan-card-bg);
+  color: var(--acton-color-text);
 }
 
 .tabs {
@@ -874,7 +868,7 @@ th.valueContainer {
 
 @media (max-width: 520px) {
   .tableCard {
-    border-radius: 14px !important;
+    border-radius: 14px;
   }
 
   .tabs {

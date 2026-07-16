@@ -1,6 +1,5 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, JSX, MouseEvent} from "react"
-import {Card, CardContent} from "@acton/shared-ui"
 import {
   BadgeDollarSign,
   BadgeMinus,
@@ -537,7 +536,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
     : undefined
 
   return (
-    <Card className={styles.tableCard}>
+    <section className={styles.tableCard}>
       <div className={styles.tabs}>
         <button
           type="button"
@@ -735,7 +734,7 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
       </div>
 
       {activeTab === "history" ? (
-        <CardContent className={styles.historyContent}>
+        <div className={styles.historyContent}>
           <div className={styles.tableWrapper}>
             <table className={styles.table}>
               <thead className={styles.historyHeaderGroup}>
@@ -990,21 +989,21 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               </div>
             </div>
           )}
-        </CardContent>
+        </div>
       ) : activeTab === "tokens" ? (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           {tokensLoading ? (
             <TokensSkeleton />
           ) : (
             <Tokens wallets={jettonWallets} client={client} onAddressClick={onAddressClick} />
           )}
-        </CardContent>
+        </div>
       ) : activeTab === "nfts" && showNftsTab ? (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           <Nfts items={nftItems} onAddressClick={onAddressClick} />
-        </CardContent>
+        </div>
       ) : activeTab === "holders" ? (
-        <CardContent className={styles.historyContent}>
+        <div className={styles.historyContent}>
           {holdersLoading ? (
             <HoldersSkeleton />
           ) : (
@@ -1073,9 +1072,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               </table>
             </div>
           )}
-        </CardContent>
+        </div>
       ) : (
-        <CardContent className={styles.tokensContent}>
+        <div className={styles.tokensContent}>
           {accountLoading && !accountState ? (
             <ContractCodeSkeleton />
           ) : (
@@ -1094,9 +1093,9 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
               />
             </Suspense>
           )}
-        </CardContent>
+        </div>
       )}
-    </Card>
+    </section>
   )
 }
 

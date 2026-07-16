@@ -813,14 +813,15 @@
   grid-column: 1 / -1;
 }
 
-.dashboardCard.dashboardCard {
+.dashboardCard {
   border-radius: 18px;
   border: 1px solid var(--litenode-border);
   background: var(--litenode-surface);
+  color: var(--litenode-text);
   box-shadow: var(--litenode-shadow-sm);
 }
 
-.homeCard.homeCard {
+.homeCard {
   overflow: hidden;
   border-color: var(--tonscan-border, var(--litenode-border-subtle));
   border-radius: 12px;
@@ -828,11 +829,11 @@
   box-shadow: none;
 }
 
-.dashboardCardHeader.dashboardCardHeader {
+.dashboardCardHeader {
   padding: 24px 24px 0;
 }
 
-.dashboardCardContent.dashboardCardContent {
+.dashboardCardContent {
   padding: 0 24px 24px;
 }
 
@@ -840,7 +841,7 @@
   margin-bottom: 10px;
 }
 
-.homeCard .dashboardCardHeader.dashboardCardHeader {
+.homeCard .dashboardCardHeader {
   min-height: 52px;
   padding: 0 18px;
   border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
@@ -851,11 +852,11 @@
   text-align: left;
 }
 
-.homeCard .dashboardCardContent.dashboardCardContent {
+.homeCard .dashboardCardContent {
   padding: 0;
 }
 
-.homeCard .dashboardCardTitle.dashboardCardTitle {
+.homeCard .dashboardCardTitle {
   margin: 0;
   font-size: 0.86rem;
   font-weight: 750;
@@ -863,18 +864,11 @@
   text-align: left;
 }
 
-.dashboardCardTitle.dashboardCardTitle {
+.dashboardCardTitle {
   margin: 1px 0 0;
   color: var(--litenode-text);
   font-size: 1rem;
   font-weight: 600;
-}
-
-.dashboardCardDescription.dashboardCardDescription {
-  margin: 6px 0 0;
-  color: var(--litenode-text-muted);
-  font-size: 0.9rem;
-  line-height: 1.5;
 }
 
 .resourceTableLayout {
@@ -1524,8 +1518,7 @@
   max-width: 44rem;
 }
 
-.formCard,
-.dashboardCard {
+.formCard {
   border-radius: 18px;
   border: 1px solid var(--litenode-border);
   background: var(--litenode-surface);
@@ -2668,11 +2661,11 @@
     font-size: 0.94rem;
   }
 
-  .dashboardCardHeader.dashboardCardHeader {
+  .dashboardCardHeader {
     padding: 18px 18px 0;
   }
 
-  .dashboardCardContent.dashboardCardContent {
+  .dashboardCardContent {
     padding: 0 18px 18px;
   }
 
