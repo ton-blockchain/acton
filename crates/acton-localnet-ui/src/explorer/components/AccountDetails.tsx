@@ -67,7 +67,6 @@ import {
 import {useMetadataRegistry} from "../metadata/MetadataRegistryProvider"
 
 import {AddressChip} from "./AddressChip"
-import {AddressLabel} from "./AddressLabel"
 import {Nfts} from "./Nfts"
 import {Tokens, TokensSkeleton} from "./Tokens"
 import styles from "./AccountDetails.module.css"
@@ -1029,28 +1028,10 @@ export const AccountDetails: FC<AccountDetailsProps> = ({
                         onClick={event => onAddressClick?.(holder.owner, event)}
                       >
                         <td>
-                          <button
-                            type="button"
-                            className={styles.address}
-                            onClick={e => {
-                              e.stopPropagation()
-                              onAddressClick?.(holder.owner, e)
-                            }}
-                          >
-                            <AddressLabel address={holder.owner} />
-                          </button>
+                          <AddressChip address={holder.owner} onAddressClick={onAddressClick} />
                         </td>
                         <td>
-                          <button
-                            type="button"
-                            className={styles.address}
-                            onClick={e => {
-                              e.stopPropagation()
-                              onAddressClick?.(holder.address, e)
-                            }}
-                          >
-                            <AddressLabel address={holder.address} />
-                          </button>
+                          <AddressChip address={holder.address} onAddressClick={onAddressClick} />
                         </td>
                         <td className={styles.valueContainer}>
                           <div className={styles.valuePositive}>
