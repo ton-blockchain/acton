@@ -51,7 +51,6 @@
       "preset": "all",
       "a11y": {
         "preset": "all",
-        "noAriaHiddenOnFocusable": "off",
         "noNoninteractiveElementInteractions": "off",
         "noStaticElementInteractions": "off",
         "noSvgWithoutTitle": "off",
