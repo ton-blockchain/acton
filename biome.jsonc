@@ -78,7 +78,6 @@
         "noEmptyPattern": "off",
         "noNodejsModules": "off",
         "noSolidDestructuredProps": "off",
-        "noUndeclaredDependencies": "off",
         "noUnresolvedImports": "off",
         "useExhaustiveDependencies": "off",
         "useImageSize": "off",

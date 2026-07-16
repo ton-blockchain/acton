@@ -1,4 +1,4 @@
-import tvmSpecData from "@tasm-spec/tvm-specification.json"
+import tvmSpecData from "../../../../../../tasm-core/spec/tvm-specification.json"
 
 import type {FiftInstruction, Instruction, Specification} from "./specification"
 
