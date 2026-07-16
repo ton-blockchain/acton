@@ -1,11 +1,22 @@
-import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@acton/shared-ui"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableSkeletonRows,
+  DataTableTable,
+} from "@acton/ui"
 import {useNavigate} from "react-router-dom"
 import {useEffect, useState} from "react"
-import type {FC, JSX} from "react"
+import type {FC} from "react"
 
 import type {TonClient} from "../../explorer/api/client"
 import type {JettonMaster} from "../../explorer/api/types"
 import {useDelayedLoadingVisibility} from "../../hooks/useDelayedLoadingVisibility"
+import {AddressChip} from "../../explorer/components/AddressChip"
 import {TOKEN_PLACEHOLDER_IMAGE} from "../constants"
 import {formatTokenSupply} from "../dashboardUtils"
 
@@ -69,120 +80,109 @@ export const TokensPage: FC<TokensPageProps> = ({client}) => {
       <section className={styles.hero}>
         <div>
           <h1 className={styles.title}>Tokens</h1>
-          <p className={styles.subtitle}>Jettons detected on the local network.</p>
+          <p className={styles.subtitle}>Jettons detected on the local network</p>
         </div>
       </section>
 
       <section
-        className={styles.resourceGrid}
+        className={styles.resourceTableLayout}
         aria-busy={tokensState.isLoading}
         aria-label={tokensState.isLoading ? "Loading tokens" : undefined}
       >
-        {tokensState.error ? (
-          <div className={styles.emptyState}>{tokensState.error}</div>
-        ) : tokensState.isLoading ? (
-          showLoadingSkeleton ? (
-            <TokenCardsSkeleton />
-          ) : null
-        ) : tokensState.items.length === 0 ? (
-          <div className={styles.emptyState}>No tokens yet.</div>
-        ) : (
-          tokensState.items.map(token => {
-            const symbol = token.jetton_content.symbol || "???"
-            const name = token.jetton_content.name || "Unknown Jetton"
-            const image = token.jetton_content.image || TOKEN_PLACEHOLDER_IMAGE
-            const href = `/explorer/address/${encodeURIComponent(token.address)}`
+        <DataTable minWidth="50rem">
+          <DataTableTable aria-label="Tokens" layout="fixed">
+            <DataTableHead>
+              <DataTableRow>
+                <DataTableHeaderCell>Token</DataTableHeaderCell>
+                <DataTableHeaderCell align="right" columnWidth="12rem">
+                  Supply
+                </DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="8rem">Mintable</DataTableHeaderCell>
+                <DataTableHeaderCell columnWidth="17rem">Address</DataTableHeaderCell>
+              </DataTableRow>
+            </DataTableHead>
+            <DataTableBody>
+              {tokensState.error ? (
+                <DataTableEmpty colSpan={4}>{tokensState.error}</DataTableEmpty>
+              ) : tokensState.isLoading ? (
+                showLoadingSkeleton ? (
+                  <DataTableSkeletonRows
+                    columns={4}
+                    rows={3}
+                    alignments={["left", "right", "left", "left"]}
+                    widths={["14rem", "8rem", "4rem", "14rem"]}
+                    rowKeyPrefix="token-table-skeleton"
+                  />
+                ) : null
+              ) : tokensState.items.length === 0 ? (
+                <DataTableEmpty colSpan={4}>No tokens yet</DataTableEmpty>
+              ) : (
+                tokensState.items.map(token => {
+                  const symbol = token.jetton_content.symbol || "???"
+                  const name = token.jetton_content.name || "Unknown Jetton"
+                  const image = token.jetton_content.image || TOKEN_PLACEHOLDER_IMAGE
+                  const href = `/explorer/address/${encodeURIComponent(token.address)}`
 
-            return (
-              <Card
-                key={token.address}
-                className={`${styles.dashboardCard} ${styles.assetCard}`}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  void navigate(href)
-                }}
-                onKeyDown={event => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault()
-                    void navigate(href)
-                  }
-                }}
-              >
-                <CardHeader className={styles.dashboardCardHeader}>
-                  <div className={styles.cardTitleRow}>
-                    <img
-                      src={image}
-                      alt=""
-                      className={styles.assetImage}
-                      onError={event => {
-                        const imageElement = event.currentTarget
-                        if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
-                          imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                  return (
+                    <DataTableRow
+                      key={token.address}
+                      interactive
+                      tabIndex={0}
+                      onClick={() => {
+                        void navigate(href)
+                      }}
+                      onKeyDown={event => {
+                        if (event.target !== event.currentTarget) return
+                        if (event.key === "Enter" || event.key === " ") {
+                          event.preventDefault()
+                          void navigate(href)
                         }
                       }}
-                    />
-                    <div>
-                      <CardTitle className={styles.dashboardCardTitle}>{name}</CardTitle>
-                      <CardDescription className={styles.dashboardCardDescription}>
-                        {symbol}
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className={styles.dashboardCardContent}>
-                  <div className={styles.assetMetaGrid}>
-                    <div>
-                      <span className={styles.assetMetaLabel}>Supply</span>
-                      <span className={styles.assetMetaValue}>{formatTokenSupply(token)}</span>
-                    </div>
-                    <div>
-                      <span className={styles.assetMetaLabel}>Mintable</span>
-                      <span className={styles.assetMetaValue}>{token.mintable ? "Yes" : "No"}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          })
-        )}
+                    >
+                      <DataTableCell>
+                        <div className={styles.assetTableIdentity}>
+                          <img
+                            src={image}
+                            alt=""
+                            className={styles.assetTableImage}
+                            onError={event => {
+                              const imageElement = event.currentTarget
+                              if (imageElement.getAttribute("src") !== TOKEN_PLACEHOLDER_IMAGE) {
+                                imageElement.src = TOKEN_PLACEHOLDER_IMAGE
+                              }
+                            }}
+                          />
+                          <span className={styles.assetTableText}>
+                            <strong className={styles.assetTableName}>{name}</strong>
+                            <span className={styles.assetTableSecondary}>{symbol}</span>
+                          </span>
+                        </div>
+                      </DataTableCell>
+                      <DataTableCell align="right" tone="strong">
+                        {formatTokenSupply(token)}
+                      </DataTableCell>
+                      <DataTableCell>
+                        <span
+                          className={
+                            token.mintable
+                              ? styles.assetTableStatusPositive
+                              : styles.assetTableStatusMuted
+                          }
+                        >
+                          {token.mintable ? "Yes" : "No"}
+                        </span>
+                      </DataTableCell>
+                      <DataTableCell>
+                        <AddressChip address={token.address} resolveName={false} />
+                      </DataTableCell>
+                    </DataTableRow>
+                  )
+                })
+              )}
+            </DataTableBody>
+          </DataTableTable>
+        </DataTable>
       </section>
-    </>
-  )
-}
-
-function TokenCardsSkeleton(): JSX.Element {
-  return (
-    <>
-      {Array.from({length: 1}, (_, index) => (
-        <Card
-          key={`token-card-skeleton-${index}`}
-          className={`${styles.dashboardCard} ${styles.assetCard} ${styles.assetSkeletonCard}`}
-          aria-hidden="true"
-        >
-          <CardHeader className={styles.dashboardCardHeader}>
-            <div className={styles.cardTitleRow}>
-              <span className={`${styles.skeletonAvatar} ${styles.assetImageSkeleton}`} />
-              <div className={styles.assetSkeletonTitleGroup}>
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonTitle}`} />
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonSubtitle}`} />
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className={styles.dashboardCardContent}>
-            <div className={styles.assetMetaGrid}>
-              <div>
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonMetaLabel}`} />
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonMetaValue}`} />
-              </div>
-              <div>
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonMetaLabel}`} />
-                <span className={`${styles.skeletonLine} ${styles.assetSkeletonMetaValue}`} />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
     </>
   )
 }
