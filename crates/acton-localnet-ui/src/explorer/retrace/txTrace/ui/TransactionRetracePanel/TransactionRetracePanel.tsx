@@ -129,10 +129,7 @@ export default function TransactionRetracePanel({
           <Suspense
             fallback={
               <div className={styles.loadingState}>
-                <InlineLoader
-                  message="Loading debug workspace"
-                  subtext="Preparing trace view"
-                />
+                <InlineLoader message="Loading debug workspace" subtext="Preparing trace view" />
               </div>
             }
           >

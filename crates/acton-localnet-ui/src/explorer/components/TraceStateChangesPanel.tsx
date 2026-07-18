@@ -27,10 +27,7 @@ interface TraceStateChangesPanelProps {
   readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly isLoading?: boolean
   readonly error?: string
-  readonly onContractClick: (
-    address: string,
-    event?: ExplorerNavigationClickEvent,
-  ) => void
+  readonly onContractClick: (address: string, event?: ExplorerNavigationClickEvent) => void
 }
 
 interface TraceStateChangeItem {

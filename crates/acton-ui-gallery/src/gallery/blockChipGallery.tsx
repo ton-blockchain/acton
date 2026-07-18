@@ -44,12 +44,7 @@ export const blockChipGallery = {
           </article>
           <article className={styles.sample}>
             <span className={styles.sampleTitle}>Highlighted</span>
-            <BlockChip
-              workchain={-1}
-              shard="8000000000000000"
-              seqno={80_323_933}
-              highlighted
-            />
+            <BlockChip workchain={-1} shard="8000000000000000" seqno={80_323_933} highlighted />
           </article>
         </div>
       ),
