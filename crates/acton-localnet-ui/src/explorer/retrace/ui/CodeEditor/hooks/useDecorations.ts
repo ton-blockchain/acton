@@ -4,17 +4,8 @@ import type * as monacoTypes from "monaco-editor"
 import type {LinesExecutionData} from "../../../txTrace/hooks"
 
 export interface HighlightGroup {
-  readonly lines: number[]
-  readonly color?: string
-  readonly className?: string
-}
-
-export interface HighlightRange {
-  readonly line: number
-  readonly startColumn: number
-  readonly endColumn: number
-  readonly color: string
-  readonly className?: string
+  readonly lines: readonly number[]
+  readonly className: string
 }
 
 interface UseDecorationsOptions {
@@ -23,8 +14,6 @@ interface UseDecorationsOptions {
   readonly implicitRetLine?: number
   readonly lineExecutionData?: LinesExecutionData
   readonly highlightGroups?: readonly HighlightGroup[]
-  readonly hoveredLines?: readonly number[]
-  readonly highlightRanges?: readonly HighlightRange[]
   readonly isCtrlPressed?: boolean
   readonly hoveredLine?: number | null
   readonly shouldCenter?: boolean
@@ -33,7 +22,6 @@ interface UseDecorationsOptions {
 
 interface UseDecorationsReturn {
   readonly updateDecorations: (editor: monacoTypes.editor.IStandaloneCodeEditor) => void
-  readonly clearDecorations: (editor: monacoTypes.editor.IStandaloneCodeEditor) => void
 }
 
 const createHighlightLineDecoration = (
@@ -54,70 +42,17 @@ const createHighlightGroupDecorations = (
 ): monacoTypes.editor.IModelDeltaDecoration[] => {
   const decorations: monacoTypes.editor.IModelDeltaDecoration[] = []
 
-  for (const [index, group] of highlightGroups.entries()) {
+  for (const group of highlightGroups) {
     for (const lineNumber of group.lines) {
       if (lineNumber > 0 && lineNumber <= totalLines) {
-        const options: monacoTypes.editor.IModelDecorationOptions = {
-          isWholeLine: true,
-          className: group.className || `source-map-group-${index}`,
-        }
-        if (group.color) {
-          options.overviewRuler = {
-            color: group.color,
-            position: 1,
-          }
-        }
-
         decorations.push({
           range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-          options,
+          options: {
+            isWholeLine: true,
+            className: group.className,
+          },
         })
       }
-    }
-  }
-
-  return decorations
-}
-
-const createHoveredLinesDecorations = (
-  monaco: typeof monacoTypes,
-  hoveredLines: readonly number[],
-  totalLines: number,
-): monacoTypes.editor.IModelDeltaDecoration[] => {
-  const decorations: monacoTypes.editor.IModelDeltaDecoration[] = []
-
-  for (const lineNumber of hoveredLines) {
-    if (lineNumber > 0 && lineNumber <= totalLines) {
-      decorations.push({
-        range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-        options: {
-          isWholeLine: true,
-          className: "source-map-hovered-line",
-        },
-      })
-    }
-  }
-
-  return decorations
-}
-
-const createHighlightRangeDecorations = (
-  monaco: typeof monacoTypes,
-  highlightRanges: readonly HighlightRange[],
-  totalLines: number,
-): monacoTypes.editor.IModelDeltaDecoration[] => {
-  const decorations: monacoTypes.editor.IModelDeltaDecoration[] = []
-
-  for (const range of highlightRanges) {
-    if (range.line > 0 && range.line <= totalLines) {
-      decorations.push({
-        range: new monaco.Range(range.line, range.startColumn, range.line, range.endColumn),
-        options: {
-          isWholeLine: false,
-          className: range.className ?? "precise-highlight",
-          inlineClassName: range.className ?? "precise-highlight",
-        },
-      })
     }
   }
 
@@ -174,8 +109,6 @@ export const useDecorations = ({
   implicitRetLine,
   lineExecutionData,
   highlightGroups = [],
-  hoveredLines = [],
-  highlightRanges = [],
   isCtrlPressed = false,
   hoveredLine = null,
   shouldCenter = true,
@@ -214,12 +147,6 @@ export const useDecorations = ({
         // Add source map highlight groups (FunC <-> TASM mappings)
         allDecorations.push(...createHighlightGroupDecorations(monaco, highlightGroups, totalLines))
 
-        // Add hovered lines highlighting
-        allDecorations.push(...createHoveredLinesDecorations(monaco, hoveredLines, totalLines))
-
-        // Add highlight ranges
-        allDecorations.push(...createHighlightRangeDecorations(monaco, highlightRanges, totalLines))
-
         // Add execution-based decorations
         if (lineExecutionData && Object.keys(lineExecutionData).length > 0) {
           allDecorations.push(
@@ -255,8 +182,6 @@ export const useDecorations = ({
       monaco,
       highlightLine,
       highlightGroups,
-      hoveredLines,
-      highlightRanges,
       lineExecutionData,
       shouldCenter,
       centerLine,
@@ -266,18 +191,7 @@ export const useDecorations = ({
     ],
   )
 
-  const clearDecorations = useCallback((editor: monacoTypes.editor.IStandaloneCodeEditor) => {
-    if (!editor) return
-
-    try {
-      decorationsRef.current = editor.deltaDecorations(decorationsRef.current, [])
-    } catch (error) {
-      console.error("Failed to clear decorations:", error)
-    }
-  }, [])
-
   return {
     updateDecorations,
-    clearDecorations,
   }
 }

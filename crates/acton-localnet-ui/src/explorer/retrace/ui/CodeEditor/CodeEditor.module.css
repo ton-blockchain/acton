@@ -31,73 +31,9 @@
   cursor: grab !important;
 }
 
-:global(.monaco-editor .source-map-hovered-line) {
-  background-color: rgb(255 215 0 / 25%) !important;
-  border-left: 4px solid #ffd700 !important;
-  transition: background-color 0.2s ease;
-  box-shadow: inset 0 0 0 1px rgb(255 215 0 / 20%) !important;
-}
-
 :global(.monaco-editor .source-debug-frame-line) {
   background-color: var(--source-debug-frame-line-bg) !important;
   box-shadow: inset 0 0 0 1px var(--source-debug-frame-line-ring) !important;
-}
-
-:global(.monaco-editor .precise-highlight) {
-  background-color: rgb(255 0 0 / 10%) !important;
-  box-shadow: inset 0 0 0 2px rgb(255 0 0 / 20%) !important;
-  border-radius: var(--acton-radius-control-xs) !important;
-  font-weight: bold !important;
-}
-
-:global(.monaco-editor .source-map-group-0) {
-  background-color: rgb(255 107 107 / 15%) !important;
-  border-left: 3px solid #ff6b6b !important;
-}
-
-:global(.monaco-editor .source-map-group-1) {
-  background-color: rgb(78 205 196 / 15%) !important;
-  border-left: 3px solid #4ecdc4 !important;
-}
-
-:global(.monaco-editor .source-map-group-2) {
-  background-color: rgb(69 183 209 / 15%) !important;
-  border-left: 3px solid #45b7d1 !important;
-}
-
-:global(.monaco-editor .source-map-group-3) {
-  background-color: rgb(150 206 180 / 15%) !important;
-  border-left: 3px solid #96ceb4 !important;
-}
-
-:global(.monaco-editor .source-map-group-4) {
-  background-color: rgb(255 234 167 / 15%) !important;
-  border-left: 3px solid #ffeaa7 !important;
-}
-
-:global(.monaco-editor .source-map-group-5) {
-  background-color: rgb(221 160 221 / 15%) !important;
-  border-left: 3px solid #dda0dd !important;
-}
-
-:global(.monaco-editor .source-map-group-6) {
-  background-color: rgb(152 216 200 / 15%) !important;
-  border-left: 3px solid #98d8c8 !important;
-}
-
-:global(.monaco-editor .source-map-group-7) {
-  background-color: rgb(247 220 111 / 15%) !important;
-  border-left: 3px solid #f7dc6f !important;
-}
-
-:global(.monaco-editor .source-map-group-8) {
-  background-color: rgb(187 143 206 / 15%) !important;
-  border-left: 3px solid #bb8fce !important;
-}
-
-:global(.monaco-editor .source-map-group-9) {
-  background-color: rgb(133 193 233 / 15%) !important;
-  border-left: 3px solid #85c1e9 !important;
 }
 
 .editorWrapper {
@@ -118,16 +54,6 @@
   width: 100% !important;
   min-width: 0;
   min-height: 0;
-}
-
-.editorWrapperWithBorderRadius {
-  composes: editorWrapper;
-  border-radius: var(--acton-radius-panel);
-}
-
-.editorWrapperWithoutBorderRadius {
-  composes: editorWrapper;
-  border-radius: 0 !important;
 }
 
 .editorHint {
@@ -162,12 +88,6 @@ kbd {
   padding: 3px 6px;
   margin: 0 var(--acton-space-1);
   font-family: var(--acton-font-mono), serif;
-}
-
-.clickIcon {
-  font-size: 1.1em;
-  margin: 0 var(--acton-space-1);
-  vertical-align: middle;
 }
 
 .hintDivider {

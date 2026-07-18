@@ -1,4 +1,4 @@
-import {useEffect, useState} from "react"
+import {useEffect} from "react"
 import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
 import {useTheme} from "@acton/ui"
@@ -17,7 +17,6 @@ interface UseMonacoSetupOptions {
 
 interface UseMonacoSetupReturn {
   readonly monaco: typeof monacoTypes | null
-  readonly isReady: boolean
   readonly isMac: boolean
   readonly theme: MonacoTheme
 }
@@ -54,14 +53,9 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
   const monaco = useMonaco()
   const {theme: appTheme} = useTheme()
   const theme: MonacoTheme = appTheme === "dark" ? "dark-theme" : "light-theme"
-  const [isReady, setIsReady] = useState(false)
-  const [isMac, setIsMac] = useState(false)
-
-  useEffect(() => {
-    if (typeof globalThis.navigator !== "undefined") {
-      setIsMac(globalThis.navigator.platform.toUpperCase().indexOf("MAC") >= 0)
-    }
-  }, [])
+  const isMac =
+    typeof globalThis.navigator !== "undefined" &&
+    globalThis.navigator.platform.toUpperCase().includes("MAC")
 
   useEffect(() => {
     if (!monaco) return
@@ -69,25 +63,13 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
     try {
       initializeMonaco(monaco, language)
       monaco.editor.setTheme(theme)
-      setIsReady(true)
     } catch (error) {
       console.error("Failed to initialize Monaco:", error)
     }
   }, [language, monaco, theme])
 
-  useEffect(() => {
-    if (!monaco || !isReady) return
-
-    try {
-      monaco.editor.setTheme(theme)
-    } catch (error) {
-      console.error("Failed to set theme:", error)
-    }
-  }, [theme, monaco, isReady])
-
   return {
     monaco,
-    isReady,
     isMac,
     theme,
   }

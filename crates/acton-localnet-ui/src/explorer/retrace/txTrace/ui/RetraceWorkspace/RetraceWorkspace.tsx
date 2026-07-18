@@ -1288,10 +1288,8 @@ function SourceFilesEditor({
               highlightGroups={frameHighlightGroups}
               shouldCenter={shouldCenterSourceStep && centerSourceLine !== undefined}
               centerLine={centerSourceLine}
-              needBorderRadius={false}
               needFloatingTip={false}
               showInstructionDocs={false}
-              compactGutter
               sourceDebugVariables={currentSourceStep?.locals ?? []}
               codeLensAnnotation={sourceExceptionAnnotation}
               compilerAbi={contractAbi}
@@ -1524,8 +1522,6 @@ function RetraceWorkspaceFc({
                   shouldCenter={transitionType === "button"}
                   exitCode={result.exitCode}
                   compilerAbi={contractAbi}
-                  needBorderRadius={false}
-                  compactGutter
                 />
               </Suspense>
             ) : (

@@ -1,5 +1,5 @@
 import type React from "react"
-import {memo, useCallback, useEffect, useRef, useState} from "react"
+import {memo, useEffect, useRef, useState} from "react"
 import {Editor, loader} from "@monaco-editor/react"
 
 import * as monaco from "monaco-editor"
@@ -11,8 +11,6 @@ import type {ExitCode} from "../../txTrace/lib/types"
 
 import type {LinesExecutionData} from "../../txTrace/hooks"
 
-import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
-
 import {
   useMonacoSetup,
   initializeMonaco,
@@ -20,15 +18,11 @@ import {
   useEditorEvents,
   useTasmHoverProvider,
   useCodeLensProvider,
-  useTasmCompletionProvider,
   useTasmInlayProvider,
-  useImplicitRetInlayProvider,
   useSourceDebugValuesProvider,
-  useFuncLanguageProviders,
   useFolding,
   type SupportedLanguage,
   type HighlightGroup,
-  type HighlightRange,
   type SourceDebugVariableValue,
   type CodeLensAnnotation,
 } from "./hooks"
@@ -42,15 +36,6 @@ interface CodeEditorProps {
 
   /** Programming language for syntax highlighting. Supports 'tasm', 'func', and 'tolk' */
   readonly language?: SupportedLanguage
-
-  /** Whether the editor is read-only or allows editing */
-  readonly readOnly?: boolean
-
-  /** Whether to apply border radius to the editor wrapper */
-  readonly needBorderRadius?: boolean
-
-  /** Callback fired when the Monaco editor instance is mounted and ready */
-  readonly onEditorMount?: (editor: monaco.editor.IStandaloneCodeEditor) => void
 
   /* -------------------------------- Trace Features -------------------------------- */
   /** Line number to highlight (1-indexed). Used for showing the current execution step */
@@ -89,33 +74,11 @@ interface CodeEditorProps {
   /** Groups of lines to highlight with different colors. Used for source map visualization */
   readonly highlightGroups?: readonly HighlightGroup[]
 
-  /** Individual lines to highlight with hover effect. Used for temporary highlighting */
-  readonly hoveredLines?: readonly number[]
-
-  /** Specific text ranges to highlight with precise positioning */
-  readonly highlightRanges?: readonly HighlightRange[]
-
-  /** Callback fired when a user hovers over a line. Used for source map highlighting */
-  readonly onLineHover?: (line: number | null) => void
-
-  /* -------------------------------- Playground/Editing -------------------------------- */
-  /** Callback fired when the code content changes */
-  readonly onChange?: (value: string) => void
-
-  /** Error markers to display in the editor. Used for compilation errors in FunC on the Code Explorer page */
-  readonly markers?: readonly monaco.editor.IMarkerData[]
-
-  /** Optional gas summation per FunC line to display as inlay hints */
-  readonly funcGasByLine?: ReadonlyMap<number, number>
-
   /** Whether to show the floating tip for the editor */
   readonly needFloatingTip?: boolean
 
   /** Optional explicit Monaco model path to avoid sharing models between editors */
   readonly modelPath?: string
-
-  /** Use tighter Monaco gutters for embedded read-only trace views. */
-  readonly compactGutter?: boolean
 
   /** Source-debug locals used for hover values. */
   readonly sourceDebugVariables?: readonly SourceDebugVariableValue[]
@@ -143,32 +106,22 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   implicitRetLine,
   implicitRetLabel,
   lineExecutionData,
-  onLineClick = () => {},
-  onLineHover,
+  onLineClick,
   shouldCenter = true,
   centerLine,
   exitCode,
   compilerAbi,
   codeLensAnnotation,
-  readOnly = true,
-  onChange,
   language = "tasm",
   highlightGroups = [],
-  hoveredLines = [],
-  highlightRanges = [],
-  markers = [],
-  needBorderRadius = true,
   showInstructionDocs = true,
-  onEditorMount,
-  funcGasByLine,
   needFloatingTip = lineExecutionData && language === "tasm",
   modelPath,
-  compactGutter = false,
   sourceDebugVariables,
 }) => {
   const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null)
+  const hasFoldedInactiveBlocksRef = useRef(false)
   const [editorReady, setEditorReady] = useState(false)
-  const [isFoldedState, setIsFolded] = useState(false)
   const modelKey =
     modelPath ?? (language === "func" ? "main.fc" : language === "tolk" ? "main.tolk" : "out.tasm")
 
@@ -179,7 +132,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     editorRef,
     lineExecutionData,
     onLineClick,
-    onLineHover,
     editorReady,
   })
 
@@ -189,8 +141,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     implicitRetLine,
     lineExecutionData,
     highlightGroups,
-    hoveredLines,
-    highlightRanges,
     isCtrlPressed,
     hoveredLine,
     shouldCenter,
@@ -216,13 +166,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     enabled: language === "tasm" || codeLensAnnotation !== undefined,
   })
 
-  useTasmCompletionProvider({
-    monaco,
-    editorRef,
-    editorReady,
-    enabled: language === "tasm",
-  })
-
   useTasmInlayProvider({
     monaco,
     implicitRetLine,
@@ -230,30 +173,6 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     editorRef,
     editorReady,
     enabled: language === "tasm",
-  })
-
-  useFuncLanguageProviders({
-    monaco,
-    editorRef,
-    markers,
-    enabled: language === "func",
-  })
-
-  useImplicitRetInlayProvider({
-    monaco,
-    editorRef,
-    languageId: "func",
-    implicitRetLine,
-    implicitRetLabel,
-    editorReady,
-    enabled: language === "func",
-  })
-
-  useTolkLanguageProviders({
-    monaco,
-    editorRef,
-    markers,
-    enabled: language === "tolk",
   })
 
   useSourceDebugValuesProvider({
@@ -272,6 +191,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   })
 
   useEffect(() => {
+    hasFoldedInactiveBlocksRef.current = false
+
     if (!editorRef.current || !lineExecutionData || Object.keys(lineExecutionData).length === 0) {
       return
     }
@@ -280,146 +201,46 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
     } catch {
       /* ignore */
     }
-    setIsFolded(true)
-  }, [code, language, lineExecutionData])
-
-  useEffect(() => {
-    setIsFolded(false)
-  }, [lineExecutionData])
-
-  // display gas sum for FunC line of code
-  useEffect(() => {
-    if (language !== "func" || !editorReady || !editorRef.current || !funcGasByLine) return
-    const editor = editorRef.current
-    const domNode = editor.getDomNode()
-    if (!domNode) return
-
-    const container = document.createElement("div")
-    container.style.position = "absolute"
-    container.style.pointerEvents = "none"
-    container.style.zIndex = "5"
-    domNode.appendChild(container)
-
-    const render = () => {
-      const layout = editor.getLayoutInfo()
-      const scrollTop = editor.getScrollTop()
-      const ranges = editor.getVisibleRanges() ?? []
-      container.style.left = `${layout.glyphMarginLeft}px`
-      container.style.width = `${layout.glyphMarginWidth}px`
-      container.style.top = "0px"
-      container.innerHTML = ""
-
-      const lines = new Set<number>()
-      for (const r of ranges) {
-        for (let ln = r.startLineNumber; ln <= r.endLineNumber; ln++) lines.add(ln)
-      }
-
-      for (const ln of lines) {
-        const gas = funcGasByLine.get(ln)
-        if (!gas || gas <= 0) continue
-        const top = editor.getTopForLineNumber(ln) - scrollTop
-        const el = document.createElement("div")
-        el.style.position = "absolute"
-        el.style.left = "0"
-        el.style.top = `${top}px`
-        el.style.height = `${editor.getOption(monaco?.editor.EditorOption.lineHeight ?? 40)}px`
-        el.style.display = "flex"
-        el.style.alignItems = "center"
-        el.style.justifyContent = "end"
-        el.style.width = "100%"
-        el.style.fontSize = "10px"
-        el.style.color = "var(--acton-color-text-muted)"
-        el.style.opacity = "0.9"
-        el.style.pointerEvents = "none"
-        el.textContent = String(gas)
-        container.appendChild(el)
-      }
-    }
-
-    const disposeScroll = editor.onDidScrollChange(() => render())
-    const disposeLayout = editor.onDidLayoutChange(() => render())
-    const disposeContent = editor.onDidChangeModelContent(() => render())
-    render()
-
-    return () => {
-      disposeScroll?.dispose()
-      disposeLayout?.dispose()
-      disposeContent?.dispose()
-      container.remove()
-    }
-  }, [language, editorReady, editorRef, funcGasByLine, monaco])
-
-  /* ----------------------- folding inactive blocks ----------------------- */
-  const handleCollapseInactiveBlocks = useCallback(() => {
-    if (isFoldedState) return
-    setIsFolded(true)
-    collapseInactiveBlocks()
-  }, [collapseInactiveBlocks, isFoldedState])
+  }, [code, language, lineExecutionData, modelKey])
 
   /* -------------------------------- effects ------------------------------ */
-  useEffect(() => {
-    if (!editorRef.current) return
-    if (isFoldedState) return // don't apply decorations and folds a second time
-
-    updateDecorations(editorRef.current)
-    handleCollapseInactiveBlocks()
-  }, [lineExecutionData, updateDecorations, handleCollapseInactiveBlocks, isFoldedState])
-
-  useEffect(() => {
-    if (!editorReady || !editorRef.current) return
-
-    updateDecorations(editorRef.current)
-    handleCollapseInactiveBlocks()
-  }, [editorReady, updateDecorations, handleCollapseInactiveBlocks])
-
   useEffect(() => {
     if (!editorReady || !editorRef.current) return
 
     const frame = globalThis.requestAnimationFrame(() => {
-      if (editorRef.current) {
-        editorRef.current.layout()
-        updateDecorations(editorRef.current)
+      const editor = editorRef.current
+      if (!editor) {
+        return
+      }
+
+      editor.layout()
+      updateDecorations(editor)
+
+      if (
+        !hasFoldedInactiveBlocksRef.current &&
+        lineExecutionData &&
+        Object.keys(lineExecutionData).length > 0
+      ) {
+        hasFoldedInactiveBlocksRef.current = true
+        collapseInactiveBlocks()
       }
     })
 
     return () => globalThis.cancelAnimationFrame(frame)
-  }, [code, editorReady, language, modelKey, updateDecorations])
-
-  // Update decorations on pressed ctrl
-  useEffect(() => {
-    if (editorRef.current) {
-      updateDecorations(editorRef.current)
-    }
-  }, [isCtrlPressed, updateDecorations])
-
-  // Handle resize events
-  useEffect(() => {
-    if (!editorReady || !editorRef.current) {
-      return
-    }
-
-    const handleResize = () => {
-      editorRef.current?.layout()
-    }
-
-    window.addEventListener("resize", handleResize)
-    handleResize()
-
-    return () => {
-      window.removeEventListener("resize", handleResize)
-    }
-  }, [editorReady])
+  }, [
+    code,
+    collapseInactiveBlocks,
+    editorReady,
+    language,
+    lineExecutionData,
+    modelKey,
+    updateDecorations,
+  ])
 
   /* -------------------------------- render ------------------------------- */
   return (
     <>
-      <div
-        className={
-          needBorderRadius
-            ? styles.editorWrapperWithBorderRadius
-            : styles.editorWrapperWithoutBorderRadius
-        }
-      >
+      <div className={styles.editorWrapper}>
         <Editor
           className={styles.editor}
           height="100%"
@@ -432,7 +253,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           keepCurrentModel
           options={{
             minimap: {enabled: false},
-            readOnly,
+            readOnly: true,
             lineNumbers: "on",
             automaticLayout: true,
             scrollBeyondLastLine: false,
@@ -442,9 +263,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             insertSpaces: true,
             detectIndentation: false,
             fontFamily: "JetBrains Mono",
-            glyphMargin: !compactGutter,
-            lineDecorationsWidth: compactGutter ? 6 : undefined,
-            lineNumbersMinChars: compactGutter ? 2 : undefined,
+            glyphMargin: false,
+            lineDecorationsWidth: 6,
+            lineNumbersMinChars: 2,
             renderLineHighlight: "none",
             hideCursorInOverviewRuler: true,
             overviewRulerBorder: false,
@@ -465,22 +286,10 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
             const model = editor.getModel()
             if (monaco && model) {
               model.setEOL(monaco.editor.EndOfLineSequence.LF)
-              monaco.editor.setTheme(theme)
             }
 
             editorRef.current = editor
             setEditorReady(true)
-            if (onEditorMount) {
-              onEditorMount(editor)
-            }
-          }}
-          onChange={value => {
-            if (onChange !== undefined && value !== undefined) {
-              onChange(value)
-            }
-            if (editorRef.current) {
-              updateDecorations(editorRef.current)
-            }
           }}
         />
       </div>

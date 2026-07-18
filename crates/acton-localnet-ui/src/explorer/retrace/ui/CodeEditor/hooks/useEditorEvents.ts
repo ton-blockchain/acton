@@ -9,7 +9,6 @@ interface UseEditorEventsOptions {
   readonly editorRef: RefObject<monacoTypes.editor.IStandaloneCodeEditor | null>
   readonly lineExecutionData?: LinesExecutionData
   readonly onLineClick?: (line: number) => void
-  readonly onLineHover?: (line: number | null) => void
   readonly editorReady?: boolean
 }
 
@@ -23,7 +22,6 @@ export const useEditorEvents = ({
   editorRef,
   lineExecutionData,
   onLineClick,
-  onLineHover,
   editorReady = true,
 }: UseEditorEventsOptions): UseEditorEventsReturn => {
   const [isCtrlPressed, setIsCtrlPressed] = useState(false)
@@ -33,11 +31,6 @@ export const useEditorEvents = ({
     (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && !isCtrlPressed) {
         setIsCtrlPressed(true)
-      }
-
-      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-        e.preventDefault()
-        e.stopPropagation()
       }
     },
     [isCtrlPressed],
@@ -60,9 +53,10 @@ export const useEditorEvents = ({
     }
   }, [isCtrlPressed])
 
-  // Line click handler
   useEffect(() => {
-    if (!editorRef.current || !monaco || !editorReady) return
+    if (!editorRef.current || !monaco || !editorReady || !lineExecutionData || !onLineClick) {
+      return
+    }
 
     const disposable = editorRef.current.onMouseDown((e: editor.IEditorMouseEvent) => {
       if (
@@ -72,12 +66,7 @@ export const useEditorEvents = ({
       ) {
         const lineNumber = e.target.position?.lineNumber
 
-        if (
-          lineNumber &&
-          lineExecutionData &&
-          lineExecutionData[lineNumber] !== undefined &&
-          onLineClick
-        ) {
+        if (lineNumber && lineExecutionData[lineNumber] !== undefined) {
           onLineClick(lineNumber)
         }
       }
@@ -86,37 +75,24 @@ export const useEditorEvents = ({
     return () => disposable.dispose()
   }, [editorRef, lineExecutionData, onLineClick, monaco, editorReady])
 
-  // Combined mouse move handler for both Ctrl+click hover and source map hover
   useEffect(() => {
-    if (!monaco || !editorRef.current || !editorReady) return
+    if (!editorRef.current || !editorReady || !lineExecutionData || !onLineClick) {
+      return
+    }
 
     const disposable = editorRef.current.onMouseMove((e: editor.IEditorMouseEvent) => {
       const lineNumber = e.target.position?.lineNumber
 
-      // Handle Ctrl+click hover (for clickable lines)
-      if (
-        isCtrlPressed &&
-        lineNumber &&
-        lineExecutionData &&
-        lineExecutionData[lineNumber] !== undefined
-      ) {
+      if (isCtrlPressed && lineNumber && lineExecutionData[lineNumber] !== undefined) {
         setHoveredLine(lineNumber)
       } else if (isCtrlPressed) {
         setHoveredLine(null)
-      }
-
-      // Handle source map hover (always active if onLineHover is provided)
-      if (onLineHover && lineNumber) {
-        onLineHover(lineNumber)
       }
     })
 
     const handleMouseLeave = () => {
       if (isCtrlPressed) {
         setHoveredLine(null)
-      }
-      if (onLineHover) {
-        onLineHover(null)
       }
     }
 
@@ -129,9 +105,13 @@ export const useEditorEvents = ({
       disposable.dispose()
       editorDom?.removeEventListener("mouseleave", handleMouseLeave)
     }
-  }, [monaco, editorRef, isCtrlPressed, lineExecutionData, onLineHover, editorReady])
+  }, [editorRef, isCtrlPressed, lineExecutionData, onLineClick, editorReady])
 
   useEffect(() => {
+    if (!lineExecutionData || !onLineClick) {
+      return
+    }
+
     document.addEventListener("keydown", handleKeyDown)
     document.addEventListener("keyup", handleKeyUp)
     window.addEventListener("blur", handleBlur)
@@ -141,7 +121,7 @@ export const useEditorEvents = ({
       document.removeEventListener("keyup", handleKeyUp)
       window.removeEventListener("blur", handleBlur)
     }
-  }, [handleKeyDown, handleKeyUp, handleBlur])
+  }, [handleKeyDown, handleKeyUp, handleBlur, lineExecutionData, onLineClick])
 
   return {
     isCtrlPressed,
