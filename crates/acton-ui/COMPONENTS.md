@@ -453,6 +453,52 @@ owns shortening, copy feedback, focus behavior, and the compact chip visual.
   address together.
 - Do not wrap AddressChip in another copy control or clickable element.
 
+## BlockChip
+
+Status: ready
+
+Import:
+
+```tsx
+import { BlockChip } from "@acton/ui"
+```
+
+Use BlockChip for a compact block seqno link or read-only value. It has one
+accent visual treatment shared with AddressChip and an optional coordinated
+highlight state.
+
+### Composition
+
+```tsx
+<BlockChip
+  workchain={block.workchain}
+  shard={block.shard}
+  seqno={block.seqno}
+  href={blockPath(block)}
+/>
+```
+
+- `workchain`, `shard`, and `seqno`: identify the block; only seqno is displayed.
+- `href`: renders a native link; without it the chip is read-only.
+- `label`: optional display content when the caller needs more context than the
+  raw seqno.
+- `highlighted`: applies the coordinated accent highlight used by AddressChip.
+- `onClick`: optional router integration while preserving a real `href`.
+- The copy action writes the Toncenter block id form `(workchain,shard,seqno)`.
+
+### States To Review Visually
+
+- Read-only block
+- Linked block and hover highlight
+- Coordinated highlighted state
+- Keyboard focus
+
+### Agent Guidance
+
+- Keep workchain, shard, route construction, and data fetching in the caller.
+- Preserve `href` when integrating a client router so modifier-click remains useful.
+- Do not add variants; BlockChip intentionally has one visual treatment.
+
 ## ContractChip
 
 Status: ready

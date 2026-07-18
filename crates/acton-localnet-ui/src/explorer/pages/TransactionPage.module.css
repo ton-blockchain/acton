@@ -160,6 +160,13 @@
     var(--acton-color-surface-raised) 94%,
     var(--acton-color-surface-row)
   );
+  overflow-x: auto;
+  scroll-padding-inline: 8px;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
 }
 
 .tabsContainerDetached .tabs {
@@ -183,6 +190,8 @@
   transition:
     background-color var(--acton-duration-fast),
     color var(--acton-duration-fast);
+  flex: 0 0 auto;
+  scroll-margin-inline: 8px;
 }
 
 .tab:hover {
@@ -229,6 +238,58 @@
   --trace-connector-offset: 12px;
   --trace-line-thickness: 1px;
   --trace-line-color: var(--acton-color-text-subtle);
+}
+
+.skeletonOverviewTable {
+  display: flex;
+  flex-direction: column;
+}
+
+.skeletonOverviewRow {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr);
+  min-height: 48px;
+  border-bottom: 1px solid var(--acton-color-border);
+}
+
+.skeletonOverviewRow:last-child {
+  border-bottom: 0;
+}
+
+.skeletonOverviewTitle,
+.skeletonOverviewContent {
+  display: flex;
+  align-items: center;
+  padding: var(--acton-space-1) var(--acton-space-3);
+}
+
+.skeletonOverviewTitle {
+  border-right: 1px solid var(--acton-color-border);
+}
+
+.skeletonOverviewContent {
+  gap: var(--acton-space-4);
+}
+
+.skeletonOverviewLabel {
+  width: 72%;
+  height: 12px;
+}
+
+.skeletonOverviewValue {
+  width: min(8rem, 24%);
+  height: 14px;
+}
+
+@media (max-width: 720px) {
+  .skeletonOverviewRow {
+    grid-template-columns: 1fr;
+  }
+
+  .skeletonOverviewTitle {
+    border-right: 0;
+    border-bottom: 1px solid var(--acton-color-border);
+  }
 }
 
 .traceNode {

@@ -1,4 +1,5 @@
 export * from "./AddressChip"
+export * from "./BlockChip"
 export * from "./Button"
 export * from "./Breadcrumbs"
 export * from "./Checkbox"

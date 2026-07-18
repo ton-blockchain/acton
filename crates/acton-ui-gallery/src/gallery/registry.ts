@@ -1,4 +1,5 @@
 import {addressChipGallery} from "./addressChipGallery"
+import {blockChipGallery} from "./blockChipGallery"
 import {buttonGallery} from "./buttonGallery"
 import {breadcrumbsGallery} from "./breadcrumbsGallery"
 import {checkboxGallery} from "./checkboxGallery"
@@ -35,6 +36,7 @@ import type {ComponentGallery} from "./types"
 export const galleries = [
   tokensGallery,
   addressChipGallery,
+  blockChipGallery,
   buttonGallery,
   inputGallery,
   searchInputGallery,

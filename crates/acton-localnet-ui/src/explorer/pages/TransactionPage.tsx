@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   CircleDotDashed,
   GitBranch,
+  Info,
   ListChecks,
   XCircle,
 } from "lucide-react"
@@ -38,6 +39,7 @@ import {buildActionValueFlowMovements} from "../api/valueFlowActions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
+import {TraceOverviewTable, type TraceOverviewData} from "../components/TraceOverviewTable"
 import {
   formatAddress as formatDisplayAddress,
   hashToHex,
@@ -61,9 +63,12 @@ interface TransactionPageProps {
   readonly openRetraceOnLoad?: boolean
 }
 
-type TabType = "transactions" | "value-flow" | "event-overview"
+type TabType = "transactions" | "value-flow" | "event-overview" | "details"
 
 const parseTabType = (tab: string | null, supportsActions: boolean): TabType => {
+  if (tab === "details" || tab === "overview") {
+    return "details"
+  }
   if (supportsActions && (tab === null || tab === "" || tab === "event-overview")) {
     return "event-overview"
   }
@@ -271,6 +276,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [valueFlow, setValueFlow] = useState<ValueFlowItem[]>([])
   const [traceActions, setTraceActions] = useState<readonly V3Action[]>([])
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
+  const [traceOverview, setTraceOverview] = useState<TraceOverviewData | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
@@ -466,6 +472,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
       setVerifiedSourcesByCodeHash(new Map())
       setTraceActions([])
       setTraceActionMetadata({})
+      setTraceOverview(undefined)
       setHoveredAction(undefined)
       try {
         const data = await client.getTraces(traceLookupHash, {
@@ -561,6 +568,21 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
           )
 
           const actions = trace.actions ?? []
+          const nextTraceOverview: TraceOverviewData = {
+            traceId: trace.trace_id,
+            externalHash: trace.external_hash ?? undefined,
+            masterchainSeqnoStart: trace.mc_seqno_start,
+            masterchainSeqnoEnd: trace.mc_seqno_end,
+            startLt: trace.start_lt,
+            endLt: trace.end_lt,
+            startUtime: trace.start_utime,
+            endUtime: trace.end_utime,
+            isIncomplete: trace.is_incomplete,
+            transactionCount: trace.trace_info.transactions,
+            messageCount: trace.trace_info.messages,
+            pendingMessageCount: trace.trace_info.pending_messages,
+            traceState: trace.trace_info.trace_state,
+          }
           const nextValueFlow = buildValueFlowItems(
             processed,
             buildActionValueFlowMovements(actions, data.metadata),
@@ -573,6 +595,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             setValueFlow(nextValueFlow)
             setTraceActions(actions)
             setTraceActionMetadata(data.metadata)
+            setTraceOverview(nextTraceOverview)
           }
         } else if (isActive) setError("Transaction not found or has no trace yet.")
       } catch (error) {
@@ -749,6 +772,15 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                       ))}
                     </div>
                   )}
+
+                  {activeTab === "details" && traceOverview && (
+                    <TraceOverviewTable
+                      data={traceOverview}
+                      transactions={traces}
+                      actionCount={supportsTraceActions ? traceActions.length : undefined}
+                      onBlockClick={handleBlockClick}
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -799,11 +831,19 @@ function TraceTabs({
   showEventOverview = false,
   onTabChange,
 }: TraceTabsProps): JSX.Element {
+  const activeTabRef = useRef<HTMLButtonElement>(null)
+
+  useLayoutEffect(() => {
+    if (disabled) return
+    activeTabRef.current?.scrollIntoView({block: "nearest", inline: "nearest"})
+  }, [activeTab, disabled])
+
   return (
     <div className={styles.tabs} aria-hidden={disabled ? "true" : undefined}>
       {showEventOverview && (
         <button
           type="button"
+          ref={activeTab === "event-overview" ? activeTabRef : undefined}
           className={`${styles.tab} ${activeTab === "event-overview" ? styles.tabActive : ""}`}
           onClick={() => onTabChange?.("event-overview")}
           disabled={disabled}
@@ -814,6 +854,7 @@ function TraceTabs({
       )}
       <button
         type="button"
+        ref={activeTab === "value-flow" ? activeTabRef : undefined}
         className={`${styles.tab} ${activeTab === "value-flow" ? styles.tabActive : ""}`}
         onClick={() => onTabChange?.("value-flow")}
         disabled={disabled}
@@ -823,12 +864,23 @@ function TraceTabs({
       </button>
       <button
         type="button"
+        ref={activeTab === "transactions" ? activeTabRef : undefined}
         className={`${styles.tab} ${activeTab === "transactions" ? styles.tabActive : ""}`}
         onClick={() => onTabChange?.("transactions")}
         disabled={disabled}
         tabIndex={disabled ? -1 : undefined}
       >
         <GitBranch size={16} /> Transactions
+      </button>
+      <button
+        type="button"
+        ref={activeTab === "details" ? activeTabRef : undefined}
+        className={`${styles.tab} ${activeTab === "details" ? styles.tabActive : ""}`}
+        onClick={() => onTabChange?.("details")}
+        disabled={disabled}
+        tabIndex={disabled ? -1 : undefined}
+      >
+        <Info size={16} /> Details
       </button>
     </div>
   )
@@ -872,6 +924,8 @@ function TransactionTraceSkeleton({
                 <TraceDetailsSkeleton />
               ) : activeTab === "event-overview" ? (
                 <ActionHistorySkeleton />
+              ) : activeTab === "details" ? (
+                <TraceOverviewSkeleton />
               ) : (
                 <ValueFlowSkeleton />
               )}
@@ -883,6 +937,28 @@ function TransactionTraceSkeleton({
           <TraceTreeSkeleton />
         </div>
       </div>
+    </div>
+  )
+}
+
+function TraceOverviewSkeleton(): JSX.Element {
+  return (
+    <div className={styles.skeletonOverviewTable} aria-hidden="true">
+      {[0, 1, 2, 3, 4, 5].map(index => (
+        <div key={`trace-overview-skeleton-${index}`} className={styles.skeletonOverviewRow}>
+          <span className={styles.skeletonOverviewTitle}>
+            <span className={`${styles.skeleton} ${styles.skeletonOverviewLabel}`} />
+          </span>
+          <span className={styles.skeletonOverviewContent}>
+            {[0, 1, 2].map(itemIndex => (
+              <span
+                key={`trace-overview-skeleton-${index}-${itemIndex}`}
+                className={`${styles.skeleton} ${styles.skeletonOverviewValue}`}
+              />
+            ))}
+          </span>
+        </div>
+      ))}
     </div>
   )
 }
