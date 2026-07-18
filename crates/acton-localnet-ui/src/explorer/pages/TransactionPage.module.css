@@ -788,6 +788,51 @@
   border-radius: 999px;
 }
 
+.skeletonStateChanges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+  padding: var(--acton-space-4);
+}
+
+.skeletonStateCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-3);
+}
+
+.skeletonStateHeader {
+  display: flex;
+  align-items: center;
+  min-height: 28px;
+}
+
+.skeletonStateAddress,
+.skeletonStateCell,
+.skeletonStateStorage {
+  border-radius: 999px;
+}
+
+.skeletonStateAddress {
+  width: min(360px, 58%);
+  height: 18px;
+}
+
+.skeletonStateGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--acton-space-3);
+}
+
+.skeletonStateCell {
+  height: 42px;
+}
+
+.skeletonStateStorage {
+  width: min(620px, 88%);
+  height: 34px;
+}
+
 .skeletonDetailCard {
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
@@ -957,6 +1002,10 @@
         120px,
         0.8fr
       );
+  }
+
+  .skeletonStateGrid {
+    grid-template-columns: 1fr;
   }
 
   .skeletonDetailRow {
