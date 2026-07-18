@@ -4,6 +4,7 @@ import {
   type ContractVerifiedSource,
   type ContractData,
   type LoadedTransactionActions,
+  type ResolveVerifiedSourceByCodeHash,
   type TransactionBlockRef,
   TransactionDetails,
   type TransactionInfo,
@@ -104,6 +105,7 @@ interface TraceTransactionNodeProps {
     event: ExplorerNavigationClickEvent,
   ) => void
   readonly loadActions: (tx: TransactionInfo) => Promise<LoadedTransactionActions>
+  readonly resolveVerifiedSourceByCodeHash: ResolveVerifiedSourceByCodeHash
 }
 
 const mapTraceTransactions = (
@@ -187,6 +189,19 @@ const withRetracedStorage = (
   })
 }
 
+async function loadVerifiedSourceByCodeHash(
+  metadataRegistry: ExplorerMetadataRegistry,
+  codeHash: string,
+): Promise<ContractVerifiedSource | undefined> {
+  try {
+    const source = await metadataRegistry.getSource({codeHash})
+    return source.verified && source.bundles.length > 0 ? source : undefined
+  } catch (error) {
+    console.debug(`Failed to fetch verified source for ${codeHash}`, error)
+    return undefined
+  }
+}
+
 async function loadVerifiedSourcesByCodeHash({
   metadataRegistry,
   codeHashes,
@@ -204,16 +219,8 @@ async function loadVerifiedSourcesByCodeHash({
   const sources = await Promise.all(
     uniqueCodeHashes.map(
       async (codeHash): Promise<readonly [string, ContractVerifiedSource] | undefined> => {
-        try {
-          const source = await metadataRegistry.getSource({codeHash})
-          if (!source.verified || source.bundles.length === 0) {
-            return undefined
-          }
-          return [codeHash, source] as const
-        } catch (error) {
-          console.debug(`Failed to fetch verified source for ${codeHash}`, error)
-          return undefined
-        }
+        const source = await loadVerifiedSourceByCodeHash(metadataRegistry, codeHash)
+        return source ? ([codeHash, source] as const) : undefined
       },
     ),
   )
@@ -248,6 +255,10 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const {fetchName} = useAddressBook()
   const {network} = useNetworkInfo()
   const metadataRegistry = useMetadataRegistry()
+  const resolveVerifiedSourceByCodeHash = useCallback(
+    (codeHash: string) => loadVerifiedSourceByCodeHash(metadataRegistry, codeHash),
+    [metadataRegistry],
+  )
   const addressFormat = useAddressFormat()
   const [traceLookupHash, setTraceLookupHash] = useState(hash)
   const supportsTraceActions = client.usesToncenterApiEndpoint() && network.supportsActions
@@ -727,6 +738,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                           getBlockPath={blockPath}
                           onBlockClick={handleBlockClick}
                           loadActions={loadTransactionActions}
+                          resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
                         />
                       ))}
                     </div>
@@ -758,6 +770,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                 getBlockPath={blockPath}
                 onBlockClick={handleBlockClick}
                 loadActions={loadTransactionActions}
+                resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
               />
             </div>
           </>
@@ -981,6 +994,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
   getBlockPath,
   onBlockClick,
   loadActions,
+  resolveVerifiedSourceByCodeHash,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null)
   const childrenRef = useRef<HTMLDivElement>(null)
@@ -1057,6 +1071,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
             getBlockPath={getBlockPath}
             onBlockClick={onBlockClick}
             loadActions={loadActions}
+            resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
           />
         </div>
         {children.length > 0 && (
@@ -1088,6 +1103,7 @@ const TraceTransactionNode: FC<TraceTransactionNodeProps> = ({
               getBlockPath={getBlockPath}
               onBlockClick={onBlockClick}
               loadActions={loadActions}
+              resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
             />
           ))}
         </div>

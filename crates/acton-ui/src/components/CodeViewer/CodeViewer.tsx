@@ -27,6 +27,7 @@ export interface CodeViewerProps {
   readonly attachedToTabs?: boolean
   readonly className?: string
   readonly compact?: boolean
+  readonly defaultFileTreeVisible?: boolean
   readonly emptyMessage?: string
   readonly entrypoint?: string
   readonly externalActionExternal?: boolean
@@ -55,6 +56,7 @@ export function CodeViewer({
   attachedToTabs = false,
   className,
   compact = false,
+  defaultFileTreeVisible = true,
   emptyMessage = "No source files",
   entrypoint,
   externalActionExternal = true,
@@ -65,7 +67,7 @@ export function CodeViewer({
   const entrypointFile = useMemo(() => findEntrypointFile(files, entrypoint), [entrypoint, files])
   const [selectedPath, setSelectedPath] = useState<string>()
   const [collapsedFolders, setCollapsedFolders] = useState<ReadonlySet<string>>(() => new Set())
-  const [isDesktopTreeVisible, setDesktopTreeVisible] = useState(true)
+  const [isDesktopTreeVisible, setDesktopTreeVisible] = useState(defaultFileTreeVisible)
   const [isMobileTreeOpen, setMobileTreeOpen] = useState(false)
   const activeFile =
     findFileByPath(files, selectedPath) ?? entrypointFile ?? files.find(file => file.path.trim())

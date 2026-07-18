@@ -1,3 +1,4 @@
+export * from "./components/CodeCellDetails/CodeCellDetails"
 export * from "./components/ContractSourcePanel/ContractSourcePanel"
 export * from "./components/DisasmSection/DisasmSection"
 export * from "./components/TransactionDetails/ActionsSummary"

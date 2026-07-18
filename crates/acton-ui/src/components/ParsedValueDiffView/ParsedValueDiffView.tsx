@@ -2,7 +2,7 @@ import type React from "react"
 import {ArrowRight} from "lucide-react"
 
 import type {ContractReferenceOptions} from "../ContractChip/ContractChip"
-import {ParsedValueView} from "../ParsedValueView/ParsedValueView"
+import {ParsedValueView, type ParsedValueViewProps} from "../ParsedValueView/ParsedValueView"
 import type {ParsedValueLeaf} from "../ParsedValueView/types"
 
 import styles from "./ParsedValueDiffView.module.css"
@@ -11,9 +11,11 @@ import type {ParsedValueDiff, ParsedValueDiffStatus} from "./types"
 export interface ParsedValueDiffViewProps extends ContractReferenceOptions {
   readonly diff: ParsedValueDiff
   readonly fieldName?: string
+  readonly renderCodeCellDetails?: ParsedValueViewProps["renderCodeCellDetails"]
 }
 
-type ParsedValueDiffContext = ContractReferenceOptions
+type ParsedValueDiffContext = ContractReferenceOptions &
+  Pick<ParsedValueViewProps, "renderCodeCellDetails">
 
 function getEntryStatusClassName(status: ParsedValueDiffStatus): string | undefined {
   switch (status) {
@@ -161,8 +163,9 @@ export function ParsedValueDiffView({
   contracts,
   formatAddress,
   onContractClick,
+  renderCodeCellDetails,
 }: ParsedValueDiffViewProps): React.JSX.Element {
-  const context = {contracts, formatAddress, onContractClick}
+  const context = {contracts, formatAddress, onContractClick, renderCodeCellDetails}
 
   if (diff.kind === "leaf") {
     if (diff.status === "unchanged") {

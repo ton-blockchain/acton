@@ -1,20 +1,29 @@
-import {Check, Copy} from "lucide-react"
+import {useState, type ReactNode} from "react"
+import {Check, Copy, FileCode2} from "lucide-react"
 
 import {ContractChip, type ContractReferenceOptions} from "../ContractChip/ContractChip"
-import {CopyInlineAction, InlineActions} from "../InlineActions/InlineActions"
+import {CopyInlineAction, InlineAction, InlineActions} from "../InlineActions/InlineActions"
+import {Popover} from "../Popover/Popover"
 import {VisuallyGroupedNumber} from "../VisuallyGroupedNumber/VisuallyGroupedNumber"
 
-import {formatScalarByFieldName, isDecimalScalarValue, isHexDisplayValue} from "./scalarDisplay"
-import type {ParsedValue, ParsedValueMapEntry} from "./types"
+import {
+  formatScalarByFieldName,
+  identifierHasWord,
+  isDecimalScalarValue,
+  isHexDisplayValue,
+} from "./scalarDisplay"
+import type {ParsedCodeCell, ParsedValue, ParsedValueMapEntry} from "./types"
 import styles from "./ParsedValueView.module.css"
 
 export interface ParsedValueViewProps extends ContractReferenceOptions {
   readonly value: ParsedValue
   readonly fallbackTypeName?: string
   readonly fieldName?: string
+  readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
 }
 
-type ParsedValueContext = ContractReferenceOptions
+type ParsedValueContext = ContractReferenceOptions &
+  Pick<ParsedValueViewProps, "renderCodeCellDetails">
 
 function ParsedTypeLabel({typeName}: {readonly typeName: string}) {
   return <span className={styles.parsedTypeLabel}>{typeName}</span>
@@ -26,6 +35,7 @@ function ParsedValueRow({
   contracts,
   formatAddress,
   onContractClick,
+  renderCodeCellDetails,
 }: ParsedValueContext & {readonly label: string; readonly value: ParsedValue}) {
   return (
     <>
@@ -36,6 +46,7 @@ function ParsedValueRow({
           contracts={contracts}
           formatAddress={formatAddress}
           onContractClick={onContractClick}
+          renderCodeCellDetails={renderCodeCellDetails}
           fieldName={label}
         />
       </div>
@@ -48,6 +59,7 @@ function ParsedMapEntry({
   contracts,
   formatAddress,
   onContractClick,
+  renderCodeCellDetails,
 }: ParsedValueContext & {readonly entry: ParsedValueMapEntry}) {
   return (
     <div className={styles.parsedMapEntry}>
@@ -59,6 +71,7 @@ function ParsedMapEntry({
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
+            renderCodeCellDetails={renderCodeCellDetails}
           />
         </div>
       </div>
@@ -70,10 +83,90 @@ function ParsedMapEntry({
             contracts={contracts}
             formatAddress={formatAddress}
             onContractClick={onContractClick}
+            renderCodeCellDetails={renderCodeCellDetails}
           />
         </div>
       </div>
     </div>
+  )
+}
+
+function ParsedScalarValue({
+  value,
+  fieldName,
+  renderCodeCellDetails,
+}: {
+  readonly value: Extract<ParsedValue, {readonly kind: "scalar"}>
+  readonly fieldName?: string
+  readonly renderCodeCellDetails?: (cell: ParsedCodeCell) => ReactNode
+}) {
+  const [isCodeOpen, setIsCodeOpen] = useState(false)
+  const displayValue = formatScalarByFieldName({
+    value: value.value,
+    typeName: value.typeName,
+    fieldName,
+  })
+  const scalarValue = (
+    <VisuallyGroupedNumber
+      className={
+        isDecimalScalarValue(value.value) && !isHexDisplayValue(displayValue)
+          ? styles.parsedPlainScalar
+          : styles.parsedScalar
+      }
+      value={displayValue}
+    />
+  )
+  const codeCell =
+    value.typeName === "Cell" &&
+    value.rawValue &&
+    fieldName &&
+    (identifierHasWord(fieldName, "code") || identifierHasWord(fieldName, "cell"))
+      ? {bocHex: value.rawValue, fieldName}
+      : undefined
+  const canShowCode = codeCell !== undefined && renderCodeCellDetails !== undefined
+
+  if (!value.rawValue && !canShowCode) return scalarValue
+
+  return (
+    <InlineActions
+      visibility={isCodeOpen ? "always" : "hover"}
+      actions={
+        <>
+          {canShowCode && (
+            <Popover
+              ariaLabel={`${fieldName} code`}
+              interaction="click"
+              placement="right"
+              maxWidth="54rem"
+              open={isCodeOpen}
+              onOpenChange={setIsCodeOpen}
+              triggerAsChild
+              contentClassName={styles.codeCellPopover}
+              content={isCodeOpen ? renderCodeCellDetails(codeCell) : null}
+            >
+              <InlineAction
+                label={isCodeOpen ? "Hide code" : "Show code"}
+                size="compact"
+                icon={<FileCode2 />}
+                aria-expanded={isCodeOpen}
+              />
+            </Popover>
+          )}
+          {value.rawValue && (
+            <CopyInlineAction
+              value={value.rawValue}
+              label="Copy raw value"
+              copiedLabel="Raw value copied"
+              size="compact"
+              icon={<Copy />}
+              copiedIcon={<Check />}
+            />
+          )}
+        </>
+      }
+    >
+      {scalarValue}
+    </InlineActions>
   )
 }
 
@@ -84,8 +177,9 @@ export function ParsedValueView({
   onContractClick,
   fallbackTypeName,
   fieldName,
+  renderCodeCellDetails,
 }: ParsedValueViewProps) {
-  const context = {contracts, formatAddress, onContractClick}
+  const context = {contracts, formatAddress, onContractClick, renderCodeCellDetails}
 
   switch (value.kind) {
     case "null":
@@ -101,39 +195,12 @@ export function ParsedValueView({
         </span>
       )
     case "scalar": {
-      const displayValue = formatScalarByFieldName({
-        value: value.value,
-        typeName: value.typeName,
-        fieldName,
-      })
-      const scalarValue = (
-        <VisuallyGroupedNumber
-          className={
-            isDecimalScalarValue(value.value) && !isHexDisplayValue(displayValue)
-              ? styles.parsedPlainScalar
-              : styles.parsedScalar
-          }
-          value={displayValue}
-        />
-      )
-
-      if (!value.rawValue) return scalarValue
-
       return (
-        <InlineActions
-          actions={
-            <CopyInlineAction
-              value={value.rawValue}
-              label="Copy raw value"
-              copiedLabel="Raw value copied"
-              size="compact"
-              icon={<Copy />}
-              copiedIcon={<Check />}
-            />
-          }
-        >
-          {scalarValue}
-        </InlineActions>
+        <ParsedScalarValue
+          value={value}
+          fieldName={fieldName}
+          renderCodeCellDetails={renderCodeCellDetails}
+        />
       )
     }
     case "array":

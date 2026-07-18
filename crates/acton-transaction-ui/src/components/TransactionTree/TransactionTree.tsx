@@ -17,6 +17,7 @@ import type {
   TransactionInfo,
 } from "../../model/transaction"
 import type {ContractVerifiedSource} from "../ContractSourcePanel/ContractSourcePanel"
+import type {ResolveVerifiedSourceByCodeHash} from "../CodeCellDetails/CodeCellDetails"
 import * as fmt from "../../lib/format"
 import {
   getTransactionActionPhase,
@@ -65,6 +66,7 @@ interface TransactionTreeProps {
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
+  readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly allContracts: readonly BackendContractInfo[]
   readonly selectedTransactionId?: string
   readonly highlightedTransactionIds?: ReadonlySet<string>
@@ -247,6 +249,7 @@ export function TransactionTree({
   contracts,
   compilerAbisByCodeHash,
   verifiedSourcesByCodeHash,
+  resolveVerifiedSourceByCodeHash,
   allContracts,
   selectedTransactionId,
   highlightedTransactionIds,
@@ -1033,6 +1036,7 @@ export function TransactionTree({
               contracts={contracts}
               compilerAbisByCodeHash={compilerAbisByCodeHash}
               verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+              resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
               allContracts={allContracts}
               onContractClick={onContractClick}
               renderSourceLocation={renderSourceLocation}

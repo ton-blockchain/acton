@@ -1,5 +1,13 @@
 import {Popover as PopoverBase} from "@base-ui/react/popover"
-import {type ComponentPropsWithRef, type ReactNode, type Ref, useCallback, useState} from "react"
+import {
+  type ComponentPropsWithRef,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+  type Ref,
+  useCallback,
+  useState,
+} from "react"
 
 import {cx} from "../../lib/cx"
 import {useTheme} from "../Theme/ThemeProvider"
@@ -20,8 +28,10 @@ export type PopoverProps = Readonly<
     readonly openDelay?: number
     readonly closeDelay?: number
     readonly offset?: number
+    readonly maxWidth?: string
     readonly contentClassName?: string
     readonly triggerClassName?: string
+    readonly triggerAsChild?: boolean
     readonly panelId?: string
     readonly ariaLabel?: string
   }
@@ -37,6 +47,7 @@ export function Popover({
   contentClassName,
   defaultOpen = false,
   interaction = "hover",
+  maxWidth,
   offset = defaultOffset,
   onOpenChange,
   open,
@@ -45,6 +56,7 @@ export function Popover({
   placement = "bottom",
   ref,
   tabIndex = 0,
+  triggerAsChild = false,
   triggerClassName,
   ariaLabel,
   ...props
@@ -71,26 +83,41 @@ export function Popover({
 
   return (
     <PopoverBase.Root open={isOpen} onOpenChange={handleOpenChange}>
-      <PopoverBase.Trigger
-        closeDelay={closeDelay}
-        delay={openDelay}
-        nativeButton={false}
-        openOnHover={interaction === "hover"}
-        render={
-          <span
-            {...props}
-            ref={setTriggerRef}
-            tabIndex={tabIndex}
-            className={cx(styles.popover, className)}
-            data-interaction={interaction}
-          />
-        }
-      >
-        <span className={cx(styles.trigger, triggerClassName)}>{children}</span>
-      </PopoverBase.Trigger>
+      {triggerAsChild ? (
+        <PopoverBase.Trigger
+          closeDelay={closeDelay}
+          delay={openDelay}
+          openOnHover={interaction === "hover"}
+          render={children as ReactElement}
+          className={triggerClassName}
+        />
+      ) : (
+        <PopoverBase.Trigger
+          closeDelay={closeDelay}
+          delay={openDelay}
+          nativeButton={false}
+          openOnHover={interaction === "hover"}
+          render={
+            <span
+              {...props}
+              ref={setTriggerRef}
+              tabIndex={tabIndex}
+              className={cx(styles.popover, className)}
+              data-interaction={interaction}
+            />
+          }
+        >
+          <span className={cx(styles.trigger, triggerClassName)}>{children}</span>
+        </PopoverBase.Trigger>
+      )}
 
       <PopoverBase.Portal>
-        <PopoverBase.Positioner className={styles.positioner} side={placement} sideOffset={offset}>
+        <PopoverBase.Positioner
+          className={styles.positioner}
+          side={placement}
+          sideOffset={offset}
+          style={maxWidth ? ({"--acton-popover-max-width": maxWidth} as CSSProperties) : undefined}
+        >
           <PopoverBase.Popup
             id={panelId}
             aria-label={ariaLabel}

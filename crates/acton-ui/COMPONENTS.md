@@ -505,6 +505,7 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Null and void
 - True and false
 - Decimal, hexadecimal, coin, and raw-copy scalars
+- Code/cell fields with an optional domain-provided inspector action
 - Known and unknown addresses
 - Empty and populated arrays
 - Empty and populated objects
@@ -520,6 +521,9 @@ address, boolean, null, void, array, object, and map nodes recursively.
 - Pass `fieldName` for isolated scalars when field-sensitive hex or coin display
   rules should apply.
 - Pass `rawValue` on a scalar to enable the shared compact copy action.
+- For a scalar with `typeName: "Cell"`, `rawValue`, and a field name containing
+  `code` or `cell`, pass `renderCodeCellDetails` to add the shared code-inspector
+  action. Keep BoC decoding, source lookup, and disassembly in domain code.
 - Reuse ContractChip metadata and `formatAddress` for address nodes.
 - Do not duplicate the recursive array, object, or map layout in callers.
 
@@ -982,6 +986,8 @@ highlighting, copy action, optional external action, and responsive file picker.
 - `externalActionUrl` and `externalActionLabel`: optional navigation to a
   verifier, repository, artifact, or other source context.
 - `compact`: limits the source height for dense details panels.
+- `defaultFileTreeVisible`: controls whether the desktop file tree is visible
+  on first render; users can still show or hide it from the code header.
 - `attachedToTabs`: removes the leading top corner radius when the viewer sits
   directly below a tab bar.
 - `emptyMessage`: caller-provided text for an empty source bundle.
@@ -993,6 +999,7 @@ highlighting, copy action, optional external action, and responsive file picker.
 - Active and hovered files
 - Entrypoint marker
 - Compact layout
+- Initially hidden desktop file tree
 - Mobile file picker
 - Empty source bundle
 
@@ -1222,6 +1229,10 @@ content that needs multiple lines, links, small actions, or structured detail.
 - `interaction`: `hover` by default, or `click` when users need to interact with
   links/buttons inside the panel.
 - `placement`: preferred side: `top`, `right`, `bottom`, or `left`.
+- `maxWidth`: opt into a wider panel for rich inspection content; the default
+  remains `22rem`.
+- `triggerAsChild`: use a single button child as the Base UI trigger instead of
+  wrapping that button in another interactive element.
 - Positioning uses Base UI collision handling. The preferred side can flip or
   shift to stay inside the viewport.
 - `open`, `defaultOpen`, and `onOpenChange`: controlled or uncontrolled state.
@@ -1229,8 +1240,8 @@ content that needs multiple lines, links, small actions, or structured detail.
   it.
 - `contentClassName` and `triggerClassName`: local layout hooks; do not use them
   to replace the shared panel frame.
-- `tabIndex`: defaults to `0` for text triggers. Pass `-1` when wrapping a
-  focusable child such as `InlineButton`.
+- `tabIndex`: defaults to `0` for text triggers. Prefer `triggerAsChild` for a
+  focusable button child.
 
 ### States To Review Visually
 

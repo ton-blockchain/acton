@@ -7,7 +7,10 @@ import type {ParsedTransactionBody} from "../ParsedValueView/types"
 import styles from "./ParsedBodySection.module.css"
 
 export interface ParsedBodySectionProps
-  extends Pick<ParsedValueViewProps, "contracts" | "formatAddress" | "onContractClick"> {
+  extends Pick<
+    ParsedValueViewProps,
+    "contracts" | "formatAddress" | "onContractClick" | "renderCodeCellDetails"
+  > {
   readonly parsedBody: ParsedTransactionBody | undefined
   readonly defaultExpanded?: boolean
   readonly title?: string
@@ -18,6 +21,7 @@ export function ParsedBodySection({
   contracts,
   formatAddress,
   onContractClick,
+  renderCodeCellDetails,
   defaultExpanded = false,
   title = "Parsed Body",
 }: ParsedBodySectionProps) {
@@ -45,6 +49,7 @@ export function ParsedBodySection({
               contracts={contracts}
               formatAddress={formatAddress}
               onContractClick={onContractClick}
+              renderCodeCellDetails={renderCodeCellDetails}
               fallbackTypeName={parsedBody.name}
             />
           </div>

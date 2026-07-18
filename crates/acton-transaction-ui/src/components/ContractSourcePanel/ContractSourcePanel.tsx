@@ -64,6 +64,7 @@ interface ContractCodeData {
 
 interface ContractSourcePanelProps {
   readonly codeBoc: string
+  readonly defaultFileTreeVisible?: boolean
   readonly verifiedSource?: ContractVerifiedSource
   readonly verifiedSourceLoading?: boolean
   readonly verificationUrl?: string
@@ -75,6 +76,7 @@ const VERIFIER_BASE_URL = "https://verifier.acton.monster"
 
 export function ContractSourcePanel({
   codeBoc,
+  defaultFileTreeVisible = true,
   verifiedSource,
   verifiedSourceLoading = false,
   verificationUrl,
@@ -98,6 +100,7 @@ export function ContractSourcePanel({
         activeTab={activeTab}
         onTabChange={setActiveTab}
         codeData={codeData}
+        defaultFileTreeVisible={defaultFileTreeVisible}
         verifiedSource={resolvedVerifiedSource}
         verificationUrl={verificationUrl}
         verificationExternal={verificationExternal}
@@ -144,6 +147,7 @@ function SourcePanel({
   activeTab,
   onTabChange,
   codeData,
+  defaultFileTreeVisible,
   verifiedSource,
   verificationUrl,
   verificationExternal,
@@ -152,6 +156,7 @@ function SourcePanel({
   readonly activeTab: ContractSourceTab
   readonly onTabChange: (tab: ContractSourceTab) => void
   readonly codeData: ContractCodeData
+  readonly defaultFileTreeVisible: boolean
   readonly verifiedSource?: ContractVerifiedSource
   readonly verificationUrl?: string
   readonly verificationExternal: boolean
@@ -224,6 +229,7 @@ function SourcePanel({
       {activeSourceTab === "verified" && verifiedSource ? (
         <VerifiedSourcePanel
           source={verifiedSource}
+          defaultFileTreeVisible={defaultFileTreeVisible}
           verificationUrl={verificationUrl}
           verificationExternal={verificationExternal}
           compact={compact}
@@ -250,11 +256,13 @@ function SourcePanel({
 
 function VerifiedSourcePanel({
   source,
+  defaultFileTreeVisible,
   verificationUrl,
   verificationExternal,
   compact,
 }: {
   readonly source: ContractVerifiedSource
+  readonly defaultFileTreeVisible: boolean
   readonly verificationUrl?: string
   readonly verificationExternal: boolean
   readonly compact: boolean
@@ -301,6 +309,7 @@ function VerifiedSourcePanel({
         key={activeBundle.source_bundle_hash}
         attachedToTabs
         compact={compact}
+        defaultFileTreeVisible={defaultFileTreeVisible}
         files={activeBundle.files}
         entrypoint={activeBundle.entrypoint}
         externalActionLabel="View verification"

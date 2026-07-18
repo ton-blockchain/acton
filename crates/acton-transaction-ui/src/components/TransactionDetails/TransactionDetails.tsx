@@ -9,6 +9,7 @@ import {
   InfoPopover,
   OpcodeChip,
   ParsedBodySection,
+  type ParsedCodeCell,
   ParsedValueDiffView,
   ParsedValueView,
   RawDataBlock,
@@ -22,6 +23,10 @@ import type {
   TransactionBlockRef,
   TransactionInfo,
 } from "../../model/transaction"
+import {
+  CodeCellDetails,
+  type ResolveVerifiedSourceByCodeHash,
+} from "../CodeCellDetails/CodeCellDetails"
 import {
   ContractSourcePanel,
   type ContractVerifiedSource,
@@ -54,6 +59,7 @@ export interface TransactionDetailsProps {
   readonly contracts: Map<string, ContractData>
   readonly compilerAbisByCodeHash?: ReadonlyMap<string, ContractData["abi"]>
   readonly verifiedSourcesByCodeHash?: ReadonlyMap<string, ContractVerifiedSource>
+  readonly resolveVerifiedSourceByCodeHash?: ResolveVerifiedSourceByCodeHash
   readonly allContracts: readonly BackendContractInfo[]
   readonly onContractClick?: (address: string) => void
   readonly renderSourceLocation?: (location: SourceLocation) => React.ReactNode
@@ -104,6 +110,7 @@ export function TransactionDetails({
   contracts,
   compilerAbisByCodeHash,
   verifiedSourcesByCodeHash,
+  resolveVerifiedSourceByCodeHash,
   allContracts,
   onContractClick,
   renderSourceLocation,
@@ -123,6 +130,16 @@ export function TransactionDetails({
   const [isLoadingStorage, setIsLoadingStorage] = useState(false)
   const [loadStorageError, setLoadStorageError] = useState<string | undefined>()
   const currentTxIdRef = useRef(tx.id)
+  const renderCodeCellDetails = React.useCallback(
+    (cell: ParsedCodeCell) => (
+      <CodeCellDetails
+        cell={cell}
+        verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
+        resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
+      />
+    ),
+    [resolveVerifiedSourceByCodeHash, verifiedSourcesByCodeHash],
+  )
 
   useEffect(() => {
     currentTxIdRef.current = tx.id
@@ -504,6 +521,7 @@ export function TransactionDetails({
                 parsedBody={parsedBody}
                 contracts={contracts}
                 onContractClick={onContractClick}
+                renderCodeCellDetails={renderCodeCellDetails}
               />
             )}
             {(stateInitCode || stateInitData) && (
@@ -563,6 +581,7 @@ export function TransactionDetails({
                                 contracts={contracts}
                                 onContractClick={onContractClick}
                                 fallbackTypeName={parsedStateInitData.name}
+                                renderCodeCellDetails={renderCodeCellDetails}
                               />
                             </div>
                           </div>
@@ -660,6 +679,7 @@ export function TransactionDetails({
                 diff={storageDiff}
                 contracts={contracts}
                 onContractClick={onContractClick}
+                renderCodeCellDetails={renderCodeCellDetails}
               />
             </div>
           )}

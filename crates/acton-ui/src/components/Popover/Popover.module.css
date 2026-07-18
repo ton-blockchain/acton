@@ -21,13 +21,13 @@
 
 .positioner {
   z-index: 1000;
-  max-width: min(22rem, var(--available-width));
+  max-width: min(var(--acton-popover-max-width, 22rem), var(--available-width));
 }
 
 .panel {
   box-sizing: border-box;
   width: max-content;
-  max-width: min(22rem, var(--available-width));
+  max-width: min(var(--acton-popover-max-width, 22rem), var(--available-width));
   overflow: visible;
   padding: var(--acton-space-3);
   border: 0;

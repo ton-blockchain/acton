@@ -13,6 +13,11 @@ export interface ParsedValueMapEntry {
   readonly value: ParsedValue
 }
 
+export interface ParsedCodeCell {
+  readonly bocHex: string
+  readonly fieldName: string
+}
+
 /**
  * Minimal presentation model consumed by ParsedValueView.
  *

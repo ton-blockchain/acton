@@ -59,6 +59,13 @@
   line-height: 1.35;
 }
 
+.codeCellPopover {
+  max-height: calc(100dvh - var(--acton-space-8));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 0;
+}
+
 .parsedScalar {
   color: var(--acton-parsed-value-tone, inherit);
   font-family: var(--acton-font-mono);

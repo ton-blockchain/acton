@@ -39,7 +39,7 @@ function identifierWordBoundary(prev: string, current: string, next: string | un
   )
 }
 
-function identifierHasWord(name: string, needle: string): boolean {
+export function identifierHasWord(name: string, needle: string): boolean {
   let start: number | undefined
   let prev: string | undefined
 

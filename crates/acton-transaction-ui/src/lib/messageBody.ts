@@ -311,6 +311,7 @@ const toSerializedCellScalar = (
   kind: "scalar",
   value: formatSerializedCellPreview(typeName, cell),
   rawValue: cell.toBoc({idx: false, crc32: false}).toString("hex"),
+  typeName,
 })
 
 interface ParsedValueTypeContext {
