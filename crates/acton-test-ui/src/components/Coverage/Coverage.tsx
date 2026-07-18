@@ -14,6 +14,10 @@ interface CoverageProps {
   readonly projectRoot?: string
 }
 
+interface CoverageContentProps extends CoverageProps {
+  readonly lcov: string
+}
+
 const getRelativePath = (filePath: string, projectRoot?: string) => {
   if (projectRoot && filePath.startsWith(projectRoot)) {
     const relativePath = filePath.slice(projectRoot.length)
@@ -96,7 +100,16 @@ const tokenStyle = (token: HighlightedCodeToken): React.CSSProperties | undefine
 
 export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
   const {lcov, error, loading} = useCoverageReport()
-  const coverage = useMemo(() => parseLcov(lcov ?? ""), [lcov])
+
+  if (loading) return <div className={styles.emptyState}>Loading coverage report...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load coverage: {error}</div>
+  if (lcov === undefined) return <div className={styles.emptyState}>Coverage is not available</div>
+
+  return <CoverageContent lcov={lcov} projectRoot={projectRoot} />
+}
+
+const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) => {
+  const coverage = useMemo(() => parseLcov(lcov), [lcov])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
     return coverage.files[0]?.filePath
@@ -202,10 +215,6 @@ export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
 
     return sourceContent.split("\n")
   }, [sourceContent])
-
-  if (loading) return <div className={styles.emptyState}>Loading coverage report...</div>
-  if (error) return <div className={styles.emptyState}>Failed to load coverage: {error}</div>
-  if (lcov === undefined) return <div className={styles.emptyState}>Coverage is not available</div>
 
   if (coverage.files.length === 0) {
     return <div className={styles.emptyState}>No coverage records found in the LCOV report</div>

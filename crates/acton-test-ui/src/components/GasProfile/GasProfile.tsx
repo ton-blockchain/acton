@@ -46,9 +46,9 @@ interface GasProfileProps {
   readonly projectRoot?: string
 }
 
-const EMPTY_GAS_PROFILE: GasProfileData = {
-  contracts: [],
-  total_gas: 0,
+interface GasProfileContentProps {
+  readonly profile: GasProfileData
+  readonly projectRoot?: string
 }
 
 interface FlameNode {
@@ -505,13 +505,24 @@ const buildInstructionStats = (
     .sort((a, b) => b.totalGas - a.totalGas || a.name.localeCompare(b.name))
 }
 
-export const GasProfile: React.FC<GasProfileProps> = ({profile: providedProfile, projectRoot}) => {
+export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) => {
   const {
     profile: loadedProfile,
     error,
     loading,
-  } = useGasProfileReport(providedProfile === undefined)
-  const profile = providedProfile ?? loadedProfile ?? EMPTY_GAS_PROFILE
+  } = useGasProfileReport(profile === undefined)
+
+  if (profile !== undefined) return <GasProfileContent profile={profile} projectRoot={projectRoot} />
+  if (loading) return <div className={styles.emptyState}>Loading gas profile...</div>
+  if (error) return <div className={styles.emptyState}>Failed to load gas profile: {error}</div>
+  if (loadedProfile === undefined) {
+    return <div className={styles.emptyState}>Gas profile is not available</div>
+  }
+
+  return <GasProfileContent profile={loadedProfile} projectRoot={projectRoot} />
+}
+
+const GasProfileContent: React.FC<GasProfileContentProps> = ({profile, projectRoot}) => {
   const [selectedContractName, setSelectedContractName] = useState<string | undefined>(
     () => profile.contracts[0]?.name,
   )
@@ -766,14 +777,6 @@ export const GasProfile: React.FC<GasProfileProps> = ({profile: providedProfile,
       flameContainer.removeEventListener("scroll", scheduleConnectorUpdate)
     }
   }, [flameWidth, selectedNodeId])
-
-  if (providedProfile === undefined) {
-    if (loading) return <div className={styles.emptyState}>Loading gas profile...</div>
-    if (error) return <div className={styles.emptyState}>Failed to load gas profile: {error}</div>
-    if (loadedProfile === undefined) {
-      return <div className={styles.emptyState}>Gas profile is not available</div>
-    }
-  }
 
   if (profile.contracts.length === 0 || profile.total_gas === 0) {
     return <div className={styles.emptyState}>No gas profile samples were recorded</div>
