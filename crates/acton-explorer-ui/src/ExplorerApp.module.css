@@ -220,7 +220,7 @@
   border: 1px solid var(--acton-color-border);
   border-radius: 10px;
   background: var(--acton-color-surface-raised);
-  box-shadow: var(--acton-shadow-overlay);
+  box-shadow: var(--acton-shadow-popover);
   box-sizing: border-box;
   overflow: hidden;
   transform-origin: top right;

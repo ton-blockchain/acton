@@ -625,7 +625,7 @@
   border: 1px solid var(--acton-color-border);
   border-radius: 14px;
   background: var(--acton-color-surface-raised);
-  box-shadow: var(--acton-shadow-overlay);
+  box-shadow: var(--acton-shadow-popover);
 }
 
 .qrPopoverHeader {
