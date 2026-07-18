@@ -37,6 +37,7 @@
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.15.0",
     "shiki": "^3.22.0",
+    "tasm-web-wasm": "file:../../../ton-opensource-button/app/src/wasm/pkg",
     "ton-source-map": "^0.2.2",
     "vite-plugin-node-polyfills": "^0.28.0"
   },

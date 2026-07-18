@@ -19,6 +19,7 @@ import type {SourceBundle, VerificationSourceResponse} from "../../../api/types"
 import type {ExplorerNetworkInfo} from "../../../hooks/useNetworkInfo"
 import type {ExplorerMetadataRegistry} from "../../../metadata/types"
 import type {ExitCode, RetraceResultAndCode, RetraceTraceResult} from "./types"
+import {buildDecompiledFuncSourceTrace} from "./decompiledFuncSource"
 
 import {
   NetworkError,
@@ -305,6 +306,9 @@ export async function traceTx(
   const verifiedSource = await loadVerifiedTolkSource(metadataRegistry, options.codeHash)
   const sourceTraceOptions = verifiedSourceTraceOptions(verifiedSource)
   const {result} = await doTrace(hash, network, sourceTraceOptions?.sourceMap)
+  const decompiledSource = sourceTraceOptions
+    ? undefined
+    : await buildDecompiledFuncSourceTrace(result)
   const {code, traceInfo, exitCode} = extractCodeAndTrace(result.codeCell, result.emulatedTx.vmLogs)
   return {
     result,
@@ -312,9 +316,10 @@ export async function traceTx(
     trace: traceInfo,
     exitCode,
     network,
-    verifiedSource,
-    sourceTrace: result.sourceTrace,
-    sourceTraceBundleHash: sourceTraceOptions?.sourceTraceBundleHash,
+    verifiedSource: decompiledSource?.source ?? verifiedSource,
+    sourceTrace: decompiledSource?.trace ?? result.sourceTrace,
+    sourceTraceBundleHash:
+      decompiledSource?.bundleHash ?? sourceTraceOptions?.sourceTraceBundleHash,
   }
 }
 

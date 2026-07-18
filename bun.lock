@@ -34,6 +34,7 @@
         "react-markdown": "^10.1.0",
         "react-router-dom": "^7.15.0",
         "shiki": "^3.22.0",
+        "tasm-web-wasm": "file:../../../ton-opensource-button/app/src/wasm/pkg",
         "ton-source-map": "^0.2.2",
         "vite-plugin-node-polyfills": "^0.28.0",
       },
@@ -76,6 +77,7 @@
         "react-markdown": "^10.1.0",
         "react-router-dom": "^7.15.0",
         "shiki": "^3.22.0",
+        "tasm-web-wasm": "file:../../../ton-opensource-button/app/src/wasm/pkg",
         "ton-source-map": "^0.2.2",
         "vite-plugin-node-polyfills": "^0.28.0",
       },
@@ -2403,7 +2405,11 @@
 
     "acton-explorer-ui/@ton/retracer-core": ["@ton/retracer-core@file:../retracer-core-new", { "dependencies": { "@ton/core": "^0.63.1", "@ton/sandbox": "^0.43.0", "ton-assembly": "0.6.1" }, "devDependencies": { "@ton-community/func-js": "^0.10.0", "@ton/crypto": "^3.3.0", "@ton/test-utils": "^0.10.0", "@types/node": "^22.14.0", "esbuild": "^0.25.2", "eslint": "^9.39.0", "eslint-plugin-unicorn": "^56.0.1", "eslint-plugin-unused-imports": "^4.1.4", "prettier": "3.4.2", "typescript": "^5.7.0", "typescript-eslint": "^8.29.1", "vitest": "^4.1.0" } }],
 
+    "acton-explorer-ui/tasm-web-wasm": ["tasm-web-wasm@file:../ton-opensource-button/app/src/wasm/pkg", {}],
+
     "acton-localnet-ui/@ton/retracer-core": ["@ton/retracer-core@file:../retracer-core-new", { "dependencies": { "@ton/core": "^0.63.1", "@ton/sandbox": "^0.43.0", "ton-assembly": "0.6.1" }, "devDependencies": { "@ton-community/func-js": "^0.10.0", "@ton/crypto": "^3.3.0", "@ton/test-utils": "^0.10.0", "@types/node": "^22.14.0", "esbuild": "^0.25.2", "eslint": "^9.39.0", "eslint-plugin-unicorn": "^56.0.1", "eslint-plugin-unused-imports": "^4.1.4", "prettier": "3.4.2", "typescript": "^5.7.0", "typescript-eslint": "^8.29.1", "vitest": "^4.1.0" } }],
+
+    "acton-localnet-ui/tasm-web-wasm": ["tasm-web-wasm@file:../ton-opensource-button/app/src/wasm/pkg", {}],
 
     "ai/@opentelemetry/api": ["@opentelemetry/api@1.9.0", "", {}, "sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg=="],
 

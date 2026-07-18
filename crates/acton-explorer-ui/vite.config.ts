@@ -28,6 +28,9 @@ export default defineConfig({
       ),
     },
   },
+  optimizeDeps: {
+    exclude: ["tasm-web-wasm"],
+  },
   build: {
     outDir: "dist",
     emptyOutDir: true,

@@ -2597,6 +2597,24 @@ fn debug_format(
                     Some(cell.clone()),
                 )
             }
+            SlotValue::Live(VmStackValue::CellSlice(cs))
+                if matches!(slice_meta(cs), (Some(267), Some(0), _)) =>
+            {
+                match try_parse_address(cs).and_then(|raw| raw.parse::<StdAddr>().ok()) {
+                    Some(addr) => render_std_address(ty_name, addr.to_string(), &addr),
+                    None => {
+                        let (bits, refs, hash) = slice_meta(cs);
+                        render_openable_cell_like(
+                            ty_name,
+                            render_slice(cs),
+                            bits,
+                            refs,
+                            hash,
+                            slice_as_cell_like(cs),
+                        )
+                    }
+                }
+            }
             SlotValue::Live(VmStackValue::CellSlice(cs)) => {
                 let (bits, refs, hash) = slice_meta(cs);
                 render_openable_cell_like(
@@ -2704,6 +2722,9 @@ fn debug_format(
             _ => typed_leaf_for_ty(symbols, ty_idx, "not a TVM continuation"),
         },
         Ty::Unknown => match r.read_slot() {
+            SlotValue::Live(VmStackValue::Tuple(items)) if items.is_empty() => {
+                RenderedValue::leaf("null")
+            }
             SlotValue::Live(any) => RenderedValue::leaf(any.to_string()),
             _ => RenderedValue::leaf("unreachable"),
         },
@@ -4746,6 +4767,57 @@ mod tests {
         assert_eq!(type_name, "address");
         assert_eq!(value, addr.to_string());
         assert_eq!(legacy_value, addr.to_string());
+    }
+
+    #[test]
+    fn render_slice_with_address_shape_as_address() {
+        let addr = StdAddr::new(0, HashBytes([0x44; 32]));
+        let mut builder = CellBuilder::new();
+        IntAddr::Std(addr.clone())
+            .store_into(&mut builder, Cell::empty_context())
+            .unwrap();
+        let addr_cell = builder.build().unwrap();
+        let addr_slice = addr_cell.as_slice_allow_exotic();
+        assert_eq!(addr_slice.size_bits(), 267);
+        assert_eq!(addr_slice.size_refs(), 0);
+
+        let stack_values = [VmStackValue::CellSlice(CellSlice {
+            value: Boc::encode_hex(&addr_cell),
+            bits: None,
+            refs: None,
+        })];
+        let slots = [SlotValue::Live(&stack_values[0])];
+
+        let rendered = debug_print_from_stack(&source_map_with_types(vec![Ty::Slice]), &slots, 0);
+
+        let RenderedValue::Address {
+            legacy_value,
+            value,
+            type_name,
+            ..
+        } = rendered
+        else {
+            panic!("expected address");
+        };
+        assert_eq!(type_name, "slice");
+        assert_eq!(value, addr.to_string());
+        assert_eq!(legacy_value, addr.to_string());
+    }
+
+    #[test]
+    fn render_unknown_empty_tuple_as_null_leaf() {
+        let stack_values = [VmStackValue::Tuple(Vec::new())];
+        let slots = [SlotValue::Live(&stack_values[0])];
+
+        let rendered = debug_print_from_stack(&source_map_with_types(vec![Ty::Unknown]), &slots, 0);
+
+        assert!(matches!(
+            rendered,
+            RenderedValue::Leaf {
+                ref value,
+                type_field: None,
+            } if value == "null"
+        ));
     }
 
     #[test]
