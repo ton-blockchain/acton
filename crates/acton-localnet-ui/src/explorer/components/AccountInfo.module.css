@@ -129,13 +129,13 @@
 }
 
 .contractDescriptionLink:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: underline;
 }
 
 .contractDescriptionLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .contractDescriptionLinks {
@@ -160,12 +160,12 @@
 }
 
 .contractDescriptionLinkItem:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
 }
 
 .contractDescriptionLinkItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .contractDescriptionLinkKind {
@@ -241,7 +241,7 @@
 }
 
 .editInput {
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   border-radius: 10px;
   font-size: var(--acton-font-size-sm);
 }
@@ -265,7 +265,7 @@
 .renameSaveButton {
   border: 1px solid var(--acton-color-primary);
   background: var(--acton-color-primary);
-  color: var(--litenode-primary-foreground);
+  color: var(--acton-color-primary-foreground);
 }
 
 .renameSaveButton:hover:not(:disabled) {
@@ -279,13 +279,13 @@
 }
 
 .renameCancelButton {
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-surface-subtle);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-raised);
   color: var(--acton-color-text);
 }
 
 .renameCancelButton:hover {
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .iconButton,
@@ -328,7 +328,7 @@
 .moreLink:focus-visible,
 .externalLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .qrToggle {
@@ -345,7 +345,7 @@
 }
 
 .saveIcon {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .assetRow {
@@ -380,7 +380,7 @@
 .assetPreviewStack:focus-visible,
 .collectiblesLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetIconImage {
@@ -421,12 +421,12 @@
 .assetPreviewIcon {
   display: block;
   object-fit: cover;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .assetPreviewPlaceholder {
   display: inline-block;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .assetPreviewIcon + .assetPreviewIcon,
@@ -482,13 +482,13 @@
 .collectibleThumb {
   display: block;
   object-fit: cover;
-  background: var(--litenode-neutral-bg);
+  background: var(--acton-color-surface-group);
 }
 
 .collectibleThumbPlaceholder {
   display: inline-block;
-  border: 1px solid var(--litenode-border-control);
-  background: var(--litenode-neutral-bg);
+  border: 1px solid var(--acton-color-border-control);
+  background: var(--acton-color-surface-group);
 }
 
 .statusBar {
@@ -528,7 +528,7 @@
 
 .statusActive {
   background: transparent;
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .statusFrozen {
@@ -571,7 +571,7 @@
 }
 
 .externalLink:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: underline;
 }
 
@@ -653,7 +653,7 @@
   background: linear-gradient(
     90deg,
     var(--acton-color-surface-row) 0%,
-    var(--litenode-control-hover) 45%,
+    var(--acton-color-surface-hover) 45%,
     var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
@@ -697,7 +697,7 @@
   background: linear-gradient(
     90deg,
     var(--acton-color-surface-row) 0%,
-    var(--litenode-control-hover) 45%,
+    var(--acton-color-surface-hover) 45%,
     var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;

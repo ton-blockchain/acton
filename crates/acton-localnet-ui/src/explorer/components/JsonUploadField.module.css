@@ -15,8 +15,8 @@
   resize: vertical;
   border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   padding: 10px;
   font: inherit;
   font-family: var(--font-family-mono, monospace);
@@ -35,9 +35,9 @@
   box-sizing: border-box;
   border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   padding: 5px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   font-weight: 400;
 }
@@ -53,7 +53,7 @@
   border: 1px solid var(--acton-color-border);
   border-radius: 6px;
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 650;
 }
 
@@ -77,6 +77,6 @@
 .textArea:focus,
 .fileControl:focus-within {
   outline: none;
-  border-color: var(--litenode-focus);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--litenode-focus) 18%, transparent);
+  border-color: var(--acton-color-focus-ring);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--acton-color-focus-ring) 18%, transparent);
 }

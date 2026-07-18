@@ -64,7 +64,7 @@
   padding: 0 18px;
   border-bottom: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   box-sizing: border-box;
   display: flex;
   align-items: center;
@@ -100,7 +100,7 @@
   border-radius: 7px;
   background: transparent;
   box-shadow: none;
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   gap: 6px;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -110,14 +110,14 @@
 .refreshButton.refreshButton:hover:not(:disabled),
 .tableActionButton.tableActionButton:hover:not(:disabled) {
   background: transparent;
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
 }
 
 .refreshButton.refreshButton:focus-visible,
 .tableActionButton.tableActionButton:focus-visible {
   outline: none;
   background: transparent;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .refreshButton.refreshButton:disabled,
@@ -143,7 +143,7 @@
 .walletTable th,
 .walletTable td {
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   box-sizing: border-box;
   line-height: 1.35;
   text-align: left;
@@ -178,7 +178,7 @@
 }
 
 .walletTableRow:hover td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .walletNameHeader,
@@ -219,7 +219,7 @@
 .pickerTitle,
 .permissionTitle,
 .messageAddress {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 600;
 }
 
@@ -244,7 +244,7 @@
 
 .walletVersion {
   display: block;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -327,7 +327,7 @@
 
 .sessionWalletCell {
   width: 170px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 600;
 }
 
@@ -392,7 +392,7 @@
 .unsupportedBlock {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .unsupportedTitle {
@@ -449,7 +449,7 @@
 .copyableAddressText {
   min-width: 0;
   flex: 1 1 auto;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.82rem;
   overflow: hidden;
@@ -458,7 +458,7 @@
 }
 
 .addressCopyButton {
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
   background: var(--acton-color-surface);
   color: var(--acton-color-text-muted);
@@ -471,26 +471,26 @@
 }
 
 .addressCopyButton:hover {
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .addressCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .addressCopyButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .permissionItem,
 .messageItem,
 .requestSummary {
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   padding: 12px;
 }
 
@@ -507,7 +507,7 @@
 }
 
 .metaValue {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   text-align: right;
 }
 
@@ -527,7 +527,7 @@
   width: min(520px, 100%);
   max-height: min(720px, calc(100vh - 36px));
   overflow: auto;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
   background: var(--acton-color-surface);
   box-shadow: var(--acton-shadow-overlay);
@@ -547,7 +547,7 @@
 
 .modalTitle {
   margin: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 1.05rem;
   font-weight: 600;
 }
@@ -567,13 +567,13 @@
 }
 
 .modalCloseButton:hover {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
 
 .modalCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .modalSubtitle {
@@ -610,9 +610,9 @@
 
 .pickerOption {
   width: 100%;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   color: inherit;
   cursor: pointer;
   display: flex;
@@ -624,17 +624,17 @@
 }
 
 .pickerOption:hover {
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-hover);
 }
 
 .pickerOption:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .pickerOptionActive {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-active);
 }
 
@@ -646,10 +646,10 @@
 .radio {
   width: 22px;
   height: 22px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 999px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .requestSummary {
@@ -661,7 +661,7 @@
 .messageIndex {
   width: 28px;
   height: 28px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
   background: var(--acton-color-surface);
   color: var(--acton-color-text-muted);
@@ -676,9 +676,9 @@
 .signPreviewPanel,
 .signPreviewDetails {
   min-width: 0;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
 }
 
 .signPreviewPanel {
@@ -688,8 +688,8 @@
 .signPreviewHeader {
   min-height: 38px;
   padding: 0 12px;
-  border-bottom: 1px solid var(--litenode-border-subtle);
-  color: var(--litenode-text);
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -737,14 +737,14 @@
 
 .signPreviewNotice {
   padding: 10px 12px;
-  border-bottom: 1px solid var(--litenode-border-subtle);
+  border-bottom: 1px solid var(--acton-color-border);
   color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   line-height: 1.4;
 }
 
 .signPreviewNoticeError {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .signPreviewRows {
@@ -759,7 +759,7 @@
   min-width: 0;
   min-height: 34px;
   padding: 7px 12px 7px calc(12px + var(--sign-preview-depth) * 14px);
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
   display: grid;
   grid-template-columns: minmax(92px, 0.42fr) minmax(0, 1fr);
   gap: 10px;
@@ -771,7 +771,7 @@
 }
 
 .signPreviewRowError .signPreviewValue {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .signPreviewLabel {
@@ -787,7 +787,7 @@
 
 .signPreviewValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow-wrap: anywhere;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
   font-size: 0.75rem;
@@ -801,7 +801,7 @@
 .signPreviewDetails summary {
   min-height: 38px;
   padding: 0 12px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -824,7 +824,7 @@
   --acton-highlighted-code-padding: 12px;
 
   margin: 0;
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .spinning {

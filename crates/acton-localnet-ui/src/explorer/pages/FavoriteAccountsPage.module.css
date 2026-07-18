@@ -19,7 +19,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: 0;
@@ -43,7 +43,7 @@
   padding: 0 18px;
   border-bottom: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.86rem;
   font-weight: 750;
   letter-spacing: 0;
@@ -73,7 +73,7 @@
 .table td {
   box-sizing: border-box;
   padding: 0 16px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   line-height: 1.35;
   text-align: left;
   vertical-align: middle;
@@ -129,12 +129,12 @@
 
 .tableRow:hover td,
 .tableRow:focus-within td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .emptyLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .savedAtCell {
@@ -160,7 +160,7 @@
 }
 
 .emptyText {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   font-weight: 650;
 }
@@ -179,7 +179,7 @@
 }
 
 .emptyLink:hover {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: underline;
 }
 

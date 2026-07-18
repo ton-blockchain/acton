@@ -37,7 +37,7 @@
 }
 
 .title {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.86rem;
   font-weight: 750;
   letter-spacing: 0;

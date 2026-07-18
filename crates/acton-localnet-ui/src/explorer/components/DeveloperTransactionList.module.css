@@ -20,7 +20,7 @@
   height: 52px;
   padding: 0 18px;
   border-bottom: 1px solid var(--acton-color-border);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
@@ -48,7 +48,7 @@
 .table td {
   height: 46px;
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   line-height: 1.35;
   border-top: 1px solid var(--acton-color-border);
@@ -70,7 +70,7 @@
 }
 
 .rowInteractive:hover {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .timeHeader,
@@ -109,7 +109,7 @@
 
 .endpointText {
   display: block;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 500;
 }
 
@@ -136,13 +136,13 @@
 }
 
 .directionIn {
-  color: var(--tonscan-success);
-  background: var(--litenode-success-bg);
+  color: var(--acton-color-status-passed);
+  background: var(--acton-color-status-passed-surface);
 }
 
 .directionOut {
   color: var(--acton-color-status-failed);
-  background: var(--litenode-danger-bg-soft);
+  background: var(--acton-color-status-failed-surface);
 }
 
 .opcodeHeader,
@@ -170,7 +170,7 @@
 }
 
 .valueCell {
-  color: var(--litenode-text) !important;
+  color: var(--acton-color-text) !important;
   font-weight: 600;
 }
 
@@ -190,7 +190,7 @@
   height: 11px;
   overflow: hidden;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--litenode-text) 8%, var(--litenode-surface-subtle));
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
 }
 
 .skeletonLine::after {
@@ -200,7 +200,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--litenode-text) 8%, transparent),
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
     transparent
   );
   transform: translateX(-100%);
@@ -237,9 +237,9 @@
 
 .emptyState {
   min-height: 62px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   color: var(--acton-color-text-muted);
   display: flex;
   align-items: center;

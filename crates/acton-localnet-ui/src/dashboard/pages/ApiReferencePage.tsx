@@ -113,39 +113,39 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           --scalar-radius-xl: 8px;
           --scalar-background-1: var(--acton-color-canvas);
           --scalar-background-2: var(--acton-color-surface);
-          --scalar-background-3: var(--litenode-surface-subtle);
-          --scalar-background-4: var(--litenode-control-hover);
+          --scalar-background-3: var(--acton-color-surface-raised);
+          --scalar-background-4: var(--acton-color-surface-hover);
           --scalar-background-accent: var(--litenode-accent-bg);
-          --scalar-background-danger: var(--litenode-danger-bg);
-          --scalar-color-1: var(--litenode-text);
+          --scalar-background-danger: var(--acton-color-status-failed-surface);
+          --scalar-color-1: var(--acton-color-text);
           --scalar-color-2: var(--acton-color-text-muted);
           --scalar-color-3: var(--litenode-text-faint);
-          --scalar-color-accent: var(--tonscan-accent);
-          --scalar-color-danger: var(--litenode-danger);
-          --scalar-border-color: var(--litenode-border);
+          --scalar-color-accent: var(--acton-color-accent);
+          --scalar-color-danger: var(--acton-color-status-failed-text);
+          --scalar-border-color: var(--acton-color-border);
           --scalar-button-1: var(--acton-color-primary);
-          --scalar-button-1-color: var(--litenode-primary-foreground);
+          --scalar-button-1-color: var(--acton-color-primary-foreground);
           --scalar-button-1-hover: var(--acton-color-primary-hover);
           --scalar-link-color: var(--acton-color-accent);
           --scalar-link-color-hover: var(--acton-color-accent);
           --scalar-link-color-visited: var(--acton-color-accent);
           --scalar-sidebar-background-1: var(--acton-color-surface);
-          --scalar-sidebar-border-color: var(--litenode-border);
-          --scalar-sidebar-color-1: var(--litenode-text);
+          --scalar-sidebar-border-color: var(--acton-color-border);
+          --scalar-sidebar-color-1: var(--acton-color-text);
           --scalar-sidebar-color-2: var(--acton-color-text-muted);
-          --scalar-sidebar-color-active: var(--litenode-text);
-          --scalar-sidebar-search-background: var(--litenode-surface-subtle);
-          --scalar-sidebar-search-border-color: var(--litenode-border-control);
+          --scalar-sidebar-color-active: var(--acton-color-text);
+          --scalar-sidebar-search-background: var(--acton-color-surface-raised);
+          --scalar-sidebar-search-border-color: var(--acton-color-border-control);
           --scalar-sidebar-search-color: var(--acton-color-text-muted);
           --scalar-sidebar-item-hover-background: var(--acton-color-surface-hover);
-          --scalar-sidebar-item-hover-color: var(--litenode-text);
+          --scalar-sidebar-item-hover-color: var(--acton-color-text);
           --scalar-sidebar-item-active-background: var(--acton-color-surface-active);
-          --scalar-scrollbar-color: var(--litenode-border-strong);
-          --scalar-scrollbar-color-active: var(--litenode-text-soft);
+          --scalar-scrollbar-color: var(--acton-color-border-strong);
+          --scalar-scrollbar-color-active: var(--acton-color-text-subtle);
         }
         .scalar-app {
           background: var(--acton-color-canvas) !important;
-          color: var(--litenode-text);
+          color: var(--acton-color-text);
           letter-spacing: 0;
         }
         .scalar-app .references-layout {
@@ -153,8 +153,8 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         }
         .scalar-app .t-doc__sidebar {
           background: var(--acton-color-surface) !important;
-          border-right: 1px solid var(--litenode-border) !important;
-          color: var(--litenode-text);
+          border-right: 1px solid var(--acton-color-border) !important;
+          color: var(--acton-color-text);
           font-size: 14px;
         }
         .scalar-app .t-doc__sidebar button {
@@ -165,11 +165,11 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         }
         .scalar-app .t-doc__sidebar button:hover {
           background: var(--acton-color-surface-hover) !important;
-          color: var(--litenode-text) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app .t-doc__sidebar .bg-sidebar-b-active {
           background: var(--acton-color-surface-active) !important;
-          color: var(--litenode-text-strong) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app .sidebar-heading-type {
           min-width: 34px;
@@ -184,17 +184,17 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           letter-spacing: 0;
         }
         .scalar-app .scalar-card {
-          border: 1px solid var(--litenode-border-control) !important;
+          border: 1px solid var(--acton-color-border-control) !important;
           border-radius: 8px !important;
           background: var(--acton-color-surface) !important;
           box-shadow: var(--litenode-inset-highlight);
         }
         .scalar-app .show-api-client-button {
           min-height: 26px;
-          border: 1px solid var(--litenode-border-control) !important;
+          border: 1px solid var(--acton-color-border-control) !important;
           border-radius: 6px;
-          background: var(--litenode-surface-raised) !important;
-          color: var(--litenode-text) !important;
+          background: var(--acton-color-surface-raised) !important;
+          color: var(--acton-color-text) !important;
           box-shadow: var(--litenode-inset-highlight);
         }
         .scalar-app .show-api-client-button:hover {
@@ -213,7 +213,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           margin-inline-end: 8px;
         }
         .scalar-app .client-libraries__active {
-          color: var(--litenode-text) !important;
+          color: var(--acton-color-text) !important;
         }
         .scalar-app pre,
         .scalar-app code {

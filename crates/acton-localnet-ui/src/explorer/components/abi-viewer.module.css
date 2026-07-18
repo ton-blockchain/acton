@@ -94,7 +94,7 @@
 .abiDeclaration summary:focus-visible,
 .abiDetails summary:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px var(--litenode-focus);
+  box-shadow: 0 0 0 3px var(--acton-color-focus-ring);
 }
 
 .highlightedCode {
@@ -305,8 +305,8 @@
 }
 
 .abiRunButton:hover:not(:disabled) {
-  background: var(--litenode-control-hover);
-  border-color: var(--litenode-border-control);
+  background: var(--acton-color-surface-hover);
+  border-color: var(--acton-color-border-control);
 }
 
 .abiRunButton:disabled {
@@ -717,7 +717,7 @@
 }
 
 .abiErrorName {
-  color: color-mix(in srgb, var(--tonscan-accent) 72%, var(--acton-color-text));
+  color: color-mix(in srgb, var(--acton-color-accent) 72%, var(--acton-color-text));
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.45;
@@ -779,7 +779,7 @@
 
 .abiSymbolAnchor:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .abiDeclarationKind {
@@ -792,11 +792,11 @@
 }
 
 .abiDeclarationKindStruct {
-  color: color-mix(in srgb, var(--tonscan-success) 76%, var(--acton-color-text-muted));
+  color: color-mix(in srgb, var(--acton-color-status-passed) 76%, var(--acton-color-text-muted));
 }
 
 .abiDeclarationKindAlias {
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text-muted));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text-muted));
 }
 
 .abiDeclarationKindEnum {

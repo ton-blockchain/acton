@@ -142,7 +142,7 @@
 }
 
 .tab:hover {
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
   color: var(--acton-color-text);
 }
 
@@ -237,7 +237,7 @@
 }
 
 .actionFilterChipSelected {
-  border-color: var(--tonscan-accent);
+  border-color: var(--acton-color-accent);
   background: var(--acton-color-surface-active);
   color: color-mix(in srgb, var(--acton-color-text) 82%, var(--acton-color-text-muted));
 }
@@ -335,7 +335,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  border: 2px solid var(--tonscan-accent);
+  border: 2px solid var(--acton-color-accent);
   border-radius: 13px;
   pointer-events: none;
 }
@@ -463,7 +463,7 @@
   background: linear-gradient(
     90deg,
     var(--acton-color-surface-row) 0%,
-    var(--litenode-control-hover) 45%,
+    var(--acton-color-surface-hover) 45%,
     var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
@@ -553,7 +553,7 @@
 
 .clickableRow:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--litenode-focus);
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .txLinkCell {
@@ -658,7 +658,7 @@ th.valueContainer {
 }
 
 .valuePositive {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
   font-weight: var(--acton-font-weight-utility);
 }
 
@@ -678,7 +678,7 @@ th.valueContainer {
 }
 
 .statusSuccess {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .statusFailed {
@@ -745,7 +745,7 @@ th.valueContainer {
 .paginationButton {
   min-height: 32px;
   background: var(--acton-color-surface-raised);
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   color: var(--acton-color-text);
   padding: 0 10px;
   border-radius: 8px;
@@ -765,8 +765,8 @@ th.valueContainer {
 }
 
 .paginationButton:hover:not(:disabled) {
-  background-color: var(--litenode-control-hover);
-  border-color: var(--litenode-border-strong);
+  background-color: var(--acton-color-surface-hover);
+  border-color: var(--acton-color-border-strong);
 }
 
 .paginationButton:disabled {
@@ -792,12 +792,12 @@ th.valueContainer {
 }
 
 .paginationPage:hover {
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
   color: var(--acton-color-text);
 }
 
 .paginationPageActive {
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-active);
   color: var(--acton-color-text);
 }

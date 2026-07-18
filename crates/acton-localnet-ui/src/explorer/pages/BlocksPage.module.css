@@ -18,7 +18,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.79px;
@@ -58,7 +58,7 @@
   padding: 0 18px;
   border-bottom: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   font-size: 0.86rem;
@@ -84,7 +84,7 @@
 .blocksTable th,
 .blocksTable td {
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   box-sizing: border-box;
   line-height: 1.35;
   text-align: left;
@@ -120,12 +120,12 @@
 }
 
 .blocksTableRow:hover td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .blocksTableRow:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--litenode-focus);
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .blocksPrimaryCell {
@@ -136,7 +136,7 @@
 }
 
 .blocksLink {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font: inherit;
   font-weight: 500;
   text-decoration: none;
@@ -154,7 +154,7 @@
 .blocksLink:focus-visible,
 .blocksCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .blocksHashCell {
@@ -166,7 +166,7 @@
 
 .blocksHashText {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -191,12 +191,12 @@
 }
 
 .blocksCopyButton:hover {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
 
 .blocksCopyButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .blocksLink {
@@ -302,7 +302,7 @@
 
 .blockSummaryValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -327,7 +327,7 @@
   min-height: 96px;
   padding: 18px;
   color: var(--acton-color-text-muted);
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -338,7 +338,7 @@
 .skeletonLine {
   position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--litenode-text) 8%, var(--litenode-surface-subtle));
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
   display: block;
   height: 11px;
   border-radius: 999px;
@@ -351,7 +351,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--litenode-text) 8%, transparent),
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
     transparent
   );
   transform: translateX(-100%);

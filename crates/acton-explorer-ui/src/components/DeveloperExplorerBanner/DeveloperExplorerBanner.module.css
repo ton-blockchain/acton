@@ -3,7 +3,7 @@
   z-index: 30;
   width: 100%;
   border-bottom: 1px solid color-mix(in srgb, white 18%, transparent);
-  background-color: color-mix(in srgb, var(--tonscan-accent) 82%, #1746b6);
+  background-color: color-mix(in srgb, var(--acton-color-accent) 82%, #1746b6);
   background-image:
     linear-gradient(color-mix(in srgb, white 8%, transparent) 1px, transparent 1px),
     linear-gradient(90deg, color-mix(in srgb, white 8%, transparent) 1px, transparent 1px);

@@ -85,7 +85,7 @@
 .addressButton:focus-visible,
 .copyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .copyButton {
@@ -117,5 +117,5 @@
 
 .copyButton:hover,
 .copyButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }

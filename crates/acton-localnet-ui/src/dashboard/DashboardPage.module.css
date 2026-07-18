@@ -2,7 +2,7 @@
   height: 100%;
   display: flex;
   background: var(--acton-color-canvas);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   overflow: hidden;
   position: relative;
 }
@@ -68,7 +68,7 @@
 .sidebarSlotPinning .floatingSidebar {
   height: calc(100vh - 16px);
   margin: 8px 0;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
   box-shadow: var(--acton-shadow-overlay);
 }
@@ -81,7 +81,7 @@
   width: 36px;
   height: 36px;
   padding: 0;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 10px;
   background: var(--acton-color-surface);
   color: var(--litenode-text-subtle);
@@ -89,7 +89,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--litenode-shadow-sm);
+  box-shadow: var(--acton-shadow-surface);
   transition:
     background-color 120ms ease,
     border-color 120ms ease,
@@ -97,14 +97,14 @@
 }
 
 .sidebarExpandButton:hover {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .sidebarExpandButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebar {
@@ -113,7 +113,7 @@
   flex-direction: column;
   gap: 8px;
   padding: 10px 8px 8px;
-  border-right: 1px solid var(--litenode-border);
+  border-right: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface);
   box-sizing: border-box;
   overflow: hidden;
@@ -134,7 +134,7 @@
   width: 100%;
   min-height: 40px;
   padding: 0 8px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -145,10 +145,10 @@
   width: 22px;
   height: 22px;
   border-radius: 999px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background:
     radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
+    linear-gradient(135deg, var(--acton-color-primary), var(--litenode-workspace-to));
   background-size:
     4px 4px,
     auto;
@@ -172,7 +172,7 @@
 
 .workspaceName {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 600;
   overflow: hidden;
@@ -184,10 +184,10 @@
   max-width: 116px;
   height: 18px;
   padding: 0 7px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 999px;
   color: var(--acton-color-text-muted);
-  background: var(--litenode-surface-raised);
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
   display: inline-flex;
   align-items: center;
@@ -228,7 +228,7 @@
   padding: 0 10px;
   box-sizing: border-box;
   border-radius: 12px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background: var(--acton-color-surface);
   display: flex;
   align-items: center;
@@ -254,7 +254,7 @@
   width: 22px;
   height: 22px;
   border-radius: 8px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -295,7 +295,7 @@
   width: var(--search-origin-width, min(386px, calc(100vw - 8px)));
   max-height: var(--search-origin-height, 40px);
   box-sizing: border-box;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
   background: var(--acton-color-surface);
   box-shadow: var(--litenode-inset-highlight);
@@ -336,7 +336,7 @@
 .searchOverlayOpen .searchInputRow {
   min-height: 49px;
   padding: 0 13px 0 17px;
-  border-bottom-color: var(--litenode-border-subtle);
+  border-bottom-color: var(--acton-color-border);
   gap: 11px;
 }
 
@@ -366,7 +366,7 @@
   margin: 0;
   outline: none;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-family: inherit;
   font-weight: 400;
   font-size: 0.88rem;
@@ -391,7 +391,7 @@
   padding: 0;
   box-sizing: content-box;
   margin-top: -1px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 8px;
   background: var(--acton-color-surface);
   color: var(--litenode-text-subtle);
@@ -416,7 +416,7 @@
   height: 31px;
   padding: 0 9px;
   margin-top: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.78rem;
 }
 
@@ -473,7 +473,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 11px;
@@ -494,7 +494,7 @@
 
 .searchResultItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .searchResultIcon {
@@ -512,7 +512,7 @@
 .searchResultIcon img {
   width: 25px;
   height: 25px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 999px;
   object-fit: cover;
 }
@@ -521,10 +521,10 @@
   width: 25px;
   height: 25px;
   border-radius: 999px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background:
     radial-gradient(circle at 50% 50%, var(--litenode-workspace-dot) 0 1px, transparent 1px 100%),
-    linear-gradient(135deg, var(--litenode-workspace-from), var(--litenode-workspace-to));
+    linear-gradient(135deg, var(--acton-color-primary), var(--litenode-workspace-to));
   background-size:
     4px 4px,
     auto;
@@ -539,7 +539,7 @@
 }
 
 .searchResultTitle {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.8rem;
   font-weight: 600;
   overflow: hidden;
@@ -565,7 +565,7 @@
 }
 
 .searchIndexError {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .navScroll {
@@ -592,7 +592,7 @@
 
 .navDivider {
   height: 1px;
-  background: var(--litenode-border-subtle);
+  background: var(--acton-color-border);
 }
 
 .navFooter {
@@ -630,12 +630,12 @@
 
 .sidebarToggleButton:hover {
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .sidebarToggleButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebarUtilityButton {
@@ -660,16 +660,16 @@
 
 .sidebarUtilityButton:hover {
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .sidebarUtilityButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .sidebarUtilityButtonActive {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .utilityStatusIcon {
@@ -681,7 +681,7 @@
   padding: 1px;
   border-radius: 999px;
   background: var(--acton-color-primary);
-  color: var(--litenode-primary-foreground);
+  color: var(--acton-color-primary-foreground);
 }
 
 .navItem {
@@ -705,7 +705,7 @@
 
 .navItem:hover {
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   text-decoration: none;
 }
 
@@ -715,7 +715,7 @@
 
 .navItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .navItemMain {
@@ -741,7 +741,7 @@
 
 .navItemActive {
   background: var(--acton-color-surface-active);
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
 }
 
 .contentArea {
@@ -815,10 +815,10 @@
 
 .dashboardCard {
   border-radius: 18px;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface);
-  color: var(--litenode-text);
-  box-shadow: var(--litenode-shadow-sm);
+  color: var(--acton-color-text);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .homeCard {
@@ -866,7 +866,7 @@
 
 .dashboardCardTitle {
   margin: 1px 0 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -999,7 +999,7 @@
 
 .nodeInfoValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
@@ -1040,7 +1040,7 @@
   align-items: baseline;
   justify-content: flex-end;
   gap: 6px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   font-weight: 500;
   line-height: 1.25;
@@ -1073,13 +1073,13 @@
 
 .nodeInfoTimeButton:hover {
   background: transparent;
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
 }
 
 .nodeInfoTimeButton:focus-visible {
   outline: none;
   background: transparent;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nodeInfoTimeButton svg {
@@ -1106,7 +1106,7 @@
 
 .nodeInfoValueLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nodeInfoValueSkeleton {
@@ -1122,7 +1122,7 @@
   gap: 16px;
   min-width: 0;
   padding: 11px 12px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   background: var(--acton-color-surface);
   color: inherit;
@@ -1163,7 +1163,7 @@
 
 .endpointValue {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.82rem;
   line-height: 1.35;
   overflow: hidden;
@@ -1219,17 +1219,17 @@
 }
 
 .endpointButton:hover {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: var(--acton-color-surface-hover);
 }
 
 .endpointButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus-strong);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .endpointButtonCopied {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   background: transparent;
 }
 
@@ -1247,9 +1247,9 @@
   gap: 14px;
   text-align: left;
   cursor: pointer;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   padding: 12px 14px;
   transition:
     background-color 120ms ease,
@@ -1259,18 +1259,18 @@
 
 .listRowButton:hover,
 .accountItem:hover {
-  border-color: var(--litenode-focus);
+  border-color: var(--acton-color-focus-ring);
   background: var(--acton-color-surface-hover);
 }
 
 .listRowButton:focus-visible,
 .accountItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .rowPrimary {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 500;
 }
@@ -1295,7 +1295,7 @@
 }
 
 .addressDisplayName {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .addressDisplayAddress {
@@ -1304,7 +1304,7 @@
 }
 
 .addressDisplaySeparator {
-  color: var(--litenode-text-soft);
+  color: var(--acton-color-text-subtle);
   flex: 0 0 auto;
 }
 
@@ -1344,8 +1344,8 @@
 }
 
 .statusError {
-  background: var(--litenode-danger-bg);
-  color: var(--litenode-danger);
+  background: var(--acton-color-status-failed-surface);
+  color: var(--acton-color-status-failed-text);
 }
 
 .rowSecondaryDetail {
@@ -1378,9 +1378,9 @@
 .skeletonRow {
   min-height: 64px;
   padding: 12px 14px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1399,7 +1399,7 @@
 .skeletonLine {
   position: relative;
   overflow: hidden;
-  background: color-mix(in srgb, var(--litenode-text) 8%, var(--litenode-surface-subtle));
+  background: color-mix(in srgb, var(--acton-color-text) 8%, var(--acton-color-surface-raised));
 }
 
 .skeletonLine::after {
@@ -1409,7 +1409,7 @@
   background: linear-gradient(
     90deg,
     transparent,
-    color-mix(in srgb, var(--litenode-text) 8%, transparent),
+    color-mix(in srgb, var(--acton-color-text) 8%, transparent),
     transparent
   );
   transform: translateX(-100%);
@@ -1449,7 +1449,7 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface);
   color: var(--litenode-text-subtle);
   display: inline-flex;
@@ -1467,7 +1467,7 @@
 }
 
 .accountName {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 500;
   overflow: hidden;
@@ -1495,7 +1495,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: -0.79px;
@@ -1520,9 +1520,9 @@
 
 .formCard {
   border-radius: 18px;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface);
-  box-shadow: var(--litenode-shadow-sm);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .formCard {
@@ -1544,8 +1544,8 @@
   width: 32px;
   height: 32px;
   border-radius: 10px;
-  border: 1px solid var(--litenode-border-subtle);
-  background: var(--litenode-surface-subtle);
+  border: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text-subtle);
   display: inline-flex;
   align-items: center;
@@ -1590,10 +1590,10 @@
   max-width: 202px;
   height: 50px;
   padding: 0 11px 0 9px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1607,14 +1607,14 @@
 }
 
 .assetSelectorButton:hover {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
 }
 
 .assetSelectorButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetSelectorIcon {
@@ -1653,7 +1653,7 @@
 }
 
 .assetSelectorSymbol {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 500;
   line-height: 1;
@@ -1686,9 +1686,9 @@
   max-width: 154px;
   height: 34px;
   padding: 0 8px 0 10px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 9px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
@@ -1706,14 +1706,14 @@
 
 .faucetDropdownTrigger:hover,
 .faucetDropdownTriggerOpen {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .faucetDropdownTrigger:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .faucetDropdownTriggerLabel {
@@ -1751,7 +1751,7 @@
   z-index: 30;
   max-height: 286px;
   padding: 6px;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
   background: var(--acton-color-surface);
   box-shadow: var(--acton-shadow-overlay);
@@ -1775,7 +1775,7 @@
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1789,12 +1789,12 @@
 
 .faucetDropdownOption:hover {
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
 }
 
 .faucetDropdownOption:focus-visible {
   outline: none;
-  box-shadow: inset 0 0 0 2px var(--litenode-focus);
+  box-shadow: inset 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .faucetDropdownOptionSelected {
@@ -1805,19 +1805,19 @@
 .faucetDropdownOptionAvatar {
   width: 32px;
   height: 32px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 10px;
   flex: 0 0 auto;
 }
 
 .faucetDropdownOptionImage {
   object-fit: cover;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
 }
 
 .faucetDropdownOptionAvatar {
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1842,7 +1842,7 @@
 }
 
 .faucetDropdownOptionTitle {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
   font-weight: 650;
 }
@@ -1907,7 +1907,7 @@
 .timeModal {
   max-height: min(760px, calc(100vh - 36px));
   overflow: auto;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 18px;
   background: var(--acton-color-surface);
   box-shadow: var(--acton-shadow-overlay);
@@ -1933,7 +1933,7 @@
 .assetModalTitle,
 .timeModalTitle {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 1.05rem;
   font-weight: 650;
   line-height: 1;
@@ -1962,13 +1962,13 @@
 .assetModalCloseButton:hover,
 .timeModalCloseButton:hover:not(:disabled) {
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .assetModalCloseButton:focus-visible,
 .timeModalCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .timeModalCloseButton:disabled {
@@ -2008,10 +2008,10 @@
 .timeAdvancePresetButton {
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 9px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font: inherit;
   font-size: 0.82rem;
   font-weight: 600;
@@ -2025,13 +2025,13 @@
 }
 
 .timeAdvancePresetButton:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
 }
 
 .timeAdvancePresetButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .timeAdvancePresetButton:disabled {
@@ -2041,9 +2041,9 @@
 
 .timeAdvancePreview {
   margin-bottom: 8px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--litenode-surface-subtle);
+  background: var(--acton-color-surface-raised);
   overflow: hidden;
 }
 
@@ -2054,7 +2054,7 @@
   grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: 10px;
-  border-top: 1px solid var(--litenode-border-subtle);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .timeAdvancePreviewRow:first-child {
@@ -2071,7 +2071,7 @@
 
 .timeAdvancePreviewRow strong {
   min-width: 0;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.84rem;
   font-weight: 600;
   text-align: right;
@@ -2081,7 +2081,7 @@
 }
 
 .timeAdvanceError {
-  color: var(--litenode-danger, #ff6b6b);
+  color: var(--acton-color-status-failed-text);
   font-size: 0.82rem;
   line-height: 1.35;
 }
@@ -2106,10 +2106,10 @@
   width: 100%;
   min-height: 62px;
   padding: 10px 12px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  background: var(--litenode-surface-subtle);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -2124,17 +2124,17 @@
 }
 
 .assetChoiceButton:hover {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
 }
 
 .assetChoiceButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .assetChoiceButtonSelected {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-active);
 }
 
@@ -2142,7 +2142,7 @@
 .assetChoiceImage {
   width: 36px;
   height: 36px;
-  border: 1px solid var(--litenode-border-subtle);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   flex: 0 0 auto;
 }
@@ -2179,7 +2179,7 @@
 }
 
 .assetChoiceTitle {
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 0.92rem;
   font-weight: 500;
 }
@@ -2274,11 +2274,11 @@
 }
 
 .rpcStatusSuccess {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .rpcStatusFailed {
-  color: var(--litenode-danger);
+  color: var(--acton-color-status-failed-text);
 }
 
 .rpcTypeCell {
@@ -2359,7 +2359,7 @@
     height: 100dvh;
     margin: 0;
     border: none;
-    border-right: 1px solid var(--litenode-border);
+    border-right: 1px solid var(--acton-color-border);
     border-radius: 0;
     box-shadow: var(--acton-shadow-overlay);
   }
@@ -2374,7 +2374,7 @@
     gap: 10px;
     min-height: 56px;
     padding: 8px;
-    border-bottom: 1px solid var(--litenode-border-subtle);
+    border-bottom: 1px solid var(--acton-color-border);
     background: var(--acton-color-surface);
     box-sizing: border-box;
   }
@@ -2393,7 +2393,7 @@
     border: 0;
     border-radius: 12px;
     background: transparent;
-    color: var(--litenode-text);
+    color: var(--acton-color-text);
     cursor: pointer;
     align-items: center;
     justify-content: center;
@@ -2413,14 +2413,14 @@
 
   .mobileMenuButton:hover,
   .mobileCloseButton:hover {
-    color: var(--litenode-text-strong);
+    color: var(--acton-color-text);
   }
 
   .mobileMenuButton:focus-visible,
   .mobileCloseButton:focus-visible,
   .mobileBackdrop:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px var(--litenode-focus);
+    box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
   }
 
   .mobileBackdrop {
@@ -2452,7 +2452,7 @@
     height: 100dvh;
     gap: 10px;
     padding: 10px 8px 8px;
-    border-right: 1px solid var(--litenode-border);
+    border-right: 1px solid var(--acton-color-border);
     border-bottom: none;
     box-shadow: var(--acton-shadow-overlay);
     transform: translateX(-100%);

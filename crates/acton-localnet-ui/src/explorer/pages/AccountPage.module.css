@@ -33,7 +33,7 @@
   background:
     linear-gradient(
       135deg,
-      color-mix(in srgb, var(--litenode-danger-bg-soft) 72%, transparent),
+      color-mix(in srgb, var(--acton-color-status-failed-surface) 72%, transparent),
       color-mix(in srgb, var(--acton-color-surface-raised) 94%, var(--acton-color-status-failed))
     ),
     var(--acton-color-surface-raised);
@@ -226,7 +226,7 @@
 
 .jettonMetadataButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .addressCopyButton {
@@ -254,7 +254,7 @@
 
 .addressCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .addressCopyButtonCopied {
@@ -336,7 +336,7 @@
 
 .accountDetailLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nftPanel {
@@ -416,7 +416,7 @@
 
 .nftPanelMetadataButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .nftPanelDescription {
@@ -555,7 +555,7 @@
 
 .metadataCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataSummary {
@@ -605,7 +605,7 @@
 .metadataLink:focus-visible {
   outline: none;
   border-radius: 6px;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataDescription {
@@ -619,7 +619,7 @@
   position: relative;
   min-width: 0;
   overflow: hidden;
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
   border-radius: 12px;
 }
 
@@ -647,7 +647,7 @@
 
 .metadataJsonCopyButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .metadataJson {

@@ -66,7 +66,7 @@
 }
 
 .statusSuccess {
-  color: var(--tonscan-success);
+  color: var(--acton-color-status-passed);
 }
 
 .statusError {
@@ -92,7 +92,7 @@
 }
 
 .link {
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   text-decoration: none;
 }
 
@@ -114,7 +114,7 @@
   min-height: 24px;
   padding: 0;
   border: 0;
-  color: var(--tonscan-accent);
+  color: var(--acton-color-accent);
   background: transparent;
   font-size: 0.8125rem;
   font-weight: 500;
@@ -126,7 +126,7 @@
 
 .retraceInlineButton:hover,
 .retraceInlineButtonActive {
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
+  color: color-mix(in srgb, var(--acton-color-accent) 78%, var(--acton-color-text));
 }
 
 .tabsContainer {
@@ -187,7 +187,7 @@
 
 .tab:hover {
   color: var(--acton-color-text);
-  background: var(--litenode-control-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .tab:disabled {
@@ -446,7 +446,7 @@
   background: linear-gradient(
     90deg,
     var(--acton-color-surface-row) 0%,
-    var(--litenode-control-hover) 45%,
+    var(--acton-color-surface-hover) 45%,
     var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;

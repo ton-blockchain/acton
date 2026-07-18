@@ -103,7 +103,7 @@
   background: linear-gradient(
     90deg,
     var(--acton-color-surface-row) 0%,
-    var(--litenode-control-hover) 45%,
+    var(--acton-color-surface-hover) 45%,
     var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;

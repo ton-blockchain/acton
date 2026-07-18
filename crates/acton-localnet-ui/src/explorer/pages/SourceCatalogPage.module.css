@@ -18,7 +18,7 @@
 
 .title {
   margin: 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 32px;
   font-weight: 500;
   letter-spacing: 0;
@@ -42,7 +42,7 @@
   padding: 0 18px;
   border-bottom: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.86rem;
   font-weight: 750;
   letter-spacing: 0;
@@ -67,7 +67,7 @@
   min-height: 38px;
   min-width: 160px;
   padding: 0 12px;
-  background: var(--litenode-text-strong);
+  background: var(--acton-color-text);
   color: var(--acton-color-surface);
   font-size: var(--acton-font-size-sm);
 }
@@ -116,7 +116,7 @@
 .table td {
   box-sizing: border-box;
   padding: 0 14px;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   line-height: 1.35;
   text-align: left;
   vertical-align: middle;
@@ -170,13 +170,17 @@
 
 .tableRow:hover td,
 .tableRow:focus-within td {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .formButtonRow td {
   height: auto;
   padding: 0;
-  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--acton-color-surface-raised));
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 5%,
+    var(--acton-color-surface-raised)
+  );
 }
 
 .registerSourceButton {
@@ -189,7 +193,7 @@
   padding: 0 14px;
   border: 0;
   background: transparent;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font: inherit;
   font-weight: 750;
   letter-spacing: 0;
@@ -205,18 +209,22 @@
 }
 
 .registerSourceButton:hover {
-  background: var(--litenode-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .registerSourceButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .expandedFormRow td {
   height: auto;
   padding: 16px;
-  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--acton-color-surface-raised));
+  background: color-mix(
+    in srgb,
+    var(--acton-color-focus-ring) 4%,
+    var(--acton-color-surface-raised)
+  );
 }
 
 .sourceInlineForm {
@@ -262,13 +270,13 @@
 }
 
 .entrypointCell span {
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-weight: 400;
 }
 
 .codeHash {
   display: inline-block;
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-family: var(--font-family-mono, monospace);
   font-size: 0.78rem;
 }

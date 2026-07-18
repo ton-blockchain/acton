@@ -45,10 +45,10 @@
   z-index: 1;
   width: min(440px, calc(100vw - 32px));
   padding: 18px;
-  border: 1px solid var(--litenode-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
   background: color-mix(in srgb, var(--acton-color-surface) 92%, transparent);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   box-shadow: var(--acton-shadow-overlay);
   backdrop-filter: blur(18px);
 }
@@ -63,10 +63,10 @@
 .authIcon {
   width: 38px;
   height: 38px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
-  background: var(--litenode-surface-raised);
-  color: var(--litenode-text);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -79,7 +79,7 @@
 
 .authTitle {
   margin: 1px 0 0;
-  color: var(--litenode-text-strong);
+  color: var(--acton-color-text);
   font-size: 1.02rem;
   font-weight: 650;
   line-height: 1.25;
@@ -112,9 +112,9 @@
 }
 
 .authCloseButton:hover {
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .authForm {
@@ -128,7 +128,7 @@
   height: 42px;
   border-radius: 12px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
   font-size: 0.9rem;
 }
 
@@ -144,7 +144,7 @@
   min-width: 0;
   min-height: 36px;
   padding: 0 12px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 10px;
   background: var(--acton-color-surface);
   color: var(--litenode-text-subtle);
@@ -164,15 +164,15 @@
 }
 
 .authActionButton:hover:not(:disabled) {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: var(--acton-color-surface-hover);
-  color: var(--litenode-text);
+  color: var(--acton-color-text);
 }
 
 .authActionButton:focus-visible,
 .authCloseButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .authActionButton:disabled {
@@ -183,13 +183,13 @@
 .authPrimaryButton {
   border-color: var(--acton-color-primary);
   background: var(--acton-color-primary);
-  color: var(--litenode-primary-foreground);
+  color: var(--acton-color-primary-foreground);
 }
 
 .authPrimaryButton:hover:not(:disabled) {
   border-color: var(--acton-color-primary-hover);
   background: var(--acton-color-primary-hover);
-  color: var(--litenode-primary-foreground);
+  color: var(--acton-color-primary-foreground);
 }
 
 @media (max-width: 520px) {

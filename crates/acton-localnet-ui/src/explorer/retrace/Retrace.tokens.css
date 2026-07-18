@@ -4,7 +4,7 @@
   --color-black: #000;
   --color-black-rgb: 0, 0, 0;
 
-  --color-primary: var(--tonscan-accent, #4e96ff);
+  --color-primary: var(--acton-color-accent, #4e96ff);
   --color-primary-rgb: 78, 150, 255;
   --color-primary-container-hover: rgb(var(--color-primary-rgb), 0.1);
   --color-primary-container-active: rgb(var(--color-primary-rgb), 0.2);
@@ -258,7 +258,7 @@ html.dark-theme .retraceRoot {
   --color-black: #000;
   --color-black-rgb: 0, 0, 0;
 
-  --color-primary: var(--tonscan-accent, #4e96ff);
+  --color-primary: var(--acton-color-accent, #4e96ff);
   --color-primary-rgb: 78, 150, 255;
   --color-primary-container-hover: rgb(var(--color-primary-rgb), 0.15);
   --color-primary-container-active: rgb(var(--color-primary-rgb), 0.25);

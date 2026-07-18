@@ -22,9 +22,9 @@
 }
 
 .searchBox:focus-within {
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: var(--acton-color-surface-raised);
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .searchBox input {
@@ -68,7 +68,7 @@
 
 .nftItem:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .imageFrame {

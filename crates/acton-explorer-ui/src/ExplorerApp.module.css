@@ -104,7 +104,7 @@
   gap: 4px;
   margin-left: 0;
   padding: 2px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
   background: color-mix(in srgb, var(--acton-color-surface-raised) 58%, transparent);
 }
@@ -137,7 +137,7 @@
   box-sizing: border-box;
   min-height: 38px;
   padding: 0 10px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
   background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
   color: var(--acton-color-text-muted);
@@ -178,7 +178,7 @@
   width: 128px;
   min-height: 38px;
   padding: 0 10px 0 12px;
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   border-radius: 12px;
   background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
   color: var(--acton-color-text);
@@ -194,7 +194,7 @@
 
 .networkTrigger:hover,
 .networkTrigger[aria-expanded="true"] {
-  border-color: var(--litenode-border-strong);
+  border-color: var(--acton-color-border-strong);
   background: color-mix(in srgb, var(--acton-color-surface-hover) 82%, transparent);
   box-shadow: none;
 }
@@ -522,9 +522,9 @@
 }
 
 .networkSubmitButton {
-  border: 1px solid var(--litenode-border-control);
+  border: 1px solid var(--acton-color-border-control);
   background: var(--acton-color-primary);
-  color: var(--litenode-primary-foreground);
+  color: var(--acton-color-primary-foreground);
 }
 
 .networkSubmitButton:hover {
@@ -536,7 +536,7 @@
   flex: 0 0 auto;
   min-height: 38px;
   padding: 5px;
-  border-color: var(--litenode-border-control);
+  border-color: var(--acton-color-border-control);
   background: color-mix(in srgb, var(--acton-color-surface-raised) 64%, transparent);
   box-sizing: border-box;
 }
@@ -565,7 +565,7 @@
 .networkCancelButton:focus-visible,
 .networkSubmitButton:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px var(--litenode-focus);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .main {
