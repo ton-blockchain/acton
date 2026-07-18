@@ -115,11 +115,11 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
           --scalar-background-2: var(--acton-color-surface);
           --scalar-background-3: var(--acton-color-surface-raised);
           --scalar-background-4: var(--acton-color-surface-hover);
-          --scalar-background-accent: var(--litenode-accent-bg);
+          --scalar-background-accent: color-mix(in srgb, var(--acton-color-accent) 10%, transparent);
           --scalar-background-danger: var(--acton-color-status-failed-surface);
           --scalar-color-1: var(--acton-color-text);
           --scalar-color-2: var(--acton-color-text-muted);
-          --scalar-color-3: var(--litenode-text-faint);
+          --scalar-color-3: var(--acton-color-text-muted);
           --scalar-color-accent: var(--acton-color-accent);
           --scalar-color-danger: var(--acton-color-status-failed-text);
           --scalar-border-color: var(--acton-color-border);

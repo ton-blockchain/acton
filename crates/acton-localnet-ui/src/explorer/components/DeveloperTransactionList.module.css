@@ -157,7 +157,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   display: block;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.8rem;
   font-weight: 600;
 }

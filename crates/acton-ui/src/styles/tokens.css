@@ -93,14 +93,16 @@
   --acton-color-progress-track: #f4f4f5;
   /* Scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.42);
+  /* Translucent surface used by frosted overlay backdrops. */
+  --acton-color-overlay-surface: rgba(250, 250, 250, 0.68);
   /* Floating overlay surface for popovers. */
   --acton-color-popover-surface: hsl(0 0% 100%);
   /* Floating overlay border for popovers. */
   --acton-color-popover-border: hsl(240 6% 84%);
   /* Subtle elevation for cards, panels, and selected surfaces. */
   --acton-shadow-surface: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
-  /* Elevated shadow for menus and other floating overlays. */
-  --acton-shadow-overlay: 0 8px 24px rgb(0 0 0 / 10%);
+  /* Deep elevation for dialogs, drawers, and other large overlays. */
+  --acton-shadow-overlay: 0 30px 80px rgb(15 23 42 / 16%), 0 1px 2px rgb(15 23 42 / 8%);
   /* Compact floating shadow for tooltips. */
   --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 15%);
   /* Floating overlay shadow used only by popovers. */
@@ -292,14 +294,16 @@
   --acton-color-progress-track: #18181b;
   /* Dark scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.68);
+  /* Dark translucent surface used by frosted overlay backdrops. */
+  --acton-color-overlay-surface: rgba(9, 9, 11, 0.72);
   /* Dark floating overlay surface for popovers. */
   --acton-color-popover-surface: hsl(240 6% 10%);
   /* Dark floating overlay border for popovers. */
   --acton-color-popover-border: hsl(240 5% 26%);
   /* Dark subtle elevation for cards, panels, and selected surfaces. */
   --acton-shadow-surface: none;
-  /* Dark elevated shadow for menus and other floating overlays. */
-  --acton-shadow-overlay: 0 30px 80px rgb(0 0 0 / 42%);
+  /* Dark deep elevation for dialogs, drawers, and other large overlays. */
+  --acton-shadow-overlay: 0 30px 80px rgb(0 0 0 / 42%), 0 1px 0 rgb(255 255 255 / 4%);
   /* Dark compact floating shadow for tooltips. */
   --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 36%);
   /* Dark floating overlay shadow used only by popovers. */

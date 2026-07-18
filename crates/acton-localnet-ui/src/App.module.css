@@ -35,7 +35,7 @@
   position: absolute;
   inset: 0;
   border: 0;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(3px);
   cursor: default;
 }
@@ -147,7 +147,7 @@
   border: 1px solid var(--acton-color-border-control);
   border-radius: 10px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 650;

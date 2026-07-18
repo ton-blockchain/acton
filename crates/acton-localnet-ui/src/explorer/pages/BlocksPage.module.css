@@ -147,7 +147,7 @@
 
 .blocksLink:hover {
   color: var(--acton-color-accent);
-  background: var(--litenode-link-chip-bg);
+  background: var(--acton-color-surface-hover);
   text-decoration: none;
 }
 

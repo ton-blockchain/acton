@@ -519,7 +519,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
 }
 
@@ -598,7 +598,7 @@
 .permissionItem svg,
 .messageItem svg {
   margin-top: 2px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
 }
 

@@ -84,7 +84,7 @@
   border: 1px solid var(--acton-color-border-control);
   border-radius: 10px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -233,7 +233,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
   font-family: inherit;
   box-shadow: var(--litenode-inset-highlight);
 }
@@ -258,7 +258,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -278,7 +278,7 @@
   position: absolute;
   inset: 0;
   border: none;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
   opacity: 0;
   transition: opacity 180ms ease;
@@ -344,7 +344,7 @@
   width: 16px;
   height: 16px;
   margin-top: -2px;
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
   transition:
     width 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
@@ -355,7 +355,7 @@
   width: 17px;
   height: 17px;
   margin-top: 0;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
 }
 
 .searchInput {
@@ -381,7 +381,7 @@
 }
 
 .searchInput::placeholder {
-  color: var(--litenode-text-faint);
+  color: var(--acton-color-text-muted);
 }
 
 .searchEscButton {
@@ -394,7 +394,7 @@
   border: 1px solid var(--acton-color-border-control);
   border-radius: 8px;
   background: var(--acton-color-surface);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-family: inherit;
   font-size: 0.82rem;
   font-weight: 500;
@@ -501,7 +501,7 @@
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -548,7 +548,7 @@
 }
 
 .searchResultDescription {
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   line-height: 1.25;
   overflow: hidden;
@@ -617,7 +617,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -647,7 +647,7 @@
   border: 0;
   border-radius: 10px;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -694,7 +694,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   text-align: left;
   text-decoration: none;
   transition:
@@ -1451,7 +1451,7 @@
   border-radius: 10px;
   border: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1546,7 +1546,7 @@
   border-radius: 10px;
   border: 1px solid var(--acton-color-border);
   background: var(--acton-color-surface-raised);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1561,7 +1561,7 @@
 }
 
 .label {
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.88rem;
   font-weight: 600;
 }
@@ -1622,7 +1622,7 @@
   height: 32px;
   border-radius: 0;
   background: transparent;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1754,7 +1754,7 @@
   border: 1px solid var(--acton-color-border);
   border-radius: 16px;
   background: var(--acton-color-surface);
-  box-shadow: var(--acton-shadow-overlay);
+  box-shadow: var(--acton-shadow-popover);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1855,7 +1855,7 @@
 .faucetDropdownBadge {
   max-width: 90px;
   padding: 0;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.72rem;
   font-weight: 700;
   overflow: hidden;
@@ -1866,7 +1866,7 @@
 .faucetDropdownCheck {
   flex: 0 0 auto;
   margin-right: 6px;
-  color: var(--litenode-accent);
+  color: var(--acton-color-accent);
 }
 
 .amountRow {
@@ -1899,7 +1899,7 @@
   align-items: center;
   justify-content: center;
   padding: 18px;
-  background: var(--litenode-overlay);
+  background: var(--acton-color-overlay-surface);
   backdrop-filter: blur(2px);
 }
 
@@ -2149,7 +2149,7 @@
 
 .assetChoiceIcon {
   background: var(--acton-color-surface);
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2191,7 +2191,7 @@
 
 .assetChoiceBadge {
   max-width: 96px;
-  color: var(--litenode-text-subtle);
+  color: var(--acton-color-text-muted);
   font-size: 0.74rem;
   font-weight: 760;
   overflow: hidden;
@@ -2200,7 +2200,7 @@
 }
 
 .assetChoiceCheck {
-  color: var(--litenode-accent);
+  color: var(--acton-color-accent);
   flex: 0 0 auto;
 }
 
@@ -2430,7 +2430,7 @@
     display: block;
     padding: 0;
     border: 0;
-    background: var(--litenode-overlay);
+    background: var(--acton-color-overlay-surface);
     opacity: 0;
     pointer-events: none;
     transition: opacity 160ms ease;
