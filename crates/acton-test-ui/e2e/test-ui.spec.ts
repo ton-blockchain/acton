@@ -594,6 +594,20 @@ test.describe("Test UI", () => {
     await expect(storageDiff.getByText("true", {exact: true})).toBeVisible()
   })
 
+  test("switches and persists the app theme", async ({actonUi, page}) => {
+    await page.goto(actonUi.baseUrl)
+
+    const root = page.locator("html")
+    await expect(root).toHaveAttribute("data-theme", "light")
+
+    await page.getByRole("button", {name: "Switch to dark theme"}).click()
+    await expect(root).toHaveAttribute("data-theme", "dark")
+
+    await page.reload()
+    await expect(root).toHaveAttribute("data-theme", "dark")
+    await expect(page.getByRole("button", {name: "Switch to light theme"})).toBeVisible()
+  })
+
   test.describe("visual snapshots", () => {
     test.skip(
       !visualSnapshotsEnabled,

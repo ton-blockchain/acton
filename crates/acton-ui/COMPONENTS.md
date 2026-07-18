@@ -1559,6 +1559,47 @@ same 16px checked-box pattern as localnet-style filter controls.
   controls.
 - Do not use Checkbox as a command button.
 
+## ThemeProvider and useTheme
+
+Status: ready
+
+Import:
+
+```tsx
+import { ThemeProvider, useTheme } from "@acton/ui"
+```
+
+Wrap each UI root once. ThemeProvider resolves the saved preference, falls back
+to the system preference, persists changes, and synchronizes the theme markers
+used by Acton tokens and legacy app styles. Theme toggles use the browser View
+Transition API when available and fall back to an immediate switch elsewhere.
+
+```tsx
+<ThemeProvider storageKey="theme">
+  <App />
+</ThemeProvider>
+```
+
+Theme-aware components read the shared state instead of receiving theme props:
+
+```tsx
+const { theme, setTheme, toggleTheme } = useTheme()
+```
+
+- `storageKey`: local-storage key; defaults to `theme`.
+- `defaultTheme`: `"light"`, `"dark"`, or `"system"`; defaults to `"system"`.
+- `theme`: resolved `"light"` or `"dark"` theme.
+- `setTheme`: sets an explicit resolved theme.
+- `toggleTheme`: switches between light and dark.
+
+### Agent Guidance
+
+- Use one ThemeProvider at the application root.
+- Read theme state with `useTheme`; do not inspect DOM classes or local storage
+  from feature components.
+- Do not pass theme through app, page, sidebar, toast, or syntax-highlighting
+  props.
+
 ## ThemeSwitch
 
 Status: ready
@@ -1566,7 +1607,7 @@ Status: ready
 Import:
 
 ```tsx
-import { ThemeSwitch } from "@acton/ui"
+import { ThemeProvider, ThemeSwitch } from "@acton/ui"
 ```
 
 Use ThemeSwitch for app-level light/dark mode toggles in app chrome, sidebars,
@@ -1577,15 +1618,14 @@ and focus treatment.
 ### Composition
 
 ```tsx
-<ThemeSwitch
-  theme={theme}
-  onToggleTheme={toggleTheme}
-  aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-/>
+<ThemeProvider>
+  <ThemeSwitch />
+</ThemeProvider>
 ```
 
-- `theme`: current app theme, either `light` or `dark`.
-- `onToggleTheme`: called when the switch is clicked.
+- ThemeSwitch reads the current theme and toggle action from ThemeProvider.
+- `theme` and `onToggleTheme` remain available only for controlled visual-state
+  previews, such as the component gallery.
 - `data-theme-toggle`: emitted for compatibility with existing app chrome CSS.
 
 ### States To Review Visually
@@ -1599,6 +1639,7 @@ and focus treatment.
 
 - Use ThemeSwitch for global app theme changes.
 - Keep the Sun/Moon segmented pill appearance; do not rebuild it with Button.
-- Use a contextual `aria-label` when the current theme is known.
+- Its default accessible label describes the target theme; override it only
+  when surrounding context requires different wording.
 - Do not use ThemeSwitch for local display modes such as source/trace view;
   use a segmented control for those.

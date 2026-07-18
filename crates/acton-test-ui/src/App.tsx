@@ -3,7 +3,6 @@ import {PanelLeft} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
-import type {ThemeMode} from "@acton/ui"
 import type {TestReport} from "@acton/shared-ui"
 
 import styles from "./App.module.css"
@@ -18,15 +17,6 @@ import {useTestUiBootstrap} from "./hooks/useTestUiBootstrap"
 const SIDEBAR_TRANSITION_MS = 250
 
 type ActiveView = "tests" | "coverage" | "profile"
-
-const readInitialTheme = (): ThemeMode => {
-  const storedTheme = localStorage.getItem("theme")
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme
-  }
-
-  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-}
 
 export const App: React.FC = () => {
   const {connectionLost, markConnected} = useRunnerConnection()
@@ -44,20 +34,11 @@ export const App: React.FC = () => {
     error: currentTraceError,
     loading: isCurrentTraceLoading,
   } = useTestTrace(selectedTest)
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
   const [activeView, setActiveView] = useState<ActiveView>(() => {
     const saved = localStorage.getItem("activeMainView")
     return saved === "coverage" || saved === "profile" ? saved : "tests"
   })
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    localStorage.setItem("theme", theme)
-  }, [theme])
-
-  const toggleTheme = useCallback(() => {
-    setTheme(prev => (prev === "light" ? "dark" : "light"))
-  }, [])
   const handleActiveViewChange = useCallback((view: ActiveView) => {
     setActiveView(view)
     localStorage.setItem("activeMainView", view)
@@ -314,8 +295,6 @@ export const App: React.FC = () => {
             onCollapse={toggleSidebar}
             isCollapsed={isSidebarCollapsed}
             className={styles.floatingSidebar}
-            theme={theme}
-            onToggleTheme={toggleTheme}
           />
         </div>
       </div>

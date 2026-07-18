@@ -34,6 +34,7 @@
     "./components/raw-data-block": "./src/components/RawDataBlock/index.ts",
     "./components/search-input": "./src/components/SearchInput/index.ts",
     "./components/skeleton": "./src/components/Skeleton/index.ts",
+    "./components/theme-provider": "./src/components/Theme/index.ts",
     "./components/theme-switch": "./src/components/ThemeSwitch/index.ts",
     "./components/toast": "./src/components/Toast/index.ts",
     "./components/visually-grouped-number": "./src/components/VisuallyGroupedNumber/index.ts",

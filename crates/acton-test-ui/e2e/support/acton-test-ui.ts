@@ -254,22 +254,33 @@ export const stabilizeVisualSnapshot = async (
   page: Page,
   options: VisualSnapshotOptions = {},
 ): Promise<void> => {
-  await page.evaluate(async theme => {
+  const theme = options.theme ?? "light"
+  const currentTheme = await page.locator("html").getAttribute("data-theme")
+  if (currentTheme !== theme) {
+    await page
+      .locator("[data-theme-toggle]")
+      .first()
+      .evaluate(element => {
+        ;(element as HTMLButtonElement).click()
+      })
+    await page.waitForFunction(expectedTheme => {
+      return document.documentElement.dataset.theme === expectedTheme
+    }, theme)
+  }
+
+  await page.evaluate(async () => {
     await document.fonts.ready
 
     if (document.activeElement instanceof HTMLElement) {
       document.activeElement.blur()
     }
 
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    localStorage.setItem("theme", theme)
-
     for (const element of document.querySelectorAll<HTMLElement>("[data-visual-dynamic]")) {
       const placeholder = element.dataset.visualPlaceholder ?? "<dynamic>"
       element.replaceChildren(document.createTextNode(placeholder))
       element.setAttribute("title", placeholder)
     }
-  }, options.theme ?? "light")
+  })
 }
 
 const createFixtureProject = async (projectName = "jetton"): Promise<FixtureProject> => {

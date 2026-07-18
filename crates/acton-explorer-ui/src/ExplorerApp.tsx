@@ -1,5 +1,4 @@
 import {Checkbox, Input, ThemeSwitch, ToastProvider, useToast} from "@acton/ui"
-import type {ThemeMode} from "@acton/ui"
 import {Check, ChevronDown, Edit2, Github, Plus, Share2, Star, Trash2} from "lucide-react"
 import {useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
@@ -390,15 +389,6 @@ function apiHostname(network: SelectableExplorerNetwork): string {
   } catch {
     return network.api.v3BaseUrl
   }
-}
-
-const readInitialTheme = (): ThemeMode => {
-  const storedTheme = localStorage.getItem("explorerTheme")
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme
-  }
-
-  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
 }
 
 function NetworkDropdown({
@@ -799,7 +789,6 @@ const ExplorerHeaderFrame: FC<{readonly children: ReactNode}> = ({children}) => 
 }
 
 export const ExplorerApp: FC = () => {
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
   const [networkState, setNetworkState] = useState<ExplorerNetworkState>(
     readInitialExplorerNetworkState,
   )
@@ -880,13 +869,6 @@ export const ExplorerApp: FC = () => {
   }, [])
 
   useLayoutEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    document.body.classList.toggle("dark-mode", theme === "dark")
-    document.body.classList.toggle("light-mode", theme !== "dark")
-    localStorage.setItem("explorerTheme", theme)
-  }, [theme])
-
-  useLayoutEffect(() => {
     document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.setAttribute("href", brandLogo)
   }, [brandLogo])
 
@@ -907,11 +889,9 @@ export const ExplorerApp: FC = () => {
     }
   }, [])
 
-  const toggleTheme = () => setTheme(current => (current === "dark" ? "light" : "dark"))
-
   return (
     <BrowserRouter>
-      <ToastProvider theme={theme}>
+      <ToastProvider>
         <StaticNetworkInfoProvider network={networkConfig}>
           <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>
@@ -960,11 +940,7 @@ export const ExplorerApp: FC = () => {
                         >
                           <Star size={18} />
                         </Link>
-                        <ThemeSwitch
-                          theme={theme}
-                          onToggleTheme={toggleTheme}
-                          aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-                        />
+                        <ThemeSwitch />
                         <a
                           className={styles.headerIconButton}
                           href="https://github.com/ton-blockchain/acton"

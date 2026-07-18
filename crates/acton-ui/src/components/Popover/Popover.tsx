@@ -2,6 +2,7 @@ import {Popover as PopoverBase} from "@base-ui/react/popover"
 import {type ComponentPropsWithRef, type ReactNode, type Ref, useCallback, useState} from "react"
 
 import {cx} from "../../lib/cx"
+import {useTheme} from "../Theme/ThemeProvider"
 import styles from "./Popover.module.css"
 
 export type PopoverPlacement = "top" | "right" | "bottom" | "left"
@@ -48,15 +49,13 @@ export function Popover({
   ariaLabel,
   ...props
 }: PopoverProps) {
+  const {theme} = useTheme()
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen)
-  const [triggerElement, setTriggerElement] = useState<HTMLSpanElement | null>(null)
   const isControlled = open !== undefined
   const isOpen = open ?? uncontrolledOpen
-  const portalTheme = isOpen ? getPortalTheme(triggerElement) : undefined
 
   const setTriggerRef = useCallback(
     (node: HTMLSpanElement | null) => {
-      setTriggerElement(node)
       assignRef(ref, node)
     },
     [ref],
@@ -96,7 +95,7 @@ export function Popover({
             id={panelId}
             aria-label={ariaLabel}
             className={cx(styles.panel, contentClassName)}
-            data-theme={portalTheme}
+            data-theme={theme}
           >
             <PopoverBase.Arrow className={styles.arrow}>
               <ArrowSvg />
@@ -118,20 +117,6 @@ function assignRef<T>(ref: Ref<T> | undefined, value: T | null) {
   }
 
   ref.current = value
-}
-
-function getPortalTheme(trigger: HTMLElement | null) {
-  const themedElement = trigger?.closest<HTMLElement>("[data-theme]")
-  if (themedElement?.dataset.theme) return themedElement.dataset.theme
-
-  if (
-    typeof document !== "undefined" &&
-    document.documentElement.classList.contains("dark-theme")
-  ) {
-    return "dark"
-  }
-
-  return undefined
 }
 
 function ArrowSvg(props: ComponentPropsWithRef<"svg">) {

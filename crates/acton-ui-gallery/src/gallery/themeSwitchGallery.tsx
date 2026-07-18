@@ -56,9 +56,9 @@ export const themeSwitchGallery = {
     "ThemeSwitch toggles between light and dark modes with the same segmented pill appearance used across existing Acton UIs.",
   importStatement: 'import { ThemeSwitch } from "@acton/ui"',
   agentSummary:
-    "Use ThemeSwitch for app-level light/dark toggles. Pass current theme and an onToggleTheme handler; do not rebuild this switch with Button.",
+    "Use ThemeSwitch inside the app-level ThemeProvider. It reads theme state from context; controlled props are reserved for visual-state previews.",
   usage: [
-    "Use in app chrome, sidebars, and settings surfaces where the whole interface theme changes.",
+    "Use inside ThemeProvider in app chrome, sidebars, and settings surfaces where the whole interface theme changes.",
     "Keep the existing Sun/Moon segmented pill appearance.",
     "Set a contextual aria-label such as Use light theme or Use dark theme when possible.",
   ],

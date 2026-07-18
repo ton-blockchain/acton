@@ -1,5 +1,6 @@
 import {StrictMode} from "react"
 import {createRoot} from "react-dom/client"
+import {ThemeProvider} from "@acton/ui"
 
 import "@acton/ui/styles/tokens.css"
 import {App} from "./App"
@@ -13,6 +14,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <App />
+    <ThemeProvider defaultTheme="light" storageKey="acton-ui-gallery-theme">
+      <App />
+    </ThemeProvider>
   </StrictMode>,
 )

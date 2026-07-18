@@ -1,17 +1,7 @@
 import {BrowserRouter, Navigate, Route, Routes} from "react-router-dom"
 import {Check, KeyRound, ShieldCheck, X} from "lucide-react"
 import {Input, ToastProvider} from "@acton/ui"
-import type {ThemeMode} from "@acton/ui"
-import {
-  Suspense,
-  lazy,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react"
+import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
 import {TonClient} from "./explorer/api/client"
@@ -52,15 +42,6 @@ const TONCENTER_API_V3_URL =
 const API_V2_BASE_URL = TONCENTER_API_V2_URL ?? `${HOST}/api/v2`
 const API_V3_BASE_URL = TONCENTER_API_V3_URL ?? `${HOST}/api/v3`
 
-const readInitialTheme = (): ThemeMode => {
-  const storedTheme = localStorage.getItem("theme")
-  if (storedTheme === "dark" || storedTheme === "light") {
-    return storedTheme
-  }
-
-  return globalThis.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
-}
-
 const readInitialLocalnetApiToken = (): string | undefined => {
   return ENV_LOCALNET_API_TOKEN || localStorage.getItem(LOCALNET_API_TOKEN_STORAGE_KEY) || undefined
 }
@@ -74,7 +55,6 @@ const ApiCallsPage = lazy(async () => {
   return {default: module.ApiCallsPage}
 })
 export const App: FC = () => {
-  const [theme, setTheme] = useState<ThemeMode>(readInitialTheme)
   const [localnetApiToken, setLocalnetApiTokenState] = useState<string | undefined>(
     readInitialLocalnetApiToken,
   )
@@ -151,16 +131,9 @@ export const App: FC = () => {
     }),
     [],
   )
-  useLayoutEffect(() => {
-    document.documentElement.classList.toggle("dark-theme", theme === "dark")
-    document.body.classList.toggle("dark-mode", theme === "dark")
-    document.body.classList.toggle("light-mode", theme !== "dark")
-    localStorage.setItem("theme", theme)
-  }, [theme])
-
   return (
     <BrowserRouter>
-      <ToastProvider theme={theme}>
+      <ToastProvider>
         <NetworkInfoProvider client={client} api={explorerApi}>
           <MetadataRegistryProvider registry={metadataRegistry}>
             <AddressBookProvider>
@@ -179,8 +152,6 @@ export const App: FC = () => {
                   onOpenAuthOverlay={openAuthOverlay}
                   onRequireAuthToken={handleUnauthorized}
                   onSaveAuthToken={saveAuthToken}
-                  theme={theme}
-                  setTheme={setTheme}
                 />
               </WalletRuntimeProvider>
             </AddressBookProvider>
@@ -201,8 +172,6 @@ interface AppContentProps {
   readonly onOpenAuthOverlay: () => void
   readonly onRequireAuthToken: () => void
   readonly onSaveAuthToken: (token: string) => void
-  readonly theme: ThemeMode
-  readonly setTheme: (theme: ThemeMode) => void
 }
 
 const AppContent: FC<AppContentProps> = ({
@@ -215,15 +184,11 @@ const AppContent: FC<AppContentProps> = ({
   onOpenAuthOverlay,
   onRequireAuthToken,
   onSaveAuthToken,
-  theme,
-  setTheme,
 }) => {
   const dashboardProps = {
     client,
     localnetApiToken,
     onOpenAuthTokenOverlay: onOpenAuthOverlay,
-    theme,
-    setTheme,
   }
 
   return (
@@ -301,7 +266,6 @@ const AppContent: FC<AppContentProps> = ({
                       apiBaseUrl={API_V2_BASE_URL}
                       localnetApiToken={TONCENTER_API_V2_URL ? undefined : localnetApiToken}
                       onUnauthorized={onRequireAuthToken}
-                      theme={theme}
                       toncenterApiKey={TONCENTER_API_KEY}
                       version="v2"
                     />
@@ -318,7 +282,6 @@ const AppContent: FC<AppContentProps> = ({
                       apiBaseUrl={API_V3_BASE_URL}
                       localnetApiToken={TONCENTER_API_V3_URL ? undefined : localnetApiToken}
                       onUnauthorized={onRequireAuthToken}
-                      theme={theme}
                       toncenterApiKey={TONCENTER_API_KEY}
                       version="v3"
                     />
@@ -335,7 +298,6 @@ const AppContent: FC<AppContentProps> = ({
                       apiBaseUrl={HOST}
                       localnetApiToken={localnetApiToken}
                       onUnauthorized={onRequireAuthToken}
-                      theme={theme}
                       version="control"
                     />
                   </RouteSuspense>

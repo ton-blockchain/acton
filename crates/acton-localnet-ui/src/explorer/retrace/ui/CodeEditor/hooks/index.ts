@@ -1,4 +1,4 @@
-export {getExplorerMonacoTheme, initializeMonaco, useMonacoSetup} from "./useMonacoSetup"
+export {initializeMonaco, useMonacoSetup} from "./useMonacoSetup"
 export {useDecorations} from "./useDecorations"
 export {useEditorEvents} from "./useEditorEvents"
 export {useTasmHoverProvider} from "./useTasmHoverProvider"

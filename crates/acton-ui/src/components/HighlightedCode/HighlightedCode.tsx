@@ -1,8 +1,9 @@
-import {useEffect, useRef, useState, type CSSProperties} from "react"
+import {useEffect, useState, type CSSProperties} from "react"
 
 import {cx} from "../../lib/cx"
+import {useTheme} from "../Theme/ThemeProvider"
 import styles from "./HighlightedCode.module.css"
-import type {HighlightedCodeLanguage, HighlightedCodeTheme} from "./types"
+import type {HighlightedCodeLanguage} from "./types"
 
 export interface HighlightedCodeProps {
   readonly ariaLabel?: string
@@ -31,34 +32,9 @@ export function HighlightedCode({
   value,
   wrap = false,
 }: HighlightedCodeProps) {
-  const rootRef = useRef<HTMLDivElement>(null)
-  const [theme, setTheme] = useState<HighlightedCodeTheme>(() => detectTheme())
+  const {theme} = useTheme()
   const [highlighted, setHighlighted] = useState<HighlightResult>({key: ""})
   const highlightKey = `${theme}:${language ?? "plain"}:${value}`
-
-  // react-doctor-disable-next-line react-doctor/effect-needs-cleanup -- cleanup disconnects every observer created by this effect
-  useEffect(() => {
-    const updateTheme = () => setTheme(detectTheme(rootRef.current))
-    updateTheme()
-
-    const themeElements = new Set(
-      [document.documentElement, rootRef.current?.closest("[data-theme], .dark-theme")].filter(
-        (element): element is Element => element !== null && element !== undefined,
-      ),
-    )
-    const observers = [...themeElements].map(element => {
-      const observer = new MutationObserver(updateTheme)
-      observer.observe(element, {
-        attributeFilter: ["class", "data-theme"],
-        attributes: true,
-      })
-      return observer
-    })
-
-    return () => {
-      for (const observer of observers) observer.disconnect()
-    }
-  }, [])
 
   useEffect(() => {
     if (!language) return
@@ -93,7 +69,6 @@ export function HighlightedCode({
 
   return (
     <div
-      ref={rootRef}
       className={cx(styles.root, className)}
       data-wrap={wrap ? "true" : undefined}
       style={resolvedStyle}
@@ -108,19 +83,6 @@ export function HighlightedCode({
       )}
     </div>
   )
-}
-
-function detectTheme(element?: Element | null): HighlightedCodeTheme {
-  if (typeof document === "undefined") return "light"
-
-  const themeRoot = element?.closest("[data-theme], .dark-theme")
-  const isDark =
-    themeRoot?.classList.contains("dark-theme") ||
-    themeRoot?.getAttribute("data-theme") === "dark" ||
-    document.documentElement.classList.contains("dark-theme") ||
-    document.documentElement.getAttribute("data-theme") === "dark"
-
-  return isDark ? "dark" : "light"
 }
 
 function toCssSize(value: CSSProperties["maxHeight"] | CSSProperties["minHeight"]) {

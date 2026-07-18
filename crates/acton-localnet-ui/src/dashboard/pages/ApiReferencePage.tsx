@@ -3,6 +3,7 @@ import "@scalar/api-reference-react/style.css"
 import {useLocation} from "react-router-dom"
 import {useCallback, useEffect, useMemo, useRef} from "react"
 import type {FC} from "react"
+import {useTheme} from "@acton/ui"
 
 import styles from "./ApiReferencePage.module.css"
 
@@ -12,7 +13,6 @@ interface ApiReferencePageProps {
   readonly apiBaseUrl: string
   readonly localnetApiToken?: string
   readonly onUnauthorized: () => void
-  readonly theme: string
   readonly toncenterApiKey?: string
   readonly version: ApiReferenceVersion
 }
@@ -46,10 +46,10 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
   apiBaseUrl,
   localnetApiToken,
   onUnauthorized,
-  theme,
   toncenterApiKey,
   version,
 }) => {
+  const {theme} = useTheme()
   const reference = apiReferences[version]
   const localnetOrigin = useMemo(() => apiOrigin(apiBaseUrl), [apiBaseUrl])
   const syncReferenceAnchor = useApiReferenceAnchorSync(reference.slug)

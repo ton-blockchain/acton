@@ -11,7 +11,7 @@ import {
   FiSearch,
   FiX,
 } from "react-icons/fi"
-import {Input, ThemeSwitch, type ThemeMode} from "@acton/ui"
+import {Input, ThemeSwitch, useTheme} from "@acton/ui"
 import {type TestReport, TestStatus} from "@acton/shared-ui"
 
 import styles from "./Sidebar.module.css"
@@ -26,8 +26,6 @@ interface SidebarProps {
   readonly onCollapse: () => void
   readonly isCollapsed: boolean
   readonly className: string
-  readonly theme: ThemeMode
-  readonly onToggleTheme: () => void
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,9 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCollapse,
   isCollapsed,
   className,
-  theme,
-  onToggleTheme,
 }) => {
+  const {theme} = useTheme()
   const [searchQuery, setSearchQuery] = useState("")
   const [collapsedSuites, setCollapsedSuites] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<Set<TestStatus>>(
@@ -272,8 +269,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <FiBookOpen />
         </a>
         <ThemeSwitch
-          theme={theme}
-          onToggleTheme={onToggleTheme}
           title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
           aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
         />

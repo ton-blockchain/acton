@@ -6,14 +6,10 @@ import styles from "./App.module.css"
 import {galleries} from "./gallery/registry"
 import type {ComponentGallery} from "./gallery/types"
 
-type Theme = "light" | "dark"
-
 const initialGallery = galleries.find(gallery => gallery.id === "button") ?? galleries[0]
 const galleryParamName = "component"
-const themeStorageKey = "acton-ui-gallery-theme"
 
 export function App() {
-  const [theme, setTheme] = useState<Theme>(getInitialTheme)
   const [activeGalleryId, setActiveGalleryId] = useState(getInitialGalleryId)
   const [isNavigationOpen, setIsNavigationOpen] = useState(false)
 
@@ -37,14 +33,6 @@ export function App() {
     }
   }, [isNavigationOpen])
 
-  const toggleTheme = () => {
-    setTheme(currentTheme => {
-      const nextTheme = currentTheme === "light" ? "dark" : "light"
-      globalThis.localStorage?.setItem(themeStorageKey, nextTheme)
-      return nextTheme
-    })
-  }
-
   const selectGallery = (galleryId: string) => {
     setActiveGalleryId(galleryId)
     setIsNavigationOpen(false)
@@ -52,8 +40,8 @@ export function App() {
   }
 
   return (
-    <ToastProvider theme={theme}>
-      <div className={styles.shell} data-theme={theme}>
+    <ToastProvider>
+      <div className={styles.shell}>
         <header className={styles.mobileToolbar}>
           <button
             type="button"
@@ -69,11 +57,7 @@ export function App() {
             <span>Acton UI</span>
             <strong>{activeGallery.title}</strong>
           </div>
-          <ThemeSwitch
-            theme={theme}
-            onToggleTheme={toggleTheme}
-            aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-          />
+          <ThemeSwitch />
         </header>
 
         {isNavigationOpen ? (
@@ -125,11 +109,7 @@ export function App() {
           </nav>
 
           <div className={styles.sidebarFooter}>
-            <ThemeSwitch
-              theme={theme}
-              onToggleTheme={toggleTheme}
-              aria-label={theme === "dark" ? "Use light theme" : "Use dark theme"}
-            />
+            <ThemeSwitch />
           </div>
         </aside>
 
@@ -199,11 +179,6 @@ export function App() {
       </div>
     </ToastProvider>
   )
-}
-
-function getInitialTheme(): Theme {
-  const storedTheme = globalThis.localStorage?.getItem(themeStorageKey)
-  return storedTheme === "dark" ? "dark" : "light"
 }
 
 function getInitialGalleryId() {

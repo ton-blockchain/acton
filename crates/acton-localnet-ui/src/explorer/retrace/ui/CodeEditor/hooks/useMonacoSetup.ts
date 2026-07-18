@@ -1,6 +1,7 @@
-import {useEffect, useLayoutEffect, useState} from "react"
+import {useEffect, useState} from "react"
 import {useMonaco} from "@monaco-editor/react"
 import type * as monacoTypes from "monaco-editor"
+import {useTheme} from "@acton/ui"
 
 import {DARK_THEME, LIGHT_THEME} from "../themes"
 import {funcLanguageDefinition} from "../languages/func-language-definition"
@@ -22,13 +23,6 @@ interface UseMonacoSetupReturn {
 }
 
 export type MonacoTheme = "light-theme" | "dark-theme"
-
-export const getExplorerMonacoTheme = (): MonacoTheme => {
-  if (typeof globalThis.document === "undefined") return "light-theme"
-  return globalThis.document.documentElement.classList.contains("dark-theme")
-    ? "dark-theme"
-    : "light-theme"
-}
 
 export const initializeMonaco = (monaco: typeof monacoTypes, language: SupportedLanguage) => {
   if (language === "tasm") {
@@ -58,7 +52,8 @@ export const initializeMonaco = (monaco: typeof monacoTypes, language: Supported
 
 export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetupReturn => {
   const monaco = useMonaco()
-  const [theme, setTheme] = useState<MonacoTheme>(() => getExplorerMonacoTheme())
+  const {theme: appTheme} = useTheme()
+  const theme: MonacoTheme = appTheme === "dark" ? "dark-theme" : "light-theme"
   const [isReady, setIsReady] = useState(false)
   const [isMac, setIsMac] = useState(false)
 
@@ -73,36 +68,14 @@ export const useMonacoSetup = ({language}: UseMonacoSetupOptions): UseMonacoSetu
 
     try {
       initializeMonaco(monaco, language)
-      const currentTheme = getExplorerMonacoTheme()
-      monaco.editor.setTheme(currentTheme)
-      setTheme(currentTheme)
+      monaco.editor.setTheme(theme)
       setIsReady(true)
     } catch (error) {
       console.error("Failed to initialize Monaco:", error)
     }
-  }, [monaco, language])
+  }, [language, monaco, theme])
 
-  useLayoutEffect(() => {
-    if (typeof globalThis.document === "undefined") return
-
-    const updateTheme = () => {
-      setTheme(getExplorerMonacoTheme())
-    }
-
-    updateTheme()
-
-    const observer = new MutationObserver(updateTheme)
-    observer.observe(globalThis.document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    })
-
-    return () => {
-      observer.disconnect()
-    }
-  }, [])
-
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!monaco || !isReady) return
 
     try {

@@ -11,6 +11,7 @@ import {
 } from "react"
 
 import {cx} from "../../lib/cx"
+import {useTheme} from "../Theme/ThemeProvider"
 import styles from "./Toast.module.css"
 
 export type ToastVariant = "info" | "success" | "error" | "loading"
@@ -71,7 +72,6 @@ export type ToastProviderProps = PropsWithChildren<
   Readonly<{
     readonly timeoutMs?: number
     readonly limit?: number
-    readonly theme?: string
     readonly viewportClassName?: string
   }>
 >
@@ -87,28 +87,24 @@ const defaultLimit = 4
 export function ToastProvider({
   children,
   limit = defaultLimit,
-  theme,
   timeoutMs = defaultTimeoutMs,
   viewportClassName,
 }: ToastProviderProps) {
   return (
     <ToastBase.Provider limit={limit} timeout={timeoutMs}>
-      <ToastProviderBridge theme={theme} viewportClassName={viewportClassName}>
-        {children}
-      </ToastProviderBridge>
+      <ToastProviderBridge viewportClassName={viewportClassName}>{children}</ToastProviderBridge>
     </ToastBase.Provider>
   )
 }
 
 function ToastProviderBridge({
   children,
-  theme,
   viewportClassName,
 }: PropsWithChildren<{
-  readonly theme?: string
   readonly viewportClassName?: string
 }>) {
   const {add, close, promise: trackPromise, update} = ToastBase.useToastManager<ToastData>()
+  const {theme} = useTheme()
 
   const showToast = useCallback(
     (options: ToastOptions) => {

@@ -15,7 +15,6 @@ import {useTolkLanguageProviders} from "./hooks/useTolkLanguageProviders"
 
 import {
   useMonacoSetup,
-  getExplorerMonacoTheme,
   initializeMonaco,
   useDecorations,
   useEditorEvents,
@@ -460,7 +459,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           loading={<></>}
           beforeMount={monacoInstance => {
             initializeMonaco(monacoInstance, language)
-            monacoInstance.editor.setTheme(getExplorerMonacoTheme())
+            monacoInstance.editor.setTheme(theme)
           }}
           onMount={editor => {
             const model = editor.getModel()

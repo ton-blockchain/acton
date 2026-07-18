@@ -1,5 +1,4 @@
 import {PanelLeftOpen} from "lucide-react"
-import type {ThemeMode} from "@acton/ui"
 import {useCallback, useEffect, useRef, useState} from "react"
 import type {FC, ReactNode} from "react"
 
@@ -15,8 +14,6 @@ interface DashboardPageProps {
   readonly client: TonClient
   readonly localnetApiToken?: string
   readonly onOpenAuthTokenOverlay: () => void
-  readonly theme: ThemeMode
-  readonly setTheme: (theme: ThemeMode) => void
   readonly children?: ReactNode
   readonly embedded?: boolean
 }
@@ -27,8 +24,6 @@ export const DashboardPage: FC<DashboardPageProps> = ({
   embedded = false,
   localnetApiToken,
   onOpenAuthTokenOverlay,
-  theme,
-  setTheme,
 }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
     return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === "true"
@@ -170,8 +165,6 @@ export const DashboardPage: FC<DashboardPageProps> = ({
             client={client}
             localnetApiToken={localnetApiToken}
             onOpenAuthTokenOverlay={onOpenAuthTokenOverlay}
-            theme={theme}
-            setTheme={setTheme}
             onToggleSidebar={toggleSidebar}
             isSidebarCollapsed={isSidebarCollapsed}
             className={styles.floatingSidebar}

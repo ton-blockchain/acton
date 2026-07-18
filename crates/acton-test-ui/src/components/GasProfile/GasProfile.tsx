@@ -506,13 +506,10 @@ const buildInstructionStats = (
 }
 
 export const GasProfile: React.FC<GasProfileProps> = ({profile, projectRoot}) => {
-  const {
-    profile: loadedProfile,
-    error,
-    loading,
-  } = useGasProfileReport(profile === undefined)
+  const {profile: loadedProfile, error, loading} = useGasProfileReport(profile === undefined)
 
-  if (profile !== undefined) return <GasProfileContent profile={profile} projectRoot={projectRoot} />
+  if (profile !== undefined)
+    return <GasProfileContent profile={profile} projectRoot={projectRoot} />
   if (loading) return <div className={styles.emptyState}>Loading gas profile...</div>
   if (error) return <div className={styles.emptyState}>Failed to load gas profile: {error}</div>
   if (loadedProfile === undefined) {

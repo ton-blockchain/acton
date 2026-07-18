@@ -2,7 +2,7 @@ import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {FiSearch} from "react-icons/fi"
 
-import {highlightCodeToTokens, type HighlightedCodeToken} from "@acton/ui"
+import {highlightCodeToTokens, type HighlightedCodeToken, useTheme} from "@acton/ui"
 
 import {useCoverageReport} from "../../hooks/useCoverageReport"
 import {useFileContent} from "../../hooks/useFileContent"
@@ -109,6 +109,7 @@ export const Coverage: React.FC<CoverageProps> = ({projectRoot}) => {
 }
 
 const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) => {
+  const {theme} = useTheme()
   const coverage = useMemo(() => parseLcov(lcov), [lcov])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
@@ -164,8 +165,7 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
 
     const renderHighlightedLines = async () => {
       try {
-        const isDark = document.documentElement.classList.contains("dark-theme")
-        const tokens = await highlightCodeToTokens(sourceContent, "tolk", isDark ? "dark" : "light")
+        const tokens = await highlightCodeToTokens(sourceContent, "tolk", theme)
         if (!isDisposed) {
           setHighlightedLines(tokens)
         }
@@ -179,21 +179,10 @@ const CoverageContent: React.FC<CoverageContentProps> = ({lcov, projectRoot}) =>
 
     void renderHighlightedLines()
 
-    const observer = new MutationObserver(mutations => {
-      for (const mutation of mutations) {
-        if (mutation.type === "attributes" && mutation.attributeName === "class") {
-          void renderHighlightedLines()
-        }
-      }
-    })
-
-    observer.observe(document.documentElement, {attributes: true})
-
     return () => {
       isDisposed = true
-      observer.disconnect()
     }
-  }, [sourceContent])
+  }, [sourceContent, theme])
 
   const focusLine = selectedFile?.firstUncoveredLine ?? selectedFile?.firstPartialLine
 

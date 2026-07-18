@@ -27,7 +27,6 @@ import {
 import type {LucideIcon} from "lucide-react"
 import {useLocation, useNavigate} from "react-router-dom"
 import {ThemeSwitch} from "@acton/ui"
-import type {ThemeMode} from "@acton/ui"
 
 import type {TonClient} from "../explorer/api/client"
 import {readExplorerLastPath, writeExplorerLastPath} from "../explorer/explorerResume"
@@ -40,8 +39,6 @@ interface DashboardNavigationProps {
   readonly client: TonClient
   readonly localnetApiToken?: string
   readonly onOpenAuthTokenOverlay: () => void
-  readonly theme: ThemeMode
-  readonly setTheme: (theme: ThemeMode) => void
   readonly onToggleSidebar?: () => void
   readonly isSidebarCollapsed?: boolean
   readonly className?: string
@@ -95,8 +92,6 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
   client,
   localnetApiToken,
   onOpenAuthTokenOverlay,
-  theme,
-  setTheme,
   onToggleSidebar,
   isSidebarCollapsed = false,
   className,
@@ -327,10 +322,7 @@ export const DashboardNavigation: FC<DashboardNavigationProps> = ({
                   <Star size={18} />
                 </button>
 
-                <ThemeSwitch
-                  theme={theme}
-                  onToggleTheme={() => setTheme(theme === "light" ? "dark" : "light")}
-                />
+                <ThemeSwitch />
               </div>
             </div>
           </nav>
