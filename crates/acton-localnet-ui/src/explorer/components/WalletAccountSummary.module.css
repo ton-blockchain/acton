@@ -23,7 +23,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
-  color: var(--tonscan-text-primary, var(--litenode-text));
+  color: var(--acton-color-text);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -68,7 +68,7 @@
   width: 20px;
   height: 20px;
   box-sizing: border-box;
-  border: 2px solid var(--tonscan-card-bg, var(--litenode-surface));
+  border: 2px solid var(--acton-color-surface-raised);
   border-radius: 50%;
   flex: 0 0 auto;
 }
@@ -100,18 +100,18 @@
 }
 
 .tokenPreviewAmount {
-  color: var(--tonscan-text-primary, var(--litenode-text));
+  color: var(--acton-color-text);
   font-weight: 500;
 }
 
 .tokenPreviewAction {
-  color: var(--tonscan-link, var(--tonscan-accent));
+  color: var(--acton-color-accent);
   font-weight: 500;
   margin-right: 8px;
 }
 
 .tokenPreviewButton:hover .tokenPreviewAction {
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
   text-decoration: underline;
 }
 
@@ -122,7 +122,7 @@
   background: linear-gradient(
     90deg,
     var(--litenode-surface-subtle),
-    var(--litenode-surface-hover),
+    var(--acton-color-surface-hover),
     var(--litenode-surface-subtle)
   );
   background-size: 200% 100%;

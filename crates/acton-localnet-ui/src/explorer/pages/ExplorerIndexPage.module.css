@@ -5,7 +5,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  background-color: var(--tonscan-bg);
+  background-color: var(--acton-color-canvas);
   color: var(--acton-color-text);
 }
 
@@ -66,13 +66,13 @@
   align-items: center;
   justify-content: center;
   gap: 18px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   line-height: 1;
 }
 
 .footer a {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   text-decoration: none;
   transition: color var(--acton-duration-fast);
 }
@@ -84,24 +84,24 @@
 }
 
 .footerBrand {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .footerBy {
   font-size: var(--acton-font-size-xs);
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .footer .footerCreditLink {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
 }
 
 .footer a:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .footer .footerCreditLink:hover {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
 }
 
 @media (max-width: 768px) {

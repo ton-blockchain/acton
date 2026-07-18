@@ -19,7 +19,7 @@
   gap: 12px;
   min-height: var(--retrace-toolbar-height);
   padding: 0 12px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .toolbarLeft {
@@ -61,11 +61,11 @@
   gap: 8px;
   min-height: 34px;
   padding: 8px 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  color: var(--tonscan-text-secondary);
-  background: var(--tonscan-row-hover);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-row);
   font: inherit;
   font-size: 13px;
   font-weight: var(--acton-font-weight-utility);
@@ -92,15 +92,15 @@
 }
 
 .primaryTab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .primaryTabActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
-  border-bottom-color: var(--tonscan-border);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+  border-bottom-color: var(--acton-color-border);
 }
 
 .statusContainer {
@@ -123,7 +123,7 @@
   padding: 0;
   border-radius: 0 0 16px 16px;
   overflow: hidden;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourcesWorkspace {
@@ -170,13 +170,13 @@
   min-width: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   scrollbar-width: thin;
 }
 
 .sourceBundleTabs,
 .sourceFileTabs {
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .sourceBundleTabs {
@@ -195,8 +195,8 @@
   justify-content: center;
   min-width: 0;
   border: 0;
-  border-right: 1px solid var(--tonscan-border);
-  color: var(--tonscan-text-secondary);
+  border-right: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
   background: transparent;
   font: inherit;
   line-height: 1.2;
@@ -220,13 +220,13 @@
 
 .sourceBundleTab:hover,
 .sourceFileTab:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-row-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-row);
 }
 
 .sourceBundleTabActive,
 .sourceFileTabActive {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   background: var(--acton-color-surface-raised);
 }
 
@@ -276,7 +276,7 @@
   justify-content: flex-end;
   gap: 10px;
   overflow: hidden;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -299,7 +299,7 @@
   flex: 0 0 auto;
   width: 1px;
   height: 16px;
-  background: color-mix(in srgb, var(--tonscan-text-secondary) 30%, transparent);
+  background: color-mix(in srgb, var(--acton-color-text-muted) 30%, transparent);
 }
 
 .sourceDebugGroupSeparator {
@@ -320,9 +320,9 @@
   width: 28px;
   height: 28px;
   padding: 0;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 6px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   background: var(--acton-color-surface-raised);
   cursor: pointer;
   transition:
@@ -332,8 +332,8 @@
 }
 
 .sourceDebugIconButton:hover:not(:disabled) {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-row-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-row);
 }
 
 .sourceDebugIconButton:disabled {
@@ -343,7 +343,7 @@
 
 .sourceDebugStepCounter {
   flex: 0 0 auto;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 12px;
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
@@ -372,7 +372,7 @@
 
 .sourceDebugGas {
   flex: 0 0 auto;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
@@ -383,7 +383,7 @@
   flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
@@ -394,7 +394,7 @@
 .sourceDebugWarning {
   flex: 0 0 auto;
   padding: 2px 6px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 999px;
   color: var(--table-gas-value-color);
   font-size: 11px;
@@ -418,8 +418,8 @@
   position: relative;
   width: 6px;
   min-width: 6px;
-  border-left: 1px solid var(--tonscan-border);
-  background: var(--tonscan-card-bg);
+  border-left: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   cursor: col-resize;
   touch-action: none;
 }
@@ -448,7 +448,7 @@
   max-height: 100%;
   padding: 0;
   overflow: hidden;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourceDebugSectionPanel {
@@ -460,7 +460,7 @@
   min-height: 72px;
   max-height: 100%;
   overflow: hidden;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .sourceDebugSectionPanelCollapsed {
@@ -486,8 +486,8 @@
   min-height: 30px;
   padding: 0 6px;
   border: 0;
-  color: var(--tonscan-text-secondary);
-  background: var(--tonscan-card-bg);
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-raised);
   font: inherit;
   cursor: pointer;
   transition:
@@ -496,8 +496,8 @@
 }
 
 .sourceDebugSectionHeader:hover {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-row-hover);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-row);
 }
 
 .sourceDebugSectionHeaderContent {
@@ -562,7 +562,7 @@
 .sourceDebugExceptionText {
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-family: var(--font-family-mono);
   font-size: 12px;
   text-overflow: ellipsis;
@@ -615,7 +615,7 @@
   height: 18px;
   padding: 0;
   border: 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   background: transparent;
   cursor: pointer;
 }
@@ -639,7 +639,7 @@
   align-items: center;
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   cursor: default;
   line-height: 1.25;
   white-space: nowrap;
@@ -674,7 +674,7 @@
   height: 17px;
   margin-right: 5px;
   border-radius: 50%;
-  background: var(--acton-color-text-muted, var(--color-text-secondary));
+  background: var(--acton-color-text-muted);
   color: var(--acton-color-surface);
   font-size: 12px;
   font-weight: var(--acton-font-weight-emphasis);
@@ -734,7 +734,7 @@
   padding: 1px 6px;
   border: 0;
   border-radius: 6px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   background: transparent;
   font: inherit;
   font-size: 12.5px;
@@ -793,7 +793,7 @@
 
 .sourceDebugEmpty,
 .sourceDebugEmptyState {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
 }
 
@@ -812,7 +812,7 @@
   justify-content: center;
   min-width: 0;
   min-height: 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 13px;
 }
 
@@ -851,7 +851,7 @@
 }
 
 .workspace .sidePanel {
-  border-left: 1px solid var(--tonscan-border);
+  border-left: 1px solid var(--acton-color-border);
   border-radius: 0 0 16px 0;
   box-shadow: none;
 }
@@ -885,7 +885,7 @@
   }
 
   .sourceDebugPanel {
-    border-top: 1px solid var(--tonscan-border);
+    border-top: 1px solid var(--acton-color-border);
     border-left: 0;
   }
 
@@ -894,7 +894,7 @@
   }
 
   .workspace .sidePanel {
-    border-top: 1px solid var(--tonscan-border);
+    border-top: 1px solid var(--acton-color-border);
     border-left: 0;
     border-radius: 0 0 16px 16px;
   }

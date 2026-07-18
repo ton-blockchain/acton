@@ -30,10 +30,10 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   box-sizing: border-box;
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   -webkit-overflow-scrolling: touch;
 }
 
@@ -62,8 +62,8 @@
   min-width: 720px;
   min-height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text);
   box-sizing: border-box;
   display: flex;
@@ -82,7 +82,7 @@
 
 .walletTableTitleMeta {
   min-width: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-align: right;
   text-overflow: ellipsis;
@@ -110,7 +110,7 @@
 .refreshButton.refreshButton:hover:not(:disabled),
 .tableActionButton.tableActionButton:hover:not(:disabled) {
   background: transparent;
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
 }
 
 .refreshButton.refreshButton:focus-visible,
@@ -137,7 +137,7 @@
   min-width: 720px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .walletTable th,
@@ -152,9 +152,9 @@
 
 .walletTable th {
   height: 36px;
-  color: var(--litenode-text-muted);
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-row);
+  border-bottom: 1px solid var(--acton-color-border);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -164,7 +164,7 @@
 
 .walletTable td {
   height: 46px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -173,7 +173,7 @@
 }
 
 .walletTableRow {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   transition: background-color 120ms ease;
 }
 
@@ -233,8 +233,8 @@
 
 .unsupportedItem {
   border-radius: 999px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   font-size: 0.72rem;
   font-weight: 600;
   line-height: 1;
@@ -259,7 +259,7 @@
 .metaLabel,
 .metaValue,
 .messageValue {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.82rem;
   line-height: 1.45;
 }
@@ -307,7 +307,7 @@
 }
 
 .sessionDappSeparator {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   flex: 0 0 auto;
   font-weight: 600;
 }
@@ -332,14 +332,14 @@
 }
 
 .sessionWalletFallback {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-weight: 500;
 }
 
 .sessionActivityHeader,
 .sessionActivityCell {
   width: 230px;
-  color: var(--litenode-text-muted) !important;
+  color: var(--acton-color-text-muted) !important;
   white-space: nowrap;
 }
 
@@ -361,8 +361,8 @@
 }
 
 .connectFooterCell {
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle)) !important;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-top: 1px solid var(--acton-color-border) !important;
+  background: var(--acton-color-surface-raised);
 }
 
 .walletNameSkeleton,
@@ -411,7 +411,7 @@
   min-height: 58px;
   padding: 11px 18px;
   box-sizing: border-box;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   display: grid;
   grid-template-columns: 128px minmax(0, 1fr) 148px;
   align-items: center;
@@ -419,7 +419,7 @@
 }
 
 .connectInlineLabel {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -434,7 +434,7 @@
 .connectInput {
   height: 34px;
   border-radius: 9px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   font-size: 0.82rem;
   font-weight: 500;
 }
@@ -460,8 +460,8 @@
 .addressCopyButton {
   border: 1px solid var(--litenode-border-subtle);
   border-radius: 9px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
 }
 
@@ -472,7 +472,7 @@
 
 .addressCopyButton:hover {
   border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
   color: var(--litenode-text);
 }
 
@@ -529,7 +529,7 @@
   overflow: auto;
   border: 1px solid var(--litenode-border);
   border-radius: 16px;
-  background: var(--litenode-surface);
+  background: var(--acton-color-surface);
   box-shadow: var(--acton-shadow-overlay);
 }
 
@@ -558,7 +558,7 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -568,7 +568,7 @@
 
 .modalCloseButton:hover {
   color: var(--litenode-text);
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .modalCloseButton:focus-visible {
@@ -578,7 +578,7 @@
 
 .modalSubtitle {
   margin: 8px 0 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.9rem;
   line-height: 1.45;
 }
@@ -625,7 +625,7 @@
 
 .pickerOption:hover {
   border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .pickerOption:focus-visible {
@@ -635,7 +635,7 @@
 
 .pickerOptionActive {
   border-color: var(--litenode-border-strong);
-  background: var(--litenode-surface-active);
+  background: var(--acton-color-surface-active);
 }
 
 .pickerTitle,
@@ -648,7 +648,7 @@
   height: 22px;
   border: 1px solid var(--litenode-border-control);
   border-radius: 999px;
-  background: var(--litenode-surface);
+  background: var(--acton-color-surface);
   color: var(--litenode-text);
 }
 
@@ -663,8 +663,8 @@
   height: 28px;
   border: 1px solid var(--litenode-border-subtle);
   border-radius: 9px;
-  background: var(--litenode-surface);
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface);
+  color: var(--acton-color-text-muted);
   font-size: 0.76rem;
   font-weight: 700;
 }
@@ -710,8 +710,8 @@
 .signPreviewDetails summary::before {
   width: 7px;
   height: 7px;
-  border-right: 1.5px solid var(--litenode-text-muted);
-  border-bottom: 1.5px solid var(--litenode-text-muted);
+  border-right: 1.5px solid var(--acton-color-text-muted);
+  border-bottom: 1.5px solid var(--acton-color-text-muted);
   content: "";
   flex: 0 0 auto;
   transform: rotate(-45deg);
@@ -726,7 +726,7 @@
 .signPreviewHash {
   min-width: 0;
   margin-left: auto;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -738,7 +738,7 @@
 .signPreviewNotice {
   padding: 10px 12px;
   border-bottom: 1px solid var(--litenode-border-subtle);
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   line-height: 1.4;
 }
@@ -776,7 +776,7 @@
 
 .signPreviewLabel {
   min-width: 0;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

@@ -46,8 +46,8 @@
   --color-neutral-bg-hover-alpha: rgb(var(--color-neutral-rgb), 0.1);
   --color-neutral-bg-alpha: rgb(var(--color-neutral-rgb), 0.2);
 
-  --color-text-primary: var(--tonscan-text-primary, #09090b);
-  --color-text-secondary: var(--tonscan-text-secondary, #71717a);
+  --color-text-primary: var(--acton-color-text);
+  --color-text-secondary: var(--acton-color-text-muted, #71717a);
   --color-text-tertiary: var(--acton-color-text-subtle, #a1a1aa);
   --color-text-secondary-hex: #636366;
   --color-text-placeholder: #a0a0a5;
@@ -58,10 +58,10 @@
   --color-text-inverted-only-on-light: #fff;
   --editor-faded-text-color: #777;
 
-  --color-background-secondary: var(--tonscan-bg, #f7f7f8);
+  --color-background-secondary: var(--acton-color-canvas, #f7f7f8);
   --color-background-secondary-rgb: 245, 245, 247;
-  --color-background-tertiary: var(--tonscan-bg-secondary, #fafafa);
-  --color-background-input: var(--tonscan-card-bg, #fff);
+  --color-background-tertiary: var(--acton-color-surface-raised);
+  --color-background-input: var(--acton-color-surface-raised);
   --color-background-error: #fff1f0;
   --color-highlight-bg: #fff3cd;
   --color-highlight-gradient: linear-gradient(
@@ -90,9 +90,9 @@
   --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
   --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
 
-  --color-border: var(--tonscan-border, #e4e4e7);
+  --color-border: var(--acton-color-border);
   --color-border-hover: #6c6c6c;
-  --color-divider: var(--tonscan-border, #e4e4e7);
+  --color-divider: var(--acton-color-border);
 
   --status-badge-success-border-color: var(--color-success, #34c759);
   --status-badge-failed-border-color: var(--color-error, #ff3b30);
@@ -300,8 +300,8 @@ html.dark-theme .retraceRoot {
   --color-neutral-bg-hover-alpha: rgb(var(--color-neutral-rgb), 0.2);
   --color-neutral-bg-alpha: rgb(var(--color-neutral-rgb), 0.3);
 
-  --color-text-primary: var(--tonscan-text-primary, #fafafa);
-  --color-text-secondary: var(--tonscan-text-secondary, #a1a1aa);
+  --color-text-primary: var(--acton-color-text);
+  --color-text-secondary: var(--acton-color-text-muted, #a1a1aa);
   --color-text-tertiary: var(--acton-color-text-subtle, #71717a);
   --color-text-secondary-hex: #aeaeb2;
   --color-text-placeholder: #8e8e93;
@@ -312,10 +312,10 @@ html.dark-theme .retraceRoot {
   --color-text-inverted-only-on-light: #fff;
   --editor-faded-text-color: #aaa;
 
-  --color-background-secondary: var(--tonscan-bg, #09090b);
+  --color-background-secondary: var(--acton-color-canvas, #09090b);
   --color-background-secondary-rgb: 44, 44, 46;
-  --color-background-tertiary: var(--tonscan-bg-secondary, #18181b);
-  --color-background-input: var(--litenode-surface-hover, #27272a);
+  --color-background-tertiary: var(--acton-color-surface-raised);
+  --color-background-input: var(--acton-color-surface-hover, #27272a);
   --color-background-error: #2f1716;
   --color-highlight-bg: #6f3434;
   --color-highlight-gradient: linear-gradient(
@@ -344,9 +344,9 @@ html.dark-theme .retraceRoot {
   --source-debug-frame-line-bg: rgb(91 126 190 / 28%);
   --source-debug-frame-line-ring: rgb(91 126 190 / 18%);
 
-  --color-border: var(--tonscan-border, #27272a);
+  --color-border: var(--acton-color-border);
   --color-border-hover: #737373;
-  --color-divider: var(--tonscan-border, #27272a);
+  --color-divider: var(--acton-color-border);
   --color-border-light-alpha: rgb(var(--color-white-rgb), 0.2);
 
   --status-badge-success-border-color: transparent;

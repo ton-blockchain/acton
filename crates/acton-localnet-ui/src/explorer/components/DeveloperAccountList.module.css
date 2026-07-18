@@ -2,9 +2,9 @@
   width: 100%;
   max-width: 100%;
   overflow-x: auto;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
   -webkit-overflow-scrolling: touch;
 }
@@ -19,9 +19,9 @@
 .tableTitle {
   height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-bottom: 1px solid var(--acton-color-border);
   color: var(--litenode-text);
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   display: flex;
   align-items: center;
   font-size: 0.86rem;
@@ -33,15 +33,15 @@
 .table th {
   height: 36px;
   padding: 0 14px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
   line-height: 1;
   text-align: left;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
   box-sizing: border-box;
 }
 
@@ -51,7 +51,7 @@
   color: var(--litenode-text);
   font-size: 0.82rem;
   line-height: 1.35;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   box-sizing: border-box;
   vertical-align: middle;
 }
@@ -61,7 +61,7 @@
 }
 
 .row {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   transition: background-color 120ms ease;
 }
 
@@ -134,12 +134,12 @@
 }
 
 .statusUninit {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   background: var(--litenode-surface-subtle);
 }
 
 .statusNonexist {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
   background: var(--litenode-danger-bg-soft);
 }
 
@@ -220,7 +220,7 @@
   border: 1px solid var(--litenode-border-subtle);
   border-radius: 12px;
   background: var(--litenode-surface-subtle);
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;

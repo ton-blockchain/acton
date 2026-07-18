@@ -54,7 +54,7 @@
 }
 
 .historyContent tbody > tr {
-  border-top: 1px solid var(--tonscan-border) !important;
+  border-top: 1px solid var(--acton-color-border) !important;
   border-bottom: 0 !important;
 }
 
@@ -71,7 +71,7 @@
 }
 
 .addressRelation {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: 400;
   white-space: nowrap;
@@ -89,12 +89,12 @@
 }
 
 .tableCard {
-  --border-color: var(--tonscan-border);
+  --border-color: var(--acton-color-border);
 
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background-color: var(--tonscan-card-bg);
+  background-color: var(--acton-color-surface-raised);
   color: var(--acton-color-text);
 }
 
@@ -103,13 +103,13 @@
   align-items: center;
   gap: 4px;
   padding: 8px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .tab {
   min-height: 34px;
   padding: 0 10px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
@@ -143,16 +143,16 @@
 
 .tab:hover {
   background: var(--litenode-control-hover);
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .tab:hover .tabIcon {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .tabActive {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-surface-active);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
 }
 
 .filterPopoverRoot {
@@ -167,9 +167,9 @@
   box-sizing: border-box;
   width: min(430px, calc(100vw - 32px));
   padding: 18px 14px 14px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background: color-mix(in srgb, var(--tonscan-card-bg) 95%, transparent);
+  background: color-mix(in srgb, var(--acton-color-surface-raised) 95%, transparent);
   box-shadow:
     0 18px 50px rgb(0 0 0 / 22%),
     inset 0 1px 0 rgb(255 255 255 / 4%);
@@ -181,7 +181,7 @@
   flex-direction: column;
   gap: 10px;
   padding-top: 14px;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .filterSection:first-child {
@@ -194,7 +194,7 @@
 }
 
 .filterSectionTitle {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 0.78rem;
   font-weight: 750;
   line-height: 1.2;
@@ -215,10 +215,10 @@
   max-width: 100%;
   min-height: 34px;
   padding: 0 13px;
-  border: 2px solid var(--tonscan-border);
+  border: 2px solid var(--acton-color-border);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--tonscan-bg) 48%, transparent);
-  color: var(--tonscan-text-secondary);
+  background: color-mix(in srgb, var(--acton-color-canvas) 48%, transparent);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -238,8 +238,8 @@
 
 .actionFilterChipSelected {
   border-color: var(--tonscan-accent);
-  background: var(--litenode-surface-active);
-  color: color-mix(in srgb, var(--tonscan-text-primary) 82%, var(--tonscan-text-secondary));
+  background: var(--acton-color-surface-active);
+  color: color-mix(in srgb, var(--acton-color-text) 82%, var(--acton-color-text-muted));
 }
 
 .filterEmptyState {
@@ -255,8 +255,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   padding: 3px;
   border-radius: 12px;
-  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
-  border: 1px solid var(--tonscan-border);
+  background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
+  border: 1px solid var(--acton-color-border);
 }
 
 .segmentedOption {
@@ -264,7 +264,7 @@
   border: 0;
   border-radius: 9px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: var(--acton-font-size-sm);
@@ -275,12 +275,12 @@
 }
 
 .segmentedOption:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .segmentedOptionActive {
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
 }
 
 .timeFormatGrid {
@@ -288,9 +288,9 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 14px;
-  background: color-mix(in srgb, var(--tonscan-bg) 72%, transparent);
+  background: color-mix(in srgb, var(--acton-color-canvas) 72%, transparent);
 }
 
 .timeFormatOption {
@@ -299,9 +299,9 @@
   min-height: 72px;
   padding: 9px 8px;
   border: 0;
-  border-left: 1px solid var(--tonscan-border);
+  border-left: 1px solid var(--acton-color-border);
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: flex;
   flex-direction: column;
@@ -321,12 +321,12 @@
 }
 
 .timeFormatOption:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .timeFormatOptionActive {
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
   z-index: 1;
   box-shadow: none;
 }
@@ -366,14 +366,14 @@
 }
 
 .tableHeader {
-  color: var(--tonscan-text-secondary) !important;
+  color: var(--acton-color-text-muted) !important;
   text-transform: uppercase;
   font-size: var(--acton-font-size-xs) !important;
   letter-spacing: 0.05em;
 }
 
 .row {
-  border-bottom: 1px solid var(--tonscan-border) !important;
+  border-bottom: 1px solid var(--acton-color-border) !important;
 }
 
 .row:last-child {
@@ -389,7 +389,7 @@
 }
 
 .row:hover {
-  background-color: var(--tonscan-row-hover) !important;
+  background-color: var(--acton-color-surface-row) !important;
 }
 
 .rowStatic:hover {
@@ -439,7 +439,7 @@
   align-items: center;
   justify-content: center;
   min-height: 56px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
 }
@@ -449,22 +449,22 @@
   align-items: center;
   justify-content: center;
   min-height: 64px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
 }
 
 .tableStateError {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .skeleton {
   display: block;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
+    var(--acton-color-surface-row) 0%,
     var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeleton-shimmer 1.15s ease-in-out infinite;
@@ -562,7 +562,7 @@
 }
 
 .txLink {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   opacity: 0;
   transition: opacity 0.2s;
   display: flex;
@@ -575,7 +575,7 @@
 }
 
 .time {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   white-space: nowrap;
 }
 
@@ -598,7 +598,7 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-weight: 400;
   min-width: 0;
   max-width: 100%;
@@ -619,7 +619,7 @@
 }
 
 .addressFallback {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
@@ -635,7 +635,7 @@
   display: block;
   max-width: 12rem;
   overflow: hidden;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.35;
@@ -663,17 +663,17 @@ th.valueContainer {
 }
 
 .valueNegative {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-weight: var(--acton-font-weight-utility);
 }
 
 .valueEmpty {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-weight: var(--acton-font-weight-utility);
 }
 
 .valueNeutral {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-weight: var(--acton-font-weight-utility);
 }
 
@@ -682,7 +682,7 @@ th.valueContainer {
 }
 
 .statusFailed {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .historyValueStack {
@@ -718,12 +718,12 @@ th.valueContainer {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   stroke-width: 2;
 }
 
 .tokenValue {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
 }
 
@@ -733,7 +733,7 @@ th.valueContainer {
   justify-content: center;
   gap: 12px;
   padding: 6px 12px;
-  border-top: 1px solid var(--tonscan-border);
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .paginationControls {
@@ -744,9 +744,9 @@ th.valueContainer {
 
 .paginationButton {
   min-height: 32px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   border: 1px solid var(--litenode-border-control);
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   padding: 0 10px;
   border-radius: 8px;
   cursor: pointer;
@@ -780,7 +780,7 @@ th.valueContainer {
   border: 1px solid transparent;
   border-radius: 8px;
   background: transparent;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: var(--acton-font-size-sm);
@@ -793,13 +793,13 @@ th.valueContainer {
 
 .paginationPage:hover {
   background: var(--litenode-control-hover);
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .paginationPageActive {
   border-color: var(--litenode-border-control);
-  background: var(--litenode-surface-active);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-surface-active);
+  color: var(--acton-color-text);
 }
 
 .paginationEllipsis {
@@ -899,7 +899,7 @@ th.valueContainer {
   .timeFormatOption {
     min-height: 56px;
     border-left: 0;
-    border-top: 1px solid var(--tonscan-border);
+    border-top: 1px solid var(--acton-color-border);
   }
 
   .timeFormatOption:first-child {

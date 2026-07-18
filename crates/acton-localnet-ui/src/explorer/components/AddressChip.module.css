@@ -45,7 +45,7 @@
 
 .addressText {
   display: inline-block;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   font-weight: 500;
   padding: 2px 6px;
   border-radius: 7px;
@@ -56,7 +56,7 @@
   padding: 2px 6px;
   border: 0;
   border-radius: 7px;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: transparent;
   display: inline-block;
   text-align: left;
@@ -69,7 +69,7 @@
 }
 
 .addressButton:hover {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: var(--litenode-link-chip-bg);
 }
 
@@ -78,7 +78,7 @@
 }
 
 .addressHighlighted {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: var(--litenode-link-chip-bg-active);
 }
 
@@ -95,7 +95,7 @@
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--tonscan-text-secondary, var(--litenode-text-muted));
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   display: inline-flex;
   align-items: center;

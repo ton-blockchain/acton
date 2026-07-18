@@ -3,7 +3,7 @@
   flex-direction: column;
   gap: 14px;
   padding: var(--acton-space-4);
-  background-color: var(--tonscan-card-bg);
+  background-color: var(--acton-color-surface-raised);
   border-radius: 0 0 var(--acton-radius-control-sm) var(--acton-radius-control-sm);
 }
 
@@ -29,13 +29,13 @@
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 500;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
   transition: color var(--acton-duration-fast);
-  background: var(--tonscan-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .tab:first-child {
@@ -48,12 +48,12 @@
 }
 
 .tab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .tabActive {
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
 }
 
 .content {
@@ -89,11 +89,11 @@
 .editorTab {
   min-height: 34px;
   padding: 8px 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-left-width: 0;
   border-radius: 0;
-  background: var(--tonscan-row-hover);
-  color: var(--tonscan-text-secondary);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font: inherit;
   font-size: 13px;
@@ -116,24 +116,24 @@
 }
 
 .editorTab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .editorTabActive {
   position: relative;
   z-index: 1;
-  color: var(--tonscan-text-primary);
-  background: var(--tonscan-bg);
-  border-bottom-color: var(--tonscan-bg);
+  color: var(--acton-color-text);
+  background: var(--acton-color-canvas);
+  border-bottom-color: var(--acton-color-canvas);
 }
 
 .dataPanel {
   position: relative;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 0 8px 8px;
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
 }
 
 .sourceDataBlock {
@@ -154,7 +154,7 @@
   font-family: var(--acton-font-mono);
   font-size: 13px;
   line-height: 1.6;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   white-space: pre;
   word-break: normal;
   padding: var(--acton-space-4) 54px var(--acton-space-4) var(--acton-space-4);
@@ -176,7 +176,7 @@
   min-height: 96px;
   overflow: auto;
   padding: var(--acton-space-4);
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: var(--acton-font-size-sm);
   line-height: 1.5;
 }
@@ -187,14 +187,14 @@
   justify-content: center;
   text-align: center;
   padding: var(--acton-space-8);
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
 }
 
 .panelEmpty {
-  background-color: var(--tonscan-bg);
-  border: 1px solid var(--tonscan-border);
+  background-color: var(--acton-color-canvas);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
 }
 
@@ -203,7 +203,7 @@
 }
 
 .emptyError {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .abiResultSkeleton {
@@ -213,9 +213,9 @@
   gap: 12px;
   min-height: 160px;
   padding: 18px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 0 8px 8px;
-  background: var(--tonscan-bg);
+  background: var(--acton-color-canvas);
 }
 
 .abiResultSkeleton span {
@@ -224,9 +224,9 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    color-mix(in srgb, var(--tonscan-text-secondary) 16%, var(--tonscan-row-hover)) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 16%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: abiSkeletonPulse 1.2s ease-in-out infinite;

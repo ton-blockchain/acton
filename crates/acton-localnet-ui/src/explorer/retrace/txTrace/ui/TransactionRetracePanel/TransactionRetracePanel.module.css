@@ -11,9 +11,9 @@
   margin-left: calc(-1 * var(--retrace-flow-offset, 0px));
   margin-right: 0;
   box-sizing: border-box;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
   overflow: visible;
   --retrace-panel-header-height: 44px;
   --retrace-panel-max-width: 1800px;
@@ -33,7 +33,7 @@
   justify-content: space-between;
   min-height: 44px;
   padding: 0 0 0 18px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .title {
@@ -52,14 +52,14 @@
   height: 44px;
   border: 0;
   border-radius: 0 16px 0 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   background: transparent;
   cursor: pointer;
   transition: color var(--acton-duration-fast);
 }
 
 .closeButton:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .content {
@@ -93,14 +93,14 @@
 }
 
 .errorTitle {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
   font-size: var(--acton-font-size-lg);
   font-weight: var(--acton-font-weight-emphasis);
 }
 
 .errorMessage {
   max-width: 760px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }

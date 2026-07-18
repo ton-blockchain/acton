@@ -13,13 +13,13 @@
   margin: 0;
   font-size: 24px;
   font-weight: 600;
-  color: var(--tonscan-text);
+  color: var(--acton-color-text);
 }
 
 .hash {
   font-family: var(--acton-font-mono);
   font-size: 14px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   word-break: break-all;
 }
 
@@ -41,8 +41,8 @@
 }
 
 .overviewCard {
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--tonscan-border);
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   padding: 20px;
   display: flex;
@@ -70,19 +70,19 @@
 }
 
 .statusError {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
 }
 
 .label {
   font-size: 12px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .value {
   font-size: 14px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-weight: 500;
   word-break: break-all;
 }
@@ -126,7 +126,7 @@
 
 .retraceInlineButton:hover,
 .retraceInlineButtonActive {
-  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--tonscan-text-primary));
+  color: color-mix(in srgb, var(--tonscan-accent) 78%, var(--acton-color-text));
 }
 
 .tabsContainer {
@@ -135,8 +135,8 @@
   flex: 1;
   min-height: 0;
   gap: 0;
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--tonscan-border);
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
   overflow: hidden;
 }
@@ -154,12 +154,16 @@
   align-items: center;
   gap: 4px;
   padding: 8px;
-  border-bottom: 1px solid var(--tonscan-border);
-  background: color-mix(in srgb, var(--tonscan-card-bg) 94%, var(--tonscan-row-hover));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: color-mix(
+    in srgb,
+    var(--acton-color-surface-raised) 94%,
+    var(--acton-color-surface-row)
+  );
 }
 
 .tabsContainerDetached .tabs {
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 16px;
 }
 
@@ -172,7 +176,7 @@
   border: none;
   border-radius: 8px;
   padding: 0 12px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 14px;
   font-weight: 400;
   cursor: pointer;
@@ -182,7 +186,7 @@
 }
 
 .tab:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   background: var(--litenode-control-hover);
 }
 
@@ -192,15 +196,15 @@
 }
 
 .tabActive {
-  color: var(--tonscan-text-primary);
-  background: var(--litenode-surface-active);
+  color: var(--acton-color-text);
+  background: var(--acton-color-surface-active);
 }
 
 .tabContent {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .tabsContainerDetached .tabContent {
@@ -317,8 +321,8 @@
 }
 
 .txListItem {
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--tonscan-border);
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   padding: 12px;
   display: flex;
@@ -338,7 +342,7 @@
   flex-direction: column;
   gap: 4px;
   font-size: 12px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .treeSection {
@@ -365,20 +369,20 @@
   font-size: 18px;
   font-weight: 600;
   margin-bottom: 16px;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .contractHeader {
   padding: 20px;
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
 .detailsSection {
-  background: var(--tonscan-card-bg);
-  border: 1px solid var(--tonscan-border);
+  background: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
   overflow: auto;
   padding: 20px;
@@ -391,17 +395,17 @@
   justify-content: center;
   height: 400px;
   gap: 16px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .errorIcon {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
   width: 48px;
   height: 48px;
 }
 
 .errorText {
-  color: var(--tonscan-error);
+  color: var(--acton-color-status-failed);
   font-weight: 500;
 }
 
@@ -409,9 +413,9 @@
   display: flex;
   align-items: center;
   gap: var(--acton-space-1);
-  background: var(--tonscan-bg);
-  border: 1px solid var(--tonscan-border);
-  color: var(--tonscan-text-primary);
+  background: var(--acton-color-canvas);
+  border: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text);
   padding: var(--acton-space-2) var(--acton-space-4);
   border-radius: var(--acton-radius-control-sm);
   cursor: pointer;
@@ -423,7 +427,7 @@
 }
 
 .backButton:hover {
-  background: var(--tonscan-row-hover);
+  background: var(--acton-color-surface-row);
 }
 
 .noSelection {
@@ -431,7 +435,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   text-align: center;
 }
 
@@ -441,9 +445,9 @@
   overflow: hidden;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
+    var(--acton-color-surface-row) 0%,
     var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: traceSkeletonShimmer 1.15s ease-in-out infinite;
@@ -526,8 +530,8 @@
   padding-block: 0;
   background: transparent;
   border-radius: 0;
-  border-bottom: 1px solid var(--tonscan-border, var(--acton-color-border));
-  color: var(--tonscan-text-secondary, var(--acton-color-text-muted));
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.05em;
@@ -560,7 +564,7 @@
   justify-content: flex-end;
   margin: 0 20px;
   padding: 8px 0;
-  border-top: 1px solid var(--tonscan-border, var(--acton-color-border));
+  border-top: 1px solid var(--acton-color-border);
 }
 
 .skeletonFlowAccount {
@@ -575,7 +579,7 @@
   height: 22px;
   border-radius: 50%;
   flex: 0 0 auto;
-  background: var(--tonscan-text-secondary, var(--acton-color-text-muted));
+  background: var(--acton-color-text-muted);
   opacity: 0.72;
   animation: none;
 }
@@ -638,8 +642,8 @@
 .skeletonEventHeader {
   min-height: 48px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--tonscan-border, var(--acton-color-border));
-  color: var(--tonscan-text-secondary, var(--acton-color-text-muted));
+  border-bottom: 1px solid var(--acton-color-border);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.05em;

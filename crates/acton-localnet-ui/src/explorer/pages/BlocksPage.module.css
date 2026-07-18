@@ -46,9 +46,9 @@
 
 .blocksTableFrame {
   min-width: 0;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -56,8 +56,8 @@
 .blocksTableTitle {
   height: 52px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text);
   display: flex;
   align-items: center;
@@ -78,7 +78,7 @@
   min-width: 520px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .blocksTable th,
@@ -93,9 +93,9 @@
 
 .blocksTable th {
   height: 36px;
-  color: var(--litenode-text-muted);
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  color: var(--acton-color-text-muted);
+  background: var(--acton-color-surface-row);
+  border-bottom: 1px solid var(--acton-color-border);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -105,7 +105,7 @@
 
 .blocksTable td {
   height: 46px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -114,7 +114,7 @@
 }
 
 .blocksTableRow {
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   cursor: pointer;
   transition: background-color 120ms ease;
 }
@@ -146,7 +146,7 @@
 }
 
 .blocksLink:hover {
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   background: var(--litenode-link-chip-bg);
   text-decoration: none;
 }
@@ -182,7 +182,7 @@
   padding: 0;
   border: 0;
   border-radius: 7px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   background: transparent;
   cursor: pointer;
   transition:
@@ -192,7 +192,7 @@
 
 .blocksCopyButton:hover {
   color: var(--litenode-text);
-  background: var(--litenode-surface-hover);
+  background: var(--acton-color-surface-hover);
 }
 
 .blocksCopyButtonCopied {
@@ -221,7 +221,7 @@
 .blockTransactionsTable th:first-child,
 .blockTransactionsTable td:first-child {
   width: 54px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
 }
 
 .blockTransactionsTable th:nth-child(3),
@@ -246,9 +246,9 @@
 
 .blockSummaryPanel {
   min-width: 0;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   overflow: hidden;
   position: relative;
   display: grid;
@@ -263,7 +263,7 @@
   top: 0;
   bottom: 0;
   width: 1px;
-  background: var(--tonscan-border, var(--litenode-border-subtle));
+  background: var(--acton-color-border);
   pointer-events: none;
 }
 
@@ -279,7 +279,7 @@
   min-width: 0;
   min-height: 46px;
   padding: 8px 14px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   position: relative;
   display: grid;
   grid-template-columns: minmax(92px, 0.36fr) minmax(0, 1fr);
@@ -293,7 +293,7 @@
 }
 
 .blockSummaryLabel {
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   line-height: 1;
@@ -326,7 +326,7 @@
 .blocksTableState {
   min-height: 96px;
   padding: 18px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   background: var(--litenode-surface-subtle);
   display: flex;
   align-items: center;
@@ -431,7 +431,7 @@
   }
 
   .blockSummaryRow:nth-child(-n + 3) {
-    border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+    border-top: 1px solid var(--acton-color-border);
   }
 
   .blockSummaryRow:first-child {

@@ -29,9 +29,9 @@
 .tableFrame {
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
 }
 
@@ -41,8 +41,8 @@
   align-items: center;
   gap: 8px;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text);
   font-size: 0.86rem;
   font-weight: 750;
@@ -66,7 +66,7 @@
   min-width: 980px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .table th,
@@ -81,9 +81,9 @@
 
 .table th {
   height: 36px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  color: var(--litenode-text-muted);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -93,7 +93,7 @@
 
 .table td {
   height: 62px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -138,7 +138,7 @@
 }
 
 .savedAtCell {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   white-space: nowrap;
 }
@@ -151,12 +151,12 @@
   justify-content: center;
   gap: 10px;
   padding: 32px;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   text-align: center;
 }
 
 .emptyIcon {
-  color: color-mix(in srgb, var(--tonscan-text-secondary) 76%, transparent);
+  color: color-mix(in srgb, var(--acton-color-text-muted) 76%, transparent);
 }
 
 .emptyText {
@@ -171,7 +171,7 @@
   justify-content: center;
   min-height: 32px;
   padding: 0 12px;
-  color: var(--tonscan-link);
+  color: var(--acton-color-accent);
   border-radius: 8px;
   font-size: var(--acton-font-size-sm);
   font-weight: 650;

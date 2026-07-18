@@ -236,8 +236,8 @@ export const AccountInfo: FC<AccountInfoProps> = ({
       size={132}
       level="M"
       marginSize={3}
-      bgColor="var(--tonscan-card-bg)"
-      fgColor="var(--tonscan-text-primary)"
+      bgColor="var(--acton-color-surface-raised)"
+      fgColor="var(--acton-color-text)"
       title={`QR code for ${rawAddress}`}
       className={styles.qrSvg}
     />

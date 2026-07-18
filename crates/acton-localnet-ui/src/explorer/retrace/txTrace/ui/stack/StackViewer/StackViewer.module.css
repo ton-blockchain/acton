@@ -129,7 +129,7 @@
   flex: 0 0 20px;
   align-self: center;
   border-radius: 50%;
-  background-color: var(--acton-color-text-muted, var(--color-text-secondary));
+  background-color: var(--acton-color-text-muted);
   color: var(--acton-color-surface);
   font-size: 11px;
   font-weight: var(--acton-font-weight-emphasis);

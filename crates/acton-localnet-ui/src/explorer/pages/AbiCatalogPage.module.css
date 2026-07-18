@@ -27,7 +27,7 @@
 
 .subtitle {
   margin: 6px 0 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   line-height: 1.45;
 }
@@ -36,9 +36,9 @@
   order: 2;
   min-width: 0;
   overflow: hidden;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
 }
 
@@ -46,7 +46,7 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: 650;
   letter-spacing: 0;
@@ -62,7 +62,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   font: inherit;
   font-weight: 650;
@@ -75,7 +75,7 @@
   min-height: 38px;
   padding: 0 12px;
   background: var(--litenode-text-strong);
-  color: var(--litenode-surface);
+  color: var(--acton-color-surface);
   font-size: var(--acton-font-size-sm);
 }
 
@@ -88,8 +88,8 @@
   width: 32px;
   height: 32px;
   flex: 0 0 32px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
-  color: var(--litenode-text-muted);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text-muted);
 }
 
 .primaryButton:hover:not(:disabled),
@@ -102,8 +102,8 @@
   display: flex;
   align-items: center;
   padding: 0 18px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text);
   font-size: 0.86rem;
   font-weight: 750;
@@ -122,7 +122,7 @@
   min-width: 820px;
   border-collapse: collapse;
   table-layout: fixed;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
 }
 
 .table th,
@@ -137,9 +137,9 @@
 
 .table th {
   height: 36px;
-  border-bottom: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
-  background: var(--tonscan-row-hover, var(--litenode-surface-subtle));
-  color: var(--litenode-text-muted);
+  border-bottom: 1px solid var(--acton-color-border);
+  background: var(--acton-color-surface-row);
+  color: var(--acton-color-text-muted);
   font-size: 0.7rem;
   font-weight: 650;
   letter-spacing: 0;
@@ -149,7 +149,7 @@
 
 .table td {
   height: 52px;
-  border-top: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border-top: 1px solid var(--acton-color-border);
   font-size: 0.82rem;
 }
 
@@ -164,7 +164,7 @@
 
 .tableRow {
   position: relative;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   cursor: pointer;
 }
 
@@ -243,9 +243,9 @@
   align-items: center;
   min-height: 16px;
   padding: 0 5px;
-  border: 1px solid color-mix(in srgb, #16a34a 34%, var(--tonscan-border));
+  border: 1px solid color-mix(in srgb, #16a34a 34%, var(--acton-color-border));
   border-radius: 999px;
-  background: color-mix(in srgb, #16a34a 13%, var(--tonscan-card-bg));
+  background: color-mix(in srgb, #16a34a 13%, var(--acton-color-surface-raised));
   color: color-mix(in srgb, #16a34a 78%, var(--litenode-text));
   font-size: 0.68rem;
   font-weight: 700;
@@ -253,7 +253,7 @@
 }
 
 .primaryCell small {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
 }
@@ -261,7 +261,7 @@
 .formButtonRow td {
   height: auto;
   padding: 0;
-  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--tonscan-card-bg));
+  background: color-mix(in srgb, var(--litenode-focus) 5%, var(--acton-color-surface-raised));
 }
 
 .registerAbiButton {
@@ -301,7 +301,7 @@
 .expandedFormRow td {
   height: auto;
   padding: 16px;
-  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--tonscan-card-bg));
+  background: color-mix(in srgb, var(--litenode-focus) 4%, var(--acton-color-surface-raised));
 }
 
 .abiInlineForm {
@@ -332,7 +332,7 @@
   align-items: flex-start;
   gap: 7px;
   margin: -2px 0 0;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: 400;
   line-height: 1.45;
@@ -363,7 +363,7 @@
   justify-content: center;
   min-height: 180px;
   padding: var(--acton-space-8);
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
   text-align: center;
@@ -371,9 +371,9 @@
 
 .emptyPage,
 .detailsSkeleton {
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 12px;
-  background: var(--tonscan-card-bg);
+  background: var(--acton-color-surface-raised);
 }
 
 .detailsHeader {
@@ -401,10 +401,10 @@
   gap: 7px;
   min-height: 30px;
   padding: 0 10px;
-  border: 1px solid var(--tonscan-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
-  background: var(--tonscan-card-bg);
-  color: var(--tonscan-link);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-accent);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
   line-height: 1;
@@ -412,7 +412,7 @@
 }
 
 .links a:hover {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .links a:focus-visible {
@@ -421,7 +421,7 @@
 }
 
 .links span {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   text-transform: capitalize;
 }
@@ -453,9 +453,9 @@
   border-radius: 999px;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
-    color-mix(in srgb, var(--tonscan-text-secondary) 14%, var(--tonscan-row-hover)) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 0%,
+    color-mix(in srgb, var(--acton-color-text-muted) 14%, var(--acton-color-surface-row)) 45%,
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeletonPulse 1.2s ease-in-out infinite;

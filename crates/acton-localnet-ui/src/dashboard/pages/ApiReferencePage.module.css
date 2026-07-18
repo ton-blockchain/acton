@@ -3,7 +3,7 @@
   height: 100%;
   min-width: 0;
   min-height: 0;
-  background: var(--litenode-bg);
+  background: var(--acton-color-canvas);
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;

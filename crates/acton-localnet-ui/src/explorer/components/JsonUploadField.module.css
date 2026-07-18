@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   gap: 7px;
-  color: var(--litenode-text-muted);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-xs);
   font-weight: 650;
   letter-spacing: 0;
@@ -13,7 +13,7 @@
   min-height: 132px;
   box-sizing: border-box;
   resize: vertical;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   background: var(--litenode-surface-subtle);
   color: var(--litenode-text);
@@ -33,7 +33,7 @@
   gap: 10px;
   min-height: 38px;
   box-sizing: border-box;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 8px;
   background: var(--litenode-surface-subtle);
   padding: 5px;
@@ -50,9 +50,9 @@
   gap: 7px;
   min-height: 28px;
   padding: 0 10px;
-  border: 1px solid var(--tonscan-border, var(--litenode-border-subtle));
+  border: 1px solid var(--acton-color-border);
   border-radius: 6px;
-  background: var(--tonscan-card-bg, var(--litenode-surface));
+  background: var(--acton-color-surface-raised);
   color: var(--litenode-text);
   font-weight: 650;
 }
@@ -60,7 +60,7 @@
 .fileName {
   min-width: 0;
   overflow: hidden;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-weight: 400;
   text-overflow: ellipsis;
   white-space: nowrap;

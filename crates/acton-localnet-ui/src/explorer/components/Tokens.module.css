@@ -14,11 +14,11 @@
   gap: var(--acton-space-4);
   cursor: pointer;
   transition: background-color var(--acton-duration-fast);
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .walletItem:hover {
-  background-color: var(--tonscan-row-hover);
+  background-color: var(--acton-color-surface-row);
 }
 
 .walletItem:last-child {
@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   gap: var(--acton-space-4);
-  border-bottom: 1px solid var(--tonscan-border);
+  border-bottom: 1px solid var(--acton-color-border);
 }
 
 .walletItemSkeleton:last-child {
@@ -42,7 +42,7 @@
   height: 40px;
   border-radius: 50%;
   object-fit: cover;
-  background-color: var(--tonscan-bg-secondary);
+  background-color: var(--acton-color-surface-raised);
 }
 
 .jettonInfoMain {
@@ -54,7 +54,7 @@
 
 .jettonName {
   font-weight: 600;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 1rem;
 }
 
@@ -66,11 +66,11 @@
 }
 
 .balanceValue {
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
 }
 
 .jettonSymbol {
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .supplyInfo {
@@ -82,19 +82,19 @@
 
 .supplyShareValue {
   font-weight: 500;
-  color: var(--tonscan-text-primary);
+  color: var(--acton-color-text);
   font-size: 0.875rem;
 }
 
 .supplyShareLabel {
   font-size: 0.75rem;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .empty {
   padding: var(--acton-space-8);
   text-align: center;
-  color: var(--tonscan-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: var(--acton-font-size-sm);
 }
 
@@ -102,9 +102,9 @@
   display: block;
   background: linear-gradient(
     90deg,
-    var(--tonscan-row-hover) 0%,
+    var(--acton-color-surface-row) 0%,
     var(--litenode-control-hover) 45%,
-    var(--tonscan-row-hover) 90%
+    var(--acton-color-surface-row) 90%
   );
   background-size: 220% 100%;
   animation: skeleton-shimmer 1.15s ease-in-out infinite;
