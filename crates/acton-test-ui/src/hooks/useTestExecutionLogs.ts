@@ -1,6 +1,6 @@
 import {useEffect, useState} from "react"
 
-import type {TestExecutionLogs, TestReport} from "@acton/shared-ui"
+import type {TestExecutionLogs, TestReport} from "../types/test"
 
 import {isAbortError} from "./request"
 

@@ -24,7 +24,7 @@ import {
   SkipForward,
 } from "lucide-react"
 
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 import {CopyInlineAction} from "@acton/ui"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 

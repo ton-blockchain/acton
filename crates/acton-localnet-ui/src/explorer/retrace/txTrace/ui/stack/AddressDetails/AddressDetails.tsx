@@ -4,7 +4,7 @@ import {useMemo} from "react"
 import type {Address} from "@ton/core"
 
 import {ContractChip} from "@acton/ui"
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 
 import {ExplorerAddressChip} from "../../../../../components/ExplorerAddressChip"
 import type {ExplorerNavigationClickEvent} from "../../../../../hooks/useOpenExplorerPath"

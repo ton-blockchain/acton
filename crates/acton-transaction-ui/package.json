@@ -1,19 +1,19 @@
 {
-  "name": "@acton/shared-ui",
+  "name": "@acton/transaction-ui",
   "version": "1.0.0",
   "private": true,
   "license": "MIT OR Apache-2.0",
   "author": "TON Core",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts",
-    "./styles/*": "./src/styles/*"
+    ".": "./src/index.ts"
   },
   "scripts": {
     "fmt": "biome format --write .",
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",
-    "lint:fix": "biome check --formatter-enabled=false --write ."
+    "lint:fix": "biome check --formatter-enabled=false --write .",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@acton/ui": "workspace:*",

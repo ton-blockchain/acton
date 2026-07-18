@@ -3,7 +3,7 @@ import {X} from "lucide-react"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import {useToast} from "@acton/ui"
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 
 import {useNetworkInfo} from "../../../../hooks/useNetworkInfo"
 import {useAvailableFlowMetrics} from "../../../../hooks/useAvailableFlowMetrics"

@@ -9,21 +9,22 @@ import {
   type TreeLinkDatum,
 } from "react-d3-tree"
 
-import type {BackendContractInfo, SourceLocation} from "@/types"
+import type {BackendContractInfo, SourceLocation} from "../../model/backend"
 import type {
   ContractData,
   LoadedTransactionActions,
   TransactionBlockRef,
   TransactionInfo,
-} from "@/types/transaction"
-import {fmt, type ContractVerifiedSource} from "@/index"
+} from "../../model/transaction"
+import type {ContractVerifiedSource} from "../ContractSourcePanel/ContractSourcePanel"
+import * as fmt from "../../lib/format"
 import {
   getTransactionActionPhase,
   getTransactionComputePhase,
   getTransactionOpcode,
   getTransactionSourceLabel,
   resolveTransactionOpcodeName,
-} from "@/utils/transaction"
+} from "../../lib/transaction"
 
 import {TransactionDetails} from "../TransactionDetails/TransactionDetails"
 

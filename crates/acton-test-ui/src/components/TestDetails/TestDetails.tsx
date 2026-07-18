@@ -30,15 +30,7 @@ import {
   RawDataBlock,
 } from "@acton/ui"
 
-import {
-  type TestReport,
-  type SourceLocation,
-  TestStatus,
-  type Trace,
-  type ContractData,
-  type FailedMessage,
-  type TransactionInfo,
-} from "@acton/shared-ui"
+import type {ContractData, SourceLocation, TransactionInfo} from "@acton/transaction-ui"
 import {
   applyParsedBodies,
   buildValueFlowItems,
@@ -48,11 +40,12 @@ import {
   TransactionTree,
   resolveAbiOpcodeName,
   ValueFlowTable,
-} from "@acton/shared-ui"
+} from "@acton/transaction-ui"
 
 import {useContracts} from "../../hooks/useContracts"
 import {useGasProfileReport} from "../../hooks/useGasProfileReport"
 import {useTestExecutionLogs} from "../../hooks/useTestExecutionLogs"
+import {type FailedMessage, type TestReport, TestStatus, type Trace} from "../../types/test"
 import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
 import {GasProfile} from "../GasProfile/GasProfile"
 

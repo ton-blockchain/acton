@@ -17,7 +17,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@acton/shared-ui": "workspace:*",
+    "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
     "@monaco-editor/react": "^4.7.0",
     "@scalar/api-reference-react": "^0.9.41",

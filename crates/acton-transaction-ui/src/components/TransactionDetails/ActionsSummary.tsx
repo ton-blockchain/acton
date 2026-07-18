@@ -18,10 +18,10 @@ import type {
   BackendExecutorAction,
   BackendExecutorActionFailureReason,
   SourceLocation,
-} from "@/types"
-import type {ContractData} from "@/types/transaction"
-import {fmt} from "@/index"
-import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "@/utils/messageBody"
+} from "../../model/backend"
+import type {ContractData} from "../../model/transaction"
+import * as fmt from "../../lib/format"
+import {decodeMessageBody, getMessageOpcode, resolveMessageOpcodeName} from "../../lib/messageBody"
 
 import {DisasmSection} from "../DisasmSection/DisasmSection"
 import {
@@ -29,7 +29,7 @@ import {
   formatMessageRelaxedBocHex,
   formatOutActionBocHex,
   formatStateInitBocHex,
-} from "../rawBoc"
+} from "../../lib/rawBoc"
 
 import styles from "./ActionsSummary.module.css"
 

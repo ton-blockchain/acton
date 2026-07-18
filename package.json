@@ -10,7 +10,7 @@
     "crates/acton-localnet-ui",
     "crates/acton-ui",
     "crates/acton-ui-gallery",
-    "crates/acton-shared-ui",
+    "crates/acton-transaction-ui",
     "crates/acton-test-ui",
     "ui-e2e"
   ],

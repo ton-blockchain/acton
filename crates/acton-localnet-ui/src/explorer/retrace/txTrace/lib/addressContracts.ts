@@ -1,6 +1,6 @@
 import {Address} from "@ton/core"
 
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 
 export function findAddressContract(
   address: string,

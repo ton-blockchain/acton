@@ -1,6 +1,6 @@
 import {Buffer} from "node:buffer"
 
-import type {TransactionInfo} from "@acton/shared-ui"
+import type {TransactionInfo} from "@acton/transaction-ui"
 import {
   Address,
   Cell,

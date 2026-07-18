@@ -1,7 +1,7 @@
 import type {Address, Cell, OutAction, Transaction} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
-import type {BackendExecutorAction} from "./index"
+import type {BackendExecutorAction} from "./backend"
 
 export interface ParsedTransactionBody {
   readonly name: string

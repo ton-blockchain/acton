@@ -14,7 +14,7 @@ import {
   decodeStorageShardAccount,
   getTransactionComputePhase,
   type ValueFlowItem,
-} from "@acton/shared-ui"
+} from "@acton/transaction-ui"
 import {Address} from "@ton/core"
 import {
   AlertCircle,

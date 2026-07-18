@@ -3,7 +3,7 @@ import {useEffect, useState} from "react"
 
 import {DisclosureToggle, HighlightedCode} from "@acton/ui"
 
-import {disassembleBocHex} from "@/utils/disasm"
+import {disassembleBocHex} from "../../lib/disasm"
 
 import styles from "./DisasmSection.module.css"
 

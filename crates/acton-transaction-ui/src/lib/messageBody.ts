@@ -8,14 +8,14 @@ import {
   unpackFromSliceDynamic,
 } from "@ton/tolk-abi-to-typescript"
 
-import type {BackendContractInfo} from "@/types"
+import type {BackendContractInfo} from "../model/backend"
 import type {
   ContractData,
   ParsedContractStorage,
   ParsedTransactionBody,
   ParsedValue,
   TransactionInfo,
-} from "@/types/transaction"
+} from "../model/transaction"
 
 interface MessageCandidate {
   readonly body_ty_idx: number

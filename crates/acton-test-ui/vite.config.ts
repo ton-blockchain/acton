@@ -20,8 +20,7 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@acton/shared-ui": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
-      "@": path.resolve(import.meta.dirname, "../acton-shared-ui/src"),
+      "@acton/transaction-ui": path.resolve(import.meta.dirname, "../acton-transaction-ui/src"),
       "vite-plugin-node-polyfills/shims/buffer": path.resolve(
         nodePolyfillsRoot,
         "shims/buffer/index.ts",

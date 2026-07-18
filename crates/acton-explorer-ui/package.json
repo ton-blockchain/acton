@@ -17,7 +17,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@acton/shared-ui": "workspace:*",
+    "@acton/transaction-ui": "workspace:*",
     "@acton/ui": "workspace:*",
     "@cloudflare/pages-plugin-vercel-og": "^0.1.2",
     "@monaco-editor/react": "^4.7.0",

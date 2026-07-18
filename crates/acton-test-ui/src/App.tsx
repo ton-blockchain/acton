@@ -3,7 +3,7 @@ import {PanelLeft} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
-import type {TestReport} from "@acton/shared-ui"
+import type {TestReport} from "./types/test"
 
 import styles from "./App.module.css"
 import {Coverage} from "./components/Coverage/Coverage"

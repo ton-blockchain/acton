@@ -14,7 +14,7 @@
       "name": "acton-explorer-ui",
       "version": "1.0.0",
       "dependencies": {
-        "@acton/shared-ui": "workspace:*",
+        "@acton/transaction-ui": "workspace:*",
         "@acton/ui": "workspace:*",
         "@cloudflare/pages-plugin-vercel-og": "^0.1.2",
         "@monaco-editor/react": "^4.7.0",
@@ -53,7 +53,7 @@
       "name": "acton-localnet-ui",
       "version": "1.0.0",
       "dependencies": {
-        "@acton/shared-ui": "workspace:*",
+        "@acton/transaction-ui": "workspace:*",
         "@acton/ui": "workspace:*",
         "@monaco-editor/react": "^4.7.0",
         "@scalar/api-reference-react": "^0.9.41",
@@ -90,34 +90,11 @@
         "vite": "^8.0.16",
       },
     },
-    "crates/acton-shared-ui": {
-      "name": "@acton/shared-ui",
-      "version": "1.0.0",
-      "dependencies": {
-        "@acton/ui": "workspace:*",
-        "@ton/core": "0.63.1",
-        "@ton/tasm": "^0.6.1",
-        "@ton/tolk-abi-to-typescript": "^0.5.0",
-        "buffer": "^6.0.3",
-        "clsx": "^2.1.1",
-        "lucide-react": "^0.474.0",
-        "react-d3-tree": "^3.6.6",
-        "react-icons": "^5.5.0",
-        "shiki": "^3.22.0",
-      },
-      "devDependencies": {
-        "@types/react": "^19.2.7",
-        "@types/react-dom": "^19.2.3",
-        "react": "^19.2.3",
-        "react-dom": "^19.2.3",
-        "typescript": "^7.0.2",
-      },
-    },
     "crates/acton-test-ui": {
       "name": "acton-test-ui",
       "version": "1.0.0",
       "dependencies": {
-        "@acton/shared-ui": "workspace:*",
+        "@acton/transaction-ui": "workspace:*",
         "@acton/ui": "workspace:*",
         "@ton/core": "0.63.1",
         "@ton/tolk-abi-to-typescript": "^0.5.0",
@@ -142,6 +119,29 @@
         "react-dom": "^19.2.3",
         "typescript": "^7.0.2",
         "vite": "^8.0.16",
+      },
+    },
+    "crates/acton-transaction-ui": {
+      "name": "@acton/transaction-ui",
+      "version": "1.0.0",
+      "dependencies": {
+        "@acton/ui": "workspace:*",
+        "@ton/core": "0.63.1",
+        "@ton/tasm": "^0.6.1",
+        "@ton/tolk-abi-to-typescript": "^0.5.0",
+        "buffer": "^6.0.3",
+        "clsx": "^2.1.1",
+        "lucide-react": "^0.474.0",
+        "react-d3-tree": "^3.6.6",
+        "react-icons": "^5.5.0",
+        "shiki": "^3.22.0",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.7",
+        "@types/react-dom": "^19.2.3",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "typescript": "^7.0.2",
       },
     },
     "crates/acton-ui": {
@@ -197,7 +197,7 @@
     "ws": ">=8.21.0",
   },
   "packages": {
-    "@acton/shared-ui": ["@acton/shared-ui@workspace:crates/acton-shared-ui"],
+    "@acton/transaction-ui": ["@acton/transaction-ui@workspace:crates/acton-transaction-ui"],
 
     "@acton/ui": ["@acton/ui@workspace:crates/acton-ui"],
 

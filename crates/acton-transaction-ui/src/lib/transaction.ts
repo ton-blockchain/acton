@@ -9,9 +9,9 @@ import {
   type Transaction,
 } from "@ton/core"
 
-import type {BackendContractInfo, BackendTransaction, TransactionInfo} from "@/types"
-import type {ContractData, ValueFlowItem} from "@/types/transaction"
-import {getMessageOpcode, getShardAccountBalance, resolveAbiOpcodeName} from "@/utils/messageBody"
+import type {BackendContractInfo, BackendTransaction} from "../model/backend"
+import type {ContractData, TransactionInfo, ValueFlowItem} from "../model/transaction"
+import {getMessageOpcode, getShardAccountBalance, resolveAbiOpcodeName} from "./messageBody"
 
 interface ValueFlowAccumulator {
   readonly address: string

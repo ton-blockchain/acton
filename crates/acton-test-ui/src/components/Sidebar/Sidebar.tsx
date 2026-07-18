@@ -12,7 +12,7 @@ import {
   FiX,
 } from "react-icons/fi"
 import {Input, ThemeSwitch, useTheme} from "@acton/ui"
-import {type TestReport, TestStatus} from "@acton/shared-ui"
+import {type TestReport, TestStatus} from "../../types/test"
 
 import styles from "./Sidebar.module.css"
 

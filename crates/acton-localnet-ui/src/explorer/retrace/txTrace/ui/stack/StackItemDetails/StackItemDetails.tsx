@@ -4,7 +4,7 @@ import type {StackElement} from "@ton/tasm/dist/trace"
 import {Address, Cell} from "@ton/core"
 import {RawDataBlock} from "@acton/ui"
 
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 
 import AddressDetails from "../AddressDetails"
 import CellTreeView from "../CellTreeView/CellTreeView"

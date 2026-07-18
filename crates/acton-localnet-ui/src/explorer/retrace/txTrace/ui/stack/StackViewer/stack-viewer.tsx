@@ -3,7 +3,7 @@ import type {StackElement} from "@ton/tasm/dist/trace"
 import {Cell} from "@ton/core"
 import {motion, AnimatePresence, type Variants} from "framer-motion"
 
-import type {ContractData} from "@acton/shared-ui"
+import type {ContractData} from "@acton/transaction-ui"
 import {CopyInlineAction} from "@acton/ui"
 
 import {formatAddress} from "../../../../../components/utils"

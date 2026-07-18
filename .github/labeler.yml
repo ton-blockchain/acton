@@ -118,7 +118,7 @@
       - any-glob-to-any-file:
           - "crates/acton-explorer-ui/**"
           - "crates/acton-localnet-ui/**"
-          - "crates/acton-shared-ui/**"
+          - "crates/acton-transaction-ui/**"
           - "crates/acton-test-ui/**"
           - "crates/acton-ui/**"
           - "crates/acton-ui-gallery/**"

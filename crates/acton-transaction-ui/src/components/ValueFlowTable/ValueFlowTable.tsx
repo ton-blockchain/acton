@@ -11,8 +11,8 @@ import {
   DataTableTable,
 } from "@acton/ui"
 
-import type {ContractData, ValueFlowItem} from "@/types/transaction"
-import {formatCurrency} from "@/utils/format"
+import type {ContractData, ValueFlowItem} from "../../model/transaction"
+import {formatCurrency} from "../../lib/format"
 
 import styles from "./ValueFlowTable.module.css"
 

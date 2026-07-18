@@ -8,7 +8,7 @@ import {
   decodeStorageDataCell,
   type ContractData,
   type ContractVerifiedSource,
-} from "@acton/shared-ui"
+} from "@acton/transaction-ui"
 import {Cell} from "@ton/core"
 import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 

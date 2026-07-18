@@ -628,7 +628,7 @@ It needs `cargo-shear`, `cargo-deny`, `cargo-audit`, and `typos-cli` locally;
 `typos` uses `_typos.toml` excludes for `docs/` and selected generated or imported trees.
 
 If your PR touches UI code (`crates/acton-test-ui`, `crates/acton-localnet-ui`,
-`crates/acton-shared-ui`, or root UI config in `package.json`), you must also
+`crates/acton-transaction-ui`, or root UI config in `package.json`), you must also
 run:
 
 ```bash

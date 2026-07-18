@@ -1,7 +1,7 @@
 import {Cell, loadTransaction} from "@ton/core"
 import type {TraceResult} from "@ton/retracer-core"
 
-import type {TransactionInfo} from "@acton/shared-ui"
+import type {TransactionInfo} from "@acton/transaction-ui"
 
 export function toTransactionInfo(result: TraceResult): TransactionInfo {
   const transaction = loadTransaction(Cell.fromHex(result.emulatedTx.raw).asSlice())

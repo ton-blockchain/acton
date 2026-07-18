@@ -15,15 +15,19 @@ import {
   SendModeViewer,
 } from "@acton/ui"
 
-import type {BackendContractInfo, SourceLocation} from "@/types"
+import type {BackendContractInfo, SourceLocation} from "../../model/backend"
 import type {
   ContractData,
   LoadedTransactionActions,
   TransactionBlockRef,
   TransactionInfo,
-} from "@/types/transaction"
-import {ContractSourcePanel, fmt, type ContractVerifiedSource} from "@/index"
-import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "@/utils/messageBody"
+} from "../../model/transaction"
+import {
+  ContractSourcePanel,
+  type ContractVerifiedSource,
+} from "../ContractSourcePanel/ContractSourcePanel"
+import * as fmt from "../../lib/format"
+import {decodeMessageBody, decodeStateInitData, getShardAccountBalance} from "../../lib/messageBody"
 import {
   computeSendMode,
   getTransactionActionPhase,
@@ -32,7 +36,7 @@ import {
   getTransactionSourceLabel,
   getTransactionTriggerLabel,
   resolveTransactionOpcodeName,
-} from "@/utils/transaction"
+} from "../../lib/transaction"
 
 import {
   formatCellBocHex,
@@ -40,7 +44,7 @@ import {
   formatOutListBocHex,
   formatShardAccountDataBocHex,
   formatStateInitBocHex,
-} from "../rawBoc"
+} from "../../lib/rawBoc"
 
 import {ActionsSummary} from "./ActionsSummary"
 import styles from "./TransactionDetails.module.css"

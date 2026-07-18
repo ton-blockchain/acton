@@ -1,5 +1,5 @@
 import {useEffect, useRef, useState} from "react"
-import type {BackendContractInfo} from "@acton/shared-ui"
+import type {BackendContractInfo} from "@acton/transaction-ui"
 
 import {isAbortError} from "./request"
 
