@@ -48,16 +48,13 @@
   font-weight: var(--acton-font-weight-semibold);
 }
 
-.popoverDocs {
-  margin-top: var(--acton-space-1);
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-xs);
-}
-
 .popoverLink {
+  width: fit-content;
   color: var(--acton-color-accent);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-medium);
   text-decoration: underline;
-  text-underline-offset: 0.12em;
+  text-underline-offset: 0.15em;
 }
 
 .popoverLink:hover {

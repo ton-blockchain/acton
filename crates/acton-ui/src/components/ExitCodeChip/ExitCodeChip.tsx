@@ -24,14 +24,6 @@ export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeChipPro
       <div className={styles.popoverSection}>
         <div className={styles.popoverLabel}>Description</div>
         <div>{description}</div>
-        {docsUrl ? (
-          <div className={styles.popoverDocs}>
-            Learn more in{" "}
-            <a href={docsUrl} target="_blank" rel="noreferrer" className={styles.popoverLink}>
-              documentation
-            </a>
-          </div>
-        ) : undefined}
       </div>
       <div className={styles.popoverSection}>
         <div className={styles.popoverLabel}>Origin</div>
@@ -42,6 +34,17 @@ export function ExitCodeChip({exitCode, abi, phase = "compute"}: ExitCodeChipPro
           <div className={styles.popoverLabel}>Error</div>
           <div>{customSymbolicName}</div>
         </div>
+      ) : undefined}
+      {docsUrl ? (
+        <a
+          href={docsUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={styles.popoverLink}
+          aria-label={`Read documentation for exit code ${exitCode}`}
+        >
+          Documentation
+        </a>
       ) : undefined}
     </div>
   )
