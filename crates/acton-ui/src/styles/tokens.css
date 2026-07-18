@@ -95,6 +95,12 @@
   --acton-color-popover-surface: hsl(0 0% 100%);
   /* Floating overlay border for popovers. */
   --acton-color-popover-border: hsl(240 6% 84%);
+  /* Subtle elevation for cards, panels, and selected surfaces. */
+  --acton-shadow-surface: 0 1px 3px 0 rgb(0 0 0 / 10%), 0 1px 2px -1px rgb(0 0 0 / 10%);
+  /* Elevated shadow for menus and other floating overlays. */
+  --acton-shadow-overlay: 0 8px 24px rgb(0 0 0 / 10%);
+  /* Compact floating shadow for tooltips. */
+  --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 15%);
   /* Floating overlay shadow used only by popovers. */
   --acton-shadow-popover:
     0 1rem 2.5rem hsl(240 10% 4% / 0.14), 0 0.25rem 0.75rem hsl(240 10% 4% / 0.08);
@@ -110,6 +116,8 @@
   --acton-font-mono:
     "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
+  /* Micro text reserved for dense diagnostic annotations. */
+  --acton-font-size-4xs: 0.5rem;
   /* Smallest text for compact structural labels. */
   --acton-font-size-3xs: 0.625rem;
   /* Micro text for inline utility captions and dense technical actions. */
@@ -124,6 +132,12 @@
   --acton-font-size-md: 0.9375rem;
   /* Large text for prominent controls and small headings. */
   --acton-font-size-lg: 1rem;
+  /* Small heading text. */
+  --acton-font-size-xl: 1.125rem;
+  /* Medium heading text. */
+  --acton-font-size-2xl: 1.25rem;
+  /* Large heading text. */
+  --acton-font-size-3xl: 1.5rem;
 
   /* Regular text weight for body copy. */
   --acton-font-weight-normal: 400;
@@ -278,6 +292,12 @@
   --acton-color-popover-surface: hsl(240 6% 10%);
   /* Dark floating overlay border for popovers. */
   --acton-color-popover-border: hsl(240 5% 26%);
+  /* Dark subtle elevation for cards, panels, and selected surfaces. */
+  --acton-shadow-surface: none;
+  /* Dark elevated shadow for menus and other floating overlays. */
+  --acton-shadow-overlay: 0 30px 80px rgb(0 0 0 / 42%);
+  /* Dark compact floating shadow for tooltips. */
+  --acton-shadow-tooltip: 0 8px 24px rgb(0 0 0 / 36%);
   /* Dark floating overlay shadow used only by popovers. */
   --acton-shadow-popover:
     0 1rem 2.5rem hsl(240 10% 2% / 0.52), 0 0.25rem 0.75rem hsl(240 10% 2% / 0.32);

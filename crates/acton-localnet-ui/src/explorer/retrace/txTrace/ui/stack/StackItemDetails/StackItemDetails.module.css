@@ -3,7 +3,7 @@
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
   box-sizing: border-box;
   border-radius: var(--acton-radius-panel);
   overflow: hidden;

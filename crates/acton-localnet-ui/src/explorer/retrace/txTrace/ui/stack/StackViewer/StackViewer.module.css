@@ -16,7 +16,7 @@
 
 .stackContainer {
   border-radius: var(--acton-radius-control-xs);
-  background-color: var(--color-background-primary);
+  background-color: var(--acton-color-surface-raised);
   flex: 1;
   overflow-y: auto;
   display: flex;
@@ -130,7 +130,7 @@
   align-self: center;
   border-radius: 50%;
   background-color: var(--acton-color-text-muted, var(--color-text-secondary));
-  color: var(--acton-color-surface, var(--color-background-primary));
+  color: var(--acton-color-surface);
   font-size: 11px;
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;

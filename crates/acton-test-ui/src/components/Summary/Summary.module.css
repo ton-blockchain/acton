@@ -16,14 +16,14 @@
 }
 
 .count {
-  font-size: var(--font-size-lg);
+  font-size: var(--acton-font-size-xl);
   font-weight: var(--acton-font-weight-bold);
   line-height: 1.2;
   color: var(--acton-color-text);
 }
 
 .label {
-  font-size: var(--font-size-xss);
+  font-size: var(--acton-font-size-4xs);
   color: var(--acton-color-text-subtle);
   text-transform: uppercase;
   font-weight: var(--acton-font-weight-emphasis);

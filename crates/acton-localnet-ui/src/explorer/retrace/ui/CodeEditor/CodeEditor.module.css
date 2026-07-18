@@ -110,7 +110,7 @@
   min-height: 0;
   overflow: hidden;
 
-  background-color: var(--color-background-primary);
+  background-color: var(--acton-color-surface-raised);
 }
 
 .editor {

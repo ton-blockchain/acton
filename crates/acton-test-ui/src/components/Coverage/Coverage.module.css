@@ -18,7 +18,7 @@
   border-radius: var(--acton-radius-control-sm);
   background-color: var(--acton-color-surface);
   padding: var(--acton-space-4);
-  box-shadow: var(--shadow);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .summaryLabel {
@@ -30,7 +30,7 @@
 
 .summaryValue {
   margin-top: var(--acton-space-1);
-  font-size: var(--font-size-2xl);
+  font-size: var(--acton-font-size-3xl);
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.1;
 }
@@ -55,7 +55,7 @@
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
   background-color: var(--acton-color-surface);
-  box-shadow: var(--shadow);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .sidebar {
@@ -189,7 +189,7 @@
 }
 
 .scoreWarn {
-  color: var(--color-skipped);
+  color: var(--acton-test-color-status-skipped);
 }
 
 .scoreCritical {
@@ -220,7 +220,7 @@
 }
 
 .progressFill.scoreWarn {
-  background-color: var(--color-skipped);
+  background-color: var(--acton-test-color-status-skipped);
 }
 
 .progressFill.scoreCritical {
@@ -289,8 +289,8 @@
 }
 
 .legendPartial {
-  background-color: var(--color-skipped-bg);
-  color: var(--color-skipped-text);
+  background-color: var(--acton-test-color-status-skipped-surface);
+  color: var(--acton-test-color-status-skipped-text);
 }
 
 .legendUncovered {
@@ -326,7 +326,11 @@
 }
 
 .codeLinePartial {
-  background-color: color-mix(in srgb, var(--color-skipped-bg) 80%, transparent);
+  background-color: color-mix(
+    in srgb,
+    var(--acton-test-color-status-skipped-surface) 80%,
+    transparent
+  );
 }
 
 .codeLineUncovered {

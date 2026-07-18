@@ -138,7 +138,7 @@
   min-height: 0;
   overflow: hidden;
   border-radius: 0 0 0 16px;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourcesWorkspace .codeArea {
@@ -159,7 +159,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourceBundleTabs,
@@ -227,7 +227,7 @@
 .sourceBundleTabActive,
 .sourceFileTabActive {
   color: var(--tonscan-text-primary);
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourceFileTabActive {
@@ -323,7 +323,7 @@
   border: 1px solid var(--tonscan-border);
   border-radius: 6px;
   color: var(--tonscan-text-secondary);
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
   cursor: pointer;
   transition:
     background-color var(--acton-duration-fast),
@@ -585,7 +585,7 @@
 .sourceCallFrame {
   min-width: 0;
   border-radius: 6px;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
 }
 
 .sourceVariableRow {
@@ -675,7 +675,7 @@
   margin-right: 5px;
   border-radius: 50%;
   background: var(--acton-color-text-muted, var(--color-text-secondary));
-  color: var(--acton-color-surface, var(--color-background-primary));
+  color: var(--acton-color-surface);
   font-size: 12px;
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 16px;
@@ -841,7 +841,7 @@
   flex-direction: column;
   overflow: hidden;
   border-radius: 0 0 0 16px;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
 }
 
 .sidePanel {

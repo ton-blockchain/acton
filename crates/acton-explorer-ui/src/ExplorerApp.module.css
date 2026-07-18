@@ -220,7 +220,7 @@
   border: 1px solid var(--tonscan-border);
   border-radius: 10px;
   background: var(--tonscan-card-bg);
-  box-shadow: var(--shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
   box-sizing: border-box;
   overflow: hidden;
   transform-origin: top right;

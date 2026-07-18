@@ -103,7 +103,7 @@
 }
 
 .sourceLocationLink {
-  color: var(--link-color);
+  color: var(--acton-color-accent);
   text-decoration: none;
 }
 
@@ -142,7 +142,7 @@
   background-color: var(--acton-color-surface);
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
-  box-shadow: var(--shadow);
+  box-shadow: var(--acton-shadow-surface);
   z-index: 1000;
   min-width: 180px;
   padding: var(--acton-space-micro);
@@ -203,10 +203,10 @@
   color: var(--acton-color-status-failed);
 }
 .skippedIcon {
-  color: var(--color-skipped);
+  color: var(--acton-test-color-status-skipped);
 }
 .todoIcon {
-  color: var(--color-todo);
+  color: var(--acton-test-color-status-todo);
 }
 
 .traceSelector {
@@ -442,7 +442,7 @@
 }
 
 .infoLabel {
-  font-size: var(--font-size-xss);
+  font-size: var(--acton-font-size-4xs);
   color: var(--acton-color-text-subtle);
   text-transform: uppercase;
   font-weight: var(--acton-font-weight-emphasis);
@@ -517,7 +517,7 @@
 .traceFeesTitle {
   margin-bottom: var(--acton-space-1);
   color: var(--acton-color-text);
-  font-size: var(--font-size-xl);
+  font-size: var(--acton-font-size-2xl);
   font-weight: var(--acton-font-weight-emphasis);
 }
 
@@ -588,7 +588,7 @@
 }
 
 .traceFeeLabel {
-  font-size: var(--font-size-xss);
+  font-size: var(--acton-font-size-4xs);
   color: var(--acton-color-text-subtle);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -650,7 +650,7 @@
   background-color: var(--acton-color-surface);
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
-  box-shadow: var(--shadow);
+  box-shadow: var(--acton-shadow-surface);
   z-index: 1000;
   min-width: 180px;
   padding: var(--acton-space-micro);
@@ -666,10 +666,10 @@
   color: var(--acton-color-status-failed);
 }
 .infoValue.skipped {
-  color: var(--color-skipped);
+  color: var(--acton-test-color-status-skipped);
 }
 .infoValue.todo {
-  color: var(--color-todo);
+  color: var(--acton-test-color-status-todo);
 }
 
 .errorSection {
@@ -763,7 +763,7 @@
 }
 
 .paramKey {
-  font-size: var(--font-size-xss);
+  font-size: var(--acton-font-size-4xs);
   color: var(--acton-color-text-subtle);
   text-transform: uppercase;
   font-weight: var(--acton-font-weight-emphasis);

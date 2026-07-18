@@ -202,5 +202,5 @@
   justify-content: center;
   color: var(--color-text-secondary);
   padding: var(--acton-space-4);
-  background-color: var(--color-background-primary);
+  background-color: var(--acton-color-surface-raised);
 }

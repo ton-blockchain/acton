@@ -137,7 +137,7 @@
 }
 
 .resizerHovered {
-  background-color: var(--color-todo);
+  background-color: var(--acton-test-color-status-todo);
 }
 
 .mainContent {
@@ -177,7 +177,7 @@
 .viewTabActive {
   background-color: var(--acton-color-surface);
   color: var(--acton-color-text);
-  box-shadow: var(--shadow);
+  box-shadow: var(--acton-shadow-surface);
 }
 
 .mainPanel {
@@ -239,7 +239,7 @@
 .connectionTitle {
   margin: 0;
   color: var(--acton-color-text);
-  font-size: var(--font-size-2xl);
+  font-size: var(--acton-font-size-3xl);
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
 }

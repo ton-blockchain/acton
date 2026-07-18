@@ -119,7 +119,7 @@
   border: 1px solid var(--acton-color-border);
   background-color: var(--acton-color-surface);
   color: var(--acton-color-text);
-  box-shadow: var(--shadow-tooltip);
+  box-shadow: var(--acton-shadow-tooltip);
   font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-xs);
 }

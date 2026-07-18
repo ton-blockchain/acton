@@ -343,7 +343,7 @@
   }
 
   .title {
-    font-size: var(--font-size-xl);
+    font-size: var(--acton-font-size-2xl);
     line-height: 1.2;
   }
 

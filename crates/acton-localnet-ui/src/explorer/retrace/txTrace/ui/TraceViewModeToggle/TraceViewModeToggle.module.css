@@ -28,7 +28,7 @@
   overflow-x: auto;
   border: 1px solid var(--tonscan-border);
   border-radius: 6px;
-  background: var(--color-background-primary);
+  background: var(--acton-color-surface-raised);
   scrollbar-width: none;
 }
 

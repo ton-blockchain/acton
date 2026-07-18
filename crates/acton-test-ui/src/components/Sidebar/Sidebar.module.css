@@ -218,11 +218,11 @@
 }
 
 .filterButton.skipped.activeFilter {
-  color: var(--color-skipped);
+  color: var(--acton-test-color-status-skipped);
 }
 
 .filterButton.todo.activeFilter {
-  color: var(--color-todo);
+  color: var(--acton-test-color-status-todo);
 }
 
 .content {
@@ -380,8 +380,8 @@
   color: var(--acton-color-status-failed);
 }
 .skipped {
-  color: var(--color-skipped);
+  color: var(--acton-test-color-status-skipped);
 }
 .todo {
-  color: var(--color-todo);
+  color: var(--acton-test-color-status-todo);
 }
