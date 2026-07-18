@@ -3,7 +3,7 @@ import path from "node:path"
 import {Address} from "@ton/core"
 import {PanelLeft} from "lucide-react"
 import type React from "react"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useEffect, useMemo, useState} from "react"
 import {
   FiArrowUpRight,
   FiCheck,
@@ -13,8 +13,6 @@ import {
   FiMinus,
   FiX,
 } from "react-icons/fi"
-import {SiIntellijidea, SiRust, SiWebstorm} from "react-icons/si"
-import {VscCode} from "react-icons/vsc"
 import {
   ContractChip,
   DataTable,
@@ -27,7 +25,10 @@ import {
   DataTableRow,
   DataTableSkeletonRows,
   DataTableTable,
+  getIdeUrl,
+  IdeSelector,
   RawDataBlock,
+  useIdePreference,
 } from "@acton/ui"
 
 import type {ContractData, SourceLocation, TransactionInfo} from "@acton/transaction-ui"
@@ -63,12 +64,6 @@ interface TestDetailsProps {
   readonly gasProfileAvailabilityLoaded: boolean
   readonly isSidebarCollapsed?: boolean
   readonly onExpandSidebar?: () => void
-}
-
-interface IDEConfig {
-  readonly name: string
-  readonly icon: React.ReactNode
-  readonly getUrl: (test: TestReport) => string
 }
 
 interface TraceFeeSummary {
@@ -127,9 +122,10 @@ const MISSING_VM_LOG_HINT = [
 ].join("\n")
 const VALUE_FLOW_EXPANDED_STORAGE_KEY = "valueFlowExpanded"
 
-const toIdeSourcePosition = (location: SourceLocation): Pick<TestReport, "row" | "column"> => ({
-  row: Math.max(0, location.line - 1),
-  column: Math.max(0, location.column - 2),
+const toIdeSourceLocation = (location: SourceLocation) => ({
+  filePath: location.file,
+  line: Math.max(1, location.line),
+  column: Math.max(1, location.column - 1),
 })
 
 const hasNonEmptyLog = (value: string | undefined): boolean => (value ?? "").trim().length > 0
@@ -182,13 +178,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return localStorage.getItem(VALUE_FLOW_EXPANDED_STORAGE_KEY) === "true"
   })
   const [isTreasuryDeployTracesExpanded, setIsTreasuryDeployTracesExpanded] = useState(false)
-  const [selectedIdeName, setSelectedIdeName] = useState<string | null>(() => {
-    return localStorage.getItem("selectedIde")
-  })
-  const [isHeaderIDESelectorOpen, setIsHeaderIDESelectorOpen] = useState(false)
-  const [isGridIDESelectorOpen, setIsGridIDESelectorOpen] = useState(false)
-  const headerDropdownRef = useRef<HTMLDivElement | null>(null)
-  const gridDropdownRef = useRef<HTMLDivElement | null>(null)
+  const [selectedIde, selectIde] = useIdePreference()
 
   const contractNames = useMemo(() => {
     const names = new Set<string>(trace?.contracts ?? [])
@@ -219,59 +209,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   } = useGasProfileReport(gasProfileAvailable && activeTab === "profile")
   const gasProfile = gasProfileReport?.tests?.find(profile => profile.name === test.name)
 
-  const ides: IDEConfig[] = useMemo(
-    () => [
-      {
-        name: "Cursor",
-        icon: <VscCode />,
-        getUrl: t => `cursor://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "Windsurf",
-        icon: <VscCode />,
-        getUrl: t => `windsurf://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "VS Code",
-        icon: <VscCode />,
-        getUrl: t => `vscode://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "VSCodium",
-        icon: <VscCode />,
-        getUrl: t => `vscodium://file/${t.file_path}:${t.row + 1}:${t.column + 1}`,
-      },
-      {
-        name: "WebStorm",
-        icon: <SiWebstorm />,
-        getUrl: t => `webstorm://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-      {
-        name: "RustRover",
-        icon: <SiRust />,
-        getUrl: t =>
-          `rustrover://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-      {
-        name: "IntelliJ",
-        icon: <SiIntellijidea />,
-        getUrl: t => `idea://open?file=${t.file_path}&line=${t.row + 1}&column=${t.column + 1}`,
-      },
-    ],
-    [],
-  )
-
-  const selectedIde = useMemo(() => {
-    return ides.find(i => i.name === selectedIdeName) || ides[0]
-  }, [ides, selectedIdeName])
-
-  const handleSelectIde = (ide: IDEConfig) => {
-    setSelectedIdeName(ide.name)
-    localStorage.setItem("selectedIde", ide.name)
-    setIsHeaderIDESelectorOpen(false)
-    setIsGridIDESelectorOpen(false)
-  }
-
   const errorLocation = useMemo(() => {
     if (test.status !== TestStatus.Failed || !test.details) {
       return {filePath: test.file_path, row: test.row, column: test.column}
@@ -293,47 +230,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return {filePath: test.file_path, row: test.row, column: test.column}
   }, [test, projectRoot])
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (
-        document.activeElement instanceof HTMLInputElement ||
-        document.activeElement instanceof HTMLTextAreaElement
-      ) {
-        return
-      }
-
-      if (e.key === ".") {
-        globalThis.location.href = selectedIde.getUrl({
-          ...test,
-          file_path: errorLocation.filePath,
-          row: errorLocation.row,
-          column: errorLocation.column,
-        })
-      }
-
-      if (e.key === "Escape") {
-        setIsHeaderIDESelectorOpen(false)
-        setIsGridIDESelectorOpen(false)
-      }
-    }
-
-    globalThis.addEventListener("keydown", handleKeyDown)
-    return () => globalThis.removeEventListener("keydown", handleKeyDown)
-  }, [test, selectedIde, errorLocation])
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (headerDropdownRef.current && !headerDropdownRef.current.contains(event.target as Node)) {
-        setIsHeaderIDESelectorOpen(false)
-      }
-      if (gridDropdownRef.current && !gridDropdownRef.current.contains(event.target as Node)) {
-        setIsGridIDESelectorOpen(false)
-      }
-    }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
-
   const getRelativePath = (path: string) => {
     if (projectRoot && path.startsWith(projectRoot)) {
       const rel = path.slice(projectRoot.length)
@@ -348,18 +244,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
 
   const renderSourceLocation = (location: SourceLocation) => {
     const label = `${getRelativePath(location.file)}:${location.line}:${location.column}`
-    const idePosition = toIdeSourcePosition(location)
 
     return (
       <a
-        href={selectedIde.getUrl({
-          ...test,
-          file_path: location.file,
-          row: idePosition.row,
-          column: idePosition.column,
-        })}
+        href={getIdeUrl(selectedIde, toIdeSourceLocation(location))}
         className={styles.sourceLocationLink}
-        title={`Open ${label} in ${selectedIde.name}`}
+        title={`Open ${label} in ${selectedIde}`}
       >
         {label}
       </a>
@@ -983,43 +873,16 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
                 line={errorLocation.row + 1}
                 projectRoot={projectRoot}
                 ideOpener={
-                  <div className={styles.gridIdeSelector} ref={gridDropdownRef}>
-                    <a
-                      href={selectedIde.getUrl({
-                        ...test,
-                        file_path: errorLocation.filePath,
-                        row: errorLocation.row,
-                        column: errorLocation.column,
-                      })}
-                      className={styles.gridIdeQuickLink}
-                      title={`Open in ${selectedIde.name} (or press \`.\`)`}
-                    >
-                      {selectedIde.icon}
-                    </a>
-                    <button
-                      type="button"
-                      className={`${styles.gridIdeTrigger} ${isGridIDESelectorOpen ? styles.active : ""}`}
-                      onClick={() => setIsGridIDESelectorOpen(!isGridIDESelectorOpen)}
-                      title="Change IDE"
-                    >
-                      <FiChevronDown />
-                    </button>
-                    {isGridIDESelectorOpen && (
-                      <div className={styles.gridIdeDropdown}>
-                        {ides.map(ide => (
-                          <button
-                            key={ide.name}
-                            type="button"
-                            className={`${styles.ideItem} ${selectedIdeName === ide.name ? styles.selectedIde : ""}`}
-                            onClick={() => handleSelectIde(ide)}
-                          >
-                            <span className={styles.ideIcon}>{ide.icon}</span>
-                            <span className={styles.ideName}>{ide.name}</span>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                  <IdeSelector
+                    value={selectedIde}
+                    onValueChange={selectIde}
+                    size="compact"
+                    location={{
+                      filePath: errorLocation.filePath,
+                      line: errorLocation.row + 1,
+                      column: errorLocation.column + 1,
+                    }}
+                  />
                 }
               />
             </div>
@@ -1265,39 +1128,12 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           <span className={styles.suiteName}>{test.suite_name} / </span>
           <span className={styles.testName}>{test.name}</span>
 
-          <div className={styles.ideSelectorContainer} ref={headerDropdownRef}>
-            <a
-              href={selectedIde.getUrl(test)}
-              className={styles.ideQuickLink}
-              title={`Open in ${selectedIde.name} (or press \`.\`)`}
-            >
-              {selectedIde.icon}
-            </a>
-            <button
-              type="button"
-              className={`${styles.ideTrigger} ${isHeaderIDESelectorOpen ? styles.active : ""}`}
-              onClick={() => setIsHeaderIDESelectorOpen(!isHeaderIDESelectorOpen)}
-              title="Change IDE"
-            >
-              <FiChevronDown />
-            </button>
-
-            {isHeaderIDESelectorOpen && (
-              <div className={styles.ideDropdown}>
-                {ides.map(ide => (
-                  <button
-                    key={ide.name}
-                    type="button"
-                    className={`${styles.ideItem} ${selectedIdeName === ide.name ? styles.selectedIde : ""}`}
-                    onClick={() => handleSelectIde(ide)}
-                  >
-                    <span className={styles.ideIcon}>{ide.icon}</span>
-                    <span className={styles.ideName}>{ide.name}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+          <IdeSelector
+            value={selectedIde}
+            onValueChange={selectIde}
+            shortcut
+            location={{filePath: test.file_path, line: test.row + 1, column: test.column + 1}}
+          />
         </div>
       </div>
 

@@ -1559,6 +1559,48 @@ same 16px checked-box pattern as localnet-style filter controls.
   controls.
 - Do not use Checkbox as a command button.
 
+## IdeSelector
+
+Status: ready
+
+Import:
+
+```tsx
+import { IdeSelector, useIdePreference } from "@acton/ui"
+```
+
+Use IdeSelector for source locations that can be opened in a desktop IDE. The
+primary icon opens the current IDE directly; the adjacent Base UI menu changes
+the preferred IDE with keyboard navigation, focus management, Escape handling,
+and outside-click dismissal built in.
+
+```tsx
+const [ide, setIde] = useIdePreference()
+
+<IdeSelector
+  value={ide}
+  onValueChange={setIde}
+  location={{ filePath, line, column }}
+  shortcut
+/>
+```
+
+- `location` uses one-based line and column values.
+- `size="compact"` fits dense code and file headers.
+- `shortcut` enables the `.` key for the current source location. Enable it on
+  only one mounted selector per screen.
+- `useIdePreference` validates and persists the selected IDE while keeping the
+  component controlled.
+- `getIdeUrl` builds editor links for source-location links that do not need the
+  selector UI.
+
+### Agent Guidance
+
+- Use IdeSelector instead of local split buttons and absolute-positioned menus.
+- Keep the IDE preference shared across all selectors on a screen.
+- Keep source-path formatting in the caller; pass the full path to `location`.
+- Do not add document-level Escape or outside-click listeners around the menu.
+
 ## ThemeProvider and useTheme
 
 Status: ready

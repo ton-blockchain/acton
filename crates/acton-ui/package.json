@@ -20,6 +20,7 @@
     "./components/disclosure-toggle": "./src/components/DisclosureToggle/index.ts",
     "./components/exit-code-chip": "./src/components/ExitCodeChip/index.ts",
     "./components/highlighted-code": "./src/components/HighlightedCode/index.ts",
+    "./components/ide-selector": "./src/components/IdeSelector/index.ts",
     "./components/info-popover": "./src/components/InfoPopover/index.ts",
     "./components/input": "./src/components/Input/index.ts",
     "./components/inline-actions": "./src/components/InlineActions/index.ts",

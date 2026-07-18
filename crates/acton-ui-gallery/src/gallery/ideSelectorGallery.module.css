@@ -1,0 +1,42 @@
+.sample {
+  display: grid;
+  gap: var(--acton-space-3);
+  max-width: 42rem;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--acton-space-5);
+  min-height: 4.5rem;
+  padding: var(--acton-space-3) var(--acton-space-4);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.label,
+.path {
+  margin: 0;
+}
+
+.label {
+  color: var(--acton-color-text);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-medium);
+}
+
+.path {
+  margin-top: var(--acton-space-1);
+  color: var(--acton-color-text-muted);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+}
+
+@media (max-width: 36rem) {
+  .row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

@@ -78,30 +78,6 @@
   color: var(--acton-color-text-muted);
 }
 
-.ideSelectorContainer {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background-color: var(--acton-color-surface-group);
-  border: 1px solid var(--acton-color-border);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.ideQuickLink {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--acton-space-1) var(--acton-space-2);
-  color: var(--acton-color-text-subtle);
-  transition: all 0.2s;
-  font-size: 1rem;
-}
-
-.ideQuickLink:hover {
-  color: var(--acton-color-text);
-}
-
 .sourceLocationLink {
   color: var(--acton-color-accent);
   text-decoration: none;
@@ -109,91 +85,6 @@
 
 .sourceLocationLink:hover {
   text-decoration: underline;
-}
-
-.ideTrigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border: none;
-  background: none;
-  color: var(--acton-color-text-subtle);
-  cursor: pointer;
-  transition:
-    background-color 0.2s,
-    color 0.2s,
-    border-color 0.2s;
-  font-size: 0.8rem;
-  border-left: 1px solid var(--acton-color-border);
-}
-
-.ideTrigger:hover,
-.ideTrigger.active {
-  color: var(--acton-color-text);
-  background-color: var(--acton-color-surface-hover);
-}
-
-.ideDropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: var(--acton-space-1);
-  background-color: var(--acton-color-surface);
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-control-sm);
-  box-shadow: var(--acton-shadow-surface);
-  z-index: 1000;
-  min-width: 180px;
-  padding: var(--acton-space-micro);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-
-.ideItem {
-  display: flex;
-  align-items: center;
-  gap: var(--acton-space-4);
-  padding: var(--acton-space-2) var(--acton-space-4);
-  border-radius: var(--acton-radius-control-xs);
-  color: var(--acton-color-text);
-  text-decoration: none;
-  font-size: var(--acton-font-size-sm);
-  transition:
-    background-color 0.2s,
-    color 0.2s;
-  border: none;
-  background: none;
-  cursor: pointer;
-  width: 100%;
-  text-align: left;
-}
-
-.ideItem:hover {
-  background-color: var(--acton-color-surface-hover);
-}
-
-.selectedIde {
-  background-color: var(--acton-color-surface-hover);
-  color: var(--acton-color-text);
-  font-weight: var(--acton-font-weight-emphasis);
-}
-
-.selectedIde .ideIcon {
-  color: var(--acton-color-text);
-}
-
-.ideIcon {
-  display: flex;
-  align-items: center;
-  font-size: 1.1rem;
-  width: 20px;
-  justify-content: center;
-}
-
-.ideName {
-  font-weight: 500;
 }
 
 .passedIcon {
@@ -600,67 +491,6 @@
 
 .emptyCellValue {
   color: var(--acton-color-text-subtle);
-}
-
-.gridIdeSelector {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  background-color: var(--acton-color-surface-group);
-  border: 1px solid var(--acton-color-border);
-  border-radius: 4px;
-  padding: 1px;
-}
-
-.gridIdeQuickLink {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px 4px;
-  color: var(--acton-color-text-subtle);
-  transition: all 0.2s;
-  font-size: 0.85rem;
-}
-
-.gridIdeQuickLink:hover {
-  color: var(--acton-color-text);
-}
-
-.gridIdeTrigger {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 2px;
-  border: none;
-  background: transparent;
-  color: var(--acton-color-text-subtle);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.7rem;
-  border-left: 1px solid var(--acton-color-border);
-}
-
-.gridIdeTrigger:hover,
-.gridIdeTrigger.active {
-  color: var(--acton-color-text);
-  background-color: var(--acton-color-surface-hover);
-}
-
-.gridIdeDropdown {
-  position: absolute;
-  top: 100%;
-  right: 0;
-  margin-top: var(--acton-space-1);
-  background-color: var(--acton-color-surface);
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-control-sm);
-  box-shadow: var(--acton-shadow-surface);
-  z-index: 1000;
-  min-width: 180px;
-  padding: var(--acton-space-micro);
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
 }
 
 .infoValue.passed {

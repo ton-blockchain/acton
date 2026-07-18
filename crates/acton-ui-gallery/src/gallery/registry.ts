@@ -9,6 +9,7 @@ import {dataTableGallery} from "./dataTableGallery"
 import {disclosureToggleGallery} from "./disclosureToggleGallery"
 import {exitCodeChipGallery} from "./exitCodeChipGallery"
 import {highlightedCodeGallery} from "./highlightedCodeGallery"
+import {ideSelectorGallery} from "./ideSelectorGallery"
 import {infoPopoverGallery} from "./infoPopoverGallery"
 import {inputGallery} from "./inputGallery"
 import {inlineActionsGallery} from "./inlineActionsGallery"
@@ -48,6 +49,7 @@ export const galleries = [
   parsedValueDiffViewGallery,
   parsedBodySectionGallery,
   highlightedCodeGallery,
+  ideSelectorGallery,
   contentTabsGallery,
   pillTabsGallery,
   markdownTextGallery,
