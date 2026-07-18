@@ -50,7 +50,7 @@
 
 .logoTitleAccent {
   -webkit-text-fill-color: transparent;
-  background: linear-gradient(89deg, #2b82eb, #1cc8ff);
+  background: var(--explorer-network-accent, linear-gradient(89deg, #2b82eb, #1cc8ff));
   background-clip: text;
   font-feature-settings:
     "clig" off,

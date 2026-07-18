@@ -1,9 +1,33 @@
 .appShell {
+  --explorer-network-accent: linear-gradient(89deg, #2b82eb, #1cc8ff);
+
+  position: relative;
   display: flex;
   flex-direction: column;
   min-height: 100vh;
   background: var(--tonscan-bg);
   color: var(--tonscan-text-primary);
+}
+
+.appShell[data-network-kind="testnet"] {
+  --explorer-network-accent: linear-gradient(89deg, #2d83ec, #1affa3);
+}
+
+.appShell[data-network-kind="custom"] {
+  --explorer-network-accent: linear-gradient(89deg, #f59e0b, #fb923c);
+}
+
+.appShell[data-network-kind="testnet"]::before,
+.appShell[data-network-kind="custom"]::before {
+  position: absolute;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 1px;
+  background: var(--explorer-network-accent);
+  content: "";
+  pointer-events: none;
 }
 
 .header {

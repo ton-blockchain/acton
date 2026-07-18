@@ -34,7 +34,9 @@ import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/Transa
 import "@acton/ui/styles/tokens.css"
 import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
+import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"
+import actonScanTestnetLogo from "./assets/acton-scan-testnet-logo-dark.svg"
 import {DeveloperExplorerBanner} from "./components/DeveloperExplorerBanner"
 import styles from "./ExplorerApp.module.css"
 
@@ -43,6 +45,13 @@ type SelectableExplorerNetworkId = BuiltinSelectableExplorerNetworkId | CustomEx
 type SelectableExplorerNetwork = ExplorerNetworkInfo & {
   readonly id: SelectableExplorerNetworkId
   readonly api: ExplorerApiConfig
+}
+type ExplorerNetworkKind = BuiltinSelectableExplorerNetworkId | "custom"
+
+const EXPLORER_NETWORK_LOGOS: Record<ExplorerNetworkKind, string> = {
+  mainnet: actonScanLogo,
+  testnet: actonScanTestnetLogo,
+  custom: actonScanCustomLogo,
 }
 
 type NetworkFormMode =
@@ -802,6 +811,8 @@ export const ExplorerApp: FC = () => {
   const networkId = networkState.selectedNetworkId
   const networkConfig =
     selectableNetworks.find(network => network.id === networkId) ?? EXPLORER_API_CONFIGS.mainnet
+  const networkKind: ExplorerNetworkKind = isCustomNetworkId(networkId) ? "custom" : networkId
+  const brandLogo = EXPLORER_NETWORK_LOGOS[networkKind]
   const client = useMemo(
     () =>
       new TonClient({
@@ -876,6 +887,10 @@ export const ExplorerApp: FC = () => {
     localStorage.setItem("explorerTheme", theme)
   }, [theme])
 
+  useLayoutEffect(() => {
+    document.querySelector<HTMLLinkElement>('link[rel="icon"]')?.setAttribute("href", brandLogo)
+  }, [brandLogo])
+
   useEffect(() => {
     localStorage.setItem(EXPLORER_NETWORK_STORAGE_KEY, networkId)
   }, [networkId])
@@ -902,7 +917,7 @@ export const ExplorerApp: FC = () => {
           <ExplorerRoutesProvider basePath="">
             <MetadataRegistryProvider registry={metadataRegistry}>
               <AddressBookProvider>
-                <div className={styles.appShell}>
+                <div className={styles.appShell} data-network-kind={networkKind}>
                   <DeveloperExplorerBanner />
                   <ExplorerHeaderFrame>
                     <div className={styles.headerInner}>
@@ -910,7 +925,7 @@ export const ExplorerApp: FC = () => {
                         <Link className={styles.brand} to="/">
                           <img
                             className={styles.brandIcon}
-                            src={actonScanLogo}
+                            src={brandLogo}
                             alt=""
                             aria-hidden="true"
                           />

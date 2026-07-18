@@ -55,13 +55,13 @@
   cursor: pointer;
   font: inherit;
   font-size: 13px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
   white-space: nowrap;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .editorTab:first-child {
@@ -88,7 +88,7 @@
   align-items: center;
   gap: 8px;
   color: var(--acton-color-success);
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
 }
 
 .editorTabVerified svg {
@@ -106,11 +106,7 @@
 .editorTabVerified.editorTabActive {
   color: var(--acton-color-success);
   background: var(--acton-color-surface);
-  border-color: color-mix(
-    in srgb,
-    var(--acton-color-success) 72%,
-    var(--acton-color-border)
-  );
+  border-color: color-mix(in srgb, var(--acton-color-success) 72%, var(--acton-color-border));
   border-bottom-color: color-mix(
     in srgb,
     var(--acton-color-success) 72%,
@@ -130,13 +126,14 @@
   --acton-highlighted-code-font-size: 13px;
   --acton-highlighted-code-line-height: 1.6;
   --acton-highlighted-code-max-height: 600px;
-  --acton-highlighted-code-padding: var(--spacing-md) 54px var(--spacing-md) var(--spacing-md);
+  --acton-highlighted-code-padding: var(--acton-space-4) 54px var(--acton-space-4)
+    var(--acton-space-4);
 }
 
 .verifiedLoading {
   margin-top: 10px;
   color: var(--acton-color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
 }
 
 .verifiedShell {
@@ -179,11 +176,11 @@
   background: transparent;
   color: var(--acton-color-text-muted);
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-xs);
-  font-weight: var(--font-weight-medium);
+  font-family: var(--acton-font-mono);
+  font-size: var(--acton-font-size-xs);
+  font-weight: var(--acton-font-weight-utility);
   white-space: nowrap;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .bundleTab:hover {
@@ -200,16 +197,16 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: var(--spacing-xl);
+  padding: var(--acton-space-8);
   color: var(--acton-color-text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .panelEmpty {
   background-color: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
 }
 
 .sourceShell > .panelEmpty {

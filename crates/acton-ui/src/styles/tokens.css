@@ -119,8 +119,12 @@
   --acton-font-weight-medium: 560;
   /* Medium text weight for tiny inline utility labels. */
   --acton-font-weight-utility: 500;
+  /* Emphasis weight for labels that need more contrast without full semibold density. */
+  --acton-font-weight-emphasis: 600;
   /* Semibold text weight for section labels and emphasis. */
   --acton-font-weight-semibold: 650;
+  /* Bold text weight for strong selected-state and summary emphasis. */
+  --acton-font-weight-bold: 700;
 
   /* Quarter-rem spacing step for tight offsets. */
   --acton-space-1: 0.25rem;
@@ -136,7 +140,13 @@
   --acton-space-5: 1.25rem;
   /* Section-level spacing step inside compact layouts. */
   --acton-space-6: 1.5rem;
+  /* Large section spacing for roomy empty states and responsive layouts. */
+  --acton-space-8: 2rem;
+  /* Extra-large section spacing between major feature regions. */
+  --acton-space-12: 3rem;
 
+  /* Extra-small radius for compact badges and nested data surfaces. */
+  --acton-radius-control-xs: 0.25rem;
   /* Small radius for compact controls. */
   --acton-radius-control-sm: 0.5rem;
   /* Default radius for buttons, inputs, and selects. */

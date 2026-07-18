@@ -1,5 +1,5 @@
 .transactionDetailsContainer {
-  border-radius: var(--border-radius-md);
+  border-radius: var(--acton-radius-control-sm);
   background-color: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   position: relative;
@@ -20,9 +20,9 @@
   display: flex;
   align-items: center;
   text-align: left;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   color: var(--acton-color-text-muted);
-  padding: var(--spacing-xs) var(--spacing-mds);
+  padding: var(--acton-space-1) var(--acton-space-3);
   width: 160px;
   flex-shrink: 0;
   vertical-align: top;
@@ -32,7 +32,7 @@
 }
 
 .detailValue {
-  padding: var(--spacing-xs) var(--spacing-mds);
+  padding: var(--acton-space-1) var(--acton-space-3);
   color: var(--acton-color-text);
   word-break: break-all;
   font-size: 0.8125rem;
@@ -41,7 +41,7 @@
 }
 
 .heightDetailValue {
-  padding: var(--spacing-sm) var(--spacing-mds);
+  padding: var(--acton-space-2) var(--acton-space-3);
   color: var(--acton-color-text);
   word-break: break-all;
   font-size: 0.8125rem;
@@ -53,7 +53,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   min-width: 0;
 }
 
@@ -67,7 +67,7 @@
 .triggerRoute {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--acton-space-2);
   flex-wrap: wrap;
 }
 
@@ -76,7 +76,7 @@
   align-items: center;
   justify-content: center;
   padding: 1px 8px;
-  border-radius: var(--border-radius-full);
+  border-radius: var(--acton-radius-round);
   background-color: color-mix(
     in srgb,
     var(--acton-color-surface-raised) 84%,
@@ -84,7 +84,7 @@
   );
   color: var(--acton-color-text);
   font-size: 0.75rem;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
@@ -94,7 +94,7 @@
   align-items: center;
   justify-content: center;
   padding: 1px 8px;
-  border-radius: var(--border-radius-full);
+  border-radius: var(--acton-radius-round);
   background-color: color-mix(
     in srgb,
     var(--acton-color-surface-raised) 84%,
@@ -102,7 +102,7 @@
   );
   color: var(--acton-color-text);
   font-size: 0.75rem;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   letter-spacing: 0.2px;
   white-space: nowrap;
 }
@@ -126,9 +126,9 @@
 
 .labeledSectionTitle {
   text-align: left;
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-text-muted);
-  padding: var(--spacing-xs) var(--spacing-mds);
+  padding: var(--acton-space-1) var(--acton-space-3);
   width: 160px;
   flex-shrink: 0;
   font-size: 0.8125rem;
@@ -140,12 +140,12 @@
 }
 
 .labeledSectionContent {
-  padding: var(--spacing-xs) var(--spacing-mds);
+  padding: var(--acton-space-1) var(--acton-space-3);
   flex-grow: 1;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   overflow: visible;
   min-width: 0;
   width: 100%;
@@ -157,24 +157,24 @@
 
 .sectionCopyActions {
   position: absolute;
-  top: var(--spacing-xs);
-  right: var(--spacing-mds);
+  top: var(--acton-space-1);
+  right: var(--acton-space-3);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   flex-wrap: wrap;
-  gap: var(--spacing-sm);
-  max-width: min(22rem, calc(100% - var(--spacing-mds) * 2));
+  gap: var(--acton-space-2);
+  max-width: min(22rem, calc(100% - var(--acton-space-3) * 2));
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--transition-duration-fast) ease;
+  transition: opacity var(--acton-duration-fast) ease;
 }
 
 .sectionCopyButton,
 .fieldCopyButton {
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--transition-duration-fast) ease;
+  transition: opacity var(--acton-duration-fast) ease;
 }
 
 .fieldCopyButton {
@@ -201,7 +201,7 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: var(--spacing-md);
+  gap: var(--acton-space-4);
 }
 
 .multiColumnItem {
@@ -227,17 +227,17 @@
   font-size: 0.8125rem;
   color: var(--acton-color-text);
   word-break: break-word;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   display: flex;
 }
 
 .booleanTrue {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-success);
 }
 
 .booleanFalse {
-  font-weight: var(--font-weight-semibold);
+  font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-danger-text);
 }
 
@@ -245,11 +245,16 @@
   font-size: 0.8125rem;
 }
 
+.numberValue > button {
+  margin-left: var(--acton-space-1);
+  padding: var(--acton-space-1);
+}
+
 .timeInlineValue {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  column-gap: var(--spacing-md);
+  column-gap: var(--acton-space-4);
   row-gap: 2px;
   word-break: normal;
 }
@@ -264,7 +269,7 @@
 .timeInlineLabel {
   color: var(--acton-color-text-subtle);
   font-size: 0.75rem;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   white-space: nowrap;
 }
 
@@ -296,7 +301,7 @@
 
 .actionsLoadError {
   color: var(--acton-color-danger-text);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
 }
 
 .parsedBodySection {
@@ -313,7 +318,7 @@
   display: flex;
   align-items: center;
   gap: var(--acton-space-1);
-  color: var(--acton-color-text-muted);
+  color: var(--acton-color-text-subtle);
   font-size: var(--acton-font-size-2xs);
   letter-spacing: 0.025rem;
 }
@@ -322,7 +327,7 @@
   width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   color: var(--acton-color-text);
 }
 
@@ -335,7 +340,7 @@
 .stateInitField {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   min-width: 0;
 }
 
@@ -354,7 +359,7 @@
 
 .stateInitAbiValue {
   align-items: center;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   min-width: 0;
 }
 
@@ -376,14 +381,14 @@
 
 .stateInitAbiInfoTitle {
   color: var(--acton-color-text-muted);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .stateInitAbiInfoText {
   color: var(--acton-color-text);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-normal);
+  font-size: var(--acton-font-size-sm);
+  font-weight: var(--acton-font-weight-normal);
 }
 
 .storageSummaryRow {
@@ -397,19 +402,19 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  column-gap: var(--spacing-sm);
-  row-gap: var(--spacing-xs);
+  column-gap: var(--acton-space-2);
+  row-gap: var(--acton-space-1);
   min-width: 0;
-  padding-right: var(--spacing-xs);
+  padding-right: var(--acton-space-1);
 }
 
 .storageChangeBadge {
   display: inline-flex;
   align-items: center;
   color: var(--acton-color-text);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 20px;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
   white-space: nowrap;
 }
 
@@ -417,7 +422,7 @@
   display: inline-flex;
   align-items: center;
   color: var(--acton-color-text-muted);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 20px;
   white-space: nowrap;
 }
@@ -426,7 +431,7 @@
   display: inline-flex;
   align-items: center;
   color: var(--acton-color-text-subtle);
-  font-size: var(--font-size-xs);
+  font-size: var(--acton-font-size-xs);
   line-height: 20px;
   white-space: nowrap;
 }
@@ -442,14 +447,14 @@
 .parsedContainer {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xs);
+  gap: var(--acton-space-1);
   min-width: 0;
 }
 
 .parsedBadge {
   align-self: flex-start;
   padding: 1px 6px;
-  border-radius: var(--border-radius-full);
+  border-radius: var(--acton-radius-round);
   border: 1px solid var(--acton-color-border);
   background-color: var(--acton-color-surface-raised);
   color: var(--acton-color-text-muted);
@@ -462,18 +467,18 @@
   color: var(--acton-color-text);
   font-size: 0.75rem;
   line-height: 1.4;
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--acton-font-weight-utility);
 }
 
 .parsedNested {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: var(--spacing-sm);
+  column-gap: var(--acton-space-2);
   grid-auto-rows: minmax(25px, auto);
-  row-gap: var(--spacing-xs);
+  row-gap: var(--acton-space-1);
   min-width: 0;
-  padding-left: var(--spacing-mds);
-  padding-bottom: var(--spacing-mds);
+  padding-left: var(--acton-space-3);
+  padding-bottom: var(--acton-space-3);
   border-left: 1px solid var(--acton-color-border);
 }
 
@@ -490,7 +495,7 @@
 }
 
 .parsedScalar {
-  font-family: var(--font-mono), monospace;
+  font-family: var(--acton-font-mono), monospace;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -510,12 +515,12 @@
 .parsedMapEntry {
   display: grid;
   grid-template-columns: max-content minmax(0, 1fr);
-  column-gap: var(--spacing-sm);
+  column-gap: var(--acton-space-2);
   grid-auto-rows: minmax(25px, auto);
-  row-gap: var(--spacing-xs);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  row-gap: var(--acton-space-1);
+  padding: var(--acton-space-1) var(--acton-space-2);
   border: 1px solid var(--acton-color-border);
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--acton-radius-control-xs);
   background-color: var(--acton-color-surface-raised);
 }
 
@@ -524,7 +529,7 @@
     position: static;
     justify-content: flex-start;
     max-width: 100%;
-    margin-bottom: var(--spacing-xs);
+    margin-bottom: var(--acton-space-1);
     opacity: 1;
     pointer-events: auto;
   }
