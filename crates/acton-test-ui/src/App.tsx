@@ -1,4 +1,5 @@
 import type * as React from "react"
+import {PanelLeft} from "lucide-react"
 import {useCallback, useEffect, useRef, useState} from "react"
 import {FiWifiOff} from "react-icons/fi"
 
@@ -8,7 +9,6 @@ import type {TestReport} from "@acton/shared-ui"
 import styles from "./App.module.css"
 import {CoverageView} from "./components/Coverage/CoverageView"
 import {GasProfileView} from "./components/GasProfile/GasProfileView"
-import {DocsSidebarIcon} from "./components/Sidebar/DocsSidebarIcon"
 import {Sidebar} from "./components/Sidebar/Sidebar"
 import {TestDetails} from "./components/TestDetails/TestDetails"
 import {useRunnerConnection} from "./hooks/useRunnerConnection"
@@ -328,7 +328,7 @@ export const App: React.FC = () => {
           aria-label="Expand sidebar"
           title="Expand sidebar"
         >
-          <DocsSidebarIcon />
+          <PanelLeft aria-hidden="true" />
         </button>
       )}
 

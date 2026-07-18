@@ -1,6 +1,7 @@
 import path from "node:path"
 
 import {Address} from "@ton/core"
+import {PanelLeft} from "lucide-react"
 import type React from "react"
 import {useEffect, useMemo, useRef, useState} from "react"
 import {
@@ -52,7 +53,6 @@ import {useGasProfileReport} from "../../hooks/useGasProfileReport"
 import {useTestExecutionLogs} from "../../hooks/useTestExecutionLogs"
 import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
 import {GasProfile} from "../GasProfile/GasProfile"
-import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
 
 import styles from "./TestDetails.module.css"
 
@@ -1239,7 +1239,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
               title="Expand sidebar"
               aria-label="Expand sidebar"
             >
-              <DocsSidebarIcon />
+              <PanelLeft aria-hidden="true" />
             </button>
           )}
           <span className={styles.statusIcon}>{getStatusIcon(test.status)}</span>

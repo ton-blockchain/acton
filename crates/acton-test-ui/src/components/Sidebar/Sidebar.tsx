@@ -1,4 +1,5 @@
 import type React from "react"
+import {PanelLeft} from "lucide-react"
 import {useMemo, useState} from "react"
 import {
   FiBookOpen,
@@ -7,15 +8,12 @@ import {
   FiChevronRight,
   FiCircle,
   FiMinus,
+  FiSearch,
   FiX,
 } from "react-icons/fi"
 import {Input, ThemeSwitch, type ThemeMode} from "@acton/ui"
 import {type TestReport, TestStatus} from "@acton/shared-ui"
 
-import {AppIcon} from "../AppIcon/AppIcon"
-import {Summary} from "../Summary/Summary"
-
-import {DocsSidebarIcon} from "./DocsSidebarIcon"
 import styles from "./Sidebar.module.css"
 
 const DOCS_URL = "https://ton-blockchain.github.io/acton/docs/testing/test-ui/overview"
@@ -24,12 +22,12 @@ interface SidebarProps {
   readonly reports: TestReport[]
   readonly selectedTest: TestReport | undefined
   readonly onSelectTest: (test: TestReport) => void
-  readonly width?: number
-  readonly onCollapse?: () => void
-  readonly isCollapsed?: boolean
-  readonly className?: string
-  readonly theme?: ThemeMode
-  readonly onToggleTheme?: () => void
+  readonly width: number
+  readonly onCollapse: () => void
+  readonly isCollapsed: boolean
+  readonly className: string
+  readonly theme: ThemeMode
+  readonly onToggleTheme: () => void
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -38,7 +36,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectTest,
   width,
   onCollapse,
-  isCollapsed = false,
+  isCollapsed,
   className,
   theme,
   onToggleTheme,
@@ -48,7 +46,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [statusFilter, setStatusFilter] = useState<Set<TestStatus>>(
     new Set([TestStatus.Passed, TestStatus.Failed, TestStatus.Todo, TestStatus.Skipped]),
   )
-  const currentTheme = theme ?? "light"
+  const passedCount = reports.filter(report => report.status === TestStatus.Passed).length
+  const failedCount = reports.filter(report => report.status === TestStatus.Failed).length
+  const appIconColor = theme === "dark" ? "#ecebeb" : "#4DB8FF"
 
   const toggleSuite = (suiteName: string) => {
     setCollapsedSuites(prev => {
@@ -119,14 +119,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
   }
 
   return (
-    <div
-      className={`${styles.sidebar} ${className ?? ""}`}
-      style={width ? {width: `${width}px`} : undefined}
-    >
+    <div className={`${styles.sidebar} ${className}`} style={{width}}>
       <div className={styles.header}>
         <div className={styles.headerTop}>
           <div className={styles.title}>
-            <AppIcon theme={currentTheme} size={24} />
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 237 237"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+              role="img"
+              aria-label="TON logo"
+            >
+              <path
+                d="M118.2 0C183.49 0 236.41 52.92 236.41 118.21C236.41 183.49 183.49 236.41 118.2 236.41C52.92 236.41 0 183.49 0 118.21C0 52.92 52.92 0 118.2 0ZM74.1 62.2C57.68 62.2 47.27 79.91 55.53 94.23L109.96 188.58C113.62 194.92 122.78 194.92 126.44 188.58L180.88 94.23C189.13 79.93 178.72 62.2 162.31 62.2H74.1ZM162.29 78.84C166.03 78.84 168.23 82.81 166.45 85.91L137.86 137.09L137.85 137.1L126.51 159.05V78.84H162.29ZM109.87 78.85V159.02L98.54 137.09L98.53 137.08L69.93 85.92L69.85 85.77C68.21 82.7 70.41 78.85 74.09 78.85H109.87Z"
+                fill={appIconColor}
+              />
+            </svg>
             <span className={styles.titleBody}>
               <span className={styles.titleRow}>
                 <span className={styles.titleName}>Test UI</span>
@@ -135,20 +145,37 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </span>
           </div>
           <div className={styles.headerButtons}>
-            {onCollapse && (
-              <button
-                type="button"
-                onClick={onCollapse}
-                className={styles.collapseButton}
-                title={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}
-                aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
-              >
-                <DocsSidebarIcon />
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={onCollapse}
+              className={styles.collapseButton}
+              title={isCollapsed ? "Pin sidebar" : "Collapse sidebar"}
+              aria-label={isCollapsed ? "Pin Sidebar" : "Collapse Sidebar"}
+            >
+              <PanelLeft aria-hidden="true" />
+            </button>
           </div>
         </div>
-        <Summary reports={reports} />
+        <div className={styles.summary}>
+          <div className={styles.summaryCard} data-testid="summary-total">
+            <span className={styles.summaryCount}>{reports.length}</span>
+            <span className={styles.summaryLabel}>Total</span>
+          </div>
+          <div
+            className={`${styles.summaryCard} ${styles.summaryPassed}`}
+            data-testid="summary-passed"
+          >
+            <span className={styles.summaryCount}>{passedCount}</span>
+            <span className={styles.summaryLabel}>Passed</span>
+          </div>
+          <div
+            className={`${styles.summaryCard} ${styles.summaryFailed}`}
+            data-testid="summary-failed"
+          >
+            <span className={styles.summaryCount}>{failedCount}</span>
+            <span className={styles.summaryLabel}>Failed</span>
+          </div>
+        </div>
 
         <Input
           type="search"
@@ -157,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           value={searchQuery}
           onChange={event => setSearchQuery(event.target.value)}
           aria-label="Filter tests"
-          leadingIcon={<DocsSearchIcon />}
+          leadingIcon={<FiSearch className={styles.searchIcon} />}
           shortcut="K"
         />
 
@@ -187,7 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <div key={suiteName} className={styles.suite}>
               <button
                 type="button"
-                className={`${styles.suiteHeader} ${hasFailed ? styles.suiteFailed : ""}`}
+                className={styles.suiteHeader}
                 onClick={() => toggleSuite(suiteName)}
                 aria-expanded={!isCollapsed}
               >
@@ -211,12 +238,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     const isSelected =
                       selectedTest?.name === report.name &&
                       selectedTest?.suite_name === report.suite_name
-                    const isFailed = report.status === TestStatus.Failed
                     return (
                       <button
                         key={`${report.name}-${idx}`}
                         type="button"
-                        className={`${styles.testItem} ${isSelected ? styles.selected : ""} ${isFailed ? styles.testFailed : ""}`}
+                        className={`${styles.testItem} ${isSelected ? styles.selected : ""}`}
                         onClick={() => onSelectTest(report)}
                         aria-current={isSelected ? "true" : undefined}
                       >
@@ -234,45 +260,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </div>
 
-      {onToggleTheme && (
-        <div className={styles.footer}>
-          <a
-            className={styles.documentationButton}
-            href={DOCS_URL}
-            target="_blank"
-            rel="noreferrer"
-            title="Open documentation"
-            aria-label="Open documentation"
-          >
-            <FiBookOpen />
-          </a>
-          <ThemeSwitch
-            theme={currentTheme}
-            onToggleTheme={onToggleTheme}
-            title={`Switch to ${currentTheme === "light" ? "dark" : "light"} theme`}
-            aria-label={`Switch to ${currentTheme === "light" ? "dark" : "light"} theme`}
-          />
-        </div>
-      )}
+      <div className={styles.footer}>
+        <a
+          className={styles.documentationButton}
+          href={DOCS_URL}
+          target="_blank"
+          rel="noreferrer"
+          title="Open documentation"
+          aria-label="Open documentation"
+        >
+          <FiBookOpen />
+        </a>
+        <ThemeSwitch
+          theme={theme}
+          onToggleTheme={onToggleTheme}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+        />
+      </div>
     </div>
   )
 }
-
-const DocsSearchIcon: React.FC = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className={styles.searchIcon}
-    aria-hidden="true"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <path d="m21 21-4.3-4.3" />
-  </svg>
-)

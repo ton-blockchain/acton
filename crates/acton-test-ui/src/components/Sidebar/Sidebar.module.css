@@ -107,6 +107,46 @@
   line-height: 1;
 }
 
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--acton-space-2);
+  padding: var(--acton-space-1) 0 0;
+}
+
+.summaryCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--acton-space-micro);
+  padding: var(--acton-space-2) var(--acton-space-3) calc(var(--acton-space-2) - 2px);
+  background-color: var(--acton-color-surface-raised);
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-control-sm);
+}
+
+.summaryCount {
+  font-size: var(--acton-font-size-xl);
+  font-weight: var(--acton-font-weight-bold);
+  line-height: 1.2;
+  color: var(--acton-color-text);
+}
+
+.summaryLabel {
+  font-size: var(--acton-font-size-4xs);
+  color: var(--acton-color-text-subtle);
+  text-transform: uppercase;
+  font-weight: var(--acton-font-weight-emphasis);
+  letter-spacing: 0.05em;
+}
+
+.summaryPassed .summaryCount {
+  color: var(--acton-color-status-passed);
+}
+
+.summaryFailed .summaryCount {
+  color: var(--acton-color-status-failed);
+}
+
 .searchIcon {
   width: 1rem;
   height: 1rem;
