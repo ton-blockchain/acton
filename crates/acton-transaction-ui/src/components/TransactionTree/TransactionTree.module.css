@@ -46,6 +46,12 @@
     transparent 100%
   );
   --transaction-tree-edge-fade: 44px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.treeContainer::-webkit-scrollbar {
+  display: none;
 }
 
 .treeWrapper {
@@ -301,6 +307,12 @@
 .storageDiffScroll {
   overflow-x: auto;
   padding-bottom: var(--acton-space-1);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.storageDiffScroll::-webkit-scrollbar {
+  display: none;
 }
 
 .topText {

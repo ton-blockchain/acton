@@ -808,7 +808,7 @@ export function TransactionDetails({
         >
           {actionPhaseCopyActions}
           {actionPhase ? (
-            <div className={styles.multiColumnRow}>
+            <div className={`${styles.multiColumnRow} ${styles.actionPhaseSummaryRow}`}>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Success</div>
                 <div
@@ -825,7 +825,9 @@ export function TransactionDetails({
               </div>
               <div className={styles.multiColumnItem}>
                 <div className={styles.multiColumnItemTitle}>Total Actions</div>
-                <div className={`${styles.multiColumnItemValue} ${styles.numberValue}`}>
+                <div
+                  className={`${styles.multiColumnItemValue} ${styles.numberValue} ${styles.actionsCountValue}`}
+                >
                   {fmt.formatNumber(actionPhase.totalActions)}
                   {canToggleActions && (
                     <DisclosureToggle

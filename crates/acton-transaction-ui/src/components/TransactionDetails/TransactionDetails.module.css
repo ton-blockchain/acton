@@ -204,6 +204,10 @@
   gap: var(--acton-space-4);
 }
 
+.actionPhaseSummaryRow {
+  align-items: flex-start;
+}
+
 .multiColumnItem {
   display: flex;
   flex-direction: column;
@@ -245,9 +249,19 @@
   font-size: 0.8125rem;
 }
 
-.numberValue > button {
-  margin-left: var(--acton-space-1);
-  padding: var(--acton-space-1);
+.actionsCountValue {
+  align-items: center;
+  gap: var(--acton-space-2);
+  min-height: 1.25rem;
+}
+
+.actionsCountValue > button {
+  font: inherit;
+  min-height: 1.25rem;
+}
+
+.actionsCountValue > button > span:last-child {
+  font: inherit;
 }
 
 .timeInlineValue {
@@ -442,6 +456,12 @@
   max-height: 260px;
   overflow: auto;
   box-sizing: border-box;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.storageDiffDetails::-webkit-scrollbar {
+  display: none;
 }
 
 .parsedContainer {

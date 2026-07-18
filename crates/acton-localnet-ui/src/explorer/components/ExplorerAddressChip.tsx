@@ -12,6 +12,7 @@ type ExplorerAddressChipDisplayFormat = "network" | "raw"
 
 interface ExplorerAddressChipProps {
   readonly address: string
+  readonly className?: string
   readonly fallback?: string
   readonly copiedAddress?: string
   readonly highlighted?: boolean
@@ -29,6 +30,7 @@ interface ExplorerAddressChipProps {
 
 export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
   address,
+  className,
   fallback,
   copiedAddress,
   highlighted = false,
@@ -48,6 +50,7 @@ export const ExplorerAddressChip: FC<ExplorerAddressChipProps> = ({
   return (
     <AddressChip
       address={address}
+      className={className}
       copied={copiedAddress === address}
       copyable={copyable}
       copyPlacement={copyPlacement}

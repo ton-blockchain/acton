@@ -23,6 +23,12 @@
   overflow-y: hidden;
   color: var(--acton-color-text);
   font-size: var(--acton-font-size-xs);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.parsedBodyTree::-webkit-scrollbar {
+  display: none;
 }
 
 .parsedBodyContent {

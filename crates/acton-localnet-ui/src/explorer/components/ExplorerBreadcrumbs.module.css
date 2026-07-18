@@ -2,6 +2,14 @@
   margin-bottom: 4px;
 }
 
+.address > span {
+  color: var(--acton-color-accent);
+}
+
+.breadcrumbs a:hover .address > span {
+  text-decoration: underline;
+}
+
 @media (max-width: 520px) {
   .breadcrumbs {
     margin-top: 0;

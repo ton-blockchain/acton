@@ -725,6 +725,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                       emptyState="No actions found"
                       showTimeColumn={false}
                       interactiveRows={false}
+                      className={styles.valueFlowPanel}
                       onAddressClick={handleContractClick}
                       onActionHoverChange={setHoveredAction}
                     />

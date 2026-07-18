@@ -64,6 +64,12 @@
   overflow: auto;
   overscroll-behavior: contain;
   padding: 0;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.codeCellPopover::-webkit-scrollbar {
+  display: none;
 }
 
 .parsedScalar {

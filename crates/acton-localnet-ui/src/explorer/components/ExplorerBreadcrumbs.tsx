@@ -30,7 +30,14 @@ function createBreadcrumbLink(path: string): BreadcrumbLink {
 
 function formatItem(item: ExplorerBreadcrumbItem): ReactNode {
   if (item.isAddress) {
-    return <ExplorerAddressChip address={item.label} copyable={false} variant="plain" />
+    return (
+      <ExplorerAddressChip
+        address={item.label}
+        className={styles.address}
+        copyable={false}
+        variant="plain"
+      />
+    )
   }
   if (item.isHash) {
     return formatAddress(item.label)

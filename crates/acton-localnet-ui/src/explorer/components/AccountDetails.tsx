@@ -1,6 +1,16 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
-import type {CSSProperties, FC, JSX, MouseEvent} from "react"
+import type {CSSProperties, FC, JSX, KeyboardEvent as ReactKeyboardEvent, MouseEvent} from "react"
 import {fmt} from "@acton/transaction-ui"
+import {
+  DataTable,
+  DataTableBody,
+  DataTableCell,
+  DataTableEmpty,
+  DataTableHead,
+  DataTableHeaderCell,
+  DataTableRow,
+  DataTableTable,
+} from "@acton/ui"
 import {
   BadgeDollarSign,
   BadgeMinus,
@@ -1264,6 +1274,7 @@ interface ActionHistoryRowsProps {
   readonly highlightedTransactionHashSet?: ReadonlySet<string>
   readonly showTimeColumn?: boolean
   readonly interactiveRows?: boolean
+  readonly standardTable?: boolean
   readonly onAddressClick?: (addr: string, event?: MouseEvent<HTMLElement>) => void
   readonly onActionHoverChange?: (action: V3Action | undefined) => void
   readonly onTransactionClick?: (hash: string, event?: MouseEvent<HTMLElement>) => void
@@ -1276,6 +1287,7 @@ export function ActionHistoryRows({
   highlightedTransactionHashSet,
   showTimeColumn = true,
   interactiveRows = true,
+  standardTable = false,
   onAddressClick,
   onActionHoverChange,
   onTransactionClick,
@@ -1298,38 +1310,11 @@ export function ActionHistoryRows({
         const ActionIcon = getHistoryActionIcon(action, info)
         const continuesTrace = isSameActionTrace(action, rows[index + 1]?.action)
         const continuesFromTrace = isSameActionTrace(rows[index - 1]?.action, action)
-
-        return (
-          <tr
-            key={info.rowKey}
-            className={`${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
-              canOpenTransaction ? styles.clickableRow : ""
-            } ${isHighlighted ? styles.newTransactionRow : ""} ${
-              continuesTrace ? styles.actionChainContinues : ""
-            } ${continuesFromTrace ? styles.actionChainContinuation : ""}`}
-            onClick={
-              canOpenTransaction
-                ? event => {
-                    if (info.transactionHash) onTransactionClick(info.transactionHash, event)
-                  }
-                : undefined
-            }
-            tabIndex={canOpenTransaction ? 0 : undefined}
-            onKeyDown={
-              canOpenTransaction
-                ? event => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault()
-                      event.currentTarget.click()
-                    }
-                  }
-                : undefined
-            }
-            onMouseEnter={onActionHoverChange ? () => onActionHoverChange(action) : undefined}
-            onMouseLeave={onActionHoverChange ? () => onActionHoverChange(undefined) : undefined}
-          >
+        const Cell = standardTable ? DataTableCell : "td"
+        const rowContent = (
+          <>
             {showTimeColumn && (
-              <td className={`${styles.time} ${styles.timeColumn}`}>
+              <Cell className={`${styles.time} ${styles.timeColumn}`}>
                 {!continuesFromTrace && formattedTime && (
                   <span
                     title={formattedTime.title}
@@ -1339,9 +1324,9 @@ export function ActionHistoryRows({
                     {formattedTime.label}
                   </span>
                 )}
-              </td>
+              </Cell>
             )}
-            <td className={styles.actionColumn}>
+            <Cell className={styles.actionColumn}>
               <div className={styles.action}>
                 <ActionIcon className={styles.actionIcon} aria-hidden="true" />
                 <span
@@ -1351,8 +1336,8 @@ export function ActionHistoryRows({
                   {info.actionLabel}
                 </span>
               </div>
-            </td>
-            <td>
+            </Cell>
+            <Cell>
               <div className={styles.addressWrapper}>
                 {info.relationLabel && (
                   <span className={styles.addressRelation}>{info.relationLabel}</span>
@@ -1369,17 +1354,54 @@ export function ActionHistoryRows({
                   <span className={styles.addressFallback}>{info.displayAddressFallback}</span>
                 )}
               </div>
-            </td>
-            <td className={styles.technicalColumn}>
+            </Cell>
+            <Cell className={styles.technicalColumn}>
               <HistoryTechnicalCell technicalLabel={info.technicalLabel} />
-            </td>
-            <td className={styles.valueContainer}>
+            </Cell>
+            <Cell className={styles.valueContainer}>
               <div className={styles.historyValueStack}>
                 {info.valueLines.map((line, lineIndex) => (
                   <HistoryValueCellLine key={`${info.rowKey}:value:${lineIndex}`} line={line} />
                 ))}
               </div>
-            </td>
+            </Cell>
+          </>
+        )
+
+        const rowClassName = standardTable
+          ? `${isHighlighted ? styles.newTransactionRow : ""}`
+          : `${styles.row} ${interactiveRows ? "" : styles.rowStatic} ${
+              canOpenTransaction ? styles.clickableRow : ""
+            } ${isHighlighted ? styles.newTransactionRow : ""} ${
+              continuesTrace ? styles.actionChainContinues : ""
+            } ${continuesFromTrace ? styles.actionChainContinuation : ""}`
+        const rowProps = {
+          className: rowClassName,
+          onClick: canOpenTransaction
+            ? (event: MouseEvent<HTMLTableRowElement>) => {
+                if (info.transactionHash) onTransactionClick(info.transactionHash, event)
+              }
+            : undefined,
+          tabIndex: canOpenTransaction ? 0 : undefined,
+          onKeyDown: canOpenTransaction
+            ? (event: ReactKeyboardEvent<HTMLTableRowElement>) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault()
+                  event.currentTarget.click()
+                }
+              }
+            : undefined,
+          onMouseEnter: onActionHoverChange ? () => onActionHoverChange(action) : undefined,
+          onMouseLeave: onActionHoverChange ? () => onActionHoverChange(undefined) : undefined,
+        }
+
+        return standardTable ? (
+          <DataTableRow key={info.rowKey} interactive={canOpenTransaction} {...rowProps}>
+            {rowContent}
+          </DataTableRow>
+        ) : (
+          <tr key={info.rowKey} {...rowProps}>
+            {rowContent}
           </tr>
         )
       })}
@@ -1431,43 +1453,38 @@ export function ActionHistoryTable({
   )
 
   return (
-    <div className={`${styles.historyContent} ${className ?? ""}`}>
-      <div className={styles.tableWrapper}>
-        <table className={styles.table}>
-          <thead className={styles.historyHeaderGroup}>
-            <tr className={styles.historyHeaderRow}>
-              {showTimeColumn && (
-                <th className={`${styles.tableHeader} ${styles.timeColumn}`}>Time</th>
-              )}
-              <th className={`${styles.tableHeader} ${styles.actionColumn}`}>Action</th>
-              <th className={styles.tableHeader}>Address</th>
-              <th className={`${styles.tableHeader} ${styles.technicalColumn}`} />
-              <th className={`${styles.tableHeader} ${styles.valueContainer}`}>Value</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.length === 0 ? (
-              <tr className={styles.emptyRow}>
-                <td colSpan={showTimeColumn ? 5 : 4} className={styles.emptyCell}>
-                  <div className={styles.tableState}>{emptyState}</div>
-                </td>
-              </tr>
-            ) : (
-              <ActionHistoryRows
-                rows={rows}
-                nowSeconds={nowSeconds}
-                timeFormat={timeFormat}
-                showTimeColumn={showTimeColumn}
-                interactiveRows={interactiveRows}
-                onAddressClick={onAddressClick}
-                onActionHoverChange={onActionHoverChange}
-                onTransactionClick={onTransactionClick}
-              />
-            )}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <DataTable className={className} minWidth={showTimeColumn ? "48rem" : "42rem"}>
+      <DataTableTable aria-label="Event overview" rowDividers={false}>
+        <DataTableHead>
+          <DataTableRow>
+            {showTimeColumn && <DataTableHeaderCell columnWidth="4rem">Time</DataTableHeaderCell>}
+            <DataTableHeaderCell columnWidth="11rem">Action</DataTableHeaderCell>
+            <DataTableHeaderCell>Address</DataTableHeaderCell>
+            <DataTableHeaderCell columnWidth="9rem" aria-label="Details" />
+            <DataTableHeaderCell align="right" columnWidth="10rem">
+              Value
+            </DataTableHeaderCell>
+          </DataTableRow>
+        </DataTableHead>
+        <DataTableBody>
+          {rows.length === 0 ? (
+            <DataTableEmpty colSpan={showTimeColumn ? 5 : 4}>{emptyState}</DataTableEmpty>
+          ) : (
+            <ActionHistoryRows
+              rows={rows}
+              nowSeconds={nowSeconds}
+              timeFormat={timeFormat}
+              showTimeColumn={showTimeColumn}
+              interactiveRows={interactiveRows}
+              standardTable
+              onAddressClick={onAddressClick}
+              onActionHoverChange={onActionHoverChange}
+              onTransactionClick={onTransactionClick}
+            />
+          )}
+        </DataTableBody>
+      </DataTableTable>
+    </DataTable>
   )
 }
 
