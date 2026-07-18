@@ -34,6 +34,7 @@ import type {V3Action, V3Metadata} from "../api/types"
 import {addressKey} from "../api/compilerAbi"
 import {resolveCompilerAbis} from "../api/compilerAbiResolver"
 import {buildTraceTransactionInfos} from "../api/traceTransactions"
+import {buildActionValueFlowMovements} from "../api/valueFlowActions"
 import {ActionHistoryTable} from "../components/AccountDetails"
 import {ExplorerAddressChip} from "../components/ExplorerAddressChip"
 import {ExplorerBreadcrumbs} from "../components/ExplorerBreadcrumbs"
@@ -559,14 +560,18 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
             }),
           )
 
-          const nextValueFlow = buildValueFlowItems(processed)
+          const actions = trace.actions ?? []
+          const nextValueFlow = buildValueFlowItems(
+            processed,
+            buildActionValueFlowMovements(actions, data.metadata),
+          )
           if (isActive) {
             setTraces(processed)
             setContracts(contractsMap)
             setCompilerAbisByCodeHash(new Map(abiByCodeHash))
             setVerifiedSourcesByCodeHash(stateInitVerifiedSources)
             setValueFlow(nextValueFlow)
-            setTraceActions(trace.actions ?? [])
+            setTraceActions(actions)
             setTraceActionMetadata(data.metadata)
           }
         } else if (isActive) setError("Transaction not found or has no trace yet.")

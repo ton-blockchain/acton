@@ -1,5 +1,5 @@
 import {
-  type Address,
+  Address,
   beginCell,
   Cell,
   loadOutList,
@@ -10,7 +10,14 @@ import {
 } from "@ton/core"
 
 import type {BackendContractInfo, BackendTransaction} from "../model/backend"
-import type {ContractData, TransactionInfo, ValueFlowItem} from "../model/transaction"
+import type {
+  ContractData,
+  TransactionInfo,
+  ValueFlowAsset,
+  ValueFlowAssetChange,
+  ValueFlowAssetMovement,
+  ValueFlowItem,
+} from "../model/transaction"
 import {getMessageOpcode, getShardAccountBalance, resolveAbiOpcodeName} from "./messageBody"
 
 interface ValueFlowAccumulator {
@@ -137,8 +144,12 @@ export function processTransactions(transactions: BackendTransaction[]): Transac
   return txInfos
 }
 
-export function buildValueFlowItems(transactions: readonly TransactionInfo[]): ValueFlowItem[] {
+export function buildValueFlowItems(
+  transactions: readonly TransactionInfo[],
+  assetMovements: readonly ValueFlowAssetMovement[] = [],
+): ValueFlowItem[] {
   const flowByAddress = new Map<string, ValueFlowAccumulator>()
+  const assetChangesByAddress = new Map<string, Map<string, ValueFlowAssetChange>>()
 
   for (const tx of [...transactions].sort(compareTransactionInfoByLt)) {
     const address = tx.address?.toString()
@@ -158,14 +169,74 @@ export function buildValueFlowItems(transactions: readonly TransactionInfo[]): V
     })
   }
 
-  return [...flowByAddress.values()]
-    .filter(
-      (item): item is ValueFlowAccumulator & {readonly before: bigint; readonly after: bigint} => {
-        return item.before !== undefined && item.after !== undefined
-      },
-    )
-    .map(({address, before, after, fee}) => ({address, change: after - before, fee}))
+  for (const movement of assetMovements) {
+    if (movement.amount <= 0n) {
+      continue
+    }
+
+    const source = normalizeValueFlowAddress(movement.source)
+    const destination = normalizeValueFlowAddress(movement.destination)
+    if (source) {
+      addAssetChange(assetChangesByAddress, source, movement.asset, -movement.amount)
+    }
+    if (destination) {
+      addAssetChange(assetChangesByAddress, destination, movement.asset, movement.amount)
+    }
+  }
+
+  const addresses = new Set([...flowByAddress.keys(), ...assetChangesByAddress.keys()])
+  return [...addresses]
+    .flatMap(address => {
+      const flow = flowByAddress.get(address)
+      const hasTonBalance = flow?.before !== undefined && flow.after !== undefined
+      const assetChanges = [...(assetChangesByAddress.get(address)?.values() ?? [])].filter(
+        change => change.change !== 0n,
+      )
+      if (!hasTonBalance && assetChanges.length === 0) {
+        return []
+      }
+
+      return [
+        {
+          address,
+          change: hasTonBalance ? flow.after - flow.before : 0n,
+          fee: flow?.fee ?? 0n,
+          assetChanges,
+        },
+      ]
+    })
     .sort((left, right) => left.address.localeCompare(right.address))
+}
+
+function addAssetChange(
+  changesByAddress: Map<string, Map<string, ValueFlowAssetChange>>,
+  address: string,
+  asset: ValueFlowAsset,
+  change: bigint,
+): void {
+  const changes = changesByAddress.get(address) ?? new Map<string, ValueFlowAssetChange>()
+  const previous = changes.get(asset.id)
+  changes.set(asset.id, {
+    asset: {
+      id: asset.id,
+      symbol: previous?.asset.symbol ?? asset.symbol,
+      decimals: previous?.asset.decimals ?? asset.decimals,
+    },
+    change: (previous?.change ?? 0n) + change,
+  })
+  changesByAddress.set(address, changes)
+}
+
+function normalizeValueFlowAddress(address: string | undefined): string | undefined {
+  if (!address) {
+    return undefined
+  }
+
+  try {
+    return Address.parse(address).toString()
+  } catch {
+    return undefined
+  }
 }
 
 function getTransactionBalanceBefore(tx: TransactionInfo): bigint | undefined {

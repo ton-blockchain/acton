@@ -105,8 +105,27 @@ export interface ContractData {
   readonly abi?: ContractABI
 }
 
+export interface ValueFlowAsset {
+  readonly id: string
+  readonly symbol?: string
+  readonly decimals?: number
+}
+
+export interface ValueFlowAssetMovement {
+  readonly asset: ValueFlowAsset
+  readonly source?: string
+  readonly destination?: string
+  readonly amount: bigint
+}
+
+export interface ValueFlowAssetChange {
+  readonly asset: ValueFlowAsset
+  readonly change: bigint
+}
+
 export interface ValueFlowItem {
   readonly address: string
   readonly change: bigint
   readonly fee: bigint
+  readonly assetChanges: readonly ValueFlowAssetChange[]
 }

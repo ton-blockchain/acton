@@ -1,5 +1,6 @@
 import {Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState} from "react"
 import type {CSSProperties, FC, JSX, MouseEvent} from "react"
+import {fmt} from "@acton/transaction-ui"
 import {
   BadgeDollarSign,
   BadgeMinus,
@@ -47,7 +48,6 @@ import type {ContractABI} from "@ton/tolk-abi-to-typescript"
 
 import type {
   AddressInformation,
-  AccountStateTokenInfo,
   JettonMaster,
   JettonWallet,
   NftItem,
@@ -59,6 +59,11 @@ import type {
 } from "../api/types"
 import type {TonClient} from "../api/client"
 import {addressKey} from "../api/compilerAbi"
+import {
+  getMetadataTokenInfo,
+  metadataTokenDecimals,
+  metadataTokenString,
+} from "../api/tokenMetadata"
 import {
   collectTransactionListAddresses,
   useMessageNamesByAddress,
@@ -2793,7 +2798,7 @@ function assetValueLine(
   const symbol = metadataTokenString(tokenInfo, "symbol")
   const normalizedAmount = amount.trim().replace(/^[+-]/, "")
   const formattedAmount =
-    decimals === undefined ? normalizedAmount : formatDecimalAmount(normalizedAmount, decimals)
+    decimals === undefined ? normalizedAmount : fmt.formatDecimalAmount(normalizedAmount, decimals)
   const readableAmount = formatReadableNumber(formattedAmount, options.maximumFractionDigits)
   const displayTone = isZeroDisplayNumber(readableAmount) ? "neutral" : tone
   const sign = options.showSign === false ? "" : valueSign(displayTone)
@@ -2865,60 +2870,6 @@ function nftValueLine(
     return {kind: "text", label: "NFT", tone: "neutral"}
   }
   return undefined
-}
-
-function getMetadataTokenInfo(
-  metadata: V3Metadata,
-  address: string,
-  type: string,
-): AccountStateTokenInfo | undefined {
-  const entries = metadata[address]?.token_info ?? metadata[addressKey(address)]?.token_info ?? []
-  return entries.find(info => info.type === type)
-}
-
-function metadataTokenString(
-  tokenInfo: AccountStateTokenInfo | undefined,
-  key: string,
-): string | undefined {
-  const value = tokenInfo?.[key]
-  if (isNonEmptyString(value)) {
-    return value
-  }
-
-  const extra = isRecord(tokenInfo?.extra) ? tokenInfo.extra : undefined
-  const extraValue = extra?.[key]
-  return isNonEmptyString(extraValue) ? extraValue : undefined
-}
-
-function metadataTokenDecimals(tokenInfo: AccountStateTokenInfo | undefined): number | undefined {
-  const rawDecimals = metadataTokenString(tokenInfo, "decimals")
-  if (!rawDecimals) {
-    return undefined
-  }
-
-  const decimals = Number(rawDecimals)
-  return Number.isInteger(decimals) && decimals >= 0 && decimals <= 36 ? decimals : undefined
-}
-
-function formatDecimalAmount(value: string, decimals: number): string {
-  if (!/^[0-9]+$/.test(value)) {
-    return value
-  }
-
-  try {
-    const raw = BigInt(value)
-    const divisor = 10n ** BigInt(decimals)
-    const whole = raw / divisor
-    const fraction = raw % divisor
-    if (decimals === 0 || fraction === 0n) {
-      return whole.toString()
-    }
-
-    const fractionText = fraction.toString().padStart(decimals, "0").replace(/0+$/, "")
-    return `${whole}.${fractionText}`
-  } catch {
-    return value
-  }
 }
 
 function formatReadableNumber(value: string, maximumFractionDigits = 9): string {

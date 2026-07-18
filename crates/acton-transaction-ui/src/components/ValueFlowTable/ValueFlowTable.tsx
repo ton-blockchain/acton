@@ -11,8 +11,8 @@ import {
   DataTableTable,
 } from "@acton/ui"
 
-import type {ContractData, ValueFlowItem} from "../../model/transaction"
-import {formatCurrency} from "../../lib/format"
+import type {ContractData, ValueFlowAsset, ValueFlowItem} from "../../model/transaction"
+import {formatAddress, formatCurrency, formatDecimalAmount} from "../../lib/format"
 
 import styles from "./ValueFlowTable.module.css"
 
@@ -31,7 +31,9 @@ export function ValueFlowTable({
 }: ValueFlowTableProps): React.JSX.Element {
   const totalFee = items.reduce((sum, item) => sum + item.fee, 0n)
   const showTotal = items.length > 1
-  const sortedItems = [...items].sort((left, right) => {
+  const assets = collectAssets(items)
+  const numericColumnWidth = `${66 / (assets.length + 2)}%`
+  const sortedItems = items.toSorted((left, right) => {
     const leftLetter = contracts.get(left.address)?.letter
     const rightLetter = contracts.get(right.address)?.letter
 
@@ -49,15 +51,25 @@ export function ValueFlowTable({
   })
 
   return (
-    <DataTable className={className} minWidth="34rem">
+    <DataTable className={className} minWidth={`${34 + assets.length * 10}rem`}>
       <DataTableTable aria-label="Value flow" rowDividers={false}>
         <DataTableHead>
           <DataTableRow>
             <DataTableHeaderCell columnWidth="34%">Account</DataTableHeaderCell>
-            <DataTableHeaderCell align="right" columnWidth="33%">
+            <DataTableHeaderCell align="right" columnWidth={numericColumnWidth}>
               Balance Change
             </DataTableHeaderCell>
-            <DataTableHeaderCell align="right" columnWidth="33%">
+            {assets.map(asset => (
+              <DataTableHeaderCell
+                key={asset.id}
+                align="right"
+                columnWidth={numericColumnWidth}
+                title={asset.id}
+              >
+                {asset.symbol ?? formatAddress(asset.id)}
+              </DataTableHeaderCell>
+            ))}
+            <DataTableHeaderCell align="right" columnWidth={numericColumnWidth}>
               Network Fee
             </DataTableHeaderCell>
           </DataTableRow>
@@ -77,6 +89,24 @@ export function ValueFlowTable({
                   {formatSignedCurrency(item.change)}
                 </span>
               </DataTableCell>
+              {assets.map(asset => {
+                const assetChange = item.assetChanges.find(change => change.asset.id === asset.id)
+                return (
+                  <DataTableCell key={asset.id} align="right">
+                    {assetChange && (
+                      <span
+                        className={
+                          assetChange.change > 0n
+                            ? `${styles.assetValue} ${styles.positive}`
+                            : styles.assetValue
+                        }
+                      >
+                        {formatSignedAssetChange(assetChange.change, asset)}
+                      </span>
+                    )}
+                  </DataTableCell>
+                )
+              })}
               <DataTableCell align="right">{formatCurrency(item.fee)}</DataTableCell>
             </DataTableRow>
           ))}
@@ -84,7 +114,7 @@ export function ValueFlowTable({
         {showTotal && (
           <DataTableFooter>
             <DataTableRow>
-              <DataTableCell colSpan={2} />
+              <DataTableCell colSpan={2 + assets.length} />
               <DataTableCell align="right" className={styles.totalCell} tone="strong">
                 Total: {formatCurrency(totalFee)}
               </DataTableCell>
@@ -94,6 +124,35 @@ export function ValueFlowTable({
       </DataTableTable>
     </DataTable>
   )
+}
+
+function collectAssets(items: readonly ValueFlowItem[]): ValueFlowAsset[] {
+  const assets = new Map<string, ValueFlowAsset>()
+  for (const item of items) {
+    for (const change of item.assetChanges) {
+      const {id} = change.asset
+      const previous = assets.get(id)
+      assets.set(id, {
+        id,
+        symbol: previous?.symbol ?? change.asset.symbol,
+        decimals: previous?.decimals ?? change.asset.decimals,
+      })
+    }
+  }
+
+  return [...assets.values()].sort((left, right) => {
+    return (left.symbol ?? left.id).localeCompare(right.symbol ?? right.id)
+  })
+}
+
+function formatSignedAssetChange(value: bigint, asset: ValueFlowAsset): string {
+  const sign = value > 0n ? "+" : value < 0n ? "-" : ""
+  const absolute = value < 0n ? -value : value
+  const amount =
+    asset.decimals === undefined
+      ? absolute.toString()
+      : formatDecimalAmount(absolute.toString(), asset.decimals)
+  return `${sign}${amount}${asset.symbol ? ` ${asset.symbol}` : ""}`
 }
 
 function formatSignedCurrency(value: bigint): string {
