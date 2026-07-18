@@ -1,0 +1,12 @@
+.sample {
+  display: grid;
+  min-height: 14rem;
+  place-items: center;
+  border: 1px solid var(--acton-color-border);
+  border-radius: var(--acton-radius-panel);
+  background: var(--acton-color-surface);
+}
+
+.sample > * {
+  margin-block-start: 0;
+}
