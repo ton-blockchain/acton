@@ -22,7 +22,7 @@
 :global(.monaco-editor .clickable-line-decoration) {
   width: 3px !important;
   margin-left: 3px;
-  background-color: var(--color-primary) !important;
+  background-color: var(--acton-color-accent) !important;
 }
 
 :global(.monaco-editor .hovered-line) {
@@ -161,7 +161,7 @@ kbd {
   font-size: var(--acton-font-size-xs);
   padding: 3px 6px;
   margin: 0 var(--acton-space-1);
-  font-family: var(--font-family-mono), serif;
+  font-family: var(--acton-font-mono), serif;
 }
 
 .clickIcon {

@@ -22,8 +22,6 @@
     var(--retrace-panel-viewport-height) +
     var(--retrace-panel-header-height)
   );
-  --retrace-workspace-height: var(--retrace-panel-viewport-height);
-  --retrace-workspace-narrow-height: var(--retrace-panel-viewport-height);
 }
 
 .header {

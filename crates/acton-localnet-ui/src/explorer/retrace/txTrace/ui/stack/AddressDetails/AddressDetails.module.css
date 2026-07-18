@@ -29,7 +29,7 @@
 }
 
 .addressLabel {
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
@@ -43,6 +43,6 @@
   min-width: 0;
   max-width: 100%;
   padding: 0;
-  color: var(--color-text-primary);
+  color: var(--acton-color-text);
   background: transparent;
 }

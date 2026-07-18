@@ -1,7 +1,7 @@
 .cellNode {
   padding: 4px;
   border-radius: 4px;
-  border-left: 1px solid var(--color-divider);
+  border-left: 1px solid var(--acton-color-border);
   margin-top: var(--acton-space-1);
   margin-bottom: var(--acton-space-1);
   display: block;
@@ -66,7 +66,7 @@
 
 .cellTextContent strong {
   font-weight: var(--acton-font-weight-utility);
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .cellInfoClickable {
@@ -92,14 +92,14 @@
   padding: 2px;
   border: none;
   background-color: transparent;
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   transition: color 0.1s ease;
   line-height: 1;
 }
 
 .copyButton:hover {
-  color: var(--color-text-primary);
+  color: var(--acton-color-text);
   background-color: transparent;
   border: none;
 }

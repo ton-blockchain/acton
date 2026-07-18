@@ -209,7 +209,7 @@
 .sourceBundleTab {
   padding: 7px 14px;
   font-size: 12.5px;
-  font-family: var(--font-family-mono);
+  font-family: var(--acton-font-mono);
 }
 
 .sourceFileTab {
@@ -231,7 +231,7 @@
 }
 
 .sourceFileTabActive {
-  box-shadow: inset 0 -2px 0 var(--color-primary);
+  box-shadow: inset 0 -2px 0 var(--acton-color-accent);
 }
 
 .sourceFileTabName {
@@ -352,8 +352,8 @@
 .sourceDebugInstruction {
   min-width: 0;
   overflow: hidden;
-  color: var(--color-primary);
-  font-family: var(--font-family-mono);
+  color: var(--acton-color-accent);
+  font-family: var(--acton-font-mono);
   font-size: 14.5px;
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
@@ -436,7 +436,7 @@
 }
 
 .sourceDebugPanelResizeHandle:hover::before {
-  background: var(--color-primary);
+  background: var(--acton-color-accent);
 }
 
 .sourceDebugPanel {
@@ -549,7 +549,7 @@
 }
 
 .sourceDebugResizeHandle:hover::before {
-  background: var(--color-primary);
+  background: var(--acton-color-accent);
 }
 
 .sourceDebugException {
@@ -563,7 +563,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--acton-color-text);
-  font-family: var(--font-family-mono);
+  font-family: var(--acton-font-mono);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;

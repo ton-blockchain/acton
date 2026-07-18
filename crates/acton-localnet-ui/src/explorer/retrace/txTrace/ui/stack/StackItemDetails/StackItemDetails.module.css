@@ -20,14 +20,14 @@
 .title {
   font-size: var(--acton-font-size-sm);
   font-weight: 400;
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   margin: 0;
 }
 
 .closeButton {
   background: none;
   border: none;
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   cursor: pointer;
   font-size: 20px;
   width: 32px;
@@ -40,8 +40,8 @@
 }
 
 .closeButton:hover {
-  background: var(--color-background-tertiary);
-  color: var(--color-text-primary);
+  background: var(--acton-color-surface-raised);
+  color: var(--acton-color-text);
 }
 
 .contentContainer {
@@ -67,10 +67,10 @@
 }
 
 .treeViewContainer {
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
   overflow: auto;
-  background: var(--color-background-secondary);
+  background: var(--acton-color-canvas);
   padding: var(--acton-space-2);
   flex: 1;
   max-height: 600px;

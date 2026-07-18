@@ -11,7 +11,7 @@
 .stackTitle {
   margin: 0 0 var(--acton-space-1) 0;
   font-size: var(--acton-font-size-sm);
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
 }
 
 .stackContainer {
@@ -87,7 +87,7 @@
 }
 
 .stackItemValue {
-  font-family: var(--font-family-mono);
+  font-family: var(--acton-font-mono);
   word-break: break-all;
   font-size: var(--acton-font-size-sm);
 }
@@ -296,12 +296,12 @@
 
 .closeBtn {
   background-color: var(--color-neutral-bg);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-xs);
   padding: 2px var(--acton-space-1);
   font-size: var(--acton-font-size-xs);
   cursor: pointer;
-  color: var(--color-text-primary);
+  color: var(--acton-color-text);
 }
 
 .closeBtn:hover {

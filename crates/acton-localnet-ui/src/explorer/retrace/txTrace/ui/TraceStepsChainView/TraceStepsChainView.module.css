@@ -1,5 +1,5 @@
 .container {
-  --trace-line-height: 21px;
+  --trace-line-height: 20px;
   --trace-line-number-width: 47px;
   --trace-scrollbar-thumb: rgb(100 100 100 / 24%);
   --trace-scrollbar-thumb-active: rgb(100 100 100 / 40%);
@@ -65,8 +65,8 @@
   gap: 0;
   text-align: left;
   color: var(--trace-editor-text);
-  font-family: "JetBrains Mono", var(--font-family-mono), monospace;
-  font-size: 14px;
+  font-family: "JetBrains Mono", var(--acton-font-mono), monospace;
+  font-size: 13.5px;
   line-height: var(--trace-line-height);
   cursor: pointer;
   transition: background-color var(--acton-duration-fast) ease;
@@ -85,7 +85,7 @@
 }
 
 .stepItem:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--acton-color-accent);
   outline-offset: 2px;
 }
 
@@ -200,7 +200,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-text-secondary);
+  color: var(--acton-color-text-muted);
   padding: var(--acton-space-4);
   background-color: var(--acton-color-surface-raised);
 }

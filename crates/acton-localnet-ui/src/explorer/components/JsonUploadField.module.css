@@ -19,7 +19,7 @@
   color: var(--acton-color-text);
   padding: 10px;
   font: inherit;
-  font-family: var(--font-family-mono, monospace);
+  font-family: var(--acton-font-mono, monospace);
   font-size: var(--acton-font-size-sm);
   font-weight: 400;
   line-height: 1.45;

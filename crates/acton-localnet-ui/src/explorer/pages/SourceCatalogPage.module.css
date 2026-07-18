@@ -277,7 +277,7 @@
 .codeHash {
   display: inline-block;
   color: var(--acton-color-text);
-  font-family: var(--font-family-mono, monospace);
+  font-family: var(--acton-font-mono, monospace);
   font-size: 0.78rem;
 }
 
