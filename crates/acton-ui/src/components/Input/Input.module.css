@@ -74,7 +74,7 @@
   position: absolute;
   z-index: 1;
   top: 50%;
-  right: var(--acton-space-1-5);
+  right: var(--acton-space-3);
   display: inline-flex;
   align-items: center;
   gap: 0.125rem;

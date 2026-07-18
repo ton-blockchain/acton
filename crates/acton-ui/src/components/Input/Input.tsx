@@ -1,4 +1,4 @@
-import {Children, useId} from "react"
+import {useCallback, useEffect, useId, useRef} from "react"
 import type {ComponentPropsWithRef, ReactNode} from "react"
 
 import {cx} from "../../lib/cx"
@@ -12,7 +12,7 @@ export type InputProps = Readonly<
     readonly mono?: boolean
     readonly invalid?: boolean
     readonly leadingIcon?: ReactNode
-    readonly shortcut?: ReactNode
+    readonly shortcut?: string
     readonly label?: ReactNode
     readonly description?: ReactNode
     readonly fieldClassName?: string
@@ -33,6 +33,7 @@ export function Input({
   autoCorrect = "off",
   className,
   description,
+  disabled,
   fieldClassName,
   id,
   invalid = false,
@@ -47,6 +48,7 @@ export function Input({
   ...props
 }: InputProps) {
   const generatedId = useId()
+  const inputRef = useRef<HTMLInputElement>(null)
   const hasField = label !== undefined || description !== undefined
   const inputId = id ?? (hasField ? generatedId : undefined)
   const descriptionId = description === undefined ? undefined : `${inputId}-description`
@@ -57,12 +59,47 @@ export function Input({
     ariaInvalid === "true" ||
     ariaInvalid === "grammar" ||
     ariaInvalid === "spelling"
+  const shortcutModifier = globalThis.navigator?.userAgent.includes("Windows") ? "Ctrl" : "⌘"
+
+  const setInputRef = useCallback(
+    (node: HTMLInputElement | null) => {
+      inputRef.current = node
+      if (typeof ref === "function") {
+        return ref(node)
+      }
+      if (ref) {
+        ref.current = node
+      }
+    },
+    [ref],
+  )
+
+  useEffect(() => {
+    if (shortcut === undefined || disabled) {
+      return
+    }
+
+    const shortcutKey = shortcut.toLowerCase()
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== shortcutKey) {
+        return
+      }
+
+      event.preventDefault()
+      inputRef.current?.focus()
+      inputRef.current?.select()
+    }
+
+    globalThis.addEventListener("keydown", handleShortcut)
+    return () => globalThis.removeEventListener("keydown", handleShortcut)
+  }, [disabled, shortcut])
 
   const input = (
     <input
       {...props}
-      ref={ref}
+      ref={setInputRef}
       id={inputId}
+      disabled={disabled}
       required={required}
       autoCapitalize={autoCapitalize}
       autoComplete={autoComplete}
@@ -92,9 +129,8 @@ export function Input({
       {input}
       {shortcut === undefined ? undefined : (
         <span className={styles.shortcut} aria-hidden="true">
-          {Children.toArray(shortcut).map((key, index) => (
-            <kbd key={index}>{key}</kbd>
-          ))}
+          <kbd>{shortcutModifier}</kbd>
+          <kbd>{shortcut}</kbd>
         </span>
       )}
     </div>

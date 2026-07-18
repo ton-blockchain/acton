@@ -1,5 +1,5 @@
 import type React from "react"
-import {useEffect, useMemo, useRef, useState} from "react"
+import {useMemo, useState} from "react"
 import {
   FiBookOpen,
   FiCheck,
@@ -44,34 +44,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleTheme,
 }) => {
   const [searchQuery, setSearchQuery] = useState("")
-  const [searchShortcutModifier, setSearchShortcutModifier] = useState("⌘")
   const [collapsedSuites, setCollapsedSuites] = useState<Set<string>>(new Set())
   const [statusFilter, setStatusFilter] = useState<Set<TestStatus>>(
     new Set([TestStatus.Passed, TestStatus.Failed, TestStatus.Todo, TestStatus.Skipped]),
   )
-  const searchInputRef = useRef<HTMLInputElement>(null)
   const currentTheme = theme ?? "light"
-
-  useEffect(() => {
-    if (globalThis.navigator.userAgent.includes("Windows")) {
-      setSearchShortcutModifier("Ctrl")
-    }
-  }, [])
-
-  useEffect(() => {
-    const handleSearchShortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.key.toLowerCase() !== "k") {
-        return
-      }
-
-      event.preventDefault()
-      searchInputRef.current?.focus()
-      searchInputRef.current?.select()
-    }
-
-    globalThis.addEventListener("keydown", handleSearchShortcut)
-    return () => globalThis.removeEventListener("keydown", handleSearchShortcut)
-  }, [])
 
   const toggleSuite = (suiteName: string) => {
     setCollapsedSuites(prev => {
@@ -174,7 +151,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         <Summary reports={reports} />
 
         <Input
-          ref={searchInputRef}
           type="search"
           size="sm"
           placeholder="Filter tests..."
@@ -182,7 +158,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           onChange={event => setSearchQuery(event.target.value)}
           aria-label="Filter tests"
           leadingIcon={<DocsSearchIcon />}
-          shortcut={[searchShortcutModifier, "K"]}
+          shortcut="K"
         />
 
         <div className={styles.filters}>
