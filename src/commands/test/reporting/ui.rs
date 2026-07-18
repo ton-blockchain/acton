@@ -384,11 +384,15 @@ async fn handle_api_file(
 #[derive(Serialize)]
 struct ConfigResponse {
     project_root: String,
+    coverage_available: bool,
+    gas_profile_available: bool,
 }
 
 async fn handle_api_config(State(state): State<Arc<UiServerState>>) -> impl IntoResponse {
     Json(ConfigResponse {
         project_root: state.project_root.clone(),
+        coverage_available: state.coverage_lcov.is_some(),
+        gas_profile_available: state.gas_profile.is_some(),
     })
 }
 

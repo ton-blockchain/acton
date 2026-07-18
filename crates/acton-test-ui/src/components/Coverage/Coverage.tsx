@@ -4,6 +4,7 @@ import {FiSearch} from "react-icons/fi"
 
 import {highlightCodeToTokens, type HighlightedCodeToken} from "@acton/ui"
 
+import {useFileContent} from "../../hooks/useFileContent"
 import {parseLcov, type CoverageFile} from "../../utils/lcov"
 
 import styles from "./Coverage.module.css"
@@ -99,9 +100,6 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
   const [selectedFilePath, setSelectedFilePath] = useState<string | undefined>(() => {
     return coverage.files[0]?.filePath
   })
-  const [sourceContent, setSourceContent] = useState("")
-  const [sourceError, setSourceError] = useState<string | undefined>()
-  const [isLoadingSource, setIsLoadingSource] = useState(false)
   const [highlightedLines, setHighlightedLines] = useState<
     readonly (readonly HighlightedCodeToken[])[] | undefined
   >()
@@ -135,49 +133,12 @@ export const Coverage: React.FC<CoverageProps> = ({lcov, projectRoot}) => {
 
     return coverage.files.find(file => file.filePath === selectedFilePath) ?? filteredFiles[0]
   }, [coverage.files, filteredFiles, selectedFilePath])
-
-  useEffect(() => {
-    if (selectedFile === undefined) {
-      setSourceContent("")
-      setSourceError(undefined)
-      setIsLoadingSource(false)
-      setHighlightedLines(undefined)
-      return
-    }
-
-    const controller = new AbortController()
-
-    setIsLoadingSource(true)
-    setSourceError(undefined)
-    setSourceContent("")
-    setHighlightedLines(undefined)
-
-    void fetch(`/api/file?path=${encodeURIComponent(selectedFile.filePath)}`, {
-      signal: controller.signal,
-    })
-      .then(async response => {
-        if (!response.ok) {
-          throw new Error(`Failed to fetch source file: ${response.status}`)
-        }
-
-        return response.text()
-      })
-      .then(content => {
-        setSourceContent(content)
-        setIsLoadingSource(false)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch coverage source file", error)
-        setSourceError(error instanceof Error ? error.message : "Unknown error")
-        setIsLoadingSource(false)
-      })
-
-    return () => controller.abort()
-  }, [selectedFile])
+  const {
+    content: loadedSourceContent,
+    error: sourceError,
+    loading: isLoadingSource,
+  } = useFileContent(selectedFile?.filePath)
+  const sourceContent = loadedSourceContent ?? ""
 
   useEffect(() => {
     if (!sourceContent) {

@@ -1,7 +1,9 @@
 import type {ReactNode} from "react"
-import {useEffect, useState} from "react"
+import {useMemo} from "react"
 
 import {HighlightedCode} from "@acton/ui"
+
+import {useFileContent} from "../../hooks/useFileContent"
 
 import styles from "./CodeSnippet.module.css"
 
@@ -20,45 +22,20 @@ export function CodeSnippet({
   projectRoot,
   ideOpener,
 }: CodeSnippetProps) {
-  const [snippet, setSnippet] = useState<string | undefined>()
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | undefined>()
+  const {content, loading, error} = useFileContent(filePath)
+  const snippet = useMemo(() => {
+    if (content === undefined) return
+
+    const lines = content.split("\n")
+    const start = Math.max(0, line - contextLines - 1)
+    const end = Math.min(lines.length, line + contextLines)
+    return lines.slice(start, end).join("\n")
+  }, [content, contextLines, line])
 
   const relativePath =
     projectRoot && filePath.startsWith(projectRoot)
       ? filePath.slice(projectRoot.length) || filePath
       : filePath
-
-  useEffect(() => {
-    const controller = new AbortController()
-
-    const loadContent = async () => {
-      setLoading(true)
-      setError(undefined)
-      try {
-        const result = await fetch(`/api/file?path=${encodeURIComponent(filePath)}`, {
-          signal: controller.signal,
-        })
-        if (!result.ok) throw new Error("Failed to fetch file content")
-        const content = await result.text()
-
-        const lines = content.split("\n")
-        const start = Math.max(0, line - contextLines - 1)
-        const end = Math.min(lines.length, line + contextLines)
-        const snippetLines = lines.slice(start, end)
-        setSnippet(snippetLines.join("\n"))
-        setLoading(false)
-      } catch (error: unknown) {
-        if (error instanceof Error && error.name === "AbortError") return
-        console.error(error)
-        setError((error as {message: string}).message)
-        setLoading(false)
-      }
-    }
-
-    void loadContent()
-    return () => controller.abort()
-  }, [filePath, line, contextLines])
 
   if (loading) return <div className={styles.loading}>Loading code snippet...</div>
   if (error) return <div className={styles.error}>Error: {error}</div>

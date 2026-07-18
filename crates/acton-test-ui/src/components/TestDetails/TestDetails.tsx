@@ -29,7 +29,6 @@ import {
 
 import {
   type TestReport,
-  type TestExecutionLogs,
   type SourceLocation,
   TestStatus,
   type Trace,
@@ -49,8 +48,10 @@ import {
 } from "@acton/shared-ui"
 
 import {useContracts} from "../../hooks/useContracts"
+import {useGasProfileReport} from "../../hooks/useGasProfileReport"
+import {useTestExecutionLogs} from "../../hooks/useTestExecutionLogs"
 import {CodeSnippet} from "../CodeSnippet/CodeSnippet"
-import {GasProfile, type GasProfileData} from "../GasProfile/GasProfile"
+import {GasProfile} from "../GasProfile/GasProfile"
 import {DocsSidebarIcon} from "../Sidebar/DocsSidebarIcon"
 
 import styles from "./TestDetails.module.css"
@@ -63,8 +64,8 @@ interface TestDetailsProps {
   readonly traceError?: string
   readonly isTraceLoading?: boolean
   readonly projectRoot?: string
-  readonly gasProfile?: GasProfileData
-  readonly gasProfileLoaded?: boolean
+  readonly gasProfileAvailable: boolean
+  readonly gasProfileAvailabilityLoaded: boolean
   readonly isSidebarCollapsed?: boolean
   readonly onExpandSidebar?: () => void
 }
@@ -166,8 +167,8 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   traceError,
   isTraceLoading = false,
   projectRoot,
-  gasProfile,
-  gasProfileLoaded = true,
+  gasProfileAvailable,
+  gasProfileAvailabilityLoaded,
   isSidebarCollapsed = false,
   onExpandSidebar,
 }) => {
@@ -189,8 +190,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   const [selectedIdeName, setSelectedIdeName] = useState<string | null>(() => {
     return localStorage.getItem("selectedIde")
   })
-  const [executionLogs, setExecutionLogs] = useState<TestExecutionLogs | undefined>()
-  const [isLoadingExecutionLogs, setIsLoadingExecutionLogs] = useState(false)
   const [isHeaderIDESelectorOpen, setIsHeaderIDESelectorOpen] = useState(false)
   const [isGridIDESelectorOpen, setIsGridIDESelectorOpen] = useState(false)
   const headerDropdownRef = useRef<HTMLDivElement | null>(null)
@@ -216,6 +215,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     return [...names]
   }, [trace, test.failed_transactions])
   const {contracts: backendContracts} = useContracts(contractNames)
+  const {executionLogs, isLoadingExecutionLogs} = useTestExecutionLogs(test)
+  const {
+    profile: gasProfileReport,
+    error: gasProfileError,
+    loading: isGasProfileLoading,
+    loaded: gasProfileLoaded,
+  } = useGasProfileReport(gasProfileAvailable && activeTab === "profile")
+  const gasProfile = gasProfileReport?.tests?.find(profile => profile.name === test.name)
 
   const ides: IDEConfig[] = useMemo(
     () => [
@@ -331,44 +338,6 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
-
-  useEffect(() => {
-    const controller = new AbortController()
-    const params = new URLSearchParams({
-      file_path: test.file_path,
-      name: test.name,
-      row: test.row.toString(),
-      column: test.column.toString(),
-    })
-
-    setIsLoadingExecutionLogs(true)
-    setExecutionLogs(undefined)
-
-    void fetch(`/api/test-logs?${params.toString()}`, {
-      signal: controller.signal,
-    })
-      .then(async res => {
-        if (!res.ok) {
-          throw new Error(`Failed to fetch test logs: ${res.status}`)
-        }
-        return (await res.json()) as TestExecutionLogs
-      })
-      .then(data => {
-        setExecutionLogs(data)
-        setIsLoadingExecutionLogs(false)
-      })
-      .catch(error => {
-        if (error instanceof Error && error.name === "AbortError") {
-          return
-        }
-
-        console.error("Failed to fetch test logs", error)
-        setExecutionLogs({})
-        setIsLoadingExecutionLogs(false)
-      })
-
-    return () => controller.abort()
-  }, [test.file_path, test.name, test.row, test.column])
 
   const getRelativePath = (path: string) => {
     if (projectRoot && path.startsWith(projectRoot)) {
@@ -706,11 +675,11 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
   }
 
   useEffect(() => {
-    if (gasProfileLoaded && activeTab === "profile" && !hasGasProfile) {
+    if (gasProfileAvailabilityLoaded && !gasProfileAvailable && activeTab === "profile") {
       setActiveTab("info")
       localStorage.setItem("activeTab", "info")
     }
-  }, [activeTab, gasProfileLoaded, hasGasProfile])
+  }, [activeTab, gasProfileAvailabilityLoaded, gasProfileAvailable])
 
   const handleTabChange = (tab: TestDetailsTab) => {
     setActiveTab(tab)
@@ -1102,6 +1071,14 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
     }
 
     if (activeTab === "profile") {
+      if (isGasProfileLoading) {
+        return <div className={styles.empty}>Loading gas profile...</div>
+      }
+
+      if (gasProfileError) {
+        return <div className={styles.empty}>Failed to load gas profile: {gasProfileError}</div>
+      }
+
       if (hasGasProfile) {
         return (
           <div className={styles.profileTab}>
@@ -1334,7 +1311,7 @@ export const TestDetails: React.FC<TestDetailsProps> = ({
           >
             Logs
           </button>
-          {hasGasProfile && (
+          {gasProfileAvailable && (
             <button
               type="button"
               role="tab"
