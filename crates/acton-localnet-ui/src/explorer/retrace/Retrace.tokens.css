@@ -163,8 +163,8 @@
   --shadow-md: var(--shadow-popover);
   --shadow-lg: var(--shadow-popover);
 
-  --font-family-sans: var(--font-family);
-  --font-family-mono: var(--font-mono);
+  --font-family-sans: var(--acton-font-sans);
+  --font-family-mono: var(--acton-font-mono);
 
   --font-size-xsss: 0.55rem;
   --font-size-xss: 0.65rem;

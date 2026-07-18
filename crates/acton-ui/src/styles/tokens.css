@@ -43,6 +43,12 @@
   --acton-color-success: hsl(142 64% 36%);
   /* Success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 44% 72%);
+  /* Passed-status accent for test and validation results. */
+  --acton-color-status-passed: #10b981;
+  /* Passed-status background for test and validation results. */
+  --acton-color-status-passed-surface: #ecfdf5;
+  /* Passed-status foreground for test and validation results. */
+  --acton-color-status-passed-text: #065f46;
   /* Added-value accent used by structured diffs. */
   --acton-color-diff-added: #10b981;
   /* Added-value surface used by structured diffs. */
@@ -69,6 +75,12 @@
   --acton-color-danger-text-hover: hsl(0 74% 42%);
   /* Text and icon color placed on danger backgrounds. */
   --acton-color-danger-foreground: hsl(0 0% 98%);
+  /* Failed-status accent for test and validation results. */
+  --acton-color-status-failed: #ef4444;
+  /* Failed-status background for test and validation results. */
+  --acton-color-status-failed-surface: #fef2f2;
+  /* Failed-status foreground for test and validation results. */
+  --acton-color-status-failed-text: #991b1b;
   /* Removed-value accent used by structured diffs. */
   --acton-color-diff-removed: #ef4444;
   /* Removed-value surface used by structured diffs. */
@@ -126,6 +138,8 @@
   /* Bold text weight for strong selected-state and summary emphasis. */
   --acton-font-weight-bold: 700;
 
+  /* Micro spacing step for dense legacy-compatible offsets. */
+  --acton-space-micro: 0.1rem;
   /* Quarter-rem spacing step for tight offsets. */
   --acton-space-1: 0.25rem;
   /* Six-pixel spacing step for compact icon padding. */
@@ -160,6 +174,8 @@
   --acton-duration-fast: 120ms;
   /* Default transition timing for small UI state changes. */
   --acton-duration-normal: 180ms;
+  /* Slow transition timing for deliberate state changes. */
+  --acton-duration-slow: 300ms;
   /* Standard easing curve for responsive UI motion. */
   --acton-ease-standard: cubic-bezier(0.2, 0, 0, 1);
 }
@@ -210,6 +226,12 @@
   --acton-color-success: hsl(142 69% 58%);
   /* Dark success border color for feedback surfaces. */
   --acton-color-success-border: hsl(142 39% 30%);
+  /* Dark passed-status accent for test and validation results. */
+  --acton-color-status-passed: #22c55e;
+  /* Dark passed-status background for test and validation results. */
+  --acton-color-status-passed-surface: rgb(20 83 45 / 32%);
+  /* Dark passed-status foreground for test and validation results. */
+  --acton-color-status-passed-text: #86efac;
   /* Dark added-value accent used by structured diffs. */
   --acton-color-diff-added: #22c55e;
   /* Dark added-value surface used by structured diffs. */
@@ -236,6 +258,12 @@
   --acton-color-danger-text-hover: hsl(0 96% 79%);
   /* Dark text and icon color placed on danger backgrounds. */
   --acton-color-danger-foreground: hsl(0 86% 97%);
+  /* Dark failed-status accent for test and validation results. */
+  --acton-color-status-failed: #ef4444;
+  /* Dark failed-status background for test and validation results. */
+  --acton-color-status-failed-surface: rgb(127 29 29 / 32%);
+  /* Dark failed-status foreground for test and validation results. */
+  --acton-color-status-failed-text: #fca5a5;
   /* Dark removed-value accent used by structured diffs. */
   --acton-color-diff-removed: #ef4444;
   /* Dark removed-value surface used by structured diffs. */

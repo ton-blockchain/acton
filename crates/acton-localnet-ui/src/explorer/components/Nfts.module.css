@@ -16,9 +16,9 @@
   gap: 10px;
   padding: 0 16px;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast);
 }
 
 .searchBox:focus-within {

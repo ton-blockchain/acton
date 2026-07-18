@@ -126,8 +126,8 @@
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .headerIconButton {
@@ -146,8 +146,8 @@
   text-decoration: none;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .navLink:hover,
@@ -186,10 +186,10 @@
   box-sizing: border-box;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .networkTrigger:hover,
@@ -259,8 +259,8 @@
   text-align: left;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .networkOption {
@@ -280,7 +280,7 @@
   min-height: 48px;
   border-radius: 8px;
   background: transparent;
-  transition: background-color var(--transition-duration-fast);
+  transition: background-color var(--acton-duration-fast);
 }
 
 .networkOptionRow:hover,
@@ -326,9 +326,9 @@
   cursor: pointer;
   opacity: 0.78;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .networkIconButton:hover {
@@ -504,10 +504,10 @@
   line-height: 1;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast);
 }
 
 .networkCancelButton {

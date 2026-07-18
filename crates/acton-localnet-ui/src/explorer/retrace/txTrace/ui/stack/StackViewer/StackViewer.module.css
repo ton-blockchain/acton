@@ -66,8 +66,8 @@
   border-radius: var(--acton-radius-control-xs);
   cursor: pointer;
   transition:
-    opacity var(--transition-duration-fast) ease,
-    box-shadow var(--transition-duration-fast) ease;
+    opacity var(--acton-duration-fast) ease,
+    box-shadow var(--acton-duration-fast) ease;
 }
 
 .stackItem:hover {
@@ -149,8 +149,8 @@
   margin-left: var(--acton-space-2);
   opacity: 0;
   transition:
-    opacity var(--transition-duration-fast) ease,
-    background-color var(--transition-duration-fast) ease;
+    opacity var(--acton-duration-fast) ease,
+    background-color var(--acton-duration-fast) ease;
 }
 
 .stackItemCopyButton:hover {

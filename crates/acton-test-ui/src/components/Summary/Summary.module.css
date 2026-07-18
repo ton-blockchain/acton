@@ -8,7 +8,7 @@
 .card {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xss);
+  gap: var(--acton-space-micro);
   padding: var(--acton-space-2) var(--acton-space-3) calc(var(--acton-space-2) - 2px);
   background-color: var(--bg-secondary-color);
   border: 1px solid var(--acton-color-border);
@@ -31,9 +31,9 @@
 }
 
 .passed .count {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 
 .failed .count {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }

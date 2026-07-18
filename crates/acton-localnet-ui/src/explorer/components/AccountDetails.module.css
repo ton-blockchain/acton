@@ -33,7 +33,7 @@
 
 .table tr {
   border-bottom: 1px solid var(--acton-color-border);
-  transition: background-color var(--transition-duration-fast);
+  transition: background-color var(--acton-duration-fast);
 }
 
 .table tr:hover {
@@ -122,8 +122,8 @@
   letter-spacing: 0;
   background: transparent;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .tabIcon {
@@ -134,7 +134,7 @@
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .tabIcon svg {
@@ -231,9 +231,9 @@
   overflow: hidden;
   text-overflow: ellipsis;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .actionFilterChipSelected {
@@ -270,8 +270,8 @@
   font-size: var(--acton-font-size-sm);
   font-weight: 700;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .segmentedOption:hover {
@@ -310,10 +310,10 @@
   gap: 5px;
   font: inherit;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    box-shadow var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    box-shadow var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .timeFormatOption:first-child {
@@ -758,10 +758,10 @@ th.valueContainer {
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .paginationButton:hover:not(:disabled) {
@@ -786,9 +786,9 @@ th.valueContainer {
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .paginationPage:hover {

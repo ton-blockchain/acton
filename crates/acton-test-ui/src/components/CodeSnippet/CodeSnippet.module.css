@@ -25,7 +25,7 @@
 .filePath {
   font-size: var(--acton-font-size-xs);
   color: var(--acton-color-text-subtle);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -51,7 +51,7 @@
   padding: 0 var(--acton-space-2);
   font-size: var(--acton-font-size-xs);
   color: var(--acton-color-text-subtle);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   line-height: 1.5rem;
 }
 
@@ -69,7 +69,7 @@
   margin: 0 !important;
   padding: var(--acton-space-2) 0 !important;
   background-color: transparent !important;
-  font-family: var(--font-mono) !important;
+  font-family: var(--acton-font-mono) !important;
   font-size: var(--acton-font-size-xs) !important;
 }
 
@@ -87,10 +87,10 @@
   position: absolute;
   left: 0;
   right: 0;
-  background-color: var(--color-failed-bg);
+  background-color: var(--acton-color-status-failed-surface);
   pointer-events: none;
   z-index: 0;
-  border-left: 2px solid var(--color-failed);
+  border-left: 2px solid var(--acton-color-status-failed);
 }
 
 .loading,
@@ -102,5 +102,5 @@
 }
 
 .error {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }

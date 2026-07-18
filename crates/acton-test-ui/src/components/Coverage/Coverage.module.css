@@ -148,8 +148,8 @@
   text-align: left;
   padding: var(--acton-space-2);
   transition:
-    border-color var(--transition-duration-fast),
-    background-color var(--transition-duration-fast);
+    border-color var(--acton-duration-fast),
+    background-color var(--acton-duration-fast);
 }
 
 .fileButton:hover,
@@ -172,7 +172,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-emphasis);
   color: var(--acton-color-text);
@@ -185,7 +185,7 @@
 }
 
 .scoreOk {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 
 .scoreWarn {
@@ -193,7 +193,7 @@
 }
 
 .scoreCritical {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }
 
 .fileMeta {
@@ -216,7 +216,7 @@
 }
 
 .progressFill.scoreOk {
-  background-color: var(--color-passed);
+  background-color: var(--acton-color-status-passed);
 }
 
 .progressFill.scoreWarn {
@@ -224,7 +224,7 @@
 }
 
 .progressFill.scoreCritical {
-  background-color: var(--color-failed);
+  background-color: var(--acton-color-status-failed);
 }
 
 .viewer {
@@ -243,7 +243,7 @@
 }
 
 .viewerPath {
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-sm);
   font-weight: var(--acton-font-weight-utility);
 }
@@ -284,8 +284,8 @@
 }
 
 .legendCovered {
-  background-color: var(--color-passed-bg);
-  color: var(--color-passed-text);
+  background-color: var(--acton-color-status-passed-surface);
+  color: var(--acton-color-status-passed-text);
 }
 
 .legendPartial {
@@ -294,8 +294,8 @@
 }
 
 .legendUncovered {
-  background-color: var(--color-failed-bg);
-  color: var(--color-failed-text);
+  background-color: var(--acton-color-status-failed-surface);
+  color: var(--acton-color-status-failed-text);
 }
 
 .viewerState,
@@ -310,7 +310,7 @@
   min-height: 0;
   flex: 1;
   overflow: auto;
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: var(--acton-font-size-xs);
 }
 
@@ -322,7 +322,7 @@
 }
 
 .codeLineCovered {
-  background-color: color-mix(in srgb, var(--color-passed-bg) 70%, transparent);
+  background-color: color-mix(in srgb, var(--acton-color-status-passed-surface) 70%, transparent);
 }
 
 .codeLinePartial {
@@ -330,7 +330,7 @@
 }
 
 .codeLineUncovered {
-  background-color: color-mix(in srgb, var(--color-failed-bg) 75%, transparent);
+  background-color: color-mix(in srgb, var(--acton-color-status-failed-surface) 75%, transparent);
 }
 
 .lineNumber,

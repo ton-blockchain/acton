@@ -36,7 +36,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all var(--transition-duration-fast) ease;
+  transition: all var(--acton-duration-fast) ease;
 }
 
 .closeButton:hover {

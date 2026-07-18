@@ -1213,9 +1213,9 @@
   align-items: center;
   justify-content: center;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .endpointButton:hover {
@@ -2398,9 +2398,9 @@
     align-items: center;
     justify-content: center;
     transition:
-      background-color var(--transition-duration-fast),
-      border-color var(--transition-duration-fast),
-      color var(--transition-duration-fast);
+      background-color var(--acton-duration-fast),
+      border-color var(--acton-duration-fast),
+      color var(--acton-duration-fast);
   }
 
   .mobileMenuButton {

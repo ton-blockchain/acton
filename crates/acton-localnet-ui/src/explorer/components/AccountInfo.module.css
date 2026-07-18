@@ -156,7 +156,7 @@
   color: var(--tonscan-link);
   border-radius: 4px;
   text-decoration: none;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .contractDescriptionLinkItem:hover {
@@ -256,10 +256,10 @@
   font-weight: var(--acton-font-weight-utility);
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .renameSaveButton {
@@ -303,9 +303,9 @@
   border-radius: 4px;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .iconButton:hover,

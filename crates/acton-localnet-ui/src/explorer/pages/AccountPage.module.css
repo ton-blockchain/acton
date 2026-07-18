@@ -243,8 +243,8 @@
   border-radius: 7px;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .addressCopyButton:hover {
@@ -544,8 +544,8 @@
   border-radius: 50%;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .metadataCloseButton:hover {

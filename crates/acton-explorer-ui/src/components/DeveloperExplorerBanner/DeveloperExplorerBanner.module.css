@@ -61,7 +61,7 @@
   text-decoration-color: color-mix(in srgb, white 58%, transparent);
   text-underline-offset: 3px;
   white-space: nowrap;
-  transition: text-decoration-color var(--transition-duration-fast);
+  transition: text-decoration-color var(--acton-duration-fast);
 }
 
 .link:hover {
@@ -92,8 +92,8 @@
   opacity: 0.72;
   transform: translateY(calc(-50% + 1px));
   transition:
-    background-color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .closeButton:hover {

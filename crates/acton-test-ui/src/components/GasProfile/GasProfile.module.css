@@ -109,7 +109,7 @@
 
 .flameChart :global(.d3-flame-graph-label) {
   color: #ffffff;
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: 12px;
   font-weight: var(--acton-font-weight-normal);
   line-height: 22px;
@@ -120,7 +120,7 @@
   background-color: var(--acton-color-surface);
   color: var(--acton-color-text);
   box-shadow: var(--shadow-tooltip);
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-xs);
 }
 
@@ -265,9 +265,9 @@
 .instructionFilterGroup {
   display: inline-flex;
   align-items: center;
-  gap: var(--spacing-xss);
+  gap: var(--acton-space-micro);
   width: fit-content;
-  padding: var(--spacing-xss);
+  padding: var(--acton-space-micro);
   border-radius: var(--acton-radius-control-xs);
   background-color: var(--bg-secondary-color);
 }

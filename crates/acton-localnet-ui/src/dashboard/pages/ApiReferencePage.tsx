@@ -106,7 +106,7 @@ export const ApiReferencePage: FC<ApiReferencePageProps> = ({
         .scalar-app,
         .scalar-app .dark-mode,
         .scalar-app .light-mode {
-          --scalar-font: var(--font-family);
+          --scalar-font: var(--acton-font-sans);
           --scalar-font-code: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", monospace;
           --scalar-radius: 4px;
           --scalar-radius-lg: 6px;

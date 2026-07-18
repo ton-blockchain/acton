@@ -177,9 +177,9 @@
 
 .filters {
   display: flex;
-  gap: var(--spacing-xss);
+  gap: var(--acton-space-micro);
   background-color: var(--bg-secondary-color);
-  padding: var(--spacing-xss);
+  padding: var(--acton-space-micro);
   border-radius: var(--acton-radius-control-xs);
   width: 100%;
 }
@@ -210,11 +210,11 @@
 }
 
 .filterButton.passed.activeFilter {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 
 .filterButton.failed.activeFilter {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }
 
 .filterButton.skipped.activeFilter {
@@ -374,10 +374,10 @@
 }
 
 .passed {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 .failed {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }
 .skipped {
   color: var(--color-skipped);

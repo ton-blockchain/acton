@@ -55,7 +55,7 @@
   color: var(--tonscan-text-secondary);
   background: transparent;
   cursor: pointer;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .closeButton:hover {

@@ -145,7 +145,7 @@
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 180px;
-  padding: var(--spacing-xss);
+  padding: var(--acton-space-micro);
   display: flex;
   flex-direction: column;
   gap: 1px;
@@ -197,10 +197,10 @@
 }
 
 .passedIcon {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 .failedIcon {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }
 .skippedIcon {
   color: var(--color-skipped);
@@ -414,7 +414,7 @@
   padding: 2px var(--acton-space-2);
   border-radius: var(--acton-radius-control-xs);
   font-weight: var(--acton-font-weight-normal);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
 }
 
 .infoTab {
@@ -433,7 +433,7 @@
 .infoItem {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-xss);
+  gap: var(--acton-space-micro);
 }
 
 .infoValueGroup {
@@ -478,7 +478,7 @@
 }
 
 .traceNoticeError {
-  border-color: color-mix(in srgb, var(--color-failed) 45%, var(--acton-color-border));
+  border-color: color-mix(in srgb, var(--acton-color-status-failed) 45%, var(--acton-color-border));
 }
 
 .traceNoticeTitle {
@@ -497,7 +497,7 @@
 .traceNoticeMeta {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: var(--acton-font-size-xs);
   color: var(--acton-color-text-subtle);
 }
@@ -653,17 +653,17 @@
   box-shadow: var(--shadow);
   z-index: 1000;
   min-width: 180px;
-  padding: var(--spacing-xss);
+  padding: var(--acton-space-micro);
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
 
 .infoValue.passed {
-  color: var(--color-passed);
+  color: var(--acton-color-status-passed);
 }
 .infoValue.failed {
-  color: var(--color-failed);
+  color: var(--acton-color-status-failed);
 }
 .infoValue.skipped {
   color: var(--color-skipped);
@@ -741,7 +741,7 @@
 
 .routeValue {
   color: var(--acton-color-text);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   background-color: var(--acton-color-surface);
   padding: 2px 6px;
   border-radius: 4px;
@@ -772,7 +772,7 @@
 .paramValue {
   font-size: var(--acton-font-size-sm);
   color: var(--acton-color-text);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
 }
 
 .empty {

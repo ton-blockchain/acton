@@ -73,9 +73,9 @@
   white-space: nowrap;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .primaryTab:first-child {
@@ -202,8 +202,8 @@
   line-height: 1.2;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .sourceBundleTab {
@@ -326,9 +326,9 @@
   background: var(--color-background-primary);
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .sourceDebugIconButton:hover:not(:disabled) {
@@ -432,7 +432,7 @@
   width: 1px;
   content: "";
   background: transparent;
-  transition: background-color var(--transition-duration-fast);
+  transition: background-color var(--acton-duration-fast);
 }
 
 .sourceDebugPanelResizeHandle:hover::before {
@@ -491,8 +491,8 @@
   font: inherit;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .sourceDebugSectionHeader:hover {
@@ -545,7 +545,7 @@
   height: 1px;
   content: "";
   background: transparent;
-  transition: background-color var(--transition-duration-fast);
+  transition: background-color var(--acton-duration-fast);
 }
 
 .sourceDebugResizeHandle:hover::before {
@@ -712,7 +712,7 @@
   margin: auto 0;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--transition-duration-fast);
+  transition: opacity var(--acton-duration-fast);
 }
 
 .sourceVariableRow:hover .sourceVariableCopyButton,

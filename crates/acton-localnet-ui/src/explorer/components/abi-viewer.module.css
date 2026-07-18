@@ -39,9 +39,9 @@
   line-height: 1.2;
   white-space: nowrap;
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .editorTab:first-child {
@@ -210,7 +210,7 @@
 
 .abiCount {
   color: var(--tonscan-text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-utility);
   line-height: 1.2;
@@ -276,7 +276,7 @@
   margin-top: 1px;
   margin-left: 6px;
   color: var(--tonscan-text-secondary);
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: 10px;
   font-weight: var(--acton-font-weight-utility);
   line-height: 1;
@@ -299,9 +299,9 @@
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-emphasis);
   transition:
-    background-color var(--transition-duration-fast),
-    border-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    border-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .abiRunButton:hover:not(:disabled) {
@@ -368,7 +368,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--tonscan-text-secondary);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: 11px;
   font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
@@ -393,7 +393,7 @@
   outline: 0;
   background: var(--tonscan-card-bg);
   color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -488,7 +488,7 @@
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: var(--acton-font-size-xs);
   line-height: 1.45;
   white-space: pre-wrap;
@@ -546,7 +546,7 @@
   background:
     linear-gradient(currentColor, currentColor) center / 8px 1.5px no-repeat,
     linear-gradient(currentColor, currentColor) center / 1.5px 8px no-repeat;
-  transition: opacity var(--transition-duration-fast);
+  transition: opacity var(--acton-duration-fast);
 }
 
 .abiDetails[open] summary::before {
@@ -562,7 +562,7 @@
   border-radius: 8px;
   background: var(--tonscan-card-bg);
   color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -710,7 +710,7 @@
   border-radius: 6px;
   background: var(--tonscan-row-hover);
   color: var(--tonscan-text-primary);
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 1.2;
@@ -748,7 +748,7 @@
   min-width: 0;
   overflow: hidden;
   color: var(--tonscan-text-primary);
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: var(--acton-font-size-xs);
   font-weight: var(--acton-font-weight-normal);
   text-overflow: ellipsis;
@@ -768,8 +768,8 @@
   text-decoration: none;
   opacity: 0.72;
   transition:
-    color var(--transition-duration-fast),
-    opacity var(--transition-duration-fast);
+    color var(--acton-duration-fast),
+    opacity var(--acton-duration-fast);
 }
 
 .abiSymbolAnchor:hover {
@@ -785,7 +785,7 @@
 .abiDeclarationKind {
   flex: 0 0 auto;
   margin-top: -2px;
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   font-size: 9px;
   font-weight: var(--acton-font-weight-emphasis);
   line-height: 1;

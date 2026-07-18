@@ -150,10 +150,10 @@
 
 body {
   margin: 0;
-  font-family: var(--font-family);
+  font-family: var(--acton-font-sans);
   background-color: var(--tonscan-bg);
   color: var(--tonscan-text-primary);
   transition:
-    background-color var(--transition-duration-normal),
-    color var(--transition-duration-normal);
+    background-color var(--acton-duration-slow),
+    color var(--acton-duration-slow);
 }

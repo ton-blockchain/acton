@@ -17,7 +17,7 @@
 }
 
 .hash {
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
   font-size: 14px;
   color: var(--tonscan-text-secondary);
   word-break: break-all;
@@ -88,7 +88,7 @@
 }
 
 .valueMono {
-  font-family: var(--font-mono);
+  font-family: var(--acton-font-mono);
 }
 
 .link {
@@ -121,7 +121,7 @@
   text-decoration: none;
   cursor: pointer;
   white-space: nowrap;
-  transition: color var(--transition-duration-fast);
+  transition: color var(--acton-duration-fast);
 }
 
 .retraceInlineButton:hover,
@@ -177,8 +177,8 @@
   font-weight: 400;
   cursor: pointer;
   transition:
-    background-color var(--transition-duration-fast),
-    color var(--transition-duration-fast);
+    background-color var(--acton-duration-fast),
+    color var(--acton-duration-fast);
 }
 
 .tab:hover {
@@ -415,7 +415,7 @@
   padding: var(--acton-space-2) var(--acton-space-4);
   border-radius: var(--acton-radius-control-sm);
   cursor: pointer;
-  transition: all var(--transition-duration-fast);
+  transition: all var(--acton-duration-fast);
   font-size: var(--acton-font-size-sm);
   text-decoration: none;
   width: fit-content;

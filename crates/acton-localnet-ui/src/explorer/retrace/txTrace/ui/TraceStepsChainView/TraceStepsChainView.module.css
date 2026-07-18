@@ -69,7 +69,7 @@
   font-size: 14px;
   line-height: var(--trace-line-height);
   cursor: pointer;
-  transition: background-color var(--transition-duration-fast) ease;
+  transition: background-color var(--acton-duration-fast) ease;
 }
 
 .stepItem:hover {

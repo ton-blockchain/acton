@@ -10,7 +10,7 @@ body {
   padding: 0;
   background-color: var(--acton-color-surface);
   color: var(--acton-color-text);
-  font-family: var(--font-family), serif;
+  font-family: var(--acton-font-sans), serif;
   line-height: 1.6;
 }
 
@@ -26,6 +26,6 @@ a {
 }
 
 pre {
-  font-family: var(--font-mono), monospace;
+  font-family: var(--acton-font-mono), monospace;
   margin: 0;
 }

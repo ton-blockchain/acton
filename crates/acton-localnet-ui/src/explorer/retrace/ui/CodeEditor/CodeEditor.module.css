@@ -16,7 +16,7 @@
 :global(.monaco-editor .clickable-line) {
   cursor: pointer !important;
   background-color: var(--editor-clickable-line-bg) !important;
-  transition: background-color var(--transition-duration-fast) ease;
+  transition: background-color var(--acton-duration-fast) ease;
 }
 
 :global(.monaco-editor .clickable-line-decoration) {
@@ -143,7 +143,7 @@
   align-items: center;
   z-index: 100;
   opacity: 0.5;
-  transition: opacity var(--transition-duration-normal);
+  transition: opacity var(--acton-duration-slow);
   backdrop-filter: blur(var(--blur-radius-sm));
   user-select: none;
 }
