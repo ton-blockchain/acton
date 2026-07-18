@@ -52,6 +52,7 @@ function TechnicalSamples() {
         aria-label="Search contracts"
         placeholder="Search contracts"
         leadingIcon={<Search size={16} />}
+        shortcut={["⌘", "K"]}
       />
       <Input
         type="password"
@@ -86,11 +87,12 @@ export const inputGallery = {
     "Use label and description when the field does not already have an external label.",
     "Use invalid or aria-invalid for validation styling; report the actual failure through Toast.",
     "Use mono for code hashes, raw addresses, and other fixed-width technical values.",
+    "Use shortcut for a decorative keyboard hint; pass an array to render separate key caps.",
     "Autocomplete, autocorrect, capitalization, and spellcheck default to off; opt in for human-language fields.",
   ],
   avoid: [
     "Do not use Input for multiline content, file uploads, checkboxes, or selects.",
-    "Do not add icons, suffix buttons, or unit labels with absolute positioning inside Input; use a dedicated composite control.",
+    "Do not add icons, shortcuts, suffix buttons, or unit labels with external absolute positioning; use the supported decorative props or a dedicated composite control.",
     "Do not render validation or request error messages inside Input; use Toast and preserve aria-invalid.",
   ],
   sections: [

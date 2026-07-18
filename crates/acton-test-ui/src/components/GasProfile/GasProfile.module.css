@@ -269,7 +269,7 @@
   width: fit-content;
   padding: var(--acton-space-micro);
   border-radius: var(--acton-radius-control-xs);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
 }
 
 .instructionStackToggle {

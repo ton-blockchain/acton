@@ -294,6 +294,8 @@ and forwards native attributes and refs.
   error message.
 - `leadingIcon`: optional decorative icon for standard search, token, or
   credential fields. The icon is hidden from assistive technology.
+- `shortcut`: optional decorative keyboard shortcut. Pass an array such as
+  `["⌘", "K"]` to render separate key caps at the trailing edge.
 - `mono`: uses the shared monospace stack for hashes, addresses, and other
   technical values.
 - `fieldClassName`: layout hook for the optional label/description wrapper;
@@ -320,9 +322,10 @@ and forwards native attributes and refs.
   and `spellCheck` to `false`, because most Acton values are technical. Override
   them explicitly for credential, email, name, or prose-like fields.
 - Keep file inputs native and use Checkbox for boolean values.
-- Do not add leading icons, unit suffixes, or embedded buttons through absolute
-  positioning outside Input. Use `leadingIcon` for a single decorative icon;
-  unit suffixes and interactive actions belong in a dedicated InputGroup.
+- Do not add leading icons, shortcuts, unit suffixes, or embedded buttons
+  through absolute positioning outside Input. Use `leadingIcon` and `shortcut`
+  for their decorative cases; unit suffixes and interactive actions belong in
+  a dedicated InputGroup.
 - Do not add an inline error-message API to Input.
 
 ## SearchInput

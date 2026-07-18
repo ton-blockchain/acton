@@ -70,6 +70,33 @@
   display: block;
 }
 
+.shortcut {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: var(--acton-space-1-5);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  color: var(--acton-color-text-subtle);
+  font-family: var(--acton-font-sans);
+  font-size: var(--acton-font-size-compact);
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.shortcut kbd {
+  min-width: 1.125rem;
+  padding: 0 var(--acton-space-1);
+  border: 1px solid var(--acton-color-border-control);
+  border-radius: var(--acton-radius-control-xs);
+  background: var(--acton-color-surface-raised);
+  color: inherit;
+  font: inherit;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .input:hover:not(:disabled, :read-only) {
   border-color: var(--acton-color-border-strong);
 }
@@ -120,6 +147,10 @@
 
 .withLeadingIcon {
   padding-inline-start: 2.5rem;
+}
+
+.withShortcut {
+  padding-inline-end: 4rem;
 }
 
 .mono {

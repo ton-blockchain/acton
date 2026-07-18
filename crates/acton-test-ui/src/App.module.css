@@ -155,7 +155,7 @@
   gap: var(--acton-space-1);
   padding: var(--acton-space-2) var(--acton-space-4);
   border-bottom: 1px solid var(--acton-color-border);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
 }
 
 .viewTab {

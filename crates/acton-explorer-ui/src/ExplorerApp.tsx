@@ -32,7 +32,6 @@ import {ExplorerIndexPage} from "../../acton-localnet-ui/src/explorer/pages/Expl
 import {FavoriteAccountsPage} from "../../acton-localnet-ui/src/explorer/pages/FavoriteAccountsPage"
 import {TransactionPage} from "../../acton-localnet-ui/src/explorer/pages/TransactionPage"
 import "@acton/ui/styles/tokens.css"
-import "@acton/shared-ui/styles/tokens.css"
 import "../../acton-localnet-ui/src/index.css"
 import actonScanCustomLogo from "./assets/acton-scan-custom-logo-dark.svg"
 import actonScanLogo from "./assets/acton-scan-logo-dark.svg"

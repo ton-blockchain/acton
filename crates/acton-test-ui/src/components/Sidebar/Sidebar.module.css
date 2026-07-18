@@ -107,78 +107,15 @@
   line-height: 1;
 }
 
-.searchContainer {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 0.375rem 0.375rem 0.375rem 0.5rem;
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-control-sm);
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 50%, transparent);
-  color: var(--acton-color-text-muted);
-  font-size: var(--acton-font-size-sm);
-  transition:
-    background-color 0.1s,
-    color 0.1s;
-}
-
-.searchContainer:hover {
-  background-color: var(--acton-color-surface-hover);
-  color: var(--acton-color-text);
-}
-
-.searchContainer:focus-within {
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--acton-color-text-subtle) 70%, transparent);
-}
-
 .searchIcon {
-  flex: 0 0 auto;
   width: 1rem;
   height: 1rem;
-  pointer-events: none;
-}
-
-.searchInput {
-  min-width: 0;
-  flex: 1 1 auto;
-  padding: 0;
-  border: 0;
-  font: inherit;
-  font-weight: var(--acton-font-weight-normal);
-  outline: none;
-  background-color: transparent;
-  color: var(--acton-color-text);
-}
-
-.searchInput::placeholder {
-  color: var(--acton-color-text-muted);
-  opacity: 1;
-}
-
-.searchShortcut {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 0.125rem;
-  margin-left: auto;
-}
-
-.searchShortcut kbd {
-  padding: 0 0.375rem;
-  border: 1px solid var(--acton-color-border);
-  border-radius: var(--acton-radius-control-sm);
-  background-color: var(--acton-color-surface);
-  color: var(--acton-color-text-subtle);
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  text-align: center;
 }
 
 .filters {
   display: flex;
   gap: var(--acton-space-micro);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   padding: var(--acton-space-micro);
   border-radius: var(--acton-radius-control-xs);
   width: 100%;
@@ -355,7 +292,7 @@
 }
 
 .testItem.selected {
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-active);
   color: var(--acton-color-text);
   font-weight: var(--acton-font-weight-utility);
 }

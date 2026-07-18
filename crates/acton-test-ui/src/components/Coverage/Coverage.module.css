@@ -116,7 +116,7 @@
 
 .searchInput:focus {
   border-color: var(--acton-color-text-subtle);
-  box-shadow: 0 0 0 2px var(--bg-secondary-color);
+  box-shadow: 0 0 0 2px var(--acton-color-focus-ring);
 }
 
 .searchInput::placeholder {
@@ -155,7 +155,14 @@
 .fileButton:hover,
 .fileButtonSelected {
   border-color: var(--acton-color-border);
-  background-color: var(--bg-secondary-color);
+}
+
+.fileButton:hover {
+  background-color: var(--acton-color-surface-hover);
+}
+
+.fileButtonSelected {
+  background-color: var(--acton-color-surface-active);
 }
 
 .fileRow,
@@ -205,7 +212,7 @@
 .progressTrack {
   margin-top: var(--acton-space-2);
   height: 6px;
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-progress-track);
   border-radius: var(--acton-radius-round);
   overflow: hidden;
 }
@@ -261,7 +268,7 @@
   align-items: center;
   padding: 2px var(--acton-space-2);
   border-radius: var(--acton-radius-round);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   font-weight: var(--acton-font-weight-emphasis);
 }
 

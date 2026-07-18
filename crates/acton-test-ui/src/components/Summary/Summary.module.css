@@ -10,7 +10,7 @@
   flex-direction: column;
   gap: var(--acton-space-micro);
   padding: var(--acton-space-2) var(--acton-space-3) calc(var(--acton-space-2) - 2px);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
 }

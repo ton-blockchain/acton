@@ -8,7 +8,7 @@
 
 .header {
   padding: var(--acton-space-1) var(--acton-space-2);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
   border-bottom: 1px solid var(--acton-color-border);
   display: flex;
   align-items: center;
@@ -39,7 +39,7 @@
 
 .lineNumbers {
   padding: var(--acton-space-2) 0;
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
   border-right: 1px solid var(--acton-color-border);
   text-align: right;
   min-width: 40px;

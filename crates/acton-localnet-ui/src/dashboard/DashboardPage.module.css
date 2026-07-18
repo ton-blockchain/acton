@@ -70,7 +70,7 @@
   margin: 8px 0;
   border: 1px solid var(--litenode-border);
   border-radius: 14px;
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .sidebarExpandButton {
@@ -317,7 +317,7 @@
   width: min(386px, calc(100vw - 8px));
   max-height: min(620px, calc(100vh - 92px));
   border-radius: 14px;
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .searchInputRow {
@@ -1754,7 +1754,7 @@
   border: 1px solid var(--litenode-border);
   border-radius: 16px;
   background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -1910,7 +1910,7 @@
   border: 1px solid var(--litenode-border);
   border-radius: 18px;
   background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .assetModal {
@@ -2361,7 +2361,7 @@
     border: none;
     border-right: 1px solid var(--litenode-border);
     border-radius: 0;
-    box-shadow: var(--litenode-shadow-popover);
+    box-shadow: var(--acton-shadow-overlay);
   }
 
   .mobileTopbar {
@@ -2454,7 +2454,7 @@
     padding: 10px 8px 8px;
     border-right: 1px solid var(--litenode-border);
     border-bottom: none;
-    box-shadow: var(--litenode-shadow-popover);
+    box-shadow: var(--acton-shadow-overlay);
     transform: translateX(-100%);
     visibility: hidden;
     overflow: hidden;

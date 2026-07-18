@@ -49,7 +49,7 @@
   border-radius: 16px;
   background: color-mix(in srgb, var(--litenode-surface) 92%, transparent);
   color: var(--litenode-text);
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
   backdrop-filter: blur(18px);
 }
 

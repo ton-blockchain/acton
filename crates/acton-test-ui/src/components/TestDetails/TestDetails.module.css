@@ -15,7 +15,7 @@
   justify-content: space-between;
   align-items: center;
   min-height: 36px;
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
 }
 
 .titleInfo {
@@ -82,7 +82,7 @@
   position: relative;
   display: flex;
   align-items: center;
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   border: 1px solid var(--acton-color-border);
   border-radius: 6px;
   padding: 2px;
@@ -256,7 +256,7 @@
   align-items: center;
   gap: 4px;
   color: var(--acton-color-text-subtle);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
 }
 
 .treasuryDeployTraceToggle svg {
@@ -267,13 +267,17 @@
 
 .treasuryDeployTraceTab {
   color: var(--acton-color-text-subtle);
-  background-color: color-mix(in srgb, var(--bg-secondary-color) 72%, var(--acton-color-surface));
+  background-color: color-mix(
+    in srgb,
+    var(--acton-color-surface-group) 72%,
+    var(--acton-color-surface)
+  );
 }
 
 .skippedTraceTab,
 .skippedTraceTab:hover {
   color: var(--acton-color-text-subtle);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   cursor: default;
   opacity: 0.75;
 }
@@ -331,7 +335,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--acton-radius-control-xs);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   padding: var(--acton-space-1);
 }
 
@@ -474,7 +478,7 @@
   padding: var(--acton-space-4);
   border: 1px solid var(--acton-color-border);
   border-radius: var(--acton-radius-control-sm);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
 }
 
 .traceNoticeError {
@@ -602,7 +606,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-group);
   border: 1px solid var(--acton-color-border);
   border-radius: 4px;
   padding: 1px;
@@ -685,7 +689,7 @@
 }
 
 .errorMessageBlock {
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
   color: var(--acton-color-text);
 }
 
@@ -702,7 +706,7 @@
   flex-direction: column;
   gap: var(--acton-space-4);
   padding: var(--acton-space-4) var(--acton-space-4) calc(var(--acton-space-4) - 3px);
-  background-color: var(--bg-secondary-color);
+  background-color: var(--acton-color-surface-raised);
   border-radius: var(--acton-radius-control-sm);
   border: 1px solid var(--acton-color-border);
   margin-top: var(--acton-space-4);

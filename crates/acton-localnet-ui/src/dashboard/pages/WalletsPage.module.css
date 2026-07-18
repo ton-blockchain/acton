@@ -530,7 +530,7 @@
   border: 1px solid var(--litenode-border);
   border-radius: 16px;
   background: var(--litenode-surface);
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .modalHeader {

@@ -1,7 +1,6 @@
 :root {
   --background: var(--acton-color-surface);
   --foreground: var(--acton-color-text);
-  --muted: var(--bg-secondary-color);
   --muted-foreground: var(--acton-color-text-muted);
   --border: var(--acton-color-border);
 

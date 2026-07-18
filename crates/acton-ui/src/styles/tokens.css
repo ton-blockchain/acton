@@ -11,7 +11,7 @@
   --acton-color-surface-row: hsl(240 5% 94%);
   /* Subtle fill behind inline markdown code fragments. */
   --acton-color-inline-code-surface: hsl(240 5% 92%);
-  /* Collapsible table group surface for rows that summarize hidden children. */
+  /* Grouped-control and collapsible-row surface. */
   --acton-color-surface-group: hsl(0 0% 98%);
   /* Pressed or selected surface for neutral elements. */
   --acton-color-surface-active: hsl(240 4% 95%);
@@ -89,6 +89,8 @@
   --acton-color-diff-removed-text: #991b1b;
   /* Accessible focus halo around keyboard-focused controls. */
   --acton-color-focus-ring: hsl(240 6% 10% / 0.18);
+  /* Neutral track behind progress indicators. */
+  --acton-color-progress-track: #f4f4f5;
   /* Scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.42);
   /* Floating overlay surface for popovers. */
@@ -208,7 +210,7 @@
   --acton-color-surface-row: hsl(240 6% 10%);
   /* Dark subtle fill behind inline markdown code fragments. */
   --acton-color-inline-code-surface: hsl(240 4% 16%);
-  /* Dark collapsible table group surface for rows that summarize hidden children. */
+  /* Dark grouped-control and collapsible-row surface. */
   --acton-color-surface-group: hsl(240 5% 14%);
   /* Dark pressed or selected surface for neutral elements. */
   --acton-color-surface-active: hsl(240 4% 16%);
@@ -286,6 +288,8 @@
   --acton-color-diff-removed-text: #fca5a5;
   /* Dark accessible focus halo around keyboard-focused controls. */
   --acton-color-focus-ring: hsl(0 0% 98% / 0.22);
+  /* Dark neutral track behind progress indicators. */
+  --acton-color-progress-track: #18181b;
   /* Dark scrim behind temporary overlays such as mobile drawers. */
   --acton-color-backdrop: hsl(240 10% 4% / 0.68);
   /* Dark floating overlay surface for popovers. */

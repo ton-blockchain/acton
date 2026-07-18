@@ -38,7 +38,6 @@ import {TokensPage} from "./dashboard/pages/TokensPage"
 import {WalletsPage} from "./dashboard/pages/WalletsPage"
 import {WalletRuntimeProvider} from "./wallet/WalletRuntimeProvider"
 import "@acton/ui/styles/tokens.css"
-import "@acton/shared-ui/styles/tokens.css"
 import "./index.css"
 import styles from "./App.module.css"
 

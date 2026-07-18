@@ -9,7 +9,7 @@ import {
   FiMinus,
   FiX,
 } from "react-icons/fi"
-import {ThemeSwitch, type ThemeMode} from "@acton/ui"
+import {Input, ThemeSwitch, type ThemeMode} from "@acton/ui"
 import {type TestReport, TestStatus} from "@acton/shared-ui"
 
 import {AppIcon} from "../AppIcon/AppIcon"
@@ -173,22 +173,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <Summary reports={reports} />
 
-        <div className={styles.searchContainer}>
-          <DocsSearchIcon />
-          <input
-            ref={searchInputRef}
-            type="text"
-            placeholder="Filter tests..."
-            className={styles.searchInput}
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            aria-label="Filter tests"
-          />
-          <span className={styles.searchShortcut} aria-hidden="true">
-            <kbd>{searchShortcutModifier}</kbd>
-            <kbd>K</kbd>
-          </span>
-        </div>
+        <Input
+          ref={searchInputRef}
+          type="search"
+          size="sm"
+          placeholder="Filter tests..."
+          value={searchQuery}
+          onChange={event => setSearchQuery(event.target.value)}
+          aria-label="Filter tests"
+          leadingIcon={<DocsSearchIcon />}
+          shortcut={[searchShortcutModifier, "K"]}
+        />
 
         <div className={styles.filters}>
           {(Object.values(TestStatus) as TestStatus[]).map(status => (

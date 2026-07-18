@@ -625,7 +625,7 @@
   border: 1px solid var(--tonscan-border);
   border-radius: 14px;
   background: var(--tonscan-card-bg);
-  box-shadow: var(--litenode-shadow-popover);
+  box-shadow: var(--acton-shadow-overlay);
 }
 
 .qrPopoverHeader {
