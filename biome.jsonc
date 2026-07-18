@@ -52,12 +52,10 @@
       "preset": "all",
       "a11y": {
         "preset": "all",
-        "noAriaHiddenOnFocusable": "off",
         "noNoninteractiveElementInteractions": "off",
         "noStaticElementInteractions": "off",
         "noSvgWithoutTitle": "off",
         "useAriaPropsSupportedByRole": "off",
-        "useFocusableInteractive": "off",
         "useSemanticElements": "off"
       },
       "complexity": {
@@ -76,10 +74,8 @@
       },
       "correctness": {
         "preset": "all",
-        "noEmptyPattern": "off",
         "noNodejsModules": "off",
         "noSolidDestructuredProps": "off",
-        "noUndeclaredDependencies": "off",
         "noUnresolvedImports": "off",
         "useExhaustiveDependencies": "off",
         "useImageSize": "off",
@@ -150,8 +146,7 @@
         "noShadow": "off",
         "noSkippedTests": "off",
         "noUnnecessaryConditions": "off",
-        "useAwait": "off",
-        "useIterableCallbackReturn": "off"
+        "useAwait": "off"
       }
     }
   }

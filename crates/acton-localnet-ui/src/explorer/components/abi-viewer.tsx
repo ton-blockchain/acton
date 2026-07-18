@@ -368,7 +368,7 @@ function AbiGetMethodItem({
           <div className={styles.abiArgsGrid}>
             {method.parameters.map((parameter, index) => {
               const input = simpleArgInputs[index]
-              if (!input) return
+              if (!input) return null
               const inputId = `${argsInputId}-${parameter.name}-${index}`
 
               return (

@@ -745,6 +745,7 @@ export function TransactionTree({
           {nodeDatum.attributes?.contractLetter as string}
         </text>
         {isFailed && (
+          // biome-ignore lint/a11y/noAriaHiddenOnFocusable: This failure badge is purely decorative.
           <g className={styles.failedBadge} aria-hidden="true">
             <circle
               cx={10}

@@ -11,5 +11,8 @@
     "fmt:check": "biome format .",
     "lint": "biome check --formatter-enabled=false .",
     "lint:fix": "biome check --formatter-enabled=false --write ."
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0"
   }
 }

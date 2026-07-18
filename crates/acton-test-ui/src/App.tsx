@@ -311,7 +311,7 @@ export const App: React.FC = () => {
         </button>
       )}
 
-      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions */}
+      {/* biome-ignore lint/a11y/useFocusableInteractive: This resize handle is pointer-only. */}
       <div
         onMouseDown={startResizing}
         onMouseEnter={() => setIsHoveredResizer(true)}

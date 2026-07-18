@@ -1121,7 +1121,10 @@ pub enum LocalnetCommand {
             value_name = "NAME[,NAME...]"
         )]
         accounts: Option<Vec<String>>,
-        #[arg(long, help = "Path to SQLite database for persistent storage")]
+        #[arg(
+            long,
+            help = "Path to SQLite database for persistent storage (default: [localnet].db-path)"
+        )]
         db_path: Option<String>,
         #[arg(
             long,
@@ -2578,6 +2581,7 @@ fn main() {
             } => {
                 let resolved_localnet = resolve_localnet_settings(
                     port,
+                    db_path,
                     fork_net,
                     fork_block_number,
                     accounts,
@@ -2594,7 +2598,7 @@ fn main() {
                 rt.block_on(async {
                     commands::localnet::localnet_start_cmd(
                         resolved_localnet.port,
-                        db_path,
+                        resolved_localnet.db_path,
                         resolved_localnet.fork_net,
                         resolved_localnet.fork_block_number,
                         resolved_localnet.accounts,
@@ -2869,6 +2873,7 @@ fn lint_command_error(args: &[String]) -> anyhow::Error {
 
 struct ResolvedLocalnetSettings {
     port: u16,
+    db_path: Option<String>,
     fork_net: Option<String>,
     fork_block_number: Option<u64>,
     accounts: Vec<String>,
@@ -2880,12 +2885,16 @@ struct ResolvedLocalnetSettings {
 }
 
 fn resolve_localnet_port(cli_port: Option<u16>) -> u16 {
-    resolve_localnet_settings(cli_port, None, None, None, None, None, None, false, false).port
+    resolve_localnet_settings(
+        cli_port, None, None, None, None, None, None, None, false, false,
+    )
+    .port
 }
 
 #[allow(clippy::too_many_arguments)]
 fn resolve_localnet_settings(
     cli_port: Option<u16>,
+    cli_db_path: Option<String>,
     cli_fork_net: Option<String>,
     cli_fork_block_number: Option<u64>,
     cli_accounts: Option<Vec<String>>,
@@ -2898,6 +2907,7 @@ fn resolve_localnet_settings(
     let config = load_localnet_settings_from_config();
     ResolvedLocalnetSettings {
         port: cli_port.or(config.port).unwrap_or(5411),
+        db_path: resolve_localnet_db_path(cli_db_path, config.db_path),
         fork_net: cli_fork_net.or(config.fork_net),
         fork_block_number: cli_fork_block_number.or(config.fork_block_number),
         accounts: cli_accounts.or(config.accounts).unwrap_or_default(),
@@ -2909,6 +2919,26 @@ fn resolve_localnet_settings(
         no_mining: cli_no_mining || config.no_mining.unwrap_or(false),
         mine_empty_blocks: cli_mine_empty_blocks || config.mine_empty_blocks.unwrap_or(false),
     }
+}
+
+fn resolve_localnet_db_path(
+    cli_db_path: Option<String>,
+    config_db_path: Option<String>,
+) -> Option<String> {
+    if cli_db_path.is_some() {
+        return cli_db_path;
+    }
+
+    config_db_path
+        .map(|path| {
+            let path = PathBuf::from(path);
+            if path.is_absolute() {
+                path
+            } else {
+                configured_project_root().join(path)
+            }
+        })
+        .map(|path| path.to_string_lossy().into_owned())
 }
 
 fn load_localnet_settings_from_config() -> LocalnetSettings {

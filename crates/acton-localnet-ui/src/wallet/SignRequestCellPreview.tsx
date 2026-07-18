@@ -166,7 +166,9 @@ function appendParsedCellFields(
 ): void {
   if (Array.isArray(value)) {
     fields.push({label, value: `Array(${value.length})`, depth, tone: "muted"})
-    value.forEach((item, index) => appendParsedCellFields(fields, item, `[${index}]`, depth + 1))
+    value.forEach((item, index) => {
+      appendParsedCellFields(fields, item, `[${index}]`, depth + 1)
+    })
     return
   }
 

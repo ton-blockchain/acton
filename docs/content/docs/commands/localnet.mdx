@@ -91,7 +91,8 @@ May be passed multiple times.
 
 </CommandOptionTitle>
 
-Path to a SQLite database for persistent node state.
+Path to a SQLite database for persistent node state. Defaults to
+`[localnet].db-path` when configured.
 
 <CommandOptionMeta label="Conflicts with">
 
@@ -196,7 +197,8 @@ endpoints. The server prints the token on startup.
 
 </CommandOptions>
 
-`--load-state` and `--db-path` cannot be used together in the same run.
+`--load-state` cannot be used when a database path comes from either
+`--db-path` or `[localnet].db-path`.
 
 ### acton localnet airdrop
 
@@ -566,6 +568,7 @@ You can store defaults in `Acton.toml`:
 ```acton-toml title="Acton.toml"
 [localnet]
 port = 5411
+db-path = ".acton/localnet.sqlite"
 fork-net = "testnet"
 fork-block-number = 55000000
 accounts = ["deployer", "user"]
@@ -575,7 +578,10 @@ block-interval-ms = 500
 no-mining = false
 ```
 
-CLI flags override config values for the current invocation.
+CLI flags override config values for the current invocation. In particular,
+`--db-path` overrides `[localnet].db-path`. A relative path in `Acton.toml`
+resolves from the project root, while a relative `--db-path` resolves from the
+current working directory.
 
 ## TonCenter API Keys
 
@@ -708,11 +714,13 @@ expose the localnet server publicly.
 
 ## Persistence
 
-- `--db-path` enables persistent SQLite-backed node state across runs
+- `--db-path` or `[localnet].db-path` enables persistent SQLite-backed node
+  state across runs
 - `--load-state` initializes state from a JSON snapshot and cannot be combined
-  with `--db-path`
+  with a database path from either CLI or `Acton.toml`
 - `--dump-state` exports a JSON snapshot on shutdown
-- when `--db-path` is not used, node state is ephemeral unless loaded or dumped
+- when no database path is configured, node state is ephemeral unless loaded
+  or dumped
 
 ## Exit Status
 
