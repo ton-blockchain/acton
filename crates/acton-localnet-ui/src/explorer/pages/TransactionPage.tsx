@@ -318,8 +318,11 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
   const [traceActionMetadata, setTraceActionMetadata] = useState<V3Metadata>({})
   const [traceOverview, setTraceOverview] = useState<TraceOverviewData | undefined>()
   const [hoveredAction, setHoveredAction] = useState<V3Action | undefined>()
-  const [stateChangesLoading, setStateChangesLoading] = useState(false)
-  const [stateChangesError, setStateChangesError] = useState<string | undefined>()
+  const [stateChangesStatus, setStateChangesStatus] = useState<{
+    readonly traceHash?: string
+    readonly isLoading: boolean
+    readonly error?: string
+  }>({isLoading: false})
   const [nowSeconds, setNowSeconds] = useState(() => Math.floor(Date.now() / 1000))
   const fetchNameRef = useRef(fetchName)
   const addressFormatRef = useRef(addressFormat)
@@ -351,6 +354,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     return highlightedIds.size > 0 ? highlightedIds : undefined
   }, [hoveredAction, traces])
   const isWideTraceTree = traces.length > WIDE_TRACE_TREE_TRANSACTION_THRESHOLD
+  const currentStateChangesStatus =
+    stateChangesStatus.traceHash === traceLookupHash.toLowerCase() ? stateChangesStatus : undefined
   const treeSectionStyle = useMemo<CSSProperties | undefined>(() => {
     if (!isWideTraceTree) {
       return undefined
@@ -493,8 +498,6 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     setExpandedRetraceHash(undefined)
     setRetraceAttempt(0)
     setHoveredAction(undefined)
-    setStateChangesLoading(false)
-    setStateChangesError(undefined)
     stateChangesRequestedHashRef.current = undefined
     loadedActionsByHashRef.current.clear()
   }, [traceLookupHash])
@@ -672,8 +675,7 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
     let isActive = true
     let completed = false
     stateChangesRequestedHashRef.current = requestedHash
-    setStateChangesLoading(true)
-    setStateChangesError(undefined)
+    setStateChangesStatus({traceHash: requestedHash, isLoading: true})
 
     const loadTraceStateChanges = async () => {
       try {
@@ -681,21 +683,29 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
         const replayedTrace = await traceTransactionTree(traceLookupHash, network)
         if (!isActive) return
 
+        if (!replayedTrace.result.stateUpdateHashOk) {
+          const divergentTransactions = Object.values(replayedTrace.result.transactions).filter(
+            result => !result.stateUpdateHashOk,
+          ).length
+          throw new Error(
+            `State changes could not be verified for ${divergentTransactions} ${divergentTransactions === 1 ? "transaction" : "transactions"}`,
+          )
+        }
+
         setTraces(currentTraces =>
           withRetracedTraceStorage(currentTraces, replayedTrace.result.transactions),
         )
+        setStateChangesStatus({traceHash: requestedHash, isLoading: false})
         completed = true
       } catch (error) {
         console.error("Failed to retrace transaction tree:", error)
         if (!isActive) return
 
-        setStateChangesError(
-          error instanceof Error ? error.message : "Failed to load decoded state changes",
-        )
-      } finally {
-        if (isActive) {
-          setStateChangesLoading(false)
-        }
+        setStateChangesStatus({
+          traceHash: requestedHash,
+          isLoading: false,
+          error: error instanceof Error ? error.message : "Failed to load decoded state changes",
+        })
       }
     }
 
@@ -855,8 +865,8 @@ export const TransactionPage: FC<TransactionPageProps> = ({client, openRetraceOn
                       contracts={contracts}
                       verifiedSourcesByCodeHash={verifiedSourcesByCodeHash}
                       resolveVerifiedSourceByCodeHash={resolveVerifiedSourceByCodeHash}
-                      isLoading={stateChangesLoading}
-                      error={stateChangesError}
+                      isLoading={currentStateChangesStatus?.isLoading ?? false}
+                      error={currentStateChangesStatus?.error}
                       onContractClick={handleContractClick}
                     />
                   )}
