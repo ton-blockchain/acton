@@ -245,7 +245,7 @@
 .filterEmptyState {
   min-height: 34px;
   padding: 8px;
-  color: var(--tonscan-text-tertiary);
+  color: var(--acton-color-text-subtle);
   font-size: var(--acton-font-size-sm);
   font-weight: 500;
 }
@@ -359,7 +359,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--tonscan-text-tertiary);
+  color: var(--acton-color-text-subtle);
   font-size: var(--acton-font-size-xs);
   font-weight: 650;
   line-height: 1.2;
@@ -808,7 +808,7 @@ th.valueContainer {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--tonscan-text-tertiary);
+  color: var(--acton-color-text-subtle);
 }
 
 .paginationSkeletonButton {

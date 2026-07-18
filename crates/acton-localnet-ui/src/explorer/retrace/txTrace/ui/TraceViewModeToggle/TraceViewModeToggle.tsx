@@ -1,3 +1,4 @@
+import {PillTab, PillTabs} from "@acton/ui"
 import {memo} from "react"
 import type {IconType} from "react-icons"
 import {FiCode, FiList} from "react-icons/fi"
@@ -24,27 +25,26 @@ function TraceViewModeToggleFc({value, onChange}: TraceViewModeToggleProps) {
   return (
     <div className={styles.root}>
       <span className={styles.label}>View mode:</span>
-      <div className={styles.toggle} role="group" aria-label="Trace view mode">
+      <PillTabs className={styles.toggle} ariaLabel="Trace view mode">
         {TRACE_VIEW_OPTIONS.map(option => {
           const isActive = value === option.value
           const Icon = option.icon
 
           return (
-            <button
+            <PillTab
               key={option.value}
-              type="button"
-              className={`${styles.button} ${isActive ? styles.buttonActive : ""}`}
+              className={styles.button}
+              selected={isActive}
               onClick={() => {
                 onChange(option.value)
               }}
-              aria-pressed={isActive}
             >
               <Icon className={styles.icon} aria-hidden="true" />
               <span>{option.label}</span>
-            </button>
+            </PillTab>
           )
         })}
-      </div>
+      </PillTabs>
     </div>
   )
 }

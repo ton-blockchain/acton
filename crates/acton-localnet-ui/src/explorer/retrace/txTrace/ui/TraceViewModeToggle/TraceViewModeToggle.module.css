@@ -18,9 +18,7 @@
 }
 
 .toggle {
-  display: inline-flex;
   width: fit-content;
-  align-items: center;
   gap: 0;
   min-height: 24px;
   padding: 1px;
@@ -37,33 +35,14 @@
 }
 
 .button {
-  display: inline-flex;
-  align-items: center;
   min-height: 20px;
   padding: 3px 8px;
   gap: 6px;
-  border: 0;
   border-radius: 4px;
   color: var(--acton-color-text-muted);
   background: transparent;
-  font: inherit;
   font-size: 12px;
   font-weight: var(--acton-font-weight-utility);
-  line-height: 1.2;
-  white-space: nowrap;
-  cursor: pointer;
-  transition:
-    background-color var(--acton-duration-fast),
-    border-color var(--acton-duration-fast),
-    color var(--acton-duration-fast);
-}
-
-.button:first-child {
-  border-radius: 4px;
-}
-
-.button:last-child {
-  border-radius: 4px;
 }
 
 .button:hover {
@@ -71,14 +50,15 @@
   background: var(--acton-color-surface-row);
 }
 
-.buttonActive {
+.button[aria-current="true"] {
   position: relative;
   z-index: 1;
   color: var(--trace-view-mode-active-text);
   background: var(--trace-view-mode-active-bg);
+  font-weight: var(--acton-font-weight-utility);
 }
 
-.buttonActive:hover {
+.button[aria-current="true"]:hover {
   color: var(--trace-view-mode-active-text);
   background: var(--trace-view-mode-active-bg);
 }
